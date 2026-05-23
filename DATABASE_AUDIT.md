@@ -131,6 +131,8 @@ Do not run these automatically against production.
 
 Detailed non-executable migration design is now tracked in `MIGRATION_BOOTSTRAP_PLAN.md` and field-level schema requirements are tracked in `MIGRATION_SCHEMA_CONTRACT.md`.
 
+The first non-production SQL draft is stored in `migration-drafts/002_commercial_bootstrap.sql`; it has not been executed.
+
 ## Static Scan Findings
 
 Generated scan found:

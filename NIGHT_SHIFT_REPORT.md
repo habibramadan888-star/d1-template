@@ -293,3 +293,87 @@ Created minimal Node test coverage:
 - known-risk documentation checks.
 
 These tests do not claim the system is commercial-ready. They ensure the current risk state cannot be silently hidden while future fixes proceed.
+
+## V2 Migration Draft Follow-Up
+
+### Task
+
+Create a non-production commercial bootstrap SQL draft and validate it statically.
+
+### Current Status
+
+Completed.
+
+### Findings
+
+- The employee entry smoke failure confirmed that clean D1 bootstrap is incomplete.
+- The project needs a reviewed, append-only migration path instead of request-path schema mutation.
+- Commercial accounting tables must use integer minor units, tenant/property scope, lifecycle status fields, and audit linkage.
+
+### Code Modified
+
+Yes, but only governance/testing/migration-draft files were changed:
+
+- `migration-drafts/002_commercial_bootstrap.sql`
+- `tests/migration-draft.spec.mjs`
+- `package.json`
+- `MIGRATION_BOOTSTRAP_PLAN.md`
+- `DATABASE_AUDIT.md`
+- `RUN_REPORT.md`
+- `NEXT_MORNING_REVIEW.md`
+- `NIGHT_SHIFT_REPORT.md`
+
+### Why
+
+To create a reviewable commercial schema target without touching production data, runtime business logic, or real migrations.
+
+### Risk
+
+Low. The SQL is intentionally kept outside the executable `migrations/` directory and was not applied to any D1 database.
+
+### Database Impact
+
+None. No local or remote migration was executed.
+
+### Permission Impact
+
+None. No auth or role logic was changed.
+
+### Worker Impact
+
+None. Worker source and embedded Worker source were not changed.
+
+### Verification
+
+Command:
+
+```bash
+npm run check
+```
+
+Result:
+
+```text
+PASS
+tests 11
+pass 11
+fail 0
+```
+
+Additional isolated SQL syntax validation:
+
+```bash
+wrangler d1 execute homelink --local --persist-to <temp-dir> --config wrangler.toml --file ../migration-drafts/002_commercial_bootstrap.sql --yes
+```
+
+Result:
+
+```text
+32 commands executed successfully.
+```
+
+The disposable local D1 state was removed after validation. No remote database or existing project local D1 state was modified.
+
+### Next Step
+
+Create a reviewed promotion checklist before moving this draft into `migrations/`, including backfill, rollback, and compatibility checks for existing production data.

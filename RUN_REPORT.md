@@ -427,3 +427,88 @@ PASS owner /api/history 200
 PASS owner /api/rent_config 200
 PASS employee allowed rent config 200
 ```
+
+## Commercial Migration Draft Update
+
+Date: 2026-05-23
+
+### Files Added Or Updated
+
+- Added non-executable SQL draft: `migration-drafts/002_commercial_bootstrap.sql`
+- Added static validation: `tests/migration-draft.spec.mjs`
+- Updated `package.json` so `npm run typecheck` checks the migration draft test.
+- Updated `MIGRATION_BOOTSTRAP_PLAN.md` and `DATABASE_AUDIT.md` to reference the draft.
+
+### Safety Scope
+
+- The SQL file is stored under `migration-drafts/`, not executable `migrations/`.
+- No `wrangler d1 migrations apply` command was run.
+- No `wrangler d1 execute --remote` command was run.
+- No production database mutation was executed.
+
+### Validation
+
+Command:
+
+```bash
+npm run check
+```
+
+Result:
+
+```text
+Governance check passed.
+Format check passed.
+Lint passed.
+Typecheck passed.
+Node test passed: tests 11, pass 11, fail 0.
+Worker assets dry-run build passed.
+Worker embedded dry-run build passed.
+```
+
+Status: PASS
+
+### Remaining Gap
+
+The migration draft has been statically validated and syntax-validated against an isolated disposable local D1 directory. It still must not be promoted into the real `migrations/` chain until the backfill/rollback plan is reviewed.
+
+### Isolated D1 Syntax Validation
+
+Command:
+
+```bash
+wrangler d1 execute homelink --local --persist-to <temp-dir> --config wrangler.toml --file ../migration-drafts/002_commercial_bootstrap.sql --yes
+```
+
+Result:
+
+```text
+32 commands executed successfully.
+```
+
+Verification query showed the expected new core tables:
+
+```text
+companies
+properties
+users
+property_memberships
+beds
+bed_rent_config_versions
+handover_sessions
+transactions
+receivables
+payments
+arrear_tasks
+deposit_ledger
+audit_events
+schema_migrations
+```
+
+Safety:
+
+- Used `--local`.
+- Used a disposable `--persist-to` directory under the OS temp folder.
+- Removed the temp folder after validation.
+- Did not touch remote D1.
+- Did not touch the existing project local D1 state.

@@ -150,3 +150,25 @@ FAIL employee entry expected 200, got 500
 Local D1 schema confirmed `transactions` is missing. This is now a confirmed P0 clean bootstrap blocker. The next safe engineering step is to design a proper migration that creates `transactions`; do not fix it by manually creating ad hoc local tables in request handling.
 
 The non-executable migration design has been started in `MIGRATION_BOOTSTRAP_PLAN.md`, with field-level target schema in `MIGRATION_SCHEMA_CONTRACT.md`.
+
+## Commercial Migration Draft Follow-Up
+
+Created `migration-drafts/002_commercial_bootstrap.sql` as a non-executable commercial bootstrap draft. It defines the target SaaS/accounting foundation tables without applying them to any database.
+
+Static validation was added in `tests/migration-draft.spec.mjs` and included in `npm run typecheck` / `npm run test`.
+
+Latest full check:
+
+```text
+npm run check
+PASS
+tests 11
+pass 11
+fail 0
+```
+
+No production deployment or database migration was executed.
+
+The draft was also syntax-validated against an isolated disposable local D1 directory using `wrangler d1 execute --local --persist-to <temp-dir>`. It executed 32 SQL commands successfully and created the expected commercial bootstrap tables. The temp directory was removed after validation.
+
+Next safe step is a human review of the migration/backfill/rollback plan before moving any SQL into the real `migrations/` directory.

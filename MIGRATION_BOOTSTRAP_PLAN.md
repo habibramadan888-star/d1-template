@@ -13,6 +13,8 @@ This plan defines the commercial-safe migration direction. It is intentionally n
 
 Field-level target schema is frozen in `MIGRATION_SCHEMA_CONTRACT.md`. If the plan and contract conflict, the contract is stricter.
 
+The first non-production SQL draft is `migration-drafts/002_commercial_bootstrap.sql`. It is intentionally outside the executable `migrations/` directory.
+
 ## Non-Negotiable Constraints
 
 - Do not add new commercial money columns as `REAL`.
