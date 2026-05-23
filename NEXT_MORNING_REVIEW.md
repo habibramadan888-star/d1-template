@@ -273,3 +273,24 @@ Worker dry-run builds passed
 ```
 
 Remaining limitation: this is a local gate. Hosted CI must run `npm run check` before any commercial deploy or merge.
+
+## Database Static Scan Drift Gate Follow-Up
+
+Added reproducible database static scanning without overwriting the manual database audit.
+
+What changed:
+
+- `npm run audit:db` now writes `DATABASE_STATIC_SCAN.md`.
+- `npm run audit:db:check` fails if `DATABASE_STATIC_SCAN.md` is stale.
+- `npm run check` now includes the database static scan drift gate.
+- `DATABASE_AUDIT.md` remains the manual commercial audit document.
+
+Current verification:
+
+```text
+npm run check passed
+tests 21 / pass 21
+Worker dry-run builds passed
+```
+
+Remaining limitation: this is still static source scanning. It does not replace a reviewed staging D1 reconciliation run.

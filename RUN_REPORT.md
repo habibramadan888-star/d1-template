@@ -727,3 +727,42 @@ build:worker:embedded --dry-run passed
 ### Current Meaning
 
 The API inventory is now reproducible. If Worker routes change without route metadata and inventory updates, `npm run check` fails locally and should fail in CI once CI is configured.
+
+## Database Static Scan Drift Gate Update
+
+Date: 2026-05-23
+
+### Files Added Or Updated
+
+- Updated `scripts/audit-db.mjs`.
+- Added generated `DATABASE_STATIC_SCAN.md`.
+- Added npm script `audit:db:check`.
+- Added `audit:db:check` to `npm run check`.
+- Updated static tests to ensure the static scan does not overwrite `DATABASE_AUDIT.md`.
+
+### Command
+
+```bash
+npm run check
+```
+
+### Result
+
+```text
+Database static scan is up to date.
+tests 21
+pass 21
+build:worker:assets --dry-run passed
+build:worker:embedded --dry-run passed
+```
+
+### Safety Scope
+
+- No D1 connection was opened.
+- No database mutation was executed.
+- No Worker business logic changed.
+- `DATABASE_AUDIT.md` remains the manual commercial database audit.
+
+### Current Meaning
+
+The database static scan is now reproducible and separate from the manual commercial audit. Runtime DDL, REAL/FLOAT/DOUBLE usage, and hard-delete statements remain tracked as generated findings without changing production behavior.

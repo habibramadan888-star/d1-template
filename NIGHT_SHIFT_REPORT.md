@@ -719,3 +719,63 @@ pass 20
 build:worker:assets --dry-run passed
 build:worker:embedded --dry-run passed
 ```
+
+## V2 Database Static Scan Drift Gate Follow-Up
+
+### Task
+
+Make database static scan reproducible without overwriting the manual commercial database audit.
+
+### Current Status
+
+Completed.
+
+### Code Modified
+
+Yes, but only tooling/tests/reports:
+
+- `scripts/audit-db.mjs`
+- `DATABASE_STATIC_SCAN.md`
+- `DATABASE_AUDIT.md`
+- `package.json`
+- `tests/source-risk.spec.mjs`
+- `RUN_REPORT.md`
+- `NIGHT_SHIFT_REPORT.md`
+
+### Why
+
+The previous database audit script wrote directly to `DATABASE_AUDIT.md`, which risks destroying manual commercial accounting/database conclusions. The generated scan now lives in a separate artifact and has a drift check.
+
+### Risk
+
+Low. The script only reads source files and migration drafts. It does not connect to D1.
+
+### Database Impact
+
+None.
+
+### Permission Impact
+
+None.
+
+### Worker Impact
+
+No runtime Worker logic changed.
+
+### Verification
+
+Command:
+
+```bash
+npm run check
+```
+
+Result:
+
+```text
+Database static scan is up to date.
+tests 21
+pass 21
+build:worker:assets --dry-run passed
+build:worker:embedded --dry-run passed
+```

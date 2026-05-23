@@ -149,3 +149,9 @@ The generated script remains available:
 ```bash
 npm run audit:db
 ```
+
+Current behavior:
+
+- `npm run audit:db` writes `DATABASE_STATIC_SCAN.md`.
+- `npm run audit:db:check` fails if that generated scan is stale.
+- This file remains the manual commercial database audit and should not be overwritten by static tooling.

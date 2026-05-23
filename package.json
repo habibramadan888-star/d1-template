@@ -14,6 +14,7 @@
     "audit:api": "node scripts/audit-api.mjs",
     "audit:api:check": "node scripts/audit-api.mjs --check",
     "audit:db": "node scripts/audit-db.mjs",
+    "audit:db:check": "node scripts/audit-db.mjs --check",
     "audit:legacy-backfill": "node scripts/audit-legacy-backfill.mjs",
     "reconciliation:template": "node scripts/generate-reconciliation-template.mjs",
     "reconciliation:dry-run": "node scripts/reconcile-legacy-dry-run.mjs",
@@ -22,7 +23,7 @@
     "smoke:auth": "node scripts/smoke-auth.mjs",
     "smoke:employee-entry": "node scripts/smoke-employee-entry.mjs",
     "test": "node --test tests/**/*.spec.mjs",
-    "check": "npm run governance:check && npm run format:check && npm run lint && npm run typecheck && npm run audit:api:check && npm run test && npm run build"
+    "check": "npm run governance:check && npm run format:check && npm run lint && npm run typecheck && npm run audit:api:check && npm run audit:db:check && npm run test && npm run build"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",

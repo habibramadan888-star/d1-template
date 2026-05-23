@@ -36,6 +36,25 @@ test("API inventory is generated and checked against Worker route metadata", asy
   assert.match(inventory, /POST.+`\/api\/delete_session`.+P0/);
 });
 
+test("database static scan is generated separately from manual database audit", async () => {
+  const pkg = JSON.parse(await readFile("package.json", "utf8"));
+  const script = await readFile("scripts/audit-db.mjs", "utf8");
+  const scan = await readFile("DATABASE_STATIC_SCAN.md", "utf8");
+  const manualAudit = await readFile("DATABASE_AUDIT.md", "utf8");
+
+  assert.equal(pkg.scripts["audit:db"], "node scripts/audit-db.mjs");
+  assert.equal(pkg.scripts["audit:db:check"], "node scripts/audit-db.mjs --check");
+  assert.match(pkg.scripts.check, /audit:db:check/);
+  assert.match(script, /DATABASE_STATIC_SCAN\.md/);
+  assert.doesNotMatch(script, /outputPath\s*=.*DATABASE_AUDIT\.md/);
+  assert.doesNotMatch(script, /writeFileSync\([^)]*DATABASE_AUDIT\.md/s);
+  assert.match(script, /Production database mutation: none/);
+  assert.match(scan, /This is a static scan artifact/);
+  assert.match(scan, /Runtime CREATE TABLE appears in Worker source/);
+  assert.match(scan, /Hard delete statement/);
+  assert.match(manualAudit, /## Recommended Migration Order/);
+});
+
 test("migration rehearsal script is local-only", async () => {
   const pkg = JSON.parse(await readFile("package.json", "utf8"));
   const script = await readFile("scripts/rehearse-migration.mjs", "utf8");
