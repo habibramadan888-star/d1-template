@@ -403,3 +403,27 @@ Follow-up:
 
 - The employee top summary should eventually call the same backend-reviewed calculation contract.
 - Do not let frontend-only display logic become the source of truth for handover cash.
+
+## Finance Receivables Settlement Follow-Up
+
+Added `modules/finance/receivables.mjs` and tests.
+
+Purpose:
+
+- convert `due vs paid` into a structured settlement result,
+- create arrears task drafts for short payments,
+- require promise date and reason anchors for arrears,
+- separate owner-approved adjustments from actual arrears.
+
+Validation completed:
+
+```text
+npm run check passed
+tests 41 / pass 41
+Worker dry-run builds passed
+```
+
+Follow-up:
+
+- Wire this only after the commercial transaction write path is designed.
+- Do not allow short-paid rent to be submitted as plain remark-only data in the final commercial flow.

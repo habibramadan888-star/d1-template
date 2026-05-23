@@ -1060,6 +1060,55 @@ Worker assets dry-run build passed
 Worker embedded dry-run build passed
 ```
 
+## V2 Finance Receivables Settlement Follow-Up
+
+### Task
+
+Create a tested pure helper for `due vs paid` settlement and arrears-task draft creation.
+
+### Current Status
+
+Completed.
+
+### Code Modified
+
+Yes, but only additive module/tests/reports:
+
+- `modules/finance/receivables.mjs`
+- `tests/finance-receivables.spec.mjs`
+- `package.json`
+- `RUN_REPORT.md`
+- `NIGHT_SHIFT_REPORT.md`
+
+### Why
+
+Partial payments need a structured closeout path. Otherwise short-paid rent can become an untracked note instead of a recoverable arrears task with amount, reason, promise date, operator, and tenant snapshot.
+
+### Risk
+
+Low. The helper is not wired into current Worker or frontend behavior.
+
+### Database Impact
+
+None.
+
+### Permission Impact
+
+None.
+
+### Worker Impact
+
+No Worker route or runtime behavior changed.
+
+### Verification
+
+```text
+npm run check passed
+tests 41 / pass 41
+Worker assets dry-run build passed
+Worker embedded dry-run build passed
+```
+
 Additional guard:
 
 - `modules/**/*.mjs` is now included in `format:check`, so future finance modules cannot bypass formatting checks.

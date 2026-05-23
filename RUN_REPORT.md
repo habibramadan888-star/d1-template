@@ -969,6 +969,56 @@ Worker assets dry-run build passed
 Worker embedded dry-run build passed
 ```
 
+## Finance Receivables Settlement Helper Update
+
+Date: 2026-05-23
+
+### Files Added Or Updated
+
+- Added `modules/finance/receivables.mjs`.
+- Added `tests/finance-receivables.spec.mjs`.
+- Added module and test syntax checks to `npm run typecheck`.
+
+### Why
+
+Short-paid rent must not stay as a free-text exception. If `paid < due`, the system needs a structured receivable outcome:
+
+- exact payment closes the receivable,
+- overpayment is recorded separately,
+- short payment creates an arrears task draft,
+- owner-approved discount/waiver creates an adjustment draft instead of arrears.
+
+### Accounting Rules Captured
+
+- Money inputs must be integer fils.
+- Dates must be explicit `YYYY-MM-DD` strings.
+- Arrears require both reason code and promise date.
+- Approved adjustments require an explicit approved adjustment reason.
+- The helper does not auto-create dates or silently waive balances.
+
+### Safety Scope
+
+- No Worker route was changed.
+- No frontend was changed.
+- No database schema was changed.
+- Existing runtime financial behavior is unchanged.
+
+### Verification
+
+Command:
+
+```bash
+npm run check
+```
+
+Result:
+
+```text
+tests 41 / pass 41
+Worker assets dry-run build passed
+Worker embedded dry-run build passed
+```
+
 ## Finance Handover Summary Helper Update
 
 Date: 2026-05-23
