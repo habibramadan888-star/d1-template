@@ -945,3 +945,64 @@ None.
 ### Verification
 
 The gate is included in `npm run check` as `npm run security:secrets`.
+
+## V2 Clean Worker Bootstrap Probe Follow-Up
+
+### Task
+
+Create a reproducible local probe for the clean D1 employee-entry bootstrap blocker.
+
+### Current Status
+
+Completed. The blocker is confirmed.
+
+### Code Modified
+
+Yes, but only tooling/tests/reports:
+
+- `scripts/probe-clean-worker-bootstrap.mjs`
+- `package.json`
+- `tests/source-risk.spec.mjs`
+- `BLOCKER_REPORT.md`
+- `RUN_REPORT.md`
+- `NIGHT_SHIFT_REPORT.md`
+
+### Why
+
+The project needs a deterministic way to prove whether a clean customer D1 can support the current Worker employee-entry flow. The previous blocker was documented but not repeatable as a single command.
+
+### Risk
+
+Low. The probe starts a local-only Worker with disposable D1 state and deletes the temporary state afterward.
+
+### Database Impact
+
+No production impact. The probe uses `--local` and `--persist-to` against a temporary directory.
+
+### Permission Impact
+
+None.
+
+### Worker Impact
+
+No runtime Worker logic changed.
+
+### Verification
+
+Command:
+
+```bash
+npm run probe:clean-bootstrap
+```
+
+Result:
+
+```text
+Employee entry smoke exit code: 1
+Caused by: Error: no such table: transactions: SQLITE_ERROR
+P0 confirmed: clean local Worker bootstrap cannot complete employee entry.
+```
+
+Closure rule:
+
+- This blocker is not closed until `npm run probe:clean-bootstrap` passes.

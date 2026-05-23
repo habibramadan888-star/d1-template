@@ -96,6 +96,24 @@ test("authenticated core smoke covers owner and employee permission boundaries",
   assert.doesNotMatch(pkg.scripts.check, /smoke:core/);
 });
 
+test("clean Worker bootstrap probe is explicit local-only and not a default gate", async () => {
+  const pkg = JSON.parse(await readFile("package.json", "utf8"));
+  const script = await readFile("scripts/probe-clean-worker-bootstrap.mjs", "utf8");
+
+  assert.equal(
+    pkg.scripts["probe:clean-bootstrap"],
+    "node scripts/probe-clean-worker-bootstrap.mjs"
+  );
+  assert.match(pkg.scripts.typecheck, /scripts\/probe-clean-worker-bootstrap\.mjs/);
+  assert.doesNotMatch(pkg.scripts.check, /probe:clean-bootstrap/);
+  assert.match(script, /--local/);
+  assert.match(script, /--persist-to/);
+  assert.match(script, /mkdtemp/);
+  assert.match(script, /Temporary D1 directory removed/);
+  assert.match(script, /P0 confirmed/);
+  assert.doesNotMatch(script, /--remote/);
+});
+
 test("migration rehearsal script is local-only", async () => {
   const pkg = JSON.parse(await readFile("package.json", "utf8"));
   const script = await readFile("scripts/rehearse-migration.mjs", "utf8");

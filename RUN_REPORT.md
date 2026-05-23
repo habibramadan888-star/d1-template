@@ -879,3 +879,40 @@ The gate checks Git-tracked files and fails if:
 - The script does not read ignored `.dev.vars` directly unless it becomes tracked by Git.
 - The script does not print secret values.
 - No production configuration changed.
+
+## Clean Worker Bootstrap Probe Update
+
+Date: 2026-05-23
+
+### Files Added Or Updated
+
+- Added `scripts/probe-clean-worker-bootstrap.mjs`.
+- Added npm script `probe:clean-bootstrap`.
+- Added the probe script to `typecheck`.
+- Added static tests to ensure the probe is local-only and not part of default `npm run check`.
+
+### Command
+
+```bash
+npm run probe:clean-bootstrap
+```
+
+### Result
+
+```text
+Employee entry smoke exit code: 1
+Caused by: Error: no such table: transactions: SQLITE_ERROR
+P0 confirmed: clean local Worker bootstrap cannot complete employee entry.
+```
+
+### Safety Scope
+
+- Started a local-only Worker with disposable D1 state.
+- Used `--local` and `--persist-to`.
+- Removed the temporary D1 directory after the run.
+- Did not run production D1.
+- Did not deploy.
+
+### Current Meaning
+
+The P0 clean bootstrap blocker is now reproducible. A fix is not considered valid until this command passes on a disposable clean local D1.

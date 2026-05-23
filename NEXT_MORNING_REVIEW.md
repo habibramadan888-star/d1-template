@@ -336,3 +336,19 @@ It blocks:
 - non-placeholder values for monitored secret keys in example env files.
 
 It does not print secret values and does not read ignored local secret files unless they are accidentally tracked.
+
+## Clean Worker Bootstrap Probe Follow-Up
+
+Added `npm run probe:clean-bootstrap`.
+
+It starts a local-only Worker using a disposable D1 state, runs the employee entry smoke, and removes the temporary D1 directory afterward.
+
+Current result:
+
+```text
+Employee entry smoke exit code: 1
+Caused by: Error: no such table: transactions: SQLITE_ERROR
+P0 confirmed: clean local Worker bootstrap cannot complete employee entry.
+```
+
+This is now the required verification command for closing the clean bootstrap blocker.

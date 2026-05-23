@@ -62,6 +62,19 @@ Confirmed follow-up:
 - The endpoint cannot create a first employee entry on a clean local D1.
 - This should not be patched with ad hoc local SQL; it requires a proper migration.
 
+Reconfirmed by disposable clean Worker probe:
+
+```text
+npm run probe:clean-bootstrap
+Employee entry smoke exit code: 1
+Caused by: Error: no such table: transactions: SQLITE_ERROR
+P0 confirmed: clean local Worker bootstrap cannot complete employee entry.
+```
+
+Validation rule:
+
+- This blocker is not closed until `npm run probe:clean-bootstrap` passes against a disposable local D1 state.
+
 ### P0: Existing money model still uses decimal/REAL in business tables
 
 Evidence:
