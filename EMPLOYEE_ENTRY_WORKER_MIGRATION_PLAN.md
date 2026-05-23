@@ -70,6 +70,12 @@ Responsibilities:
 - return a database execution plan and response shape,
 - contain no direct D1 calls.
 
+Current status:
+
+- module created,
+- tests added,
+- not wired into the Worker route.
+
 ### Phase 2: Local Commercial Executor
 
 Create a small D1 executor module for the commercial write plan:

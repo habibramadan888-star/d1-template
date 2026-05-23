@@ -723,3 +723,31 @@ Tomorrow's implementation gate:
 
 - Build the adapter module and tests first.
 - Do not modify the Worker route until the adapter is tested.
+
+## Employee Entry Commercial Adapter Follow-Up
+
+Added `modules/worker/employee-entry-commercial-adapter.mjs`.
+
+Purpose:
+
+- translate existing employee rent payloads into the commercial write-plan contract,
+- generate scoped idempotency keys,
+- preserve integer-fils money handling,
+- require authenticated company/property/operator context,
+- avoid direct D1 access inside the adapter.
+
+Validation completed:
+
+```text
+npm run check passed
+npm run rehearsal:rent-write-plan passed
+Syntax check passed for 40 file(s).
+tests 73 / pass 73
+Worker dry-run builds passed
+Duplicate idempotency write blocked: true
+```
+
+Next implementation gate:
+
+- Build and test the D1 write-plan executor.
+- Keep the Worker route unchanged until adapter and executor are both tested.

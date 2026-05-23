@@ -1784,3 +1784,60 @@ Worker embedded dry-run build passed
 ### Next Step
 
 If moving into implementation, create the adapter module outside `deploy-worker/src/index.js` first. Do not edit the Worker route until adapter tests exist.
+
+## V2 Employee Entry Commercial Adapter Follow-Up
+
+### Task
+
+Create the first Worker-migration adapter outside the monolith.
+
+### Current Status
+
+Completed.
+
+### Code Modified
+
+Yes, but only additive module/tests/docs/reports:
+
+- `modules/worker/employee-entry-commercial-adapter.mjs`
+- `tests/employee-entry-commercial-adapter.spec.mjs`
+- `EMPLOYEE_ENTRY_WORKER_MIGRATION_PLAN.md`
+- `RUN_REPORT.md`
+- `NIGHT_SHIFT_REPORT.md`
+- `NEXT_MORNING_REVIEW.md`
+
+### Why
+
+The adapter isolates conversion from the existing employee rent payload to commercial accounting primitives. This keeps the next Worker integration step small and testable instead of expanding `deploy-worker/src/index.js`.
+
+### Risk
+
+Low. The adapter is not wired into live routes and contains no direct D1 calls.
+
+### Database Impact
+
+None.
+
+### Permission Impact
+
+None. The adapter requires authenticated `companyId`, `propertyId`, and `operatorId` to be passed in by the future route.
+
+### Worker Impact
+
+No Worker route or runtime behavior changed.
+
+### Verification
+
+```text
+npm run check passed
+npm run rehearsal:rent-write-plan passed
+Syntax check passed for 40 file(s).
+tests 73 / pass 73
+Worker assets dry-run build passed
+Worker embedded dry-run build passed
+Duplicate idempotency write blocked: true
+```
+
+### Next Step
+
+Create the D1 write-plan executor module and tests before wiring the adapter into the Worker.

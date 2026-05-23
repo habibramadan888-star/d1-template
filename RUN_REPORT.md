@@ -1599,3 +1599,37 @@ tests 69 / pass 69
 Worker assets dry-run build passed
 Worker embedded dry-run build passed
 ```
+
+## Employee Entry Commercial Adapter Update
+
+Date: 2026-05-23
+
+### Files Added Or Updated
+
+- Added `modules/worker/employee-entry-commercial-adapter.mjs`.
+- Added `tests/employee-entry-commercial-adapter.spec.mjs`.
+- Updated `EMPLOYEE_ENTRY_WORKER_MIGRATION_PLAN.md`.
+
+### Why
+
+The live Worker route should not be modified until the commercial conversion logic is isolated and tested outside the monolith. The adapter converts an existing employee rent payload plus authenticated/resolved server context into a rent draft, scoped idempotency key, and commercial write plan without touching D1.
+
+### Safety Scope
+
+- No Worker route was changed.
+- No frontend was changed.
+- No database schema was changed.
+- No production data was read or mutated.
+- Adapter contains no direct D1 access.
+
+### Verification
+
+```text
+npm run check passed
+npm run rehearsal:rent-write-plan passed
+Syntax check passed for 40 file(s).
+tests 73 / pass 73
+Worker assets dry-run build passed
+Worker embedded dry-run build passed
+Duplicate idempotency write blocked: true
+```
