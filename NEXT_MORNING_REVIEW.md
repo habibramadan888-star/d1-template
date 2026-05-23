@@ -135,3 +135,13 @@ PASS employee denied owner history 403
 ```
 
 The previous blocker for basic local authentication is now cleared for smoke coverage. Full employee entry/export and owner dashboard workflows are still not validated.
+
+## Employee Entry Smoke Follow-Up
+
+`npm run smoke:employee-entry` was added and executed. It failed:
+
+```text
+FAIL employee entry expected 200, got 500
+```
+
+Local D1 schema confirmed `transactions` is missing. This is now a confirmed P0 clean bootstrap blocker. The next safe engineering step is to design a proper migration that creates `transactions`; do not fix it by manually creating ad hoc local tables in request handling.

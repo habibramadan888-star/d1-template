@@ -55,6 +55,13 @@ Safe resolution:
 - Use integer minor-unit money columns in new migrations.
 - Test clean database bootstrap locally before production rollout.
 
+Confirmed follow-up:
+
+- `npm run smoke:employee-entry` failed with HTTP 500.
+- Local D1 table scan confirmed `transactions` is missing.
+- The endpoint cannot create a first employee entry on a clean local D1.
+- This should not be patched with ad hoc local SQL; it requires a proper migration.
+
 ### P0: Existing money model still uses decimal/REAL in business tables
 
 Evidence:

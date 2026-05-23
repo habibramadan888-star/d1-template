@@ -67,6 +67,41 @@ Current source does not consistently provide these fields across all business ta
 - `employee_users` is not tenant-scoped.
 - No formal `receivables` table exists, so arrears are derived from payment rows/tasks instead of a proper receivable lifecycle.
 
+## Confirmed Local Bootstrap Failure
+
+Date: 2026-05-23
+
+Authenticated employee entry smoke failed:
+
+```text
+npm run smoke:employee-entry
+FAIL employee entry expected 200, got 500
+```
+
+Local D1 table scan after the failed request showed:
+
+```text
+active_sessions
+arrear_tasks
+deposit_ledger
+employee_users
+entry_events
+sessions
+```
+
+`transactions` was still missing.
+
+Conclusion:
+
+- The Worker can create several employee workflow tables at runtime.
+- It cannot bootstrap a clean database for employee entry because `transactions` is required but not created.
+- The migration file only runs `ALTER TABLE transactions`, so it also cannot bootstrap a new D1.
+
+Commercial impact:
+
+- A clean customer deployment can fail on the first employee entry.
+- This must be fixed through ordered migrations, not through request-path schema mutation.
+
 ## P1 Database Risks
 
 - `app_settings` JSON blobs store business-critical config such as rent reference and WiFi data.

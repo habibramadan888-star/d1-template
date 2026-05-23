@@ -15,7 +15,7 @@ Production mutation: none
 | Employee login                   | PASS          | local non-production `.dev.vars`; `/auth/employee-login` 200 |
 | Employee `/api/me`               | PASS          | returned staff role                                          |
 | Employee denied owner history    | PASS          | `/api/history` returned 403 for employee session             |
-| Entry flow after login           | NOT RUN       | next authenticated workflow test                             |
+| Entry flow after login           | FAIL          | `/api/employee/entry` returned 500 on clean local bootstrap  |
 | Arrear follow-up after login     | NOT RUN       | next authenticated workflow test                             |
 | Export after login               | NOT RUN       | next authenticated workflow test                             |
 | Mobile layout                    | NOT RUN in V2 | requires follow-up visual pass                               |
@@ -43,6 +43,7 @@ PASS employee denied owner history 403
 
 ### P0
 
+- Employee entry fails on clean local D1 because `transactions` is missing.
 - Existing employee login seed/default account behavior must be reviewed before production.
 - Entry, arrear update, and export flows still need authenticated E2E validation.
 
@@ -54,9 +55,11 @@ PASS employee denied owner history 403
 
 ## Safe Next Employee Tests
 
-1. Load rent config with employee session.
-2. Load TTLock cards with test/mocked integration or controlled failure.
-3. Create local draft entry.
-4. Submit full handover.
-5. Validate session, transaction, arrear task, deposit ledger, and audit rows.
-6. Repeat submit and confirm idempotency.
+1. Design and test clean migration that creates `transactions`.
+2. Re-run `npm run smoke:employee-entry`.
+3. Load rent config with employee session.
+4. Load TTLock cards with test/mocked integration or controlled failure.
+5. Create local draft entry.
+6. Submit full handover.
+7. Validate session, transaction, arrear task, deposit ledger, and audit rows.
+8. Repeat submit and confirm idempotency.

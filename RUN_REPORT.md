@@ -324,6 +324,49 @@ Coverage:
 
 After local smoke, the leftover local Worker child process on port 8793 was stopped. Final port state showed only `TimeWait`, not an active listener.
 
+## Employee Entry Smoke Update
+
+Date: 2026-05-23
+
+Command:
+
+```bash
+npm run smoke:employee-entry
+```
+
+Result:
+
+```text
+FAIL employee entry expected 200, got 500
+```
+
+Local D1 read-only schema check showed these business tables after the failed attempt:
+
+```text
+active_sessions
+arrear_tasks
+deposit_ledger
+employee_users
+entry_events
+sessions
+```
+
+`transactions` was missing.
+
+Assessment:
+
+- `/api/employee/entry` depends on `transactions`.
+- `empEnsureSchema` creates `sessions`, `arrear_tasks`, `entry_events`, and `deposit_ledger`, but does not create `transactions` on a clean local D1.
+- The existing migration alters `transactions` but does not create it.
+
+Status: FAIL / P0 clean bootstrap blocker.
+
+Decision:
+
+- Do not apply ad hoc SQL to create `transactions`.
+- Do not bypass the endpoint.
+- Fix requires an explicit clean migration design and regression test.
+
 ## Authenticated Smoke Update
 
 Date: 2026-05-23
