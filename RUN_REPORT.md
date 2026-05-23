@@ -1803,3 +1803,71 @@ P0 confirmed: clean local Worker bootstrap cannot complete employee entry.
 ```
 
 This remains P0-005 and was not force-fixed in this task.
+
+## P0-004 Delete Session Void / Soft-Delete
+
+Date: 2026-05-23
+
+### Files Added Or Updated
+
+- Added `DELETE_SESSION_AUDIT.md`.
+- Added `DELETE_SESSION_VOID_DESIGN.md`.
+- Added `DELETE_SESSION_MIGRATION_PLAN.md`.
+- Added `DELETE_SQL_SCAN.md`.
+- Added `migration-drafts/003_delete_session_void_fields.sql`.
+- Added `scripts/test-delete-session-void.mjs`.
+- Updated `deploy-worker/src/index.js`.
+- Regenerated `deploy-worker/src/index.embedded.js`.
+- Updated `scripts/audit-api.mjs`, `API_INVENTORY.md`, and `DATABASE_STATIC_SCAN.md`.
+- Updated `tests/source-risk.spec.mjs`, `COMMERCIALIZATION_BACKLOG.md`, and `P0_P1_STATUS_REVIEW.md`.
+- Updated `package.json` with `test:delete-session`.
+
+### Why
+
+`/api/delete_session` previously physically deleted `deposit_ledger`, `transactions`, `arrears`, and `sessions`. That destroys financial evidence and is not acceptable for commercial accounting software. The route now voids rows and records audit evidence instead.
+
+### Safety Scope
+
+- No production Worker deploy was executed.
+- No production D1 migration was executed.
+- No production config was modified.
+- No financial formula was changed.
+- No multi-tenant architecture was changed.
+- No secret was generated or committed.
+
+### Verification
+
+```text
+npm run test:delete-session passed
+npm run check passed
+npm run smoke:with-worker passed
+```
+
+### Delete Session Void Evidence
+
+```text
+PASS unauthenticated delete rejected 401
+PASS invalid jwt delete rejected 401
+PASS employee delete forbidden 403
+PASS owner void session 200
+PASS owner second void idempotent 200
+PASS voided session hidden from active history
+PASS voided transaction hidden from active detail
+PASS sessions_count 1
+PASS transactions_count 1
+PASS deposit_count 1
+PASS arrears_count 1
+PASS voided_sessions 1
+PASS voided_transactions 1
+PASS voided_deposits 1
+PASS voided_arrears 1
+PASS audit_logs_count 1
+PASS entry_events_count 1
+```
+
+### Remaining Risks Outside P0-004
+
+- P0-001 money precision remains open because legacy runtime still uses `REAL`/`Number`.
+- P0-005 clean D1 bootstrap remains open and was not fixed in this task.
+- P0-006 tenant isolation remains open and was not changed in this task.
+- The migration draft must not be applied to production without manual review and rollback planning.

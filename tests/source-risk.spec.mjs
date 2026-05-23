@@ -59,7 +59,8 @@ test("API inventory is generated and checked against Worker route metadata", asy
   assert.match(script, /API_INVENTORY\.md is out of date/);
   assert.match(inventory, /Drift gate: `npm run audit:api:check`/);
   assert.match(inventory, /POST.+`\/api\/employee\/entry`.+P0/);
-  assert.match(inventory, /POST.+`\/api\/delete_session`.+P0/);
+  assert.match(inventory, /POST.+`\/api\/delete_session`.+P1/);
+  assert.match(inventory, /POST.+`\/api\/delete_session`.+No hard delete/);
 });
 
 test("database static scan is generated separately from manual database audit", async () => {
@@ -77,7 +78,7 @@ test("database static scan is generated separately from manual database audit", 
   assert.match(script, /Production database mutation: none/);
   assert.match(scan, /This is a static scan artifact/);
   assert.match(scan, /Runtime CREATE TABLE appears in Worker source/);
-  assert.match(scan, /Hard delete statement/);
+  assert.doesNotMatch(scan, /Hard delete statement/);
   assert.match(manualAudit, /## Recommended Migration Order/);
 });
 

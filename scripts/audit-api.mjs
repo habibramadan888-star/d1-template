@@ -310,18 +310,18 @@ const routeCatalog = {
     notes: "Legacy financial write path lacks backend-owned handover validation."
   },
   "POST /api/delete_session": {
-    purpose: "delete session",
+    purpose: "void session",
     login: "Yes",
     roles: "owner",
     tenantScope: "`corpid` filter",
     reads: "`sessions`, `transactions`",
     writes:
-      "hard deletes `deposit_ledger`, `transactions`, `arrears`, `sessions`; voids `arrear_tasks`; writes `audit_logs`",
+      "voids `sessions`, `transactions`, `deposit_ledger`, legacy `arrears`, and `arrear_tasks`; writes `audit_logs` and `entry_events`",
     financial: "Yes",
-    delete: "Yes",
+    delete: "No hard delete",
     audit: "Yes",
-    risk: "P0",
-    notes: "Commercial data must become void/soft-delete, not hard delete."
+    risk: "P1",
+    notes: "Normal business flow preserves rows; production migration discipline remains required."
   },
   "POST /api/clear_arrear": {
     purpose: "manager clear arrear",
@@ -483,7 +483,7 @@ function buildInventory() {
     "## Next API Work",
     "",
     "1. Add route-level tests for unauthenticated, employee, owner, and future admin cases.",
-    "2. Replace hard delete route behavior with void workflow after database audit.",
+    "2. Keep `/api/delete_session` void behavior covered by regression tests and audited migration discipline.",
     "3. Introduce tenant/property scope model before multi-customer SaaS rollout.",
     "4. Keep frontend hidden buttons as UX only; server checks remain mandatory.",
     ""

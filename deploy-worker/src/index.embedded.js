@@ -1017,24 +1017,27 @@ const EMP_TX_COLUMNS = [
   "bank_ref","status","ts","checkout_date","deposit_held","deposit_return","deposit_amt","deposit_deduction",
   "ded_reason","ded_days","ded_rate","ded_note","early_days","arrear_handling","bed_from","bed_to","fee_paid",
   "fee_waiver_reason","expense_category","expense_desc","linked_task_id","original_period_start","original_period_end",
-  "arrear_promise_date","arrear_reason_detail","promise_amount","operator_name"
+  "arrear_promise_date","arrear_reason_detail","promise_amount","operator_name",
+  "voided_at","voided_by","void_reason","void_source"
 ];
 const EMP_TASK_COLUMNS = [
   "task_id","corpid","userid","entry_id","bed","tenant_name","arrear_amount","arrear_reason","created_at",
   "followup_status","promise_date","promise_amount","actual_received","close_status","close_reason","owner_note","staff_note","last_followup_at","updated_by","updated_at",
-  "tenant_card_id","original_entry_id","original_period_start","original_period_end","created_by","write_off_authorized","write_off_reason","write_off_at"
+  "tenant_card_id","original_entry_id","original_period_start","original_period_end","created_by","write_off_authorized","write_off_reason","write_off_at",
+  "voided_at","voided_by","void_reason","void_source"
 ];
 const EMP_SESSION_COLUMNS = [
   "id","corpid","anchor_id","date","entries_count","created_by","created_at",
   "operator_id","operator_name","cash_handover","bank_transfer_total","bank_transfer_count",
-  "gross_received","handover_status","exported_at","export_text","source"
+  "gross_received","handover_status","exported_at","export_text","source",
+  "voided_at","voided_by","void_reason","void_source"
 ];
 const EMP_EVENT_COLUMNS = [
   "event_id","corpid","userid","ref_id","ref_type","event_type","field_name","old_value","new_value","operator_id","ts"
 ];
 const EMP_DEPOSIT_COLUMNS = [
   "ledger_id","corpid","userid","tenant_card_id","tenant_name","bed","entry_id","type","amount","delta",
-  "balance_after","note","operator_id","ts"
+  "balance_after","note","operator_id","ts","voided_at","voided_by","void_reason","void_source"
 ];
 async function empTableColumns(env, table){
   const r=await env.DB.prepare(`PRAGMA table_info(${table})`).all();
@@ -1053,6 +1056,13 @@ async function empAddColumn(env, table, col, ddl){
   return true;
 }
 __name(empAddColumn,"empAddColumn");
+async function empAddVoidColumns(env, table){
+  await empAddColumn(env,table,"voided_at","TEXT");
+  await empAddColumn(env,table,"voided_by","TEXT");
+  await empAddColumn(env,table,"void_reason","TEXT");
+  await empAddColumn(env,table,"void_source","TEXT");
+}
+__name(empAddVoidColumns,"empAddVoidColumns");
 async function empEnsureSchema(env){
   await env.DB.prepare(`CREATE TABLE IF NOT EXISTS sessions (
     id TEXT PRIMARY KEY,
@@ -1073,6 +1083,7 @@ async function empEnsureSchema(env){
   await empAddColumn(env,"sessions","exported_at","TEXT");
   await empAddColumn(env,"sessions","export_text","TEXT");
   await empAddColumn(env,"sessions","source","TEXT");
+  await empAddVoidColumns(env,"sessions");
   if(await empTableExists(env,"transactions")){
     await empAddColumn(env,"transactions","pay_type","TEXT");
     await empAddColumn(env,"transactions","period_start","TEXT");
@@ -1120,6 +1131,7 @@ async function empEnsureSchema(env){
     await empAddColumn(env,"transactions","arrear_promise_date","TEXT");
     await empAddColumn(env,"transactions","arrear_reason_detail","TEXT");
     await empAddColumn(env,"transactions","promise_amount","REAL");
+    await empAddVoidColumns(env,"transactions");
   }
   await env.DB.prepare(`CREATE TABLE IF NOT EXISTS arrear_tasks (
     task_id TEXT PRIMARY KEY,
@@ -1173,9 +1185,18 @@ async function empEnsureSchema(env){
   await empAddColumn(env,"arrear_tasks","original_period_start","TEXT");
   await empAddColumn(env,"arrear_tasks","original_period_end","TEXT");
   await empAddColumn(env,"arrear_tasks","created_by","TEXT");
+  await empAddColumn(env,"arrear_tasks","close_reason","TEXT");
+  await empAddColumn(env,"arrear_tasks","owner_note","TEXT");
+  await empAddColumn(env,"arrear_tasks","staff_note","TEXT");
+  await empAddColumn(env,"arrear_tasks","last_followup_at","TEXT");
   await empAddColumn(env,"arrear_tasks","write_off_authorized","TEXT");
   await empAddColumn(env,"arrear_tasks","write_off_reason","TEXT");
   await empAddColumn(env,"arrear_tasks","write_off_at","TEXT");
+  await empAddVoidColumns(env,"arrear_tasks");
+  await empAddVoidColumns(env,"deposit_ledger");
+  if(await empTableExists(env,"arrears")){
+    await empAddVoidColumns(env,"arrears");
+  }
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_transactions_period ON transactions(corpid, period_start, period_end)").run().catch(()=>{});
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_transactions_operator ON transactions(corpid, operator_id)").run().catch(()=>{});
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_transactions_cid_period ON transactions(corpid, tenant_card_id, period_start, period_end)").run().catch(()=>{});
@@ -1264,7 +1285,7 @@ async function empEvent(env,user,event){
 __name(empEvent,"empEvent");
 async function empDepositBalance(env, corpid, tenantCardId){
   if(!tenantCardId)return 0;
-  const row=await env.DB.prepare("SELECT COALESCE(SUM(delta),0) AS balance FROM deposit_ledger WHERE corpid=? AND tenant_card_id=?")
+  const row=await env.DB.prepare("SELECT COALESCE(SUM(delta),0) AS balance FROM deposit_ledger WHERE corpid=? AND tenant_card_id=? AND COALESCE(voided_at,'')=''")
     .bind(corpid,tenantCardId).first();
   return Number(row?.balance||0);
 }
@@ -1272,7 +1293,7 @@ __name(empDepositBalance,"empDepositBalance");
 async function empDepositMove(env,user,move){
   if(move.entry_id){
     const existing=await env.DB.prepare(`SELECT ledger_id,balance_after,delta FROM deposit_ledger
-      WHERE corpid=? AND tenant_card_id=? AND entry_id=? AND type=? LIMIT 1`)
+      WHERE corpid=? AND tenant_card_id=? AND entry_id=? AND type=? AND COALESCE(voided_at,'')='' LIMIT 1`)
       .bind(user.corpid,move.tenant_card_id,move.entry_id,move.type||"").first();
     if(existing)return {ledger_id:existing.ledger_id,balance_after:Number(existing.balance_after||0),delta:Number(existing.delta||0),duplicate:true};
   }
@@ -1699,7 +1720,7 @@ async function empListMergedArrearTasks(env,user){
     empTaskRemaining(t).toFixed(2)
   ].join("|")));
   if(await empTableExists(env,"arrears")){
-    const legacy=await env.DB.prepare("SELECT * FROM arrears WHERE corpid=? AND cleared=0 ORDER BY created_at DESC").bind(user.corpid).all();
+    const legacy=await env.DB.prepare("SELECT * FROM arrears WHERE corpid=? AND cleared=0 AND COALESCE(voided_at,'')='' ORDER BY created_at DESC").bind(user.corpid).all();
     for(const row of legacy.results||[]){
       const mapped=empLegacyArrearToTask(row);
       const mappedId=cleanText(mapped.task_id,100);
@@ -2276,34 +2297,101 @@ async function handleRequest(request, env, ctx) {
     if (path === "/api/delete_session" && method === "POST") {
       if (!requireManager(user)) return forbidden();
       await empEnsureSchema(env);
-      const { id: rawId } = await request.json();
+      let body;
+      try {
+        body = await request.json();
+      } catch {
+        return badRequest("invalid_json");
+      }
+      const { id: rawId } = body || {};
       const id = cleanId(rawId);
       if (!id) return json({ error: "bad_request" }, 400);
+      const voidReason = cleanText(body?.void_reason || body?.reason || "manager_void_session", 240);
+      const voidSource = cleanText(body?.void_source || "api.delete_session", 80);
+      const requestId = cleanText(body?.request_id || body?.idempotency_key || crypto.randomUUID(), 100);
       const existing = await env.DB.prepare(
-        "SELECT id FROM sessions WHERE id=? AND corpid=? LIMIT 1"
+        "SELECT id, voided_at FROM sessions WHERE id=? AND corpid=? LIMIT 1"
       ).bind(id, user.corpid).first();
       if (!existing) return json({ error: "not_found" }, 404);
       const now=empNow();
-      await env.DB.batch([
-        env.DB.prepare(`UPDATE arrear_tasks
-          SET close_status='VOID',
-              close_reason='session_deleted',
-              updated_by=?,
-              updated_at=?
-          WHERE corpid=?
-            AND (
-              entry_id IN (SELECT id FROM transactions WHERE session_id=? AND corpid=?)
-              OR original_entry_id IN (SELECT id FROM transactions WHERE session_id=? AND corpid=?)
-            )`).bind(user.userid, now, user.corpid, id, user.corpid, id, user.corpid),
-        env.DB.prepare(`DELETE FROM deposit_ledger
-          WHERE corpid=?
-            AND entry_id IN (SELECT id FROM transactions WHERE session_id=? AND corpid=?)`).bind(user.corpid, id, user.corpid),
-        env.DB.prepare("DELETE FROM transactions WHERE session_id=? AND corpid=?").bind(id, user.corpid),
-        env.DB.prepare("DELETE FROM arrears WHERE session_id=? AND corpid=?").bind(id, user.corpid),
-        env.DB.prepare("DELETE FROM sessions WHERE id=? AND corpid=?").bind(id, user.corpid)
-      ]);
-      await audit(env, user, "session.delete", id, { cascaded: true });
-      return json({ success: true, sessionId: id });
+      if (existing.voided_at) {
+        await audit(env, user, "session.void.already_voided", id, { request_id: requestId });
+        return json({ success: true, sessionId: id, voided: true, already_voided: true });
+      }
+      const batch = [
+        env.DB.prepare(`UPDATE sessions
+          SET voided_at=?,
+              voided_by=?,
+              void_reason=?,
+              void_source=?,
+              handover_status='VOID'
+          WHERE id=? AND corpid=? AND COALESCE(voided_at,'')=''`).bind(
+            now,
+            user.userid,
+            voidReason,
+            voidSource,
+            id,
+            user.corpid
+          )
+      ];
+      const hasTransactions = await empTableExists(env,"transactions");
+      if (hasTransactions) {
+        batch.push(
+          env.DB.prepare(`UPDATE arrear_tasks
+            SET close_status='VOID',
+                close_reason='session_voided',
+                followup_status='作废',
+                voided_at=?,
+                voided_by=?,
+                void_reason=?,
+                void_source=?,
+                updated_by=?,
+                updated_at=?
+            WHERE corpid=?
+              AND (
+                entry_id IN (SELECT id FROM transactions WHERE session_id=? AND corpid=?)
+                OR original_entry_id IN (SELECT id FROM transactions WHERE session_id=? AND corpid=?)
+              )`).bind(now, user.userid, voidReason, voidSource, user.userid, now, user.corpid, id, user.corpid, id, user.corpid),
+          env.DB.prepare(`UPDATE deposit_ledger
+            SET voided_at=?,
+                voided_by=?,
+                void_reason=?,
+                void_source=?
+            WHERE corpid=?
+              AND COALESCE(voided_at,'')=''
+              AND entry_id IN (SELECT id FROM transactions WHERE session_id=? AND corpid=?)`).bind(now, user.userid, voidReason, voidSource, user.corpid, id, user.corpid),
+          env.DB.prepare(`UPDATE transactions
+            SET status='VOID',
+                voided_at=?,
+                voided_by=?,
+                void_reason=?,
+                void_source=?
+            WHERE session_id=? AND corpid=? AND COALESCE(voided_at,'')=''`).bind(now, user.userid, voidReason, voidSource, id, user.corpid)
+        );
+      }
+      if(await empTableExists(env,"arrears")){
+        batch.push(
+          env.DB.prepare(`UPDATE arrears
+            SET voided_at=?,
+                voided_by=?,
+                void_reason=?,
+                void_source=?
+            WHERE session_id=? AND corpid=? AND COALESCE(voided_at,'')=''`).bind(now, user.userid, voidReason, voidSource, id, user.corpid)
+        );
+      }
+      await env.DB.batch(batch);
+      await empEvent(env,user,{
+        ref_id:id,
+        ref_type:"session",
+        event_type:"session_void",
+        field_name:"voided_at",
+        old_value:"",
+        new_value:JSON.stringify({voided_at:now,voided_by:user.userid,void_reason:voidReason,void_source:voidSource,request_id:requestId}),
+        operator_id:user.userid,
+        ts:now
+      });
+      await audit(env, user, "session.void", id, { request_id: requestId, reason: voidReason, source: voidSource });
+      return json({ success: true, sessionId: id, voided: true, voided_at: now });
     }
     if (path === "/api/clear_arrear" && method === "POST") {
       if (!requireManager(user)) return forbidden();
@@ -2315,16 +2403,25 @@ async function handleRequest(request, env, ctx) {
       return json({ success: true, changed });
     }
     if (path === "/api/history") {
+      await empEnsureSchema(env);
+      const includeVoided = url.searchParams.get("include_voided") === "1";
       const { results } = await env.DB.prepare(
-        "SELECT * FROM sessions WHERE corpid=? ORDER BY created_at DESC"
+        includeVoided
+          ? "SELECT * FROM sessions WHERE corpid=? ORDER BY created_at DESC"
+          : "SELECT * FROM sessions WHERE corpid=? AND COALESCE(voided_at,'')='' AND COALESCE(handover_status,'')<>'VOID' ORDER BY created_at DESC"
       ).bind(user.corpid).all();
       return json(results);
     }
     if (path === "/api/session_detail" && method === "GET") {
+      await empEnsureSchema(env);
       const sid = cleanId(url.searchParams.get("id"));
       if (!sid) return json({ error: "bad_request" }, 400);
+      if(!await empTableExists(env,"transactions"))return json([]);
+      const includeVoided = url.searchParams.get("include_voided") === "1";
       const { results } = await env.DB.prepare(
-        "SELECT * FROM transactions WHERE session_id=? AND corpid=? ORDER BY created_at ASC"
+        includeVoided
+          ? "SELECT * FROM transactions WHERE session_id=? AND corpid=? ORDER BY created_at ASC"
+          : "SELECT * FROM transactions WHERE session_id=? AND corpid=? AND COALESCE(voided_at,'')='' AND COALESCE(status,'ACTIVE')<>'VOID' ORDER BY created_at ASC"
       ).bind(sid, user.corpid).all();
       return json(results);
     }

@@ -37,7 +37,8 @@ test("commercial blockers are explicitly tracked", async () => {
   assert.match(blocker, /P0/i);
   assert.match(backlog, /P0-001/);
   assert.match(backlog, /Money uses `REAL`/);
-  assert.match(backlog, /hard deletes financial records/i);
+  assert.match(backlog, /previously hard-deleted financial records/i);
+  assert.match(backlog, /Normal path now voids records/i);
 });
 
 test("environment protection files exist", async () => {
