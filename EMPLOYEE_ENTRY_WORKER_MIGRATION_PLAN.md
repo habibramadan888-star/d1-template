@@ -92,6 +92,12 @@ Responsibilities:
 - handle transaction idempotency uniqueness conflicts,
 - never expose raw SQLite errors to employees.
 
+Current status:
+
+- module created,
+- tests added,
+- not wired into the Worker route.
+
 ### Phase 3: Route Feature Gate
 
 Add a server-side feature flag:

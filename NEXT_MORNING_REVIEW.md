@@ -751,3 +751,31 @@ Next implementation gate:
 
 - Build and test the D1 write-plan executor.
 - Keep the Worker route unchanged until adapter and executor are both tested.
+
+## D1 Write Plan Executor Follow-Up
+
+Added `modules/worker/d1-write-plan-executor.mjs`.
+
+Purpose:
+
+- convert commercial write-plan operations into parameterized D1 statements,
+- allow only expected accounting tables,
+- require D1 `batch` execution,
+- map transaction idempotency uniqueness failures to `IDEMPOTENCY_CONFLICT`,
+- keep SQL out of the Worker monolith.
+
+Validation completed:
+
+```text
+npm run check passed
+npm run rehearsal:rent-write-plan passed
+Syntax check passed for 42 file(s).
+tests 77 / pass 77
+Worker dry-run builds passed
+Duplicate idempotency write blocked: true
+```
+
+Next implementation gate:
+
+- Add a route-level commercial handler wrapper test.
+- Do not wire into `deploy-worker/src/index.js` until wrapper tests define auth, membership, idempotency conflict, and safe error responses.

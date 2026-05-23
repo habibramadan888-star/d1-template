@@ -1633,3 +1633,36 @@ Worker assets dry-run build passed
 Worker embedded dry-run build passed
 Duplicate idempotency write blocked: true
 ```
+
+## D1 Write Plan Executor Update
+
+Date: 2026-05-23
+
+### Files Added Or Updated
+
+- Added `modules/worker/d1-write-plan-executor.mjs`.
+- Added `tests/d1-write-plan-executor.spec.mjs`.
+- Updated `EMPLOYEE_ENTRY_WORKER_MIGRATION_PLAN.md`.
+
+### Why
+
+Before wiring the commercial adapter into the Worker, the D1 execution boundary needs a tested module. The executor converts write-plan operations into allowlisted, parameterized SQL statements, requires `db.batch`, and maps unique constraint failures to an idempotency-conflict result.
+
+### Safety Scope
+
+- No Worker route was changed.
+- No frontend was changed.
+- No production database was read or mutated.
+- Tests use a fake D1 object.
+
+### Verification
+
+```text
+npm run check passed
+npm run rehearsal:rent-write-plan passed
+Syntax check passed for 42 file(s).
+tests 77 / pass 77
+Worker assets dry-run build passed
+Worker embedded dry-run build passed
+Duplicate idempotency write blocked: true
+```

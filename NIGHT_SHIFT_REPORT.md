@@ -1841,3 +1841,60 @@ Duplicate idempotency write blocked: true
 ### Next Step
 
 Create the D1 write-plan executor module and tests before wiring the adapter into the Worker.
+
+## V2 D1 Write Plan Executor Follow-Up
+
+### Task
+
+Create a tested D1 execution boundary for commercial write plans.
+
+### Current Status
+
+Completed.
+
+### Code Modified
+
+Yes, but only additive module/tests/docs/reports:
+
+- `modules/worker/d1-write-plan-executor.mjs`
+- `tests/d1-write-plan-executor.spec.mjs`
+- `EMPLOYEE_ENTRY_WORKER_MIGRATION_PLAN.md`
+- `RUN_REPORT.md`
+- `NIGHT_SHIFT_REPORT.md`
+- `NEXT_MORNING_REVIEW.md`
+
+### Why
+
+The Worker route should call a small tested executor instead of building SQL inside the monolith. The executor enforces table allowlists, parameterized bindings, `db.batch`, and idempotency-conflict mapping.
+
+### Risk
+
+Low. The executor is not wired into live routes.
+
+### Database Impact
+
+None in runtime. Tests use a fake D1 object.
+
+### Permission Impact
+
+None.
+
+### Worker Impact
+
+No Worker route or runtime behavior changed.
+
+### Verification
+
+```text
+npm run check passed
+npm run rehearsal:rent-write-plan passed
+Syntax check passed for 42 file(s).
+tests 77 / pass 77
+Worker assets dry-run build passed
+Worker embedded dry-run build passed
+Duplicate idempotency write blocked: true
+```
+
+### Next Step
+
+Build a route-level commercial handler wrapper test before touching `deploy-worker/src/index.js`.
