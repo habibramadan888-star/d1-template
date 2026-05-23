@@ -71,6 +71,39 @@ Caused by: Error: no such table: transactions: SQLITE_ERROR
 P0 confirmed: clean local Worker bootstrap cannot complete employee entry.
 ```
 
+## Recheck: Clean Worker Bootstrap Still Blocked
+
+Date: 2026-05-23
+
+Command:
+
+```bash
+npm run probe:clean-bootstrap
+```
+
+Result:
+
+```text
+Employee entry smoke exit code: 1
+FAIL employee entry expected 200, got 500
+Caused by: Error: no such table: transactions: SQLITE_ERROR
+P0 confirmed: clean local Worker bootstrap cannot complete employee entry.
+```
+
+Assessment:
+
+- The commercial schema draft and local rent write rehearsal now pass.
+- The live Worker route still has not been migrated to that commercial path.
+- This remains a P0 blocker for any new customer environment.
+
+Do not close this blocker until:
+
+```bash
+npm run probe:clean-bootstrap
+```
+
+passes against a clean disposable local D1 without ad hoc SQL patches.
+
 Validation rule:
 
 - This blocker is not closed until `npm run probe:clean-bootstrap` passes against a disposable local D1 state.

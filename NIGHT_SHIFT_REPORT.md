@@ -1683,3 +1683,50 @@ Mode: local-only disposable D1; no production mutation.
 ### Next Step
 
 When implementing the Worker route, add explicit conflict handling that fetches and returns the original committed transaction bundle. The Worker should not expose the raw SQLite error to staff users.
+
+## V2 Clean Worker Bootstrap Recheck
+
+### Task
+
+Re-run the clean Worker bootstrap probe after the commercial schema/write-plan work.
+
+### Current Status
+
+Still blocked.
+
+### Code Modified
+
+No.
+
+### Why
+
+The commercial draft path is now rehearsed locally, but the production Worker route is unchanged. The probe verifies whether the current runtime can serve a clean-customer environment.
+
+### Risk
+
+No mutation risk. Probe uses temporary local D1 state and deletes it after completion.
+
+### Database Impact
+
+Disposable local D1 only.
+
+### Permission Impact
+
+None.
+
+### Worker Impact
+
+No Worker code changed.
+
+### Verification
+
+```text
+npm run probe:clean-bootstrap failed as expected
+Employee entry expected 200, got 500
+Caused by: Error: no such table: transactions: SQLITE_ERROR
+P0 remains open.
+```
+
+### Next Step
+
+Do not patch this with ad hoc runtime table creation. The safe path is a reviewed Worker migration to the commercial schema and write-plan contract, then the same probe must pass.

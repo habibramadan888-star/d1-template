@@ -680,3 +680,21 @@ Follow-up:
 
 - Worker implementation must translate duplicate idempotency conflicts into a safe “already accepted” response.
 - Do not return raw database errors to employees.
+
+## Clean Worker Bootstrap Recheck
+
+Re-ran the clean Worker bootstrap probe.
+
+Result:
+
+```text
+npm run probe:clean-bootstrap failed
+Employee entry expected 200, got 500
+Caused by: Error: no such table: transactions: SQLITE_ERROR
+```
+
+Meaning:
+
+- The commercial draft schema and local write-plan rehearsal are passing.
+- The live Worker employee-entry route is still not migrated.
+- This remains the first P0 to inspect before any production onboarding.

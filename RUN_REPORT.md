@@ -1546,3 +1546,26 @@ Rent write plan local D1 rehearsal passed
 Duplicate idempotency write blocked: true
 Mode: local-only disposable D1; no production mutation.
 ```
+
+## Clean Worker Bootstrap Recheck
+
+Date: 2026-05-23
+
+### Command
+
+```bash
+npm run probe:clean-bootstrap
+```
+
+### Result
+
+```text
+Employee entry smoke exit code: 1
+FAIL employee entry expected 200, got 500
+Caused by: Error: no such table: transactions: SQLITE_ERROR
+P0 confirmed: clean local Worker bootstrap cannot complete employee entry.
+```
+
+### Assessment
+
+The local commercial schema rehearsal is healthy, but the live Worker employee-entry route still uses the legacy path and cannot bootstrap a clean D1. This is intentionally left unfixed until the Worker route is migrated safely with commercial write-path tests.
