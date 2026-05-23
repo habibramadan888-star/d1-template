@@ -1,0 +1,295 @@
+# Night Shift Report
+
+Date: 2026-05-23  
+Mode: autonomous safe engineering  
+Goal: improve commercial readiness without changing business logic  
+Production deploy: not executed  
+Production database mutation: not executed
+
+## Global Compliance
+
+- No large-scale refactor performed.
+- No core business logic deleted.
+- No financial calculation result changed.
+- No production configuration changed.
+- No production deployment executed.
+- No dangerous SQL executed.
+- No business code was migrated.
+- No UI redesign was performed.
+- No credentials, tokens, or tenant identifiers were hardcoded.
+
+## Stage A: Governance Documents
+
+### Modified
+
+- Verified `AI_CONTRACT.md`
+- Verified `ARCHITECTURE.md`
+- Verified `PROJECT_MAP.md`
+
+### Why
+
+- Confirmed the governance layer covers module boundaries, Worker structure, API layering, Cloudflare architecture, data flow, multi-tenant rules, permission rules, and financial rules.
+
+### Risk
+
+- Low. Read-only verification and existing governance document validation.
+
+### Database Impact
+
+- None.
+
+### Permission Impact
+
+- None.
+
+### Worker Impact
+
+- None.
+
+### Rollback
+
+- No rollback needed for verification.
+
+## Stage B: Engineering Baseline
+
+### Modified
+
+- Added `package.json`
+- Added `package-lock.json`
+- Added `.gitignore`
+- Added `.prettierrc`
+- Added `.prettierignore`
+- Added `eslint.config.mjs`
+- Added `.env.example`
+- Added `README.md`
+- Added `tools/check-governance.cjs`
+
+### Why
+
+- The project had no root engineering baseline for repeatable validation.
+- Added scripts for governance check, lint, format check, syntax check, and Worker dry-run build.
+- Added `.env.example` to document required local secrets without committing real secrets.
+
+### Risk
+
+- Low to medium.
+- Tooling can reveal failures but does not alter runtime behavior.
+- `node_modules` and `.wrangler-dryrun` are local artifacts and are ignored.
+
+### Database Impact
+
+- None from file creation.
+
+### Permission Impact
+
+- None.
+
+### Worker Impact
+
+- No Worker source logic changed.
+- Dry-run build reads Worker configs and emits local dry-run artifacts only.
+
+### Rollback
+
+- Remove the added engineering files and `node_modules`.
+- No data migration required.
+
+## Stage C: Directory Governance
+
+### Modified
+
+- Added `DIRECTORY_GOVERNANCE.md`
+
+### Why
+
+- Defined the target modular structure:
+  - `modules/auth/`
+  - `modules/finance/`
+  - `modules/contracts/`
+  - `modules/properties/`
+  - `modules/employees/`
+  - `modules/reports/`
+  - `modules/settings/`
+  - `modules/audit/`
+- Explicitly stated that no migration happens tonight.
+
+### Risk
+
+- Low. Documentation only.
+
+### Database Impact
+
+- None.
+
+### Permission Impact
+
+- None.
+
+### Worker Impact
+
+- None.
+
+### Rollback
+
+- Delete `DIRECTORY_GOVERNANCE.md`.
+
+## Stage D: Local Validation
+
+### Commands Passed
+
+- `npm run governance:check`
+- `npm run typecheck`
+- `npm run format:check`
+- `npm run build`
+- local Worker startup with `wrangler.toml`
+- local embedded Worker startup with `wrangler.embedded.toml`
+- local D1 read query
+
+### Commands Failed
+
+- `npm run lint`
+- local employee login after page startup
+
+### Why Failures Were Not Auto-Fixed
+
+- Lint failures are in legacy business files.
+- Fixing them safely requires isolated review and regression checks.
+- Local login failure is caused by missing secrets; hardcoding or using fake production-like secrets would violate the security rules.
+
+### Database Impact
+
+- No production database impact.
+- Local D1 was read through Wrangler.
+- Worker auth path can create local helper tables during local testing; this is local-only and not production data.
+
+### Permission Impact
+
+- Unauthenticated API behavior was validated.
+- Authenticated role behavior was not fully validated because local secrets are missing.
+
+### Worker Impact
+
+- Worker startup and dry-run build are verified.
+- No Worker source logic changed.
+
+### Rollback
+
+- No runtime changes to roll back.
+- Remove local `.wrangler-dryrun` and `node_modules` if needed.
+
+## Current Blocking Items
+
+See `BLOCKER_REPORT.md`.
+
+Main blockers:
+
+- missing local authentication secrets,
+- incomplete clean D1 bootstrap proof,
+- existing float/REAL money model,
+- hard-delete financial path,
+- owner-side duplicate function declaration blocking lint.
+
+## Final State
+
+The system is safer than before because governance and repeatable validation now exist. It is not yet commercial-ready. The next work should be small, isolated, and blocker-driven.
+
+## Recommended Next Step
+
+Start with local environment safety:
+
+1. Add a non-production `.dev.vars` locally, not committed.
+2. Add a password hash helper.
+3. Re-run authenticated employee and owner flows.
+4. Then fix lint blockers one by one.
+
+## NIGHT SHIFT V2 Continuation
+
+### Current Status
+
+The V2 loop continued from local validation into safe engineering fixes and report generation. Production deployment and production database mutation were not executed.
+
+### Modified
+
+- `deploy-worker/src/index.js`
+- `eslint.config.mjs`
+- `.gitignore`
+- `.env.local.example`
+- `package.json`
+- `package-lock.json`
+- `scripts/smoke-worker.mjs`
+- `scripts/audit-api.mjs`
+- `scripts/audit-db.mjs`
+- `tests/governance.spec.mjs`
+- `tests/source-risk.spec.mjs`
+- `API_INVENTORY.md`
+- `DATABASE_AUDIT.md`
+- `FINANCE_AUDIT.md`
+- `AUTH_TENANCY_AUDIT.md`
+- `EMPLOYEE_FLOW_REPORT.md`
+- `OWNER_FLOW_REPORT.md`
+- `MANUAL_TEST_PLAN.md`
+- `COMMERCIALIZATION_BACKLOG.md`
+- `NEXT_MORNING_REVIEW.md`
+
+### Why
+
+- Establish repeatable local checks.
+- Make API/database/finance/auth risks visible before business logic changes.
+- Add smoke tests without weakening auth or changing financial behavior.
+- Add governance tests that verify commercial blockers remain visible instead of hidden.
+- Track commercial blockers by priority.
+
+### Risk
+
+- Low for reports and tooling.
+- Low for Worker lint cleanup because no financial formula, permission rule, database write, or route behavior was intentionally changed.
+- Medium operational risk remains because authenticated flows and clean D1 bootstrap are not fully validated yet.
+
+### Database Impact
+
+- No production or local business data migration was executed by V2 report generation.
+- Local Worker smoke may create local auth helper tables only in Wrangler local storage.
+
+### Permission Impact
+
+- No permission logic was changed.
+- Unauthenticated API protection was smoke-tested.
+- Authenticated permission tests remain blocked until safe local secrets exist.
+
+### Worker Impact
+
+- Source Worker lint issues were fixed.
+- Embedded generated Worker was not regenerated under the no-giant-file-expansion rule.
+- Dry-run build passed for current configurations.
+
+### Verification
+
+Commands passing:
+
+```bash
+npm run governance:check
+npm run format:check
+npm run lint
+npm run typecheck
+npm run test
+npm run build
+npm run smoke
+npm run check
+```
+
+### Next Step
+
+Configure local-only `.dev.vars` with non-production secrets, then run authenticated smoke tests for employee and owner roles.
+
+### Test Layer Added
+
+Created minimal Node test coverage:
+
+- report existence and completeness checks,
+- blocker tracking checks,
+- env protection checks,
+- dry-run-only deploy script checks,
+- Worker auth gate presence checks,
+- known-risk documentation checks.
+
+These tests do not claim the system is commercial-ready. They ensure the current risk state cannot be silently hidden while future fixes proceed.
