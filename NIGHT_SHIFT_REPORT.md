@@ -1730,3 +1730,57 @@ P0 remains open.
 ### Next Step
 
 Do not patch this with ad hoc runtime table creation. The safe path is a reviewed Worker migration to the commercial schema and write-plan contract, then the same probe must pass.
+
+## V2 Employee Entry Worker Migration Plan Follow-Up
+
+### Task
+
+Document the safe Worker migration boundary for `/api/employee/entry`.
+
+### Current Status
+
+Completed.
+
+### Code Modified
+
+Yes, but only documentation and a documentation test:
+
+- `EMPLOYEE_ENTRY_WORKER_MIGRATION_PLAN.md`
+- `tests/migration-draft.spec.mjs`
+- `RUN_REPORT.md`
+- `NIGHT_SHIFT_REPORT.md`
+- `NEXT_MORNING_REVIEW.md`
+
+### Why
+
+The next implementation step touches the highest-risk Worker route. A migration plan is required so future work does not expand the monolith, create runtime schema patches, bypass authorization, or keep frontend totals as accounting truth.
+
+### Risk
+
+Low. No runtime behavior changed.
+
+### Database Impact
+
+None.
+
+### Permission Impact
+
+None.
+
+### Worker Impact
+
+No Worker route or runtime behavior changed.
+
+### Verification
+
+```text
+npm run check passed
+Syntax check passed for 38 file(s).
+tests 69 / pass 69
+Worker assets dry-run build passed
+Worker embedded dry-run build passed
+```
+
+### Next Step
+
+If moving into implementation, create the adapter module outside `deploy-worker/src/index.js` first. Do not edit the Worker route until adapter tests exist.

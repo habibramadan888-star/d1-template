@@ -205,3 +205,23 @@ test("commercial entry write contract requires atomic audited server-side writes
     assert.match(text, new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i"));
   }
 });
+
+test("employee entry Worker migration plan preserves commercial safety gates", async () => {
+  const text = await readFile("EMPLOYEE_ENTRY_WORKER_MIGRATION_PLAN.md", "utf8");
+  const requiredTerms = [
+    "Production deployment: not executed",
+    "Production database mutation: not executed",
+    "/api/employee/entry",
+    "clean-bootstrap P0",
+    "idempotency",
+    "integer fils",
+    "property membership",
+    "EMPLOYEE_ENTRY_COMMERCIAL_V1",
+    "npm run probe:clean-bootstrap",
+    "rollback"
+  ];
+
+  for (const term of requiredTerms) {
+    assert.match(text, new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i"));
+  }
+});

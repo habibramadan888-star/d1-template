@@ -698,3 +698,28 @@ Meaning:
 - The commercial draft schema and local write-plan rehearsal are passing.
 - The live Worker employee-entry route is still not migrated.
 - This remains the first P0 to inspect before any production onboarding.
+
+## Employee Entry Worker Migration Plan Follow-Up
+
+Added `EMPLOYEE_ENTRY_WORKER_MIGRATION_PLAN.md`.
+
+Purpose:
+
+- document the exact boundary around live `/api/employee/entry`,
+- prevent a direct monolith patch,
+- require an adapter/executor/feature-flag path,
+- preserve clean-bootstrap, idempotency, integer-money, property-membership, and rollback gates.
+
+Validation completed:
+
+```text
+npm run check passed
+Syntax check passed for 38 file(s).
+tests 69 / pass 69
+Worker dry-run builds passed
+```
+
+Tomorrow's implementation gate:
+
+- Build the adapter module and tests first.
+- Do not modify the Worker route until the adapter is tested.

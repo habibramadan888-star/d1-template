@@ -1569,3 +1569,33 @@ P0 confirmed: clean local Worker bootstrap cannot complete employee entry.
 ### Assessment
 
 The local commercial schema rehearsal is healthy, but the live Worker employee-entry route still uses the legacy path and cannot bootstrap a clean D1. This is intentionally left unfixed until the Worker route is migrated safely with commercial write-path tests.
+
+## Employee Entry Worker Migration Plan Update
+
+Date: 2026-05-23
+
+### Files Added Or Updated
+
+- Added `EMPLOYEE_ENTRY_WORKER_MIGRATION_PLAN.md`.
+- Updated `tests/migration-draft.spec.mjs`.
+
+### Why
+
+The live `/api/employee/entry` route is the current P0 boundary. Directly patching the monolith would risk expanding the legacy function and mixing commercial accounting with the old flow. The plan defines a staged adapter/executor/feature-flag approach before any Worker modification.
+
+### Safety Scope
+
+- No Worker route was changed.
+- No frontend was changed.
+- No database schema was changed.
+- No production deployment or D1 mutation was executed.
+
+### Verification
+
+```text
+npm run check passed
+Syntax check passed for 38 file(s).
+tests 69 / pass 69
+Worker assets dry-run build passed
+Worker embedded dry-run build passed
+```
