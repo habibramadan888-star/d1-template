@@ -1104,7 +1104,7 @@ No Worker route or runtime behavior changed.
 
 ```text
 npm run check passed
-Syntax check passed for 30 file(s).
+Syntax check passed for 31 file(s).
 tests 52 / pass 52
 Worker assets dry-run build passed
 Worker embedded dry-run build passed

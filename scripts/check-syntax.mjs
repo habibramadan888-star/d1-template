@@ -13,6 +13,7 @@ const scannedRoots = [
   { dir: "scripts", extensions: new Set([".mjs"]) },
   { dir: "tests", extensions: new Set([".mjs"]) },
   { dir: "tools", extensions: new Set([".cjs"]) },
+  { dir: "deploy-worker/src", extensions: new Set([".js"]) },
   { dir: "deploy-worker/scripts", extensions: new Set([".js"]) }
 ];
 

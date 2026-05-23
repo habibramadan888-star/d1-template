@@ -90,6 +90,7 @@ test("syntax check scans future module, script, test, and tool files automatical
   assert.match(script, /scripts/);
   assert.match(script, /tests/);
   assert.match(script, /tools/);
+  assert.match(script, /deploy-worker\/src/);
   assert.match(script, /deploy-worker\/scripts/);
   assert.match(script, /spawnSync\(process\.execPath, \["--check"/);
 });

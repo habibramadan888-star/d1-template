@@ -492,7 +492,7 @@ Validation completed:
 
 ```text
 npm run check passed
-Syntax check passed for 30 file(s).
+Syntax check passed for 31 file(s).
 tests 52 / pass 52
 Worker dry-run builds passed
 ```

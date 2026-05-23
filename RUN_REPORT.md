@@ -1010,7 +1010,7 @@ npm run check
 Result:
 
 ```text
-Syntax check passed for 30 file(s).
+Syntax check passed for 31 file(s).
 tests 52 / pass 52
 Worker assets dry-run build passed
 Worker embedded dry-run build passed
