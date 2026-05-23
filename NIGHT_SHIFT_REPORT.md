@@ -1159,6 +1159,55 @@ Worker assets dry-run build passed
 Worker embedded dry-run build passed
 ```
 
+## V2 Commercial Entry Write Contract Follow-Up
+
+### Task
+
+Document the future server-side rent entry write sequence before modifying Worker routes.
+
+### Current Status
+
+Completed.
+
+### Code Modified
+
+Yes, but only documentation/tests/reports:
+
+- `COMMERCIAL_ENTRY_WRITE_CONTRACT.md`
+- `tests/migration-draft.spec.mjs`
+- `RUN_REPORT.md`
+- `NIGHT_SHIFT_REPORT.md`
+
+### Why
+
+The P0 clean-bootstrap issue must be solved through a commercial write path, not by patching legacy tables blindly. The write contract defines the table sequence, atomicity requirement, idempotency requirement, audit events, and backend recomputation of handover totals.
+
+### Risk
+
+Low. This is not executable code and does not touch production data.
+
+### Database Impact
+
+None. No migration was run.
+
+### Permission Impact
+
+None. The contract requires server-side auth but does not implement it.
+
+### Worker Impact
+
+No Worker route or runtime behavior changed.
+
+### Verification
+
+```text
+npm run check passed
+Syntax check passed for 33 file(s).
+tests 58 / pass 58
+Worker assets dry-run build passed
+Worker embedded dry-run build passed
+```
+
 ## V2 TTLock Remark Parser Follow-Up
 
 ### Task

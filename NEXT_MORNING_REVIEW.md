@@ -526,3 +526,29 @@ Follow-up:
 
 - Next safe step is documenting the exact table writes this draft should produce.
 - Do not wire this into `/api/employee/entry` until the database write sequence and rollback strategy are reviewed.
+
+## Commercial Entry Write Contract Follow-Up
+
+Added `COMMERCIAL_ENTRY_WRITE_CONTRACT.md`.
+
+Purpose:
+
+- define the future server-side write order for employee rent entries,
+- require authenticated company/property/operator/session anchors,
+- require atomic writes across transactions, receivables, payments, conditional arrear tasks, audit events, and handover summary recomputation,
+- block frontend totals from becoming accounting source of truth,
+- document failure rules before Worker implementation.
+
+Validation completed:
+
+```text
+npm run check passed
+Syntax check passed for 33 file(s).
+tests 58 / pass 58
+Worker dry-run builds passed
+```
+
+Follow-up:
+
+- Next implementation step should be a local-only persistence rehearsal for this contract.
+- Do not modify the production Worker route until the rehearsal passes against disposable D1 state.

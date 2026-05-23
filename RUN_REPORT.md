@@ -1063,6 +1063,51 @@ Worker assets dry-run build passed
 Worker embedded dry-run build passed
 ```
 
+## Commercial Entry Write Contract Update
+
+Date: 2026-05-23
+
+### Files Added Or Updated
+
+- Added `COMMERCIAL_ENTRY_WRITE_CONTRACT.md`.
+- Added a regression test that verifies the contract requires atomic audited server-side writes.
+
+### Why
+
+Before changing `/api/employee/entry`, the project needs a reviewed write contract that defines exact table writes, idempotency, audit logs, session recomputation, and failure rules.
+
+### Contract Scope
+
+- Employee rent collection only.
+- Writes: `transactions`, `receivables`, `payments`, conditional `arrear_tasks`, `audit_events`.
+- Recompute: `handover_sessions` summary totals from accepted rows.
+- Rejects frontend-only totals as source of truth.
+- Requires all writes to be one atomic unit or not promoted.
+
+### Safety Scope
+
+- No Worker route was changed.
+- No frontend was changed.
+- No database schema was changed.
+- No production migration was run.
+
+### Verification
+
+Command:
+
+```bash
+npm run check
+```
+
+Result:
+
+```text
+Syntax check passed for 33 file(s).
+tests 58 / pass 58
+Worker assets dry-run build passed
+Worker embedded dry-run build passed
+```
+
 ## TTLock Remark Parser Helper Update
 
 Date: 2026-05-23

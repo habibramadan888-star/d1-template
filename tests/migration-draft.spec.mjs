@@ -167,3 +167,32 @@ test("legacy reconciliation template is generated and non-executing", async () =
   assert.match(mdText, /money totals in integer AED fils/);
   assert.match(csvText, /severity,code,legacy_table/);
 });
+
+test("commercial entry write contract requires atomic audited server-side writes", async () => {
+  const text = await readFile("COMMERCIAL_ENTRY_WRITE_CONTRACT.md", "utf8");
+  const requiredTerms = [
+    "not executable code",
+    "Production database mutation: not executed",
+    "Authenticate request",
+    "company_id",
+    "property_id",
+    "property_memberships",
+    "createRentEntryDraft",
+    "atomic write unit",
+    "transactions",
+    "receivables",
+    "payments",
+    "arrear_tasks",
+    "audit_events",
+    "handover_sessions",
+    "idempotency key",
+    "Frontend totals are display-only",
+    "must not be the source of truth",
+    "REAL",
+    "FLOAT"
+  ];
+
+  for (const term of requiredTerms) {
+    assert.match(text, new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i"));
+  }
+});
