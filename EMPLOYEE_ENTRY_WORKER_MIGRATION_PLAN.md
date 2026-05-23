@@ -161,3 +161,17 @@ Legacy owner pages that still read old `transactions` rows must be explicitly ha
 `npm run probe:clean-bootstrap` still fails because the live Worker route references `transactions` before a clean D1 creates it.
 
 This plan does not close the blocker by itself. It defines the safe implementation path to close it.
+
+## Worker Source Boundary Blocker
+
+`deploy-worker/src/index.js` currently appears to be a bundled monolith rather than clean source. It has no source-level `import` graph, and `wrangler.toml` points directly to that file.
+
+Do not manually paste the commercial adapter/executor/handler into this bundled file as a shortcut.
+
+Before route integration:
+
+1. Identify or reconstruct the canonical Worker source module tree.
+2. Add a reviewed build step for Worker modules.
+3. Bundle `modules/worker/*` through that build step.
+4. Keep `EMPLOYEE_ENTRY_COMMERCIAL_V1` default-off.
+5. Re-run `npm run check`, `npm run rehearsal:rent-write-plan`, and `npm run probe:clean-bootstrap`.

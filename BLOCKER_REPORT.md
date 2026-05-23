@@ -104,6 +104,33 @@ npm run probe:clean-bootstrap
 
 passes against a clean disposable local D1 without ad hoc SQL patches.
 
+## Worker Source Boundary Blocks Direct Module Integration
+
+Date: 2026-05-23
+
+Finding:
+
+- `deploy-worker/src/index.js` is a bundled monolith.
+- It starts with bundled helper declarations and has no source-level `import` graph.
+- `wrangler.toml` points directly to `src/index.js`.
+- Directly importing `modules/worker/*` from this file would be a high-risk manual edit to the bundled runtime boundary.
+
+Commercial impact:
+
+- The commercial adapter, handler, and D1 executor now exist and are tested.
+- They cannot be safely wired into production until the Worker source/build boundary is clarified.
+- Patching the generated/bundled file directly would increase maintenance risk and could hide future regressions.
+
+Safe resolution:
+
+- Identify the canonical Worker source before bundling, or create an explicit Worker source module tree.
+- Add a build step that bundles `modules/worker/*` into the Worker.
+- Only then add the default-off `EMPLOYEE_ENTRY_COMMERCIAL_V1` route integration.
+
+Current action:
+
+- No Worker route modification was made.
+
 Validation rule:
 
 - This blocker is not closed until `npm run probe:clean-bootstrap` passes against a disposable local D1 state.

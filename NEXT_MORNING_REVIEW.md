@@ -807,3 +807,16 @@ Next implementation gate:
 
 - The next step is the first actual Worker integration, and it must be behind a default-off feature flag.
 - Do not enable production until `npm run probe:clean-bootstrap` passes.
+
+## Worker Source Boundary Recheck
+
+Finding:
+
+- `deploy-worker/src/index.js` is a bundled monolith.
+- `deploy-worker/wrangler.toml` points directly to that bundled file.
+- Directly importing or pasting the commercial modules into it would be a high-risk integration step.
+
+Decision:
+
+- No Worker route integration was performed.
+- The next safe task is to establish a real Worker source/build boundary before enabling `EMPLOYEE_ENTRY_COMMERCIAL_V1`.

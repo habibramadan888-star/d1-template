@@ -1955,3 +1955,49 @@ Duplicate idempotency write blocked: true
 ### Next Step
 
 The remaining risky step is actual Worker integration behind a default-off feature flag. Do not enable in production until clean bootstrap passes.
+
+## V2 Worker Source Boundary Recheck
+
+### Task
+
+Check whether the tested commercial modules can be safely wired into the Worker.
+
+### Current Status
+
+Blocked.
+
+### Code Modified
+
+Only reports and migration plan.
+
+### Why
+
+`deploy-worker/src/index.js` is a bundled monolith, and `wrangler.toml` points directly to it. There is no clear source-level import/build boundary for safely adding `modules/worker/*`.
+
+### Risk
+
+High if modified directly. Manual integration into a bundled file would expand the monolith and weaken maintainability.
+
+### Database Impact
+
+None.
+
+### Permission Impact
+
+None.
+
+### Worker Impact
+
+No Worker route or runtime behavior changed.
+
+### Verification
+
+```text
+Read deploy-worker/src/index.js top-level structure.
+Read deploy-worker/wrangler.toml.
+Confirmed no source-level import graph.
+```
+
+### Next Step
+
+Identify or create the canonical Worker source module tree and build step before default-off route integration.

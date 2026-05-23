@@ -1699,3 +1699,25 @@ Worker assets dry-run build passed
 Worker embedded dry-run build passed
 Duplicate idempotency write blocked: true
 ```
+
+## Worker Source Boundary Recheck
+
+Date: 2026-05-23
+
+### Finding
+
+`deploy-worker/src/index.js` is a bundled monolith with no source-level import graph, while `deploy-worker/wrangler.toml` points directly to that file. Directly wiring `modules/worker/*` into it would require manual edits to a bundled runtime boundary.
+
+### Decision
+
+No Worker route integration was performed in this step.
+
+### Risk Avoided
+
+- Avoided expanding the bundled Worker monolith.
+- Avoided manual copy/paste integration that would be hard to maintain.
+- Avoided changing live `/api/employee/entry` behavior without a reviewed Worker build path.
+
+### Required Next Step
+
+Identify the canonical Worker source or add a reviewed Worker module build step before enabling `EMPLOYEE_ENTRY_COMMERCIAL_V1`.
