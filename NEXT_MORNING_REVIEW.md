@@ -145,3 +145,5 @@ FAIL employee entry expected 200, got 500
 ```
 
 Local D1 schema confirmed `transactions` is missing. This is now a confirmed P0 clean bootstrap blocker. The next safe engineering step is to design a proper migration that creates `transactions`; do not fix it by manually creating ad hoc local tables in request handling.
+
+The non-executable migration design has been started in `MIGRATION_BOOTSTRAP_PLAN.md`.
