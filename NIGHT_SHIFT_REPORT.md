@@ -1110,6 +1110,55 @@ Worker assets dry-run build passed
 Worker embedded dry-run build passed
 ```
 
+## V2 Employee Rent Entry Draft Contract Follow-Up
+
+### Task
+
+Create a tested pure contract for future server-side rent entry writes.
+
+### Current Status
+
+Completed.
+
+### Code Modified
+
+Yes, but only additive module/tests/reports:
+
+- `modules/employees/entry-draft.mjs`
+- `tests/employee-entry-draft.spec.mjs`
+- `RUN_REPORT.md`
+- `NIGHT_SHIFT_REPORT.md`
+
+### Why
+
+The current P0 cannot be safely closed by adding ad hoc legacy tables. The next commercial-grade step is defining a reviewed rent-entry draft that includes tenant/property/operator/session anchors, TTLock anchors, rent period anchors, payment method, paid/due amounts, and arrears drafts.
+
+### Risk
+
+Low. This is not wired into Worker or frontend runtime behavior.
+
+### Database Impact
+
+None.
+
+### Permission Impact
+
+None.
+
+### Worker Impact
+
+No Worker route or runtime behavior changed.
+
+### Verification
+
+```text
+npm run check passed
+Syntax check passed for 33 file(s).
+tests 57 / pass 57
+Worker assets dry-run build passed
+Worker embedded dry-run build passed
+```
+
 ## V2 TTLock Remark Parser Follow-Up
 
 ### Task

@@ -1016,6 +1016,53 @@ Worker assets dry-run build passed
 Worker embedded dry-run build passed
 ```
 
+## Employee Rent Entry Draft Contract Update
+
+Date: 2026-05-23
+
+### Files Added Or Updated
+
+- Added `modules/employees/entry-draft.mjs`.
+- Added `tests/employee-entry-draft.spec.mjs`.
+
+### Why
+
+The commercial write path needs one structured contract before any Worker route is changed. This rent-entry draft composes existing pure helpers into a single draft object that can later be reviewed and written server-side.
+
+### Rules Captured
+
+- Only rent entry is supported in this draft; other event types are rejected.
+- Staff-paid amount must be an AED string and is converted to integer fils.
+- Input bed must match the TTLock remark bed.
+- Staff beds and vacant beds are rejected from rent entry.
+- System rent period rules calculate due amount and dates.
+- Short payment creates an arrears task draft with reason and promise date.
+- The full TTLock remark is preserved as `tenantSnapshot` and `ttlockRemarkRaw`.
+
+### Safety Scope
+
+- No Worker route was changed.
+- No frontend was changed.
+- No database schema was changed.
+- Existing runtime behavior is unchanged.
+
+### Verification
+
+Command:
+
+```bash
+npm run check
+```
+
+Result:
+
+```text
+Syntax check passed for 33 file(s).
+tests 57 / pass 57
+Worker assets dry-run build passed
+Worker embedded dry-run build passed
+```
+
 ## TTLock Remark Parser Helper Update
 
 Date: 2026-05-23

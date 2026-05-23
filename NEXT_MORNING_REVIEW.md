@@ -501,3 +501,28 @@ Follow-up:
 
 - Keep adding new code under scanned directories.
 - If new file types are introduced, extend `scripts/check-syntax.mjs` before relying on them.
+
+## Employee Rent Entry Draft Contract Follow-Up
+
+Added `modules/employees/entry-draft.mjs` and tests.
+
+Purpose:
+
+- create one server-side rent-entry draft contract before touching Worker routes,
+- combine TTLock remark parsing, rent period calculation, money parsing, and receivable settlement,
+- reject mismatched beds, employee beds, vacant beds, float money input, and unsupported event types,
+- preserve tenant/property/session/operator anchors for future audit logging.
+
+Validation completed:
+
+```text
+npm run check passed
+Syntax check passed for 33 file(s).
+tests 57 / pass 57
+Worker dry-run builds passed
+```
+
+Follow-up:
+
+- Next safe step is documenting the exact table writes this draft should produce.
+- Do not wire this into `/api/employee/entry` until the database write sequence and rollback strategy are reviewed.
