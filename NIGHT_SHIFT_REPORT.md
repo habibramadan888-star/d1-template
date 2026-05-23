@@ -1006,3 +1006,60 @@ P0 confirmed: clean local Worker bootstrap cannot complete employee entry.
 Closure rule:
 
 - This blocker is not closed until `npm run probe:clean-bootstrap` passes.
+
+## V2 Finance Minor-Unit Helper Follow-Up
+
+### Task
+
+Create a tested finance helper for AED-to-fils conversion and integer-only money arithmetic.
+
+### Current Status
+
+Completed.
+
+### Code Modified
+
+Yes, but only additive module/tests/reports:
+
+- `modules/finance/money.mjs`
+- `tests/finance-money.spec.mjs`
+- `package.json`
+- `RUN_REPORT.md`
+- `NIGHT_SHIFT_REPORT.md`
+
+### Why
+
+Commercial employee entry cannot safely move to the new schema while money is parsed or calculated as JavaScript floating point. This helper provides a small, tested boundary for future commercial write paths.
+
+### Risk
+
+Low. The helper is not wired into current Worker behavior yet.
+
+### Database Impact
+
+None.
+
+### Permission Impact
+
+None.
+
+### Worker Impact
+
+No Worker route or runtime behavior changed.
+
+### Verification
+
+Covered by `tests/finance-money.spec.mjs` and default `npm run check`.
+
+Latest result:
+
+```text
+npm run check passed
+tests 31 / pass 31
+Worker assets dry-run build passed
+Worker embedded dry-run build passed
+```
+
+Additional guard:
+
+- `modules/**/*.mjs` is now included in `format:check`, so future finance modules cannot bypass formatting checks.

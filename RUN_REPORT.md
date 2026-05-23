@@ -916,3 +916,55 @@ P0 confirmed: clean local Worker bootstrap cannot complete employee entry.
 ### Current Meaning
 
 The P0 clean bootstrap blocker is now reproducible. A fix is not considered valid until this command passes on a disposable clean local D1.
+
+## Finance Minor-Unit Helper Update
+
+Date: 2026-05-23
+
+### Files Added Or Updated
+
+- Added `modules/finance/money.mjs`.
+- Added `tests/finance-money.spec.mjs`.
+- Added module syntax checks to `npm run typecheck`.
+
+### Why
+
+The commercial schema requires authoritative money values as integer minor units (`*_fils`). Before wiring employee entry to commercial tables, amount parsing and arithmetic need a tested helper that rejects JavaScript floating-point input.
+
+### Behavior
+
+- Parses AED string input into `bigint` fils.
+- Rejects JavaScript `number` input at the boundary.
+- Rejects amounts with more than 2 decimal places.
+- Supports explicit negative deltas only when requested.
+- Provides integer-only add/subtract/max helpers.
+- Converts checked `bigint` values to safe SQL integer values only at the D1 binding boundary.
+
+### Safety Scope
+
+- No Worker route was changed.
+- No frontend was changed.
+- No database schema was changed.
+- Existing financial behavior is unchanged.
+
+### Verification
+
+Command:
+
+```bash
+npx prettier --write "*.md" "tools/**/*.cjs" "scripts/**/*.mjs" "tests/**/*.mjs" "modules/**/*.mjs" ".github/**/*.yml"
+npm run check
+```
+
+Result:
+
+```text
+format:check passed, including modules/**/*.mjs
+lint passed
+typecheck passed
+audit:api:check passed
+audit:db:check passed
+tests 31 / pass 31
+Worker assets dry-run build passed
+Worker embedded dry-run build passed
+```

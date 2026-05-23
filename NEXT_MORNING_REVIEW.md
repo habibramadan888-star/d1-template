@@ -352,3 +352,30 @@ P0 confirmed: clean local Worker bootstrap cannot complete employee entry.
 ```
 
 This is now the required verification command for closing the clean bootstrap blocker.
+
+## Finance Minor-Unit Helper Follow-Up
+
+Added `modules/finance/money.mjs` and tests.
+
+Purpose:
+
+- parse AED strings into integer fils,
+- reject JavaScript `number` input for money boundaries,
+- reject ambiguous precision beyond 2 decimals,
+- support integer-only money arithmetic,
+- convert to safe SQL integer only at the D1 binding boundary.
+
+This is a foundation for commercial schema writes. It is not wired into the current Worker yet, so existing runtime behavior is unchanged.
+
+Validation completed:
+
+```text
+npm run check passed
+tests 31 / pass 31
+Worker dry-run builds passed
+```
+
+Follow-up:
+
+- Use this helper for new commercial write paths only after the backend write model is designed and reviewed.
+- Do not retrofit the legacy Worker financial formulas without separate accounting tests.
