@@ -574,3 +574,39 @@ Wrangler D1 rejects SQL `BEGIN TRANSACTION` / `ROLLBACK` in SQL files. The rehea
 - Did not run `wrangler d1 execute --remote`.
 - Did not run `wrangler d1 migrations apply`.
 - Did not mutate existing local D1 or production D1.
+
+## Legacy Backfill Mapping Update
+
+Date: 2026-05-23
+
+### Files Added Or Updated
+
+- Added `LEGACY_BACKFILL_MAP.md`.
+- Added `scripts/audit-legacy-backfill.mjs`.
+- Added generated read-only report `LEGACY_BACKFILL_AUDIT.md`.
+- Added npm script `audit:legacy-backfill`.
+- Updated static tests to require legacy backfill mapping and audit output.
+
+### Command
+
+```bash
+npm run audit:legacy-backfill
+```
+
+### Result
+
+```text
+Legacy backfill audit written: 0 static findings
+```
+
+### Safety Scope
+
+- Static source scan only.
+- No D1 connection opened.
+- No SQL executed.
+- No backfill executed.
+- No production or local business data changed.
+
+### Backfill Position
+
+The project now has a documented mapping from legacy `sessions`, `transactions`, `arrears`, `arrear_tasks`, `deposit_ledger`, `entry_events`, `audit_logs`, `employee_users`, and `app_settings` to the commercial schema. This is still not a data reconciliation pass.

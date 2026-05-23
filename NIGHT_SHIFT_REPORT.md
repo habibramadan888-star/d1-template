@@ -481,3 +481,60 @@ Validated accounting fixture: session, transactions, receivable, payment, arrear
 ### D1 Transaction Finding
 
 Wrangler D1 rejects SQL `BEGIN TRANSACTION` and `ROLLBACK` in SQL files. Rollback rehearsal is therefore represented by disposable local D1 cleanup. Production rollback must still be handled with backup restore or forward rollback migration planning.
+
+## V2 Legacy Backfill Mapping Follow-Up
+
+### Task
+
+Create a read-only legacy-to-commercial backfill map and static audit.
+
+### Current Status
+
+Completed.
+
+### Code Modified
+
+Yes, but only tooling/tests/reports:
+
+- `LEGACY_BACKFILL_MAP.md`
+- `LEGACY_BACKFILL_AUDIT.md`
+- `scripts/audit-legacy-backfill.mjs`
+- `package.json`
+- `tests/migration-draft.spec.mjs`
+- `RUN_REPORT.md`
+- `NEXT_MORNING_REVIEW.md`
+- `NIGHT_SHIFT_REPORT.md`
+
+### Why
+
+Commercial backfill cannot safely proceed until legacy accounting fields are mapped to the target schema and the non-negotiable reconciliation anchors are documented.
+
+### Risk
+
+Low. This is documentation and static analysis only.
+
+### Database Impact
+
+None. No D1 connection was opened and no SQL was executed.
+
+### Permission Impact
+
+None. No auth code was changed.
+
+### Worker Impact
+
+None. No Worker source was changed.
+
+### Verification
+
+Command:
+
+```bash
+npm run audit:legacy-backfill
+```
+
+Result:
+
+```text
+Legacy backfill audit written: 0 static findings
+```

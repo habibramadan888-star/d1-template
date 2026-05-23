@@ -208,3 +208,19 @@ The script:
 The rehearsal passed locally. It does not touch remote D1, existing local D1 state, production config, or executable migrations.
 
 Important finding: D1 rejects SQL `BEGIN TRANSACTION` / `ROLLBACK` through `wrangler d1 execute`, so rollback rehearsal is represented by disposable local D1 cleanup. Production rollback still requires backup restore or forward rollback migration planning.
+
+## Legacy Backfill Mapping Follow-Up
+
+Added `LEGACY_BACKFILL_MAP.md` and `npm run audit:legacy-backfill`.
+
+The mapping now explicitly covers:
+
+- `corpid` to `company_id` / `property_id`,
+- `sessions` to `handover_sessions`,
+- `transactions` to `transactions`, `payments`, and `receivables`,
+- `arrears` to `receivables` and `arrear_tasks`,
+- `deposit_ledger` to commercial deposit liability ledger,
+- `entry_events` / `audit_logs` to `audit_events`,
+- employee identity and settings migration risks.
+
+The audit is read-only. It does not connect to D1 and does not execute SQL.
