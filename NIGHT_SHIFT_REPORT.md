@@ -1257,6 +1257,57 @@ Worker assets dry-run build passed
 Worker embedded dry-run build passed
 ```
 
+## V2 Rent Write Plan Local D1 Rehearsal Follow-Up
+
+### Task
+
+Create a disposable local D1 rehearsal for the commercial rent write plan.
+
+### Current Status
+
+Completed.
+
+### Code Modified
+
+Yes, but only tooling/tests/reports:
+
+- `scripts/rehearse-rent-write-plan.mjs`
+- `package.json`
+- `tests/source-risk.spec.mjs`
+- `RUN_REPORT.md`
+- `NIGHT_SHIFT_REPORT.md`
+
+### Why
+
+The write plan must be proven against the commercial schema before touching Worker routes. This rehearsal verifies the planned rows can be inserted into a clean local D1 and that handover totals can be recomputed from stored rows.
+
+### Risk
+
+Low. The rehearsal uses local-only D1 with a temporary `--persist-to` directory and removes it afterward.
+
+### Database Impact
+
+No production impact. No remote D1 command was used.
+
+### Permission Impact
+
+None.
+
+### Worker Impact
+
+No Worker route or runtime behavior changed.
+
+### Verification
+
+```text
+npm run check passed
+npm run rehearsal:rent-write-plan passed
+Syntax check passed for 36 file(s).
+tests 64 / pass 64
+Validated operations: 10
+Temporary D1 directory removed
+```
+
 ## V2 TTLock Remark Parser Follow-Up
 
 ### Task

@@ -578,3 +578,31 @@ Follow-up:
 
 - The next safe task is a disposable local D1 rehearsal that applies the draft schema and validates these planned rows can fit the schema.
 - The Worker route should remain untouched until that local rehearsal exists and passes.
+
+## Rent Write Plan Local D1 Rehearsal Follow-Up
+
+Added `scripts/rehearse-rent-write-plan.mjs`.
+
+Purpose:
+
+- apply the commercial schema draft to disposable local D1,
+- seed minimum company/property/staff/bed/rent/session rows,
+- execute the generated rent write plan locally,
+- verify transaction, receivable, payment, arrear task, audit events, and handover summary totals,
+- remove the temporary D1 directory after the run.
+
+Validation completed:
+
+```text
+npm run check passed
+npm run rehearsal:rent-write-plan passed
+Syntax check passed for 36 file(s).
+tests 64 / pass 64
+Validated operations: 10
+Mode: local-only disposable D1; no production mutation.
+```
+
+Follow-up:
+
+- This validates schema fit, not the current Worker route.
+- The current P0 clean Worker bootstrap blocker remains open until `/api/employee/entry` is safely migrated and `npm run probe:clean-bootstrap` passes.

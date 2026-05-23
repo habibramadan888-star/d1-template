@@ -1153,6 +1153,58 @@ Worker assets dry-run build passed
 Worker embedded dry-run build passed
 ```
 
+## Rent Write Plan Local D1 Rehearsal Update
+
+Date: 2026-05-23
+
+### Files Added Or Updated
+
+- Added `scripts/rehearse-rent-write-plan.mjs`.
+- Added npm script `rehearsal:rent-write-plan`.
+- Added static safety test to ensure the rehearsal is local-only and not part of default `npm run check`.
+
+### Why
+
+The rent write plan needed proof that planned commercial rows fit the draft D1 schema before any Worker route is changed.
+
+### Rehearsal Behavior
+
+- Creates a disposable local D1 directory.
+- Applies `migration-drafts/002_commercial_bootstrap.sql`.
+- Seeds company, property, staff user, membership, bed, rent config, and draft handover session.
+- Builds a partial rent entry draft and write plan.
+- Executes generated SQL locally.
+- Verifies transaction, receivable, payment, arrear task, audit events, and handover recomputed totals.
+- Deletes the temporary D1 directory.
+
+### Verification
+
+Commands:
+
+```bash
+npm run check
+npm run rehearsal:rent-write-plan
+```
+
+Result:
+
+```text
+Syntax check passed for 36 file(s).
+tests 64 / pass 64
+Worker assets dry-run build passed
+Worker embedded dry-run build passed
+Rent write plan rehearsal passed.
+Validated operations: 10
+Mode: local-only disposable D1; no production mutation.
+```
+
+### Safety Scope
+
+- No production D1 was touched.
+- No Worker route was changed.
+- No frontend was changed.
+- The rehearsal command is not part of default `npm run check`.
+
 ## TTLock Remark Parser Helper Update
 
 Date: 2026-05-23

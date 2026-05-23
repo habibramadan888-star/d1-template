@@ -156,6 +156,25 @@ test("migration rehearsal script uses disposable local cleanup instead of SQL ro
   assert.doesNotMatch(script, /ROLLBACK;/);
 });
 
+test("rent write plan rehearsal is local-only and not a default gate", async () => {
+  const pkg = JSON.parse(await readFile("package.json", "utf8"));
+  const script = await readFile("scripts/rehearse-rent-write-plan.mjs", "utf8");
+
+  assert.equal(
+    pkg.scripts["rehearsal:rent-write-plan"],
+    "node scripts/rehearse-rent-write-plan.mjs"
+  );
+  assert.doesNotMatch(pkg.scripts.check, /rehearsal:rent-write-plan/);
+  assert.match(script, /--local/);
+  assert.match(script, /--persist-to/);
+  assert.match(script, /mkdtemp/);
+  assert.match(script, /Temporary D1 directory removed/);
+  assert.match(script, /createRentWritePlan/);
+  assert.match(script, /Mode: local-only disposable D1/);
+  assert.doesNotMatch(script, /--remote/);
+  assert.doesNotMatch(script, /migrations apply/i);
+});
+
 test("legacy reconciliation dry-run is explicit local read-only", async () => {
   const pkg = JSON.parse(await readFile("package.json", "utf8"));
   const script = await readFile("scripts/reconcile-legacy-dry-run.mjs", "utf8");

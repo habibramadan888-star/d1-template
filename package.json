@@ -20,6 +20,7 @@
     "reconciliation:template": "node scripts/generate-reconciliation-template.mjs",
     "reconciliation:dry-run": "node scripts/reconcile-legacy-dry-run.mjs",
     "migration:rehearse": "node scripts/rehearse-migration.mjs",
+    "rehearsal:rent-write-plan": "node scripts/rehearse-rent-write-plan.mjs",
     "probe:clean-bootstrap": "node scripts/probe-clean-worker-bootstrap.mjs",
     "smoke": "node scripts/smoke-worker.mjs",
     "smoke:auth": "node scripts/smoke-auth.mjs",
