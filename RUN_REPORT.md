@@ -1974,3 +1974,54 @@ npm run db:local:bootstrap passed
 ### Status
 
 P0-005 remains `Verified`. The Windows cleanup instability is fixed for local verification tooling. No production migration, remote D1 command, production deploy, business logic change, financial logic change, or schema change was performed.
+
+## P0-001A Money Precision Audit And Guardrails
+
+Date: 2026-05-24
+
+### Files Added Or Updated
+
+- `modules/finance/money.mjs`: extended the existing integer-fils helper with `normalizeMoneyInput`, `assertValidFils`, `compareFils`, `filsToAedString`, and backward-compatible variadic `addFils`.
+- `tests/money.spec.mjs`: added P0-001A money helper guardrail tests.
+- `scripts/audit-money-fields.mjs`: added a non-blocking static money risk scanner.
+- `package.json`: added `test:money` and `audit:money` scripts.
+- `MONEY_FIELD_INVENTORY.md`: mapped current money fields across DB, Worker, API, employee UI, owner UI, and settings.
+- `FINANCE_FLOW_MAP.md`: mapped current rent, deposit, arrears, refund, handover, dashboard, and void money flows.
+- `MONEY_PRECISION_POLICY.md`: defined future AED fils accounting policy and phase boundaries.
+- `MONEY_HELPER_DESIGN.md`: documented helper API and non-invasive boundary.
+- `MONEY_MIGRATION_PLAN.md`: documented dual-write, fallback, and reconciliation phases.
+- `MONEY_PRECISION_AUDIT_RESULT.md`: generated static money risk counts and detailed findings.
+
+### Audit Counts
+
+```text
+REAL_FLOAT_RISKS=179
+JS_NUMBER_PARSEFLOAT_RISKS=466
+FRONTEND_MONEY_CALC_RISKS=435
+BACKEND_MONEY_CALC_RISKS=143
+MONEY_FINDINGS=2546
+```
+
+### Verification
+
+```text
+npm run check passed
+npm run smoke:with-worker passed
+npm run test:delete-session passed
+npm run db:local:bootstrap passed
+npm run verify:clean-d1 passed
+npm run test:money passed
+npm run audit:money passed
+```
+
+### Safety Scope
+
+- No production Worker deploy was executed.
+- No production or remote D1 migration was executed.
+- No database schema was changed.
+- No live financial write path was rewired.
+- No dashboard formula, handover flow, delete-session void behavior, tenancy logic, or receivables model was changed.
+
+### Status
+
+P0-001 is `Partial`. P0-001A created the audit, money flow map, policy, helper guardrails, and test scan. It did not migrate legacy `REAL`/JS `Number` paths to integer minor units.

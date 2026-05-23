@@ -16,6 +16,7 @@
     "audit:api:check": "node scripts/audit-api.mjs --check",
     "audit:db": "node scripts/audit-db.mjs",
     "audit:db:check": "node scripts/audit-db.mjs --check",
+    "audit:money": "node scripts/audit-money-fields.mjs",
     "audit:legacy-backfill": "node scripts/audit-legacy-backfill.mjs",
     "dev:secrets": "node scripts/generate-dev-secrets.mjs",
     "dev:worker": "node scripts/dev-worker.mjs",
@@ -39,6 +40,7 @@
     "smoke:core": "node scripts/smoke-core-flows.mjs",
     "smoke:employee-entry": "node scripts/smoke-employee-entry.mjs",
     "test:delete-session": "node scripts/test-delete-session-void.mjs",
+    "test:money": "node --test tests/money.spec.mjs",
     "test": "node --test tests/**/*.spec.mjs",
     "check": "npm run governance:check && npm run security:secrets && npm run format:check && npm run lint && npm run typecheck && npm run audit:api:check && npm run audit:db:check && npm run test && npm run build"
   },
