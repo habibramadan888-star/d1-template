@@ -1995,11 +1995,11 @@ Date: 2026-05-24
 ### Audit Counts
 
 ```text
-REAL_FLOAT_RISKS=179
+REAL_FLOAT_RISKS=187
 JS_NUMBER_PARSEFLOAT_RISKS=466
 FRONTEND_MONEY_CALC_RISKS=435
 BACKEND_MONEY_CALC_RISKS=143
-MONEY_FINDINGS=2546
+MONEY_FINDINGS=2573
 ```
 
 ### Verification
@@ -2025,3 +2025,49 @@ npm run audit:money passed
 ### Status
 
 P0-001 is `Partial`. P0-001A created the audit, money flow map, policy, helper guardrails, and test scan. It did not migrate legacy `REAL`/JS `Number` paths to integer minor units.
+
+## P0-001B Money Shadow Validation
+
+Date: 2026-05-24
+
+### Files Added Or Updated
+
+- `MONEY_SHADOW_VALIDATION_PLAN.md`: documents the low-risk local-only shadow validation approach and explicit non-production boundary.
+- `scripts/money-shadow-reconcile.mjs`: adds a read-only local D1 money-column scanner that parses legacy values through the money helper and writes a reconciliation report.
+- `tests/money-shadow.spec.mjs`: covers shadow analyzer parsing, unsafe values, column detection, and summary counts.
+- `MONEY_SHADOW_RECONCILIATION_RESULT.md`: generated local shadow result.
+- `package.json`: added `test:money-shadow` and `reconcile:money`.
+- `COMMERCIALIZATION_BACKLOG.md`, `P0_P1_STATUS_REVIEW.md`, `VERIFICATION_STATUS.md`: updated P0-001B status as Partial.
+
+### Shadow Result
+
+```text
+MONEY_COLUMNS=22
+MONEY_VALUES=0
+MONEY_PARSE_OK=0
+MONEY_EMPTY=0
+MONEY_INVALID=0
+MONEY_OVER_PRECISION=0
+MONEY_DIFFERS=0
+```
+
+### Verification
+
+```text
+npm run test:money-shadow passed
+npm run reconcile:money passed
+```
+
+Full stage verification was run after this section was added and is recorded in the Night Shift V3 report.
+
+### Safety Scope
+
+- No production Worker deploy was executed.
+- No production or remote D1 migration was executed.
+- No database rows were modified by the shadow reconciliation script.
+- No database schema was changed.
+- No dashboard formula, handover flow, delete-session void behavior, tenancy logic, or receivables model was changed.
+
+### Status
+
+P0-001 remains `Partial - P0-001B shadow validation ready`. The system can now perform read-only local D1 money precision reconciliation, but live legacy write/read paths are still not migrated to integer minor units.
