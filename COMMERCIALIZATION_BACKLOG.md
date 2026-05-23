@@ -22,6 +22,16 @@ The project is not yet ready for commercial SaaS launch. Static checks, local Wo
 | P0-007 | Auth         | Full authenticated employee/owner business flows are not yet verified beyond login and one staff-denial check. | Entry/export and dashboard regressions may still be hidden.      | Extend authenticated smoke to employee entry/export and owner dashboard APIs.                 | Authenticated flow tests pass locally.                                   |
 | P0-008 | Accounting   | No formal `receivables` table exists.                                                                          | Arrears are not a first-class accounting lifecycle.              | Introduce receivables before payments/arrear tasks.                                           | Short-pay and repayment lifecycle tests.                                 |
 
+### P0 Mitigation Progress
+
+- P0-001: integer AED fils helpers now exist and are covered by tests, but legacy runtime still uses `REAL`/`Number`.
+- P0-002/P0-003: rent write plan and local D1 rehearsal now prove backend-owned handover recomputation is viable, but live Worker route is not migrated.
+- P0-005/P0-008: commercial schema draft includes `transactions`, `receivables`, `payments`, and `arrear_tasks`; local rent write rehearsal passes against disposable D1, but clean Worker bootstrap still fails until the live route uses the commercial path.
+
+Current closure rule:
+
+- These P0 items remain open until the Worker route, clean local bootstrap, authenticated smoke, and production migration plan all pass without bypassing auth or financial controls.
+
 ## P1: Must Fix Before Commercial Release
 
 | ID     | Area           | Problem                                                                              | Impact                                               | Required Fix                                                        | Verification                                         |

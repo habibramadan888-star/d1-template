@@ -75,6 +75,19 @@ Validation rule:
 
 - This blocker is not closed until `npm run probe:clean-bootstrap` passes against a disposable local D1 state.
 
+Mitigation progress:
+
+- `modules/employees/entry-draft.mjs` defines a tested rent-entry draft contract.
+- `modules/employees/rent-write-plan.mjs` maps that draft to commercial table operations.
+- `COMMERCIAL_ENTRY_WRITE_CONTRACT.md` defines the required server-side write sequence.
+- `npm run rehearsal:rent-write-plan` now proves the planned rent rows fit `migration-drafts/002_commercial_bootstrap.sql` on disposable local D1.
+
+Current status:
+
+- Still open.
+- The rehearsal validates the future commercial write plan only.
+- The live `/api/employee/entry` route still uses the legacy Worker path and `npm run probe:clean-bootstrap` remains the closure gate.
+
 ### P0: Existing money model still uses decimal/REAL in business tables
 
 Evidence:
