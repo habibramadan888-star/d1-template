@@ -29,3 +29,22 @@ Thumbs.db
 tmp/
 temp/
 *.tmp
+
+# Local audit / verification scratch files
+/_check*.js
+/_extract-index-*.js
+/_live_*
+/_verify_*
+/mobile-current.png
+/cf-assets-manifest.json
+
+# Legacy root snapshots not part of the active source baseline
+/index-22-1.html
+/index-3*.html
+/index-4*.html
+/index-50.html
+/index-49.before-wifi-module.html
+/index-51-main.broken-backup-*.js
+/employee.html
+/employee-v2.html
+/worker-employee-api-patch.js

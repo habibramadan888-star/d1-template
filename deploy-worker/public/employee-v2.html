@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Homelink 员工端</title>
+<style>
+:root{
+  --bg:#f4f6f8;--wash:#ecfaf4;--surface:#ffffff;--surface2:#f8faf9;--surface3:#eef3f0;
+  --border:#dfe5e8;--border2:#cfd8dc;--text:#111827;--text2:#5f6877;--text3:#8a94a3;
+  --accent:#09a64f;--accent2:#078d42;--accent-dim:rgba(9,166,79,.10);--accent-b:rgba(9,166,79,.26);
+  --blue:#1a73e8;--orange:#e16b00;--amber:#f7bc00;--red:#d93025;
+  --shadow:0 16px 38px rgba(20,32,51,.10);--soft:0 8px 22px rgba(20,32,51,.07);
+  --r:18px;--r2:26px;
+}
+*{box-sizing:border-box}
+html{background:var(--bg)}
+body{margin:0;min-height:100vh;overflow-x:hidden;color:var(--text);font-family:Inter,"Microsoft YaHei","PingFang SC","Noto Sans SC",system-ui,sans-serif;font-size:14px;background:
+  radial-gradient(circle at 86% 8%,rgba(9,166,79,.18),transparent 24rem),
+  linear-gradient(180deg,#ffffff 0,#f2faf7 18rem,#eef3f1 100%)}
+button,input,select,textarea{font:inherit}
+.mobile-appbar{height:74px;background:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 28px;border-bottom:1px solid #eef1f2;color:#05070a}
+.mobile-appbar .back{font-size:42px;line-height:1;font-weight:300}.mobile-appbar .dots{font-size:42px;line-height:.7;letter-spacing:2px}.mobile-appbar strong{font-size:34px;font-weight:500;letter-spacing:.01em}
+.top{position:sticky;top:0;z-index:8;background:linear-gradient(100deg,rgba(255,255,255,.97),rgba(237,250,244,.95));backdrop-filter:blur(18px);border-bottom:1px solid rgba(177,204,191,.55);box-shadow:0 2px 14px rgba(20,32,51,.06)}
+.brand{max-width:980px;margin:0 auto;padding:24px 34px 22px;display:flex;align-items:center;justify-content:space-between;gap:18px}
+.logo{display:flex;align-items:center;gap:18px;min-width:0}.logo-badge{width:84px;height:84px;border-radius:18px;background:linear-gradient(145deg,#0bb25b,#078d42);color:#fff;box-shadow:inset 0 -10px 20px rgba(0,0,0,.08);display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:900;line-height:1.05;letter-spacing:.03em}.logo-badge .sm{font-size:14px;color:#f1d800;margin-top:5px}.logo-text{font-size:36px;font-weight:900;letter-spacing:-.03em;white-space:nowrap}.logo-text .gn{color:var(--accent)}.logo-text .dot{color:#d5c100}
+.top-actions{display:flex;align-items:center;gap:14px}.role-pill{border:1.5px solid rgba(9,166,79,.23);color:var(--accent2);background:#fff;border-radius:999px;padding:13px 22px;font-size:20px;font-weight:900;box-shadow:var(--soft)}.control-pill{border:0;color:#fff;background:linear-gradient(180deg,#10ad5a,#078d42);border-radius:999px;padding:15px 28px;font-size:20px;font-weight:900;box-shadow:0 10px 24px rgba(9,166,79,.22)}.lock-pill{width:70px;height:62px;border:1.5px solid var(--border);background:#fff;border-radius:24px;color:#2f3948;font-size:28px;display:grid;place-items:center;box-shadow:var(--soft)}
+.operator{display:flex;align-items:center;gap:8px;color:var(--text2);font-size:12px;font-weight:800}.operator input{width:96px;border:1px solid var(--border);border-radius:12px;padding:8px 10px;background:#fff;color:var(--text)}
+.tabs{max-width:980px;margin:0 auto;padding:0 34px 24px;display:flex;gap:0;overflow-x:auto;scrollbar-width:none}.tabs::-webkit-scrollbar{display:none}
+.tab{min-width:210px;height:100px;border:1px solid var(--border);border-right:0;background:rgba(255,255,255,.94);color:#243044;cursor:pointer;font-size:30px;font-weight:900;letter-spacing:.08em;display:flex;align-items:center;justify-content:center;gap:14px;box-shadow:0 6px 18px rgba(20,32,51,.05);transition:all .16s}
+.tab:first-child{border-radius:28px 0 0 28px}.tab:last-child{border-right:1px solid var(--border);border-radius:0 28px 28px 0}.tab.active{background:linear-gradient(180deg,#10ad5a,#078d42);color:#fff;border-color:rgba(9,166,79,.7);box-shadow:0 12px 26px rgba(9,166,79,.24);transform:translateY(-1px)}.tab .en-sub{font-family:"JetBrains Mono",Consolas,monospace;font-size:19px;font-weight:600;letter-spacing:.09em;color:inherit;opacity:.82}
+.wrap{max-width:980px;margin:0 auto;padding:72px 34px 110px}.page-title{font-size:54px;font-weight:950;letter-spacing:-.04em;line-height:1.05;margin:0 0 10px}.page-title .en-sub{display:block;font-family:"JetBrains Mono",Consolas,monospace;font-size:26px;font-weight:700;letter-spacing:.18em;color:#697386;margin-top:22px}.page-sub{font-size:26px;line-height:1.35;color:#586273;font-weight:800;margin-bottom:38px}
+.card{background:rgba(255,255,255,.94);border:1px solid var(--border);border-radius:var(--r2);box-shadow:var(--shadow);margin-bottom:26px;overflow:hidden}
+.head{padding:26px 30px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:16px}.title{font-size:28px;font-weight:950;letter-spacing:-.02em}.body{padding:30px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}.field{margin-bottom:18px}
+label{display:block;color:#435168;font-size:15px;font-weight:900;margin-bottom:9px;letter-spacing:.01em}
+input,select,textarea{width:100%;border:1.5px solid #d4dde0;border-radius:17px;padding:18px 18px;background:#fff;color:var(--text);outline:none;box-shadow:inset 0 1px 0 rgba(255,255,255,.8)}
+input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 4px rgba(9,166,79,.12)}
+textarea{min-height:112px;resize:vertical}.hidden{display:none!important}
+.hint{font-size:15px;color:#566174;line-height:1.8;background:rgba(255,255,255,.75);border:1px dashed #d7e3dd;border-radius:18px;padding:18px 20px;margin-bottom:22px}
+.ctx{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:22px}.ctx div{background:linear-gradient(180deg,#f9fcfb,#f4f8f6);border:1px solid var(--border);border-radius:18px;padding:16px}.ctx span{display:block;color:#697386;font-size:13px;font-weight:800}.ctx b{display:block;margin-top:7px;font-family:"JetBrains Mono",Consolas,monospace;font-size:15px;color:#111827}
+.btn{border:1px solid var(--border);border-radius:18px;padding:18px 24px;font-weight:950;cursor:pointer;background:#fff;color:#263246;box-shadow:var(--soft)}.btn.primary{background:linear-gradient(180deg,#10ad5a,#078d42);color:#fff;border-color:transparent}.btn.warn{background:#fff6e8;color:#a45400}.btn.danger{background:#fff0ee;color:var(--red)}
+.row{display:flex;gap:14px;flex-wrap:wrap}.row .btn{flex:1}
+.task{border:1px solid var(--border);border-left:5px solid #aab4c2;border-radius:22px;padding:22px;margin-bottom:16px;background:rgba(255,255,255,.96);box-shadow:var(--soft)}
+.task-top{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}.bed{font-size:26px;font-weight:950;font-family:"JetBrains Mono",Consolas,monospace}.pill{display:inline-flex;border-radius:999px;padding:7px 13px;font-size:13px;font-weight:900;background:#eef2ef;color:var(--text2)}
+.pill.red{background:#fff0ee;color:var(--red)}.pill.orange{background:#fff6e8;color:var(--orange)}.pill.green{background:var(--accent-dim);color:var(--accent2)}
+.money{font-family:"JetBrains Mono",Consolas,monospace;font-weight:950;color:var(--orange);font-size:22px}.small{font-size:15px;color:var(--text2);line-height:1.75}
+.toast{position:fixed;left:28px;right:28px;bottom:24px;background:#142033;color:#fff;padding:18px 22px;border-radius:20px;box-shadow:var(--shadow);display:none;z-index:20;font-weight:800}
+pre{white-space:pre-wrap;background:#111827;color:#e5e7eb;padding:22px;border-radius:22px;max-height:420px;overflow:auto;font-family:"JetBrains Mono",Consolas,monospace}
+@media(max-width:720px){.mobile-appbar{height:58px;padding:0 16px}.mobile-appbar strong{font-size:22px}.mobile-appbar .back,.mobile-appbar .dots{font-size:30px}.brand{padding:16px}.logo-badge{width:56px;height:56px;border-radius:14px;font-size:13px}.logo-badge .sm{font-size:10px}.logo-text{font-size:26px}.top-actions{gap:8px}.role-pill,.control-pill{font-size:14px;padding:10px 13px}.lock-pill{display:none}.operator{position:absolute;right:16px;top:72px;background:rgba(255,255,255,.86);border:1px solid var(--border);border-radius:14px;padding:7px}.tabs{padding:0 16px 14px}.tab{min-width:132px;height:72px;font-size:21px;gap:8px}.tab .en-sub{font-size:11px}.wrap{padding:42px 16px 90px}.page-title{font-size:40px}.page-title .en-sub{font-size:17px;margin-top:14px}.page-sub{font-size:18px;margin-bottom:24px}.head{padding:18px 18px}.title{font-size:21px}.body{padding:18px}.grid2{grid-template-columns:1fr}.ctx{grid-template-columns:1fr 1fr}.card{border-radius:24px}.btn{padding:15px 16px}}
+</style>
+</head>
+<body>
+<div class="mobile-appbar">
+  <span class="back">‹</span>
+  <strong>Homelink · 流水管理</strong>
+  <span class="dots">⋮</span>
+</div>
+<div class="top">
+  <div class="brand">
+    <div class="logo">
+      <div class="logo-badge"><span>HOME</span><span class="sm">LINK.</span></div>
+      <div class="logo-text"><span class="gn">HOME</span>LINK<span class="dot">.</span></div>
+    </div>
+    <div class="top-actions">
+      <div class="operator">员工编号 <input id="operatorId" placeholder="如 A01"></div>
+      <span class="role-pill">员工</span>
+      <span class="control-pill">🔐 员工端</span>
+      <span class="lock-pill">▢</span>
+    </div>
+  </div>
+  <div class="tabs">
+    <button class="tab active" data-view="entry">录入<span class="en-sub">ENTRY</span></button>
+    <button class="tab" data-view="arrears">欠款<span class="en-sub">ARREARS</span></button>
+    <button class="tab" data-view="export">导出<span class="en-sub">EXPORT</span></button>
+  </div>
+</div>
+<main class="wrap">
+  <div class="page-title">员工工作台<span class="en-sub">STAFF WORKFLOW</span></div>
+  <div class="page-sub">快速录入 · 欠款跟进 · 今日导出</div>
+
+  <section id="view-entry">
+    <div class="card">
+      <div class="head"><div class="title">快速录入</div><button class="btn" id="btnLoadLock">抓取床位</button></div>
+      <div class="body">
+        <div class="hint">输入床位后，系统会尝试从通通锁卡片中抓取押金、入住日期、当前截止日期和租客姓名。新客户、续租才显示租期和截止日期字段。</div>
+        <div class="grid2">
+          <div class="field"><label>床位</label><input id="bed" placeholder="431"></div>
+          <div class="field"><label>业务类型</label><select id="entryType"><option value="R">租金/续租</option><option value="D">押金/新客</option><option value="DR">押金退款</option><option value="TF">换床</option><option value="E">其他支出</option></select></div>
+        </div>
+        <div class="field hidden" id="transferTargetWrap"><label>换入床位</label><input id="roomTo" placeholder="例如 852"></div>
+        <div class="ctx" id="bedContext"></div>
+        <div class="grid2">
+          <div class="field"><label>实收金额 amount</label><input id="amount" inputmode="decimal" placeholder="400.00"></div>
+          <div class="field"><label>租客姓名</label><input id="tenantName" placeholder="自动抓取或手动填写"></div>
+        </div>
+        <div class="grid2">
+          <div class="field"><label>应收金额 due</label><input id="due" inputmode="decimal" placeholder="系统参考或手动填写"></div>
+          <div class="field"><label>计入金额 paid</label><input id="paid" inputmode="decimal" placeholder="默认等于实收"></div>
+        </div>
+        <div id="periodFields">
+          <div class="grid2">
+            <div class="field"><label>起始日期</label><input id="periodStart" readonly></div>
+            <div class="field"><label>租期</label><select id="cycle"><option value="15D">15天</option><option value="1M">1个月</option><option value="CUSTOM">自定义天数</option></select></div>
+          </div>
+          <div class="grid2">
+            <div class="field hidden" id="customDaysWrap"><label>自定义天数</label><input id="customDays" inputmode="numeric" placeholder="例如 10"></div>
+            <div class="field"><label>截止日期</label><input id="periodEnd" readonly></div>
+          </div>
+        </div>
+        <div class="grid2">
+          <div class="field"><label>是否收清 clr</label><select id="clr"><option value="Y">Y 已收清</option><option value="N">N 未收清</option></select></div>
+          <div class="field"><label>差异原因 reason</label><input id="reason" placeholder="如短租/折扣/尾款/退款"></div>
+        </div>
+        <div class="field"><label>备注 remark</label><textarea id="note" placeholder="例如：承诺 5/25 补齐，或押金退还原因"></textarea></div>
+        <div class="row"><button class="btn primary" id="btnSaveEntry">保存录入</button><button class="btn" id="btnReset">清空</button></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="view-arrears" class="hidden">
+    <div class="card">
+      <div class="head"><div class="title">欠款更新</div><button class="btn" id="btnRefreshTasks">刷新</button></div>
+      <div class="body"><div id="taskList" class="small">正在加载...</div></div>
+    </div>
+  </section>
+
+  <section id="view-export" class="hidden">
+    <div class="card">
+      <div class="head"><div class="title">导出</div><button class="btn" id="btnCopyExport">复制</button></div>
+      <div class="body">
+        <div class="row" style="margin-bottom:10px"><button class="btn primary" id="btnBuildExport">生成今日文本</button><button class="btn danger" id="btnClearLocal">清空本机草稿</button></div>
+        <pre id="exportText">暂无导出内容</pre>
+      </div>
+    </div>
+  </section>
+</main>
+<div class="toast" id="toast"></div>
+<script>
+const API_ORIGIN='https://homelink-finance.habibramadan888.workers.dev';
+const $=id=>document.getElementById(id);
+const pad=n=>String(n).padStart(2,'0');
+const today=()=>{const d=new Date();return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`};
+const nowText=()=>{const d=new Date();return `${today()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`};
+const money=n=>(Number(n)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+const uid=p=>p+'-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,7);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const state={lockCards:[],drafts:JSON.parse(localStorage.getItem('emp:drafts')||'[]'),tasks:[],currentBed:null};
+function apiUrl(path){return location.protocol!=='file:'&&location.host.includes('workers.dev')?path:API_ORIGIN+path}
+async function apiFetch(path,opts={}){return fetch(apiUrl(path),{credentials:'include',...opts,headers:{'Content-Type':'application/json',...(opts.headers||{})}})}
+function toast(msg){const el=$('toast');el.textContent=msg;el.style.display='block';clearTimeout(window.__t);window.__t=setTimeout(()=>el.style.display='none',2600)}
+function saveDrafts(){localStorage.setItem('emp:drafts',JSON.stringify(state.drafts))}
+function operatorId(){return $('operatorId').value.trim()||localStorage.getItem('emp:operator')||'EMP'}
+function setOperator(v){localStorage.setItem('emp:operator',v||'EMP')}
+function addDays(dateStr,days){const d=new Date(dateStr+'T00:00:00');d.setDate(d.getDate()+Number(days||0));return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`}
+function addMonths(dateStr,months){const d=new Date(dateStr+'T00:00:00');const day=d.getDate();d.setMonth(d.getMonth()+Number(months||0));if(d.getDate()!==day)d.setDate(0);return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`}
+function findDateText(s){
+  s=String(s||'');
+  const validMD=(m,d)=>{const y=new Date().getFullYear();const x=new Date(y,m-1,d);return x.getFullYear()===y&&x.getMonth()===m-1&&x.getDate()===d;};
+  const full=s.match(/(20\d{2})[-/.年](\d{1,2})[-/.月](\d{1,2})/);
+  if(full)return `${full[1]}-${pad(full[2])}-${pad(full[3])}`;
+  const md=s.match(/(?:^|\D)(\d{1,2})[-/.月](\d{1,2})(?:日|\D|$)/);
+  if(md&&validMD(Number(md[1]),Number(md[2]))){const y=new Date().getFullYear();return `${y}-${pad(md[1])}-${pad(md[2])}`;}
+  const compactMatches=[...s.matchAll(/(?:^|\D)(0[1-9]|1[0-2])([0-3]\d)(?=\D|$)/g)];
+  for(const compact of compactMatches){
+    const m=Number(compact[1]),d=Number(compact[2]);
+    if(validMD(m,d)){
+      const y=new Date().getFullYear();
+      return `${y}-${pad(m)}-${pad(d)}`;
+    }
+  }
+  const nums=(s.match(/\d+(?:\.\d+)?/g)||[]).map(Number);
+  for(let i=0;i<nums.length-1;i++){
+    const m=nums[i],d=nums[i+1];
+    if(Number.isInteger(m)&&Number.isInteger(d)&&validMD(m,d)){
+      const y=new Date().getFullYear();
+      return `${y}-${pad(m)}-${pad(d)}`;
+    }
+  }
+  return '';
+}
+function numberLooksLikeMonthDay(n){
+  const s=String(Math.trunc(Number(n)||0)).padStart(4,'0');
+  const m=Number(s.slice(0,2)),d=Number(s.slice(2));
+  return m>=1&&m<=12&&d>=1&&d<=31;
+}
+function normalizeCard(raw){
+  const cardText=[raw.cardName,raw.name,raw.tenant_name,raw.tenant].filter(Boolean).join(' ');
+  const roomText=String(raw.room||raw.bed||raw.roomName||'').trim();
+  const remarkText=[raw.remark,raw.remarks,raw.cardRemark,raw.memo,raw.note,raw.description].filter(Boolean).join(' ');
+  const text=[roomText,cardText,remarkText].filter(Boolean).join(' ');
+  const cardBed=(cardText.match(/\b(\d{2,5})\b/)||[])[1]||'';
+  const roomBed=(roomText.match(/\b(\d{2,5})\b/)||[])[1]||roomText;
+  const bed=cardBed||roomBed;
+  const depLabel=text.match(/押金\D{0,8}(\d{3,5}(?:\.\d{1,2})?)/);
+  const remarkNums=[...remarkText.matchAll(/\b(\d{2,5}(?:\.\d{1,2})?)\b/g)].map(m=>Number(m[1]));
+  const allNums=[...text.matchAll(/\b(\d{2,5}(?:\.\d{1,2})?)\b/g)].map(m=>Number(m[1]));
+  const deposit=depLabel?Number(depLabel[1]):(
+    remarkNums.find(n=>n!==Number(bed)&&n>=100&&n<=5000&&!numberLooksLikeMonthDay(n))||
+    allNums.find(n=>n!==Number(bed)&&n>=100&&n<=5000&&!numberLooksLikeMonthDay(n))||
+    ''
+  );
+  const start=findDateText(remarkText)||findDateText(cardText)||findDateText(text);
+  const end=raw.endDate?new Date(raw.endDate):raw.end_date?new Date(raw.end_date):null;
+  return {bed,room:roomText,searchText:text,tenant:raw.tenant_name||raw.tenant||raw.cardName||raw.name||'',deposit,start,end:end&&!isNaN(end)?`${end.getFullYear()}-${pad(end.getMonth()+1)}-${pad(end.getDate())}`:'',raw};
+}
+function lookupBed(){
+  const bed=$('bed').value.trim().replace(/^#/,'');
+  if(!bed){state.currentBed=null;renderContext();calcPeriodEnd();return;}
+  const exact=state.lockCards.filter(c=>String(c.bed||'')===bed);
+  const fuzzy=exact.length?exact:state.lockCards.filter(c=>String(c.searchText||'').includes(bed)||String(c.room||'').includes(bed));
+  state.currentBed=(fuzzy.find(c=>!/老板|员工|staff|空置|vacant/i.test(c.tenant||''))||fuzzy[0]||null);
+  const c=state.currentBed||{};
+  $('tenantName').value=$('tenantName').value||c.tenant||'';
+  if(!$('periodStart').value)$('periodStart').value=c.start||c.end||today();
+  renderContext();
+  calcPeriodEnd();
+  if(state.lockCards.length&&bed&&!state.currentBed)toast('已抓取床位，但未匹配到 '+bed);
+}
+function renderContext(){
+  const c=state.currentBed;
+  $('bedContext').innerHTML=[
+    ['押金',c&&c.deposit?money(c.deposit):'未抓取'],
+    ['入住',c&&c.start?c.start:'未抓取'],
+    ['当前截止',c&&c.end?c.end:'未抓取'],
+    ['租客',c&&c.tenant?c.tenant:'未抓取']
+  ].map(([k,v])=>`<div><span>${k}</span><b>${esc(v)}</b></div>`).join('');
+}
+function calcPeriodEnd(){
+  const type=$('entryType').value;
+  const show=type==='R'||type==='D';
+  const c=state.currentBed||{};
+  $('periodFields').classList.toggle('hidden',!show);
+  $('transferTargetWrap').classList.toggle('hidden',type!=='TF');
+  if(type==='DR'){
+    if(c.deposit&&!$('amount').value)$('amount').value=money(c.deposit);
+    if(!$('note').value)$('note').value=['押金退款',c.start?`入住日期 ${c.start}`:'',c.tenant?`租客 ${c.tenant}`:''].filter(Boolean).join('，');
+  }
+  if(!show)return;
+  $('periodStart').value=type==='R'?(c.end||today()):(c.start||today());
+  const start=$('periodStart').value;
+  const cycle=$('cycle').value;
+  $('customDaysWrap').classList.toggle('hidden',cycle!=='CUSTOM');
+  $('periodEnd').value=cycle==='1M'?addMonths(start,1):addDays(start,cycle==='CUSTOM'?($('customDays').value||0):15);
+}
+async function loadLock(){
+  try{
+    const r=await apiFetch('/api/employee/lock/cards');
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    const data=await r.json();
+    const list=data.roomsData&&typeof data.roomsData==='object'
+      ?Object.entries(data.roomsData).flatMap(([room,cards])=>(cards||[]).map(card=>({...card,room})))
+      :Array.isArray(data)?data:Array.isArray(data.cards)?data.cards:Array.isArray(data.rows)?data.rows:[];
+    state.lockCards=list.map(normalizeCard).filter(x=>x.bed);
+    toast('已抓取床位 '+state.lockCards.length+' 条');
+    lookupBed();
+  }catch(e){toast('床位抓取失败，仍可手动录入')}
+}
+function entryPayload(){
+  const type=$('entryType').value;
+  const cat=type==='DR'?'refund':type==='E'?'expense':type==='R'?'cash':'bank';
+  const periodStart=(type==='R'||type==='D')?$('periodStart').value:'';
+  const periodEnd=(type==='R'||type==='D')?$('periodEnd').value:'';
+  const cycle=(type==='R'||type==='D')?($('cycle').value==='CUSTOM'?($('customDays').value+'D'):$('cycle').value):'';
+  const amount=Number($('amount').value||0);
+  const due=Number($('due').value||amount||0);
+  const paid=Number($('paid').value||amount||0);
+  return {
+    id:uid('ent'),cat,room:$('bed').value.trim().replace(/^#/,''),amount,due,paid,deficit:Math.max(0,due-paid),
+    tag:type==='D'?'New':type==='TF'?'Transfer':'Old',note:$('note').value.trim(),
+    roomTo:type==='TF'?$('roomTo').value.trim().replace(/^#/,''):undefined,
+    period_start:periodStart,period_end:periodEnd,cycle,reason_code:type,operator_id:operatorId(),src:'EMP',
+    tenant_name:$('tenantName').value.trim(),clr:$('clr').value,reason:$('reason').value.trim(),created_at:nowText()
+  };
+}
+function exportLine(e){
+  const code=e.reason_code||'OLD';
+  const p=e.period_start&&e.period_end?` ${e.period_start}~${e.period_end} ${e.cycle}`:'';
+  const move=e.roomTo?` -> #${e.roomTo}`:'';
+  const tenant=e.tenant_name?` 租客:${e.tenant_name}`:'';
+  const acc=` due:${money(e.due)} paid:${money(e.paid)} clr:${e.clr||'Y'}`;
+  const reason=e.reason?` reason:${e.reason}`:'';
+  const note=e.note?` 备注:${e.note}`:'';
+  return `#${e.room}${move} ${money(e.amount)} ${code}${p}${acc}${reason}${tenant} 员工:${e.operator_id}${note}`;
+}
+async function saveEntry(){
+  const e=entryPayload();
+  if(!e.room||!e.amount){toast('请填写床位和金额');return}
+  setOperator(operatorId());
+  state.drafts.unshift(e);saveDrafts();
+  const session={id:uid('emp'),date:nowText(),anchorId:'EMP-'+today().replaceAll('-','')+'-'+operatorId(),entries:[{
+    id:e.id,cat:e.cat,room:e.room,amount:e.amount,due:e.due,paid:e.paid,deficit:e.deficit,tag:e.tag,note:e.note,roomTo:e.roomTo,
+    period_start:e.period_start,period_end:e.period_end,cycle:e.cycle,reason_code:e.reason_code,
+    operator_id:e.operator_id,src:e.src,tenant_name:e.tenant_name,clr:e.clr,reason:e.reason
+  }]};
+  try{
+    let r=await apiFetch('/api/employee/entry',{method:'POST',body:JSON.stringify({entry:e,session})});
+    if(!r.ok)r=await apiFetch('/api/save_session',{method:'POST',body:JSON.stringify({session,arrears:[]})});
+    toast(r.ok?'已保存并同步':'已保存本机，云端同步失败');
+  }catch(err){toast('已保存本机，云端暂不可用')}
+}
+function resetForm(){['bed','roomTo','amount','due','paid','tenantName','periodStart','periodEnd','customDays','reason','note'].forEach(id=>$(id).value='');$('clr').value='Y';state.currentBed=null;renderContext();calcPeriodEnd()}
+function statusClass(s){return s==='已结清'?'green':s==='承诺付款'||s==='已联系'||s==='部分支付'?'orange':'red'}
+async function loadTasks(){
+  $('taskList').textContent='正在加载...';
+  try{
+    let r=await apiFetch('/api/arrear_tasks');
+    let data=null;
+    if(r.ok)data=await r.json();
+    else{
+      r=await apiFetch('/api/arrears');
+      if(r.ok){
+        const rows=await r.json();
+        data=(Array.isArray(rows)?rows:rows.arrears||[]).filter(x=>!x.cleared).map(x=>({
+          task_id:x.id||uid('task'),entry_id:x.entryId,bed:x.room,tenant_name:x.tenant_name||'',arrear_amount:x.remain,
+          arrear_reason:x.note||'欠款',followup_status:x.followup_status||'待跟进',promise_date:x.promiseDate||'',promise_amount:x.promiseAmount||'',actual_received:x.actualReceived||0,
+          close_status:x.close_status||'',close_reason:x.close_reason||'',owner_note:x.owner_note||'',staff_note:x.staff_note||'',last_followup_at:x.last_followup_at||''
+        }));
+      }
+    }
+    state.tasks=Array.isArray(data)?data:Array.isArray(data.tasks)?data.tasks:[];
+    renderTasks();
+  }catch(e){$('taskList').textContent='欠款任务加载失败';}
+}
+function renderTasks(){
+  if(!state.tasks.length){$('taskList').innerHTML='<div class="hint">当前没有欠款任务。</div>';return}
+  $('taskList').innerHTML=state.tasks.map(t=>`<div class="task" data-id="${esc(t.task_id)}">
+    <div class="task-top"><div><div class="bed">#${esc(t.bed||'')}</div><div class="small">${esc(t.tenant_name||'未填租客')} · ${esc(t.arrear_reason||'欠款')}</div></div><div class="money">AED ${money(t.arrear_amount)}</div></div>
+    <div style="margin:10px 0"><span class="pill ${statusClass(t.followup_status)}">${esc(t.followup_status||'待跟进')}</span></div>
+    <div class="grid2"><div class="field"><label>跟进状态</label><select data-k="followup_status"><option>待跟进</option><option>已联系</option><option>承诺付款</option><option>部分支付</option><option>已结清</option><option>无法联系</option><option>转老板处理</option></select></div><div class="field"><label>承诺日期</label><input type="date" data-k="promise_date" value="${esc(t.promise_date||'')}"></div></div>
+    <div class="grid2"><div class="field"><label>承诺金额</label><input inputmode="decimal" data-k="promise_amount" value="${esc(t.promise_amount||'')}"></div><div class="field"><label>实际收到</label><input inputmode="decimal" data-k="actual_received" value="${esc(t.actual_received||'')}"></div></div>
+    <div class="grid2"><div class="field"><label>结案状态</label><input data-k="close_status" value="${esc(t.close_status||'')}"></div><div class="field"><label>结案原因</label><input data-k="close_reason" value="${esc(t.close_reason||'')}"></div></div>
+    <div class="field"><label>老板备注</label><textarea data-k="owner_note">${esc(t.owner_note||'')}</textarea></div>
+    <div class="field"><label>员工备注</label><textarea data-k="staff_note">${esc(t.staff_note||'')}</textarea></div>
+    <div class="field"><label>原因说明</label><textarea data-k="arrear_reason">${esc(t.arrear_reason||'')}</textarea></div>
+    <button class="btn primary" data-act="update-task" data-id="${esc(t.task_id)}">保存跟进</button>
+  </div>`).join('');
+  state.tasks.forEach(t=>{const row=document.querySelector(`[data-id="${CSS.escape(t.task_id)}"]`);if(row)row.querySelector('[data-k="followup_status"]').value=t.followup_status||'待跟进'});
+}
+async function updateTask(id){
+  const row=document.querySelector(`[data-id="${CSS.escape(id)}"]`);if(!row)return;
+  const old=state.tasks.find(t=>t.task_id===id)||{};
+  const patch={...old,updated_by:operatorId(),updated_at:nowText()};
+  patch.last_followup_at=patch.updated_at;
+  row.querySelectorAll('[data-k]').forEach(el=>patch[el.dataset.k]=el.value);
+  try{
+    const r=await apiFetch('/api/arrear_tasks/update',{method:'POST',body:JSON.stringify({task_id:id,patch})});
+    toast(r.ok?'跟进已同步':'跟进已保存本机，云端未确认');
+  }catch(e){toast('跟进已保存本机，云端暂不可用')}
+  state.tasks=state.tasks.map(t=>t.task_id===id?patch:t);
+  localStorage.setItem('emp:task_updates',JSON.stringify(state.tasks));
+  renderTasks();
+}
+function buildExport(){
+  const lines=['员工录入导出 '+nowText(),'员工 '+operatorId(),''].concat(state.drafts.map(exportLine));
+  const updates=state.tasks.filter(t=>t.updated_at).map(t=>`#${t.bed} arrear:${money(t.arrear_amount)} status:${t.followup_status} promise:${t.promise_date||'-'} promise_amt:${money(t.promise_amount)} received:${money(t.actual_received)} reason:${t.arrear_reason||'-'} close:${t.close_status||'-'} updated:${t.updated_by||operatorId()}/${t.updated_at}`);
+  if(updates.length)lines.push('', '欠款跟进', ...updates);
+  $('exportText').textContent=lines.join('\n');
+}
+document.querySelectorAll('.tab').forEach(btn=>btn.onclick=()=>{document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));btn.classList.add('active');['entry','arrears','export'].forEach(v=>$('view-'+v).classList.toggle('hidden',v!==btn.dataset.view));if(btn.dataset.view==='arrears')loadTasks();if(btn.dataset.view==='export')buildExport();});
+$('operatorId').value=localStorage.getItem('emp:operator')||'';
+$('operatorId').onchange=e=>setOperator(e.target.value.trim());
+$('btnLoadLock').onclick=loadLock;$('bed').oninput=lookupBed;$('entryType').onchange=calcPeriodEnd;$('cycle').onchange=calcPeriodEnd;$('customDays').oninput=calcPeriodEnd;
+$('amount').oninput=()=>{if(!$('paid').value)$('paid').value=$('amount').value;if(!$('due').value)$('due').value=$('amount').value;};
+$('due').oninput=()=>{const due=Number($('due').value||0),paid=Number($('paid').value||$('amount').value||0);$('clr').value=paid>=due?'Y':'N';};
+$('paid').oninput=()=>{const due=Number($('due').value||$('amount').value||0),paid=Number($('paid').value||0);$('clr').value=paid>=due?'Y':'N';};
+$('btnSaveEntry').onclick=saveEntry;$('btnReset').onclick=resetForm;$('btnRefreshTasks').onclick=loadTasks;$('btnBuildExport').onclick=buildExport;
+$('btnCopyExport').onclick=async()=>{await navigator.clipboard.writeText($('exportText').textContent);toast('已复制')};
+$('btnClearLocal').onclick=()=>{if(confirm('清空本机草稿？')){state.drafts=[];saveDrafts();buildExport();toast('已清空')}};
+$('taskList').addEventListener('click',e=>{
+  const btn=e.target.closest('[data-act="update-task"]');
+  if(btn)updateTask(btn.dataset.id);
+});
+renderContext();calcPeriodEnd();
+</script>
+</body>
+</html>

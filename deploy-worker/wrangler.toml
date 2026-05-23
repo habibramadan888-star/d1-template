@@ -1,0 +1,21 @@
+name = "homelink-finance"
+main = "src/index.js"
+compatibility_date = "2024-09-23"
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "homelink"
+database_id = "562aa079-1cca-4176-ba3b-7276a65f98fb"
+
+[[kv_namespaces]]
+binding = "RATE_LIMIT"
+id = "c7c64d522d964baba2e72454e7262da9"
+
+[vars]
+APP_NAME = "Homelink Finance"
+APP_VERSION = "2.0.0"
+CORPID = "homelink"
