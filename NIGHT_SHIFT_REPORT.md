@@ -1627,3 +1627,59 @@ Mode: local-only disposable D1; no production mutation.
 ### Next Step
 
 The Worker implementation must handle unique-key conflicts by returning the original committed result. Do not insert a second transaction or generate a replacement key after conflict.
+
+## V2 Duplicate Idempotency Rehearsal Follow-Up
+
+### Task
+
+Extend the local D1 rent write rehearsal to prove duplicate idempotency writes are blocked.
+
+### Current Status
+
+Completed.
+
+### Code Modified
+
+Yes, but only local rehearsal script and reports:
+
+- `scripts/rehearse-rent-write-plan.mjs`
+- `RUN_REPORT.md`
+- `NIGHT_SHIFT_REPORT.md`
+- `NEXT_MORNING_REVIEW.md`
+
+### Why
+
+A schema-level unique index is only useful if the actual write plan surfaces and respects the conflict. The local rehearsal now confirms that a retry using different row ids but the same scoped idempotency key fails before duplicate accounting rows are created.
+
+### Risk
+
+Low. This is a local-only verification change.
+
+### Database Impact
+
+Disposable local D1 only. No production database mutation.
+
+### Permission Impact
+
+None.
+
+### Worker Impact
+
+No Worker route or runtime behavior changed.
+
+### Verification
+
+```text
+npm run check passed
+npm run rehearsal:rent-write-plan passed
+Syntax check passed for 38 file(s).
+tests 68 / pass 68
+Worker assets dry-run build passed
+Worker embedded dry-run build passed
+Duplicate idempotency write blocked: true
+Mode: local-only disposable D1; no production mutation.
+```
+
+### Next Step
+
+When implementing the Worker route, add explicit conflict handling that fetches and returns the original committed transaction bundle. The Worker should not expose the raw SQLite error to staff users.

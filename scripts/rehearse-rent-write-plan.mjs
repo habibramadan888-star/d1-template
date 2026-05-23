@@ -23,6 +23,20 @@ function runWrangler(args) {
   });
 }
 
+function expectWranglerFailure(args, expectedPattern) {
+  try {
+    runWrangler(args);
+  } catch (error) {
+    const output = `${error.stdout ?? ""}\n${error.stderr ?? ""}\n${error.message ?? ""}`;
+    if (!expectedPattern.test(output)) {
+      throw new Error(`Unexpected wrangler failure output: ${output.slice(0, 500)}`);
+    }
+    return;
+  }
+
+  throw new Error("Expected wrangler command to fail, but it succeeded.");
+}
+
 function parseJsonOutput(output) {
   const text = output.trim();
   const firstArray = text.indexOf("[");
@@ -133,6 +147,24 @@ const writePlan = createRentWritePlan(entryDraft, {
   bedId: "bed_rent_plan_144"
 });
 
+const duplicateWritePlan = createRentWritePlan(entryDraft, {
+  transactionId: "tx_rent_plan_retry",
+  idempotencyKey: "emp_entry_rehearsal_rent_plan",
+  receivableId: "rec_rent_plan_retry",
+  paymentId: "pay_rent_plan_retry",
+  arrearTaskId: "task_rent_plan_retry",
+  auditEventIds: [
+    "audit_tx_plan_retry",
+    "audit_rec_plan_retry",
+    "audit_pay_plan_retry",
+    "audit_task_plan_retry"
+  ],
+  handoverAuditEventId: "audit_handover_plan_retry",
+  createdAt,
+  actorRole: "employee",
+  bedId: "bed_rent_plan_144"
+});
+
 const seedSql = `
 INSERT INTO companies (company_id, name, status, created_at, updated_at)
 VALUES ('co_rent_plan', 'Rent Plan Company', 'ACTIVE', '${createdAt}', '${createdAt}');
@@ -172,10 +204,12 @@ SELECT
 
 const persistDir = await mkdtemp(path.join(tmpdir(), "homelink-rent-plan-"));
 const rehearsalSqlPath = path.join(persistDir, "rent-write-plan.sql");
+const duplicateSqlPath = path.join(persistDir, "rent-write-plan-duplicate.sql");
 let summary;
 
 try {
   await writeFile(rehearsalSqlPath, `${seedSql}\n${planToSql(writePlan)}\n${verifySql}`, "utf8");
+  await writeFile(duplicateSqlPath, planToSql(duplicateWritePlan), "utf8");
 
   runWrangler([
     "d1",
@@ -222,7 +256,54 @@ try {
   requireEqual(row.bank_transfer_count, 0, "bank_transfer_count");
   requireEqual(row.gross_received_fils, 8000, "gross_received_fils");
 
-  summary = { persistDir, operationCount: writePlan.operations.length };
+  expectWranglerFailure(
+    [
+      "d1",
+      "execute",
+      "homelink",
+      "--local",
+      "--persist-to",
+      persistDir,
+      "--config",
+      "wrangler.toml",
+      "--file",
+      duplicateSqlPath,
+      "--json",
+      "--yes"
+    ],
+    /UNIQUE constraint failed/i
+  );
+
+  const postDuplicateJson = parseJsonOutput(
+    runWrangler([
+      "d1",
+      "execute",
+      "homelink",
+      "--local",
+      "--persist-to",
+      persistDir,
+      "--config",
+      "wrangler.toml",
+      "--command",
+      verifySql,
+      "--json",
+      "--yes"
+    ])
+  );
+
+  const postDuplicateRow = rowsFromJson(postDuplicateJson).find((entry) =>
+    Object.hasOwn(entry, "transaction_count")
+  );
+  if (!postDuplicateRow) throw new Error("Missing post-duplicate SELECT result.");
+  requireEqual(postDuplicateRow.transaction_count, 1, "post_duplicate_transaction_count");
+  requireEqual(postDuplicateRow.receivable_count, 1, "post_duplicate_receivable_count");
+  requireEqual(postDuplicateRow.payment_count, 1, "post_duplicate_payment_count");
+
+  summary = {
+    persistDir,
+    operationCount: writePlan.operations.length,
+    duplicateBlocked: true
+  };
 } finally {
   await rm(persistDir, { recursive: true, force: true });
 }
@@ -230,6 +311,7 @@ try {
 if (summary) {
   console.log("Rent write plan rehearsal passed.");
   console.log(`Validated operations: ${summary.operationCount}`);
+  console.log(`Duplicate idempotency write blocked: ${summary.duplicateBlocked}`);
   console.log(`Temporary D1 directory removed: ${summary.persistDir}`);
   console.log("Mode: local-only disposable D1; no production mutation.");
 }

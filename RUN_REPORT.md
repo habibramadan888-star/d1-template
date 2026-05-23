@@ -1498,3 +1498,51 @@ Rent write plan local D1 rehearsal passed
 Validated operations: 10
 Mode: local-only disposable D1; no production mutation.
 ```
+
+## Duplicate Idempotency Rehearsal Update
+
+Date: 2026-05-23
+
+### Files Added Or Updated
+
+- Updated `scripts/rehearse-rent-write-plan.mjs`.
+
+### Why
+
+The prior local D1 rehearsal proved a commercial rent write plan could be inserted once. It did not prove that a weak-network retry with a different transaction id but the same scoped idempotency key would be blocked by the database. Commercial accounting writes need this duplicate-write guard before Worker promotion.
+
+### Rules Captured
+
+- The rehearsal now inserts the rent write plan once.
+- It then attempts a second write with different row ids and the same `idempotency_key`.
+- The duplicate write must fail with a SQLite unique constraint error.
+- After the blocked duplicate, transaction, receivable, and payment counts must remain at one.
+
+### Safety Scope
+
+- Local disposable D1 only.
+- No production migration was executed.
+- No production data was read or mutated.
+- No Worker route was changed.
+- No frontend behavior was changed.
+
+### Verification
+
+Commands:
+
+```bash
+npm run check
+npm run rehearsal:rent-write-plan
+```
+
+Result:
+
+```text
+Syntax check passed for 38 file(s).
+tests 68 / pass 68
+Worker assets dry-run build passed
+Worker embedded dry-run build passed
+Rent write plan local D1 rehearsal passed
+Duplicate idempotency write blocked: true
+Mode: local-only disposable D1; no production mutation.
+```

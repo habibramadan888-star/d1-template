@@ -660,3 +660,23 @@ Follow-up:
 
 - Future Worker code must catch uniqueness conflicts and return the original committed result.
 - Production D1 migration is still blocked until the promotion checklist and clean Worker bootstrap gate pass.
+
+## Duplicate Idempotency Rehearsal Follow-Up
+
+Updated `scripts/rehearse-rent-write-plan.mjs` so the local disposable D1 rehearsal tests duplicate submission behavior.
+
+Validation completed:
+
+```text
+npm run check passed
+npm run rehearsal:rent-write-plan passed
+Syntax check passed for 38 file(s).
+tests 68 / pass 68
+Duplicate idempotency write blocked: true
+Worker dry-run builds passed
+```
+
+Follow-up:
+
+- Worker implementation must translate duplicate idempotency conflicts into a safe “already accepted” response.
+- Do not return raw database errors to employees.
