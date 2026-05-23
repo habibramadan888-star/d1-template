@@ -24,7 +24,9 @@ for (const check of checks) {
       url,
       status: "ERR",
       pass: false,
-      error: error?.message || String(error)
+      error:
+        `${error?.message || String(error)}. ` +
+        "Local Worker is not reachable. Run npm run dev:worker in another terminal or use npm run smoke:with-worker."
     });
   }
 }

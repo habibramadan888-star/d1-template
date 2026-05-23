@@ -1,5 +1,5 @@
-# Local-only example for non-production validation.
-# Copy to deploy-worker/.dev.vars, then replace every placeholder.
+# Local Wrangler development only.
+# Copy to deploy-worker/.dev.vars or run `npm run dev:secrets`.
 # Never commit deploy-worker/.dev.vars.
 
 APP_NAME="Homelink Finance"
@@ -8,17 +8,18 @@ APP_ENV="development"
 CORPID="local-dev-company"
 ALLOW_DEV_SEED="true"
 
-JWT_SECRET="generate-a-long-random-local-jwt-secret"
-PW_SALT="generate-a-long-random-local-password-salt"
-DATA_ENCRYPTION_KEY="generate-a-long-random-local-encryption-key"
+JWT_SECRET="replace-with-long-random-local-jwt-secret"
+PW_SALT="replace-with-long-random-local-password-salt"
+DATA_ENCRYPTION_KEY="replace-with-long-random-local-encryption-key"
 
 MANAGER_PW_HASH="replace-with-local-manager-password-hash"
 STAFF_PW_HASH="replace-with-local-staff-password-hash"
+USER_ACCOUNTS='[]'
+
 LOCAL_MANAGER_PASSWORD="replace-with-local-manager-password"
 LOCAL_EMPLOYEE_ID="abdul"
 LOCAL_EMPLOYEE_NAME="阿布杜"
 LOCAL_EMPLOYEE_PIN="replace-with-local-employee-pin"
-USER_ACCOUNTS='[]'
 
 TTLOCK_API_ORIGIN="https://api.sciener.com"
 TTLOCK_CLIENT_ID="local-test-only"
@@ -26,6 +27,6 @@ TTLOCK_CLIENT_SECRET="local-test-only"
 TTLOCK_USERNAME="local-test-only"
 TTLOCK_PASSWORD="local-test-only"
 
-ALLOWED_ORIGINS="http://127.0.0.1:8793,http://127.0.0.1:8794"
+ALLOWED_ORIGINS="http://127.0.0.1:8793,http://localhost:8793"
 ALLOWED_HOST="127.0.0.1:8793"
 CLOUD_API_ORIGIN="http://127.0.0.1:8793"

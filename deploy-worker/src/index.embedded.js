@@ -578,14 +578,21 @@ async function ensureEmployeeUsers(env){
     created_at TEXT,
     updated_at TEXT
   )`).run();
-  const row=await env.DB.prepare("SELECT employee_id FROM employee_users WHERE lower(employee_id)='abdul' LIMIT 1").first();
+  const appEnv=String(env.APP_ENV||"").trim().toLowerCase();
+  const allowDevSeed=["1","true","yes","on"].includes(String(env.ALLOW_DEV_SEED||"").trim().toLowerCase());
+  if(!allowDevSeed||!["development","dev","local","test"].includes(appEnv))return;
+  const seedEmployeeId=cleanText(env.LOCAL_EMPLOYEE_ID||"abdul",80).toLowerCase();
+  const seedEmployeePin=String(env.LOCAL_EMPLOYEE_PIN||"");
+  const seedEmployeeName=cleanText(env.LOCAL_EMPLOYEE_NAME||seedEmployeeId,120)||seedEmployeeId;
+  if(!seedEmployeeId||!seedEmployeePin)return;
+  const row=await env.DB.prepare("SELECT employee_id FROM employee_users WHERE lower(employee_id)=? LIMIT 1").bind(seedEmployeeId).first();
   if(!row){
     const salt=env.PW_SALT||env.JWT_SECRET||"homelink";
-    const pinHash=await hashPassword("8888",salt);
+    const pinHash=await hashPassword(seedEmployeePin,salt);
     await env.DB.prepare(`INSERT OR REPLACE INTO employee_users
       (employee_id, employee_name, pin_hash, role, status, created_at, updated_at)
       VALUES (?, ?, ?, 'staff', 'ACTIVE', ?, ?)`)
-      .bind("abdul","阿布杜",pinHash,new Date().toISOString(),new Date().toISOString()).run();
+      .bind(seedEmployeeId,seedEmployeeName,pinHash,new Date().toISOString(),new Date().toISOString()).run();
   }
 }
 __name(ensureEmployeeUsers,"ensureEmployeeUsers");
@@ -760,7 +767,14 @@ async function audit(env, user, action, target = "", detail = {}) {
 }
 __name(audit, "audit");
 function cleanText(value, max = MAX_TEXT) {
-  return String(value ?? "").replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "").trim().slice(0, max);
+  return Array.from(String(value ?? ""))
+    .filter((ch) => {
+      const code = ch.charCodeAt(0);
+      return !(code <= 8 || code === 11 || code === 12 || code === 127 || code >= 14 && code <= 31);
+    })
+    .join("")
+    .trim()
+    .slice(0, max);
 }
 __name(cleanText, "cleanText");
 function cleanId(value, max = 80) {
@@ -994,7 +1008,7 @@ async function loadLockCards(env) {
   return { roomsData, locksCount: locks.length, loadedAt: (/* @__PURE__ */ new Date()).toISOString() };
 }
 __name(loadLockCards, "loadLockCards");
-﻿// EMPLOYEE_API_PATCH_START
+// EMPLOYEE_API_PATCH_START
 const EMP_TX_COLUMNS = [
   "id","corpid","userid","session_id","cat","room","amount","due","paid","deficit","tag","note","room_to",
   "start_date","dep_due","dep_paid","dep_def","due_date","dep_date","pay_type","discount_reason","deposit_collection",

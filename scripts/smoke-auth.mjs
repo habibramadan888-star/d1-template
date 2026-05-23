@@ -79,9 +79,29 @@ async function main() {
   const employeeId = env.LOCAL_EMPLOYEE_ID || "abdul";
   const employeePin = env.LOCAL_EMPLOYEE_PIN || "8888";
 
+  for (const key of ["JWT_SECRET", "PW_SALT", "MANAGER_PW_HASH"]) {
+    if (!String(env[key] || "").trim()) throw new Error(`${key} missing from ${envPath}`);
+  }
   if (!managerPassword) {
     throw new Error(`LOCAL_MANAGER_PASSWORD missing from ${envPath}`);
   }
+  const appEnv = String(env.APP_ENV || "").toLowerCase();
+  if (!["development", "dev", "local", "test"].includes(appEnv)) {
+    throw new Error(
+      `APP_ENV must be development/local/test for auth smoke, got ${env.APP_ENV || ""}`
+    );
+  }
+  if (String(env.ALLOW_DEV_SEED || "").toLowerCase() !== "true") {
+    throw new Error(`ALLOW_DEV_SEED must be true in ${envPath} for local employee auth smoke`);
+  }
+
+  const unauthMe = await request("/api/me");
+  await expectStatus("unauthenticated /api/me rejected", unauthMe, 401);
+
+  const badJwt = await request("/api/me", {
+    headers: { Authorization: "Bearer invalid.local.jwt" }
+  });
+  await expectStatus("invalid jwt rejected", badJwt, 401);
 
   const ownerCookie = await loginOwner(managerPassword);
   const ownerMe = await request("/api/me", { headers: { Cookie: ownerCookie } });
@@ -92,13 +112,10 @@ async function main() {
   }
   console.log("PASS owner role manager");
 
-  const ownerHistory = await request("/api/history", { headers: { Cookie: ownerCookie } });
-  await expectStatus("owner /api/history", ownerHistory, 200);
-
   const ownerRentConfig = await request("/api/rent_config", {
     headers: { Cookie: ownerCookie }
   });
-  await expectStatus("owner /api/rent_config", ownerRentConfig, 200);
+  await expectStatus("owner allowed /api/rent_config", ownerRentConfig, 200);
 
   const employeeCookie = await loginEmployee(employeeId, employeePin);
   const employeeMe = await request("/api/me", { headers: { Cookie: employeeCookie } });

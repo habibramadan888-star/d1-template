@@ -8,6 +8,8 @@ node_modules/
 !.env.local.example
 .dev.vars
 .dev.vars.*
+!.dev.vars.example
+!deploy-worker/.dev.vars.example
 
 # Cloudflare / local runtime
 .wrangler/

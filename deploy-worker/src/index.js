@@ -567,14 +567,21 @@ async function ensureEmployeeUsers(env){
     created_at TEXT,
     updated_at TEXT
   )`).run();
-  const row=await env.DB.prepare("SELECT employee_id FROM employee_users WHERE lower(employee_id)='abdul' LIMIT 1").first();
+  const appEnv=String(env.APP_ENV||"").trim().toLowerCase();
+  const allowDevSeed=["1","true","yes","on"].includes(String(env.ALLOW_DEV_SEED||"").trim().toLowerCase());
+  if(!allowDevSeed||!["development","dev","local","test"].includes(appEnv))return;
+  const seedEmployeeId=cleanText(env.LOCAL_EMPLOYEE_ID||"abdul",80).toLowerCase();
+  const seedEmployeePin=String(env.LOCAL_EMPLOYEE_PIN||"");
+  const seedEmployeeName=cleanText(env.LOCAL_EMPLOYEE_NAME||seedEmployeeId,120)||seedEmployeeId;
+  if(!seedEmployeeId||!seedEmployeePin)return;
+  const row=await env.DB.prepare("SELECT employee_id FROM employee_users WHERE lower(employee_id)=? LIMIT 1").bind(seedEmployeeId).first();
   if(!row){
     const salt=env.PW_SALT||env.JWT_SECRET||"homelink";
-    const pinHash=await hashPassword("8888",salt);
+    const pinHash=await hashPassword(seedEmployeePin,salt);
     await env.DB.prepare(`INSERT OR REPLACE INTO employee_users
       (employee_id, employee_name, pin_hash, role, status, created_at, updated_at)
       VALUES (?, ?, ?, 'staff', 'ACTIVE', ?, ?)`)
-      .bind("abdul","阿布杜",pinHash,new Date().toISOString(),new Date().toISOString()).run();
+      .bind(seedEmployeeId,seedEmployeeName,pinHash,new Date().toISOString(),new Date().toISOString()).run();
   }
 }
 __name(ensureEmployeeUsers,"ensureEmployeeUsers");

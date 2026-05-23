@@ -1721,3 +1721,85 @@ No Worker route integration was performed in this step.
 ### Required Next Step
 
 Identify the canonical Worker source or add a reviewed Worker module build step before enabling `EMPLOYEE_ENTRY_COMMERCIAL_V1`.
+
+## P0-007A Repeatable Local Worker Auth Smoke
+
+Date: 2026-05-23
+
+### Files Added Or Updated
+
+- Added `scripts/local-worker-utils.mjs`.
+- Added `scripts/dev-worker.mjs`.
+- Added `scripts/wait-for-worker.mjs`.
+- Added `scripts/smoke-with-worker.mjs`.
+- Added `scripts/generate-dev-secrets.mjs`.
+- Added `scripts/smoke-owner-auth.mjs`.
+- Added `scripts/smoke-employee-auth.mjs`.
+- Added `deploy-worker/.dev.vars.example`.
+- Updated `.env.example`, `.env.local.example`, `.gitignore`, `package.json`.
+- Updated `scripts/smoke-worker.mjs` and `scripts/smoke-auth.mjs`.
+- Updated `deploy-worker/src/index.js` and regenerated `deploy-worker/src/index.embedded.js` so dev employee seed only runs when `APP_ENV` is local/dev/test and `ALLOW_DEV_SEED=true`.
+
+### Why
+
+`npm run smoke` and `npm run smoke:auth` previously failed if the local Worker was not already running on `127.0.0.1:8793`. This was a test orchestration failure. P0-007A requires a repeatable local Worker + Auth smoke command without production deploy, production D1 migration, or auth bypass.
+
+### Safety Scope
+
+- No production Worker deploy was executed.
+- No production D1 migration was executed.
+- No production config was modified.
+- No financial formula was changed.
+- No tenant architecture was changed.
+- `deploy-worker/.dev.vars` remains ignored and was not committed.
+
+### Verification
+
+```text
+npm run format:check passed
+npm run lint passed
+npm run typecheck passed
+Syntax check passed for 51 file(s).
+npm run build passed with wrangler dry-run only
+npm run governance:check passed
+npm run audit:api passed
+API inventory written: 27 routes
+npm run audit:db passed
+Database static scan written: 40 findings, 20 tables
+npm test passed
+tests 81 / pass 81 / fail 0
+npm run smoke:with-worker passed
+```
+
+### Auth Smoke Evidence
+
+```text
+PASS Worker ready at http://127.0.0.1:8793
+PASS employee page 200 http://127.0.0.1:8793/employee-v3.html
+PASS owner page 200 http://127.0.0.1:8793/index-51.html
+PASS unauthenticated api 401 http://127.0.0.1:8793/api/me
+PASS unauthenticated /api/me rejected 401
+PASS invalid jwt rejected 401
+PASS owner login 200
+PASS owner /api/me 200
+PASS owner role manager
+PASS owner allowed /api/rent_config 200
+PASS employee login 200
+PASS employee /api/me 200
+PASS employee role staff
+PASS employee denied owner history 403
+PASS employee allowed rent config 200
+PASS smoke:auth
+Local Worker stopped.
+```
+
+### Remaining Blocker Outside P0-007A
+
+`npm run probe:clean-bootstrap` still fails because clean local D1 does not have a `transactions` table for employee entry:
+
+```text
+Caused by: Error: no such table: transactions: SQLITE_ERROR
+P0 confirmed: clean local Worker bootstrap cannot complete employee entry.
+```
+
+This remains P0-005 and was not force-fixed in this task.
