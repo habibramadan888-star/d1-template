@@ -829,3 +829,28 @@ PASS employee denied POST /api/security/revoke_sessions 403
 ```
 
 The local Worker was started with ignored local secrets and stopped after the smoke run. This did not deploy production.
+
+## Commercial CI Workflow Update
+
+Date: 2026-05-23
+
+### Files Added Or Updated
+
+- Added `.github/workflows/commercial-check.yml`.
+- Updated static tests to verify the workflow does not reference deploy secrets or remote D1 mutation commands.
+- Updated backlog to mark CI workflow creation done, with branch protection still pending.
+
+### Workflow Behavior
+
+The workflow runs:
+
+```bash
+npm ci
+npm run check
+```
+
+It does not configure Cloudflare API tokens, does not deploy, and does not run production migrations.
+
+### Remaining Limitation
+
+GitHub branch protection is not configured from this local repository. Before commercial release, repository settings should require the `Commercial Check` workflow before merge/deploy.

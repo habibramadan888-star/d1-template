@@ -12,6 +12,17 @@ test("npm scripts keep Cloudflare deploy commands in dry-run mode", async () => 
   }
 });
 
+test("commercial CI workflow runs checks without deploy secrets", async () => {
+  const workflow = await readFile(".github/workflows/commercial-check.yml", "utf8");
+
+  assert.match(workflow, /npm ci/);
+  assert.match(workflow, /npm run check/);
+  assert.match(workflow, /contents: read/);
+  assert.doesNotMatch(workflow, /wrangler deploy(?!.*--dry-run)/i);
+  assert.doesNotMatch(workflow, /CLOUDFLARE_API_TOKEN|CF_API_TOKEN|secrets\./);
+  assert.doesNotMatch(workflow, /migrations apply|d1 execute .*--remote/i);
+});
+
 test("server-side auth gate remains present in Worker source", async () => {
   const worker = await readFile("deploy-worker/src/index.js", "utf8");
 

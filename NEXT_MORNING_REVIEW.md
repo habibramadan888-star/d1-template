@@ -311,3 +311,16 @@ Important limitation:
 - It is not part of default `npm run check` because it requires a running Worker plus ignored local/staging secrets.
 - It was run once locally and passed all listed permission checks.
 - It should be run against staging before commercial deploys.
+
+## Commercial CI Workflow Follow-Up
+
+Added `.github/workflows/commercial-check.yml`.
+
+It runs:
+
+- `npm ci`
+- `npm run check`
+
+It does not include Cloudflare deploy tokens, production deploy commands, or remote D1 migration commands.
+
+Tomorrow's required manual action: configure repository branch protection so `Commercial Check` is required before merge/deploy.

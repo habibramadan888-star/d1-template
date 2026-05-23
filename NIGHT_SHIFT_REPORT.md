@@ -857,3 +857,47 @@ PASS employee denied owner-only APIs 403
 ```
 
 The local Worker was stopped after the smoke run.
+
+## V2 Commercial CI Workflow Follow-Up
+
+### Task
+
+Add a non-deploying CI workflow for commercial checks.
+
+### Current Status
+
+Completed.
+
+### Code Modified
+
+Yes, but only workflow/tests/reports:
+
+- `.github/workflows/commercial-check.yml`
+- `tests/source-risk.spec.mjs`
+- `COMMERCIALIZATION_BACKLOG.md`
+- `RUN_REPORT.md`
+- `NIGHT_SHIFT_REPORT.md`
+
+### Why
+
+Local gates are not enough for commercial SaaS. The repository needs a repeatable check path that runs governance, formatting, lint, typecheck, API/DB drift checks, tests, and dry-run Worker builds before merge/deploy.
+
+### Risk
+
+Low. The workflow does not configure Cloudflare API tokens and does not deploy.
+
+### Database Impact
+
+None. No remote D1 command is added.
+
+### Permission Impact
+
+None.
+
+### Worker Impact
+
+No Worker source changed. CI runs the existing dry-run builds.
+
+### Verification
+
+The workflow is statically checked to ensure it runs `npm ci` and `npm run check` without deployment secrets or remote D1 mutation commands.
