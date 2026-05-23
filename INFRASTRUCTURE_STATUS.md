@@ -19,30 +19,30 @@ Generated: 2026-05-23, Asia/Dubai
 
 ## Required Checks
 
-| Check                                  | Status             | Evidence                                                                                                             | Risk                                                        |
-| -------------------------------------- | ------------------ | -------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
-| Dev / staging / production separation  | Not complete       | `deploy-worker/wrangler.toml` and `deploy-worker/wrangler.embedded.toml` do not define separate environment strategy | Production/test confusion risk                              |
-| Local D1 exists                        | Partial            | Local rehearsals and `.wrangler` use exist in reports; no production mutation evidence                               | Local success does not guarantee clean production bootstrap |
-| Clean bootstrap flow                   | Exists but failing | `npm run probe:clean-bootstrap` historical failure: `no such table: transactions`                                    | New customer environment cannot be initialized from zero    |
-| Migration files                        | Partial            | `migrations/001_employee_anchor_schema.sql`, `migration-drafts/002_commercial_bootstrap.sql`                         | Commercial migration is draft and not production-applied    |
-| Runtime `CREATE TABLE` / `ALTER TABLE` | Present            | `DATABASE_STATIC_SCAN.md` runtime DDL findings                                                                       | Schema drift and concurrency risk                           |
-| KV binding                             | Present            | `RATE_LIMIT` in wrangler configs                                                                                     | Binding exists, runtime behavior not fully validated        |
-| RATE_LIMIT                             | Partial            | KV binding exists                                                                                                    | Policy behavior and production thresholds not verified      |
-| Worker local startup record            | Partial            | Historical reports exist; current smoke failed because local Worker was not running                                  | Current local runtime is not one-command repeatable         |
-| Embedded Worker generation             | Present            | `deploy-worker/scripts/build-embedded-worker.js`, `src/index.embedded.js`                                            | Drift risk remains                                          |
-| Source vs embedded drift               | Risk present       | `BLOCKER_REPORT.md` source boundary blocker                                                                          | Direct patching can break bundled production source         |
-| Deploy commands                        | Present as dry-run | `npm run build` executes `wrangler deploy --dry-run`                                                                 | Dry-run is safe; production deploy not proven               |
-| Production deploy executed today       | No evidence        | Git/report review and build logs                                                                                     | None from this reconciliation                               |
-| Production data mutation today         | No evidence        | Migration/rehearsal reports indicate local/draft only                                                                | None from this reconciliation                               |
+| Check                                  | Status             | Evidence                                                                                                             | Risk                                                         |
+| -------------------------------------- | ------------------ | -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| Dev / staging / production separation  | Not complete       | `deploy-worker/wrangler.toml` and `deploy-worker/wrangler.embedded.toml` do not define separate environment strategy | Production/test confusion risk                               |
+| Local D1 exists                        | Verified for local | `npm run verify:clean-d1` uses a disposable empty local D1 and passes                                                | Production migration still requires human review             |
+| Clean bootstrap flow                   | Verified for local | `npm run db:local:bootstrap`, `npm run verify:clean-d1`, and `npm run probe:clean-bootstrap` pass                    | Production migration not executed                            |
+| Migration files                        | Partial            | `migrations/local/001_clean_legacy_bootstrap.sql`, `migrations/001_employee_anchor_schema.sql`, migration drafts     | Local legacy bootstrap exists; commercial migration is draft |
+| Runtime `CREATE TABLE` / `ALTER TABLE` | Present            | `DATABASE_STATIC_SCAN.md` runtime DDL findings                                                                       | Schema drift and concurrency risk                            |
+| KV binding                             | Present            | `RATE_LIMIT` in wrangler configs                                                                                     | Binding exists, runtime behavior not fully validated         |
+| RATE_LIMIT                             | Partial            | KV binding exists                                                                                                    | Policy behavior and production thresholds not verified       |
+| Worker local startup record            | Verified           | `npm run smoke:with-worker` and `npm run verify:clean-d1` pass                                                       | Browser E2E remains separate                                 |
+| Embedded Worker generation             | Present            | `deploy-worker/scripts/build-embedded-worker.js`, `src/index.embedded.js`                                            | Drift risk remains                                           |
+| Source vs embedded drift               | Risk present       | `BLOCKER_REPORT.md` source boundary blocker                                                                          | Direct patching can break bundled production source          |
+| Deploy commands                        | Present as dry-run | `npm run build` executes `wrangler deploy --dry-run`                                                                 | Dry-run is safe; production deploy not proven                |
+| Production deploy executed today       | No evidence        | Git/report review and build logs                                                                                     | None from this reconciliation                                |
+| Production data mutation today         | No evidence        | Migration/rehearsal reports indicate local/draft only                                                                | None from this reconciliation                                |
 
 ## Can A New Customer Environment Be Initialized From Zero?
 
-No.
+Yes for local/dev/test bootstrap. No for production SaaS rollout without human-approved migration and tenant setup.
 
 Missing pieces:
 
-- Clean commercial bootstrap migration is not live and verified.
-- Employee entry smoke against clean local D1 fails because `transactions` table is missing.
+- Clean local legacy bootstrap is verified with `npm run verify:clean-d1`.
+- Employee entry smoke against clean local D1 now passes.
 - Runtime DDL still exists and must be replaced by migration-controlled schema.
 - Tenant/company/property bootstrap model is not complete.
 - Default credential/setup flow is not production-safe.
@@ -53,7 +53,7 @@ The Worker source boundary is not clean. The project has a large legacy Worker a
 
 ## Most Dangerous Data Risk
 
-Financial data can still be represented with `REAL` / JavaScript `Number` in legacy paths, and hard-delete statements exist for commercial financial tables. Combined with incomplete clean bootstrap, this is not commercial SaaS safe.
+Financial data can still be represented with `REAL` / JavaScript `Number` in legacy paths. Clean local bootstrap is fixed, but P0-001 money precision remains the largest data risk.
 
 ## Current Safe Infrastructure Work
 

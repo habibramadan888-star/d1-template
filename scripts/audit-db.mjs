@@ -14,7 +14,10 @@ const scanFiles = [
 
 function safeList(dir) {
   if (!fs.existsSync(dir)) return [];
-  return fs.readdirSync(dir).map((name) => path.join(dir, name));
+  return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const fullPath = path.join(dir, entry.name);
+    return entry.isDirectory() ? safeList(fullPath) : [fullPath];
+  });
 }
 
 function rel(file) {

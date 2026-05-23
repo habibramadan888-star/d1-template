@@ -1868,6 +1868,76 @@ PASS entry_events_count 1
 ### Remaining Risks Outside P0-004
 
 - P0-001 money precision remains open because legacy runtime still uses `REAL`/`Number`.
-- P0-005 clean D1 bootstrap remains open and was not fixed in this task.
+- P0-005 clean D1 bootstrap was outside P0-004 and is addressed in the P0-005 section below.
 - P0-006 tenant isolation remains open and was not changed in this task.
 - The migration draft must not be applied to production without manual review and rollback planning.
+
+## P0-005 Clean Local D1 Bootstrap
+
+Date: 2026-05-24
+
+### Files Added Or Updated
+
+- Added `migrations/local/001_clean_legacy_bootstrap.sql`.
+- Added `scripts/db-local-bootstrap-utils.mjs`.
+- Added `scripts/db-local-reset.mjs`.
+- Added `scripts/db-local-migrate.mjs`.
+- Added `scripts/db-local-seed.mjs`.
+- Added `scripts/db-local-bootstrap.mjs`.
+- Added `scripts/verify-clean-d1.mjs`.
+- Added `D1_BOOTSTRAP_AUDIT.md`.
+- Added `D1_MINIMUM_SCHEMA_PLAN.md`.
+- Added `D1_MIGRATION_ORDER.md`.
+- Added `D1_CLEAN_BOOTSTRAP_FIX_REPORT.md`.
+- Added `CLEAN_D1_BOOTSTRAP_RESULT.md`.
+- Added `RUNTIME_DDL_STATUS.md`.
+- Updated `scripts/probe-clean-worker-bootstrap.mjs`.
+- Updated `scripts/audit-db.mjs`.
+- Updated `package.json` with local D1 scripts.
+
+### Why
+
+A clean local D1 could not run employee entry because `transactions` was never created by a migration. The previous `migrations/001_employee_anchor_schema.sql` only alters an existing `transactions` table, so it cannot bootstrap a new environment.
+
+### Safety Scope
+
+- No production Worker deploy was executed.
+- No production D1 migration was executed.
+- No remote D1 command was executed.
+- No production config was modified.
+- No financial formula was changed.
+- No tenancy model was changed.
+
+### Verification
+
+```text
+npm run db:local:bootstrap passed
+npm run verify:clean-d1 passed
+npm run probe:clean-bootstrap passed
+```
+
+### Clean D1 Evidence
+
+```text
+PASS local migration migrations\local\001_clean_legacy_bootstrap.sql
+PASS local dev seed app_settings for local-dev-company
+PASS Worker ready at http://127.0.0.1:8797
+PASS smoke
+PASS smoke:auth
+PASS smoke:core
+PASS smoke:employee-entry
+PASS sessions_count 1
+PASS transactions_count 1
+PASS arrear_tasks_count 1
+PASS audit_logs_count 1
+PASS entry_events_count 1
+PASS rent_settings_count 1
+PASS clean D1 bootstrap verification
+```
+
+### Remaining Risks Outside P0-005
+
+- P0-001 money precision remains open because local bootstrap intentionally preserves legacy `REAL` columns.
+- P0-006 tenant isolation remains open.
+- P0-008 formal receivables lifecycle remains open.
+- Runtime DDL remains P1-002 and was not removed in this task.

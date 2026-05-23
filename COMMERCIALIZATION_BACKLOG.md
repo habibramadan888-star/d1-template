@@ -17,7 +17,7 @@ The project is not yet ready for commercial SaaS launch. Static checks, local Wo
 | P0-002 | Finance      | Employee handover is uploaded entry by entry, not as a backend atomic session commit.           | Partial success can create incomplete handovers.                                              | Add backend session commit endpoint with idempotency key and transaction-like acceptance.                      | Duplicate submit and weak-network tests.                                              |
 | P0-003 | Finance      | Backend accepts frontend-provided session totals.                                               | Staff browser can become accounting authority.                                                | Backend recomputes cash handover, bank transfer, and gross received from accepted rows.                        | Compare UI summary to backend summary.                                                |
 | P0-004 | Data         | `/api/delete_session` previously hard-deleted financial records. Normal path now voids records. | Original data-loss risk is locally mitigated; production migration discipline still required. | Keep void/soft-delete behavior covered by regression tests and review the production migration before rollout. | `npm run test:delete-session`, `npm run check`, and `npm run smoke:with-worker` pass. |
-| P0-005 | Database     | Clean D1 bootstrap is incomplete; employee entry fails because `transactions` is missing.       | New customer environment fails on first employee entry.                                       | Build ordered migrations for all business tables, starting with `transactions`.                                | New local D1 starts from zero and `npm run smoke:employee-entry` passes.              |
+| P0-005 | Database     | Clean local D1 bootstrap previously failed because `transactions` was missing.                  | New local/test customer environment could not verify first employee entry.                    | Keep local reset/migrate/seed/verify workflow stable; production migration still needs human review.           | `npm run verify:clean-d1`, `npm run probe:clean-bootstrap`, `npm run check` pass.     |
 | P0-006 | Auth/Tenancy | `employee_users` is not tenant-scoped and `CORPID` is static.                                   | Future multi-customer SaaS can leak or collide staff identities.                              | Add company/tenant/property model and user membership scope.                                                   | Cross-tenant denial tests.                                                            |
 | P0-007 | Auth         | Local Worker + owner/employee auth smoke was not repeatable from one command.                   | Login and permission regressions could not be verified reliably.                              | Add dev-only Worker orchestration, dev secret preflight, and auth smoke boundary checks.                       | `npm run smoke:with-worker` passes locally.                                           |
 | P0-008 | Accounting   | No formal `receivables` table exists.                                                           | Arrears are not a first-class accounting lifecycle.                                           | Introduce receivables before payments/arrear tasks.                                                            | Short-pay and repayment lifecycle tests.                                              |
@@ -27,7 +27,8 @@ The project is not yet ready for commercial SaaS launch. Static checks, local Wo
 - P0-001: integer AED fils helpers now exist and are covered by tests, but legacy runtime still uses `REAL`/`Number`.
 - P0-002/P0-003: rent write plan and local D1 rehearsal now prove backend-owned handover recomputation and transaction idempotency storage are viable, but live Worker route is not migrated.
 - P0-004: `/api/delete_session` now voids `sessions`, `transactions`, `deposit_ledger`, legacy `arrears`, and linked `arrear_tasks` instead of hard deleting them. Verification passed with unauthenticated denial, invalid JWT denial, employee 403, owner void success, idempotent second void, hidden active rows, visible audit rows, retained original rows, `audit_logs`, and `entry_events`.
-- P0-005/P0-008: commercial schema draft includes `transactions`, `receivables`, `payments`, and `arrear_tasks`; local rent write rehearsal passes against disposable D1, but clean Worker bootstrap still fails until the live route uses the commercial path.
+- P0-005: clean local D1 bootstrap now creates the minimum legacy-compatible tables, including `transactions`; `npm run verify:clean-d1` passes smoke, auth, owner core reads, and employee entry from an empty disposable D1.
+- P0-008: commercial schema draft includes `receivables`, `payments`, and formal arrear lifecycle tables; this remains future accounting work and was not implemented in P0-005.
 - P0-007: local Worker startup and auth smoke are now repeatable via `npm run smoke:with-worker`. Verified checks include unauthenticated denial, invalid JWT denial, owner login, employee login, employee denial from owner history, and employee allowed rent config. This does not close employee entry/export or owner dashboard business-flow coverage.
 
 Current closure rule:
@@ -74,11 +75,11 @@ Current closure rule:
 ## Safe Next Implementation Order
 
 1. Keep P0-007A smoke orchestration as the local preflight for future P0 work.
-2. Prepare clean D1 migration chain using integer money fields for new schema.
+2. Move money precision to integer fils for live financial write paths.
 3. Add receivables model and backend handover commit endpoint.
 4. Add tenant/property/user membership model.
 5. Move dashboard statistics to backend-owned calculations.
-6. Promote `/api/delete_session` production migration only after manual approval.
+6. Promote clean schema and `/api/delete_session` production migration only after manual approval.
 
 ## Items Not To Auto-Fix Without Explicit Approval
 

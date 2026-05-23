@@ -3,6 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { runLocalDevSeed, runLocalMigrations } from "./db-local-bootstrap-utils.mjs";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(scriptDir, "..");
@@ -58,6 +59,9 @@ const persistDir = await mkdtemp(path.join(tmpdir(), "homelink-clean-worker-boot
 let worker;
 
 try {
+  await runLocalMigrations({ persistTo: persistDir });
+  runLocalDevSeed({ persistTo: persistDir });
+
   worker = spawn(
     process.execPath,
     [

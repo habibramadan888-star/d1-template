@@ -11,74 +11,102 @@ This is a static scan artifact. It does not replace `DATABASE_AUDIT.md`, which c
 
 - `deploy-worker/src/index.js`
 - `migrations/001_employee_anchor_schema.sql`
+- `migrations/local/001_clean_legacy_bootstrap.sql`
 - `migration-drafts/002_commercial_bootstrap.sql`
 - `migration-drafts/003_delete_session_void_fields.sql`
 
 ## Tables Detected
 
-| Table                      | Source Files                                                                                                         |
-| -------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `active_sessions`          | deploy-worker/src/index.js                                                                                           |
-| `app_settings`             | deploy-worker/src/index.js                                                                                           |
-| `arrear_tasks`             | deploy-worker/src/index.js, migration-drafts/002_commercial_bootstrap.sql, migrations/001_employee_anchor_schema.sql |
-| `audit_events`             | migration-drafts/002_commercial_bootstrap.sql                                                                        |
-| `audit_logs`               | deploy-worker/src/index.js                                                                                           |
-| `bed_rent_config_versions` | migration-drafts/002_commercial_bootstrap.sql                                                                        |
-| `beds`                     | migration-drafts/002_commercial_bootstrap.sql                                                                        |
-| `companies`                | migration-drafts/002_commercial_bootstrap.sql                                                                        |
-| `deposit_ledger`           | deploy-worker/src/index.js, migration-drafts/002_commercial_bootstrap.sql                                            |
-| `employee_users`           | deploy-worker/src/index.js                                                                                           |
-| `entry_events`             | deploy-worker/src/index.js, migrations/001_employee_anchor_schema.sql                                                |
-| `handover_sessions`        | migration-drafts/002_commercial_bootstrap.sql                                                                        |
-| `payments`                 | migration-drafts/002_commercial_bootstrap.sql                                                                        |
-| `properties`               | migration-drafts/002_commercial_bootstrap.sql                                                                        |
-| `property_memberships`     | migration-drafts/002_commercial_bootstrap.sql                                                                        |
-| `receivables`              | migration-drafts/002_commercial_bootstrap.sql                                                                        |
-| `schema_migrations`        | migration-drafts/002_commercial_bootstrap.sql                                                                        |
-| `sessions`                 | deploy-worker/src/index.js                                                                                           |
-| `transactions`             | migration-drafts/002_commercial_bootstrap.sql                                                                        |
-| `users`                    | migration-drafts/002_commercial_bootstrap.sql                                                                        |
+| Table                      | Source Files                                                                                                                                                          |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `active_sessions`          | deploy-worker/src/index.js, migrations/local/001_clean_legacy_bootstrap.sql                                                                                           |
+| `app_settings`             | deploy-worker/src/index.js, migrations/local/001_clean_legacy_bootstrap.sql                                                                                           |
+| `arrear_tasks`             | deploy-worker/src/index.js, migration-drafts/002_commercial_bootstrap.sql, migrations/001_employee_anchor_schema.sql, migrations/local/001_clean_legacy_bootstrap.sql |
+| `arrears`                  | migrations/local/001_clean_legacy_bootstrap.sql                                                                                                                       |
+| `audit_events`             | migration-drafts/002_commercial_bootstrap.sql                                                                                                                         |
+| `audit_logs`               | deploy-worker/src/index.js, migrations/local/001_clean_legacy_bootstrap.sql                                                                                           |
+| `bed_rent_config_versions` | migration-drafts/002_commercial_bootstrap.sql                                                                                                                         |
+| `beds`                     | migration-drafts/002_commercial_bootstrap.sql                                                                                                                         |
+| `companies`                | migration-drafts/002_commercial_bootstrap.sql                                                                                                                         |
+| `deposit_ledger`           | deploy-worker/src/index.js, migration-drafts/002_commercial_bootstrap.sql, migrations/local/001_clean_legacy_bootstrap.sql                                            |
+| `employee_users`           | deploy-worker/src/index.js, migrations/local/001_clean_legacy_bootstrap.sql                                                                                           |
+| `entry_events`             | deploy-worker/src/index.js, migrations/001_employee_anchor_schema.sql, migrations/local/001_clean_legacy_bootstrap.sql                                                |
+| `handover_sessions`        | migration-drafts/002_commercial_bootstrap.sql                                                                                                                         |
+| `payments`                 | migration-drafts/002_commercial_bootstrap.sql                                                                                                                         |
+| `properties`               | migration-drafts/002_commercial_bootstrap.sql                                                                                                                         |
+| `property_memberships`     | migration-drafts/002_commercial_bootstrap.sql                                                                                                                         |
+| `receivables`              | migration-drafts/002_commercial_bootstrap.sql                                                                                                                         |
+| `schema_migrations`        | migration-drafts/002_commercial_bootstrap.sql                                                                                                                         |
+| `sessions`                 | deploy-worker/src/index.js, migrations/local/001_clean_legacy_bootstrap.sql                                                                                           |
+| `transactions`             | migration-drafts/002_commercial_bootstrap.sql, migrations/local/001_clean_legacy_bootstrap.sql                                                                        |
+| `users`                    | migration-drafts/002_commercial_bootstrap.sql                                                                                                                         |
 
 ## Findings
 
-| Severity | Location                                       | Issue                                         | Evidence                                     |
-| -------- | ---------------------------------------------- | --------------------------------------------- | -------------------------------------------- |
-| P1       | `deploy-worker/src/index.js:217`               | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS active_sessions` |
-| P1       | `deploy-worker/src/index.js:445`               | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS active_sessions` |
-| P1       | `deploy-worker/src/index.js:561`               | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS employee_users`  |
-| P1       | `deploy-worker/src/index.js:730`               | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS audit_logs`      |
-| P1       | `deploy-worker/src/index.js:1056`              | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS sessions`        |
-| P1       | `deploy-worker/src/index.js:1125`              | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS arrear_tasks`    |
-| P1       | `deploy-worker/src/index.js:1143`              | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS entry_events`    |
-| P1       | `deploy-worker/src/index.js:1156`              | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS deposit_ledger`  |
-| P1       | `deploy-worker/src/index.js:1374`              | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS app_settings`    |
-| P1       | `deploy-worker/src/index.js:1959`              | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS active_sessions` |
-| P1       | `deploy-worker/src/index.js:1991`              | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS app_settings`    |
-| P1       | `deploy-worker/src/index.js:2048`              | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS app_settings`    |
-| P1       | `deploy-worker/src/index.js:2073`              | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS app_settings`    |
-| P1       | `deploy-worker/src/index.js:2109`              | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS app_settings`    |
-| P1       | `deploy-worker/src/index.js:2131`              | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS app_settings`    |
-| P1       | `deploy-worker/src/index.js:2154`              | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS app_settings`    |
-| P0       | `deploy-worker/src/index.js:1067`              | Decimal/money precision risk keyword          | `REAL`                                       |
-| P0       | `deploy-worker/src/index.js:1068`              | Decimal/money precision risk keyword          | `REAL`                                       |
-| P0       | `deploy-worker/src/index.js:1070`              | Decimal/money precision risk keyword          | `REAL`                                       |
-| P0       | `deploy-worker/src/index.js:1090`              | Decimal/money precision risk keyword          | `REAL`                                       |
-| P0       | `deploy-worker/src/index.js:1092`              | Decimal/money precision risk keyword          | `REAL`                                       |
-| P0       | `deploy-worker/src/index.js:1095`              | Decimal/money precision risk keyword          | `REAL`                                       |
-| P0       | `deploy-worker/src/index.js:1101`              | Decimal/money precision risk keyword          | `REAL`                                       |
-| P0       | `deploy-worker/src/index.js:1103`              | Decimal/money precision risk keyword          | `REAL`                                       |
-| P0       | `deploy-worker/src/index.js:1104`              | Decimal/money precision risk keyword          | `REAL`                                       |
-| P0       | `deploy-worker/src/index.js:1107`              | Decimal/money precision risk keyword          | `REAL`                                       |
-| P0       | `deploy-worker/src/index.js:1122`              | Decimal/money precision risk keyword          | `REAL`                                       |
-| P0       | `deploy-worker/src/index.js:1132`              | Decimal/money precision risk keyword          | `REAL`                                       |
-| P0       | `deploy-worker/src/index.js:1137`              | Decimal/money precision risk keyword          | `REAL`                                       |
-| P0       | `deploy-worker/src/index.js:1138`              | Decimal/money precision risk keyword          | `REAL`                                       |
-| P0       | `deploy-worker/src/index.js:1165`              | Decimal/money precision risk keyword          | `REAL`                                       |
-| P0       | `deploy-worker/src/index.js:1166`              | Decimal/money precision risk keyword          | `REAL`                                       |
-| P0       | `deploy-worker/src/index.js:1167`              | Decimal/money precision risk keyword          | `REAL`                                       |
-| P0       | `migrations/001_employee_anchor_schema.sql:23` | Decimal/money precision risk keyword          | `REAL`                                       |
-| P0       | `migrations/001_employee_anchor_schema.sql:28` | Decimal/money precision risk keyword          | `REAL`                                       |
-| P0       | `migrations/001_employee_anchor_schema.sql:29` | Decimal/money precision risk keyword          | `REAL`                                       |
+| Severity | Location                                              | Issue                                         | Evidence                                     |
+| -------- | ----------------------------------------------------- | --------------------------------------------- | -------------------------------------------- |
+| P1       | `deploy-worker/src/index.js:217`                      | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS active_sessions` |
+| P1       | `deploy-worker/src/index.js:445`                      | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS active_sessions` |
+| P1       | `deploy-worker/src/index.js:561`                      | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS employee_users`  |
+| P1       | `deploy-worker/src/index.js:730`                      | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS audit_logs`      |
+| P1       | `deploy-worker/src/index.js:1056`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS sessions`        |
+| P1       | `deploy-worker/src/index.js:1125`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS arrear_tasks`    |
+| P1       | `deploy-worker/src/index.js:1143`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS entry_events`    |
+| P1       | `deploy-worker/src/index.js:1156`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS deposit_ledger`  |
+| P1       | `deploy-worker/src/index.js:1374`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS app_settings`    |
+| P1       | `deploy-worker/src/index.js:1959`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS active_sessions` |
+| P1       | `deploy-worker/src/index.js:1991`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS app_settings`    |
+| P1       | `deploy-worker/src/index.js:2048`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS app_settings`    |
+| P1       | `deploy-worker/src/index.js:2073`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS app_settings`    |
+| P1       | `deploy-worker/src/index.js:2109`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS app_settings`    |
+| P1       | `deploy-worker/src/index.js:2131`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS app_settings`    |
+| P1       | `deploy-worker/src/index.js:2154`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS app_settings`    |
+| P0       | `deploy-worker/src/index.js:1067`                     | Decimal/money precision risk keyword          | `REAL`                                       |
+| P0       | `deploy-worker/src/index.js:1068`                     | Decimal/money precision risk keyword          | `REAL`                                       |
+| P0       | `deploy-worker/src/index.js:1070`                     | Decimal/money precision risk keyword          | `REAL`                                       |
+| P0       | `deploy-worker/src/index.js:1090`                     | Decimal/money precision risk keyword          | `REAL`                                       |
+| P0       | `deploy-worker/src/index.js:1092`                     | Decimal/money precision risk keyword          | `REAL`                                       |
+| P0       | `deploy-worker/src/index.js:1095`                     | Decimal/money precision risk keyword          | `REAL`                                       |
+| P0       | `deploy-worker/src/index.js:1101`                     | Decimal/money precision risk keyword          | `REAL`                                       |
+| P0       | `deploy-worker/src/index.js:1103`                     | Decimal/money precision risk keyword          | `REAL`                                       |
+| P0       | `deploy-worker/src/index.js:1104`                     | Decimal/money precision risk keyword          | `REAL`                                       |
+| P0       | `deploy-worker/src/index.js:1107`                     | Decimal/money precision risk keyword          | `REAL`                                       |
+| P0       | `deploy-worker/src/index.js:1122`                     | Decimal/money precision risk keyword          | `REAL`                                       |
+| P0       | `deploy-worker/src/index.js:1132`                     | Decimal/money precision risk keyword          | `REAL`                                       |
+| P0       | `deploy-worker/src/index.js:1137`                     | Decimal/money precision risk keyword          | `REAL`                                       |
+| P0       | `deploy-worker/src/index.js:1138`                     | Decimal/money precision risk keyword          | `REAL`                                       |
+| P0       | `deploy-worker/src/index.js:1165`                     | Decimal/money precision risk keyword          | `REAL`                                       |
+| P0       | `deploy-worker/src/index.js:1166`                     | Decimal/money precision risk keyword          | `REAL`                                       |
+| P0       | `deploy-worker/src/index.js:1167`                     | Decimal/money precision risk keyword          | `REAL`                                       |
+| P0       | `migrations/001_employee_anchor_schema.sql:23`        | Decimal/money precision risk keyword          | `REAL`                                       |
+| P0       | `migrations/001_employee_anchor_schema.sql:28`        | Decimal/money precision risk keyword          | `REAL`                                       |
+| P0       | `migrations/001_employee_anchor_schema.sql:29`        | Decimal/money precision risk keyword          | `REAL`                                       |
+| P0       | `migrations/local/001_clean_legacy_bootstrap.sql:8`   | Decimal/money precision risk keyword          | `REAL`                                       |
+| P0       | `migrations/local/001_clean_legacy_bootstrap.sql:71`  | Decimal/money precision risk keyword          | `REAL`                                       |
+| P0       | `migrations/local/001_clean_legacy_bootstrap.sql:72`  | Decimal/money precision risk keyword          | `REAL`                                       |
+| P0       | `migrations/local/001_clean_legacy_bootstrap.sql:74`  | Decimal/money precision risk keyword          | `REAL`                                       |
+| P0       | `migrations/local/001_clean_legacy_bootstrap.sql:95`  | Decimal/money precision risk keyword          | `REAL`                                       |
+| P0       | `migrations/local/001_clean_legacy_bootstrap.sql:96`  | Decimal/money precision risk keyword          | `REAL`                                       |
+| P0       | `migrations/local/001_clean_legacy_bootstrap.sql:97`  | Decimal/money precision risk keyword          | `REAL`                                       |
+| P0       | `migrations/local/001_clean_legacy_bootstrap.sql:98`  | Decimal/money precision risk keyword          | `REAL`                                       |
+| P0       | `migrations/local/001_clean_legacy_bootstrap.sql:103` | Decimal/money precision risk keyword          | `REAL`                                       |
+| P0       | `migrations/local/001_clean_legacy_bootstrap.sql:104` | Decimal/money precision risk keyword          | `REAL`                                       |
+| P0       | `migrations/local/001_clean_legacy_bootstrap.sql:105` | Decimal/money precision risk keyword          | `REAL`                                       |
+| P0       | `migrations/local/001_clean_legacy_bootstrap.sql:123` | Decimal/money precision risk keyword          | `REAL`                                       |
+| P0       | `migrations/local/001_clean_legacy_bootstrap.sql:125` | Decimal/money precision risk keyword          | `REAL`                                       |
+| P0       | `migrations/local/001_clean_legacy_bootstrap.sql:128` | Decimal/money precision risk keyword          | `REAL`                                       |
+| P0       | `migrations/local/001_clean_legacy_bootstrap.sql:134` | Decimal/money precision risk keyword          | `REAL`                                       |
+| P0       | `migrations/local/001_clean_legacy_bootstrap.sql:136` | Decimal/money precision risk keyword          | `REAL`                                       |
+| P0       | `migrations/local/001_clean_legacy_bootstrap.sql:137` | Decimal/money precision risk keyword          | `REAL`                                       |
+| P0       | `migrations/local/001_clean_legacy_bootstrap.sql:140` | Decimal/money precision risk keyword          | `REAL`                                       |
+| P0       | `migrations/local/001_clean_legacy_bootstrap.sql:155` | Decimal/money precision risk keyword          | `REAL`                                       |
+| P0       | `migrations/local/001_clean_legacy_bootstrap.sql:181` | Decimal/money precision risk keyword          | `REAL`                                       |
+| P0       | `migrations/local/001_clean_legacy_bootstrap.sql:206` | Decimal/money precision risk keyword          | `REAL`                                       |
+| P0       | `migrations/local/001_clean_legacy_bootstrap.sql:211` | Decimal/money precision risk keyword          | `REAL`                                       |
+| P0       | `migrations/local/001_clean_legacy_bootstrap.sql:212` | Decimal/money precision risk keyword          | `REAL`                                       |
+| P0       | `migrations/local/001_clean_legacy_bootstrap.sql:269` | Decimal/money precision risk keyword          | `REAL`                                       |
+| P0       | `migrations/local/001_clean_legacy_bootstrap.sql:270` | Decimal/money precision risk keyword          | `REAL`                                       |
+| P0       | `migrations/local/001_clean_legacy_bootstrap.sql:271` | Decimal/money precision risk keyword          | `REAL`                                       |
 
 ## Commercial Interpretation
 
