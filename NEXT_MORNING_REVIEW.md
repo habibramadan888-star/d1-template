@@ -779,3 +779,31 @@ Next implementation gate:
 
 - Add a route-level commercial handler wrapper test.
 - Do not wire into `deploy-worker/src/index.js` until wrapper tests define auth, membership, idempotency conflict, and safe error responses.
+
+## Employee Entry Commercial Handler Wrapper Follow-Up
+
+Added `modules/worker/employee-entry-commercial-handler.mjs`.
+
+Purpose:
+
+- enforce allowed roles before write,
+- enforce active property membership before write,
+- call the commercial adapter and executor through a small wrapper,
+- return safe duplicate/idempotency responses,
+- avoid exposing raw database errors to staff users.
+
+Validation completed:
+
+```text
+npm run check passed
+npm run rehearsal:rent-write-plan passed
+Syntax check passed for 44 file(s).
+tests 81 / pass 81
+Worker dry-run builds passed
+Duplicate idempotency write blocked: true
+```
+
+Next implementation gate:
+
+- The next step is the first actual Worker integration, and it must be behind a default-off feature flag.
+- Do not enable production until `npm run probe:clean-bootstrap` passes.

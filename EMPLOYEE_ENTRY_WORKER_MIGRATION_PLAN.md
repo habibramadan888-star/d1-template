@@ -112,6 +112,12 @@ Rules:
 - local/staging only until gates pass,
 - no production enablement without migration promotion checklist.
 
+Pre-route wrapper status:
+
+- `modules/worker/employee-entry-commercial-handler.mjs` created,
+- role, property membership, idempotency conflict, and safe response tests added,
+- still not wired into `deploy-worker/src/index.js`.
+
 ### Phase 4: Local Clean Bootstrap Gate
 
 The route cannot be promoted until:

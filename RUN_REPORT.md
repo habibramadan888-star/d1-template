@@ -1666,3 +1666,36 @@ Worker assets dry-run build passed
 Worker embedded dry-run build passed
 Duplicate idempotency write blocked: true
 ```
+
+## Employee Entry Commercial Handler Wrapper Update
+
+Date: 2026-05-23
+
+### Files Added Or Updated
+
+- Added `modules/worker/employee-entry-commercial-handler.mjs`.
+- Added `tests/employee-entry-commercial-handler.spec.mjs`.
+- Updated `EMPLOYEE_ENTRY_WORKER_MIGRATION_PLAN.md`.
+
+### Why
+
+Before changing the live Worker route, route-level behavior must be tested outside the monolith. The wrapper enforces role and property membership checks, calls the commercial adapter/executor, maps idempotency conflicts to staff-safe responses, and avoids raw database error leakage.
+
+### Safety Scope
+
+- No Worker route was changed.
+- No frontend was changed.
+- No production database was read or mutated.
+- Tests use injected executors and fake inputs.
+
+### Verification
+
+```text
+npm run check passed
+npm run rehearsal:rent-write-plan passed
+Syntax check passed for 44 file(s).
+tests 81 / pass 81
+Worker assets dry-run build passed
+Worker embedded dry-run build passed
+Duplicate idempotency write blocked: true
+```

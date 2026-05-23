@@ -1898,3 +1898,60 @@ Duplicate idempotency write blocked: true
 ### Next Step
 
 Build a route-level commercial handler wrapper test before touching `deploy-worker/src/index.js`.
+
+## V2 Employee Entry Commercial Handler Wrapper Follow-Up
+
+### Task
+
+Create a tested route-level wrapper before modifying the live Worker route.
+
+### Current Status
+
+Completed.
+
+### Code Modified
+
+Yes, but only additive module/tests/docs/reports:
+
+- `modules/worker/employee-entry-commercial-handler.mjs`
+- `tests/employee-entry-commercial-handler.spec.mjs`
+- `EMPLOYEE_ENTRY_WORKER_MIGRATION_PLAN.md`
+- `RUN_REPORT.md`
+- `NIGHT_SHIFT_REPORT.md`
+- `NEXT_MORNING_REVIEW.md`
+
+### Why
+
+The wrapper fixes the next integration boundary before touching `deploy-worker/src/index.js`: role authorization, property membership, adapter invocation, executor invocation, idempotency conflict mapping, and safe employee-facing errors.
+
+### Risk
+
+Low. The wrapper is not wired into live routes.
+
+### Database Impact
+
+None. Tests use injected executors.
+
+### Permission Impact
+
+Positive test coverage: role and property membership denial are explicitly tested.
+
+### Worker Impact
+
+No Worker route or runtime behavior changed.
+
+### Verification
+
+```text
+npm run check passed
+npm run rehearsal:rent-write-plan passed
+Syntax check passed for 44 file(s).
+tests 81 / pass 81
+Worker assets dry-run build passed
+Worker embedded dry-run build passed
+Duplicate idempotency write blocked: true
+```
+
+### Next Step
+
+The remaining risky step is actual Worker integration behind a default-off feature flag. Do not enable in production until clean bootstrap passes.
