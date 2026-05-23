@@ -73,3 +73,24 @@ test("commercial bootstrap draft stores money as integer fils", async () => {
     assert.match(sql, new RegExp(`\\b${column} INTEGER\\b`, "i"));
   }
 });
+
+test("migration promotion checklist requires commercial safety gates", async () => {
+  const text = await readFile("MIGRATION_PROMOTION_CHECKLIST.md", "utf8");
+  const requiredTerms = [
+    "Financial Safety",
+    "Multi-Tenant Isolation",
+    "Audit And Soft-Delete",
+    "Legacy Compatibility",
+    "Backfill Plan",
+    "Rollback Plan",
+    "Production Cutover",
+    "No-Go Conditions",
+    "integer AED fils",
+    "wrangler d1 execute homelink --local --persist-to <temp-dir>",
+    "Do not promote or run the migration"
+  ];
+
+  for (const term of requiredTerms) {
+    assert.match(text, new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i"));
+  }
+});

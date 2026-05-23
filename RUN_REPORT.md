@@ -512,3 +512,29 @@ Safety:
 - Removed the temp folder after validation.
 - Did not touch remote D1.
 - Did not touch the existing project local D1 state.
+
+## Migration Promotion Gate Update
+
+Date: 2026-05-23
+
+### Files Added Or Updated
+
+- Added `MIGRATION_PROMOTION_CHECKLIST.md`.
+- Updated `MIGRATION_BOOTSTRAP_PLAN.md` and `DATABASE_AUDIT.md` to reference the promotion gate.
+- Extended `tests/migration-draft.spec.mjs` to require promotion safety gates.
+
+### Purpose
+
+The SQL draft must not move from `migration-drafts/` into executable `migrations/` until backup, rollback, backfill, tenant isolation, audit, and financial reconciliation requirements are reviewed.
+
+### Database Impact
+
+None. No migration was executed.
+
+### Worker Impact
+
+None. No Worker source was changed.
+
+### Permission Impact
+
+None. No auth logic was changed.

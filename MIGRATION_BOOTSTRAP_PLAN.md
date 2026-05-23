@@ -15,6 +15,8 @@ Field-level target schema is frozen in `MIGRATION_SCHEMA_CONTRACT.md`. If the pl
 
 The first non-production SQL draft is `migration-drafts/002_commercial_bootstrap.sql`. It is intentionally outside the executable `migrations/` directory.
 
+Promotion from draft SQL to executable migration is governed by `MIGRATION_PROMOTION_CHECKLIST.md`.
+
 ## Non-Negotiable Constraints
 
 - Do not add new commercial money columns as `REAL`.

@@ -133,6 +133,8 @@ Detailed non-executable migration design is now tracked in `MIGRATION_BOOTSTRAP_
 
 The first non-production SQL draft is stored in `migration-drafts/002_commercial_bootstrap.sql`; it has not been executed.
 
+Promotion requirements are tracked in `MIGRATION_PROMOTION_CHECKLIST.md`; no draft should move into `migrations/` until that checklist is satisfied.
+
 ## Static Scan Findings
 
 Generated scan found:

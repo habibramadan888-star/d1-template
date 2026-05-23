@@ -377,3 +377,45 @@ The disposable local D1 state was removed after validation. No remote database o
 ### Next Step
 
 Create a reviewed promotion checklist before moving this draft into `migrations/`, including backfill, rollback, and compatibility checks for existing production data.
+
+## V2 Migration Promotion Gate Follow-Up
+
+### Task
+
+Create a commercial promotion checklist for moving SQL drafts into executable migrations.
+
+### Current Status
+
+Completed.
+
+### Code Modified
+
+Yes, but only documentation and static tests:
+
+- `MIGRATION_PROMOTION_CHECKLIST.md`
+- `MIGRATION_BOOTSTRAP_PLAN.md`
+- `DATABASE_AUDIT.md`
+- `tests/migration-draft.spec.mjs`
+- `RUN_REPORT.md`
+- `NEXT_MORNING_REVIEW.md`
+- `NIGHT_SHIFT_REPORT.md`
+
+### Why
+
+The project needs an explicit gate that prevents a clean-bootstrap SQL draft from being promoted without rollback, backup, staging, reconciliation, and tenant-isolation review.
+
+### Risk
+
+Low. This is a governance/test change only.
+
+### Database Impact
+
+None. No local or remote database migration was executed.
+
+### Permission Impact
+
+None. No auth code was changed.
+
+### Worker Impact
+
+None. No Worker source was changed.

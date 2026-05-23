@@ -172,3 +172,22 @@ No production deployment or database migration was executed.
 The draft was also syntax-validated against an isolated disposable local D1 directory using `wrangler d1 execute --local --persist-to <temp-dir>`. It executed 32 SQL commands successfully and created the expected commercial bootstrap tables. The temp directory was removed after validation.
 
 Next safe step is a human review of the migration/backfill/rollback plan before moving any SQL into the real `migrations/` directory.
+
+## Migration Promotion Gate Follow-Up
+
+Added `MIGRATION_PROMOTION_CHECKLIST.md` as the required gate before any SQL draft can be moved into executable migrations.
+
+The checklist requires:
+
+- financial safety,
+- tenant/property isolation,
+- audit and soft-delete behavior,
+- legacy compatibility mapping,
+- backfill dry-run,
+- rollback test,
+- staging validation,
+- production cutover controls,
+- post-migration monitoring,
+- no-go conditions.
+
+No database or Worker runtime change was made.
