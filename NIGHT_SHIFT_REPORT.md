@@ -779,3 +779,81 @@ pass 21
 build:worker:assets --dry-run passed
 build:worker:embedded --dry-run passed
 ```
+
+## V2 Authenticated Core Smoke Script Follow-Up
+
+### Task
+
+Add a local/staging authenticated smoke script for owner and employee permission boundaries.
+
+### Current Status
+
+Completed.
+
+### Code Modified
+
+Yes, but only testing/tooling/reports:
+
+- `scripts/smoke-core-flows.mjs`
+- `package.json`
+- `tests/source-risk.spec.mjs`
+- `RUN_REPORT.md`
+- `NIGHT_SHIFT_REPORT.md`
+
+### Why
+
+Commercial validation needs a repeatable way to verify that employees can access staff workflow APIs while being denied owner-only reads and writes.
+
+### Risk
+
+Low. The script is not part of default `npm run check` because it requires a running Worker and local/staging credentials.
+
+### Database Impact
+
+No production database impact. The script is intended only for local/staging Worker smoke tests.
+
+### Permission Impact
+
+No permission code changed. The script verifies existing permission boundaries.
+
+### Worker Impact
+
+No runtime Worker logic changed.
+
+### Static Verification
+
+Command:
+
+```bash
+npm run check
+```
+
+Result:
+
+```text
+tests 22
+pass 22
+```
+
+### Local Authenticated Smoke Verification
+
+```bash
+npm run smoke:core
+```
+
+Result:
+
+```text
+PASS unauthenticated /api/me 401
+PASS owner login 200
+PASS owner /api/me 200
+PASS owner /api/history 200
+PASS owner /api/arrears 200
+PASS employee login 200
+PASS employee /api/me 200
+PASS employee allowed /api/rent_config 200
+PASS employee allowed /api/arrear_tasks 200
+PASS employee denied owner-only APIs 403
+```
+
+The local Worker was stopped after the smoke run.

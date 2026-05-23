@@ -294,3 +294,20 @@ Worker dry-run builds passed
 ```
 
 Remaining limitation: this is still static source scanning. It does not replace a reviewed staging D1 reconciliation run.
+
+## Authenticated Core Smoke Script Follow-Up
+
+Added `npm run smoke:core`.
+
+Purpose:
+
+- verify unauthenticated API rejection,
+- verify owner login and owner read APIs,
+- verify employee login and employee-allowed APIs,
+- verify employees are rejected from owner-only reads/writes.
+
+Important limitation:
+
+- It is not part of default `npm run check` because it requires a running Worker plus ignored local/staging secrets.
+- It was run once locally and passed all listed permission checks.
+- It should be run against staging before commercial deploys.

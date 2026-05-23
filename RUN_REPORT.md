@@ -766,3 +766,66 @@ build:worker:embedded --dry-run passed
 ### Current Meaning
 
 The database static scan is now reproducible and separate from the manual commercial audit. Runtime DDL, REAL/FLOAT/DOUBLE usage, and hard-delete statements remain tracked as generated findings without changing production behavior.
+
+## Authenticated Core Smoke Script Update
+
+Date: 2026-05-23
+
+### Files Added Or Updated
+
+- Added `scripts/smoke-core-flows.mjs`.
+- Added npm script `smoke:core`.
+- Added the script to `typecheck`.
+- Added static tests to verify coverage intent.
+
+### Coverage
+
+The script verifies against a running local/staging Worker:
+
+- unauthenticated `/api/me` is rejected,
+- owner login works,
+- owner `/api/me`, `/api/history`, and `/api/arrears` return expected JSON shapes,
+- employee login works,
+- employee `/api/me`, `/api/rent_config`, and `/api/arrear_tasks` are allowed,
+- employee access is denied for owner-only reads and writes including `/api/delete_session` and `/api/security/revoke_sessions`.
+
+### Safety Scope
+
+- The script is not part of default `npm run check` because it requires a running Worker and local/staging credentials.
+- No production URL is configured by default.
+- No business logic changed.
+- No production deployment or database migration was executed.
+
+### Command
+
+```bash
+npm run smoke:core
+```
+
+### Result
+
+```text
+PASS unauthenticated /api/me 401
+PASS owner login 200
+PASS owner /api/me 200
+PASS owner /api/history 200
+PASS owner /api/arrears 200
+PASS employee login 200
+PASS employee /api/me 200
+PASS employee allowed /api/rent_config 200
+PASS employee allowed /api/arrear_tasks 200
+PASS employee denied GET /api/history 403
+PASS employee denied GET /api/arrears 403
+PASS employee denied GET /api/customers 403
+PASS employee denied GET /api/lock/cards 403
+PASS employee denied GET /api/wifi/accounts 403
+PASS employee denied POST /api/rent_config 403
+PASS employee denied POST /api/save_session 403
+PASS employee denied POST /api/delete_session 403
+PASS employee denied POST /api/clear_arrear 403
+PASS employee denied POST /api/wifi/accounts 403
+PASS employee denied POST /api/customers 403
+PASS employee denied POST /api/security/revoke_sessions 403
+```
+
+The local Worker was started with ignored local secrets and stopped after the smoke run. This did not deploy production.

@@ -55,6 +55,23 @@ test("database static scan is generated separately from manual database audit", 
   assert.match(manualAudit, /## Recommended Migration Order/);
 });
 
+test("authenticated core smoke covers owner and employee permission boundaries", async () => {
+  const pkg = JSON.parse(await readFile("package.json", "utf8"));
+  const script = await readFile("scripts/smoke-core-flows.mjs", "utf8");
+
+  assert.equal(pkg.scripts["smoke:core"], "node scripts/smoke-core-flows.mjs");
+  assert.match(pkg.scripts.typecheck, /scripts\/smoke-core-flows\.mjs/);
+  assert.match(script, /unauthenticated \/api\/me/);
+  assert.match(script, /owner \/api\/history/);
+  assert.match(script, /owner \/api\/arrears/);
+  assert.match(script, /employee allowed \/api\/rent_config/);
+  assert.match(script, /employee allowed \/api\/arrear_tasks/);
+  assert.match(script, /employee denied/);
+  assert.match(script, /\/api\/delete_session/);
+  assert.match(script, /\/api\/security\/revoke_sessions/);
+  assert.doesNotMatch(pkg.scripts.check, /smoke:core/);
+});
+
 test("migration rehearsal script is local-only", async () => {
   const pkg = JSON.parse(await readFile("package.json", "utf8"));
   const script = await readFile("scripts/rehearse-migration.mjs", "utf8");
