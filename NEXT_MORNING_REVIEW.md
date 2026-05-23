@@ -606,3 +606,30 @@ Follow-up:
 
 - This validates schema fit, not the current Worker route.
 - The current P0 clean Worker bootstrap blocker remains open until `/api/employee/entry` is safely migrated and `npm run probe:clean-bootstrap` passes.
+
+## Employee Entry Idempotency Follow-Up
+
+Added `modules/employees/idempotency.mjs` and tests.
+
+Purpose:
+
+- create a deterministic idempotency key for employee entry submissions,
+- scope duplicate protection by company, property, session, operator, and client entry id,
+- prevent future weak-network retries or repeated clicks from producing duplicate accounting rows,
+- keep implementation pure and unwired until a database uniqueness contract is added.
+
+Validation completed:
+
+```text
+npm run check passed
+npm run rehearsal:rent-write-plan passed
+Syntax check passed for 38 file(s).
+tests 67 / pass 67
+Worker dry-run builds passed
+Rent write plan local D1 rehearsal passed
+```
+
+Follow-up:
+
+- Add a database-backed uniqueness plan before connecting this helper to the Worker.
+- Do not rely on frontend-only duplicate prevention for commercial accounting writes.

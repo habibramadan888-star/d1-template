@@ -1394,3 +1394,53 @@ tests 35 / pass 35
 Worker assets dry-run build passed
 Worker embedded dry-run build passed
 ```
+
+## Employee Entry Idempotency Helper Update
+
+Date: 2026-05-23
+
+### Files Added Or Updated
+
+- Added `modules/employees/idempotency.mjs`.
+- Added `tests/employee-idempotency.spec.mjs`.
+
+### Why
+
+Employee entry submission must be safe under weak networks, browser refreshes, and repeated clicks. A commercial write path needs a deterministic idempotency key scoped by company, property, session, operator, and client-generated entry id before any transaction rows are inserted.
+
+### Rules Captured
+
+- `companyId`, `propertyId`, `sessionId`, `operatorId`, and `clientEntryId` are all required.
+- Values are trimmed before canonicalization.
+- The returned key is a SHA-256 based scoped key prefixed with `emp_entry_`.
+- Changing any isolation anchor changes the key.
+- The helper stores no secrets and does not execute SQL.
+
+### Safety Scope
+
+- No Worker route was changed.
+- No frontend was changed.
+- No database schema was changed.
+- No production data was read or mutated.
+- Existing runtime financial behavior is unchanged.
+
+### Verification
+
+Commands:
+
+```bash
+npm run check
+npm run rehearsal:rent-write-plan
+```
+
+Result:
+
+```text
+Syntax check passed for 38 file(s).
+tests 67 / pass 67
+Worker assets dry-run build passed
+Worker embedded dry-run build passed
+Rent write plan local D1 rehearsal passed
+Validated operations: 10
+Mode: local-only disposable D1; no production mutation.
+```

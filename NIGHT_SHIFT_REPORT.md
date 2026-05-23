@@ -1507,3 +1507,61 @@ tests 35 / pass 35
 Worker assets dry-run build passed
 Worker embedded dry-run build passed
 ```
+
+## V2 Employee Entry Idempotency Follow-Up
+
+### Task
+
+Create a tested pure helper for scoped employee entry idempotency.
+
+### Current Status
+
+Completed.
+
+### Code Modified
+
+Yes, but only additive module/tests/reports:
+
+- `modules/employees/idempotency.mjs`
+- `tests/employee-idempotency.spec.mjs`
+- `RUN_REPORT.md`
+- `NIGHT_SHIFT_REPORT.md`
+- `NEXT_MORNING_REVIEW.md`
+
+### Why
+
+Employee entry writes must tolerate weak network retries, refreshes, and repeated submit clicks without creating duplicate financial records. The key must include company, property, session, operator, and client entry anchors so future multi-tenant writes remain isolated.
+
+### Risk
+
+Low. The helper is not wired into current Worker or frontend behavior.
+
+### Database Impact
+
+None.
+
+### Permission Impact
+
+None.
+
+### Worker Impact
+
+No Worker route or runtime behavior changed.
+
+### Verification
+
+```text
+npm run check passed
+npm run rehearsal:rent-write-plan passed
+Syntax check passed for 38 file(s).
+tests 67 / pass 67
+Worker assets dry-run build passed
+Worker embedded dry-run build passed
+Rent write plan local D1 rehearsal passed
+Validated operations: 10
+Mode: local-only disposable D1; no production mutation.
+```
+
+### Next Step
+
+Do not wire this into the Worker yet. First document or draft the transaction-level idempotency storage contract so duplicate detection is backed by a database uniqueness constraint, not only by frontend state.
