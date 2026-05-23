@@ -452,3 +452,28 @@ Follow-up:
 
 - Before wiring, confirm whether the UI should display both `displayEndDate` and `nextDueDate` or hide one behind an explanation.
 - Database fields should store both if the business needs audit clarity.
+
+## TTLock Remark Parser Follow-Up
+
+Added `modules/properties/ttlock-remark.mjs` and tests.
+
+Purpose:
+
+- preserve the full TTLock remark for display,
+- parse bed number, deposit, and check-in month/day as structured anchors,
+- avoid inventing a year from TTLock month/day remarks,
+- exclude staff beds containing `abdul` or `bilal`,
+- exclude explicit vacant beds with standalone `e`.
+
+Validation completed:
+
+```text
+npm run check passed
+tests 51 / pass 51
+Worker dry-run builds passed
+```
+
+Follow-up:
+
+- The follow-up UI should display the full raw remark, not only the parsed bed.
+- The parser should be wired only after the follow-up data contract is reviewed.

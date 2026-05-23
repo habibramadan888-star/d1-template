@@ -1060,6 +1060,55 @@ Worker assets dry-run build passed
 Worker embedded dry-run build passed
 ```
 
+## V2 TTLock Remark Parser Follow-Up
+
+### Task
+
+Create a tested pure helper for TTLock remark parsing and rent-follow-up exclusion.
+
+### Current Status
+
+Completed.
+
+### Code Modified
+
+Yes, but only additive module/tests/reports:
+
+- `modules/properties/ttlock-remark.mjs`
+- `tests/ttlock-remark.spec.mjs`
+- `package.json`
+- `RUN_REPORT.md`
+- `NIGHT_SHIFT_REPORT.md`
+
+### Why
+
+The follow-up page must show the full TTLock remark while using structured anchors for bed, deposit, check-in month/day, and exclusion rules. This prevents accidental year fabrication and prevents employee/vacant beds from entering rent collection tasks.
+
+### Risk
+
+Low. The helper is not wired into current Worker or frontend behavior.
+
+### Database Impact
+
+None.
+
+### Permission Impact
+
+None.
+
+### Worker Impact
+
+No Worker route or runtime behavior changed.
+
+### Verification
+
+```text
+npm run check passed
+tests 51 / pass 51
+Worker assets dry-run build passed
+Worker embedded dry-run build passed
+```
+
 ## V2 Finance Rent Period Follow-Up
 
 ### Task

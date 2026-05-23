@@ -969,6 +969,52 @@ Worker assets dry-run build passed
 Worker embedded dry-run build passed
 ```
 
+## TTLock Remark Parser Helper Update
+
+Date: 2026-05-23
+
+### Files Added Or Updated
+
+- Added `modules/properties/ttlock-remark.mjs`.
+- Added `tests/ttlock-remark.spec.mjs`.
+- Added module and test syntax checks to `npm run typecheck`.
+
+### Why
+
+Rent follow-up depends on TTLock remark anchors. The parser must preserve the full raw remark while extracting structured anchors without inventing missing data.
+
+### Rules Captured
+
+- First numeric token is the bed anchor.
+- `Dxxx` is parsed as deposit AED and converted to integer fils.
+- First valid 4-digit month/day token becomes `MM-DD`; no year is created.
+- Remarks containing staff keywords `abdul` or `bilal` are excluded from rent follow-up.
+- A standalone `e` token marks a vacant bed and is excluded from rent follow-up.
+- Missing anchors return `null` instead of fabricated values.
+
+### Safety Scope
+
+- No Worker route was changed.
+- No frontend was changed.
+- No database schema was changed.
+- Existing TTLock behavior is unchanged.
+
+### Verification
+
+Command:
+
+```bash
+npm run check
+```
+
+Result:
+
+```text
+tests 51 / pass 51
+Worker assets dry-run build passed
+Worker embedded dry-run build passed
+```
+
 ## Finance Rent Period Helper Update
 
 Date: 2026-05-23
