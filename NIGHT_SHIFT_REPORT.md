@@ -1208,6 +1208,55 @@ Worker assets dry-run build passed
 Worker embedded dry-run build passed
 ```
 
+## V2 Employee Rent Write Plan Follow-Up
+
+### Task
+
+Create a pure write-plan generator for the commercial rent entry contract.
+
+### Current Status
+
+Completed.
+
+### Code Modified
+
+Yes, but only additive module/tests/reports:
+
+- `modules/employees/rent-write-plan.mjs`
+- `tests/employee-rent-write-plan.spec.mjs`
+- `RUN_REPORT.md`
+- `NIGHT_SHIFT_REPORT.md`
+
+### Why
+
+Before writing to D1, the project needs a deterministic mapping from a validated rent entry draft to commercial table operations. This prevents Worker implementation from inventing ad hoc row shapes.
+
+### Risk
+
+Low. It generates a plan only and does not execute SQL.
+
+### Database Impact
+
+None.
+
+### Permission Impact
+
+None.
+
+### Worker Impact
+
+No Worker route or runtime behavior changed.
+
+### Verification
+
+```text
+npm run check passed
+Syntax check passed for 35 file(s).
+tests 63 / pass 63
+Worker assets dry-run build passed
+Worker embedded dry-run build passed
+```
+
 ## V2 TTLock Remark Parser Follow-Up
 
 ### Task

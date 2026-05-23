@@ -552,3 +552,29 @@ Follow-up:
 
 - Next implementation step should be a local-only persistence rehearsal for this contract.
 - Do not modify the production Worker route until the rehearsal passes against disposable D1 state.
+
+## Employee Rent Write Plan Follow-Up
+
+Added `modules/employees/rent-write-plan.mjs` and tests.
+
+Purpose:
+
+- convert validated rent entry drafts into ordered commercial table operations,
+- preserve company/property isolation on inserted rows,
+- convert money to SQL-safe integers only at the persistence boundary,
+- require audit events and handover recomputation,
+- keep SQL execution out of the module.
+
+Validation completed:
+
+```text
+npm run check passed
+Syntax check passed for 35 file(s).
+tests 63 / pass 63
+Worker dry-run builds passed
+```
+
+Follow-up:
+
+- The next safe task is a disposable local D1 rehearsal that applies the draft schema and validates these planned rows can fit the schema.
+- The Worker route should remain untouched until that local rehearsal exists and passes.

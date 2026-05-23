@@ -1108,6 +1108,51 @@ Worker assets dry-run build passed
 Worker embedded dry-run build passed
 ```
 
+## Employee Rent Write Plan Helper Update
+
+Date: 2026-05-23
+
+### Files Added Or Updated
+
+- Added `modules/employees/rent-write-plan.mjs`.
+- Added `tests/employee-rent-write-plan.spec.mjs`.
+
+### Why
+
+The write contract now has a pure plan generator that converts a reviewed rent entry draft into ordered table operations. This is the last safe step before any local-only persistence rehearsal.
+
+### Rules Captured
+
+- Generates ordered operations for `transactions`, `receivables`, `payments`, conditional `arrear_tasks`, `audit_events`, and `handover_sessions` recompute.
+- Keeps `company_id` and `property_id` on every inserted row.
+- Converts BigInt money into SQL-safe integer values at the boundary.
+- Requires audit event ids and rejects incomplete partial-payment plans.
+- Does not execute SQL.
+
+### Safety Scope
+
+- No Worker route was changed.
+- No frontend was changed.
+- No database schema was changed.
+- No production migration was run.
+
+### Verification
+
+Command:
+
+```bash
+npm run check
+```
+
+Result:
+
+```text
+Syntax check passed for 35 file(s).
+tests 63 / pass 63
+Worker assets dry-run build passed
+Worker embedded dry-run build passed
+```
+
 ## TTLock Remark Parser Helper Update
 
 Date: 2026-05-23
