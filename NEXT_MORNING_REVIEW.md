@@ -191,3 +191,20 @@ The checklist requires:
 - no-go conditions.
 
 No database or Worker runtime change was made.
+
+## Migration Rehearsal Follow-Up
+
+Added `npm run migration:rehearse`.
+
+The script:
+
+- creates a disposable local D1 directory,
+- applies `migration-drafts/002_commercial_bootstrap.sql`,
+- verifies all core commercial tables,
+- inserts a representative accounting chain,
+- verifies session, transaction, receivable, payment, arrear task, deposit ledger, and audit event rows,
+- removes the temporary local D1 directory.
+
+The rehearsal passed locally. It does not touch remote D1, existing local D1 state, production config, or executable migrations.
+
+Important finding: D1 rejects SQL `BEGIN TRANSACTION` / `ROLLBACK` through `wrangler d1 execute`, so rollback rehearsal is represented by disposable local D1 cleanup. Production rollback still requires backup restore or forward rollback migration planning.

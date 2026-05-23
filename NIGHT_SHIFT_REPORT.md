@@ -419,3 +419,65 @@ None. No auth code was changed.
 ### Worker Impact
 
 None. No Worker source was changed.
+
+## V2 Migration Rehearsal Follow-Up
+
+### Task
+
+Create a repeatable local migration rehearsal command.
+
+### Current Status
+
+Completed.
+
+### Code Modified
+
+Yes, but only tooling/tests/reports:
+
+- `scripts/rehearse-migration.mjs`
+- `package.json`
+- `tests/source-risk.spec.mjs`
+- `MIGRATION_PROMOTION_CHECKLIST.md`
+- `RUN_REPORT.md`
+- `NEXT_MORNING_REVIEW.md`
+- `NIGHT_SHIFT_REPORT.md`
+
+### Why
+
+Manual SQL validation is not enough for a commercial migration path. The project now has a repeatable command that applies the draft to disposable local D1 state and verifies table creation plus a basic accounting chain.
+
+### Risk
+
+Low. The rehearsal is explicitly local-only and uses a temporary `--persist-to` directory.
+
+### Database Impact
+
+No production or existing local D1 was changed. The disposable D1 directory was removed after the rehearsal.
+
+### Permission Impact
+
+None. No auth code was changed.
+
+### Worker Impact
+
+None. No Worker source was changed.
+
+### Verification
+
+Command:
+
+```bash
+npm run migration:rehearse
+```
+
+Result:
+
+```text
+Migration rehearsal passed.
+Validated tables: 14
+Validated accounting fixture: session, transactions, receivable, payment, arrear task, deposit ledger, audit event.
+```
+
+### D1 Transaction Finding
+
+Wrangler D1 rejects SQL `BEGIN TRANSACTION` and `ROLLBACK` in SQL files. Rollback rehearsal is therefore represented by disposable local D1 cleanup. Production rollback must still be handled with backup restore or forward rollback migration planning.

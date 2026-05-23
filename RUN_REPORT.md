@@ -538,3 +538,39 @@ None. No Worker source was changed.
 ### Permission Impact
 
 None. No auth logic was changed.
+
+## Migration Rehearsal Script Update
+
+Date: 2026-05-23
+
+### Files Added Or Updated
+
+- Added `scripts/rehearse-migration.mjs`.
+- Added npm script `migration:rehearse`.
+- Updated static tests to ensure the rehearsal script is local-only and does not apply migrations.
+
+### Command
+
+```bash
+npm run migration:rehearse
+```
+
+### Result
+
+```text
+Migration rehearsal passed.
+Validated tables: 14
+Validated accounting fixture: session, transactions, receivable, payment, arrear task, deposit ledger, audit event.
+```
+
+### Important D1 Finding
+
+Wrangler D1 rejects SQL `BEGIN TRANSACTION` / `ROLLBACK` in SQL files. The rehearsal therefore uses a disposable local D1 state directory and removes it after validation.
+
+### Safety Scope
+
+- Used local D1 only.
+- Used disposable `--persist-to` directory.
+- Did not run `wrangler d1 execute --remote`.
+- Did not run `wrangler d1 migrations apply`.
+- Did not mutate existing local D1 or production D1.

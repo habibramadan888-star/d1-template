@@ -126,6 +126,7 @@ Required commands:
 
 ```bash
 npm run check
+npm run migration:rehearse
 npm run smoke
 npm run smoke:auth
 npm run smoke:employee-entry
@@ -141,6 +142,7 @@ wrangler d1 migrations apply homelink --local --persist-to <temp-dir>
 Pass condition:
 
 - Clean local D1 starts from zero tables and reaches a usable schema.
+- `npm run migration:rehearse` validates the draft in a disposable local D1 state directory.
 - Existing local fixture D1 remains compatible.
 - Staging D1 migration and rollback are documented.
 
