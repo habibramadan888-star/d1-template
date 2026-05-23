@@ -323,3 +323,54 @@ Coverage:
 ### Port Cleanup
 
 After local smoke, the leftover local Worker child process on port 8793 was stopped. Final port state showed only `TimeWait`, not an active listener.
+
+## Authenticated Smoke Update
+
+Date: 2026-05-23
+
+### Local Secret Setup
+
+- Created `deploy-worker/.dev.vars` with local-only random credentials.
+- The file is ignored by Git and must not be committed.
+- Credentials were rotated after an accidental terminal display of the first generated local-only values.
+
+### Local D1 Test Data
+
+The existing local D1 `employee_users` row for `abdul` had been seeded with an older password salt. After rotating `PW_SALT`, employee login failed with `invalid_employee_pin`.
+
+Resolution:
+
+- Ran a Wrangler `d1 execute --local` update against local D1 only.
+- Updated the local test employee PIN hash to match the current local `PW_SALT`.
+- No remote D1 command was executed.
+
+### Commands
+
+```bash
+npm run smoke
+npm run smoke:auth
+```
+
+### Results
+
+```text
+PASS employee page 200
+PASS owner page 200
+PASS unauthenticated api 401
+PASS owner login 200
+PASS owner /api/me 200
+PASS owner role manager
+PASS employee login 200
+PASS employee /api/me 200
+PASS employee role staff
+PASS employee denied owner history 403
+```
+
+Status: PASS
+
+### Scope Confirmed
+
+- Owner authentication works locally with non-production secrets.
+- Employee authentication works locally with non-production secrets.
+- Employee cannot access the owner history API.
+- Local Worker port 8793 was cleaned up after testing.

@@ -70,8 +70,8 @@ fail 0
 
 ## Commands Or Flows Not Fully Verified
 
-- Employee authenticated workflow: blocked until local non-production secrets are configured.
-- Owner authenticated workflow: blocked until local non-production secrets are configured.
+- Employee entry/export workflow: authenticated login now passes; entry/export still not fully tested.
+- Owner dashboard workflow: authenticated login now passes; dashboard APIs still not fully tested.
 - TTLock live integration: not validated in V2.
 - D1 clean commercial bootstrap: not proven.
 - Mobile authenticated employee/owner workflows: not fully verified in V2.
@@ -84,7 +84,7 @@ fail 0
 4. Hard delete exists for financial session data.
 5. Clean D1 bootstrap/migration chain is incomplete or unproven.
 6. Tenant/property isolation is not SaaS-ready.
-7. Local authenticated tests cannot run until safe `.dev.vars` exists.
+7. Full authenticated employee entry/export and owner dashboard tests are still pending.
 8. No formal receivables lifecycle exists.
 
 ## P1 Issues To Review Next
@@ -100,12 +100,12 @@ fail 0
 ## What You Should Check First Tomorrow
 
 1. Review `COMMERCIALIZATION_BACKLOG.md` P0 list.
-2. Confirm whether local `.dev.vars` can be created with non-production secrets.
+2. Review authenticated smoke output and decide whether to proceed to employee entry/export E2E.
 3. Decide whether the next engineering task is:
    - auth test enablement, or
    - hard-delete to void workflow, or
    - clean migration design.
-4. Open employee and owner pages locally after secrets are configured and run the manual tests in `MANUAL_TEST_PLAN.md`.
+4. Open employee and owner pages locally and run the remaining manual tests in `MANUAL_TEST_PLAN.md`.
 
 ## What Must Not Be Auto-Fixed
 
@@ -118,4 +118,20 @@ fail 0
 
 ## Recommended Next Instruction
 
-Configure a local-only `.dev.vars` with non-production secrets, then run authenticated owner and employee smoke tests without changing production configuration.
+Run authenticated employee entry/export E2E against local D1 only, then validate created session, transaction, arrear task, deposit ledger, and audit rows.
+
+## Authenticated Smoke Follow-Up
+
+Local non-production `.dev.vars` has now been configured and authenticated smoke passed:
+
+```text
+PASS owner login 200
+PASS owner /api/me 200
+PASS owner role manager
+PASS employee login 200
+PASS employee /api/me 200
+PASS employee role staff
+PASS employee denied owner history 403
+```
+
+The previous blocker for basic local authentication is now cleared for smoke coverage. Full employee entry/export and owner dashboard workflows are still not validated.

@@ -19,7 +19,6 @@ Observed:
 
 ## P0 Risks
 
-- Local authenticated flow cannot be validated without `JWT_SECRET`.
 - Default employee seed `abdul` with PIN `8888` exists in code path. This must not exist as a production default.
 - `employee_users` lacks `corpid`, so future multi-company employee isolation is unsafe.
 - `CORPID` comes from env and is static. Future SaaS needs tenant/company resolved from account/session, not a single deployment constant.
@@ -67,3 +66,17 @@ Before commercial SaaS:
 3. Remove production default employee seed behavior or gate it to local development only.
 4. Add tenant/property schema in migrations.
 5. Refactor queries to tenant/property scope after tests exist.
+
+## Authenticated Smoke Result
+
+Date: 2026-05-23
+
+Local non-production `.dev.vars` was configured and authenticated smoke passed:
+
+- owner login returned 200,
+- owner `/api/me` returned manager,
+- employee login returned 200,
+- employee `/api/me` returned staff,
+- employee access to `/api/history` returned 403.
+
+This confirms the current server-side auth gate and staff allowlist work for the tested routes. It does not resolve tenant isolation or production default seed risks.

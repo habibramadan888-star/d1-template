@@ -7,7 +7,7 @@ Production database mutation: not executed
 
 ## Blocking Risks
 
-### P0: Local authentication cannot be fully validated
+### P0: Local authentication setup was blocking authenticated flows
 
 Evidence:
 
@@ -26,6 +26,12 @@ Safe resolution:
 - Add real local `.dev.vars` using non-production secrets.
 - Add documented password-hash generation workflow.
 - Do not hardcode passwords or secrets.
+
+Current status:
+
+- Basic authenticated smoke is now passing locally with ignored non-production `.dev.vars`.
+- Owner login, employee login, `/api/me`, and employee denial from `/api/history` are verified.
+- Full employee entry/export and owner dashboard flows are still not fully validated.
 
 ### P0: Clean database bootstrap is not proven
 

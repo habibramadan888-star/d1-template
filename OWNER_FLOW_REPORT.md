@@ -9,25 +9,35 @@ Production mutation: none
 | Check                     | Result  | Notes                                                       |
 | ------------------------- | ------- | ----------------------------------------------------------- |
 | Owner page opens          | PASS    | `GET /index-51.html` returned 200                           |
-| Browser title             | PASS    | `Homelink · 流水管理`                                       |
+| Browser title             | PASS    | `Homelink 路 娴佹按绠＄悊`                                  |
 | Login input exists        | PASS    | Browser check found `#empCode`                              |
-| Dashboard after login     | BLOCKED | local owner credentials not configured                      |
-| Statistics APIs           | BLOCKED | login required                                              |
-| Tables render after login | BLOCKED | login required                                              |
+| Owner login               | PASS    | local non-production `.dev.vars`; `/auth/login` 200         |
+| Owner `/api/me`           | PASS    | returned manager role                                       |
+| Dashboard after login     | NOT RUN | next authenticated browser workflow test                    |
+| Statistics APIs           | NOT RUN | next authenticated API workflow test                        |
+| Tables render after login | NOT RUN | next authenticated browser workflow test                    |
 | Critical buttons          | PARTIAL | login page button visible; authenticated buttons not tested |
 
 ## Static Findings
 
-- `index-51-main.js` now passes syntax/typecheck and lint after ESLint config correction.
+- `index-51-main.js` passes syntax/typecheck and lint after ESLint config correction.
 - Owner dashboard still relies heavily on frontend aggregation.
 - API base URL is hardcoded to production Workers URL when not served from production host.
+
+## Authenticated Smoke Result
+
+```text
+PASS owner login 200
+PASS owner /api/me 200
+PASS owner role manager
+```
 
 ## Risks
 
 ### P0
 
-- Owner authenticated flow cannot be validated without local secrets.
 - Owner financial statistics must not remain browser-only authority for commercial launch.
+- Owner dashboard and statistics APIs still need authenticated browser/API validation.
 
 ### P1
 
@@ -38,12 +48,7 @@ Production mutation: none
 
 ## Safe Next Owner Tests
 
-After local `.dev.vars` is configured:
-
-1. Login as owner.
-2. Confirm `/api/me` returns manager.
-3. Confirm owner can access `/api/history`.
-4. Confirm owner can access `/api/rent_config`.
-5. Confirm owner dashboard renders empty state on clean local D1.
-6. Confirm staff account cannot access owner endpoints.
-7. Confirm delete/session void risk is not executed against real data.
+1. Confirm owner can access `/api/history`.
+2. Confirm owner can access `/api/rent_config`.
+3. Confirm owner dashboard renders empty state on clean local D1.
+4. Confirm delete/session void risk is not executed against real data.
