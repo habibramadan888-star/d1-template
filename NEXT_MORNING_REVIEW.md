@@ -253,3 +253,23 @@ Safety behavior:
 - does not execute write SQL or backfill.
 
 Validation used an empty disposable local D1 directory. It completed with 9 expected missing-table exceptions and no P0 no-go. A real reconciliation still requires a reviewed local/staging D1 copy.
+
+## API Inventory Drift Gate Follow-Up
+
+Added reproducible API inventory generation and check mode.
+
+What changed:
+
+- `npm run audit:api` regenerates `API_INVENTORY.md` from Worker route scanning plus route metadata.
+- `npm run audit:api:check` fails if `API_INVENTORY.md` is stale.
+- `npm run check` now includes the API inventory drift gate.
+
+Current verification:
+
+```text
+npm run check passed
+tests 20 / pass 20
+Worker dry-run builds passed
+```
+
+Remaining limitation: this is a local gate. Hosted CI must run `npm run check` before any commercial deploy or merge.

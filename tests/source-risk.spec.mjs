@@ -20,6 +20,22 @@ test("server-side auth gate remains present in Worker source", async () => {
   assert.match(worker, /handleEmployeeApi/);
 });
 
+test("API inventory is generated and checked against Worker route metadata", async () => {
+  const pkg = JSON.parse(await readFile("package.json", "utf8"));
+  const script = await readFile("scripts/audit-api.mjs", "utf8");
+  const inventory = await readFile("API_INVENTORY.md", "utf8");
+
+  assert.equal(pkg.scripts["audit:api"], "node scripts/audit-api.mjs");
+  assert.equal(pkg.scripts["audit:api:check"], "node scripts/audit-api.mjs --check");
+  assert.match(pkg.scripts.check, /audit:api:check/);
+  assert.match(script, /const routeCatalog =/);
+  assert.match(script, /API inventory catalog drift detected/);
+  assert.match(script, /API_INVENTORY\.md is out of date/);
+  assert.match(inventory, /Drift gate: `npm run audit:api:check`/);
+  assert.match(inventory, /POST.+`\/api\/employee\/entry`.+P0/);
+  assert.match(inventory, /POST.+`\/api\/delete_session`.+P0/);
+});
+
 test("migration rehearsal script is local-only", async () => {
   const pkg = JSON.parse(await readFile("package.json", "utf8"));
   const script = await readFile("scripts/rehearse-migration.mjs", "utf8");

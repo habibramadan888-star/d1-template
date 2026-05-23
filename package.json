@@ -12,6 +12,7 @@
     "typecheck": "node --check deploy-worker/src/index.js && node --check deploy-worker/scripts/build-embedded-worker.js && node --check index-51-main.js && node --check scripts/smoke-worker.mjs && node --check scripts/smoke-auth.mjs && node --check scripts/smoke-employee-entry.mjs && node --check scripts/audit-api.mjs && node --check scripts/audit-db.mjs && node --check scripts/audit-legacy-backfill.mjs && node --check scripts/generate-reconciliation-template.mjs && node --check scripts/reconcile-legacy-dry-run.mjs && node --check scripts/rehearse-migration.mjs && node --check tests/governance.spec.mjs && node --check tests/source-risk.spec.mjs && node --check tests/migration-draft.spec.mjs",
     "governance:check": "node tools/check-governance.cjs",
     "audit:api": "node scripts/audit-api.mjs",
+    "audit:api:check": "node scripts/audit-api.mjs --check",
     "audit:db": "node scripts/audit-db.mjs",
     "audit:legacy-backfill": "node scripts/audit-legacy-backfill.mjs",
     "reconciliation:template": "node scripts/generate-reconciliation-template.mjs",
@@ -21,7 +22,7 @@
     "smoke:auth": "node scripts/smoke-auth.mjs",
     "smoke:employee-entry": "node scripts/smoke-employee-entry.mjs",
     "test": "node --test tests/**/*.spec.mjs",
-    "check": "npm run governance:check && npm run format:check && npm run lint && npm run typecheck && npm run test && npm run build"
+    "check": "npm run governance:check && npm run format:check && npm run lint && npm run typecheck && npm run audit:api:check && npm run test && npm run build"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",

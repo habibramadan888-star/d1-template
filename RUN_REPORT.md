@@ -689,3 +689,41 @@ No-go: 0
 ### Current Meaning
 
 The run used an empty temporary local D1, so the 9 exceptions are expected missing legacy-table findings. This proves the command path works and stays local; it is not a real production-data reconciliation.
+
+## API Inventory Drift Gate Update
+
+Date: 2026-05-23
+
+### Files Added Or Updated
+
+- Updated `scripts/audit-api.mjs` to generate `API_INVENTORY.md` from Worker route scanning plus route metadata.
+- Added `npm run audit:api:check`.
+- Added `audit:api:check` to `npm run check`.
+- Updated static tests to require the route inventory drift gate.
+
+### Command
+
+```bash
+npm run check
+```
+
+### Result
+
+```text
+API inventory is up to date.
+tests 20
+pass 20
+build:worker:assets --dry-run passed
+build:worker:embedded --dry-run passed
+```
+
+### Safety Scope
+
+- No Worker business logic changed.
+- No frontend business logic changed.
+- No database operation was executed.
+- No production deployment was executed.
+
+### Current Meaning
+
+The API inventory is now reproducible. If Worker routes change without route metadata and inventory updates, `npm run check` fails locally and should fail in CI once CI is configured.

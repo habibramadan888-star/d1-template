@@ -659,3 +659,63 @@ No-go: 0
 ```
 
 The 9 exceptions are expected for an empty local D1 and confirm that missing source tables are reported rather than hidden.
+
+## V2 API Inventory Drift Gate Follow-Up
+
+### Task
+
+Make API inventory reproducible and enforce route metadata drift checks.
+
+### Current Status
+
+Completed.
+
+### Code Modified
+
+Yes, but only tooling/tests/reports:
+
+- `scripts/audit-api.mjs`
+- `package.json`
+- `API_INVENTORY.md`
+- `tests/source-risk.spec.mjs`
+- `COMMERCIALIZATION_BACKLOG.md`
+- `RUN_REPORT.md`
+- `NIGHT_SHIFT_REPORT.md`
+
+### Why
+
+The previous API inventory could drift because it was effectively manual. Commercial SaaS work needs every route to have reviewed metadata for auth, role, tenant scope, financial impact, delete behavior, audit coverage, and risk.
+
+### Risk
+
+Low. The change scans existing Worker source and checks documentation drift. It does not change route behavior.
+
+### Database Impact
+
+None.
+
+### Permission Impact
+
+None. No auth logic was changed.
+
+### Worker Impact
+
+No runtime Worker logic changed. The build still runs in dry-run mode only.
+
+### Verification
+
+Command:
+
+```bash
+npm run check
+```
+
+Result:
+
+```text
+API inventory is up to date.
+tests 20
+pass 20
+build:worker:assets --dry-run passed
+build:worker:embedded --dry-run passed
+```
