@@ -1060,6 +1060,56 @@ Worker assets dry-run build passed
 Worker embedded dry-run build passed
 ```
 
+## V2 Automatic Syntax Gate Follow-Up
+
+### Task
+
+Replace manual syntax-check file lists with an automatic scanner.
+
+### Current Status
+
+Completed.
+
+### Code Modified
+
+Yes, but only tooling/tests/reports:
+
+- `scripts/check-syntax.mjs`
+- `tests/source-risk.spec.mjs`
+- `package.json`
+- `RUN_REPORT.md`
+- `NIGHT_SHIFT_REPORT.md`
+
+### Why
+
+Manual typecheck lists do not scale. Future commercial modules must not be able to bypass syntax checks simply because a developer forgot to add a new file to `package.json`.
+
+### Risk
+
+Low. This only changes validation tooling.
+
+### Database Impact
+
+None.
+
+### Permission Impact
+
+None.
+
+### Worker Impact
+
+No Worker route or runtime behavior changed.
+
+### Verification
+
+```text
+npm run check passed
+Syntax check passed for 30 file(s).
+tests 52 / pass 52
+Worker assets dry-run build passed
+Worker embedded dry-run build passed
+```
+
 ## V2 TTLock Remark Parser Follow-Up
 
 ### Task

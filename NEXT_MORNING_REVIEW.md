@@ -477,3 +477,27 @@ Follow-up:
 
 - The follow-up UI should display the full raw remark, not only the parsed bed.
 - The parser should be wired only after the follow-up data contract is reviewed.
+
+## Automatic Syntax Gate Follow-Up
+
+Added `scripts/check-syntax.mjs` and changed `typecheck` to use it.
+
+Purpose:
+
+- prevent future modules from bypassing syntax checks,
+- scan modules, scripts, tests, tools, Worker helper scripts, and key entry files,
+- reduce package.json maintenance risk as the project becomes modular.
+
+Validation completed:
+
+```text
+npm run check passed
+Syntax check passed for 30 file(s).
+tests 52 / pass 52
+Worker dry-run builds passed
+```
+
+Follow-up:
+
+- Keep adding new code under scanned directories.
+- If new file types are introduced, extend `scripts/check-syntax.mjs` before relying on them.

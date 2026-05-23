@@ -969,6 +969,53 @@ Worker assets dry-run build passed
 Worker embedded dry-run build passed
 ```
 
+## Automatic Syntax Check Gate Update
+
+Date: 2026-05-23
+
+### Files Added Or Updated
+
+- Added `scripts/check-syntax.mjs`.
+- Replaced manual `typecheck` file list with `node scripts/check-syntax.mjs`.
+- Updated source-risk tests for the automatic scan.
+
+### Why
+
+The previous `typecheck` command manually listed every `.mjs` file. That is unsafe for a modular commercial codebase because new modules can be added without syntax checking. The new gate scans future module, script, test, tool, and Worker helper files automatically.
+
+### Coverage
+
+- `modules/**/*.mjs`
+- `scripts/**/*.mjs`
+- `tests/**/*.mjs`
+- `tools/**/*.cjs`
+- `deploy-worker/scripts/**/*.js`
+- key entry files: Worker source and owner main bundle
+
+### Safety Scope
+
+- No Worker route was changed.
+- No frontend was changed.
+- No database schema was changed.
+- Existing runtime behavior is unchanged.
+
+### Verification
+
+Command:
+
+```bash
+npm run check
+```
+
+Result:
+
+```text
+Syntax check passed for 30 file(s).
+tests 52 / pass 52
+Worker assets dry-run build passed
+Worker embedded dry-run build passed
+```
+
 ## TTLock Remark Parser Helper Update
 
 Date: 2026-05-23

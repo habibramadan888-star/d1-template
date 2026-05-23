@@ -26,10 +26,12 @@ test("commercial CI workflow runs checks without deploy secrets", async () => {
 test("secret hygiene check blocks tracked local secret files", async () => {
   const pkg = JSON.parse(await readFile("package.json", "utf8"));
   const script = await readFile("scripts/check-secrets.mjs", "utf8");
+  const syntaxScript = await readFile("scripts/check-syntax.mjs", "utf8");
 
   assert.equal(pkg.scripts["security:secrets"], "node scripts/check-secrets.mjs");
   assert.match(pkg.scripts.check, /security:secrets/);
-  assert.match(pkg.scripts.typecheck, /scripts\/check-secrets\.mjs/);
+  assert.equal(pkg.scripts.typecheck, "node scripts/check-syntax.mjs");
+  assert.match(syntaxScript, /scripts/);
   assert.match(script, /deploy-worker\/\.dev\.vars/);
   assert.match(script, /\.env\.local/);
   assert.match(script, /Secret hygiene check failed/);
@@ -79,12 +81,27 @@ test("database static scan is generated separately from manual database audit", 
   assert.match(manualAudit, /## Recommended Migration Order/);
 });
 
+test("syntax check scans future module, script, test, and tool files automatically", async () => {
+  const pkg = JSON.parse(await readFile("package.json", "utf8"));
+  const script = await readFile("scripts/check-syntax.mjs", "utf8");
+
+  assert.equal(pkg.scripts.typecheck, "node scripts/check-syntax.mjs");
+  assert.match(script, /modules/);
+  assert.match(script, /scripts/);
+  assert.match(script, /tests/);
+  assert.match(script, /tools/);
+  assert.match(script, /deploy-worker\/scripts/);
+  assert.match(script, /spawnSync\(process\.execPath, \["--check"/);
+});
+
 test("authenticated core smoke covers owner and employee permission boundaries", async () => {
   const pkg = JSON.parse(await readFile("package.json", "utf8"));
   const script = await readFile("scripts/smoke-core-flows.mjs", "utf8");
+  const syntaxScript = await readFile("scripts/check-syntax.mjs", "utf8");
 
   assert.equal(pkg.scripts["smoke:core"], "node scripts/smoke-core-flows.mjs");
-  assert.match(pkg.scripts.typecheck, /scripts\/smoke-core-flows\.mjs/);
+  assert.equal(pkg.scripts.typecheck, "node scripts/check-syntax.mjs");
+  assert.match(syntaxScript, /scripts/);
   assert.match(script, /unauthenticated \/api\/me/);
   assert.match(script, /owner \/api\/history/);
   assert.match(script, /owner \/api\/arrears/);
@@ -99,12 +116,14 @@ test("authenticated core smoke covers owner and employee permission boundaries",
 test("clean Worker bootstrap probe is explicit local-only and not a default gate", async () => {
   const pkg = JSON.parse(await readFile("package.json", "utf8"));
   const script = await readFile("scripts/probe-clean-worker-bootstrap.mjs", "utf8");
+  const syntaxScript = await readFile("scripts/check-syntax.mjs", "utf8");
 
   assert.equal(
     pkg.scripts["probe:clean-bootstrap"],
     "node scripts/probe-clean-worker-bootstrap.mjs"
   );
-  assert.match(pkg.scripts.typecheck, /scripts\/probe-clean-worker-bootstrap\.mjs/);
+  assert.equal(pkg.scripts.typecheck, "node scripts/check-syntax.mjs");
+  assert.match(syntaxScript, /scripts/);
   assert.doesNotMatch(pkg.scripts.check, /probe:clean-bootstrap/);
   assert.match(script, /--local/);
   assert.match(script, /--persist-to/);
