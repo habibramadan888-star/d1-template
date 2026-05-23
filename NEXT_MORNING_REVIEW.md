@@ -633,3 +633,30 @@ Follow-up:
 
 - Add a database-backed uniqueness plan before connecting this helper to the Worker.
 - Do not rely on frontend-only duplicate prevention for commercial accounting writes.
+
+## Transaction Idempotency Storage Contract Follow-Up
+
+Updated the commercial schema draft and rent write plan so transaction-level idempotency is part of the future accounting write path.
+
+Purpose:
+
+- require `transactions.idempotency_key`,
+- enforce uniqueness by `company_id/property_id/idempotency_key`,
+- pass idempotency into the rent write plan instead of keeping it only in frontend state,
+- verify the local D1 rehearsal stores the expected key.
+
+Validation completed:
+
+```text
+npm run check passed
+npm run rehearsal:rent-write-plan passed
+Syntax check passed for 38 file(s).
+tests 68 / pass 68
+Worker dry-run builds passed
+Rent write plan local D1 rehearsal passed
+```
+
+Follow-up:
+
+- Future Worker code must catch uniqueness conflicts and return the original committed result.
+- Production D1 migration is still blocked until the promotion checklist and clean Worker bootstrap gate pass.

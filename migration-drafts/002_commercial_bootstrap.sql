@@ -122,6 +122,7 @@ CREATE TABLE IF NOT EXISTS transactions (
   transaction_id TEXT PRIMARY KEY,
   company_id TEXT NOT NULL,
   property_id TEXT NOT NULL,
+  idempotency_key TEXT NOT NULL,
   session_id TEXT NOT NULL,
   bed_id TEXT,
   bed_code_snapshot TEXT,
@@ -149,6 +150,9 @@ CREATE TABLE IF NOT EXISTS transactions (
 
 CREATE INDEX IF NOT EXISTS idx_transactions_session
   ON transactions(company_id, property_id, session_id, created_at);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_transactions_idempotency
+  ON transactions(company_id, property_id, idempotency_key);
 
 CREATE INDEX IF NOT EXISTS idx_transactions_bed_period
   ON transactions(company_id, property_id, bed_id, period_start, period_end);

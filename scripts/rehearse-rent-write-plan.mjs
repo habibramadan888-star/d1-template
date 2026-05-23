@@ -122,6 +122,7 @@ const entryDraft = createRentEntryDraft({
 
 const writePlan = createRentWritePlan(entryDraft, {
   transactionId: "tx_rent_plan",
+  idempotencyKey: "emp_entry_rehearsal_rent_plan",
   receivableId: "rec_rent_plan",
   paymentId: "pay_rent_plan",
   arrearTaskId: "task_rent_plan",
@@ -158,6 +159,7 @@ VALUES ('sess_rent_plan', 'co_rent_plan', 'prop_rent_plan', 'user_staff_rent_pla
 const verifySql = `
 SELECT
   (SELECT COUNT(*) FROM transactions WHERE company_id = 'co_rent_plan') AS transaction_count,
+  (SELECT COUNT(*) FROM transactions WHERE company_id = 'co_rent_plan' AND idempotency_key = 'emp_entry_rehearsal_rent_plan') AS transaction_idempotency_count,
   (SELECT COUNT(*) FROM receivables WHERE company_id = 'co_rent_plan' AND amount_remaining_fils = 69000) AS receivable_count,
   (SELECT COUNT(*) FROM payments WHERE company_id = 'co_rent_plan' AND amount_fils = 8000) AS payment_count,
   (SELECT COUNT(*) FROM arrear_tasks WHERE company_id = 'co_rent_plan' AND remaining_fils = 69000 AND promise_date = '2026-05-29') AS arrear_task_count,
@@ -210,6 +212,7 @@ try {
   if (!row) throw new Error("Missing rent write plan rehearsal SELECT result.");
 
   requireEqual(row.transaction_count, 1, "transaction_count");
+  requireEqual(row.transaction_idempotency_count, 1, "transaction_idempotency_count");
   requireEqual(row.receivable_count, 1, "receivable_count");
   requireEqual(row.payment_count, 1, "payment_count");
   requireEqual(row.arrear_task_count, 1, "arrear_task_count");

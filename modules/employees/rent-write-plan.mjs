@@ -73,6 +73,7 @@ export function createRentWritePlan(entryDraft, options) {
   const transactionRow = {
     ...scope,
     transaction_id: ids.transactionId,
+    idempotency_key: requireString(options.idempotencyKey, "idempotencyKey"),
     session_id: requireString(tx.sessionId, "sessionId"),
     bed_id: bedId,
     bed_code_snapshot: tx.bed,

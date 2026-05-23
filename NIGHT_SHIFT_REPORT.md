@@ -1565,3 +1565,65 @@ Mode: local-only disposable D1; no production mutation.
 ### Next Step
 
 Do not wire this into the Worker yet. First document or draft the transaction-level idempotency storage contract so duplicate detection is backed by a database uniqueness constraint, not only by frontend state.
+
+## V2 Transaction Idempotency Storage Contract Follow-Up
+
+### Task
+
+Add transaction-level idempotency to the commercial schema draft and rent write plan.
+
+### Current Status
+
+Completed.
+
+### Code Modified
+
+Yes, but only draft schema, pure write plan, local rehearsal, tests, and reports:
+
+- `COMMERCIAL_ENTRY_WRITE_CONTRACT.md`
+- `migration-drafts/002_commercial_bootstrap.sql`
+- `modules/employees/rent-write-plan.mjs`
+- `scripts/rehearse-rent-write-plan.mjs`
+- `tests/employee-rent-write-plan.spec.mjs`
+- `tests/migration-draft.spec.mjs`
+- `RUN_REPORT.md`
+- `NIGHT_SHIFT_REPORT.md`
+- `NEXT_MORNING_REVIEW.md`
+
+### Why
+
+Duplicate prevention for employee financial entries must be enforced by a scoped database uniqueness constraint. Frontend disabled buttons and generated keys are not sufficient in weak-network or retry scenarios.
+
+### Risk
+
+Low to medium. This changes only draft migration and pure modules, not the live Worker route. Any future production migration still requires explicit promotion review.
+
+### Database Impact
+
+Draft only. No production D1 mutation was executed.
+
+### Permission Impact
+
+None.
+
+### Worker Impact
+
+No Worker route or runtime behavior changed.
+
+### Verification
+
+```text
+npm run check passed
+npm run rehearsal:rent-write-plan passed
+Syntax check passed for 38 file(s).
+tests 68 / pass 68
+Worker assets dry-run build passed
+Worker embedded dry-run build passed
+Rent write plan local D1 rehearsal passed
+Validated operations: 10
+Mode: local-only disposable D1; no production mutation.
+```
+
+### Next Step
+
+The Worker implementation must handle unique-key conflicts by returning the original committed result. Do not insert a second transaction or generate a replacement key after conflict.

@@ -1444,3 +1444,57 @@ Rent write plan local D1 rehearsal passed
 Validated operations: 10
 Mode: local-only disposable D1; no production mutation.
 ```
+
+## Transaction Idempotency Storage Contract Update
+
+Date: 2026-05-23
+
+### Files Added Or Updated
+
+- Updated `COMMERCIAL_ENTRY_WRITE_CONTRACT.md`.
+- Updated `migration-drafts/002_commercial_bootstrap.sql`.
+- Updated `modules/employees/rent-write-plan.mjs`.
+- Updated `scripts/rehearse-rent-write-plan.mjs`.
+- Updated `tests/employee-rent-write-plan.spec.mjs`.
+- Updated `tests/migration-draft.spec.mjs`.
+
+### Why
+
+Pure idempotency keys are not enough for commercial accounting writes. The database schema draft and write plan must carry the key so duplicate employee submissions are blocked by a database uniqueness constraint, not only by UI state or client behavior.
+
+### Rules Captured
+
+- `transactions.idempotency_key` is required in the commercial schema draft.
+- The draft schema includes `idx_transactions_idempotency` on `transactions(company_id, property_id, idempotency_key)`.
+- The rent write plan requires `options.idempotencyKey` and maps it to the transaction row.
+- The local D1 rehearsal verifies the transaction row includes the expected key.
+- The Worker conflict-return behavior remains documented, not implemented.
+
+### Safety Scope
+
+- No production migration was executed.
+- No production database was read or mutated.
+- No Worker route was changed.
+- No frontend behavior was changed.
+- Existing runtime financial behavior is unchanged.
+
+### Verification
+
+Commands:
+
+```bash
+npm run check
+npm run rehearsal:rent-write-plan
+```
+
+Result:
+
+```text
+Syntax check passed for 38 file(s).
+tests 68 / pass 68
+Worker assets dry-run build passed
+Worker embedded dry-run build passed
+Rent write plan local D1 rehearsal passed
+Validated operations: 10
+Mode: local-only disposable D1; no production mutation.
+```

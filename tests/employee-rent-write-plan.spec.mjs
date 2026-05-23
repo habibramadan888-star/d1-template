@@ -27,6 +27,7 @@ function draft(overrides = {}) {
 function planOptions(overrides = {}) {
   return {
     transactionId: "tx_1",
+    idempotencyKey: "emp_entry_test_1",
     receivableId: "rec_1",
     paymentId: "pay_1",
     auditEventIds: ["audit_tx", "audit_rec", "audit_pay"],
@@ -57,6 +58,7 @@ test("createRentWritePlan maps a settled rent draft to ordered commercial table 
   const [transaction, receivable, payment] = plan.operations;
   assert.equal(transaction.row.company_id, "company_hl_009");
   assert.equal(transaction.row.property_id, "property_hl_009");
+  assert.equal(transaction.row.idempotency_key, "emp_entry_test_1");
   assert.equal(transaction.row.amount_fils, 77000);
   assert.equal(transaction.row.due_fils, 77000);
   assert.equal(transaction.row.deficit_fils, 0);
@@ -125,6 +127,10 @@ test("createRentWritePlan rejects incomplete ids and partial plans without arrea
   assert.throws(
     () => createRentWritePlan(draft(), planOptions({ auditEventIds: [] })),
     /audit event ids/
+  );
+  assert.throws(
+    () => createRentWritePlan(draft(), planOptions({ idempotencyKey: "" })),
+    /idempotencyKey/
   );
   assert.throws(
     () =>

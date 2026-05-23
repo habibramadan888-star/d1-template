@@ -25,7 +25,7 @@ The project is not yet ready for commercial SaaS launch. Static checks, local Wo
 ### P0 Mitigation Progress
 
 - P0-001: integer AED fils helpers now exist and are covered by tests, but legacy runtime still uses `REAL`/`Number`.
-- P0-002/P0-003: rent write plan and local D1 rehearsal now prove backend-owned handover recomputation is viable, but live Worker route is not migrated.
+- P0-002/P0-003: rent write plan and local D1 rehearsal now prove backend-owned handover recomputation and transaction idempotency storage are viable, but live Worker route is not migrated.
 - P0-005/P0-008: commercial schema draft includes `transactions`, `receivables`, `payments`, and `arrear_tasks`; local rent write rehearsal passes against disposable D1, but clean Worker bootstrap still fails until the live route uses the commercial path.
 
 Current closure rule:

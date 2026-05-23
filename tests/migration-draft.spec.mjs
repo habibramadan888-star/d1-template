@@ -47,6 +47,13 @@ test("commercial bootstrap draft uses tenant and property scope", async () => {
   assert.match(sql, /\bcompany_id, property_id\b/);
 });
 
+test("commercial bootstrap draft enforces transaction idempotency", async () => {
+  const sql = await readFile("migration-drafts/002_commercial_bootstrap.sql", "utf8");
+  assert.match(sql, /\bidempotency_key TEXT NOT NULL\b/);
+  assert.match(sql, /CREATE UNIQUE INDEX IF NOT EXISTS idx_transactions_idempotency/i);
+  assert.match(sql, /ON transactions\(company_id, property_id, idempotency_key\)/i);
+});
+
 test("commercial bootstrap draft stores money as integer fils", async () => {
   const sql = await readFile("migration-drafts/002_commercial_bootstrap.sql", "utf8");
   const requiredMoneyColumns = [
@@ -186,6 +193,8 @@ test("commercial entry write contract requires atomic audited server-side writes
     "audit_events",
     "handover_sessions",
     "idempotency key",
+    "transactions(company_id, property_id, idempotency_key)",
+    "uniqueness constraint",
     "Frontend totals are display-only",
     "must not be the source of truth",
     "REAL",

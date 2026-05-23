@@ -80,6 +80,7 @@ If the storage layer cannot provide an atomic batch or equivalent all-or-nothing
 | ---------------------- | ---------------------------------------------------- |
 | `company_id`           | authenticated company                                |
 | `property_id`          | authenticated property                               |
+| `idempotency_key`      | server-verified scoped employee entry key            |
 | `session_id`           | draft session                                        |
 | `bed_id`               | resolved bed id                                      |
 | `bed_code_snapshot`    | parsed bed or full TTLock remark where useful        |
@@ -175,6 +176,14 @@ Every employee entry request must carry an idempotency key scoped by:
 - client entry id.
 
 Duplicate requests with the same key must return the original committed result and must not create duplicate transactions, payments, receivables, or arrear tasks.
+
+The commercial schema must enforce this with a database uniqueness constraint on:
+
+```text
+transactions(company_id, property_id, idempotency_key)
+```
+
+The Worker must check the existing committed row on uniqueness conflict and return the original result. It must not silently insert a second row, regenerate a new key, or rely only on frontend disabled buttons.
 
 ## Failure Rules
 
