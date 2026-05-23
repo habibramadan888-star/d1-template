@@ -324,3 +324,15 @@ It runs:
 It does not include Cloudflare deploy tokens, production deploy commands, or remote D1 migration commands.
 
 Tomorrow's required manual action: configure repository branch protection so `Commercial Check` is required before merge/deploy.
+
+## Secret Hygiene Gate Follow-Up
+
+Added `npm run security:secrets` and included it in `npm run check`.
+
+It blocks:
+
+- tracked `.env`, `.env.local`, `.dev.vars`, `deploy-worker/.dev.vars`,
+- real-looking secret assignments in non-example tracked files,
+- non-placeholder values for monitored secret keys in example env files.
+
+It does not print secret values and does not read ignored local secret files unless they are accidentally tracked.

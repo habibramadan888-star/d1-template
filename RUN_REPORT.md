@@ -854,3 +854,28 @@ It does not configure Cloudflare API tokens, does not deploy, and does not run p
 ### Remaining Limitation
 
 GitHub branch protection is not configured from this local repository. Before commercial release, repository settings should require the `Commercial Check` workflow before merge/deploy.
+
+## Secret Hygiene Gate Update
+
+Date: 2026-05-23
+
+### Files Added Or Updated
+
+- Added `scripts/check-secrets.mjs`.
+- Added npm script `security:secrets`.
+- Added `security:secrets` to `npm run check`.
+- Added static tests for the secret hygiene gate.
+
+### Coverage
+
+The gate checks Git-tracked files and fails if:
+
+- `.env`, `.env.local`, `.dev.vars`, or `deploy-worker/.dev.vars` are tracked,
+- secret-looking assignments such as `JWT_SECRET=...`, `TTLOCK_CLIENT_SECRET=...`, or `CLOUDFLARE_API_TOKEN=...` appear in non-example tracked files,
+- example files contain non-placeholder secret values for monitored keys.
+
+### Safety Scope
+
+- The script does not read ignored `.dev.vars` directly unless it becomes tracked by Git.
+- The script does not print secret values.
+- No production configuration changed.

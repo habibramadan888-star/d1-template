@@ -23,6 +23,19 @@ test("commercial CI workflow runs checks without deploy secrets", async () => {
   assert.doesNotMatch(workflow, /migrations apply|d1 execute .*--remote/i);
 });
 
+test("secret hygiene check blocks tracked local secret files", async () => {
+  const pkg = JSON.parse(await readFile("package.json", "utf8"));
+  const script = await readFile("scripts/check-secrets.mjs", "utf8");
+
+  assert.equal(pkg.scripts["security:secrets"], "node scripts/check-secrets.mjs");
+  assert.match(pkg.scripts.check, /security:secrets/);
+  assert.match(pkg.scripts.typecheck, /scripts\/check-secrets\.mjs/);
+  assert.match(script, /deploy-worker\/\.dev\.vars/);
+  assert.match(script, /\.env\.local/);
+  assert.match(script, /Secret hygiene check failed/);
+  assert.match(script, /tracked secret-looking assignment/);
+});
+
 test("server-side auth gate remains present in Worker source", async () => {
   const worker = await readFile("deploy-worker/src/index.js", "utf8");
 

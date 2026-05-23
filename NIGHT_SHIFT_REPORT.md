@@ -901,3 +901,47 @@ No Worker source changed. CI runs the existing dry-run builds.
 ### Verification
 
 The workflow is statically checked to ensure it runs `npm ci` and `npm run check` without deployment secrets or remote D1 mutation commands.
+
+## V2 Secret Hygiene Gate Follow-Up
+
+### Task
+
+Add an automated guard against accidentally tracking local secrets.
+
+### Current Status
+
+Completed.
+
+### Code Modified
+
+Yes, but only tooling/tests/reports:
+
+- `scripts/check-secrets.mjs`
+- `package.json`
+- `tests/source-risk.spec.mjs`
+- `RUN_REPORT.md`
+- `NIGHT_SHIFT_REPORT.md`
+
+### Why
+
+Commercial SaaS work must prevent local `.dev.vars`, `.env.local`, Cloudflare tokens, TTLock secrets, and password/JWT secrets from entering Git history.
+
+### Risk
+
+Low. The gate scans only Git-tracked files and does not read ignored local secret files unless they become tracked.
+
+### Database Impact
+
+None.
+
+### Permission Impact
+
+None.
+
+### Worker Impact
+
+None.
+
+### Verification
+
+The gate is included in `npm run check` as `npm run security:secrets`.
