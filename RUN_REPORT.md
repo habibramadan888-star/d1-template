@@ -969,6 +969,50 @@ Worker assets dry-run build passed
 Worker embedded dry-run build passed
 ```
 
+## Finance Rent Period Helper Update
+
+Date: 2026-05-23
+
+### Files Added Or Updated
+
+- Added `modules/finance/periods.mjs`.
+- Added `tests/finance-periods.spec.mjs`.
+- Added module and test syntax checks to `npm run typecheck`.
+
+### Why
+
+Rent entry needs deterministic period anchors so staff do not manually invent start/end dates. The helper separates display coverage dates from next due dates to avoid the recurring 15-day ambiguity.
+
+### Rules Captured
+
+- `1M`: keeps the same-day monthly anchor and uses system list rent.
+- `15D`: fixed `400.00 AED`; display end is start + 14 days; next due date is start + 15 days.
+- `CUST`: fixed `40.00 AED` per custom day; display end is start + days - 1; next due date is start + days.
+- Invalid dates, invalid cycles, and non-positive custom days are rejected.
+
+### Safety Scope
+
+- No Worker route was changed.
+- No frontend was changed.
+- No database schema was changed.
+- Existing runtime period calculation is unchanged.
+
+### Verification
+
+Command:
+
+```bash
+npm run check
+```
+
+Result:
+
+```text
+tests 46 / pass 46
+Worker assets dry-run build passed
+Worker embedded dry-run build passed
+```
+
 ## Finance Receivables Settlement Helper Update
 
 Date: 2026-05-23

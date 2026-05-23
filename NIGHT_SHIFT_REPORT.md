@@ -1060,6 +1060,55 @@ Worker assets dry-run build passed
 Worker embedded dry-run build passed
 ```
 
+## V2 Finance Rent Period Follow-Up
+
+### Task
+
+Create a tested pure helper for rent period anchors and cycle pricing.
+
+### Current Status
+
+Completed.
+
+### Code Modified
+
+Yes, but only additive module/tests/reports:
+
+- `modules/finance/periods.mjs`
+- `tests/finance-periods.spec.mjs`
+- `package.json`
+- `RUN_REPORT.md`
+- `NIGHT_SHIFT_REPORT.md`
+
+### Why
+
+The commercial flow must derive period dates and expected rent from system rules, not staff input. This helper makes the expected monthly, 15-day, and custom-day calculations explicit and testable.
+
+### Risk
+
+Low. The helper is not wired into current Worker or frontend behavior.
+
+### Database Impact
+
+None.
+
+### Permission Impact
+
+None.
+
+### Worker Impact
+
+No Worker route or runtime behavior changed.
+
+### Verification
+
+```text
+npm run check passed
+tests 46 / pass 46
+Worker assets dry-run build passed
+Worker embedded dry-run build passed
+```
+
 ## V2 Finance Receivables Settlement Follow-Up
 
 ### Task

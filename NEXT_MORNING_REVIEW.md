@@ -427,3 +427,28 @@ Follow-up:
 
 - Wire this only after the commercial transaction write path is designed.
 - Do not allow short-paid rent to be submitted as plain remark-only data in the final commercial flow.
+
+## Finance Rent Period Follow-Up
+
+Added `modules/finance/periods.mjs` and tests.
+
+Purpose:
+
+- calculate system-derived rent periods instead of letting staff choose arbitrary dates,
+- keep monthly same-day anchors,
+- fix 15-day rent at 400 AED,
+- calculate custom rent as days multiplied by 40 AED,
+- separate employee-visible display end from next due date.
+
+Validation completed:
+
+```text
+npm run check passed
+tests 46 / pass 46
+Worker dry-run builds passed
+```
+
+Follow-up:
+
+- Before wiring, confirm whether the UI should display both `displayEndDate` and `nextDueDate` or hide one behind an explanation.
+- Database fields should store both if the business needs audit clarity.
