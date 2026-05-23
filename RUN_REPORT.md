@@ -1995,11 +1995,11 @@ Date: 2026-05-24
 ### Audit Counts
 
 ```text
-REAL_FLOAT_RISKS=187
-JS_NUMBER_PARSEFLOAT_RISKS=466
+REAL_FLOAT_RISKS=188
+JS_NUMBER_PARSEFLOAT_RISKS=467
 FRONTEND_MONEY_CALC_RISKS=435
-BACKEND_MONEY_CALC_RISKS=143
-MONEY_FINDINGS=2573
+BACKEND_MONEY_CALC_RISKS=144
+MONEY_FINDINGS=2625
 ```
 
 ### Verification
@@ -2071,3 +2071,47 @@ Full stage verification was run after this section was added and is recorded in 
 ### Status
 
 P0-001 remains `Partial - P0-001B shadow validation ready`. The system can now perform read-only local D1 money precision reconciliation, but live legacy write/read paths are still not migrated to integer minor units.
+
+## P0-003A Backend Totals Authority Audit And Shadow Checks
+
+Date: 2026-05-24
+
+### Files Added Or Updated
+
+- `BACKEND_TOTALS_AUTHORITY_AUDIT.md`: maps frontend-submitted totals, backend totals, source-of-truth risk, and required future behavior.
+- `modules/finance/shadow-totals.mjs`: adds a non-invasive shadow helper that recomputes handover totals from accepted rows and compares against submitted session totals.
+- `tests/backend-totals-shadow.spec.mjs`: covers recompute, match detection, mismatch detection, and unsafe amount rejection.
+- `scripts/audit-backend-totals.mjs`: adds a static scan for total authority risks.
+- `BACKEND_TOTALS_SHADOW_RESULT.md`: generated static totals authority result.
+- `package.json`: added `test:backend-totals-shadow` and `audit:backend-totals`.
+- `COMMERCIALIZATION_BACKLOG.md`, `P0_P1_STATUS_REVIEW.md`, `VERIFICATION_STATUS.md`: updated P0-003A status as Partial.
+
+### Audit Counts
+
+```text
+FRONTEND_SUBMITTED_TOTALS=36
+TOTAL_NUMERIC_OPERATIONS=539
+BACKEND_LEGACY_TOTAL_PARSE=11
+BACKEND_RECOMPUTE_EVIDENCE=24
+BACKEND_TOTAL_FINDINGS=610
+```
+
+### Verification
+
+```text
+npm run test:backend-totals-shadow passed
+npm run audit:backend-totals passed
+```
+
+Full stage verification was run after this section was added and is recorded in the Night Shift V3 report.
+
+### Safety Scope
+
+- No production Worker deploy was executed.
+- No production or remote D1 migration was executed.
+- No database schema was changed.
+- No dashboard formula, handover submission flow, API response, delete-session void behavior, tenancy logic, or receivables model was changed.
+
+### Status
+
+P0-003 remains `Partial - backend totals authority audited / shadow tests prepared`. The live Worker route may still accept frontend-provided handover totals; this task only adds shadow evidence and test guardrails.
