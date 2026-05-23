@@ -379,3 +379,27 @@ Follow-up:
 
 - Use this helper for new commercial write paths only after the backend write model is designed and reviewed.
 - Do not retrofit the legacy Worker financial formulas without separate accounting tests.
+
+## Finance Handover Summary Follow-Up
+
+Added `modules/finance/handover.mjs` and tests.
+
+Purpose:
+
+- define cash handover as cash income minus cash refund/expense outflow,
+- define bank transfer total/count from bank income entries only,
+- define gross received as all received income before refunds and expenses,
+- keep detail breakdowns separate from the three handover core metrics.
+
+Validation completed:
+
+```text
+npm run check passed
+tests 35 / pass 35
+Worker dry-run builds passed
+```
+
+Follow-up:
+
+- The employee top summary should eventually call the same backend-reviewed calculation contract.
+- Do not let frontend-only display logic become the source of truth for handover cash.

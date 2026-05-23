@@ -1063,3 +1063,52 @@ Worker embedded dry-run build passed
 Additional guard:
 
 - `modules/**/*.mjs` is now included in `format:check`, so future finance modules cannot bypass formatting checks.
+
+## V2 Finance Handover Summary Follow-Up
+
+### Task
+
+Create a tested pure helper for employee session handover totals.
+
+### Current Status
+
+Completed.
+
+### Code Modified
+
+Yes, but only additive module/tests/reports:
+
+- `modules/finance/handover.mjs`
+- `tests/finance-handover.spec.mjs`
+- `package.json`
+- `RUN_REPORT.md`
+- `NIGHT_SHIFT_REPORT.md`
+
+### Why
+
+The handover UI must not invent totals independently. It needs a backend-compatible calculation contract for the three business-critical values: cash handover, bank transfer total/count, and gross received.
+
+### Risk
+
+Low. The helper is not wired into current Worker or frontend behavior.
+
+### Database Impact
+
+None.
+
+### Permission Impact
+
+None.
+
+### Worker Impact
+
+No Worker route or runtime behavior changed.
+
+### Verification
+
+```text
+npm run check passed
+tests 35 / pass 35
+Worker assets dry-run build passed
+Worker embedded dry-run build passed
+```

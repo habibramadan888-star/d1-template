@@ -968,3 +968,53 @@ tests 31 / pass 31
 Worker assets dry-run build passed
 Worker embedded dry-run build passed
 ```
+
+## Finance Handover Summary Helper Update
+
+Date: 2026-05-23
+
+### Files Added Or Updated
+
+- Added `modules/finance/handover.mjs`.
+- Added `tests/finance-handover.spec.mjs`.
+- Added module and test syntax checks to `npm run typecheck`.
+
+### Why
+
+The employee handover screen needs three stable accounting anchors:
+
+- cash handover,
+- bank transfer total and count,
+- gross received.
+
+These values must be computed from normalized entry data with integer minor-unit money before any UI or Worker write path relies on them.
+
+### Accounting Rules Captured
+
+- `cashHandoverFils = cash inflows - cash deposit refunds - cash expenses`.
+- `bankTransferInFils` only counts bank income entries.
+- `grossReceivedFils` counts all received income and excludes refunds or expenses.
+- Detail breakdowns stay separate: rent, deposit-in, arrears recovery, transfer fee, deposit refund, expense.
+
+### Safety Scope
+
+- No Worker route was changed.
+- No frontend was changed.
+- No database schema was changed.
+- Existing runtime financial behavior is unchanged.
+
+### Verification
+
+Command:
+
+```bash
+npm run check
+```
+
+Result:
+
+```text
+tests 35 / pass 35
+Worker assets dry-run build passed
+Worker embedded dry-run build passed
+```
