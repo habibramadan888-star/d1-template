@@ -5,12 +5,12 @@ import {
   defaultEnvPath,
   defaultPersistTo,
   defaultPort,
-  killTree,
   readDevVars,
   rootDir,
   runNodeScript,
   sanitizeLog,
   startWorker,
+  stopProcessTree,
   waitForWorker
 } from "./local-worker-utils.mjs";
 
@@ -68,7 +68,10 @@ try {
   }
   process.exitCode = 1;
 } finally {
-  killTree(worker);
+  const stopResult = await stopProcessTree(worker, { label: "smoke Worker" });
+  if (!stopResult.ok) {
+    console.warn(`WARNING smoke Worker pid ${stopResult.pid} did not close cleanly`);
+  }
   console.log("Local Worker stopped.");
 }
 

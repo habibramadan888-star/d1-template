@@ -1941,3 +1941,36 @@ PASS clean D1 bootstrap verification
 - P0-006 tenant isolation remains open.
 - P0-008 formal receivables lifecycle remains open.
 - Runtime DDL remains P1-002 and was not removed in this task.
+
+## P0-005A Clean D1 Windows Lock Stability
+
+Date: 2026-05-24
+
+### Files Added Or Updated
+
+- `scripts/local-worker-utils.mjs`: added awaited child-process shutdown and retrying local directory cleanup helpers.
+- `scripts/verify-clean-d1.mjs`: waits for Worker shutdown, retries D1 cleanup, and separates business verification from cleanup status.
+- `scripts/smoke-with-worker.mjs`: waits for the local Worker process to close before finishing.
+- `scripts/test-delete-session-void.mjs`: waits for Worker shutdown and uses retrying cleanup for its disposable D1 directory.
+- `scripts/db-local-reset.mjs`: uses retrying cleanup for the local D1 reset directory.
+- `scripts/db-local-bootstrap.mjs`: uses retrying cleanup before local bootstrap.
+- `D1_WINDOWS_LOCK_DIAGNOSIS.md`: records the Windows `EBUSY` root cause and safety boundaries.
+- `D1_CLEAN_BOOTSTRAP_STABILITY_RESULT.md`: records three consecutive clean D1 verification passes.
+
+### Root Cause
+
+The failing preflight did not indicate a business bootstrap failure. The clean D1 verification had already passed smoke, auth, owner core reads, employee entry, and database evidence. The command failed in the final cleanup phase because Windows still held a Wrangler/Miniflare local D1 file handle under the isolated `--persist-to` directory.
+
+### Verification
+
+```text
+npm run verify:clean-d1 passed three consecutive times
+npm run check passed
+npm run smoke:with-worker passed
+npm run test:delete-session passed
+npm run db:local:bootstrap passed
+```
+
+### Status
+
+P0-005 remains `Verified`. The Windows cleanup instability is fixed for local verification tooling. No production migration, remote D1 command, production deploy, business logic change, financial logic change, or schema change was performed.

@@ -1,13 +1,14 @@
 import { execFileSync } from "node:child_process";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import {
   defaultEnvPath,
-  killTree,
   readDevVars,
+  removeDirWithRetries,
   sanitizeLog,
   startWorker,
+  stopProcessTree,
   waitForWorker,
   workerDir,
   wranglerBin
@@ -288,7 +289,10 @@ try {
     "voided transaction missing from audit detail"
   );
 } finally {
-  killTree(worker);
+  const stopResult = await stopProcessTree(worker, { label: "delete-session void Worker" });
+  if (!stopResult.ok) {
+    console.warn(`WARNING delete-session void Worker pid ${stopResult.pid} did not close cleanly`);
+  }
 }
 
 try {
@@ -328,6 +332,18 @@ SELECT
   if (workerLog) console.error(sanitizeLog(workerLog));
   throw error;
 } finally {
-  await rm(persistDir, { recursive: true, force: true });
-  console.log("Temporary D1 directory removed.");
+  const cleanup = await removeDirWithRetries(persistDir, {
+    label: "Temporary delete-session D1 directory"
+  });
+  if (cleanup.ok) {
+    console.log(`Temporary D1 directory removed in ${cleanup.attempts} attempt(s).`);
+  } else if (cleanup.movedTo) {
+    console.warn(
+      `WARNING Temporary D1 directory moved to pending cleanup ${cleanup.movedTo}; next run uses an isolated directory.`
+    );
+  } else {
+    console.warn(
+      `WARNING Temporary D1 directory could not be removed (${cleanup.errorCode}); next run uses an isolated directory.`
+    );
+  }
 }

@@ -3,7 +3,8 @@ import {
   defaultPort,
   defaultPersistTo,
   sanitizeLog,
-  startWorker
+  startWorker,
+  stopProcessTree
 } from "./local-worker-utils.mjs";
 
 const worker = startWorker({ port: defaultPort, persistTo: defaultPersistTo });
@@ -16,7 +17,7 @@ worker.stdout.on("data", (chunk) => process.stdout.write(sanitizeLog(chunk)));
 worker.stderr.on("data", (chunk) => process.stderr.write(sanitizeLog(chunk)));
 
 function stop() {
-  worker.kill("SIGTERM");
+  void stopProcessTree(worker, { label: "dev Worker" });
 }
 
 process.on("SIGINT", stop);

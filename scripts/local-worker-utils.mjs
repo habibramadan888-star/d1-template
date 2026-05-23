@@ -1,5 +1,6 @@
 import { execFileSync, spawn } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
+import { mkdir, rename, rm } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -122,6 +123,141 @@ export function killTree(child) {
       // Best effort cleanup only.
     }
   }
+}
+
+export function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+export async function stopProcessTree(child, { label = "child process", timeoutMs = 10000 } = {}) {
+  if (!child?.pid) return { ok: true, skipped: true, label };
+  if (child.exitCode !== null || child.signalCode !== null) {
+    return { ok: true, alreadyExited: true, label, pid: child.pid };
+  }
+
+  const closed = new Promise((resolve) => {
+    child.once("close", (code, signal) => resolve({ code, signal }));
+  });
+
+  try {
+    if (process.platform === "win32") {
+      execFileSync("taskkill", ["/PID", String(child.pid), "/T", "/F"], { stdio: "ignore" });
+    } else {
+      process.kill(-child.pid, "SIGTERM");
+    }
+  } catch {
+    try {
+      child.kill("SIGTERM");
+    } catch {
+      // Best effort cleanup only; wait below will decide whether it actually closed.
+    }
+  }
+
+  let result = await Promise.race([closed, sleep(timeoutMs).then(() => null)]);
+  if (!result && process.platform !== "win32") {
+    try {
+      process.kill(-child.pid, "SIGKILL");
+    } catch {
+      try {
+        child.kill("SIGKILL");
+      } catch {
+        // Best effort cleanup only.
+      }
+    }
+    result = await Promise.race([closed, sleep(2000).then(() => null)]);
+  }
+
+  return {
+    ok: Boolean(result),
+    label,
+    pid: child.pid,
+    code: result?.code ?? null,
+    signal: result?.signal ?? null
+  };
+}
+
+function isRetryableWindowsFsError(error) {
+  return ["EBUSY", "EPERM", "ENOTEMPTY"].includes(error?.code);
+}
+
+export async function removeDirWithRetries(
+  target,
+  { attempts = 10, delayMs = 300, label = "directory", pendingRoot } = {}
+) {
+  const resolved = path.resolve(target);
+  let lastError;
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      await rm(resolved, { recursive: true, force: true });
+      return { ok: true, path: resolved, attempts: attempt, label };
+    } catch (error) {
+      lastError = error;
+      if (!isRetryableWindowsFsError(error) || attempt === attempts) break;
+      await sleep(delayMs);
+    }
+  }
+
+  const quarantineRoot = path.resolve(pendingRoot || path.join(rootDir, ".tmp", "pending-cleanup"));
+  try {
+    await mkdir(quarantineRoot, { recursive: true });
+    const destination = path.join(
+      quarantineRoot,
+      `${path.basename(resolved)}-${Date.now().toString(36)}`
+    );
+    await rename(resolved, destination);
+    return {
+      ok: false,
+      movedTo: destination,
+      path: resolved,
+      attempts,
+      label,
+      errorCode: lastError?.code || "UNKNOWN"
+    };
+  } catch (moveError) {
+    return {
+      ok: false,
+      path: resolved,
+      attempts,
+      label,
+      errorCode: lastError?.code || moveError?.code || "UNKNOWN",
+      message: lastError?.message || moveError?.message || String(moveError)
+    };
+  }
+}
+
+export function installProcessCleanupHandlers(cleanup, { label = "process cleanup" } = {}) {
+  let running = false;
+
+  async function runAndExit(exitCode, reason, error) {
+    if (running) return;
+    running = true;
+    if (error) console.error(sanitizeLog(error?.stack || error?.message || String(error)));
+    try {
+      await cleanup(reason);
+    } catch (cleanupError) {
+      console.error(`${label} failed: ${sanitizeLog(cleanupError?.message || cleanupError)}`);
+    } finally {
+      process.exit(exitCode);
+    }
+  }
+
+  const onSigint = () => void runAndExit(130, "SIGINT");
+  const onSigterm = () => void runAndExit(143, "SIGTERM");
+  const onUncaught = (error) => void runAndExit(1, "uncaughtException", error);
+  const onUnhandled = (reason) => void runAndExit(1, "unhandledRejection", reason);
+
+  process.once("SIGINT", onSigint);
+  process.once("SIGTERM", onSigterm);
+  process.once("uncaughtException", onUncaught);
+  process.once("unhandledRejection", onUnhandled);
+
+  return () => {
+    process.off("SIGINT", onSigint);
+    process.off("SIGTERM", onSigterm);
+    process.off("uncaughtException", onUncaught);
+    process.off("unhandledRejection", onUnhandled);
+  };
 }
 
 export function sanitizeLog(text) {

@@ -1,7 +1,13 @@
-import { rm } from "node:fs/promises";
 import { assertSafeLocalPersistTo, resolveCleanD1PersistTo } from "./db-local-bootstrap-utils.mjs";
+import { removeDirWithRetries } from "./local-worker-utils.mjs";
 
 const persistTo = assertSafeLocalPersistTo(resolveCleanD1PersistTo());
 
-await rm(persistTo, { recursive: true, force: true });
+const cleanup = await removeDirWithRetries(persistTo, { label: "Local D1 reset directory" });
+if (!cleanup.ok && !cleanup.movedTo) {
+  throw new Error(`Local D1 reset failed for ${persistTo}: ${cleanup.errorCode}`);
+}
+if (cleanup.movedTo) {
+  console.warn(`WARNING moved locked local D1 directory to ${cleanup.movedTo}`);
+}
 console.log(`PASS local D1 reset ${persistTo}`);
