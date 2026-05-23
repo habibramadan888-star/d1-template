@@ -597,3 +597,65 @@ Result:
 ```text
 Legacy reconciliation templates generated.
 ```
+
+## V2 Local Legacy Reconciliation Dry-Run Follow-Up
+
+### Task
+
+Implement a local-only, read-only legacy reconciliation dry-run command.
+
+### Current Status
+
+Completed.
+
+### Code Modified
+
+Yes, but only tooling/tests/reports:
+
+- `scripts/reconcile-legacy-dry-run.mjs`
+- `.gitignore`
+- `package.json`
+- `LEGACY_RECONCILIATION_SPEC.md`
+- `tests/source-risk.spec.mjs`
+- `RUN_REPORT.md`
+- `NEXT_MORNING_REVIEW.md`
+- `NIGHT_SHIFT_REPORT.md`
+
+### Why
+
+The project now needs a controlled way to inspect a local/staging D1 copy and generate reconciliation reports before any commercial backfill is written.
+
+### Risk
+
+Low. The command refuses to run without `--persist-to`, rejects remote flags, and writes reports to ignored `reconciliation-output/`.
+
+### Database Impact
+
+No production or existing local D1 was changed. Validation used an empty disposable local D1 state directory and removed it after the run.
+
+### Permission Impact
+
+None. No auth code was changed.
+
+### Worker Impact
+
+None. No Worker source was changed.
+
+### Verification
+
+Command:
+
+```bash
+npm run reconciliation:dry-run -- --persist-to <temp-dir> --company-id company_default --property-id property_default --legacy-corpid homelink --source-label temp-empty-local
+```
+
+Result:
+
+```text
+Legacy reconciliation dry-run completed.
+Tables detected: 0
+Exceptions: 9
+No-go: 0
+```
+
+The 9 exceptions are expected for an empty local D1 and confirm that missing source tables are reported rather than hidden.

@@ -181,3 +181,24 @@ The dry-run is acceptable only when:
 ## Explicit Non-Execution Statement
 
 This spec does not read a database and does not perform backfill. The first implementation must default to dry-run and must refuse to run against remote D1 unless a separate production backup workflow exists.
+
+## Local Read-Only Implementation
+
+The first implementation is `scripts/reconcile-legacy-dry-run.mjs`.
+
+Safety rules:
+
+- It requires explicit `--persist-to <local D1 state directory>`.
+- It rejects `--remote` and `--preview`.
+- It only calls Wrangler with `--local`.
+- It generates output under `reconciliation-output/` by default.
+- `reconciliation-output/` is ignored by Git because reports may contain production-derived counts or identifiers.
+- It does not execute `INSERT`, `UPDATE`, `DELETE`, `CREATE TABLE`, `ALTER TABLE`, `DROP TABLE`, or backfill SQL.
+
+Example:
+
+```bash
+npm run reconciliation:dry-run -- --persist-to <local-d1-copy> --company-id company_default --property-id property_default --legacy-corpid homelink
+```
+
+The command is still a dry-run. A non-empty report does not approve production migration.

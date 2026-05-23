@@ -42,6 +42,25 @@ test("migration rehearsal script uses disposable local cleanup instead of SQL ro
   assert.doesNotMatch(script, /ROLLBACK;/);
 });
 
+test("legacy reconciliation dry-run is explicit local read-only", async () => {
+  const pkg = JSON.parse(await readFile("package.json", "utf8"));
+  const script = await readFile("scripts/reconcile-legacy-dry-run.mjs", "utf8");
+  const gitignore = await readFile(".gitignore", "utf8");
+
+  assert.equal(pkg.scripts["reconciliation:dry-run"], "node scripts/reconcile-legacy-dry-run.mjs");
+  assert.match(script, /Missing required --persist-to/);
+  assert.match(script, /--local/);
+  assert.match(script, /--persist-to/);
+  assert.match(script, /arg === "--remote"/);
+  assert.match(script, /forbidden for legacy reconciliation dry-run/);
+  assert.doesNotMatch(script, /wrangler[^"]*--remote/i);
+  assert.doesNotMatch(
+    script,
+    /\b(INSERT|UPDATE|DELETE FROM|CREATE TABLE|ALTER TABLE|DROP TABLE)\b/i
+  );
+  assert.match(gitignore, /reconciliation-output\//);
+});
+
 test("known financial risks are still documented while code remains unchanged", async () => {
   const worker = await readFile("deploy-worker/src/index.js", "utf8");
   const dbAudit = await readFile("DATABASE_AUDIT.md", "utf8");

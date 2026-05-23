@@ -15,17 +15,17 @@ No D1 connection was opened. No SQL was executed. No backfill was performed.
 
 ## Legacy-To-Commercial Mapping
 
-| Legacy source | Commercial target | Risk | Required action |
-| --- | --- | --- | --- |
-| `corpid` | `company_id, property_id` | P0 | Seed a default company/property for legacy rows, then require every future query to use scoped identifiers. |
-| `sessions` | `handover_sessions` | P0 | Convert session totals to *_fils after backend recomputation; do not trust cash_handover/gross_received from the browser. |
-| `transactions` | `transactions, payments, receivables` | P0 | Convert REAL amount/due/paid/deficit fields to integer fils; split payment application from receivable generation. |
-| `arrears` | `receivables, arrear_tasks` | P1 | Treat legacy arrears as open receivables plus staff follow-up tasks; reconcile cleared rows separately. |
-| `arrear_tasks` | `arrear_tasks linked to receivables` | P1 | Preserve promise_date, promise_amount, status, notes, assigned staff, and closure fields; do not make task amount the accounting source. |
-| `deposit_ledger` | `deposit_ledger` | P0 | Convert amount/delta/balance_after REAL values to *_fils and verify every tenant_card_id balance can be reconstructed. |
-| `entry_events, audit_logs` | `audit_events` | P1 | Preserve actor, role, entity, before/after values, reason, and timestamp; flag rows with missing actor as reconciliation exceptions. |
-| `employee_users, active_sessions` | `users, property_memberships, session/auth tables` | P1 | Migrate only account identity and role scope; do not migrate local dev passwords or sessions as production credentials. |
-| `app_settings` | `settings tables or versioned config tables` | P2 | Split rent configuration into bed_rent_config_versions and keep other settings scoped by company/property. |
+| Legacy source                     | Commercial target                                  | Risk | Required action                                                                                                                          |
+| --------------------------------- | -------------------------------------------------- | ---- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `corpid`                          | `company_id, property_id`                          | P0   | Seed a default company/property for legacy rows, then require every future query to use scoped identifiers.                              |
+| `sessions`                        | `handover_sessions`                                | P0   | Convert session totals to \*\_fils after backend recomputation; do not trust cash_handover/gross_received from the browser.              |
+| `transactions`                    | `transactions, payments, receivables`              | P0   | Convert REAL amount/due/paid/deficit fields to integer fils; split payment application from receivable generation.                       |
+| `arrears`                         | `receivables, arrear_tasks`                        | P1   | Treat legacy arrears as open receivables plus staff follow-up tasks; reconcile cleared rows separately.                                  |
+| `arrear_tasks`                    | `arrear_tasks linked to receivables`               | P1   | Preserve promise_date, promise_amount, status, notes, assigned staff, and closure fields; do not make task amount the accounting source. |
+| `deposit_ledger`                  | `deposit_ledger`                                   | P0   | Convert amount/delta/balance_after REAL values to \*\_fils and verify every tenant_card_id balance can be reconstructed.                 |
+| `entry_events, audit_logs`        | `audit_events`                                     | P1   | Preserve actor, role, entity, before/after values, reason, and timestamp; flag rows with missing actor as reconciliation exceptions.     |
+| `employee_users, active_sessions` | `users, property_memberships, session/auth tables` | P1   | Migrate only account identity and role scope; do not migrate local dev passwords or sessions as production credentials.                  |
+| `app_settings`                    | `settings tables or versioned config tables`       | P2   | Split rent configuration into bed_rent_config_versions and keep other settings scoped by company/property.                               |
 
 ## Mandatory Reconciliation Rules
 
@@ -40,9 +40,9 @@ No D1 connection was opened. No SQL was executed. No backfill was performed.
 
 ## Static Findings
 
-| Severity | Issue |
-| --- | --- |
-| P3 | Static mapping signals present. This is not a data reconciliation pass. |
+| Severity | Issue                                                                   |
+| -------- | ----------------------------------------------------------------------- |
+| P3       | Static mapping signals present. This is not a data reconciliation pass. |
 
 ## Backfill No-Go Conditions
 

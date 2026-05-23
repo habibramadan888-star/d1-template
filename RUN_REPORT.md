@@ -649,3 +649,43 @@ reconciliation-templates/legacy-reconciliation-exceptions.template.csv
 ### Reconciliation Coverage
 
 The template now requires source counts, target counts, money totals in integer AED fils, session total comparison, receivable comparison, deposit balance comparison, audit coverage, tenant scope, idempotency, and P0/P1/P2/P3 exceptions.
+
+## Local Legacy Reconciliation Dry-Run Update
+
+Date: 2026-05-23
+
+### Files Added Or Updated
+
+- Added `scripts/reconcile-legacy-dry-run.mjs`.
+- Added npm script `reconciliation:dry-run`.
+- Updated `.gitignore` to exclude `reconciliation-output/`.
+- Updated `LEGACY_RECONCILIATION_SPEC.md` with the local read-only implementation rules.
+- Updated static tests to require explicit local-only behavior.
+
+### Command
+
+```bash
+npm run reconciliation:dry-run -- --persist-to <temp-dir> --company-id company_default --property-id property_default --legacy-corpid homelink --source-label temp-empty-local
+```
+
+### Result
+
+```text
+Legacy reconciliation dry-run completed.
+Tables detected: 0
+Exceptions: 9
+No-go: 0
+```
+
+### Safety Scope
+
+- Used a disposable local D1 state directory.
+- Removed the temporary directory after the run.
+- Did not run remote D1.
+- Did not execute write SQL.
+- Did not backfill data.
+- Wrote reports only under ignored `reconciliation-output/`.
+
+### Current Meaning
+
+The run used an empty temporary local D1, so the 9 exceptions are expected missing legacy-table findings. This proves the command path works and stays local; it is not a real production-data reconciliation.

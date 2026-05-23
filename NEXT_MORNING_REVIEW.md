@@ -238,3 +238,18 @@ Generated template files:
 These define the future dry-run output shape for source counts, target counts, money totals, session reconciliation, receivable reconciliation, deposit balance reconciliation, audit coverage, idempotency, exceptions, and no-go conditions.
 
 No D1 connection was opened and no SQL/backfill was executed.
+
+## Local Legacy Reconciliation Dry-Run Follow-Up
+
+Added `npm run reconciliation:dry-run`.
+
+Safety behavior:
+
+- requires explicit `--persist-to`,
+- rejects `--remote` and `--preview`,
+- uses Wrangler D1 only with `--local`,
+- writes generated reports under ignored `reconciliation-output/`,
+- performs read-only table/count/money-total queries,
+- does not execute write SQL or backfill.
+
+Validation used an empty disposable local D1 directory. It completed with 9 expected missing-table exceptions and no P0 no-go. A real reconciliation still requires a reviewed local/staging D1 copy.
