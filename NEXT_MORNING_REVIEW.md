@@ -128,10 +128,13 @@ Local non-production `.dev.vars` has now been configured and authenticated smoke
 PASS owner login 200
 PASS owner /api/me 200
 PASS owner role manager
+PASS owner /api/history 200
+PASS owner /api/rent_config 200
 PASS employee login 200
 PASS employee /api/me 200
 PASS employee role staff
 PASS employee denied owner history 403
+PASS employee allowed rent config 200
 ```
 
 The previous blocker for basic local authentication is now cleared for smoke coverage. Full employee entry/export and owner dashboard workflows are still not validated.

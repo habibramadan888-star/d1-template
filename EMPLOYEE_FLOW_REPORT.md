@@ -63,3 +63,9 @@ PASS employee denied owner history 403
 6. Submit full handover.
 7. Validate session, transaction, arrear task, deposit ledger, and audit rows.
 8. Repeat submit and confirm idempotency.
+
+## Extended Authenticated Smoke Result
+
+```text
+PASS employee allowed rent config 200
+```

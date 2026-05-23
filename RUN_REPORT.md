@@ -417,3 +417,13 @@ Status: PASS
 - Employee authentication works locally with non-production secrets.
 - Employee cannot access the owner history API.
 - Local Worker port 8793 was cleaned up after testing.
+
+### Extended Authenticated Smoke Result
+
+The authenticated smoke script was expanded and passed these additional checks:
+
+```text
+PASS owner /api/history 200
+PASS owner /api/rent_config 200
+PASS employee allowed rent config 200
+```

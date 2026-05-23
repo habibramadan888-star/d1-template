@@ -75,8 +75,11 @@ Local non-production `.dev.vars` was configured and authenticated smoke passed:
 
 - owner login returned 200,
 - owner `/api/me` returned manager,
+- owner `/api/history` returned 200,
+- owner `/api/rent_config` returned 200,
 - employee login returned 200,
 - employee `/api/me` returned staff,
-- employee access to `/api/history` returned 403.
+- employee access to `/api/history` returned 403,
+- employee access to `/api/rent_config` returned 200.
 
 This confirms the current server-side auth gate and staff allowlist work for the tested routes. It does not resolve tenant isolation or production default seed risks.

@@ -92,6 +92,14 @@ async function main() {
   }
   console.log("PASS owner role manager");
 
+  const ownerHistory = await request("/api/history", { headers: { Cookie: ownerCookie } });
+  await expectStatus("owner /api/history", ownerHistory, 200);
+
+  const ownerRentConfig = await request("/api/rent_config", {
+    headers: { Cookie: ownerCookie }
+  });
+  await expectStatus("owner /api/rent_config", ownerRentConfig, 200);
+
   const employeeCookie = await loginEmployee(employeeId, employeePin);
   const employeeMe = await request("/api/me", { headers: { Cookie: employeeCookie } });
   await expectStatus("employee /api/me", employeeMe, 200);
@@ -105,6 +113,11 @@ async function main() {
     headers: { Cookie: employeeCookie }
   });
   await expectStatus("employee denied owner history", employeeHistory, 403);
+
+  const employeeRentConfig = await request("/api/rent_config", {
+    headers: { Cookie: employeeCookie }
+  });
+  await expectStatus("employee allowed rent config", employeeRentConfig, 200);
 }
 
 main().catch((error) => {

@@ -48,7 +48,12 @@ PASS owner role manager
 
 ## Safe Next Owner Tests
 
-1. Confirm owner can access `/api/history`.
-2. Confirm owner can access `/api/rent_config`.
-3. Confirm owner dashboard renders empty state on clean local D1.
-4. Confirm delete/session void risk is not executed against real data.
+1. Confirm owner dashboard renders empty state on clean local D1.
+2. Confirm delete/session void risk is not executed against real data.
+
+## Extended Authenticated Smoke Result
+
+```text
+PASS owner /api/history 200
+PASS owner /api/rent_config 200
+```
