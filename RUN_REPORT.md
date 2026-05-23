@@ -610,3 +610,42 @@ Legacy backfill audit written: 0 static findings
 ### Backfill Position
 
 The project now has a documented mapping from legacy `sessions`, `transactions`, `arrears`, `arrear_tasks`, `deposit_ledger`, `entry_events`, `audit_logs`, `employee_users`, and `app_settings` to the commercial schema. This is still not a data reconciliation pass.
+
+## Legacy Reconciliation Template Update
+
+Date: 2026-05-23
+
+### Files Added Or Updated
+
+- Added `LEGACY_RECONCILIATION_SPEC.md`.
+- Added `scripts/generate-reconciliation-template.mjs`.
+- Added generated templates under `reconciliation-templates/`.
+- Added npm script `reconciliation:template`.
+- Updated static tests to require dry-run reconciliation sections.
+
+### Command
+
+```bash
+npm run reconciliation:template
+```
+
+### Result
+
+```text
+Legacy reconciliation templates generated.
+reconciliation-templates/legacy-reconciliation-report.template.json
+reconciliation-templates/legacy-reconciliation-report.template.md
+reconciliation-templates/legacy-reconciliation-exceptions.template.csv
+```
+
+### Safety Scope
+
+- Template generation only.
+- No D1 connection opened.
+- No SQL executed.
+- No backfill executed.
+- No production or local business data changed.
+
+### Reconciliation Coverage
+
+The template now requires source counts, target counts, money totals in integer AED fils, session total comparison, receivable comparison, deposit balance comparison, audit coverage, tenant scope, idempotency, and P0/P1/P2/P3 exceptions.

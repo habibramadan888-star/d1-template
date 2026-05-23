@@ -125,3 +125,45 @@ test("legacy backfill audit is read-only and generated", async () => {
   assert.match(text, /No SQL was executed/);
   assert.match(text, /Legacy-To-Commercial Mapping/);
 });
+
+test("legacy reconciliation spec requires dry-run accounting outputs", async () => {
+  const text = await readFile("LEGACY_RECONCILIATION_SPEC.md", "utf8");
+  const requiredTerms = [
+    "Backfill executed: no",
+    "legacy-reconciliation-report.json",
+    "legacy-reconciliation-exceptions.csv",
+    "money_totals_fils",
+    "session_totals",
+    "receivable_totals",
+    "deposit_balances",
+    "audit_coverage",
+    "idempotency",
+    "P0 Exceptions"
+  ];
+
+  for (const term of requiredTerms) {
+    assert.match(text, new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i"));
+  }
+});
+
+test("legacy reconciliation template is generated and non-executing", async () => {
+  const jsonText = await readFile(
+    "reconciliation-templates/legacy-reconciliation-report.template.json",
+    "utf8"
+  );
+  const mdText = await readFile(
+    "reconciliation-templates/legacy-reconciliation-report.template.md",
+    "utf8"
+  );
+  const csvText = await readFile(
+    "reconciliation-templates/legacy-reconciliation-exceptions.template.csv",
+    "utf8"
+  );
+  const report = JSON.parse(jsonText);
+
+  assert.equal(report.run.mode, "dry-run-template");
+  assert.equal(report.run.source, "not-connected");
+  assert.match(mdText, /No D1 connection was opened/);
+  assert.match(mdText, /money totals in integer AED fils/);
+  assert.match(csvText, /severity,code,legacy_table/);
+});

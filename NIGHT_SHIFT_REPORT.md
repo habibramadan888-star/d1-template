@@ -538,3 +538,62 @@ Result:
 ```text
 Legacy backfill audit written: 0 static findings
 ```
+
+## V2 Legacy Reconciliation Template Follow-Up
+
+### Task
+
+Define the dry-run reconciliation output schema and generate non-executing templates.
+
+### Current Status
+
+Completed.
+
+### Code Modified
+
+Yes, but only tooling/tests/reports:
+
+- `LEGACY_RECONCILIATION_SPEC.md`
+- `scripts/generate-reconciliation-template.mjs`
+- `reconciliation-templates/legacy-reconciliation-report.template.json`
+- `reconciliation-templates/legacy-reconciliation-report.template.md`
+- `reconciliation-templates/legacy-reconciliation-exceptions.template.csv`
+- `package.json`
+- `tests/migration-draft.spec.mjs`
+- `RUN_REPORT.md`
+- `NEXT_MORNING_REVIEW.md`
+- `NIGHT_SHIFT_REPORT.md`
+
+### Why
+
+A commercial backfill must produce a repeatable reconciliation report before any data is written. The report shape is now fixed before database-reading code is introduced.
+
+### Risk
+
+Low. Template generation is local file generation only.
+
+### Database Impact
+
+None. No D1 connection was opened and no SQL was executed.
+
+### Permission Impact
+
+None. No auth code was changed.
+
+### Worker Impact
+
+None. No Worker source was changed.
+
+### Verification
+
+Command:
+
+```bash
+npm run reconciliation:template
+```
+
+Result:
+
+```text
+Legacy reconciliation templates generated.
+```

@@ -224,3 +224,17 @@ The mapping now explicitly covers:
 - employee identity and settings migration risks.
 
 The audit is read-only. It does not connect to D1 and does not execute SQL.
+
+## Legacy Reconciliation Template Follow-Up
+
+Added `LEGACY_RECONCILIATION_SPEC.md` and `npm run reconciliation:template`.
+
+Generated template files:
+
+- `reconciliation-templates/legacy-reconciliation-report.template.json`
+- `reconciliation-templates/legacy-reconciliation-report.template.md`
+- `reconciliation-templates/legacy-reconciliation-exceptions.template.csv`
+
+These define the future dry-run output shape for source counts, target counts, money totals, session reconciliation, receivable reconciliation, deposit balance reconciliation, audit coverage, idempotency, exceptions, and no-go conditions.
+
+No D1 connection was opened and no SQL/backfill was executed.
