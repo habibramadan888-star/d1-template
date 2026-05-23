@@ -11,6 +11,8 @@ Local migration: not executed
 
 This plan defines the commercial-safe migration direction. It is intentionally non-executable.
 
+Field-level target schema is frozen in `MIGRATION_SCHEMA_CONTRACT.md`. If the plan and contract conflict, the contract is stricter.
+
 ## Non-Negotiable Constraints
 
 - Do not add new commercial money columns as `REAL`.

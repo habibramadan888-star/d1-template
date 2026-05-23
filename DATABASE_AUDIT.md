@@ -129,7 +129,7 @@ Do not run these automatically against production.
 13. Backfill legacy data with a dry-run reconciliation report.
 14. Only after reconciliation, switch read paths to new schema.
 
-Detailed non-executable migration design is now tracked in `MIGRATION_BOOTSTRAP_PLAN.md`.
+Detailed non-executable migration design is now tracked in `MIGRATION_BOOTSTRAP_PLAN.md` and field-level schema requirements are tracked in `MIGRATION_SCHEMA_CONTRACT.md`.
 
 ## Static Scan Findings
 
