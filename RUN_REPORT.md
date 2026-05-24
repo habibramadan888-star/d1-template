@@ -2514,3 +2514,56 @@ P0-002 status:
 
 - Partial - local/staging handover atomic endpoint implemented and verified.
 - Not Verified because the live employee handover route remains unchanged and production endpoint is intentionally disabled.
+
+## P0-002D Handover Staging Manual Validation Package
+
+Date: 2026-05-24, Asia/Dubai
+
+Scope:
+
+- Added manual validation guide and command helper for `POST /api/staging/handover/commit`.
+- Added endpoint hardening review.
+- Added dashboard/history unchanged verification wrapper.
+- Added legacy live table unchanged verification wrapper.
+- Added embedded Worker drift review for the staging handover route.
+- Did not switch live employee handover flow.
+- Did not change live dashboard/history behavior.
+- Did not change live financial formulas.
+- Did not execute production or remote D1 migration.
+- Did not deploy production Worker.
+- Did not regenerate embedded Worker artifact.
+
+Files added:
+
+- `P0_002D_STARTING_CONTEXT.md`
+- `HANDOVER_STAGING_MANUAL_VALIDATION_GUIDE.md`
+- `HANDOVER_STAGING_ENDPOINT_HARDENING_AUDIT.md`
+- `HANDOVER_STAGING_MANUAL_COMMANDS.md`
+- `HANDOVER_STAGING_DASHBOARD_UNCHANGED_RESULT.md`
+- `HANDOVER_STAGING_LEGACY_TABLES_UNCHANGED_RESULT.md`
+- `EMBEDDED_WORKER_DRIFT_REVIEW_FOR_HANDOVER_STAGING.md`
+- `P0_002D_GO_NO_GO_REVIEW.md`
+- `scripts/handover-staging-validation-utils.mjs`
+- `scripts/manual-handover-staging-validation.mjs`
+- `scripts/verify-dashboard-unchanged-after-staging-handover.mjs`
+- `scripts/verify-handover-staging-legacy-tables-unchanged.mjs`
+
+Verification:
+
+```text
+npm run manual:handover-staging
+PASS - generated redacted manual commands and exercised local production-disabled,
+feature-disabled, employee submit, replay, tamper reject, voided reject, and owner reject cases.
+
+npm run verify:dashboard-unchanged
+PASS - endpoint regression evidence proves owner history stays unchanged after staging submit.
+
+npm run verify:handover-legacy-unchanged
+PASS - endpoint regression evidence proves staging tables/audit are written and legacy
+transactions/deposit_ledger/arrears are not written.
+```
+
+P0-002 status:
+
+- Partial - staging endpoint implemented with manual validation package ready.
+- Not Verified because live employee handover flow remains unchanged, production endpoint remains disabled, and real staging QA is not yet complete.

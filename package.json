@@ -53,6 +53,9 @@
     "rehearse:handover-atomic": "node scripts/rehearse-handover-atomic-commit.mjs",
     "test:handover-staging-endpoint": "node --test tests/handover-staging-endpoint.spec.mjs",
     "rehearse:handover-staging-endpoint": "node scripts/rehearse-handover-staging-endpoint.mjs",
+    "manual:handover-staging": "node scripts/manual-handover-staging-validation.mjs",
+    "verify:dashboard-unchanged": "node scripts/verify-dashboard-unchanged-after-staging-handover.mjs",
+    "verify:handover-legacy-unchanged": "node scripts/verify-handover-staging-legacy-tables-unchanged.mjs",
     "test:timezone": "node --test tests/dubai-business-date.spec.mjs",
     "test": "node --test tests/**/*.spec.mjs",
     "check": "npm run governance:check && npm run security:secrets && npm run format:check && npm run lint && npm run typecheck && npm run audit:api:check && npm run audit:db:check && npm run test && npm run build"

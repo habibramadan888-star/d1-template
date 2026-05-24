@@ -272,3 +272,31 @@ Safe resolution:
 
 - Add a generated-file hash check.
 - Regenerate embedded Worker only during explicit deploy preparation.
+
+### P1: Embedded Worker missing P0-002C staging handover route
+
+Date: 2026-05-24
+
+Evidence:
+
+```text
+deploy-worker/wrangler.toml -> main = "src/index.js"
+deploy-worker/wrangler.embedded.toml -> main = "src/index.embedded.js"
+rg "/api/staging/handover/commit|ENABLE_HANDOVER_ATOMIC_STAGING|handover_commits" deploy-worker/src/index.js deploy-worker/src/index.embedded.js
+```
+
+Result:
+
+- `deploy-worker/src/index.js` contains the P0-002C staging handover route.
+- `deploy-worker/src/index.embedded.js` does not contain the P0-002C staging handover route.
+
+Impact:
+
+- Local/main Worker validation is not blocked because it uses `wrangler.toml`.
+- Any staging deploy using `wrangler.embedded.toml` would not expose the staging endpoint until a controlled embedded regeneration step is approved.
+
+Safe resolution:
+
+- Do not deploy the embedded Worker path for P0-002C validation yet.
+- Create a P1-006 controlled embedded Worker regeneration/diff task.
+- Add an embedded source drift gate before production deploy.

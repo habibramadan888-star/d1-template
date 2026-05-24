@@ -81,6 +81,47 @@ Next step:
 
 - P0-002D can perform staging UI/manual validation, or P0-001C can prepare minor-unit dual-write. Do not enable production cutover automatically.
 
+## P0-002D Manual Validation Addendum
+
+Date: 2026-05-24, Asia/Dubai
+
+Current P0-002 status is now `Partial - staging endpoint implemented with manual validation package ready`.
+
+Added evidence:
+
+- `P0_002D_STARTING_CONTEXT.md`
+- `HANDOVER_STAGING_MANUAL_VALIDATION_GUIDE.md`
+- `HANDOVER_STAGING_ENDPOINT_HARDENING_AUDIT.md`
+- `HANDOVER_STAGING_MANUAL_COMMANDS.md`
+- `HANDOVER_STAGING_DASHBOARD_UNCHANGED_RESULT.md`
+- `HANDOVER_STAGING_LEGACY_TABLES_UNCHANGED_RESULT.md`
+- `EMBEDDED_WORKER_DRIFT_REVIEW_FOR_HANDOVER_STAGING.md`
+- `P0_002D_GO_NO_GO_REVIEW.md`
+- `npm run manual:handover-staging`
+- `npm run verify:dashboard-unchanged`
+- `npm run verify:handover-legacy-unchanged`
+
+Result:
+
+- Manual QA instructions and copyable redacted commands are ready.
+- Production-disabled behavior remains verified.
+- Feature-flag-disabled behavior remains verified.
+- Employee submit, idempotent replay, frontend totals tamper reject, voided row reject, and owner reject remain verified.
+- Owner history/dashboard source remains unchanged based on regression evidence.
+- Legacy live financial tables remain unwritten based on regression evidence.
+- Embedded Worker drift is documented as a P1 deploy-prep risk if `wrangler.embedded.toml` is used.
+
+Remaining risk:
+
+- Real staging Worker/D1 deployment and human QA have not been performed.
+- Live employee handover flow remains unchanged.
+- Production endpoint remains disabled.
+- P0-001C, P0-003 live authority, P0-006 tenant isolation, and P0-008 receivables remain open.
+
+Next step:
+
+- Human review can choose P0-001C minor-unit dual-write preparation or P0-002E real staging deployment preparation. Do not enable production cutover automatically.
+
 ## P1 Review
 
 | ID     | Area                            | Problem                                                        | 原状态 | 当前状态    | 是否已修复         | 是否已验证                                 | 证据                                                                                                                                                                                                                                  | 剩余风险                                                                                                          | 下一步                                                                                         |
