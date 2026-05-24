@@ -27,6 +27,7 @@
     "gate:money-reconciliation": "node scripts/reconcile-money-dual-write-gate.mjs",
     "audit:backend-totals": "node scripts/audit-backend-totals.mjs",
     "gate:backend-totals-live": "node scripts/gate-backend-totals-live-authority.mjs",
+    "gate:receivables": "node scripts/gate-receivables-readiness.mjs",
     "audit:runtime-ddl": "node scripts/audit-runtime-ddl.mjs",
     "reconcile:money": "node scripts/money-shadow-reconcile.mjs",
     "audit:legacy-backfill": "node scripts/audit-legacy-backfill.mjs",

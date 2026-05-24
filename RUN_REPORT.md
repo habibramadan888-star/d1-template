@@ -3081,3 +3081,34 @@ Notes:
   requires money reconciliation, P0-008 receivables, P0-006 scope, staging
   comparison, and human accounting approval.
 - P0-003 remains Partial.
+
+## P0-008B Receivables Implementation Readiness Gate
+
+Date: 2026-05-25, Asia/Dubai
+
+Scope:
+
+- Readiness gate for receivables implementation.
+- No production table creation.
+- No migration execution.
+- No dashboard/arrears live switch.
+
+Changes:
+
+- Added `P0_008B_RECEIVABLES_IMPLEMENTATION_READINESS_GATE.md`.
+- Added `scripts/gate-receivables-readiness.mjs`.
+- Added `RECEIVABLES_READINESS_GATE_RESULT.md`.
+- Added `NEXT_PROMPT_P0_008C_RECEIVABLES_LOCAL_STAGING_REHEARSAL.md`.
+
+Verification:
+
+| Command                    | Result          |
+| -------------------------- | --------------- |
+| `npm run gate:receivables` | MANUAL_REQUIRED |
+
+Notes:
+
+- Receivables design and lifecycle plan exist.
+- A concrete receivables migration draft is not yet present.
+- Production receivables remain blocked by P0-001, P0-003, P0-006, migration
+  review, reconciliation, and human approval.

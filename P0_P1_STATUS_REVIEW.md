@@ -630,3 +630,31 @@ Next step:
 
 - P0-003D can be a local/staging shadow comparison only. Do not switch live
   dashboard totals automatically.
+
+## P0-008B Receivables Implementation Readiness Gate Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+P0-008 current status:
+
+- Partial - receivables implementation readiness gate ready.
+- Not Verified because receivables tables, lifecycle tests, production
+  migration, and live integration are not implemented.
+
+Added evidence:
+
+- `P0_008B_RECEIVABLES_IMPLEMENTATION_READINESS_GATE.md`
+- `RECEIVABLES_READINESS_GATE_RESULT.md`
+- `NEXT_PROMPT_P0_008C_RECEIVABLES_LOCAL_STAGING_REHEARSAL.md`
+- `scripts/gate-receivables-readiness.mjs`
+- `npm run gate:receivables`
+
+Result:
+
+- Receivables model and lifecycle plan exist.
+- Migration draft is missing and production implementation remains blocked.
+
+Next step:
+
+- P0-008C can create local/staging-only schema draft, pure module, tests, and
+  rehearsal. Do not execute production or remote migration.

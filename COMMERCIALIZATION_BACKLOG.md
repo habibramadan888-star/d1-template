@@ -570,3 +570,36 @@ Blockers before live authority:
 - P0-008 receivables.
 - P0-006 tenant/property scope.
 - Staging read-only comparison and human accounting review.
+
+## P0-008B Receivables Implementation Readiness Gate Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+P0-008 current status:
+
+- Partial - receivables implementation readiness gate ready.
+
+Completed safely:
+
+- Added receivables readiness gate document.
+- Added read-only receivables readiness script.
+- Added next-step P0-008C prompt.
+
+Verification:
+
+- `npm run gate:receivables` returned `MANUAL_REQUIRED`.
+
+Still forbidden:
+
+- Production receivables table creation.
+- Production or remote D1 migration.
+- Dashboard/arrears live switch.
+- Treating legacy `arrear_tasks` as final accounting authority.
+
+Blockers before production:
+
+- Receivables migration draft and local/staging tests.
+- P0-001 minor-unit migration/reconciliation.
+- P0-003 backend totals live authority.
+- P0-006 tenant/property scope.
+- Human accounting approval.

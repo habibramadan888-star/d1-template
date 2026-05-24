@@ -228,3 +228,14 @@ Date: 2026-05-25, Asia/Dubai
 
 P0-003 remains Partial. No live dashboard output or live financial formula was
 changed.
+
+## P0-008B Verification Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+| Command                    | Exists | Result          | Error Summary | Log Evidence                                 | Commercial Meaning                                                                                                                   |
+| -------------------------- | ------ | --------------- | ------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `npm run gate:receivables` | yes    | MANUAL_REQUIRED | none          | `RECEIVABLES_READINESS_GATE=MANUAL_REQUIRED` | Confirms receivables design is ready for local/staging rehearsal planning, but migration draft and production approvals are missing. |
+
+P0-008 remains Partial. No receivables migration was executed and no live
+arrears/dashboard logic was changed.
