@@ -1,0 +1,37 @@
+{
+  "description": "Three-decimal money must be rejected.",
+  "context": {
+    "role": "staff",
+    "employeeId": "emp-a",
+    "allowedEmployeeIds": ["emp-a"],
+    "allowedPropertyIds": ["HL-009"]
+  },
+  "input": {
+    "session_id": "S-INVALID-3DP-001",
+    "idempotency_key": "key-invalid-3dp-001",
+    "employee_id": "emp-a",
+    "property_id": "HL-009",
+    "submitted_at": "2026-05-24T04:00:00+04:00",
+    "frontend_totals": {
+      "cash_handover": "100.999",
+      "bank_transfer_total": "0.00",
+      "bank_transfer_count": 0,
+      "gross_received": "100.999",
+      "session_total": "100.999"
+    },
+    "rows": [
+      {
+        "client_entry_id": "invalid-3dp-row-1",
+        "event_type": "R",
+        "payment_method": "C",
+        "amount": "100.999"
+      }
+    ]
+  },
+  "expected": {
+    "status": "INVALID_AMOUNT",
+    "accepted_rows": 0,
+    "rejected_rows": 1,
+    "error_code": "INVALID_AMOUNT"
+  }
+}

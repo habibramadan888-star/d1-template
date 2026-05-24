@@ -1,0 +1,39 @@
+{
+  "description": "Weak-network retry uses the same key and must not duplicate finance results.",
+  "context": {
+    "role": "staff",
+    "employeeId": "emp-a",
+    "allowedEmployeeIds": ["emp-a"],
+    "allowedPropertyIds": ["HL-009"]
+  },
+  "existing_state": {
+    "mode": "same_idempotency_key"
+  },
+  "input": {
+    "session_id": "S-WEAK-001",
+    "idempotency_key": "key-weak-001",
+    "employee_id": "emp-a",
+    "property_id": "HL-009",
+    "submitted_at": "2026-05-24T03:40:00+04:00",
+    "frontend_totals": {
+      "cash_handover": "200.00",
+      "bank_transfer_total": "0.00",
+      "bank_transfer_count": 0,
+      "gross_received": "200.00",
+      "session_total": "200.00"
+    },
+    "rows": [
+      {
+        "client_entry_id": "weak-row-1",
+        "event_type": "R",
+        "payment_method": "C",
+        "amount": "200.00",
+        "bed": "835"
+      }
+    ]
+  },
+  "expected": {
+    "status": "IDEMPOTENT_REPLAY",
+    "idempotency_status": "IDEMPOTENT_REPLAY"
+  }
+}

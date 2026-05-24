@@ -2347,3 +2347,57 @@ P0-003 status:
 
 - Partial - backend totals authority implementation rehearsal passed.
 - Not Verified because live Worker/dashboard output has not been switched.
+
+## P0-002B Employee Handover Atomic Commit Implementation Rehearsal
+
+Date: 2026-05-24, Asia/Dubai
+
+Scope:
+
+- Added employee handover atomic commit rehearsal only.
+- Did not change the live employee handover flow.
+- Did not wire a live Worker endpoint.
+- Did not change live dashboard output or production financial formulas.
+- Did not execute production or remote D1 migration.
+- Did not deploy production Worker.
+
+Files added:
+
+- `P0_002B_STARTING_REVIEW_PACKET.md`
+- `HANDOVER_ATOMIC_SOURCE_OF_TRUTH.md`
+- `HANDOVER_ATOMIC_API_CONTRACT.md`
+- `HANDOVER_ATOMIC_MIGRATION_PLAN.md`
+- `HANDOVER_ATOMIC_GO_LIVE_GATE.md`
+- `HANDOVER_ATOMIC_REHEARSAL_RESULT.md`
+- `modules/finance/handover-atomic.mjs`
+- `scripts/rehearse-handover-atomic-commit.mjs`
+- `tests/handover-atomic-rehearsal.spec.mjs`
+- `tests/fixtures/handover-atomic/*.json`
+- `migration-drafts/handover_atomic_commit_draft.sql`
+
+Verification:
+
+```text
+npm run test:handover-atomic
+PASS - 24 tests passed
+
+npm run rehearse:handover-atomic
+PASS - disposable local D1 rehearsal generated HANDOVER_ATOMIC_REHEARSAL_RESULT.md
+```
+
+Rehearsal result:
+
+- `valid-cash-only`: ACCEPTED.
+- `duplicate-same-idempotency-key`: IDEMPOTENT_REPLAY.
+- `duplicate-different-idempotency-key`: DUPLICATE_WARNING.
+- `weak-network-retry`: IDEMPOTENT_REPLAY.
+- `frontend-total-tampered`: DISCREPANCY.
+- `voided-session-row`: VOIDED_REJECTED.
+- `invalid-money-3dp`: INVALID_AMOUNT.
+- `unauthorized-employee-scope`: UNAUTHORIZED.
+- `partial-upload-simulation`: REJECTED.
+
+P0-002 status:
+
+- Partial - handover atomic commit implementation rehearsal passed.
+- Not Verified because the live employee handover route has not been switched and draft SQL was not applied.
