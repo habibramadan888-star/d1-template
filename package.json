@@ -59,6 +59,8 @@
     "rehearse:money-dual-write-local-staging": "node scripts/rehearse-money-dual-write-local-staging.mjs",
     "test:employee-entry-live-write-adapter": "node --test tests/employee-entry-live-write-adapter.spec.mjs",
     "rehearse:employee-entry-live-write-adapter": "node scripts/rehearse-employee-entry-live-write-adapter.mjs",
+    "test:employee-entry-adapter-staging-endpoint": "node --test tests/employee-entry-adapter-staging-endpoint.spec.mjs",
+    "rehearse:employee-entry-adapter-staging-endpoint": "node scripts/rehearse-employee-entry-adapter-staging-endpoint.mjs",
     "test:backend-totals-shadow": "node --test tests/backend-totals-shadow.spec.mjs",
     "test:backend-totals": "node --test tests/backend-totals-authority.spec.mjs",
     "rehearse:backend-totals": "node scripts/rehearse-backend-totals-authority.mjs",

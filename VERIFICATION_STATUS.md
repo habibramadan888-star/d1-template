@@ -150,3 +150,17 @@ Date: 2026-05-24, Asia/Dubai
 P0-001 remains Partial. P0-001G verifies a non-invasive local/staging adapter
 only; it does not wire `/api/employee/entry`, switch dashboard or handover
 behavior, or execute production migration.
+
+## P0-001H Verification Addendum
+
+Date: 2026-05-24, Asia/Dubai
+
+| Command                                                    | Exists | Result | Error Summary | Log Evidence                                                                                  | Commercial Meaning                                                                                                                      |
+| ---------------------------------------------------------- | ------ | ------ | ------------- | --------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run test:employee-entry-adapter-staging-endpoint`     | yes    | Pass   | none          | `tests 3`, `pass 3`                                                                           | Validates production 404, feature-flag disabled 403, auth/role guards, adapter draft response, and no live writes.                      |
+| `npm run rehearse:employee-entry-adapter-staging-endpoint` | yes    | Pass   | none          | `P0_001H_EMPLOYEE_ENTRY_ADAPTER_STAGING_ENDPOINT_REHEARSAL=PASS`                              | Generates local/staging evidence that the route returns adapter plans without mutating legacy live financial tables.                    |
+| `npm run check`                                            | yes    | Pass   | none          | `tests 170`, `pass 170`; Worker dry-run builds completed                                      | Confirms the new route harness did not break governance, secret scan, formatting, lint, syntax, API/DB audits, tests, or dry-run build. |
+| `npm run smoke:with-worker`                                | yes    | Pass   | none          | Worker ready, owner/employee auth smoke passed                                                | Confirms normal local Worker auth and pages still work.                                                                                 |
+| `npm run verify:clean-d1`                                  | yes    | Pass   | none          | Clean D1 reset/migrate/seed, smoke, auth, owner probe, employee entry probe, cleanup all PASS | Confirms clean local D1 remains bootstrappable after adding the staging route.                                                          |
+
+P0-001 remains Partial. P0-001H verifies local/staging route harness behavior only; it does not switch the live `/api/employee/entry` route, migrate production schema, or change dashboard/history accounting authority.

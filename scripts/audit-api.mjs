@@ -194,6 +194,20 @@ const routeCatalog = {
     notes:
       "Feature-flagged local/staging endpoint only; production returns 404 and live handover flow remains unchanged."
   },
+  "POST /api/staging/employee-entry/adapter-draft": {
+    purpose: "local/staging-only employee entry live write adapter draft endpoint",
+    login: "Yes",
+    roles: "employee only",
+    tenantScope: "session `corpid` plus request/resolved `property_id`",
+    reads: "request body only",
+    writes: "none",
+    financial: "Yes",
+    delete: "No",
+    audit: "Planned only",
+    risk: "P0",
+    notes:
+      "Feature-flagged local/staging endpoint only; returns adapter write plans and does not write legacy live financial tables."
+  },
   "POST /api/employee/migrate": {
     purpose: "employee schema migration endpoint",
     login: "Yes",

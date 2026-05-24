@@ -1,6 +1,6 @@
 # P0-001G Employee Entry Live Write Adapter Rehearsal Result
 
-Generated: 2026-05-24T18:27:43.251Z, Asia/Dubai
+Generated: 2026-05-24T19:11:49.960Z, Asia/Dubai
 
 Scope: local/staging-only rehearsal. This run used an isolated local D1 directory for evidence only. The adapter generated write plans and `*_fils` patches, but it did not write D1, did not execute production migration, did not execute remote D1 migration, did not deploy, did not switch live dashboard results, and did not switch the live employee handover flow.
 
@@ -17,7 +17,7 @@ Scope: local/staging-only rehearsal. This run used an isolated local D1 director
 | Live dashboard changed        | no                                                                           |
 | Live handover flow changed    | no                                                                           |
 | Legacy decimal fields deleted | no                                                                           |
-| Temporary persist path        | `C:\Users\CHINAL~1\AppData\Local\Temp\homelink-p0-001g-entry-adapter-UnoAsv` |
+| Temporary persist path        | `C:\Users\CHINAL~1\AppData\Local\Temp\homelink-p0-001g-entry-adapter-fsPhlE` |
 
 ## Live Table Mutation Evidence
 

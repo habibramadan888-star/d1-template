@@ -340,3 +340,43 @@ Tomorrow priority:
 1. Review whether to create a local/staging route harness around the adapter.
 2. Do not switch `/api/employee/entry` production behavior.
 3. Do not execute production or remote D1 migration.
+
+## P0-001H Update
+
+Most important result:
+
+- The employee entry adapter now has a local/staging-only Worker route harness.
+
+Evidence:
+
+- `POST /api/staging/employee-entry/adapter-draft`
+- `P0_001H_EMPLOYEE_ENTRY_ADAPTER_ROUTE_HARNESS.md`
+- `EMPLOYEE_ENTRY_ADAPTER_STAGING_ENDPOINT_REHEARSAL_RESULT.md`
+- `tests/employee-entry-adapter-staging-endpoint.spec.mjs`
+- `scripts/rehearse-employee-entry-adapter-staging-endpoint.mjs`
+- `npm run test:employee-entry-adapter-staging-endpoint`
+- `npm run rehearse:employee-entry-adapter-staging-endpoint`
+- `npm run check`
+- `npm run smoke:with-worker`
+- `npm run verify:clean-d1`
+
+Findings:
+
+- Production mode returns `404` for the staging adapter route.
+- Feature flag off returns `403 FEATURE_DISABLED`.
+- Employee/staff can request a draft; owner/manager cannot submit.
+- The route returns write plans and audit plans only.
+- Legacy live tables remain unchanged.
+- Live `/api/employee/entry`, dashboard, handover, and financial formulas remain unchanged.
+
+P0-001 status:
+
+- Partial - local/staging employee entry adapter route harness passed.
+- Not Verified.
+
+Tomorrow priority:
+
+1. Review whether the next step should be a live-route cutover gate, broader
+   staging QA, or P0-008 receivables dependency work.
+2. Do not execute production or remote D1 migration.
+3. Do not switch live `/api/employee/entry` without explicit approval.

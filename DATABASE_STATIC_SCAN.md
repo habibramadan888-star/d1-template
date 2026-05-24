@@ -56,39 +56,39 @@ This is a static scan artifact. It does not replace `DATABASE_AUDIT.md`, which c
 
 | Severity | Location                                              | Issue                                         | Evidence                                     |
 | -------- | ----------------------------------------------------- | --------------------------------------------- | -------------------------------------------- |
-| P1       | `deploy-worker/src/index.js:217`                      | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS active_sessions` |
-| P1       | `deploy-worker/src/index.js:445`                      | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS active_sessions` |
-| P1       | `deploy-worker/src/index.js:561`                      | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS employee_users`  |
-| P1       | `deploy-worker/src/index.js:730`                      | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS audit_logs`      |
-| P1       | `deploy-worker/src/index.js:1056`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS sessions`        |
-| P1       | `deploy-worker/src/index.js:1125`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS arrear_tasks`    |
-| P1       | `deploy-worker/src/index.js:1143`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS entry_events`    |
-| P1       | `deploy-worker/src/index.js:1156`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS deposit_ledger`  |
-| P1       | `deploy-worker/src/index.js:1374`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS app_settings`    |
-| P1       | `deploy-worker/src/index.js:2377`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS active_sessions` |
-| P1       | `deploy-worker/src/index.js:2409`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS app_settings`    |
-| P1       | `deploy-worker/src/index.js:2466`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS app_settings`    |
-| P1       | `deploy-worker/src/index.js:2491`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS app_settings`    |
-| P1       | `deploy-worker/src/index.js:2527`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS app_settings`    |
-| P1       | `deploy-worker/src/index.js:2549`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS app_settings`    |
-| P1       | `deploy-worker/src/index.js:2572`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS app_settings`    |
-| P0       | `deploy-worker/src/index.js:1067`                     | Decimal/money precision risk keyword          | `REAL`                                       |
-| P0       | `deploy-worker/src/index.js:1068`                     | Decimal/money precision risk keyword          | `REAL`                                       |
+| P1       | `deploy-worker/src/index.js:219`                      | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS active_sessions` |
+| P1       | `deploy-worker/src/index.js:447`                      | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS active_sessions` |
+| P1       | `deploy-worker/src/index.js:563`                      | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS employee_users`  |
+| P1       | `deploy-worker/src/index.js:732`                      | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS audit_logs`      |
+| P1       | `deploy-worker/src/index.js:1058`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS sessions`        |
+| P1       | `deploy-worker/src/index.js:1127`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS arrear_tasks`    |
+| P1       | `deploy-worker/src/index.js:1145`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS entry_events`    |
+| P1       | `deploy-worker/src/index.js:1158`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS deposit_ledger`  |
+| P1       | `deploy-worker/src/index.js:1376`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS app_settings`    |
+| P1       | `deploy-worker/src/index.js:2448`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS active_sessions` |
+| P1       | `deploy-worker/src/index.js:2480`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS app_settings`    |
+| P1       | `deploy-worker/src/index.js:2537`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS app_settings`    |
+| P1       | `deploy-worker/src/index.js:2562`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS app_settings`    |
+| P1       | `deploy-worker/src/index.js:2598`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS app_settings`    |
+| P1       | `deploy-worker/src/index.js:2620`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS app_settings`    |
+| P1       | `deploy-worker/src/index.js:2643`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS app_settings`    |
+| P0       | `deploy-worker/src/index.js:1069`                     | Decimal/money precision risk keyword          | `REAL`                                       |
 | P0       | `deploy-worker/src/index.js:1070`                     | Decimal/money precision risk keyword          | `REAL`                                       |
-| P0       | `deploy-worker/src/index.js:1090`                     | Decimal/money precision risk keyword          | `REAL`                                       |
+| P0       | `deploy-worker/src/index.js:1072`                     | Decimal/money precision risk keyword          | `REAL`                                       |
 | P0       | `deploy-worker/src/index.js:1092`                     | Decimal/money precision risk keyword          | `REAL`                                       |
-| P0       | `deploy-worker/src/index.js:1095`                     | Decimal/money precision risk keyword          | `REAL`                                       |
-| P0       | `deploy-worker/src/index.js:1101`                     | Decimal/money precision risk keyword          | `REAL`                                       |
+| P0       | `deploy-worker/src/index.js:1094`                     | Decimal/money precision risk keyword          | `REAL`                                       |
+| P0       | `deploy-worker/src/index.js:1097`                     | Decimal/money precision risk keyword          | `REAL`                                       |
 | P0       | `deploy-worker/src/index.js:1103`                     | Decimal/money precision risk keyword          | `REAL`                                       |
-| P0       | `deploy-worker/src/index.js:1104`                     | Decimal/money precision risk keyword          | `REAL`                                       |
-| P0       | `deploy-worker/src/index.js:1107`                     | Decimal/money precision risk keyword          | `REAL`                                       |
-| P0       | `deploy-worker/src/index.js:1122`                     | Decimal/money precision risk keyword          | `REAL`                                       |
-| P0       | `deploy-worker/src/index.js:1132`                     | Decimal/money precision risk keyword          | `REAL`                                       |
-| P0       | `deploy-worker/src/index.js:1137`                     | Decimal/money precision risk keyword          | `REAL`                                       |
-| P0       | `deploy-worker/src/index.js:1138`                     | Decimal/money precision risk keyword          | `REAL`                                       |
-| P0       | `deploy-worker/src/index.js:1165`                     | Decimal/money precision risk keyword          | `REAL`                                       |
-| P0       | `deploy-worker/src/index.js:1166`                     | Decimal/money precision risk keyword          | `REAL`                                       |
+| P0       | `deploy-worker/src/index.js:1105`                     | Decimal/money precision risk keyword          | `REAL`                                       |
+| P0       | `deploy-worker/src/index.js:1106`                     | Decimal/money precision risk keyword          | `REAL`                                       |
+| P0       | `deploy-worker/src/index.js:1109`                     | Decimal/money precision risk keyword          | `REAL`                                       |
+| P0       | `deploy-worker/src/index.js:1124`                     | Decimal/money precision risk keyword          | `REAL`                                       |
+| P0       | `deploy-worker/src/index.js:1134`                     | Decimal/money precision risk keyword          | `REAL`                                       |
+| P0       | `deploy-worker/src/index.js:1139`                     | Decimal/money precision risk keyword          | `REAL`                                       |
+| P0       | `deploy-worker/src/index.js:1140`                     | Decimal/money precision risk keyword          | `REAL`                                       |
 | P0       | `deploy-worker/src/index.js:1167`                     | Decimal/money precision risk keyword          | `REAL`                                       |
+| P0       | `deploy-worker/src/index.js:1168`                     | Decimal/money precision risk keyword          | `REAL`                                       |
+| P0       | `deploy-worker/src/index.js:1169`                     | Decimal/money precision risk keyword          | `REAL`                                       |
 | P0       | `migrations/001_employee_anchor_schema.sql:23`        | Decimal/money precision risk keyword          | `REAL`                                       |
 | P0       | `migrations/001_employee_anchor_schema.sql:28`        | Decimal/money precision risk keyword          | `REAL`                                       |
 | P0       | `migrations/001_employee_anchor_schema.sql:29`        | Decimal/money precision risk keyword          | `REAL`                                       |

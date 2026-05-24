@@ -2836,3 +2836,54 @@ Commercial meaning:
   minor-unit write plans in a local/staging rehearsal.
 - P0-001 remains Partial because the adapter is not yet connected to a live or
   staging Worker route and production schema remains unmigrated.
+
+## P0-001H Employee Entry Adapter Staging Route Harness
+
+Date: 2026-05-24, Asia/Dubai
+
+Scope:
+
+- Added a local/staging-only route harness:
+  `POST /api/staging/employee-entry/adapter-draft`.
+- The route is protected by `APP_ENV` and
+  `ENABLE_EMPLOYEE_ENTRY_ADAPTER_STAGING=true`.
+- Production returns `404`; feature flag off returns `403 FEATURE_DISABLED`.
+- Server-side auth is required; employee/staff is allowed and owner/manager is
+  rejected.
+- The route returns adapter write plans and audit plans only.
+- The route does not write `sessions`, `transactions`, `deposit_ledger`,
+  `arrears`, or `arrear_tasks`.
+- Live `/api/employee/entry`, dashboard, handover, and financial formulas were
+  not changed.
+
+Verification:
+
+```text
+npm run test:employee-entry-adapter-staging-endpoint
+PASS - 3 tests passed
+
+npm run rehearse:employee-entry-adapter-staging-endpoint
+PASS - local/staging endpoint rehearsal passed; legacy live table mutations 0
+
+npm run check
+PASS - 170 tests passed; build dry-run passed
+
+npm run smoke:with-worker
+PASS
+
+npm run verify:clean-d1
+PASS
+
+npm run test:employee-entry-live-write-adapter
+PASS - 9 tests passed
+
+npm run rehearse:employee-entry-live-write-adapter
+PASS - 8 scenarios, 0 DB mutations, cleanup PASS
+```
+
+Commercial meaning:
+
+- P0-001H proves the employee entry adapter can be exposed through a
+  local/staging Worker route without mutating live financial tables.
+- P0-001 remains Partial because the live `/api/employee/entry` route, live
+  dashboard/history readers, and production schema are still unchanged.

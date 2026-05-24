@@ -338,3 +338,48 @@ Next allowed step:
 
 - P0-001G local/staging live write adapter rehearsal. It must be non-invasive,
   must not wire into live routes, and must keep P0-001 Partial.
+
+## P0-001H Employee Entry Adapter Route Harness Addendum
+
+Date: 2026-05-24, Asia/Dubai
+
+P0-001 current status:
+
+- Partial - local/staging employee entry adapter route harness passed.
+- Not Verified because live `/api/employee/entry`, live dashboard/history, and
+  production schema remain unchanged.
+
+Completed safely:
+
+- Added `POST /api/staging/employee-entry/adapter-draft`.
+- Added `P0_001H_EMPLOYEE_ENTRY_ADAPTER_ROUTE_HARNESS.md`.
+- Added `tests/employee-entry-adapter-staging-endpoint.spec.mjs`.
+- Added `scripts/rehearse-employee-entry-adapter-staging-endpoint.mjs`.
+- Generated `EMPLOYEE_ENTRY_ADAPTER_STAGING_ENDPOINT_REHEARSAL_RESULT.md`.
+- Updated API and DB static scan reports.
+
+Verification:
+
+- `npm run test:employee-entry-adapter-staging-endpoint` passed.
+- `npm run rehearse:employee-entry-adapter-staging-endpoint` passed.
+- `npm run check` passed with 170 tests.
+- `npm run smoke:with-worker` passed.
+- `npm run verify:clean-d1` passed.
+- `npm run test:employee-entry-live-write-adapter` passed.
+- `npm run rehearse:employee-entry-live-write-adapter` passed.
+
+Still forbidden:
+
+- Production D1 migration.
+- Remote D1 migration.
+- Staging or production deploy.
+- Live dashboard switch.
+- Live handover flow switch.
+- Live `/api/employee/entry` route switch.
+- Deleting legacy decimal/REAL fields.
+
+Next allowed step:
+
+- A separate human-reviewed live-route cutover or staging cutover gate. P0-001
+  must remain Partial until live accounting authority and reconciliation are
+  approved.

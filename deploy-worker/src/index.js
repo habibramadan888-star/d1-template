@@ -1,6 +1,8 @@
 ﻿var __defProp = Object.defineProperty;
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 
+import { createEmployeeEntryLiveWriteAdapterDraft } from "../../modules/worker/employee-entry-live-write-adapter.mjs";
+
 // src/lib/jwt.js
 var ALGO = { name: "HMAC", hash: "SHA-256" };
 var DEFAULT_TTL_SECONDS = 8 * 60 * 60;
@@ -2315,6 +2317,72 @@ async function handleHandoverStagingCommit(request,env){
   return json({success:true,status:"ACCEPTED",commit_id:commitId,idempotency_status:"NEW",accepted_rows:classified.acceptedRows.length,rejected_rows:classified.rejectedRows,backend_totals:backend,frontend_total_comparison:comparison,audit_events:["handover_commit_attempt","handover_commit_accepted"]},201);
 }
 __name(handleHandoverStagingCommit,"handleHandoverStagingCommit");
+const EEA_ALLOWED_APP_ENVS = HSC_ALLOWED_APP_ENVS;
+const EEA_EMPLOYEE_ROLES = HSC_EMPLOYEE_ROLES;
+function eeaEnvGate(env){
+  const appEnv=String(env.APP_ENV||"").trim().toLowerCase();
+  if(appEnv==="production")return {ok:false,status:404,code:"NOT_FOUND",message:"Endpoint not found."};
+  if(!EEA_ALLOWED_APP_ENVS.has(appEnv))return {ok:false,status:403,code:"FEATURE_DISABLED",message:"Feature disabled for this environment."};
+  const enabled=["1","true","yes","on"].includes(String(env.ENABLE_EMPLOYEE_ENTRY_ADAPTER_STAGING||"").trim().toLowerCase());
+  if(!enabled)return {ok:false,status:403,code:"FEATURE_DISABLED",message:"Employee entry adapter staging endpoint is disabled."};
+  return {ok:true,appEnv};
+}
+__name(eeaEnvGate,"eeaEnvGate");
+function eeaBuildAdapterInput(body,user){
+  const entry=body?.entry&&typeof body.entry==="object"&&!Array.isArray(body.entry)?body.entry:{};
+  const session=body?.session&&typeof body.session==="object"&&!Array.isArray(body.session)?body.session:{};
+  const resolved=body?.resolved&&typeof body.resolved==="object"&&!Array.isArray(body.resolved)?body.resolved:{};
+  const ids=body?.ids&&typeof body.ids==="object"&&!Array.isArray(body.ids)?body.ids:{};
+  const propertyId=cleanText(body?.property_id??body?.propertyId??resolved.propertyId??"",120);
+  return {
+    auth:{
+      companyId:cleanText(user.corpid||"",120),
+      corpid:cleanText(user.corpid||"",120),
+      propertyId,
+      operatorId:cleanText(user.userid||"",120),
+      userid:cleanText(user.userid||"",120),
+      userId:cleanText(user.userid||"",120)
+    },
+    body:{session,entry},
+    resolved:{...resolved,propertyId:propertyId||cleanText(resolved.propertyId||"",120)},
+    ids
+  };
+}
+__name(eeaBuildAdapterInput,"eeaBuildAdapterInput");
+async function handleEmployeeEntryAdapterStagingDraft(request,env){
+  const gate=eeaEnvGate(env);
+  if(!gate.ok)return hscError(gate.code,gate.message,gate.status);
+  if(request.method!=="POST")return hscError("METHOD_NOT_ALLOWED","Method not allowed.",405);
+  const auth=await requireAuth(request,env);
+  if(auth.error)return unauthorized();
+  const user=auth.payload;
+  if(!EEA_EMPLOYEE_ROLES.has(String(user.role||"").toLowerCase()))return hscError("FORBIDDEN","Only employee/staff may use the employee entry adapter staging endpoint.",403);
+  let body;
+  try{body=await request.json();}catch{return badRequest("invalid_json");}
+  if(!body||typeof body!=="object"||Array.isArray(body))return hscError("INVALID_REQUEST","Request body must be an object.",400);
+  const draft=createEmployeeEntryLiveWriteAdapterDraft(eeaBuildAdapterInput(body,user));
+  const response={
+    success: Boolean(draft.ok),
+    endpoint:"/api/staging/employee-entry/adapter-draft",
+    status:draft.status,
+    adapter_draft:draft,
+    audit_plan:draft.auditPlan||[],
+    metadata:{
+      ...(draft.metadata||{}),
+      app_env:gate.appEnv,
+      stagingOnly:true,
+      writesDatabase:false,
+      liveRouteChanged:false,
+      legacyLiveTablesWritten:false,
+      productionMigration:false,
+      remoteMigration:false,
+      productionDeploy:false
+    }
+  };
+  if(draft.status==="SKIPPED_VOIDED")return json(response,200);
+  return json(response,draft.ok?200:422);
+}
+__name(handleEmployeeEntryAdapterStagingDraft,"handleEmployeeEntryAdapterStagingDraft");
 // EMPLOYEE_API_PATCH_END
 
 async function handleRequest(request, env, ctx) {
@@ -2348,6 +2416,9 @@ async function handleRequest(request, env, ctx) {
   }
   if (path === "/api/staging/handover/commit" && method === "POST") {
     return handleHandoverStagingCommit(request, env);
+  }
+  if (path === "/api/staging/employee-entry/adapter-draft" && method === "POST") {
+    return handleEmployeeEntryAdapterStagingDraft(request, env);
   }
   if (path.startsWith("/api/")) {
     const auth = await requireAuth(request, env);

@@ -321,6 +321,46 @@ Next step:
 - P0-001H may create a local/staging route harness around this adapter after
   human review. Do not switch live production behavior automatically.
 
+## P0-001H Employee Entry Adapter Route Harness Addendum
+
+Date: 2026-05-24, Asia/Dubai
+
+Current P0-001 status is now
+`Partial - local/staging employee entry adapter route harness passed`.
+
+Added evidence:
+
+- `P0_001H_EMPLOYEE_ENTRY_ADAPTER_ROUTE_HARNESS.md`
+- `EMPLOYEE_ENTRY_ADAPTER_STAGING_ENDPOINT_REHEARSAL_RESULT.md`
+- `tests/employee-entry-adapter-staging-endpoint.spec.mjs`
+- `scripts/rehearse-employee-entry-adapter-staging-endpoint.mjs`
+- `POST /api/staging/employee-entry/adapter-draft`
+- `npm run test:employee-entry-adapter-staging-endpoint`
+- `npm run rehearse:employee-entry-adapter-staging-endpoint`
+
+Result:
+
+- Production mode returns `404`.
+- Feature flag disabled returns `403 FEATURE_DISABLED`.
+- Unauthenticated and invalid JWT requests return `401`.
+- Owner/manager submit is rejected with `403`.
+- Employee submit returns adapter draft plans for rent, short-paid rent, deposit
+  collection, invalid money, and voided rows.
+- Legacy live financial tables remain unchanged.
+
+Remaining risk:
+
+- Live `/api/employee/entry` still uses the legacy live path.
+- Production schema has not been migrated.
+- Live dashboard/history readers have not been switched to minor-unit authority.
+- This is not production deploy approval.
+
+Next step:
+
+- P0-001 can proceed only to a separate reviewed live-route/staging cutover gate
+  or another local/staging rehearsal. Do not execute production or remote D1
+  migration automatically.
+
 ## P0-001E Local/Staging Dual-Write Rehearsal Addendum
 
 Date: 2026-05-24, Asia/Dubai
