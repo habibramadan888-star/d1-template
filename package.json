@@ -17,6 +17,8 @@
     "audit:db": "node scripts/audit-db.mjs",
     "audit:db:check": "node scripts/audit-db.mjs --check",
     "audit:money": "node scripts/audit-money-fields.mjs",
+    "triage:money": "node scripts/triage-money-audit.mjs",
+    "gate:money-reconciliation": "node scripts/reconcile-money-dual-write-gate.mjs",
     "audit:backend-totals": "node scripts/audit-backend-totals.mjs",
     "audit:runtime-ddl": "node scripts/audit-runtime-ddl.mjs",
     "reconcile:money": "node scripts/money-shadow-reconcile.mjs",

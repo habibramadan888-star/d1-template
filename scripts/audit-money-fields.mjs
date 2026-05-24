@@ -167,6 +167,7 @@ Scope: static source scan for P0-001A. This report is non-blocking and does not 
 - This scan intentionally includes legacy Worker and frontend code because P0-001A is an inventory task.
 - Counts are risk indicators, not proof that every occurrence is an active production accounting defect.
 - P0-001 remains Partial because this task does not migrate storage or live write paths to integer minor units.
+- P0-001D adds \`npm run triage:money\` and \`npm run gate:money-reconciliation\` so these raw counts are reviewed through risk classes and a read-only reconciliation gate before any local/staging dual-write rehearsal.
 
 ## Detailed Findings
 

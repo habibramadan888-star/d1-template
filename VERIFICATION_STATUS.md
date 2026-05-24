@@ -75,3 +75,14 @@ Date: 2026-05-24, Asia/Dubai
 | `npm run rehearse:money-dual-write` | yes    | Pass   | none          | `DUAL_WRITE_SCHEMA_TABLES=5`, `DUAL_WRITE_MISSING_FUTURE_COLUMNS=24`, `DUAL_WRITE_PASS=4`, `DUAL_WRITE_FAIL=1` | Generates `MONEY_DUAL_WRITE_REHEARSAL_RESULT.md`; the one failed scenario is an intentional invalid `100.999` AED guardrail. |
 
 P0-001 remains Partial. These commands verify preparation and guardrails only; they do not migrate live schema or change accounting authority.
+
+## P0-001D Verification Addendum
+
+Date: 2026-05-24, Asia/Dubai
+
+| Command                             | Exists | Result | Error Summary | Log Evidence                                                                                    | Commercial Meaning                                                                                                                     |
+| ----------------------------------- | ------ | ------ | ------------- | ----------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run triage:money`              | yes    | Pass   | none          | `MONEY_TRIAGE_FINDINGS=3171`; generated `MONEY_AUDIT_TRIAGE.md` and `TOP_25_MONEY_RISKS.md`     | Converts raw money audit counts into P0/P1/P2/test/doc/false-positive categories so the project avoids unsafe bulk edits.              |
+| `npm run gate:money-reconciliation` | yes    | Pass   | none          | `MONEY_RECONCILIATION_OVERALL=MANUAL_REQUIRED`; generated `MONEY_RECONCILIATION_GATE_RESULT.md` | Read-only local D1 gate confirms production migration is not allowed yet; local/staging rehearsal can proceed only after human review. |
+
+P0-001 remains Partial. These commands verify review and reconciliation readiness only; they do not migrate live schema or change accounting authority.

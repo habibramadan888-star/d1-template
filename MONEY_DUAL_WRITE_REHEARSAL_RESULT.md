@@ -1,6 +1,6 @@
 # Money Dual-Write Rehearsal Result
 
-Generated: 2026-05-24T12:56:23.560Z, Asia/Dubai
+Generated: 2026-05-24T13:30:15.856Z, Asia/Dubai
 
 Scope: P0-001C preparation only. This rehearsal reads local D1 schema and generates draft `*_fils` patches. It does not alter local data, production data, live dashboard results, live handover flow, or current financial formulas.
 

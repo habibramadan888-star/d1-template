@@ -65,3 +65,17 @@ P0-001C added preparation guardrails without changing live accounting behavior:
 - `migration-drafts/005_money_minor_units_dual_write_draft.sql` documents nullable `*_fils` companion columns for human review.
 
 P0-001 remains Partial. No production migration, remote D1 operation, live write-path switch, dashboard reader switch, or automatic legacy correction has been performed.
+
+## P0-001D Review Gate Update
+
+Date: 2026-05-24, Asia/Dubai
+
+P0-001D added review and reconciliation gates without changing live accounting behavior:
+
+- `MONEY_DUAL_WRITE_MIGRATION_REVIEW.md` reviews the draft `*_fils` migration table by table.
+- `MONEY_AUDIT_TRIAGE.md` and `TOP_25_MONEY_RISKS.md` classify raw `audit:money` findings into actionable categories.
+- `MONEY_RECONCILIATION_GATE.md` defines zero-delta reconciliation rules for local/staging and future production review.
+- `scripts/reconcile-money-dual-write-gate.mjs` reads local D1 and writes `MONEY_RECONCILIATION_GATE_RESULT.md`.
+- `scripts/triage-money-audit.mjs` writes the triage and top-risk reports.
+
+P0-001 remains Partial. P0-001D does not execute migration, backfill data, change live write paths, change dashboard readers, or make `*_fils` production authority.

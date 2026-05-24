@@ -100,6 +100,41 @@ Verification:
 | P3-005 | Mobile App     | Native mobile app after web workflow stabilizes. |
 | P3-006 | Multi-language | Arabic/English/Chinese localization.             |
 
+## P0-001D Minor-Unit Migration Review Addendum
+
+Date: 2026-05-24, Asia/Dubai
+
+P0-001 current status:
+
+- Partial - minor-unit migration review and reconciliation gate ready.
+- Not Verified because live write paths, production schema, backfill, dashboard readers, and production reconciliation remain unchanged.
+
+New evidence:
+
+- `P0_001D_STARTING_REVIEW_CONTEXT.md`
+- `MONEY_DUAL_WRITE_MIGRATION_REVIEW.md`
+- `MONEY_AUDIT_TRIAGE.md`
+- `TOP_25_MONEY_RISKS.md`
+- `MONEY_RECONCILIATION_GATE.md`
+- `MONEY_RECONCILIATION_GATE_RESULT.md`
+- `P0_001D_GO_NO_GO_CHECKLIST.md`
+- `scripts/triage-money-audit.mjs`
+- `scripts/reconcile-money-dual-write-gate.mjs`
+- `npm run triage:money`
+- `npm run gate:money-reconciliation`
+
+Next allowed step:
+
+- P0-001E local/staging dual-write rehearsal after human review.
+
+Still forbidden:
+
+- Production D1 migration.
+- Remote D1 migration.
+- Live dashboard reader switch.
+- Live employee handover switch.
+- Bulk auto-fixing all `REAL` / `Number` findings.
+
 ## Safe Next Implementation Order
 
 1. Keep P0-007A smoke orchestration as the local preflight for future P0 work.

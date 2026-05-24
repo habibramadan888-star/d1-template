@@ -160,6 +160,44 @@ Next step:
 
 - P0-001D can be planned only after human approval of the migration draft and after staging reconciliation is defined. Do not execute production or remote D1 migration automatically.
 
+## P0-001D Migration Review And Reconciliation Gate Addendum
+
+Date: 2026-05-24, Asia/Dubai
+
+Current P0-001 status is now `Partial - minor-unit migration review and reconciliation gate ready`.
+
+Added evidence:
+
+- `P0_001D_STARTING_REVIEW_CONTEXT.md`
+- `MONEY_DUAL_WRITE_MIGRATION_REVIEW.md`
+- `MONEY_AUDIT_TRIAGE.md`
+- `TOP_25_MONEY_RISKS.md`
+- `MONEY_RECONCILIATION_GATE.md`
+- `MONEY_RECONCILIATION_GATE_RESULT.md`
+- `P0_001D_GO_NO_GO_CHECKLIST.md`
+- `NEXT_PROMPT_P0_001E_LOCAL_STAGING_DUAL_WRITE_REHEARSAL.md`
+- `NEXT_PROMPT_P1_006_EMBEDDED_WORKER_DRIFT_CONTROL.md`
+- `npm run triage:money`
+- `npm run gate:money-reconciliation`
+
+Result:
+
+- `audit:money` raw findings are now triaged into P0/P1/P2/test/doc/false-positive classes.
+- The top 25 money risks are available for human review.
+- The reconciliation gate is read-only and currently returns `MANUAL_REQUIRED`, not production approval.
+- P0-001 remains open until live write/read paths use integer minor units with approved reconciliation.
+
+Remaining risk:
+
+- Live Worker write paths still use legacy decimal/REAL fields.
+- Production schema has not been migrated.
+- Dashboard/history readers have not been switched to `*_fils`.
+- P0-003, P0-008, P0-006, and P1-006 remain relevant dependencies before production migration.
+
+Next step:
+
+- P0-001E may rehearse local/staging-only dual-write after human review. Do not execute production or remote D1 migration automatically.
+
 ## P1 Review
 
 | ID     | Area                            | Problem                                                        | 原状态 | 当前状态    | 是否已修复         | 是否已验证                                 | 证据                                                                                                                                                                                                                                  | 剩余风险                                                                                                          | 下一步                                                                                         |

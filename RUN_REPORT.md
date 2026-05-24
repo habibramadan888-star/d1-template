@@ -2617,3 +2617,33 @@ P0-001 status:
 
 - Partial - minor-unit dual-write preparation ready.
 - Not Verified because live write paths, production schema, reconciliation, and dashboard readers remain unchanged.
+
+## P0-001D Migration Review And Reconciliation Gate
+
+Date: 2026-05-24, Asia/Dubai
+
+Scope:
+
+- Reviewed `migration-drafts/005_money_minor_units_dual_write_draft.sql`.
+- Added `npm run triage:money` to classify `audit:money` raw findings instead of bulk-editing by count.
+- Added `npm run gate:money-reconciliation` as a read-only local D1 reconciliation gate.
+- Did not modify live financial formulas.
+- Did not modify live dashboard/history results.
+- Did not modify live employee handover flow.
+- Did not execute production or remote D1 migration.
+- Did not deploy production Worker.
+
+Verification:
+
+```text
+npm run triage:money
+PASS - generated MONEY_AUDIT_TRIAGE.md and TOP_25_MONEY_RISKS.md.
+
+npm run gate:money-reconciliation
+PASS - generated MONEY_RECONCILIATION_GATE_RESULT.md with overall MANUAL_REQUIRED.
+```
+
+P0-001 status:
+
+- Partial - minor-unit migration review and reconciliation gate ready.
+- Not Verified because live write paths, production schema, reconciliation backfill, and dashboard readers remain unchanged.

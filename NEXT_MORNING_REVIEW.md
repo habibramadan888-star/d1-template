@@ -145,3 +145,30 @@ Meaning:
 
 - P0-001 is still Partial, not Verified.
 - The system now has safe dual-write preparation guardrails, but live schema and live write/read paths are unchanged.
+
+## P0-001D Update
+
+Date: 2026-05-24, Asia/Dubai
+
+New evidence:
+
+- `P0_001D_STARTING_REVIEW_CONTEXT.md`
+- `MONEY_DUAL_WRITE_MIGRATION_REVIEW.md`
+- `MONEY_AUDIT_TRIAGE.md`
+- `TOP_25_MONEY_RISKS.md`
+- `MONEY_RECONCILIATION_GATE.md`
+- `MONEY_RECONCILIATION_GATE_RESULT.md`
+- `P0_001D_GO_NO_GO_CHECKLIST.md`
+- `NEXT_PROMPT_P0_001E_LOCAL_STAGING_DUAL_WRITE_REHEARSAL.md`
+- `NEXT_PROMPT_P1_006_EMBEDDED_WORKER_DRIFT_CONTROL.md`
+
+Verification:
+
+- `npm run triage:money` passed.
+- `npm run gate:money-reconciliation` passed with overall `MANUAL_REQUIRED`.
+
+Meaning:
+
+- P0-001 is still Partial, not Verified.
+- Local/staging dual-write rehearsal can be considered after human review.
+- Production money migration remains NO-GO.
