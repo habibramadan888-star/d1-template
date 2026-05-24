@@ -2179,3 +2179,32 @@ npm run verify:clean-d1 passed
 ### Status
 
 P0-008 remains `Partial - receivables model designed`. The system still does not use a live receivables table as the accounting source of truth; this stage only defines the future model, draft schema, and lifecycle test plan.
+
+## P0-006A Tenant Isolation And CORPID Scope Audit
+
+Date: 2026-05-24
+
+### Files Added Or Updated
+
+- `TENANCY_SCOPE_AUDIT.md`: maps current static `CORPID`, legacy `corpid`, employee, owner, API, and table scope risks.
+- `TENANCY_MIGRATION_PLAN.md`: defines a staged path toward company/property/user membership isolation.
+- `TENANCY_TEST_PLAN.md`: defines required cross-tenant and property-scope tests before shared SaaS launch.
+- `COMMERCIALIZATION_BACKLOG.md`, `P0_P1_STATUS_REVIEW.md`: updated P0-006A status as Partial.
+
+### Verification
+
+```text
+npm run check passed
+npm run smoke:with-worker passed
+```
+
+### Safety Scope
+
+- No production Worker deploy was executed.
+- No production or remote D1 migration was executed.
+- No auth/login behavior was changed.
+- No live API query scope, dashboard statistic, employee permission behavior, tenant migration, or database schema was changed.
+
+### Status
+
+P0-006 remains `Partial - tenancy scope audited`. The current live system still relies on static deployment scope and legacy `corpid`; this stage only defines the migration and test requirements.

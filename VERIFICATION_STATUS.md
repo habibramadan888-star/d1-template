@@ -43,6 +43,7 @@ Post-report check: after generating this reconciliation report set, `npm run for
 - P0-003A update: `npm run test:backend-totals-shadow` and `npm run audit:backend-totals` now exist. They add shadow comparison and authority visibility only; live dashboard/API totals remain unchanged.
 - P0-002A update: `npm run test:handover-atomic-design` now exists. It validates a future atomic commit contract and stable idempotency key design only; the live handover submission path is not migrated.
 - P0-008A update: receivables model design, lifecycle test plan, and draft SQL were added. `npm run audit:db`, `npm run check`, `npm run smoke:with-worker`, and `npm run verify:clean-d1` pass; draft SQL was not applied to local or production D1.
+- P0-006A update: tenant isolation/CORPID scope audit, migration plan, and cross-tenant test plan were added. `npm run check` and `npm run smoke:with-worker` pass; live tenant/query isolation was not changed.
 - Tests that validate real login now exist locally through `npm run smoke:with-worker`.
 - Tests that validate real API now include `/api/me`, `/api/rent_config`, and employee denial from `/api/history`.
 - Tests that validate database now include static DB scan plus disposable clean local D1 bootstrap through `npm run verify:clean-d1`.
