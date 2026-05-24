@@ -54,6 +54,33 @@ Next step:
 - If the human reviewer approves GO, run the prompt in `NEXT_PROMPT_P0_002C_STAGING_IMPLEMENTATION.md`.
 - P0-002 must remain Partial until live production cutover is separately implemented, tested, approved, and reconciled.
 
+## P0-002C Implementation Addendum
+
+Date: 2026-05-24, Asia/Dubai
+
+Current P0-002 status is now `Partial - local/staging handover atomic endpoint implemented and verified`.
+
+Added evidence:
+
+- `POST /api/staging/handover/commit` implemented in `deploy-worker/src/index.js`.
+- `migrations/local/002_handover_atomic_staging.sql` creates local/staging handover commit, row, idempotency, and audit tables.
+- `tests/handover-staging-endpoint.spec.mjs` verifies production 404, feature flag 403, unauth 401, invalid JWT 401, owner 403, employee success, missing idempotency 400, idempotent replay, duplicate-risk rejection, frontend-totals mismatch rejection, voided-row rejection, invalid amount rejection, staging table writes, no legacy financial table writes, and audit/entry evidence.
+- `scripts/rehearse-handover-staging-endpoint.mjs` generates `HANDOVER_STAGING_ENDPOINT_REHEARSAL_RESULT.md` from a disposable local D1.
+- `npm run test:handover-staging-endpoint` passed.
+- `npm run rehearse:handover-staging-endpoint` passed.
+
+Remaining risk:
+
+- The live employee handover flow still uses the legacy path and was not switched.
+- Production `APP_ENV=production` intentionally returns `404` for the staging endpoint.
+- Production/remote D1 migration was not executed.
+- Live dashboard, live history, and live financial formulas were not changed.
+- P0-002 cannot be marked Verified until live cutover, staging reconciliation, rollback, and accounting review are approved.
+
+Next step:
+
+- P0-002D can perform staging UI/manual validation, or P0-001C can prepare minor-unit dual-write. Do not enable production cutover automatically.
+
 ## P1 Review
 
 | ID     | Area                            | Problem                                                        | 原状态 | 当前状态    | 是否已修复         | 是否已验证                                 | 证据                                                                                                                                                                                                                                  | 剩余风险                                                                                                          | 下一步                                                                                         |

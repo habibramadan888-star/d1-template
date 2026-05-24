@@ -179,6 +179,21 @@ const routeCatalog = {
     risk: "P0",
     notes: "Needs backend atomic handover commit and recomputed totals."
   },
+  "POST /api/staging/handover/commit": {
+    purpose: "local/staging-only atomic employee handover commit rehearsal endpoint",
+    login: "Yes",
+    roles: "employee only",
+    tenantScope: "session `corpid` plus request `property_id`",
+    reads: "`handover_idempotency_keys`, `handover_commits`",
+    writes:
+      "`handover_commits`, `handover_commit_rows`, `handover_idempotency_keys`, `handover_audit_events`, `audit_logs`, `entry_events`",
+    financial: "Yes",
+    delete: "No",
+    audit: "Yes",
+    risk: "P0",
+    notes:
+      "Feature-flagged local/staging endpoint only; production returns 404 and live handover flow remains unchanged."
+  },
   "POST /api/employee/migrate": {
     purpose: "employee schema migration endpoint",
     login: "Yes",

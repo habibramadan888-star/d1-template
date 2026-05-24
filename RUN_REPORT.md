@@ -2463,3 +2463,54 @@ P0-002 status:
 
 - Partial - handover atomic commit implementation rehearsal passed.
 - Not Verified because P0-002C is a human review gate only and the live employee handover route has not been switched.
+
+## P0-002C Handover Atomic Local/Staging Endpoint
+
+Date: 2026-05-24, Asia/Dubai
+
+Scope:
+
+- Implemented `POST /api/staging/handover/commit` as a local/staging-only endpoint.
+- Added dual protection: `APP_ENV` must be development/dev/local/test/staging and `ENABLE_HANDOVER_ATOMIC_STAGING=true`.
+- Production `APP_ENV=production` returns `404`.
+- Feature flag off or missing app environment returns `403 FEATURE_DISABLED`.
+- Endpoint is server-authenticated and accepts only `staff`/employee submitters.
+- Owner/manager submit is rejected with `403`.
+- Backend recomputes totals in integer fils and rejects frontend-total mismatch.
+- Successful commits write staging tables plus audit/entry evidence only.
+- Live employee handover flow, live dashboard output, live financial formulas, and legacy financial write paths were not changed.
+- No production or remote D1 migration was executed.
+- No production Worker deploy was executed.
+
+Files added:
+
+- `migrations/local/002_handover_atomic_staging.sql`
+- `tests/handover-staging-endpoint.spec.mjs`
+- `scripts/rehearse-handover-staging-endpoint.mjs`
+- `HANDOVER_STAGING_ENDPOINT_IMPLEMENTATION.md`
+
+Files updated:
+
+- `deploy-worker/src/index.js`
+- `scripts/local-worker-utils.mjs`
+- `scripts/audit-api.mjs`
+- `package.json`
+- generated audit/rehearsal/status reports
+
+Verification:
+
+```text
+npm run test:handover-staging-endpoint
+PASS - 3 endpoint tests passed, including production disabled, feature disabled,
+auth/role enforcement, idempotency replay, duplicate risk, tamper rejection,
+voided-row rejection, invalid amount rejection, staging table writes, no legacy
+transactions/deposit_ledger/arrears writes, and audit/entry evidence.
+
+npm run rehearse:handover-staging-endpoint
+PASS - HANDOVER_STAGING_ENDPOINT_REHEARSAL_RESULT.md generated from disposable local D1.
+```
+
+P0-002 status:
+
+- Partial - local/staging handover atomic endpoint implemented and verified.
+- Not Verified because the live employee handover route remains unchanged and production endpoint is intentionally disabled.

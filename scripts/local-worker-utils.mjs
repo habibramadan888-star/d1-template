@@ -79,10 +79,14 @@ export async function waitForWorker(baseUrl = defaultBaseUrl, timeoutMs = 30000)
   );
 }
 
-export function startWorker({ port = defaultPort, persistTo = defaultPersistTo } = {}) {
+export function startWorker({ port = defaultPort, persistTo = defaultPersistTo, vars = {} } = {}) {
   if (!existsSync(wranglerBin)) {
     throw new Error(`Wrangler binary not found at ${wranglerBin}. Run npm install first.`);
   }
+  const varArgs = Object.entries(vars).flatMap(([key, value]) => [
+    "--var",
+    `${key}:${String(value)}`
+  ]);
   return spawn(
     process.execPath,
     [
@@ -94,7 +98,8 @@ export function startWorker({ port = defaultPort, persistTo = defaultPersistTo }
       "--persist-to",
       persistTo,
       "--port",
-      String(port)
+      String(port),
+      ...varArgs
     ],
     {
       cwd: workerDir,

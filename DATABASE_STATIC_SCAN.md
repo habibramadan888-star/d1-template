@@ -12,6 +12,7 @@ This is a static scan artifact. It does not replace `DATABASE_AUDIT.md`, which c
 - `deploy-worker/src/index.js`
 - `migrations/001_employee_anchor_schema.sql`
 - `migrations/local/001_clean_legacy_bootstrap.sql`
+- `migrations/local/002_handover_atomic_staging.sql`
 - `migration-drafts/002_commercial_bootstrap.sql`
 - `migration-drafts/003_delete_session_void_fields.sql`
 - `migration-drafts/004_receivables_model_draft.sql`
@@ -33,10 +34,10 @@ This is a static scan artifact. It does not replace `DATABASE_AUDIT.md`, which c
 | `deposit_ledger`            | deploy-worker/src/index.js, migration-drafts/002_commercial_bootstrap.sql, migrations/local/001_clean_legacy_bootstrap.sql                                            |
 | `employee_users`            | deploy-worker/src/index.js, migrations/local/001_clean_legacy_bootstrap.sql                                                                                           |
 | `entry_events`              | deploy-worker/src/index.js, migrations/001_employee_anchor_schema.sql, migrations/local/001_clean_legacy_bootstrap.sql                                                |
-| `handover_audit_events`     | migration-drafts/handover_atomic_commit_draft.sql                                                                                                                     |
-| `handover_commit_rows`      | migration-drafts/handover_atomic_commit_draft.sql                                                                                                                     |
-| `handover_commits`          | migration-drafts/handover_atomic_commit_draft.sql                                                                                                                     |
-| `handover_idempotency_keys` | migration-drafts/handover_atomic_commit_draft.sql                                                                                                                     |
+| `handover_audit_events`     | migration-drafts/handover_atomic_commit_draft.sql, migrations/local/002_handover_atomic_staging.sql                                                                   |
+| `handover_commit_rows`      | migration-drafts/handover_atomic_commit_draft.sql, migrations/local/002_handover_atomic_staging.sql                                                                   |
+| `handover_commits`          | migration-drafts/handover_atomic_commit_draft.sql, migrations/local/002_handover_atomic_staging.sql                                                                   |
+| `handover_idempotency_keys` | migration-drafts/handover_atomic_commit_draft.sql, migrations/local/002_handover_atomic_staging.sql                                                                   |
 | `handover_sessions`         | migration-drafts/002_commercial_bootstrap.sql                                                                                                                         |
 | `payment_allocations`       | migration-drafts/004_receivables_model_draft.sql                                                                                                                      |
 | `payments`                  | migration-drafts/002_commercial_bootstrap.sql                                                                                                                         |
@@ -63,13 +64,13 @@ This is a static scan artifact. It does not replace `DATABASE_AUDIT.md`, which c
 | P1       | `deploy-worker/src/index.js:1143`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS entry_events`    |
 | P1       | `deploy-worker/src/index.js:1156`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS deposit_ledger`  |
 | P1       | `deploy-worker/src/index.js:1374`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS app_settings`    |
-| P1       | `deploy-worker/src/index.js:1959`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS active_sessions` |
-| P1       | `deploy-worker/src/index.js:1991`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS app_settings`    |
-| P1       | `deploy-worker/src/index.js:2048`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS app_settings`    |
-| P1       | `deploy-worker/src/index.js:2073`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS app_settings`    |
-| P1       | `deploy-worker/src/index.js:2109`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS app_settings`    |
-| P1       | `deploy-worker/src/index.js:2131`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS app_settings`    |
-| P1       | `deploy-worker/src/index.js:2154`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS app_settings`    |
+| P1       | `deploy-worker/src/index.js:2377`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS active_sessions` |
+| P1       | `deploy-worker/src/index.js:2409`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS app_settings`    |
+| P1       | `deploy-worker/src/index.js:2466`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS app_settings`    |
+| P1       | `deploy-worker/src/index.js:2491`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS app_settings`    |
+| P1       | `deploy-worker/src/index.js:2527`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS app_settings`    |
+| P1       | `deploy-worker/src/index.js:2549`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS app_settings`    |
+| P1       | `deploy-worker/src/index.js:2572`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS app_settings`    |
 | P0       | `deploy-worker/src/index.js:1067`                     | Decimal/money precision risk keyword          | `REAL`                                       |
 | P0       | `deploy-worker/src/index.js:1068`                     | Decimal/money precision risk keyword          | `REAL`                                       |
 | P0       | `deploy-worker/src/index.js:1070`                     | Decimal/money precision risk keyword          | `REAL`                                       |

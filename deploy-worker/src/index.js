@@ -1900,6 +1900,421 @@ function allowStaffApi(path,method){
   return false;
 }
 __name(allowStaffApi,"allowStaffApi");
+const HSC_ALLOWED_APP_ENVS = new Set(["development","dev","local","test","staging"]);
+const HSC_EMPLOYEE_ROLES = new Set(["staff","employee"]);
+const HSC_VOIDED_STATUSES = new Set(["VOID","VOIDED","DELETED","CANCELLED"]);
+const HSC_CATEGORY_ALIASES = {
+  R:"rent",RENT:"rent",RENT_INCOME:"rent",
+  D:"deposit_in",DEPOSIT:"deposit_in",DEPOSIT_IN:"deposit_in",
+  AP:"arrears",ARREARS:"arrears",ARREARS_PAYMENT:"arrears",
+  TF:"transfer_fee",TRANSFER_FEE:"transfer_fee",
+  DR:"deposit_refund",DEPOSIT_REFUND:"deposit_refund",
+  E:"expense",EXPENSE:"expense"
+};
+const HSC_PAYMENT_ALIASES = {C:"cash",CASH:"cash",B:"bank",BANK:"bank",TRANSFER:"bank"};
+const HSC_INCOME_CATEGORIES = new Set(["rent","deposit_in","arrears","transfer_fee"]);
+const HSC_OUTFLOW_CATEGORIES = new Set(["deposit_refund","expense"]);
+function hscIssue(code,message,extra={}){
+  return {code,message,...extra};
+}
+__name(hscIssue,"hscIssue");
+function hscError(code,message,status,extra={}){
+  return json({success:false,code,error:code,message,...extra},status);
+}
+__name(hscError,"hscError");
+function hscEnvGate(env){
+  const appEnv=String(env.APP_ENV||"").trim().toLowerCase();
+  if(appEnv==="production")return {ok:false,status:404,code:"NOT_FOUND",message:"Endpoint not found."};
+  if(!HSC_ALLOWED_APP_ENVS.has(appEnv))return {ok:false,status:403,code:"FEATURE_DISABLED",message:"Feature disabled for this environment."};
+  const enabled=["1","true","yes","on"].includes(String(env.ENABLE_HANDOVER_ATOMIC_STAGING||"").trim().toLowerCase());
+  if(!enabled)return {ok:false,status:403,code:"FEATURE_DISABLED",message:"Handover atomic staging endpoint is disabled."};
+  return {ok:true,appEnv};
+}
+__name(hscEnvGate,"hscEnvGate");
+function hscInputValue(row,keys){
+  for(const key of keys){
+    if(row?.[key]!==void 0&&row?.[key]!==null)return row[key];
+  }
+  return void 0;
+}
+__name(hscInputValue,"hscInputValue");
+function hscRequiredText(value,field,errors,max=160){
+  const text=cleanText(value||"",max);
+  if(!text)errors.push(hscIssue("MISSING_REQUIRED_FIELD",`${field} is required.`,{field}));
+  return text;
+}
+__name(hscRequiredText,"hscRequiredText");
+function hscNormalizeAlias(value,aliases,field,rowId,errors){
+  const key=String(value??"").trim().toUpperCase();
+  const normalized=aliases[key];
+  if(!normalized){
+    errors.push(hscIssue(`INVALID_${field.toUpperCase()}`,`Unsupported ${field}.`,{field,rowId,value}));
+    return "";
+  }
+  return normalized;
+}
+__name(hscNormalizeAlias,"hscNormalizeAlias");
+function hscFilsToAedString(fils){
+  let value=BigInt(fils);
+  const negative=value<0n;
+  if(negative)value=-value;
+  const whole=value/100n;
+  const cents=String(value%100n).padStart(2,"0");
+  return `${negative?"-":""}${whole.toString()}.${cents}`;
+}
+__name(hscFilsToAedString,"hscFilsToAedString");
+function hscFilsToSafeInteger(fils,field){
+  const value=BigInt(fils);
+  if(value>BigInt(Number.MAX_SAFE_INTEGER)||value<BigInt(Number.MIN_SAFE_INTEGER)){
+    throw new Error(`${field} exceeds safe integer range.`);
+  }
+  return Number(value);
+}
+__name(hscFilsToSafeInteger,"hscFilsToSafeInteger");
+function hscParseAedToFils(value,{field="amount",rowId="",allowNegative=false}={}){
+  const warnings=[];
+  const errors=[];
+  if(value===null||value===void 0||String(value).trim()===""){
+    errors.push(hscIssue("MISSING_AMOUNT",`${field} is required.`,{field,rowId,value}));
+    return {ok:false,fils:null,aed:null,warnings,errors};
+  }
+  if(typeof value==="number"&&!Number.isFinite(value)){
+    errors.push(hscIssue("INVALID_NUMBER_AMOUNT",`${field} is not finite.`,{field,rowId,value}));
+    return {ok:false,fils:null,aed:null,warnings,errors};
+  }
+  if(typeof value==="number")warnings.push(hscIssue("LEGACY_NUMBER_AMOUNT","Legacy numeric money value converted.",{field,rowId,value}));
+  else warnings.push(hscIssue("LEGACY_DECIMAL_AMOUNT","Legacy decimal money value converted.",{field,rowId,value}));
+  const raw=String(value).trim().replace(/,/g,"");
+  if(!/^-?\d+(?:\.\d{1,2})?$/.test(raw)){
+    errors.push(hscIssue("INVALID_AMOUNT",`${field} must have at most 2 decimals.`,{field,rowId,value}));
+    return {ok:false,fils:null,aed:null,warnings,errors};
+  }
+  const negative=raw.startsWith("-");
+  if(negative&&!allowNegative){
+    errors.push(hscIssue("NEGATIVE_AMOUNT_NOT_ALLOWED",`${field} cannot be negative.`,{field,rowId,value}));
+    return {ok:false,fils:null,aed:null,warnings,errors};
+  }
+  const clean=negative?raw.slice(1):raw;
+  const [whole,frac=""]=clean.split(".");
+  let fils=BigInt(whole)*100n+BigInt(frac.padEnd(2,"0"));
+  if(negative)fils=-fils;
+  return {ok:true,fils,aed:hscFilsToAedString(fils),warnings,errors};
+}
+__name(hscParseAedToFils,"hscParseAedToFils");
+function hscIsVoidedRow(row){
+  if(!row||typeof row!=="object")return false;
+  if(row.voided_at||row.session_voided_at||row.transaction_voided_at)return true;
+  const status=String(row.status??row.session_status??row.transaction_status??"").trim().toUpperCase();
+  return HSC_VOIDED_STATUSES.has(status);
+}
+__name(hscIsVoidedRow,"hscIsVoidedRow");
+function hscNormalizeOneRow(row,index){
+  const errors=[];
+  const warnings=[];
+  const rowId=String(hscInputValue(row,["client_entry_id","clientEntryId","id"])??`row-${index+1}`);
+  const clientEntryId=hscRequiredText(hscInputValue(row,["client_entry_id","clientEntryId","id"]),"client_entry_id",errors,120);
+  const rawType=hscInputValue(row,["event_type","eventType","type","category"]);
+  const rawPayment=hscInputValue(row,["payment_method","paymentMethod","pay_type","pay","cat"]);
+  const amountValue=hscInputValue(row,["amount","paid","amount_aed","amountAed"]);
+  const category=hscNormalizeAlias(rawType,HSC_CATEGORY_ALIASES,"event_type",rowId,errors);
+  const paymentMethod=hscNormalizeAlias(rawPayment,HSC_PAYMENT_ALIASES,"payment_method",rowId,errors);
+  const money=hscParseAedToFils(amountValue,{field:"amount",rowId});
+  warnings.push(...money.warnings);
+  errors.push(...money.errors);
+  if(hscIsVoidedRow(row))errors.push(hscIssue("VOIDED_ROW_REJECTED","Voided session or transaction row cannot be recommitted.",{rowId}));
+  const normalized={
+    ...row,
+    id:rowId,
+    client_entry_id:clientEntryId,
+    category,
+    event_type:String(rawType??""),
+    payment_method:paymentMethod,
+    pay_type:paymentMethod==="cash"?"C":"B",
+    amount:amountValue===void 0||amountValue===null?"":String(amountValue).trim(),
+    amountFils:money.ok?money.fils:null,
+    amountAed:money.ok?money.aed:null,
+    bed:cleanText(row?.bed??row?.room??"",80),
+    tenant:cleanText(row?.tenant??row?.tenant_name??"",160)
+  };
+  return {ok:errors.length===0,rowId,normalized,errors,warnings};
+}
+__name(hscNormalizeOneRow,"hscNormalizeOneRow");
+function hscClassifyRows(rows){
+  const acceptedRows=[];
+  const rejectedRows=[];
+  const warnings=[];
+  const errors=[];
+  (Array.isArray(rows)?rows:[]).forEach((row,index)=>{
+    const item=hscNormalizeOneRow(row,index);
+    warnings.push(...item.warnings);
+    if(item.ok)acceptedRows.push(item.normalized);
+    else{
+      errors.push(...item.errors);
+      rejectedRows.push({rowId:item.rowId,errors:item.errors,warnings:item.warnings});
+    }
+  });
+  return {acceptedRows,rejectedRows,warnings,errors};
+}
+__name(hscClassifyRows,"hscClassifyRows");
+function hscCreateTotals(rows){
+  const totals={
+    cashTotalFils:0n,cashOutflowFils:0n,cashHandoverFils:0n,bankTransferTotalFils:0n,bankTransferOutFils:0n,
+    bankTransferCount:0,grossReceivedFils:0n,rentReceivedFils:0n,depositReceivedFils:0n,arrearsPaidFils:0n,
+    transferFeeFils:0n,refundFils:0n,expenseFils:0n,sessionTotalFils:0n,handoverTotalFils:0n,
+    rowCount:rows.length,includedRowCount:0,excludedVoidedRowCount:0,warnings:[],errors:[]
+  };
+  for(const row of rows){
+    const amount=BigInt(row.amountFils||0n);
+    totals.includedRowCount+=1;
+    if(row.category==="rent")totals.rentReceivedFils+=amount;
+    if(row.category==="deposit_in")totals.depositReceivedFils+=amount;
+    if(row.category==="arrears")totals.arrearsPaidFils+=amount;
+    if(row.category==="transfer_fee")totals.transferFeeFils+=amount;
+    if(row.category==="deposit_refund")totals.refundFils+=amount;
+    if(row.category==="expense")totals.expenseFils+=amount;
+    if(HSC_INCOME_CATEGORIES.has(row.category)){
+      totals.grossReceivedFils+=amount;
+      totals.sessionTotalFils+=amount;
+      totals.handoverTotalFils+=amount;
+      if(row.payment_method==="cash")totals.cashTotalFils+=amount;
+      if(row.payment_method==="bank"){
+        totals.bankTransferTotalFils+=amount;
+        if(amount>0n)totals.bankTransferCount+=1;
+      }
+    }else if(HSC_OUTFLOW_CATEGORIES.has(row.category)){
+      totals.sessionTotalFils-=amount;
+      totals.handoverTotalFils-=amount;
+      if(row.payment_method==="cash")totals.cashOutflowFils+=amount;
+      if(row.payment_method==="bank")totals.bankTransferOutFils+=amount;
+    }
+  }
+  totals.cashHandoverFils=totals.cashTotalFils-totals.cashOutflowFils;
+  return totals;
+}
+__name(hscCreateTotals,"hscCreateTotals");
+function hscFormatTotals(totals){
+  return {
+    cashHandoverFils:hscFilsToSafeInteger(totals.cashHandoverFils,"cashHandoverFils"),
+    cashHandoverAed:hscFilsToAedString(totals.cashHandoverFils),
+    bankTransferTotalFils:hscFilsToSafeInteger(totals.bankTransferTotalFils,"bankTransferTotalFils"),
+    bankTransferTotalAed:hscFilsToAedString(totals.bankTransferTotalFils),
+    grossReceivedFils:hscFilsToSafeInteger(totals.grossReceivedFils,"grossReceivedFils"),
+    grossReceivedAed:hscFilsToAedString(totals.grossReceivedFils),
+    sessionTotalFils:hscFilsToSafeInteger(totals.sessionTotalFils,"sessionTotalFils"),
+    sessionTotalAed:hscFilsToAedString(totals.sessionTotalFils),
+    rentReceivedFils:hscFilsToSafeInteger(totals.rentReceivedFils,"rentReceivedFils"),
+    rentReceivedAed:hscFilsToAedString(totals.rentReceivedFils),
+    depositReceivedFils:hscFilsToSafeInteger(totals.depositReceivedFils,"depositReceivedFils"),
+    depositReceivedAed:hscFilsToAedString(totals.depositReceivedFils),
+    arrearsPaidFils:hscFilsToSafeInteger(totals.arrearsPaidFils,"arrearsPaidFils"),
+    arrearsPaidAed:hscFilsToAedString(totals.arrearsPaidFils),
+    bankTransferCount:totals.bankTransferCount,
+    rowCount:totals.rowCount,
+    includedRowCount:totals.includedRowCount,
+    warnings:totals.warnings,
+    errors:totals.errors
+  };
+}
+__name(hscFormatTotals,"hscFormatTotals");
+function hscFrontendMoney(frontendTotals,keys,field,allowNegative=false){
+  const value=keys.map((key)=>frontendTotals?.[key]).find((item)=>item!==void 0);
+  if(value===void 0)return null;
+  return hscParseAedToFils(value,{field,allowNegative});
+}
+__name(hscFrontendMoney,"hscFrontendMoney");
+function hscCompareFrontendTotals(frontendTotals,backendTotals){
+  const comparisons=[];
+  const warnings=[];
+  const errors=[];
+  const items=[
+    {field:"cash_handover",keys:["cash_handover","cashHandover","cashHandoverAed"],backendKey:"cashHandoverFils",allowNegative:true},
+    {field:"bank_transfer_total",keys:["bank_transfer_total","bankTransferTotal","bankTransferAed"],backendKey:"bankTransferTotalFils"},
+    {field:"gross_received",keys:["gross_received","grossReceived","grossReceivedAed"],backendKey:"grossReceivedFils"},
+    {field:"session_total",keys:["session_total","sessionTotal","handover_total","handoverTotal"],backendKey:"sessionTotalFils"}
+  ];
+  for(const item of items){
+    const parsed=hscFrontendMoney(frontendTotals,item.keys,item.field,item.allowNegative);
+    if(!parsed)continue;
+    warnings.push(...parsed.warnings);
+    errors.push(...parsed.errors);
+    if(!parsed.ok){
+      comparisons.push({field:item.field,matches:false,error:true});
+      continue;
+    }
+    const backendFils=BigInt(backendTotals[item.backendKey]||0n);
+    const deltaFils=parsed.fils-backendFils;
+    comparisons.push({field:item.field,submittedFils:hscFilsToSafeInteger(parsed.fils,item.field),backendFils:hscFilsToSafeInteger(backendFils,item.field),deltaFils:hscFilsToSafeInteger(deltaFils,item.field),submittedAed:hscFilsToAedString(parsed.fils),backendAed:hscFilsToAedString(backendFils),deltaAed:hscFilsToAedString(deltaFils),matches:deltaFils===0n});
+  }
+  const countValue=frontendTotals?.bank_transfer_count??frontendTotals?.bankTransferCount;
+  if(countValue!==void 0){
+    const submittedCount=Number(countValue);
+    const backendCount=Number(backendTotals.bankTransferCount||0);
+    comparisons.push({field:"bank_transfer_count",submittedCount,backendCount,deltaCount:submittedCount-backendCount,matches:submittedCount===backendCount});
+  }
+  return {matches:comparisons.every((item)=>item.matches)&&errors.length===0,comparisons,warnings,errors};
+}
+__name(hscCompareFrontendTotals,"hscCompareFrontendTotals");
+function hscStableValue(value){
+  if(typeof value==="bigint")return `${value.toString()}n`;
+  if(Array.isArray(value))return value.map((item)=>hscStableValue(item));
+  if(value&&typeof value==="object"){
+    return Object.fromEntries(Object.keys(value).sort().map((key)=>[key,hscStableValue(value[key])]));
+  }
+  return value;
+}
+__name(hscStableValue,"hscStableValue");
+async function hscSha256(value){
+  const bytes=new TextEncoder().encode(value);
+  const hash=await crypto.subtle.digest("SHA-256",bytes);
+  return Array.from(new Uint8Array(hash)).map((b)=>b.toString(16).padStart(2,"0")).join("");
+}
+__name(hscSha256,"hscSha256");
+async function hscFingerprint(requestBody){
+  const rows=Array.isArray(requestBody?.rows)?requestBody.rows:[];
+  const payload={
+    sessionId:requestBody.session_id??requestBody.sessionId??"",
+    employeeId:requestBody.employee_id??requestBody.employeeId??"",
+    propertyId:requestBody.property_id??requestBody.propertyId??"",
+    rows:rows.map((row)=>({
+      client_entry_id:hscInputValue(row,["client_entry_id","clientEntryId","id"]),
+      event_type:hscInputValue(row,["event_type","eventType","type","category"]),
+      payment_method:hscInputValue(row,["payment_method","paymentMethod","pay_type","pay","cat"]),
+      amount:hscInputValue(row,["amount","paid","amount_aed","amountAed"]),
+      bed:row?.bed??row?.room??"",
+      tenant:row?.tenant??row?.tenant_name??"",
+      voided_at:row?.voided_at??row?.session_voided_at??row?.transaction_voided_at??"",
+      status:row?.status??row?.session_status??row?.transaction_status??""
+    }))
+  };
+  return hscSha256(JSON.stringify(hscStableValue(payload)));
+}
+__name(hscFingerprint,"hscFingerprint");
+function hscMaxDeltaFils(comparison){
+  return Math.max(0,...(comparison.comparisons||[]).map((item)=>Math.abs(Number(item.deltaFils||item.deltaCount||0))));
+}
+__name(hscMaxDeltaFils,"hscMaxDeltaFils");
+function hscHasError(errors,code){
+  return (errors||[]).some((item)=>item.code===code);
+}
+__name(hscHasError,"hscHasError");
+async function hscWriteAttemptAudit(env,user,{commitId="",propertyId="",sessionId="",employeeId="",status="",payload={}}){
+  await audit(env,user,`handover.staging.${status.toLowerCase()}`,"handover_commits",{commit_id:commitId,property_id:propertyId,session_id:sessionId,employee_id:employeeId,...payload}).catch(()=>{});
+  await env.DB.prepare(`INSERT INTO handover_audit_events
+    (event_id, commit_id, company_id, property_id, employee_id, session_id, event_type, event_status, event_payload_json, created_at, created_by)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    .bind(crypto.randomUUID(),commitId,user.corpid||"",propertyId,employeeId,sessionId,"handover_commit_attempt",status,JSON.stringify(payload||{}),empNow(),user.userid||"").run().catch(()=>{});
+}
+__name(hscWriteAttemptAudit,"hscWriteAttemptAudit");
+async function handleHandoverStagingCommit(request,env){
+  const gate=hscEnvGate(env);
+  if(!gate.ok)return hscError(gate.code,gate.message,gate.status);
+  if(request.method!=="POST")return hscError("METHOD_NOT_ALLOWED","Method not allowed.",405);
+  const auth=await requireAuth(request,env);
+  if(auth.error)return unauthorized();
+  const user=auth.payload;
+  if(!HSC_EMPLOYEE_ROLES.has(String(user.role||"").toLowerCase()))return hscError("FORBIDDEN","Only employee/staff may submit staging handover commits.",403);
+  let body;
+  try{body=await request.json();}catch{return badRequest("invalid_json");}
+  if(!body||typeof body!=="object"||Array.isArray(body))return hscError("INVALID_REQUEST","Request body must be an object.",400);
+  const errors=[];
+  const sessionId=hscRequiredText(body.session_id??body.sessionId,"session_id",errors,120);
+  const idempotencyKey=hscRequiredText(body.idempotency_key??body.idempotencyKey,"idempotency_key",errors,180);
+  const bodyEmployeeId=hscRequiredText(body.employee_id??body.employeeId,"employee_id",errors,120).toLowerCase();
+  const propertyId=hscRequiredText(body.property_id??body.propertyId,"property_id",errors,120);
+  const submittedAt=hscRequiredText(body.submitted_at??body.submittedAt,"submitted_at",errors,80);
+  const rows=Array.isArray(body.rows)?body.rows:[];
+  if(!Array.isArray(body.rows)||!rows.length)errors.push(hscIssue("MISSING_ROWS","Handover rows are required.",{field:"rows"}));
+  if(rows.length>500)errors.push(hscIssue("TOO_MANY_ROWS","Handover rows exceed limit 500.",{field:"rows",value:rows.length}));
+  if(bodyEmployeeId&&bodyEmployeeId!==String(user.userid||"").toLowerCase())errors.push(hscIssue("EMPLOYEE_CONTEXT_MISMATCH","Authenticated employee does not match request employee.",{field:"employee_id",value:bodyEmployeeId}));
+  if(!idempotencyKey)return hscError("MISSING_IDEMPOTENCY_KEY","idempotency_key is required.",400,{errors});
+  const fingerprint=await hscFingerprint(body);
+  const existingKey=await env.DB.prepare("SELECT * FROM handover_idempotency_keys WHERE company_id=? AND property_id=? AND idempotency_key=? LIMIT 1")
+    .bind(user.corpid||"",propertyId,idempotencyKey).first().catch(()=>null);
+  if(existingKey){
+    if(existingKey.request_fingerprint===fingerprint){
+      const commit=await env.DB.prepare("SELECT * FROM handover_commits WHERE commit_id=? LIMIT 1").bind(existingKey.commit_id||"").first().catch(()=>null);
+      return json({success:true,status:"IDEMPOTENT_REPLAY",commit_id:existingKey.commit_id,idempotency_status:"IDEMPOTENT_REPLAY",backend_totals:commit?{cashHandoverFils:commit.backend_cash_handover_fils,bankTransferTotalFils:commit.backend_bank_transfer_fils,grossReceivedFils:commit.backend_gross_received_fils,sessionTotalFils:commit.backend_session_total_fils}:null});
+    }
+    return hscError("IDEMPOTENCY_CONFLICT","Same idempotency key was used with a different payload.",409);
+  }
+  const duplicateFingerprint=await env.DB.prepare("SELECT * FROM handover_idempotency_keys WHERE company_id=? AND property_id=? AND request_fingerprint=? LIMIT 1")
+    .bind(user.corpid||"",propertyId,fingerprint).first().catch(()=>null);
+  if(duplicateFingerprint)return hscError("DUPLICATE_HANDOVER_RISK","Same handover rows were submitted with a different idempotency key.",409,{existing_commit_id:duplicateFingerprint.commit_id||""});
+  const duplicateSession=await env.DB.prepare("SELECT * FROM handover_commits WHERE company_id=? AND property_id=? AND session_id=? AND status='ACCEPTED' LIMIT 1")
+    .bind(user.corpid||"",propertyId,sessionId).first().catch(()=>null);
+  if(duplicateSession)return hscError("DUPLICATE_HANDOVER_RISK","Session already has an accepted staging handover commit.",409,{existing_commit_id:duplicateSession.commit_id||""});
+  const classified=hscClassifyRows(rows);
+  errors.push(...classified.errors);
+  const totals=hscCreateTotals(classified.acceptedRows);
+  errors.push(...totals.errors);
+  const frontendTotals=body.frontend_totals??body.frontendTotals??body.client_totals??{};
+  const comparison=hscCompareFrontendTotals(frontendTotals,totals);
+  errors.push(...comparison.errors);
+  let status="ACCEPTED";
+  if(hscHasError(errors,"EMPLOYEE_CONTEXT_MISMATCH"))status="UNAUTHORIZED";
+  else if(hscHasError(errors,"VOIDED_ROW_REJECTED"))status="VOIDED_REJECTED";
+  else if(hscHasError(errors,"INVALID_AMOUNT")||hscHasError(errors,"MISSING_AMOUNT")||hscHasError(errors,"INVALID_NUMBER_AMOUNT"))status="INVALID_AMOUNT";
+  else if(errors.length)status="REJECTED";
+  else if(!comparison.matches)status="FRONTEND_TOTALS_MISMATCH";
+  if(status==="UNAUTHORIZED")return hscError("UNAUTHORIZED_EMPLOYEE_SCOPE","Employee is outside allowed handover scope.",403,{errors});
+  if(status==="VOIDED_REJECTED"||status==="INVALID_AMOUNT"||status==="FRONTEND_TOTALS_MISMATCH"||status==="REJECTED"){
+    await hscWriteAttemptAudit(env,user,{propertyId,sessionId,employeeId:bodyEmployeeId,status,payload:{errors,comparison}});
+    const code=status==="FRONTEND_TOTALS_MISMATCH"?"FRONTEND_TOTALS_MISMATCH":status;
+    return hscError(code,"Staging handover commit rejected.",422,{errors,rejected_rows:classified.rejectedRows,frontend_total_comparison:comparison,backend_totals:hscFormatTotals(totals)});
+  }
+  const now=empNow();
+  const commitId=empId("hsc");
+  const backend=hscFormatTotals(totals);
+  const frontendParsed={
+    cash:hscFrontendMoney(frontendTotals,["cash_handover","cashHandover","cashHandoverAed"],"cash_handover",true),
+    bank:hscFrontendMoney(frontendTotals,["bank_transfer_total","bankTransferTotal","bankTransferAed"],"bank_transfer_total"),
+    gross:hscFrontendMoney(frontendTotals,["gross_received","grossReceived","grossReceivedAed"],"gross_received"),
+    session:hscFrontendMoney(frontendTotals,["session_total","sessionTotal","handover_total","handoverTotal"],"session_total")
+  };
+  const statements=[
+    env.DB.prepare(`INSERT INTO handover_commits (
+      commit_id, company_id, property_id, employee_id, session_id, idempotency_key, request_fingerprint,
+      status, submitted_at, accepted_at, committed_at,
+      backend_cash_handover_fils, backend_bank_transfer_fils, backend_gross_received_fils, backend_session_total_fils,
+      backend_deposit_fils, backend_rent_fils, backend_arrears_paid_fils,
+      frontend_cash_handover_fils, frontend_bank_transfer_fils, frontend_gross_received_fils, frontend_session_total_fils,
+      frontend_bank_transfer_count, delta_max_fils, delta_json, bank_transfer_count, accepted_row_count, rejected_row_count,
+      decision_reason, audit_payload_json, created_at, created_by, updated_at, updated_by
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .bind(commitId,user.corpid||"",propertyId,bodyEmployeeId,sessionId,idempotencyKey,fingerprint,"ACCEPTED",submittedAt,now,now,
+        backend.cashHandoverFils,backend.bankTransferTotalFils,backend.grossReceivedFils,backend.sessionTotalFils,
+        backend.depositReceivedFils,backend.rentReceivedFils,backend.arrearsPaidFils,
+        frontendParsed.cash?.ok?hscFilsToSafeInteger(frontendParsed.cash.fils,"frontend_cash_handover_fils"):null,
+        frontendParsed.bank?.ok?hscFilsToSafeInteger(frontendParsed.bank.fils,"frontend_bank_transfer_fils"):null,
+        frontendParsed.gross?.ok?hscFilsToSafeInteger(frontendParsed.gross.fils,"frontend_gross_received_fils"):null,
+        frontendParsed.session?.ok?hscFilsToSafeInteger(frontendParsed.session.fils,"frontend_session_total_fils"):null,
+        Number(frontendTotals.bank_transfer_count??frontendTotals.bankTransferCount??0),
+        hscMaxDeltaFils(comparison),JSON.stringify(comparison.comparisons||[]),backend.bankTransferCount,classified.acceptedRows.length,classified.rejectedRows.length,
+        "accepted_by_staging_backend_recompute",JSON.stringify({warnings:[...classified.warnings,...comparison.warnings]}),now,user.userid||"",now,user.userid||""),
+    env.DB.prepare(`INSERT INTO handover_idempotency_keys
+      (key_id, company_id, property_id, employee_id, idempotency_key, request_fingerprint, commit_id, status, first_seen_at, last_seen_at, response_digest)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .bind(empId("idem"),user.corpid||"",propertyId,bodyEmployeeId,idempotencyKey,fingerprint,commitId,"ACCEPTED",now,now,await hscSha256(`${commitId}:${fingerprint}`)),
+    env.DB.prepare(`INSERT INTO handover_audit_events
+      (event_id, commit_id, company_id, property_id, employee_id, session_id, event_type, event_status, event_payload_json, created_at, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .bind(empId("hae"),commitId,user.corpid||"",propertyId,bodyEmployeeId,sessionId,"handover_commit_accepted","ACCEPTED",JSON.stringify({backend_totals:backend}),now,user.userid||""),
+    env.DB.prepare(`INSERT INTO entry_events
+      (event_id, corpid, userid, ref_id, ref_type, event_type, field_name, old_value, new_value, operator_id, ts)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .bind(empId("evt"),user.corpid||"",user.userid||"",commitId,"handover_commit","handover_commit_accepted","*", "", JSON.stringify({session_id:sessionId,backend_totals:backend}), user.userid||"", now)
+  ];
+  classified.acceptedRows.forEach((row,index)=>{
+    statements.push(env.DB.prepare(`INSERT INTO handover_commit_rows
+      (row_id, commit_id, company_id, property_id, session_id, client_entry_id, row_index, row_status, event_type, payment_method, bed, tenant_label, amount_fils, normalized_payload_json, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .bind(empId("hrow"),commitId,user.corpid||"",propertyId,sessionId,row.client_entry_id,index,"ACCEPTED",row.category,row.payment_method,row.bed,row.tenant,hscFilsToSafeInteger(row.amountFils,"row_amount_fils"),JSON.stringify({...row,amountFils:void 0}),now));
+  });
+  await env.DB.batch(statements);
+  await audit(env,user,"handover.staging.accepted",commitId,{property_id:propertyId,session_id:sessionId,accepted_rows:classified.acceptedRows.length}).catch(()=>{});
+  return json({success:true,status:"ACCEPTED",commit_id:commitId,idempotency_status:"NEW",accepted_rows:classified.acceptedRows.length,rejected_rows:classified.rejectedRows,backend_totals:backend,frontend_total_comparison:comparison,audit_events:["handover_commit_attempt","handover_commit_accepted"]},201);
+}
+__name(handleHandoverStagingCommit,"handleHandoverStagingCommit");
 // EMPLOYEE_API_PATCH_END
 
 async function handleRequest(request, env, ctx) {
@@ -1930,6 +2345,9 @@ async function handleRequest(request, env, ctx) {
   }
   if (path === "/auth/logout" && method === "POST") {
     return handleLogout(request, env);
+  }
+  if (path === "/api/staging/handover/commit" && method === "POST") {
+    return handleHandoverStagingCommit(request, env);
   }
   if (path.startsWith("/api/")) {
     const auth = await requireAuth(request, env);
