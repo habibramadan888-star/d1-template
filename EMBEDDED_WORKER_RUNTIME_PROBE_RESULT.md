@@ -41,10 +41,10 @@ env.CORPID ("homelink")                                                    Envir
 
 ⎔ Starting local server...
 [wrangler:info] Ready on http://127.0.0.1:8803
+[wrangler:info] GET /api/me 401 Unauthorized (11ms)
 [wrangler:info] GET /api/me 401 Unauthorized (7ms)
-[wrangler:info] GET /api/me 401 Unauthorized (5ms)
-[wrangler:info] POST /api/staging/handover/commit 404 Not Found (4ms)
-[wrangler:info] POST /api/delete_session 401 Unauthorized (5ms)
+[wrangler:info] POST /api/staging/handover/commit 404 Not Found (6ms)
+[wrangler:info] POST /api/delete_session 401 Unauthorized (4ms)
 
 ```
 
@@ -66,8 +66,8 @@ env.CORPID ("homelink")                                                    Envir
 
 ⎔ Starting local server...
 [wrangler:info] Ready on http://127.0.0.1:8804
-[wrangler:info] GET /api/me 401 Unauthorized (209ms)
-[wrangler:info] POST /api/staging/handover/commit 403 Forbidden (6ms)
+[wrangler:info] GET /api/me 401 Unauthorized (8ms)
+[wrangler:info] POST /api/staging/handover/commit 403 Forbidden (5ms)
 
 ```
 
@@ -89,7 +89,7 @@ env.CORPID ("homelink")                                                    Envir
 
 ⎔ Starting local server...
 [wrangler:info] Ready on http://127.0.0.1:8805
-[wrangler:info] GET /api/me 401 Unauthorized (189ms)
+[wrangler:info] GET /api/me 401 Unauthorized (10ms)
 [wrangler:info] POST /api/staging/handover/commit 401 Unauthorized (5ms)
 
 ```

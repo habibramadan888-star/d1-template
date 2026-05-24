@@ -282,3 +282,38 @@ Remaining risk:
 - This is not a Cloudflare deployment.
 - This is not production approval.
 - Real staging/prod Worker, D1, KV, and secrets remain unconfirmed.
+
+## P0-001E Local/Staging Dual-Write Rehearsal Addendum
+
+Date: 2026-05-24, Asia/Dubai
+
+Current P0-001 status is now
+`Partial - local/staging minor-unit dual-write rehearsal passed`.
+
+Added evidence:
+
+- `P0_001E_LOCAL_STAGING_DUAL_WRITE_REHEARSAL_RESULT.md`
+- `scripts/rehearse-money-dual-write-local-staging.mjs`
+- `tests/money-dual-write-local-staging.spec.mjs`
+- `npm run test:money-dual-write-local-staging`
+- `npm run rehearse:money-dual-write-local-staging`
+
+Result:
+
+- The draft `*_fils` migration was applied only to an isolated local D1.
+- Six rehearsal rows were patched with integer-fils values.
+- Active reconciliation had 0 mismatches and 0 invalid rows.
+- Audit reconciliation includes the voided sample row, while active
+  reconciliation excludes it from accounting authority.
+
+Remaining risk:
+
+- Live Worker write paths still use legacy decimal/REAL fields.
+- Production schema was not migrated.
+- Owner dashboard and live handover flow were not switched to minor-unit
+  authority.
+
+Next step:
+
+- P0-001F may design live write-path switch gates after human review. Do not
+  execute production or remote D1 migration automatically.

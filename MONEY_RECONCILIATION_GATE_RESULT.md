@@ -1,6 +1,6 @@
 # Money Reconciliation Gate Result
 
-Generated: 2026-05-24T16:16:45.319Z, Asia/Dubai
+Generated: 2026-05-24T17:04:56.711Z, Asia/Dubai
 
 Scope: P0-001D local read-only reconciliation gate. This command reads local D1 schema/data and does not write database rows, execute remote D1, execute production migration, modify live financial formulas, or change dashboard/handover behavior.
 

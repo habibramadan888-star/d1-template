@@ -113,3 +113,14 @@ Date: 2026-05-24, Asia/Dubai
 | Full post-write verification chain   | yes    | Pass   | none          | `npm run check` through `npm run security:secrets` completed successfully                                           | Controlled artifact refresh did not break the existing local P0/P1 validation suite.                          |
 
 P1-006 artifact freshness is verified. This does not approve production deployment or staging deployment.
+
+## P0-001E Verification Addendum
+
+Date: 2026-05-24, Asia/Dubai
+
+| Command                                           | Exists | Result | Error Summary | Log Evidence                                                                                         | Commercial Meaning                                                                                                                            |
+| ------------------------------------------------- | ------ | ------ | ------------- | ---------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run test:money-dual-write-local-staging`     | yes    | Pass   | none          | `tests 4`, `pass 4`                                                                                  | Validates local/staging rehearsal SQL generation, safe integer patch fields, and active/voided row summary logic.                             |
+| `npm run rehearse:money-dual-write-local-staging` | yes    | Pass   | none          | `P0_001E_DUAL_WRITE_REHEARSAL=PASS`, `P0_001E_PATCHED_ROWS=6`, `P0_001E_RECONCILIATION_MISMATCHES=0` | Applies the draft `*_fils` migration only in isolated local D1, writes rehearsal minor-unit patches, and proves local/staging reconciliation. |
+
+P0-001 remains Partial. This verifies local/staging rehearsal only; it does not migrate production schema, switch live accounting reads/writes, or approve production backfill.

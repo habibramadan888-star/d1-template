@@ -214,3 +214,43 @@ Deploy gate:
 - Local/source Worker development remains GO.
 - Embedded artifact freshness is now verified.
 - Staging/prod deploy remains MANUAL_REQUIRED / NO-GO until actual Cloudflare environment, D1/KV resources, secrets, and deploy command are explicitly approved.
+
+## P0-001E Local/Staging Dual-Write Rehearsal Addendum
+
+Date: 2026-05-24, Asia/Dubai
+
+P0-001 current status:
+
+- Partial - local/staging minor-unit dual-write rehearsal passed.
+- Not Verified because live financial write paths, production schema, backfill,
+  dashboard readers, and live handover flow remain unchanged.
+
+Completed safely:
+
+- Added `scripts/rehearse-money-dual-write-local-staging.mjs`.
+- Added `tests/money-dual-write-local-staging.spec.mjs`.
+- Added `npm run test:money-dual-write-local-staging`.
+- Added `npm run rehearse:money-dual-write-local-staging`.
+- Generated `P0_001E_LOCAL_STAGING_DUAL_WRITE_REHEARSAL_RESULT.md`.
+
+Verification:
+
+- Local/staging rehearsal patched 6 isolated D1 rows.
+- Active reconciliation mismatches: 0.
+- Active invalid rows: 0.
+- Voided sample rows are audit-visible but excluded from active reconciliation.
+
+Still forbidden:
+
+- Production D1 migration.
+- Remote D1 migration.
+- Staging or production deploy.
+- Live dashboard switch.
+- Live employee handover switch.
+- Deleting legacy decimal/REAL fields.
+
+Next allowed step:
+
+- P0-001F live write-path switch gate design after human review, or continue
+  with P0-008/P0-006 design work. Do not execute production migration
+  automatically.

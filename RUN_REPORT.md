@@ -2724,3 +2724,40 @@ Commercial meaning:
 
 - Embedded artifact is now fresh for checked critical route/guard behavior.
 - Production deploy remains forbidden until a separate deploy approval and environment-specific smoke run.
+
+## P0-001E Local/Staging Money Dual-Write Rehearsal
+
+Date: 2026-05-24, Asia/Dubai
+
+Scope:
+
+- Added a disposable local/staging-only dual-write rehearsal for the draft
+  `*_fils` columns.
+- Applied `migration-drafts/005_money_minor_units_dual_write_draft.sql` only
+  inside an isolated temporary local D1 directory.
+- Wrote rehearsal `*_fils` values for sampled sessions, transactions,
+  deposit_ledger, arrears, and arrear_tasks rows.
+- Verified active reconciliation separately from audit reconciliation so
+  voided rows are not active accounting authority.
+- Did not execute production migration.
+- Did not execute remote D1 migration.
+- Did not deploy staging or production.
+- Did not modify live dashboard results, live handover flow, live financial
+  formulas, or live legacy write paths.
+
+Verification:
+
+```text
+npm run test:money-dual-write-local-staging
+PASS - 4 tests passed
+
+npm run rehearse:money-dual-write-local-staging
+PASS - patched 6 isolated local rows, voided rows 1, reconciliation mismatches 0, invalid rows 0
+```
+
+Commercial meaning:
+
+- P0-001E proves the minor-unit draft migration can be applied and reconciled
+  in a local/staging rehearsal.
+- P0-001 remains Partial because live write/read paths still use legacy
+  decimal/REAL fields and production migration remains forbidden.

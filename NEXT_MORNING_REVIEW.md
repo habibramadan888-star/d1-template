@@ -240,3 +240,35 @@ Next decision:
 
 - P0-001E local/staging dual-write rehearsal can proceed if no real deploy is required.
 - If the next step is real staging deployment, first confirm Cloudflare Worker/D1/KV/secrets and run a deploy-specific approval gate.
+
+## P0-001E Update
+
+Date: 2026-05-24, Asia/Dubai
+
+New evidence:
+
+- `P0_001E_LOCAL_STAGING_DUAL_WRITE_REHEARSAL_RESULT.md`
+- `scripts/rehearse-money-dual-write-local-staging.mjs`
+- `tests/money-dual-write-local-staging.spec.mjs`
+
+Verification:
+
+- `npm run test:money-dual-write-local-staging` passed.
+- `npm run rehearse:money-dual-write-local-staging` passed.
+- The rehearsal applied the draft `*_fils` migration only in an isolated local
+  D1 directory.
+- Six local rehearsal rows were patched.
+- Active reconciliation mismatches: 0.
+- Active invalid rows: 0.
+
+Meaning:
+
+- P0-001 can move from migration review to local/staging rehearsal evidence.
+- P0-001 is still not Verified.
+- Production migration, live dashboard switch, and live handover switch remain
+  forbidden without a later explicit approval gate.
+
+Next decision:
+
+- Review whether to design P0-001F live write-path switch gates or move to
+  P0-008/P0-006 next.

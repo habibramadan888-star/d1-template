@@ -79,3 +79,31 @@ P0-001D added review and reconciliation gates without changing live accounting b
 - `scripts/triage-money-audit.mjs` writes the triage and top-risk reports.
 
 P0-001 remains Partial. P0-001D does not execute migration, backfill data, change live write paths, change dashboard readers, or make `*_fils` production authority.
+
+## P0-001E Local/Staging Rehearsal Update
+
+Date: 2026-05-24, Asia/Dubai
+
+P0-001E added a local/staging-only rehearsal that applies the draft `*_fils`
+migration inside an isolated temporary local D1 and writes rehearsal minor-unit
+values.
+
+Evidence:
+
+- `scripts/rehearse-money-dual-write-local-staging.mjs`
+- `tests/money-dual-write-local-staging.spec.mjs`
+- `P0_001E_LOCAL_STAGING_DUAL_WRITE_REHEARSAL_RESULT.md`
+- `npm run test:money-dual-write-local-staging`
+- `npm run rehearse:money-dual-write-local-staging`
+
+Result:
+
+- Draft companion columns can be applied and populated in a disposable
+  local/staging D1 rehearsal.
+- Active reconciliation excludes voided rows and returned 0 mismatches.
+- Audit reconciliation can still see the voided sample row.
+- Legacy decimal fields were retained.
+
+P0-001 remains Partial. P0-001E does not execute production migration, remote D1
+migration, production/staging deploy, live dashboard switch, live handover
+switch, or legacy-field deletion.
