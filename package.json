@@ -45,6 +45,7 @@
     "test:money": "node --test tests/money.spec.mjs",
     "test:money-shadow": "node --test tests/money-shadow.spec.mjs",
     "test:backend-totals-shadow": "node --test tests/backend-totals-shadow.spec.mjs",
+    "test:handover-atomic-design": "node --test tests/handover-atomic.design.spec.mjs",
     "test": "node --test tests/**/*.spec.mjs",
     "check": "npm run governance:check && npm run security:secrets && npm run format:check && npm run lint && npm run typecheck && npm run audit:api:check && npm run audit:db:check && npm run test && npm run build"
   },

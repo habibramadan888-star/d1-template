@@ -2115,3 +2115,36 @@ Full stage verification was run after this section was added and is recorded in 
 ### Status
 
 P0-003 remains `Partial - backend totals authority audited / shadow tests prepared`. The live Worker route may still accept frontend-provided handover totals; this task only adds shadow evidence and test guardrails.
+
+## P0-002A Employee Handover Atomic Commit Design
+
+Date: 2026-05-24
+
+### Files Added Or Updated
+
+- `HANDOVER_FLOW_AUDIT.md`: traces the current employee handover path and identifies entry-by-entry write risk.
+- `HANDOVER_ATOMIC_COMMIT_DESIGN.md`: defines the future `/api/employee/handover/commit` contract, idempotency behavior, backend recompute requirement, and audit requirements.
+- `HANDOVER_ATOMIC_TEST_PLAN.md`: lists required commercial tests before the live handover path can be migrated.
+- `modules/employees/handover-atomic-contract.mjs`: adds a non-invasive future request validator and deterministic idempotency key helper.
+- `tests/handover-atomic.design.spec.mjs`: validates future request schema and idempotency key behavior without calling a production endpoint.
+- `package.json`: added `test:handover-atomic-design`.
+- `COMMERCIALIZATION_BACKLOG.md`, `P0_P1_STATUS_REVIEW.md`, `VERIFICATION_STATUS.md`: updated P0-002A status as Partial.
+
+### Verification
+
+```text
+npm run test:handover-atomic-design passed
+```
+
+Full stage verification was run after this section was added and is recorded in the Night Shift V3 report.
+
+### Safety Scope
+
+- No production Worker deploy was executed.
+- No production or remote D1 migration was executed.
+- No database schema was changed.
+- No live employee handover route, dashboard formula, financial calculation result, delete-session void behavior, tenancy logic, or receivables model was changed.
+
+### Status
+
+P0-002 remains `Partial - audit and atomic design complete`. The current live employee handover path is still not migrated to an atomic backend commit endpoint; this stage only creates the future contract, test plan, and non-invasive guardrail tests.
