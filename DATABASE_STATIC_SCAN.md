@@ -16,6 +16,7 @@ This is a static scan artifact. It does not replace `DATABASE_AUDIT.md`, which c
 - `migration-drafts/002_commercial_bootstrap.sql`
 - `migration-drafts/003_delete_session_void_fields.sql`
 - `migration-drafts/004_receivables_model_draft.sql`
+- `migration-drafts/005_money_minor_units_dual_write_draft.sql`
 - `migration-drafts/handover_atomic_commit_draft.sql`
 
 ## Tables Detected

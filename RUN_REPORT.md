@@ -2567,3 +2567,53 @@ P0-002 status:
 
 - Partial - staging endpoint implemented with manual validation package ready.
 - Not Verified because live employee handover flow remains unchanged, production endpoint remains disabled, and real staging QA is not yet complete.
+
+## P0-001C Money Minor-Unit Dual-Write Preparation
+
+Date: 2026-05-24, Asia/Dubai
+
+Scope:
+
+- Added minor-unit dual-write preparation only.
+- Did not change live financial formulas.
+- Did not switch live employee handover flow.
+- Did not switch live dashboard or history readers.
+- Did not execute production or remote D1 migration.
+- Did not deploy production Worker.
+
+Files added:
+
+- `P0_001C_STARTING_CONTEXT.md`
+- `MONEY_DUAL_WRITE_PREPARATION_PLAN.md`
+- `MONEY_DUAL_WRITE_GO_LIVE_GATE.md`
+- `MONEY_DUAL_WRITE_REHEARSAL_RESULT.md`
+- `modules/finance/money-dual-write.mjs`
+- `tests/money-dual-write.spec.mjs`
+- `scripts/rehearse-money-dual-write.mjs`
+- `migration-drafts/005_money_minor_units_dual_write_draft.sql`
+
+Verification:
+
+```text
+npm run test:money-dual-write
+PASS - 7 tests passed
+
+npm run db:local:bootstrap
+PASS - local reset, migrations, and dev seed completed
+
+npm run rehearse:money-dual-write
+PASS - MONEY_DUAL_WRITE_REHEARSAL_RESULT.md generated
+```
+
+Rehearsal result:
+
+- 5 target tables inspected.
+- 24 future `*_fils` columns are still missing from the active local legacy schema, which is expected before an approved migration.
+- 5 synthetic scenarios were evaluated.
+- 4 scenarios produced deterministic draft patches.
+- 1 scenario intentionally failed because `100.999` must be rejected for AED authority.
+
+P0-001 status:
+
+- Partial - minor-unit dual-write preparation ready.
+- Not Verified because live write paths, production schema, reconciliation, and dashboard readers remain unchanged.

@@ -52,3 +52,16 @@ Scope: P0-001A planning only. No live schema migration, production D1 operation,
 ## Current Status
 
 P0-001 is Partial after P0-001A. The project now has better helper/test/audit guardrails, but live legacy money columns and JS Number calculations still exist.
+
+## P0-001C Preparation Update
+
+Date: 2026-05-24, Asia/Dubai
+
+P0-001C added preparation guardrails without changing live accounting behavior:
+
+- `modules/finance/money-dual-write.mjs` generates draft `*_fils` patches from legacy decimal values.
+- `tests/money-dual-write.spec.mjs` verifies safe patch generation, invalid input rejection, explicit negative handling, and mismatch reporting.
+- `scripts/rehearse-money-dual-write.mjs` inspects local schema and creates `MONEY_DUAL_WRITE_REHEARSAL_RESULT.md`.
+- `migration-drafts/005_money_minor_units_dual_write_draft.sql` documents nullable `*_fils` companion columns for human review.
+
+P0-001 remains Partial. No production migration, remote D1 operation, live write-path switch, dashboard reader switch, or automatic legacy correction has been performed.

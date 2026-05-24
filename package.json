@@ -45,6 +45,8 @@
     "test:delete-session": "node scripts/test-delete-session-void.mjs",
     "test:money": "node --test tests/money.spec.mjs",
     "test:money-shadow": "node --test tests/money-shadow.spec.mjs",
+    "test:money-dual-write": "node --test tests/money-dual-write.spec.mjs",
+    "rehearse:money-dual-write": "node scripts/rehearse-money-dual-write.mjs",
     "test:backend-totals-shadow": "node --test tests/backend-totals-shadow.spec.mjs",
     "test:backend-totals": "node --test tests/backend-totals-authority.spec.mjs",
     "rehearse:backend-totals": "node scripts/rehearse-backend-totals-authority.mjs",

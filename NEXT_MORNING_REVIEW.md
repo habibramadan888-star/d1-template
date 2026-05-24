@@ -88,7 +88,7 @@ Yes, but only on isolated P0 implementation tasks with one branch per task and f
 ## Tasks Codex Can Safely Do Next
 
 - P0-002D: validate the local/staging handover endpoint from an employee UI/manual workflow without switching production.
-- P0-001C: prepare minor-unit dual-write for new financial writes after accounting review.
+- P0-001C: preparation completed; next money step requires human review of migration draft and reconciliation scope before any live write-path switch.
 - P0-003C: add reviewed staging/live comparison for backend totals without replacing live dashboard output.
 - P0-006B: create cross-tenant local fixtures and tests without changing production tenant schema.
 - P1 runtime DDL cleanup planning and additional static gates.
@@ -117,6 +117,31 @@ Yes, but only on isolated P0 implementation tasks with one branch per task and f
 Recommended next prompt:
 
 ```text
-进入 TASK P0-002D：handover staging endpoint UI/manual validation。
-目标：不切换生产员工端主流程、不执行 production/remote D1 migration、不部署 production Worker，只用 local/staging feature flag 验证员工端或手工请求能完整提交一票 handover，核对 staging 表、audit/entry 证据、idempotency replay、frontend totals tamper rejection、voided row rejection，以及 live dashboard/history 不变化。P0-002 仍保持 Partial，不能标记 Verified。
+进入 TASK P0-001D-GATE：money minor-unit dual-write migration review and reconciliation gate。
+目标：不要执行 production/remote D1 migration，不切换 live 写入路径，不修改 dashboard live 结果。只 review `migration-drafts/005_money_minor_units_dual_write_draft.sql`、`MONEY_DUAL_WRITE_REHEARSAL_RESULT.md`、`MONEY_DUAL_WRITE_GO_LIVE_GATE.md`，冻结字段、回滚、reconciliation、staging 验证和人工会计确认要求。P0-001 仍保持 Partial，不能标记 Verified。
 ```
+
+## P0-001C Update
+
+Date: 2026-05-24, Asia/Dubai
+
+New evidence:
+
+- `modules/finance/money-dual-write.mjs`
+- `tests/money-dual-write.spec.mjs`
+- `scripts/rehearse-money-dual-write.mjs`
+- `migration-drafts/005_money_minor_units_dual_write_draft.sql`
+- `MONEY_DUAL_WRITE_PREPARATION_PLAN.md`
+- `MONEY_DUAL_WRITE_GO_LIVE_GATE.md`
+- `MONEY_DUAL_WRITE_REHEARSAL_RESULT.md`
+
+Verification:
+
+- `npm run test:money-dual-write` passed.
+- `npm run db:local:bootstrap` passed.
+- `npm run rehearse:money-dual-write` passed.
+
+Meaning:
+
+- P0-001 is still Partial, not Verified.
+- The system now has safe dual-write preparation guardrails, but live schema and live write/read paths are unchanged.

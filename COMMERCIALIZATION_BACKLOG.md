@@ -24,7 +24,7 @@ The project is not yet ready for commercial SaaS launch. Static checks, local Wo
 
 ### P0 Mitigation Progress
 
-- P0-001: Partial. P0-001A now documents the money field inventory, finance flow map, AED fils policy, helper design, and migration plan. `npm run test:money` passes and `npm run audit:money` currently reports 205 REAL/FLOAT risks, 473 JS Number/parseFloat risks, 435 frontend money calculation risks, and 154 backend money calculation risks after adding P0-002B rehearsal artifacts. P0-001B added read-only local D1 shadow reconciliation; `npm run reconcile:money` scans local legacy money columns without writing data. Legacy runtime still uses `REAL`/`Number`, so P0-001 is not Verified.
+- P0-001: Partial. P0-001A now documents the money field inventory, finance flow map, AED fils policy, helper design, and migration plan. `npm run test:money` passes and `npm run audit:money` currently reports 211 REAL/FLOAT risks, 480 JS Number/parseFloat risks, 435 frontend money calculation risks, and 161 backend money calculation risks after adding P0-001C preparation artifacts. P0-001B added read-only local D1 shadow reconciliation; `npm run reconcile:money` scans local legacy money columns without writing data. P0-001C added draft dual-write preparation, but legacy runtime still uses `REAL`/`Number`, so P0-001 is not Verified.
 - P0-002/P0-003: rent write plan and local D1 rehearsal now prove backend-owned handover recomputation and transaction idempotency storage are viable, but the live employee flow is still not switched. P0-002A added flow audit, future atomic design, idempotency contract tests, and a manual test plan. P0-002B added a non-invasive handover atomic module, 18 scenario fixtures, 24 rehearsal tests, a disposable local D1 rehearsal, source-of-truth/API/migration/go-live docs, and evidence for idempotent retry, duplicate warnings, frontend total tamper detection, voided-row rejection, unauthorized submitter rejection, and audit event planning. P0-002C-GATE added a human review packet and decision checklist. P0-002C implemented `POST /api/staging/handover/commit` as a local/staging-only feature-flagged endpoint with production 404, owner/admin 403, employee submit success, idempotency replay, duplicate-risk rejection, frontend-totals mismatch rejection, voided-row rejection, staging-table writes, audit/entry evidence, and no legacy `transactions`/`deposit_ledger`/`arrears` writes. P0-002D added manual QA guide, redacted PowerShell command generation, hardening audit, dashboard/history unchanged evidence, legacy-table unchanged evidence, and embedded Worker drift review. P0-003B added backend totals source-of-truth rules, non-invasive totals helper, 12 scenario fixtures, 16 authority tests, and a disposable local D1 rehearsal that produces MATCH/MISMATCH/LEGACY_WARNING discrepancy evidence.
 - P0-004: `/api/delete_session` now voids `sessions`, `transactions`, `deposit_ledger`, legacy `arrears`, and linked `arrear_tasks` instead of hard deleting them. Verification passed with unauthenticated denial, invalid JWT denial, employee 403, owner void success, idempotent second void, hidden active rows, visible audit rows, retained original rows, `audit_logs`, and `entry_events`.
 - P0-005: clean local D1 bootstrap now creates the minimum legacy-compatible tables, including `transactions`; `npm run verify:clean-d1` passes smoke, auth, owner core reads, and employee entry from an empty disposable D1. P0-005A fixed Windows cleanup stability by awaiting Worker shutdown and retrying local D1 cleanup; three consecutive `verify:clean-d1` runs passed without `EBUSY`.
@@ -34,6 +34,34 @@ The project is not yet ready for commercial SaaS launch. Static checks, local Wo
 Current closure rule:
 
 - These P0 items remain open until the Worker route, clean local bootstrap, authenticated smoke, and production migration plan all pass without bypassing auth or financial controls.
+
+## P0-001C Minor-Unit Dual-Write Preparation Addendum
+
+Date: 2026-05-24, Asia/Dubai
+
+P0-001 remains `Partial - minor-unit dual-write preparation ready`.
+
+Completed safely:
+
+- Added `modules/finance/money-dual-write.mjs` to generate draft `*_fils` patches without database writes.
+- Added `tests/money-dual-write.spec.mjs` and `npm run test:money-dual-write`.
+- Added `scripts/rehearse-money-dual-write.mjs` and `npm run rehearse:money-dual-write`.
+- Added draft-only migration `migration-drafts/005_money_minor_units_dual_write_draft.sql`.
+- Added `MONEY_DUAL_WRITE_PREPARATION_PLAN.md` and `MONEY_DUAL_WRITE_GO_LIVE_GATE.md`.
+
+Not completed:
+
+- No production schema migration.
+- No remote D1 migration.
+- No live write-path switch.
+- No dashboard/history reader switch.
+- No automatic legacy/fils correction.
+
+Verification:
+
+- `npm run test:money-dual-write` passed.
+- `npm run rehearse:money-dual-write` passed and generated `MONEY_DUAL_WRITE_REHEARSAL_RESULT.md`.
+- The rehearsal intentionally reports one invalid `100.999` scenario as failed because AED authority must reject three-decimal input.
 
 ## P1: Must Fix Before Commercial Release
 
