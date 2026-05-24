@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { mkdtemp } from "node:fs/promises";
+import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { after, test } from "node:test";
@@ -40,21 +41,34 @@ function cookieHeader(response) {
   return values.map((value) => value.split(";")[0]).join("; ");
 }
 
+function freePort() {
+  return new Promise((resolve, reject) => {
+    const server = createServer();
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      const address = server.address();
+      const port = typeof address === "object" && address ? address.port : 0;
+      server.close(() => resolve(port));
+    });
+  });
+}
+
 async function startIsolatedWorker({
-  port,
+  port = 0,
   vars,
   migrate = false,
   seed = false,
   label = "handover staging endpoint worker"
 }) {
+  const actualPort = port || (await freePort());
   const persistTo = await mkdtemp(path.join(tmpdir(), "homelink-handover-staging-"));
   if (migrate) await runLocalMigrations({ persistTo });
   if (seed) runLocalDevSeed({ persistTo });
-  const worker = startWorker({ port, persistTo, vars });
+  const worker = startWorker({ port: actualPort, persistTo, vars });
   worker.stdout.on("data", () => {});
   worker.stderr.on("data", () => {});
   workerRuns.push({ worker, persistTo, label });
-  const baseUrl = `http://127.0.0.1:${port}`;
+  const baseUrl = `http://127.0.0.1:${actualPort}`;
   await waitForWorker(baseUrl, 45000);
   return { baseUrl, persistTo, worker };
 }
@@ -145,7 +159,6 @@ function d1Results(command, persistTo) {
 
 test("production APP_ENV hides staging handover endpoint with 404", async () => {
   const { baseUrl } = await startIsolatedWorker({
-    port: 8891,
     vars: { APP_ENV: "production", ENABLE_HANDOVER_ATOMIC_STAGING: "true" },
     label: "production disabled handover worker"
   });
@@ -158,7 +171,6 @@ test("production APP_ENV hides staging handover endpoint with 404", async () => 
 
 test("missing or disabled feature flag rejects before auth", async () => {
   const missing = await startIsolatedWorker({
-    port: 8892,
     vars: { APP_ENV: "", ENABLE_HANDOVER_ATOMIC_STAGING: "true" },
     label: "missing APP_ENV handover worker"
   });
@@ -170,7 +182,6 @@ test("missing or disabled feature flag rejects before auth", async () => {
   assert.equal((await jsonBody(missingResponse)).code, "FEATURE_DISABLED");
 
   const disabled = await startIsolatedWorker({
-    port: 8893,
     vars: { APP_ENV: "test", ENABLE_HANDOVER_ATOMIC_STAGING: "false" },
     label: "feature disabled handover worker"
   });
@@ -185,7 +196,6 @@ test("missing or disabled feature flag rejects before auth", async () => {
 test("enabled staging handover endpoint enforces auth, roles, idempotency, totals, and staging writes", async () => {
   assert.ok(ownerPassword, "LOCAL_MANAGER_PASSWORD is required for owner rejection test");
   const { baseUrl, persistTo, worker } = await startIsolatedWorker({
-    port: 8894,
     vars: {
       APP_ENV: "test",
       ALLOW_DEV_SEED: "true",

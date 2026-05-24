@@ -380,3 +380,36 @@ Tomorrow priority:
    staging QA, or P0-008 receivables dependency work.
 2. Do not execute production or remote D1 migration.
 3. Do not switch live `/api/employee/entry` without explicit approval.
+
+## P0-001I Update
+
+Most important result:
+
+- A live-route cutover gate now exists for future `/api/employee/entry`
+  rehearsal.
+
+Evidence:
+
+- `P0_001I_EMPLOYEE_ENTRY_LIVE_ROUTE_CUTOVER_CONTEXT.md`
+- `P0_001I_LIVE_ROUTE_CUTOVER_DECISION_MATRIX.md`
+- `P0_001I_LIVE_ROUTE_CUTOVER_BLUEPRINT.md`
+- `EMPLOYEE_ENTRY_LIVE_ROUTE_CUTOVER_TEST_PLAN.md`
+- `P0_001I_GO_NO_GO_CHECKLIST.md`
+- `NEXT_PROMPT_P0_001J_EMPLOYEE_ENTRY_LIVE_ROUTE_SWITCH_REHEARSAL.md`
+- `npm run check` passed with 170 tests and Worker dry-run builds.
+- Test orchestration now avoids concurrent local Wrangler Worker startup in the
+  full test suite.
+
+Findings:
+
+- Next step must be local/staging-only.
+- Production behavior must remain unchanged.
+- Dashboard/history authority must remain unchanged.
+- Rollback by feature flag is required.
+- P0-001 remains Partial.
+
+Tomorrow priority:
+
+1. Human review of P0-001I GO/NO-GO.
+2. If approved, run P0-001J using the prepared prompt.
+3. Do not run production or remote D1 migration.

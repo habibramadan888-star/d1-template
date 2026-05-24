@@ -2887,3 +2887,46 @@ Commercial meaning:
   local/staging Worker route without mutating live financial tables.
 - P0-001 remains Partial because the live `/api/employee/entry` route, live
   dashboard/history readers, and production schema are still unchanged.
+
+## P0-001I Employee Entry Live Route Cutover Gate
+
+Date: 2026-05-24, Asia/Dubai
+
+Scope:
+
+- Added a review gate for future local/staging live-route switch rehearsal.
+- Did not modify Worker business logic.
+- Did not switch live `/api/employee/entry`.
+- Did not change dashboard/history output.
+- Did not execute production or remote D1 migration.
+- Did not deploy staging or production.
+
+Verification:
+
+```text
+npm run test:employee-entry-adapter-staging-endpoint
+PASS - 3 tests passed
+
+npm run rehearse:employee-entry-adapter-staging-endpoint
+PASS - endpoint rehearsal passed
+
+npm run check
+PASS - 170 tests passed; Worker dry-run builds completed
+
+npm run security:secrets
+PASS
+```
+
+Stability note:
+
+- Full `npm test` now runs with `--test-concurrency=1` because several endpoint
+  tests start local Wrangler Workers and Windows can otherwise race on ports or
+  Miniflare resources.
+- `tests/handover-staging-endpoint.spec.mjs` now uses dynamic free ports instead
+  of fixed `8891-8894` ports.
+
+Commercial meaning:
+
+- P0-001I defines the next safe cutover rehearsal boundary before any live route
+  change is attempted.
+- P0-001 remains Partial because this is a review gate only.

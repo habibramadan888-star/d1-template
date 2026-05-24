@@ -383,3 +383,37 @@ Next allowed step:
 - A separate human-reviewed live-route cutover or staging cutover gate. P0-001
   must remain Partial until live accounting authority and reconciliation are
   approved.
+
+## P0-001I Employee Entry Live Route Cutover Gate Addendum
+
+Date: 2026-05-24, Asia/Dubai
+
+P0-001 current status:
+
+- Partial - local/staging employee entry adapter route harness passed.
+- P0-001I is a gate only, not a live switch.
+
+Completed safely:
+
+- Added `P0_001I_EMPLOYEE_ENTRY_LIVE_ROUTE_CUTOVER_CONTEXT.md`.
+- Added `P0_001I_LIVE_ROUTE_CUTOVER_DECISION_MATRIX.md`.
+- Added `P0_001I_LIVE_ROUTE_CUTOVER_BLUEPRINT.md`.
+- Added `EMPLOYEE_ENTRY_LIVE_ROUTE_CUTOVER_TEST_PLAN.md`.
+- Added `P0_001I_GO_NO_GO_CHECKLIST.md`.
+- Added `NEXT_PROMPT_P0_001J_EMPLOYEE_ENTRY_LIVE_ROUTE_SWITCH_REHEARSAL.md`.
+- `npm run check` passed with 170 tests and Worker dry-run builds.
+- Test orchestration was stabilized only: full `npm test` is serialized and
+  handover staging endpoint tests use dynamic ports.
+
+Still forbidden:
+
+- Production D1 migration.
+- Remote D1 migration.
+- Staging or production deploy.
+- Live dashboard switch.
+- Live handover flow switch.
+- Live `/api/employee/entry` route switch without the next approved rehearsal.
+
+Next allowed step:
+
+- P0-001J local/staging live-route switch rehearsal after human approval.

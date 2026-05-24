@@ -1,6 +1,6 @@
 # Employee Entry Adapter Staging Endpoint Rehearsal Result
 
-Generated: 2026-05-24T19:16:56.347Z, Asia/Dubai
+Generated: 2026-05-24T19:20:13.658Z, Asia/Dubai
 
 Scope: local/staging-only endpoint rehearsal for `/api/staging/employee-entry/adapter-draft`. This did not execute production or remote D1 migration, did not deploy, did not switch `/api/employee/entry`, did not change dashboard output, and did not write legacy live financial tables.
 
@@ -18,7 +18,7 @@ Scope: local/staging-only endpoint rehearsal for `/api/staging/employee-entry/ad
 | Production deploy executed        | no                                                                           |
 | Live employee entry flow switched | no                                                                           |
 | Live dashboard changed            | no                                                                           |
-| Temporary persist path            | `C:\Users\CHINAL~1\AppData\Local\Temp\homelink-eea-staging-rehearsal-Z0HCip` |
+| Temporary persist path            | `C:\Users\CHINAL~1\AppData\Local\Temp\homelink-eea-staging-rehearsal-SoqxFm` |
 
 ## Live Table Mutation Evidence
 

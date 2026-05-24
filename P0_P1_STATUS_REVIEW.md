@@ -361,6 +361,45 @@ Next step:
   or another local/staging rehearsal. Do not execute production or remote D1
   migration automatically.
 
+## P0-001I Employee Entry Live Route Cutover Gate Addendum
+
+Date: 2026-05-24, Asia/Dubai
+
+Current P0-001 status remains
+`Partial - local/staging employee entry adapter route harness passed`.
+
+Added evidence:
+
+- `P0_001I_EMPLOYEE_ENTRY_LIVE_ROUTE_CUTOVER_CONTEXT.md`
+- `P0_001I_LIVE_ROUTE_CUTOVER_DECISION_MATRIX.md`
+- `P0_001I_LIVE_ROUTE_CUTOVER_BLUEPRINT.md`
+- `EMPLOYEE_ENTRY_LIVE_ROUTE_CUTOVER_TEST_PLAN.md`
+- `P0_001I_GO_NO_GO_CHECKLIST.md`
+- `NEXT_PROMPT_P0_001J_EMPLOYEE_ENTRY_LIVE_ROUTE_SWITCH_REHEARSAL.md`
+- `npm run check` passed with 170 tests and Worker dry-run builds.
+- Full test runner now serializes Worker-starting tests to avoid Windows
+  Wrangler/port concurrency flake; handover staging endpoint tests now use
+  dynamic ports.
+
+Result:
+
+- Future cutover must be local/staging-only.
+- Future cutover must use a separate feature flag.
+- Production behavior must remain unchanged until explicit approval.
+- Dashboard/history authority must remain unchanged unless separately approved.
+- Rollback by feature flag is required.
+
+Remaining risk:
+
+- Live `/api/employee/entry` still uses the legacy live path.
+- Production schema has not been migrated.
+- Live dashboard/history readers have not been switched to minor-unit authority.
+
+Next step:
+
+- Use `NEXT_PROMPT_P0_001J_EMPLOYEE_ENTRY_LIVE_ROUTE_SWITCH_REHEARSAL.md` only
+  after human approval. Do not execute production or remote D1 migration.
+
 ## P0-001E Local/Staging Dual-Write Rehearsal Addendum
 
 Date: 2026-05-24, Asia/Dubai

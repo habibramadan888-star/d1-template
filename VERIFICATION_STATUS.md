@@ -164,3 +164,16 @@ Date: 2026-05-24, Asia/Dubai
 | `npm run verify:clean-d1`                                  | yes    | Pass   | none          | Clean D1 reset/migrate/seed, smoke, auth, owner probe, employee entry probe, cleanup all PASS | Confirms clean local D1 remains bootstrappable after adding the staging route.                                                          |
 
 P0-001 remains Partial. P0-001H verifies local/staging route harness behavior only; it does not switch the live `/api/employee/entry` route, migrate production schema, or change dashboard/history accounting authority.
+
+## P0-001I Verification Addendum
+
+Date: 2026-05-24, Asia/Dubai
+
+| Command                                                    | Exists | Result | Error Summary | Log Evidence                                                     | Commercial Meaning                                                                                    |
+| ---------------------------------------------------------- | ------ | ------ | ------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `npm run test:employee-entry-adapter-staging-endpoint`     | yes    | Pass   | none          | `tests 3`, `pass 3`                                              | Confirms P0-001H route harness remains stable before documenting cutover gate.                        |
+| `npm run rehearse:employee-entry-adapter-staging-endpoint` | yes    | Pass   | none          | `P0_001H_EMPLOYEE_ENTRY_ADAPTER_STAGING_ENDPOINT_REHEARSAL=PASS` | Confirms local/staging adapter route evidence remains valid and no legacy live writes occur.          |
+| `npm run check`                                            | yes    | Pass   | none          | `tests 170`, `pass 170`; Worker dry-run builds completed         | Confirms P0-001I gate docs and Worker-test stability changes do not break the commercial safety gate. |
+| `npm run security:secrets`                                 | yes    | Pass   | none          | `Secret hygiene check passed.`                                   | Confirms the gate docs did not add tracked secrets.                                                   |
+
+P0-001 remains Partial. P0-001I is a review gate only; it does not change live route behavior or production accounting authority.
