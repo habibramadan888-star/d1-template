@@ -25,6 +25,35 @@ Status vocabulary:
 | P0-007 | Auth/smoke               | Local Worker + owner/employee auth smoke must be repeatable                          | P0 launch blocker | Verified | Yes        | `npm run smoke:with-worker` passed | `LOCAL_WORKER_SMOKE_DIAGNOSIS.md`; `npm run smoke:with-worker` passed Worker startup, pages, unauthenticated denial, invalid JWT denial, owner login, employee login, employee owner-API denial                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | Business-flow smoke for employee entry/export and owner dashboard remains outside P0-007A and is still blocked by P0-005 clean bootstrap                            | Use `npm run smoke:with-worker` as the preflight before P0-004/P0-005/P0-008 work                                                                                 |
 | P0-008 | Receivables              | Receivables model not fully closed for rent, arrears, tail payments, follow-up       | P0 launch blocker | Partial  | No         | Model design complete; not wired   | `RECEIVABLES_MODEL_DESIGN.md`, `RECEIVABLES_LIFECYCLE_TEST_PLAN.md`, `migration-drafts/004_receivables_model_draft.sql`, `modules/finance/receivables.mjs`, `tests/finance-receivables.spec.mjs`, `migration-drafts/002_commercial_bootstrap.sql`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | Live route and database do not yet guarantee receivable/payment/arrears consistency; draft SQL was not applied to local or production D1                            | P0-008B should build local-only schema/tests after human review; do not wire production until P0-001/P0-002/P0-003/P0-006 gates are ready                         |
 
+## P0-002C Review Gate Addendum
+
+Date: 2026-05-24, Asia/Dubai
+
+Current P0-002 status remains `Partial - handover atomic commit implementation rehearsal passed`.
+
+Added evidence:
+
+- `P0_002C_REVIEW_CONTEXT.md`
+- `P0_002C_DECISION_MATRIX.md`
+- `P0_002C_STAGING_IMPLEMENTATION_BLUEPRINT.md`
+- `HANDOVER_ATOMIC_API_CONTRACT_REVIEW.md`
+- `HANDOVER_ATOMIC_MIGRATION_REVIEW.md`
+- `P0_002C_GO_NO_GO_CHECKLIST.md`
+- `NEXT_PROMPT_P0_002C_STAGING_IMPLEMENTATION.md`
+
+Remaining risk:
+
+- No live or staging Worker endpoint was implemented.
+- No employee live handover flow was switched.
+- No production or remote D1 migration was executed.
+- No dashboard live result changed.
+- Human approval is still required for endpoint path, feature flag behavior, mismatch policy, migration draft, staging environment, rollback, tenant scope, and receivables dependency.
+
+Next step:
+
+- If the human reviewer approves GO, run the prompt in `NEXT_PROMPT_P0_002C_STAGING_IMPLEMENTATION.md`.
+- P0-002 must remain Partial until live production cutover is separately implemented, tested, approved, and reconciled.
+
 ## P1 Review
 
 | ID     | Area                            | Problem                                                        | 原状态 | 当前状态    | 是否已修复         | 是否已验证                                 | 证据                                                                                                                                                                                                                                  | 剩余风险                                                                                                          | 下一步                                                                                         |

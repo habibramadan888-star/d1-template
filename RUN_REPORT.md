@@ -2401,3 +2401,65 @@ P0-002 status:
 
 - Partial - handover atomic commit implementation rehearsal passed.
 - Not Verified because the live employee handover route has not been switched and draft SQL was not applied.
+
+## P0-002C Handover Atomic Staging Endpoint Review Gate
+
+Date: 2026-05-24, Asia/Dubai
+
+Scope:
+
+- Added review gate, decision matrix, staging implementation blueprint, API contract review, migration review, go/no-go checklist, and next prompt.
+- Did not implement a live or staging Worker endpoint.
+- Did not change the live employee handover flow.
+- Did not change live dashboard output or production financial formulas.
+- Did not execute production or remote D1 migration.
+- Did not deploy production Worker.
+
+Files added:
+
+- `P0_002C_REVIEW_CONTEXT.md`
+- `P0_002C_DECISION_MATRIX.md`
+- `P0_002C_STAGING_IMPLEMENTATION_BLUEPRINT.md`
+- `HANDOVER_ATOMIC_API_CONTRACT_REVIEW.md`
+- `HANDOVER_ATOMIC_MIGRATION_REVIEW.md`
+- `P0_002C_GO_NO_GO_CHECKLIST.md`
+- `NEXT_PROMPT_P0_002C_STAGING_IMPLEMENTATION.md`
+
+Verification:
+
+```text
+npm run check
+PASS - 144 tests passed, Worker dry-run build completed, no production deploy
+
+npm run smoke:with-worker
+PASS - local Worker, pages, unauthenticated denial, owner login, employee login, employee owner-API denial
+
+npm run verify:clean-d1
+PASS - disposable local D1 bootstrap, smoke, auth, owner core reads, employee entry, cleanup
+
+npm run test:delete-session
+PASS - void preserves rows and writes audit evidence
+
+npm run test:money
+PASS - 6 money helper tests passed
+
+npm run audit:money
+PASS - report generated; risk counts unchanged at 205 / 473 / 435 / 154
+
+npm run test:backend-totals
+PASS - 16 backend totals tests passed
+
+npm run rehearse:backend-totals
+PASS - disposable local D1 rehearsal generated BACKEND_TOTALS_AUTHORITY_REHEARSAL_RESULT.md
+
+npm run test:handover-atomic
+PASS - 24 handover atomic tests passed
+
+npm run rehearse:handover-atomic
+PASS - disposable local D1 rehearsal generated HANDOVER_ATOMIC_REHEARSAL_RESULT.md
+```
+
+P0-002 status:
+
+- Partial - handover atomic commit implementation rehearsal passed.
+- Not Verified because P0-002C is a human review gate only and the live employee handover route has not been switched.
