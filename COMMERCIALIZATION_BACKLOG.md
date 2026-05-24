@@ -501,3 +501,37 @@ Next allowed step:
 - Real staging QA can be prepared after human confirmation of staging env,
   entrypoint, D1 backup/rollback, and feature flag configuration. Production
   cutover remains blocked.
+
+## P0-001L Real Staging QA Preflight Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+P0-001 current status:
+
+- Partial - real staging QA package ready, manual staging inputs required.
+
+Completed safely:
+
+- Added `P0_001L_STAGING_ENVIRONMENT_PREFLIGHT.md`.
+- Added `STAGING_QA_MANUAL_REQUIRED.md`.
+- Added `EMPLOYEE_ENTRY_REAL_STAGING_QA_PLAN.md`.
+- Added `EMPLOYEE_ENTRY_REAL_STAGING_QA_COMMANDS.md`.
+- Added `P0_001L_PRODUCTION_CUTOVER_NO_GO_REVIEW.md`.
+- Added `scripts/qa-employee-entry-real-staging.mjs`.
+- Added `EMPLOYEE_ENTRY_REAL_STAGING_QA_DRY_RUN_RESULT.md`.
+- Added `npm run qa:employee-entry-staging`.
+
+Verification:
+
+- `npm run qa:employee-entry-staging` returned `MANUAL_REQUIRED` without
+  writing remote/staging/prod data.
+
+Still forbidden:
+
+- Production D1 migration.
+- Remote D1 migration.
+- Staging or production deploy by automation.
+- Real staging writes until staging URL, D1, backup, rollback, credentials, and
+  entrypoint are human-confirmed.
+- Production adapter cutover.
+- Marking P0-001 Verified.

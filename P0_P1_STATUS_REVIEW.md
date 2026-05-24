@@ -562,3 +562,41 @@ Next step:
 - Human may start real staging QA only after confirming the staging Worker
   entrypoint, staging D1 backup/rollback plan, and feature flag settings. Do not
   execute production deploy or migration automatically.
+
+## P0-001L Real Staging QA Preflight Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+P0-001 current status:
+
+- Partial - real staging QA package ready, manual staging inputs required.
+- Not Verified because real staging QA has not been executed and production
+  migration/cutover remains prohibited.
+
+Added evidence:
+
+- `P0_001L_STAGING_ENVIRONMENT_PREFLIGHT.md`
+- `STAGING_QA_MANUAL_REQUIRED.md`
+- `EMPLOYEE_ENTRY_REAL_STAGING_QA_PLAN.md`
+- `EMPLOYEE_ENTRY_REAL_STAGING_QA_COMMANDS.md`
+- `P0_001L_PRODUCTION_CUTOVER_NO_GO_REVIEW.md`
+- `EMPLOYEE_ENTRY_REAL_STAGING_QA_DRY_RUN_RESULT.md`
+- `scripts/qa-employee-entry-real-staging.mjs`
+- `npm run qa:employee-entry-staging`
+
+Result:
+
+- Staging Worker URL, staging D1 database, staging entrypoint, employee/owner
+  test accounts, backup confirmation, and rollback confirmation are missing
+  from committed non-secret configuration.
+- Dry-run QA command returns `MANUAL_REQUIRED` and performs no remote write.
+- Production cutover remains NO-GO.
+
+Remaining risk:
+
+- Real staging QA cannot execute until human supplies and approves staging
+  target, backup, rollback, credentials, and entrypoint.
+
+Next step:
+
+- Continue safe gates and planning. Do not deploy or migrate automatically.

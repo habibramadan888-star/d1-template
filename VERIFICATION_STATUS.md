@@ -204,3 +204,14 @@ Date: 2026-05-25, Asia/Dubai
 P0-001 remains Partial. P0-001K prepares real staging QA and production cutover
 readiness review only; it does not deploy, migrate, or approve production
 cutover.
+
+## P0-001L Verification Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+| Command                             | Exists | Result          | Error Summary | Log Evidence                                                                                                                                              | Commercial Meaning                                                                                                                                         |
+| ----------------------------------- | ------ | --------------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run qa:employee-entry-staging` | yes    | MANUAL_REQUIRED | none          | `EMPLOYEE_ENTRY_STAGING_QA=MANUAL_REQUIRED`; missing staging URL, D1, entrypoint, employee/owner accounts, backup confirmation, and rollback confirmation | Confirms the project has a safe dry-run staging QA gate and refuses to guess or write staging without human-approved staging inputs and rollback evidence. |
+
+P0-001 remains Partial. P0-001L prepares real staging QA only; it does not
+execute staging writes, production deployment, or migration.

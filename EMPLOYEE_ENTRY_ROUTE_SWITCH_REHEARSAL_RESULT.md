@@ -1,6 +1,6 @@
 # Employee Entry Route Switch Rehearsal Result
 
-Generated: 2026-05-24T22:03:53.662Z
+Generated: 2026-05-24T23:36:49.524Z
 
 Scope: P0-001J local/staging-only rehearsal for `POST /api/employee/entry`.
 
@@ -31,27 +31,27 @@ node --test tests/employee-entry-route-switch-rehearsal.spec.mjs
 PASS local migration migrations\local\001_clean_legacy_bootstrap.sql
 PASS local migration migrations\local\002_handover_atomic_staging.sql
 PASS local dev seed app_settings for local-dev-company
-✔ production APP_ENV keeps /api/employee/entry on legacy behavior even when adapter flag is true (10929.2567ms)
+✔ production APP_ENV keeps /api/employee/entry on legacy behavior even when adapter flag is true (8387.2506ms)
 PASS local migration migrations\local\001_clean_legacy_bootstrap.sql
 PASS local migration migrations\local\002_handover_atomic_staging.sql
 PASS local dev seed app_settings for local-dev-company
-✔ local flag off keeps legacy behavior and rollback path available (11186.1566ms)
+✔ local flag off keeps legacy behavior and rollback path available (8436.6756ms)
 PASS local migration migrations\local\001_clean_legacy_bootstrap.sql
 PASS local migration migrations\local\002_handover_atomic_staging.sql
 PASS local dev seed app_settings for local-dev-company
-✔ local flag on runs adapter pre-validation before continuing legacy write (11278.0955ms)
+✔ local flag on runs adapter pre-validation before continuing legacy write (8496.3536ms)
 PASS local migration migrations\local\001_clean_legacy_bootstrap.sql
 PASS local migration migrations\local\002_handover_atomic_staging.sql
 PASS local dev seed app_settings for local-dev-company
-✔ local flag on rejects owner submitter before adapter rehearsal write (11417.2784ms)
+✔ local flag on rejects owner submitter before adapter rehearsal write (8366.1573ms)
 PASS local migration migrations\local\001_clean_legacy_bootstrap.sql
 PASS local migration migrations\local\002_handover_atomic_staging.sql
 PASS local dev seed app_settings for local-dev-company
-✔ local flag on rejects invalid money before legacy write (11294.3776ms)
+✔ local flag on rejects invalid money before legacy write (8526.595ms)
 PASS local migration migrations\local\001_clean_legacy_bootstrap.sql
 PASS local migration migrations\local\002_handover_atomic_staging.sql
 PASS local dev seed app_settings for local-dev-company
-✔ local flag on skips voided rows before legacy write (11852.0275ms)
+✔ local flag on skips voided rows before legacy write (8542.6042ms)
 ℹ tests 6
 ℹ suites 0
 ℹ pass 6
@@ -59,6 +59,6 @@ PASS local dev seed app_settings for local-dev-company
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 79516.9568
+ℹ duration_ms 61820.7008
 
 ```

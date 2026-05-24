@@ -1,6 +1,6 @@
 # Top 25 Money Risks
 
-Generated: 2026-05-24T21:57:37.095Z, Asia/Dubai
+Generated: 2026-05-24T23:31:48.138Z, Asia/Dubai
 
 Scope: ranked human-review queue from `npm run triage:money`. These are not automatic fix targets.
 

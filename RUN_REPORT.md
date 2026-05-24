@@ -3010,3 +3010,39 @@ Notes:
 - Rollback by disabling `ENABLE_EMPLOYEE_ENTRY_ADAPTER_LIVE_ROUTE` passed.
 - Production behavior remains legacy.
 - P0-001 remains Partial and production cutover remains NO-GO.
+
+## P0-001L Real Staging QA Preflight
+
+Date: 2026-05-25, Asia/Dubai
+
+Scope:
+
+- Real staging QA preflight for employee entry adapter route switch.
+- No staging deploy.
+- No production deploy.
+- No production or remote D1 migration.
+- No remote write.
+- No secret committed.
+
+Changes:
+
+- Added real staging environment preflight report.
+- Added manual-required staging input report.
+- Added real staging QA plan and command guide.
+- Added production cutover NO-GO review.
+- Added `scripts/qa-employee-entry-real-staging.mjs`, a default dry-run script
+  that refuses production-looking URLs and requires explicit backup/rollback
+  confirmations before any future staging write.
+
+Verification:
+
+| Command                             | Result          |
+| ----------------------------------- | --------------- |
+| `npm run qa:employee-entry-staging` | MANUAL_REQUIRED |
+
+Notes:
+
+- Real staging Worker URL, D1 target, backup evidence, rollback evidence,
+  staging entrypoint, and staging test credentials are not present in committed
+  non-secret configuration.
+- P0-001 remains Partial. Production cutover remains NO-GO.

@@ -1,6 +1,6 @@
 # Employee Entry Legacy vs Adapter Comparison
 
-Generated: 2026-05-24T22:06:23.320Z
+Generated: 2026-05-24T23:38:40.992Z
 
 Scope: P0-001K local-only comparison. This command uses disposable local D1 Workers only. It does not execute production deploy, staging deploy, production D1 migration, remote D1 migration, production config changes, or secret writes.
 
