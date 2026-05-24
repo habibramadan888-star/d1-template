@@ -23,6 +23,7 @@
     "smoke:embedded-with-worker": "node scripts/smoke-embedded-with-worker.mjs",
     "audit:money": "node scripts/audit-money-fields.mjs",
     "triage:money": "node scripts/triage-money-audit.mjs",
+    "audit:money-live-writes": "node scripts/audit-money-live-write-paths.mjs",
     "gate:money-reconciliation": "node scripts/reconcile-money-dual-write-gate.mjs",
     "audit:backend-totals": "node scripts/audit-backend-totals.mjs",
     "audit:runtime-ddl": "node scripts/audit-runtime-ddl.mjs",

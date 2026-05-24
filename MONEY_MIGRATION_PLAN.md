@@ -107,3 +107,27 @@ Result:
 P0-001 remains Partial. P0-001E does not execute production migration, remote D1
 migration, production/staging deploy, live dashboard switch, live handover
 switch, or legacy-field deletion.
+
+## P0-001F Live Write Path Switch Gate Update
+
+Date: 2026-05-24, Asia/Dubai
+
+P0-001F added live write-path switch gate evidence without changing live
+accounting behavior:
+
+- `scripts/audit-money-live-write-paths.mjs` scans Worker financial SQL writes
+  and money parsing / rounding patterns.
+- `MONEY_LIVE_WRITE_PATH_AUDIT_RESULT.md` identifies 19 financial write
+  statements, including 10 P0 live decimal authority statements.
+- `MONEY_LIVE_WRITE_PATH_AUDIT.md` maps the affected live paths:
+  `/api/employee/entry`, `empDepositMove`, arrear reconciliation, arrear task
+  update, `/api/save_session`, rent config JSON, delete-session void, and the
+  staging handover endpoint.
+- `P0_001F_LIVE_WRITE_PATH_SWITCH_GATE.md` defines the gate for entering a
+  local/staging-only write-adapter rehearsal.
+- `MONEY_LIVE_WRITE_SWITCH_TEST_PLAN.md` defines required test coverage before
+  any live route switch.
+
+P0-001 remains Partial. P0-001F does not execute production migration, remote D1
+migration, staging/prod deploy, live dashboard switch, live handover switch, or
+legacy-field deletion.

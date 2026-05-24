@@ -254,3 +254,44 @@ Next allowed step:
 - P0-001F live write-path switch gate design after human review, or continue
   with P0-008/P0-006 design work. Do not execute production migration
   automatically.
+
+## P0-001F Live Write Path Switch Gate Addendum
+
+Date: 2026-05-24, Asia/Dubai
+
+P0-001 current status:
+
+- Partial - live write-path switch gate ready.
+- Not Verified because live write paths still use legacy decimal/REAL-compatible values.
+
+Completed safely:
+
+- Added `scripts/audit-money-live-write-paths.mjs`.
+- Added `npm run audit:money-live-writes`.
+- Generated `MONEY_LIVE_WRITE_PATH_AUDIT_RESULT.md`.
+- Added `MONEY_LIVE_WRITE_PATH_AUDIT.md`.
+- Added `P0_001F_LIVE_WRITE_PATH_SWITCH_GATE.md`.
+- Added `MONEY_LIVE_WRITE_SWITCH_TEST_PLAN.md`.
+- Added `NEXT_PROMPT_P0_001G_LOCAL_STAGING_LIVE_WRITE_ADAPTER_REHEARSAL.md`.
+
+Findings:
+
+- 19 financial SQL write statements scanned.
+- 10 P0 live decimal authority write statements remain.
+- 92 Worker money parsing / rounding patterns were identified.
+- Highest-priority next candidate is `/api/employee/entry` adapter rehearsal.
+
+Still forbidden:
+
+- Production D1 migration.
+- Remote D1 migration.
+- Staging or production deploy.
+- Live dashboard switch.
+- Live employee handover switch.
+- Deleting legacy decimal/REAL fields.
+- Treating frontend totals as authority.
+
+Next allowed step:
+
+- P0-001G local/staging live write adapter rehearsal. It must be non-invasive,
+  must not wire into live routes, and must keep P0-001 Partial.

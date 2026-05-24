@@ -377,3 +377,33 @@ Scope: static source scan for P0-001A. This report is non-blocking and does not 
 | Frontend | `deploy-worker/public/employee.html:121`       | money keyword        | `<section id="view-arrears" class="hidden">`                                                                                                                                                                           | Treat as display/input only; backend must parse and recompute authoritative integer fils. |
 
 Report truncated to 350 of 3291 findings. Use `npm run audit:money` to regenerate counts.
+
+## P0-001F Live Write Path Audit Addendum
+
+Generated: 2026-05-24, Asia/Dubai
+
+Additional targeted command:
+
+```text
+npm run audit:money-live-writes
+```
+
+Result:
+
+| Metric                                     | Count |
+| ------------------------------------------ | ----: |
+| Financial SQL write statements scanned     |    19 |
+| P0 live decimal authority write statements |    10 |
+| Money parsing / rounding patterns scanned  |    92 |
+
+Output:
+
+- `MONEY_LIVE_WRITE_PATH_AUDIT_RESULT.md`
+
+Interpretation:
+
+- This targeted audit narrows the broader `audit:money` result to live Worker
+  financial write authority paths.
+- It does not change runtime behavior.
+- P0-001 remains Partial until these live paths are adapted, rehearsed,
+  reconciled, and approved for production cutover.

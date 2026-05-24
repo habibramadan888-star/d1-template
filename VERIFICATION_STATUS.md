@@ -124,3 +124,16 @@ Date: 2026-05-24, Asia/Dubai
 | `npm run rehearse:money-dual-write-local-staging` | yes    | Pass   | none          | `P0_001E_DUAL_WRITE_REHEARSAL=PASS`, `P0_001E_PATCHED_ROWS=6`, `P0_001E_RECONCILIATION_MISMATCHES=0` | Applies the draft `*_fils` migration only in isolated local D1, writes rehearsal minor-unit patches, and proves local/staging reconciliation. |
 
 P0-001 remains Partial. This verifies local/staging rehearsal only; it does not migrate production schema, switch live accounting reads/writes, or approve production backfill.
+
+## P0-001F Verification Addendum
+
+Date: 2026-05-24, Asia/Dubai
+
+| Command                                           | Exists | Result | Error Summary | Log Evidence                                                                                                   | Commercial Meaning                                                                                                 |
+| ------------------------------------------------- | ------ | ------ | ------------- | -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `npm run audit:money-live-writes`                 | yes    | Pass   | none          | `MONEY_LIVE_WRITE_SQL_STATEMENTS=19`, `MONEY_LIVE_WRITE_P0_STATEMENTS=10`, `MONEY_LIVE_WRITE_PATTERNS=92`      | Identifies live financial write paths that still use legacy decimal/REAL semantics before any switch is attempted. |
+| `npm run test:money-dual-write-local-staging`     | yes    | Pass   | none          | `tests 4`, `pass 4`                                                                                            | Confirms the prior local/staging dual-write rehearsal helpers remain stable.                                       |
+| `npm run rehearse:money-dual-write-local-staging` | yes    | Pass   | none          | `P0_001E_DUAL_WRITE_REHEARSAL=PASS`, `P0_001E_RECONCILIATION_MISMATCHES=0`, `P0_001E_RECONCILIATION_INVALID=0` | Confirms isolated local D1 rehearsal remains safe before planning a live-write adapter rehearsal.                  |
+| `npm run security:secrets`                        | yes    | Pass   | none          | `Secret hygiene check passed.`                                                                                 | Confirms the new audit/gate files did not introduce tracked secrets.                                               |
+
+P0-001 remains Partial. P0-001F verifies switch-gate readiness only; it does not switch live writes or execute migration.

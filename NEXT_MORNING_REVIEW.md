@@ -272,3 +272,37 @@ Next decision:
 
 - Review whether to design P0-001F live write-path switch gates or move to
   P0-008/P0-006 next.
+
+## P0-001F Update
+
+Most important result:
+
+- Live money write paths are now explicitly mapped and gated.
+
+Evidence:
+
+- `MONEY_LIVE_WRITE_PATH_AUDIT.md`
+- `MONEY_LIVE_WRITE_PATH_AUDIT_RESULT.md`
+- `P0_001F_LIVE_WRITE_PATH_SWITCH_GATE.md`
+- `MONEY_LIVE_WRITE_SWITCH_TEST_PLAN.md`
+- `NEXT_PROMPT_P0_001G_LOCAL_STAGING_LIVE_WRITE_ADAPTER_REHEARSAL.md`
+- `npm run audit:money-live-writes`
+
+Findings:
+
+- 19 financial SQL write statements scanned.
+- 10 P0 live decimal authority write statements remain.
+- 92 Worker money parsing / rounding patterns found.
+- `/api/employee/entry` is the recommended first local/staging adapter rehearsal target.
+
+P0-001 status:
+
+- Partial - live write-path switch gate ready.
+- Not Verified.
+
+Tomorrow priority:
+
+1. Review whether P0-001G should start with a non-live `/api/employee/entry`
+   adapter rehearsal.
+2. Do not execute production migration.
+3. Do not wire the adapter into live routes without explicit approval.

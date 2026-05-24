@@ -2761,3 +2761,44 @@ Commercial meaning:
   in a local/staging rehearsal.
 - P0-001 remains Partial because live write/read paths still use legacy
   decimal/REAL fields and production migration remains forbidden.
+
+## P0-001F Live Write Path Switch Gate
+
+Date: 2026-05-24, Asia/Dubai
+
+Scope:
+
+- Added a live financial write-path static audit and switch gate.
+- Added a test plan for future local/staging write-adapter rehearsal.
+- Did not change live financial formulas.
+- Did not change live dashboard results.
+- Did not change live employee handover flow.
+- Did not execute production or remote D1 migration.
+- Did not deploy staging or production.
+
+Verification:
+
+```text
+npm run audit:money-live-writes
+PASS - generated MONEY_LIVE_WRITE_PATH_AUDIT_RESULT.md
+Financial SQL write statements scanned: 19
+P0 live decimal authority write statements: 10
+Money parsing / rounding patterns scanned: 92
+
+npm run test:money-dual-write-local-staging
+PASS - 4 tests passed
+
+npm run rehearse:money-dual-write-local-staging
+PASS - patched 6 isolated local rows, voided rows 1, reconciliation mismatches 0, invalid rows 0
+
+npm run security:secrets
+PASS
+```
+
+Commercial meaning:
+
+- P0-001 can proceed to a local/staging write-adapter rehearsal, starting with
+  `/api/employee/entry`.
+- P0-001 is still Partial because live financial write paths still store
+  legacy decimal/REAL-compatible values and production migration remains
+  forbidden.

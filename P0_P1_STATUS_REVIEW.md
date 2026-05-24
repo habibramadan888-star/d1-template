@@ -317,3 +317,41 @@ Next step:
 
 - P0-001F may design live write-path switch gates after human review. Do not
   execute production or remote D1 migration automatically.
+
+## P0-001F Live Write Path Switch Gate Addendum
+
+Date: 2026-05-24, Asia/Dubai
+
+Current P0-001 status is now
+`Partial - live write-path switch gate ready`.
+
+Added evidence:
+
+- `MONEY_LIVE_WRITE_PATH_AUDIT.md`
+- `MONEY_LIVE_WRITE_PATH_AUDIT_RESULT.md`
+- `P0_001F_LIVE_WRITE_PATH_SWITCH_GATE.md`
+- `MONEY_LIVE_WRITE_SWITCH_TEST_PLAN.md`
+- `NEXT_PROMPT_P0_001G_LOCAL_STAGING_LIVE_WRITE_ADAPTER_REHEARSAL.md`
+- `scripts/audit-money-live-write-paths.mjs`
+- `npm run audit:money-live-writes`
+
+Result:
+
+- Static scan found 19 financial SQL write statements.
+- Static scan found 10 P0 live decimal authority write statements.
+- Static scan found 92 money parsing / rounding patterns in the Worker.
+- The recommended next step is a local/staging-only write-adapter rehearsal,
+  starting with `/api/employee/entry`.
+
+Remaining risk:
+
+- Live Worker write paths still use legacy decimal/REAL-compatible values.
+- Production schema was not migrated.
+- Dashboard and live handover were not switched.
+- Arrears/receivables remain blocked by P0-008.
+
+Next step:
+
+- P0-001G may build a non-invasive local/staging adapter rehearsal. Do not
+  wire it into the live route and do not execute production or remote D1
+  migration automatically.
