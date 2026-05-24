@@ -50,15 +50,41 @@ function runWranglerD1(args) {
   }
   if (args.includes("--remote"))
     throw new Error("Remote D1 operations are forbidden in local bootstrap scripts.");
-  return execFileSync(
-    process.execPath,
-    [wranglerBin, "d1", "execute", localD1DatabaseName, ...args],
-    {
-      cwd: workerDir,
-      encoding: "utf8",
-      env: { ...process.env, WRANGLER_SEND_METRICS: "false" }
+  const command = [wranglerBin, "d1", "execute", localD1DatabaseName, ...args];
+  const maxAttempts = 3;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      return execFileSync(process.execPath, command, {
+        cwd: workerDir,
+        encoding: "utf8",
+        env: { ...process.env, WRANGLER_SEND_METRICS: "false" }
+      });
+    } catch (error) {
+      if (!isRetryableLocalD1FetchFailure(error, args) || attempt === maxAttempts) throw error;
+      const delayMs = 500 * attempt;
+      console.warn(
+        `WARN local D1 command hit transient Wrangler fetch failure; retry ${attempt + 1}/${maxAttempts} after ${delayMs}ms.`
+      );
+      sleepSync(delayMs);
     }
-  );
+  }
+}
+
+function isRetryableLocalD1FetchFailure(error, args) {
+  if (!args.includes("--local")) return false;
+  const text = [
+    error?.message,
+    error?.stdout,
+    error?.stderr,
+    ...(Array.isArray(error?.output) ? error.output : [])
+  ]
+    .filter(Boolean)
+    .join("\n");
+  return /fetch failed|connectivity issue/i.test(text);
+}
+
+function sleepSync(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
 
 export async function listLocalMigrationFiles() {

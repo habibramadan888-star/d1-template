@@ -300,3 +300,23 @@ Safe resolution:
 - Do not deploy the embedded Worker path for P0-002C validation yet.
 - Create a P1-006 controlled embedded Worker regeneration/diff task.
 - Add an embedded source drift gate before production deploy.
+
+## P1-006 update: drift gate exists; controlled write still needs approval
+
+Status: Partial, not resolved.
+
+Evidence:
+
+- `npm run audit:worker-drift` generated `WORKER_ENTRYPOINT_DRIFT_AUDIT.md`.
+- `npm run verify:embedded-worker` generated `EMBEDDED_WORKER_FRESHNESS_RESULT.md` with `MANUAL_REQUIRED`.
+- `npm run build:embedded:dry-run` generated `.tmp/embedded-worker-dry-run/index.embedded.generated.js` without overwriting `deploy-worker/src/index.embedded.js`.
+
+Current blocker:
+
+- Current `deploy-worker/src/index.embedded.js` still lacks `/api/staging/handover/commit` and staging feature/table references.
+- Embedded staging/prod deploy remains blocked until human approval of controlled write.
+
+Safe path:
+
+- Continue local/source Worker validation through `deploy-worker/wrangler.toml`.
+- Do not deploy through `wrangler.embedded.toml` until P1-006B controlled write is approved and verified.

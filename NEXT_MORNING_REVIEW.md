@@ -172,3 +172,37 @@ Meaning:
 - P0-001 is still Partial, not Verified.
 - Local/staging dual-write rehearsal can be considered after human review.
 - Production money migration remains NO-GO.
+
+## P1-006 Update
+
+Date: 2026-05-24, Asia/Dubai
+
+New evidence:
+
+- `DEPLOY_ENTRYPOINT_REVIEW.md`
+- `WORKER_ENTRYPOINT_DRIFT_AUDIT.md`
+- `EMBEDDED_WORKER_FRESHNESS_RESULT.md`
+- `EMBEDDED_WORKER_GENERATION_AUDIT.md`
+- `EMBEDDED_WORKER_GENERATION_DRY_RUN_RESULT.md`
+- `EMBEDDED_WORKER_CONTROLLED_WRITE_PLAN.md`
+- `DEPLOY_ARTIFACT_GO_NO_GO_GATE.md`
+- `WORKER_DRIFT_CI_GATE_PLAN.md`
+- `NEXT_PROMPT_P1_006B_CONTROLLED_EMBEDDED_WRITE.md`
+
+Verification:
+
+- `npm run audit:worker-drift` passed and found current embedded artifact missing the P0-002C staging route.
+- `npm run verify:embedded-worker` passed with result `MANUAL_REQUIRED`.
+- `npm run build:embedded:dry-run` passed with result `WARNING`; dry-run generated artifact contains all checked critical items.
+
+Meaning:
+
+- P1-006 is now Partial, not Done.
+- Local source Worker validation may continue.
+- Embedded staging/prod deploy is NO-GO until controlled write and human diff review are approved.
+- Production deploy remains NO-GO.
+
+Next decision:
+
+- If staging deploy uses `wrangler.embedded.toml`, review `NEXT_PROMPT_P1_006B_CONTROLLED_EMBEDDED_WRITE.md`.
+- If staging deploy uses source `wrangler.toml`, proceed to P0-001E local/staging dual-write rehearsal and keep embedded drift as a deploy-prep blocker.

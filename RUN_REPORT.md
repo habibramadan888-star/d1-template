@@ -2647,3 +2647,42 @@ P0-001 status:
 
 - Partial - minor-unit migration review and reconciliation gate ready.
 - Not Verified because live write paths, production schema, reconciliation backfill, and dashboard readers remain unchanged.
+
+## P1-006 Embedded Worker Drift Gate
+
+Date: 2026-05-24, Asia/Dubai
+
+Scope:
+
+- Added read-only/dry-run embedded Worker drift gates.
+- Did not overwrite `deploy-worker/src/index.embedded.js`.
+- Did not execute production or staging deploy.
+- Did not execute production or remote D1 migration.
+- Did not modify live financial formulas, live dashboard result, or live employee handover flow.
+
+Verification:
+
+```text
+npm run audit:worker-drift
+PASS - generated WORKER_ENTRYPOINT_DRIFT_AUDIT.md
+Critical mismatches: 3
+Route mismatches: 1
+Staging handover route missing from embedded: yes
+
+npm run verify:embedded-worker
+PASS - generated EMBEDDED_WORKER_FRESHNESS_RESULT.md
+Result: MANUAL_REQUIRED
+Missing critical checks: 4
+
+npm run build:embedded:dry-run
+PASS - generated .tmp/embedded-worker-dry-run/index.embedded.generated.js
+Result: WARNING
+Current embedded missing critical items: 6
+Dry-run generated missing critical items: 0
+```
+
+Commercial meaning:
+
+- Source Worker local validation can continue.
+- Any staging/prod deploy through `wrangler.embedded.toml` is blocked until controlled artifact write and human diff review are approved.
+- Production deploy was not performed.
