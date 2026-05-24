@@ -2240,3 +2240,35 @@ npm run smoke:with-worker passed
 ### Status
 
 P1-002 remains `Partial - runtime DDL audit and migration plan added`. Runtime DDL is still present and must stay until reviewed migrations, staging rehearsal, and rollback are ready.
+
+## P1-004A Dubai Timezone Audit And Guardrails
+
+Date: 2026-05-24
+
+### Files Added Or Updated
+
+- `DUBAI_TIMEZONE_AUDIT.md`: maps current browser-local, UTC, and Dubai-date mixing risk.
+- `DUBAI_BUSINESS_DATE_POLICY.md`: defines the commercial rule that due/overdue/period decisions must use Asia/Dubai business dates.
+- `modules/finance/dubai-business-date.mjs`: adds a non-invasive Dubai business-date helper.
+- `tests/dubai-business-date.spec.mjs`: adds midnight-boundary, due-status, and invalid-date guardrail tests.
+- `package.json`: added `test:timezone`.
+- `COMMERCIALIZATION_BACKLOG.md`, `P0_P1_STATUS_REVIEW.md`: updated P1-004A status as Partial.
+
+### Verification
+
+```text
+npm run test:timezone passed
+npm run check passed
+npm run smoke:with-worker passed
+npm run verify:clean-d1 passed
+```
+
+### Safety Scope
+
+- No production Worker deploy was executed.
+- No production or remote D1 migration was executed.
+- No live due/overdue formula, dashboard period grouping, employee promise-date validation, or database date field was changed.
+
+### Status
+
+P1-004 remains `Partial - Dubai business date policy/helper/tests added`. The live frontend and Worker still contain browser-local and UTC date logic that must be migrated only after reconciliation.
