@@ -4,14 +4,14 @@ Scope: P1-006 dry-run generation. This script writes only to `.tmp/embedded-work
 
 ## Summary
 
-- Result: **PASS**
+- Result: **WARNING**
 - Generated artifact: `.tmp\embedded-worker-dry-run\index.embedded.generated.js`
 - Embedded assets included: 7
 - Current embedded size: 1077580 bytes
-- Dry-run generated size: 1077580 bytes
+- Dry-run generated size: 1081150 bytes
 - Current embedded SHA-256: `b8f84fc86018c50a7799d4d4b97fe22bfd2915e65d75880d06883acb8b296e07`
-- Dry-run generated SHA-256: `b8f84fc86018c50a7799d4d4b97fe22bfd2915e65d75880d06883acb8b296e07`
-- Hashes match: Yes
+- Dry-run generated SHA-256: `3dea422a0d0762c5d3a82ca81bfe08fe328e80a75db8bffea65302fb2152bc3e`
+- Hashes match: No
 
 ## Critical Item Presence
 
@@ -32,7 +32,7 @@ Scope: P1-006 dry-run generation. This script writes only to `.tmp/embedded-work
 
 - Current embedded artifact contains the checked critical items.
 - Dry-run generated artifact contains all checked critical items.
-- Current embedded artifact matches dry-run output for this generator.
+- Current embedded artifact differs from dry-run output; controlled write requires human diff review.
 
 ## Gate
 

@@ -6,9 +6,9 @@ Scope: P1-006 controlled embedded Worker drift review. This script is read-only 
 
 - Source Worker: `deploy-worker\src\index.js`
 - Embedded Worker artifact: `deploy-worker\src\index.embedded.js`
-- Source SHA-256: `3951fc8d8ea49d17696502993a3ee8d1cd2ec9d5d2b0ea78b630501985b63572`
+- Source SHA-256: `595458d25a45f9ad91ee58c6a0ef8320cdb825890fee2d56783d955e0894dd41`
 - Embedded SHA-256: `b8f84fc86018c50a7799d4d4b97fe22bfd2915e65d75880d06883acb8b296e07`
-- Source API/auth route literals found: 23
+- Source API/auth route literals found: 24
 - Embedded API/auth route literals found: 23
 
 ## Critical Behavior Comparison
@@ -31,36 +31,37 @@ Scope: P1-006 controlled embedded Worker drift review. This script is read-only 
 
 ## Route Drift Comparison
 
-| Item                            | Source Worker | Embedded Worker | Match | Risk  | Recommendation           |
-| ------------------------------- | ------------- | --------------- | ----- | ----- | ------------------------ |
-| `/api/arrear_tasks`             | Yes           | Yes             | Yes   | P3    | No route drift detected. |
-| `/api/arrear_tasks/update`      | Yes           | Yes             | Yes   | P3    | No route drift detected. |
-| `/api/arrears`                  | Yes           | Yes             | Yes   | P3    | No route drift detected. |
-| `/api/clear_arrear`             | Yes           | Yes             | Yes   | P3    | No route drift detected. |
-| `/api/customers`                | Yes           | Yes             | Yes   | P3    | No route drift detected. |
-| `/api/delete_session`           | Yes           | Yes             | Yes   | P3    | No route drift detected. |
-| `/api/employee/deposit`         | Yes           | Yes             | Yes   | P3    | No route drift detected. |
-| `/api/employee/entry`           | Yes           | Yes             | Yes   | P3    | No route drift detected. |
-| `/api/employee/lock/cards`      | Yes           | Yes             | Yes   | P3    | No route drift detected. |
-| `/api/employee/migrate`         | Yes           | Yes             | Yes   | P3    | No route drift detected. |
-| `/api/history`                  | Yes           | Yes             | Yes   | P3    | No route drift detected. |
-| `/api/lock/cards`               | Yes           | Yes             | Yes   | P3    | No route drift detected. |
-| `/api/me`                       | Yes           | Yes             | Yes   | P3    | No route drift detected. |
-| `/api/rent_config`              | Yes           | Yes             | Yes   | P3    | No route drift detected. |
-| `/api/save_session`             | Yes           | Yes             | Yes   | P3    | No route drift detected. |
-| `/api/security/revoke_sessions` | Yes           | Yes             | Yes   | P3    | No route drift detected. |
-| `/api/session_detail`           | Yes           | Yes             | Yes   | P3    | No route drift detected. |
-| `/api/staging/handover/commit`  | Yes           | Yes             | Yes   | P0/P1 | No route drift detected. |
-| `/api/wifi/accounts`            | Yes           | Yes             | Yes   | P3    | No route drift detected. |
-| `/auth/confirm-manager`         | Yes           | Yes             | Yes   | P3    | No route drift detected. |
-| `/auth/employee-login`          | Yes           | Yes             | Yes   | P3    | No route drift detected. |
-| `/auth/login`                   | Yes           | Yes             | Yes   | P3    | No route drift detected. |
-| `/auth/logout`                  | Yes           | Yes             | Yes   | P3    | No route drift detected. |
+| Item                                        | Source Worker | Embedded Worker | Match | Risk  | Recommendation                                                                |
+| ------------------------------------------- | ------------- | --------------- | ----- | ----- | ----------------------------------------------------------------------------- |
+| `/api/arrear_tasks`                         | Yes           | Yes             | Yes   | P3    | No route drift detected.                                                      |
+| `/api/arrear_tasks/update`                  | Yes           | Yes             | Yes   | P3    | No route drift detected.                                                      |
+| `/api/arrears`                              | Yes           | Yes             | Yes   | P3    | No route drift detected.                                                      |
+| `/api/clear_arrear`                         | Yes           | Yes             | Yes   | P3    | No route drift detected.                                                      |
+| `/api/customers`                            | Yes           | Yes             | Yes   | P3    | No route drift detected.                                                      |
+| `/api/delete_session`                       | Yes           | Yes             | Yes   | P3    | No route drift detected.                                                      |
+| `/api/employee/deposit`                     | Yes           | Yes             | Yes   | P3    | No route drift detected.                                                      |
+| `/api/employee/entry`                       | Yes           | Yes             | Yes   | P3    | No route drift detected.                                                      |
+| `/api/employee/lock/cards`                  | Yes           | Yes             | Yes   | P3    | No route drift detected.                                                      |
+| `/api/employee/migrate`                     | Yes           | Yes             | Yes   | P3    | No route drift detected.                                                      |
+| `/api/history`                              | Yes           | Yes             | Yes   | P3    | No route drift detected.                                                      |
+| `/api/lock/cards`                           | Yes           | Yes             | Yes   | P3    | No route drift detected.                                                      |
+| `/api/me`                                   | Yes           | Yes             | Yes   | P3    | No route drift detected.                                                      |
+| `/api/rent_config`                          | Yes           | Yes             | Yes   | P3    | No route drift detected.                                                      |
+| `/api/save_session`                         | Yes           | Yes             | Yes   | P3    | No route drift detected.                                                      |
+| `/api/security/revoke_sessions`             | Yes           | Yes             | Yes   | P3    | No route drift detected.                                                      |
+| `/api/session_detail`                       | Yes           | Yes             | Yes   | P3    | No route drift detected.                                                      |
+| `/api/staging/employee-entry/adapter-draft` | Yes           | No              | No    | P1    | Regenerate or review embedded artifact before deploy through embedded config. |
+| `/api/staging/handover/commit`              | Yes           | Yes             | Yes   | P0/P1 | No route drift detected.                                                      |
+| `/api/wifi/accounts`                        | Yes           | Yes             | Yes   | P3    | No route drift detected.                                                      |
+| `/auth/confirm-manager`                     | Yes           | Yes             | Yes   | P3    | No route drift detected.                                                      |
+| `/auth/employee-login`                      | Yes           | Yes             | Yes   | P3    | No route drift detected.                                                      |
+| `/auth/login`                               | Yes           | Yes             | Yes   | P3    | No route drift detected.                                                      |
+| `/auth/logout`                              | Yes           | Yes             | Yes   | P3    | No route drift detected.                                                      |
 
 ## Deployment Risk
 
 - Critical behavior mismatches: 0
-- Route mismatches: 0
+- Route mismatches: 1
 - Staging handover route missing from embedded: No
 - Staging deploy using embedded artifact: Needs entrypoint confirmation
 - Production deploy using embedded artifact: Needs standard deploy gate
