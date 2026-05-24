@@ -131,3 +131,30 @@ accounting behavior:
 P0-001 remains Partial. P0-001F does not execute production migration, remote D1
 migration, staging/prod deploy, live dashboard switch, live handover switch, or
 legacy-field deletion.
+
+## P0-001G Employee Entry Adapter Rehearsal Update
+
+Date: 2026-05-24, Asia/Dubai
+
+P0-001G adds a non-invasive local/staging adapter for the legacy
+`/api/employee/entry` write path.
+
+Evidence:
+
+- `modules/worker/employee-entry-live-write-adapter.mjs`
+- `tests/employee-entry-live-write-adapter.spec.mjs`
+- `scripts/rehearse-employee-entry-live-write-adapter.mjs`
+- `P0_001G_LIVE_WRITE_ADAPTER_REHEARSAL.md`
+- `P0_001G_LIVE_WRITE_ADAPTER_REHEARSAL_RESULT.md`
+
+Result:
+
+- Employee rent, deposit collection, deposit refund, checkout deduction,
+  arrears payment, transfer fee, and expense entries can now be represented as
+  `*_fils` write plans.
+- The adapter distinguishes cash handover delta from gross received, so refunds
+  and expenses do not inflate income.
+- Invalid money and voided rows are rejected or excluded before planning.
+
+P0-001 remains Partial. The adapter is not wired into the live route and does
+not approve production migration.

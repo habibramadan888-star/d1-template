@@ -1,6 +1,6 @@
 # P0-001E Local/Staging Dual-Write Rehearsal Result
 
-Generated: 2026-05-24T17:37:36.100Z, Asia/Dubai
+Generated: 2026-05-24T18:29:19.964Z, Asia/Dubai
 
 Scope: local/staging-only rehearsal. This run used an isolated local D1 directory and did not execute production migration, remote D1 migration, staging deploy, production deploy, live dashboard switch, live handover switch, or legacy field deletion.
 
@@ -16,7 +16,7 @@ Scope: local/staging-only rehearsal. This run used an isolated local D1 director
 | Live dashboard changed             | no                                                                        |
 | Live handover flow changed         | no                                                                        |
 | Legacy decimal fields retained     | yes                                                                       |
-| Temporary persist path             | `C:\Users\CHINAL~1\AppData\Local\Temp\homelink-p0-001e-dual-write-iTnb4L` |
+| Temporary persist path             | `C:\Users\CHINAL~1\AppData\Local\Temp\homelink-p0-001e-dual-write-JLkMYA` |
 
 ## Patch Summary
 

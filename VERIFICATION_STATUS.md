@@ -137,3 +137,16 @@ Date: 2026-05-24, Asia/Dubai
 | `npm run security:secrets`                        | yes    | Pass   | none          | `Secret hygiene check passed.`                                                                                 | Confirms the new audit/gate files did not introduce tracked secrets.                                               |
 
 P0-001 remains Partial. P0-001F verifies switch-gate readiness only; it does not switch live writes or execute migration.
+
+## P0-001G Verification Addendum
+
+Date: 2026-05-24, Asia/Dubai
+
+| Command                                              | Exists | Result | Error Summary | Log Evidence                                                     | Commercial Meaning                                                                                                  |
+| ---------------------------------------------------- | ------ | ------ | ------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `npm run test:employee-entry-live-write-adapter`     | yes    | Pass   | none          | `tests 9`, `pass 9`                                              | Validates employee entry adapter plans for rent, deposits, refunds, checkout deduction, arrears, invalid, and void. |
+| `npm run rehearse:employee-entry-live-write-adapter` | yes    | Pass   | none          | `P0_001G_ENTRY_ADAPTER_REHEARSAL=PASS`, `P0_001G_DB_MUTATIONS=0` | Proves the adapter creates `*_fils` plans in isolated local D1 evidence without mutating live financial tables.     |
+
+P0-001 remains Partial. P0-001G verifies a non-invasive local/staging adapter
+only; it does not wire `/api/employee/entry`, switch dashboard or handover
+behavior, or execute production migration.

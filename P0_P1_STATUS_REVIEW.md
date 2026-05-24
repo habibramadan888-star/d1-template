@@ -283,6 +283,44 @@ Remaining risk:
 - This is not production approval.
 - Real staging/prod Worker, D1, KV, and secrets remain unconfirmed.
 
+## P0-001G Live Write Adapter Rehearsal Addendum
+
+Date: 2026-05-24, Asia/Dubai
+
+Current P0-001 status is now
+`Partial - employee entry live write adapter rehearsal passed`.
+
+Added evidence:
+
+- `P0_001G_LIVE_WRITE_ADAPTER_REHEARSAL.md`
+- `P0_001G_LIVE_WRITE_ADAPTER_REHEARSAL_RESULT.md`
+- `modules/worker/employee-entry-live-write-adapter.mjs`
+- `tests/employee-entry-live-write-adapter.spec.mjs`
+- `scripts/rehearse-employee-entry-live-write-adapter.mjs`
+- `npm run test:employee-entry-live-write-adapter`
+- `npm run rehearse:employee-entry-live-write-adapter`
+
+Result:
+
+- The adapter creates `*_fils` patches for rent, deposit collection, deposit
+  refund, checkout deduction, arrears payment, transfer fee, and expense entry
+  planning.
+- Invalid three-decimal and JS `Number` money inputs are rejected.
+- Voided rows are excluded from active write planning.
+- The isolated local D1 evidence shows 0 adapter DB mutations.
+
+Remaining risk:
+
+- `/api/employee/entry` still uses the legacy live path.
+- The adapter is not wired into the Worker route.
+- Production schema has not been migrated.
+- Dashboard/history readers have not been switched to minor-unit authority.
+
+Next step:
+
+- P0-001H may create a local/staging route harness around this adapter after
+  human review. Do not switch live production behavior automatically.
+
 ## P0-001E Local/Staging Dual-Write Rehearsal Addendum
 
 Date: 2026-05-24, Asia/Dubai

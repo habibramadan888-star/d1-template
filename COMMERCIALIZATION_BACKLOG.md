@@ -255,6 +255,49 @@ Next allowed step:
   with P0-008/P0-006 design work. Do not execute production migration
   automatically.
 
+## P0-001G Employee Entry Live Write Adapter Addendum
+
+Date: 2026-05-24, Asia/Dubai
+
+P0-001 current status:
+
+- Partial - employee entry live write adapter rehearsal passed.
+- Not Verified because the adapter is not wired into `/api/employee/entry`,
+  production schema has not been migrated, and live dashboard/history readers
+  are unchanged.
+
+Completed safely:
+
+- Added `modules/worker/employee-entry-live-write-adapter.mjs`.
+- Added `tests/employee-entry-live-write-adapter.spec.mjs`.
+- Added `scripts/rehearse-employee-entry-live-write-adapter.mjs`.
+- Added `P0_001G_LIVE_WRITE_ADAPTER_REHEARSAL.md`.
+- Generated `P0_001G_LIVE_WRITE_ADAPTER_REHEARSAL_RESULT.md`.
+
+Verification:
+
+- `npm run test:employee-entry-live-write-adapter` passed.
+- `npm run rehearse:employee-entry-live-write-adapter` passed.
+- Rehearsal scenarios: rent full payment, rent short payment, deposit
+  collection, deposit refund, checkout deduction, arrears payment, invalid
+  three-decimal money rejection, and voided-row exclusion.
+- Adapter DB mutations: 0.
+
+Still forbidden:
+
+- Production D1 migration.
+- Remote D1 migration.
+- Staging or production deploy.
+- Live dashboard switch.
+- Live handover flow switch.
+- Live `/api/employee/entry` route switch.
+- Deleting legacy decimal/REAL fields.
+
+Next allowed step:
+
+- P0-001H local/staging route harness or staging-only adapter validation after
+  human review.
+
 ## P0-001F Live Write Path Switch Gate Addendum
 
 Date: 2026-05-24, Asia/Dubai

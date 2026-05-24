@@ -2802,3 +2802,37 @@ Commercial meaning:
 - P0-001 is still Partial because live financial write paths still store
   legacy decimal/REAL-compatible values and production migration remains
   forbidden.
+
+## P0-001G Employee Entry Live Write Adapter Rehearsal
+
+Date: 2026-05-24, Asia/Dubai
+
+Scope:
+
+- Added a non-invasive adapter for legacy `/api/employee/entry`-style payloads.
+- The adapter creates rehearsal write plans and `*_fils` patches for rent,
+  deposit collection, deposit refund, checkout deduction, arrears payment,
+  transfer fee, and expense entries.
+- The adapter was not wired into the live Worker route.
+- The adapter does not write D1.
+- No production migration, remote D1 migration, staging deploy, or production
+  deploy was executed.
+- Live dashboard, live handover flow, and live financial formulas were not
+  changed.
+
+Verification:
+
+```text
+npm run test:employee-entry-live-write-adapter
+PASS - 9 tests passed
+
+npm run rehearse:employee-entry-live-write-adapter
+PASS - 8 scenarios, 0 DB mutations, cleanup PASS
+```
+
+Commercial meaning:
+
+- P0-001G proves the first live write-path candidate can be converted into
+  minor-unit write plans in a local/staging rehearsal.
+- P0-001 remains Partial because the adapter is not yet connected to a live or
+  staging Worker route and production schema remains unmigrated.

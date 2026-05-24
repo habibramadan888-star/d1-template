@@ -306,3 +306,37 @@ Tomorrow priority:
    adapter rehearsal.
 2. Do not execute production migration.
 3. Do not wire the adapter into live routes without explicit approval.
+
+## P0-001G Update
+
+Most important result:
+
+- A non-invasive employee entry live write adapter rehearsal now exists.
+
+Evidence:
+
+- `P0_001G_LIVE_WRITE_ADAPTER_REHEARSAL.md`
+- `P0_001G_LIVE_WRITE_ADAPTER_REHEARSAL_RESULT.md`
+- `modules/worker/employee-entry-live-write-adapter.mjs`
+- `tests/employee-entry-live-write-adapter.spec.mjs`
+- `scripts/rehearse-employee-entry-live-write-adapter.mjs`
+- `npm run test:employee-entry-live-write-adapter`
+- `npm run rehearse:employee-entry-live-write-adapter`
+
+Findings:
+
+- Rent, deposit collection, deposit refund, checkout deduction, arrears payment,
+  invalid money, and voided rows are covered.
+- Rehearsal generated 0 DB mutations.
+- Live route, live dashboard, and live handover flow remain unchanged.
+
+P0-001 status:
+
+- Partial - employee entry live write adapter rehearsal passed.
+- Not Verified.
+
+Tomorrow priority:
+
+1. Review whether to create a local/staging route harness around the adapter.
+2. Do not switch `/api/employee/entry` production behavior.
+3. Do not execute production or remote D1 migration.
