@@ -1,0 +1,23 @@
+{
+  "name": "mixed-cash-bank",
+  "rows": [
+    { "id": "cash-rent", "type": "R", "pay_type": "C", "amount": "640.00" },
+    { "id": "bank-rent", "type": "R", "pay_type": "B", "amount": "770.00" },
+    { "id": "cash-expense", "type": "E", "pay_type": "C", "amount": "20.00" }
+  ],
+  "frontendTotals": {
+    "cash_handover": "620.00",
+    "bank_transfer_total": "770.00",
+    "bank_transfer_count": 1,
+    "gross_received": "1410.00",
+    "session_total": "1390.00"
+  },
+  "expected": {
+    "cashTotalAed": "640.00",
+    "cashHandoverAed": "620.00",
+    "bankTransferAed": "770.00",
+    "grossReceivedAed": "1410.00",
+    "sessionTotalAed": "1390.00",
+    "errors": 0
+  }
+}

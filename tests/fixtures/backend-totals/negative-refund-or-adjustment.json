@@ -1,0 +1,10 @@
+{
+  "name": "negative-refund-or-adjustment",
+  "rows": [
+    { "id": "negative-refund", "type": "DR", "pay_type": "C", "amount": "-50.00", "allowNegative": true }
+  ],
+  "expected": {
+    "errorsAtLeast": 1,
+    "note": "Refund rows should be positive outflow rows; signed adjustments need a separate approved adjustment model."
+  }
+}

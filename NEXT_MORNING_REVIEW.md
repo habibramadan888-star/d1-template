@@ -36,16 +36,16 @@ Remote D1 migration: not executed
 
 ## Current P0 Status
 
-| P0                             | Status   | Evidence                                                                                                                                             | Next                                                                                          |
-| ------------------------------ | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| P0-001 Money precision         | Partial  | `MONEY_FIELD_INVENTORY.md`, `MONEY_SHADOW_VALIDATION_PLAN.md`, `tests/money-shadow.spec.mjs`, `npm run test:money-shadow`, `npm run reconcile:money` | P0-001C or P0-003B depending on whether the next step is money migration or totals authority. |
-| P0-002 Handover atomic commit  | Partial  | `HANDOVER_FLOW_AUDIT.md`, `HANDOVER_ATOMIC_COMMIT_DESIGN.md`, `tests/handover-atomic.design.spec.mjs`                                                | Implement behind a guarded endpoint only after backend totals authority is settled.           |
-| P0-003 Backend totals          | Partial  | `BACKEND_TOTALS_AUTHORITY_AUDIT.md`, `modules/finance/shadow-totals.mjs`, `tests/backend-totals-shadow.spec.mjs`                                     | Recommended next task: P0-003B.                                                               |
-| P0-004 Delete session void     | Verified | `npm run test:delete-session`                                                                                                                        | Keep regression test; do not reintroduce hard delete.                                         |
-| P0-005 Clean D1 bootstrap      | Verified | `npm run verify:clean-d1`                                                                                                                            | Keep as preflight before every P0 implementation.                                             |
-| P0-006 Tenant isolation        | Partial  | `TENANCY_SCOPE_AUDIT.md`, `TENANCY_MIGRATION_PLAN.md`, `TENANCY_TEST_PLAN.md`                                                                        | Add cross-tenant fixtures/tests before schema rewrite.                                        |
-| P0-007 Local Worker/auth smoke | Verified | `npm run smoke:with-worker`                                                                                                                          | Keep as required preflight.                                                                   |
-| P0-008 Receivables model       | Partial  | `RECEIVABLES_MODEL_DESIGN.md`, `RECEIVABLES_LIFECYCLE_TEST_PLAN.md`, `migration-drafts/004_receivables_model_draft.sql`                              | Human review before any active migration.                                                     |
+| P0                             | Status   | Evidence                                                                                                                                                                                                  | Next                                                                                          |
+| ------------------------------ | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| P0-001 Money precision         | Partial  | `MONEY_FIELD_INVENTORY.md`, `MONEY_SHADOW_VALIDATION_PLAN.md`, `tests/money-shadow.spec.mjs`, `npm run test:money-shadow`, `npm run reconcile:money`                                                      | P0-001C or P0-003B depending on whether the next step is money migration or totals authority. |
+| P0-002 Handover atomic commit  | Partial  | `HANDOVER_FLOW_AUDIT.md`, `HANDOVER_ATOMIC_COMMIT_DESIGN.md`, `tests/handover-atomic.design.spec.mjs`                                                                                                     | Implement behind a guarded endpoint only after backend totals authority is settled.           |
+| P0-003 Backend totals          | Partial  | `BACKEND_TOTALS_AUTHORITY_AUDIT.md`, `BACKEND_TOTALS_SOURCE_OF_TRUTH.md`, `BACKEND_TOTALS_AUTHORITY_REHEARSAL_RESULT.md`, `modules/finance/backend-totals.mjs`, `tests/backend-totals-authority.spec.mjs` | Next task can move to reviewed staging/live comparison or P0-002B handover atomic rehearsal.  |
+| P0-004 Delete session void     | Verified | `npm run test:delete-session`                                                                                                                                                                             | Keep regression test; do not reintroduce hard delete.                                         |
+| P0-005 Clean D1 bootstrap      | Verified | `npm run verify:clean-d1`                                                                                                                                                                                 | Keep as preflight before every P0 implementation.                                             |
+| P0-006 Tenant isolation        | Partial  | `TENANCY_SCOPE_AUDIT.md`, `TENANCY_MIGRATION_PLAN.md`, `TENANCY_TEST_PLAN.md`                                                                                                                             | Add cross-tenant fixtures/tests before schema rewrite.                                        |
+| P0-007 Local Worker/auth smoke | Verified | `npm run smoke:with-worker`                                                                                                                                                                               | Keep as required preflight.                                                                   |
+| P0-008 Receivables model       | Partial  | `RECEIVABLES_MODEL_DESIGN.md`, `RECEIVABLES_LIFECYCLE_TEST_PLAN.md`, `migration-drafts/004_receivables_model_draft.sql`                                                                                   | Human review before any active migration.                                                     |
 
 ## Current P1 Status
 
@@ -80,7 +80,7 @@ Yes, but only on isolated P0 implementation tasks with one branch per task and f
 
 ## Tasks Codex Can Safely Do Next
 
-- P0-003B: add backend totals comparison/recompute evidence without replacing live dashboard output.
+- P0-003C: add reviewed staging/live comparison for backend totals without replacing live dashboard output.
 - P0-006B: create cross-tenant local fixtures and tests without changing production tenant schema.
 - P1 runtime DDL cleanup planning and additional static gates.
 - Manual test plan expansion for employee and owner authenticated flows.

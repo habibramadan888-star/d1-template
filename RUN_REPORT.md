@@ -2299,3 +2299,51 @@ npm run check passed
 ### Status
 
 P1-010 remains `Partial - separation plan and checklist added`. Actual dev/staging/production Cloudflare resources still need human provisioning and reviewed config changes.
+
+## P0-003B Backend Totals Authority Implementation Rehearsal
+
+Date: 2026-05-24, Asia/Dubai
+
+Scope:
+
+- Added backend totals authority rehearsal only.
+- Did not change production API responses.
+- Did not replace owner dashboard totals.
+- Did not replace employee handover flow.
+- Did not execute production or remote D1 migration.
+- Did not deploy production Worker.
+
+Files added:
+
+- `P0_003B_STARTING_CONTEXT.md`
+- `BACKEND_TOTALS_SOURCE_OF_TRUTH.md`
+- `BACKEND_TOTALS_AUTHORITY_GATE.md`
+- `BACKEND_TOTALS_AUTHORITY_REHEARSAL_RESULT.md`
+- `BACKEND_TOTALS_EDGE_CASE_REPORT.md`
+- `modules/finance/backend-totals.mjs`
+- `scripts/rehearse-backend-totals-authority.mjs`
+- `tests/backend-totals-authority.spec.mjs`
+- `tests/fixtures/backend-totals/*.json`
+
+Verification:
+
+```text
+npm run test:backend-totals
+PASS - 16 tests passed
+
+npm run rehearse:backend-totals
+PASS - disposable local D1 rehearsal generated BACKEND_TOTALS_AUTHORITY_REHEARSAL_RESULT.md
+```
+
+Rehearsal result:
+
+- `match-session`: MATCH, delta `0.00`.
+- `tampered-session`: MISMATCH, delta `359.00`.
+- `voided-session`: MISMATCH, delta `900.00`, proving voided rows are excluded from active totals.
+- `dashboard-active`: LEGACY_WARNING, no active amount errors.
+- `synthetic-frontend-tamper`: MISMATCH, delta `9359.99`.
+
+P0-003 status:
+
+- Partial - backend totals authority implementation rehearsal passed.
+- Not Verified because live Worker/dashboard output has not been switched.

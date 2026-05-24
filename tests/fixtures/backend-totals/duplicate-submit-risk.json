@@ -1,0 +1,17 @@
+{
+  "name": "duplicate-submit-risk",
+  "rows": [
+    { "id": "row-1", "client_entry_id": "client-1", "type": "R", "pay_type": "C", "amount": "400.00" },
+    { "id": "row-2", "client_entry_id": "client-1", "type": "R", "pay_type": "C", "amount": "400.00" }
+  ],
+  "frontendTotals": {
+    "cash_handover": "400.00",
+    "gross_received": "400.00",
+    "session_total": "400.00"
+  },
+  "expected": {
+    "cashHandoverAed": "800.00",
+    "discrepancy": true,
+    "note": "Backend totals expose duplicate row impact; P0-002 idempotency must prevent the duplicate."
+  }
+}

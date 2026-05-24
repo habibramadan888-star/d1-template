@@ -1,0 +1,24 @@
+{
+  "name": "arrears-partial-payment",
+  "rows": [
+    { "id": "arrears-payment", "type": "AP", "pay_type": "C", "amount": "100.00" }
+  ],
+  "arrearsRows": [
+    {
+      "task_id": "task-1",
+      "arrear_amount": "690.00",
+      "actual_received": "100.00",
+      "followup_status": "承诺付款"
+    }
+  ],
+  "frontendTotals": {
+    "cash_handover": "100.00",
+    "gross_received": "100.00",
+    "session_total": "100.00"
+  },
+  "expected": {
+    "arrearsPaidAed": "100.00",
+    "arrearsOutstandingAed": "590.00",
+    "errors": 0
+  }
+}

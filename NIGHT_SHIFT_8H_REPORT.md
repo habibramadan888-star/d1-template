@@ -111,16 +111,16 @@ Baseline commit: `45a32cd test: add money precision audit and helper guardrails`
 
 ## P0 Status Changes
 
-| P0                             | Current Status | Night Shift Result                                                                              |
-| ------------------------------ | -------------- | ----------------------------------------------------------------------------------------------- |
-| P0-001 Money precision         | Partial        | Shadow validation and reconciliation guardrails added. Live financial write paths not migrated. |
-| P0-002 Handover atomic commit  | Partial        | Current flow audited and future atomic endpoint contract designed. Live flow not switched.      |
-| P0-003 Backend totals          | Partial        | Backend totals authority audited and shadow tests added. Live totals not replaced.              |
-| P0-004 Delete session void     | Verified       | No behavior change; regression tests still pass.                                                |
-| P0-005 Clean D1 bootstrap      | Verified       | Clean bootstrap and Windows cleanup still pass.                                                 |
-| P0-006 Tenant isolation        | Partial        | CORPID/static tenancy risks audited and migration/test plan added.                              |
-| P0-007 Local Worker auth smoke | Verified       | Smoke remained available.                                                                       |
-| P0-008 Receivables model       | Partial        | Formal receivables model designed; draft SQL not applied.                                       |
+| P0                             | Current Status | Night Shift Result                                                                                                            |
+| ------------------------------ | -------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| P0-001 Money precision         | Partial        | Shadow validation and reconciliation guardrails added. Live financial write paths not migrated.                               |
+| P0-002 Handover atomic commit  | Partial        | Current flow audited and future atomic endpoint contract designed. Live flow not switched.                                    |
+| P0-003 Backend totals          | Partial        | Backend totals authority audited; P0-003B rehearsal added helper/tests/local D1 discrepancy report. Live totals not replaced. |
+| P0-004 Delete session void     | Verified       | No behavior change; regression tests still pass.                                                                              |
+| P0-005 Clean D1 bootstrap      | Verified       | Clean bootstrap and Windows cleanup still pass.                                                                               |
+| P0-006 Tenant isolation        | Partial        | CORPID/static tenancy risks audited and migration/test plan added.                                                            |
+| P0-007 Local Worker auth smoke | Verified       | Smoke remained available.                                                                                                     |
+| P0-008 Receivables model       | Partial        | Formal receivables model designed; draft SQL not applied.                                                                     |
 
 ## P1 Status Changes
 

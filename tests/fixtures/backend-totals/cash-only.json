@@ -1,0 +1,23 @@
+{
+  "name": "cash-only",
+  "rows": [
+    { "id": "cash-rent-1", "type": "R", "pay_type": "C", "amount": "640.00" },
+    { "id": "cash-arrears-1", "type": "AP", "pay_type": "cash", "amount": "100.00" }
+  ],
+  "frontendTotals": {
+    "cash_handover": "740.00",
+    "bank_transfer_total": "0.00",
+    "bank_transfer_count": 0,
+    "gross_received": "740.00",
+    "session_total": "740.00"
+  },
+  "expected": {
+    "cashTotalAed": "740.00",
+    "cashHandoverAed": "740.00",
+    "bankTransferAed": "0.00",
+    "grossReceivedAed": "740.00",
+    "rentReceivedAed": "640.00",
+    "arrearsPaidAed": "100.00",
+    "errors": 0
+  }
+}
