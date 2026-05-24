@@ -6,12 +6,13 @@ Scope: 8-hour continuous commercialization engineering run. No production deploy
 
 ## Stage Ledger
 
-| Stage                                         | Status    | Commit             | Evidence                            | Notes                                                                                                                                                      |
-| --------------------------------------------- | --------- | ------------------ | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Baseline                                      | Completed | Existing `f5efc5a` | `.tmp/night-shift-v4-baseline.log`  | All requested baseline commands exited 0; money reconciliation remains MANUAL_REQUIRED; embedded dry-run WARNING with 0 critical missing.                  |
-| A: P0-001L real staging QA preflight          | Completed | `c2b9417`          | `npm run qa:employee-entry-staging` | Result is MANUAL_REQUIRED. Real staging URL, D1 target, entrypoint, credentials, backup, and rollback inputs are missing from committed non-secret config. |
-| B: P0-003C backend totals live authority gate | Completed | Pending            | `npm run gate:backend-totals-live`  | Result is MANUAL_REQUIRED. Live dashboard authority remains blocked by reconciliation, receivables, tenant scope, and human review.                        |
-| C: P0-008B receivables readiness gate         | Completed | Pending            | `npm run gate:receivables`          | Result is MANUAL_REQUIRED. Receivables design exists, but migration draft and production dependencies remain missing.                                      |
+| Stage                                           | Status    | Commit             | Evidence                            | Notes                                                                                                                                                      |
+| ----------------------------------------------- | --------- | ------------------ | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Baseline                                        | Completed | Existing `f5efc5a` | `.tmp/night-shift-v4-baseline.log`  | All requested baseline commands exited 0; money reconciliation remains MANUAL_REQUIRED; embedded dry-run WARNING with 0 critical missing.                  |
+| A: P0-001L real staging QA preflight            | Completed | `c2b9417`          | `npm run qa:employee-entry-staging` | Result is MANUAL_REQUIRED. Real staging URL, D1 target, entrypoint, credentials, backup, and rollback inputs are missing from committed non-secret config. |
+| B: P0-003C backend totals live authority gate   | Completed | Pending            | `npm run gate:backend-totals-live`  | Result is MANUAL_REQUIRED. Live dashboard authority remains blocked by reconciliation, receivables, tenant scope, and human review.                        |
+| C: P0-008B receivables readiness gate           | Completed | Pending            | `npm run gate:receivables`          | Result is MANUAL_REQUIRED. Receivables design exists, but migration draft and production dependencies remain missing.                                      |
+| D: P0-006B tenant/property scope readiness gate | Completed | Pending            | `npm run gate:tenant-scope`         | Result is MANUAL_REQUIRED. Live Worker source still relies primarily on deployment-wide `corpid`.                                                          |
 
 ## Safety Ledger
 
@@ -30,14 +31,15 @@ Scope: 8-hour continuous commercialization engineering run. No production deploy
 
 ## Verification Ledger
 
-| Command                             | Result          | Notes                                      |
-| ----------------------------------- | --------------- | ------------------------------------------ |
-| Baseline command suite              | Pass            | See `.tmp/night-shift-v4-baseline.log`.    |
-| `npm run qa:employee-entry-staging` | MANUAL_REQUIRED | Safe dry-run completed; no remote write.   |
-| `npm run test:backend-totals`       | PASS            | 16 tests passed.                           |
-| `npm run rehearse:backend-totals`   | PASS            | Local-only rehearsal regenerated evidence. |
-| `npm run gate:backend-totals-live`  | MANUAL_REQUIRED | Dry-run gate only; no live result change.  |
-| `npm run gate:receivables`          | MANUAL_REQUIRED | Read-only gate; no migration executed.     |
+| Command                             | Result          | Notes                                       |
+| ----------------------------------- | --------------- | ------------------------------------------- |
+| Baseline command suite              | Pass            | See `.tmp/night-shift-v4-baseline.log`.     |
+| `npm run qa:employee-entry-staging` | MANUAL_REQUIRED | Safe dry-run completed; no remote write.    |
+| `npm run test:backend-totals`       | PASS            | 16 tests passed.                            |
+| `npm run rehearse:backend-totals`   | PASS            | Local-only rehearsal regenerated evidence.  |
+| `npm run gate:backend-totals-live`  | MANUAL_REQUIRED | Dry-run gate only; no live result change.   |
+| `npm run gate:receivables`          | MANUAL_REQUIRED | Read-only gate; no migration executed.      |
+| `npm run gate:tenant-scope`         | MANUAL_REQUIRED | Read-only gate; no auth/schema/data change. |
 
 ## Pending Updates
 

@@ -239,3 +239,13 @@ Date: 2026-05-25, Asia/Dubai
 
 P0-008 remains Partial. No receivables migration was executed and no live
 arrears/dashboard logic was changed.
+
+## P0-006B Verification Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+| Command                     | Exists | Result          | Error Summary | Log Evidence                                                                                  | Commercial Meaning                                                                              |
+| --------------------------- | ------ | --------------- | ------------- | --------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `npm run gate:tenant-scope` | yes    | MANUAL_REQUIRED | none          | `TENANT_SCOPE_READINESS_GATE=MANUAL_REQUIRED`; `corpid=185`, `company_id=8`, `property_id=14` | Confirms tenant/property scope is designed but not implemented; static CORPID remains dominant. |
+
+P0-006 remains Partial. No auth behavior, schema, or data was changed.

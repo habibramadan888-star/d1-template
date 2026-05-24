@@ -3112,3 +3112,33 @@ Notes:
 - A concrete receivables migration draft is not yet present.
 - Production receivables remain blocked by P0-001, P0-003, P0-006, migration
   review, reconciliation, and human approval.
+
+## P0-006B Tenant / Property Scope Readiness Gate
+
+Date: 2026-05-25, Asia/Dubai
+
+Scope:
+
+- Readiness gate for tenant/property scope implementation.
+- No auth rewrite.
+- No schema migration.
+- No production behavior change.
+
+Changes:
+
+- Added `P0_006B_TENANT_PROPERTY_SCOPE_READINESS_GATE.md`.
+- Added `scripts/gate-tenant-scope-readiness.mjs`.
+- Added `TENANT_SCOPE_READINESS_GATE_RESULT.md`.
+- Added `NEXT_PROMPT_P0_006C_TENANT_SCOPE_LOCAL_STAGING_REHEARSAL.md`.
+
+Verification:
+
+| Command                     | Result          |
+| --------------------------- | --------------- |
+| `npm run gate:tenant-scope` | MANUAL_REQUIRED |
+
+Notes:
+
+- Live Worker source still relies heavily on `corpid` (`corpid=185`,
+  `company_id=8`, `property_id=14` in the static gate scan).
+- P0-006 remains Partial and production SaaS multi-tenant launch remains NO-GO.

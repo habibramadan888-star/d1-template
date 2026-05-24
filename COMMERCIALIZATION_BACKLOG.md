@@ -603,3 +603,36 @@ Blockers before production:
 - P0-003 backend totals live authority.
 - P0-006 tenant/property scope.
 - Human accounting approval.
+
+## P0-006B Tenant / Property Scope Readiness Gate Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+P0-006 current status:
+
+- Partial - tenant/property scope readiness gate ready.
+
+Completed safely:
+
+- Added tenant/property scope readiness gate document.
+- Added read-only tenant scope gate script.
+- Added next-step P0-006C prompt.
+
+Verification:
+
+- `npm run gate:tenant-scope` returned `MANUAL_REQUIRED`.
+
+Still forbidden:
+
+- Global tenant rewrite.
+- Production schema migration.
+- Production auth behavior changes.
+- Removing legacy `CORPID` fallback.
+
+Blockers before production:
+
+- Human decision on shared Worker/D1 vs isolated deployment per customer.
+- Company/property membership model.
+- Legacy data backfill to property scope.
+- Cross-tenant denial tests.
+- Server-side scope filters on every sensitive API.

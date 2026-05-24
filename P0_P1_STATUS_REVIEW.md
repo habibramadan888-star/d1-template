@@ -658,3 +658,31 @@ Next step:
 
 - P0-008C can create local/staging-only schema draft, pure module, tests, and
   rehearsal. Do not execute production or remote migration.
+
+## P0-006B Tenant / Property Scope Readiness Gate Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+P0-006 current status:
+
+- Partial - tenant/property scope readiness gate ready.
+- Not Verified because live API queries and auth sessions are not
+  company/property scoped.
+
+Added evidence:
+
+- `P0_006B_TENANT_PROPERTY_SCOPE_READINESS_GATE.md`
+- `TENANT_SCOPE_READINESS_GATE_RESULT.md`
+- `NEXT_PROMPT_P0_006C_TENANT_SCOPE_LOCAL_STAGING_REHEARSAL.md`
+- `scripts/gate-tenant-scope-readiness.mjs`
+- `npm run gate:tenant-scope`
+
+Result:
+
+- Current live Worker uses `corpid` far more than `company_id`/`property_id`.
+- Cross-tenant denial tests and scoped memberships are not implemented.
+
+Next step:
+
+- P0-006C can add local/staging cross-tenant fixtures and denial tests. Do not
+  do a global tenant rewrite automatically.
