@@ -600,3 +600,33 @@ Remaining risk:
 Next step:
 
 - Continue safe gates and planning. Do not deploy or migrate automatically.
+
+## P0-003C Backend Totals Live Authority Gate Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+P0-003 current status:
+
+- Partial - backend totals live authority gate ready.
+- Not Verified because live dashboard/API totals have not been switched and
+  production/staging authority has not been approved.
+
+Added evidence:
+
+- `P0_003C_BACKEND_TOTALS_LIVE_AUTHORITY_GATE.md`
+- `BACKEND_TOTALS_LIVE_AUTHORITY_GATE_RESULT.md`
+- `NEXT_PROMPT_P0_003D_BACKEND_TOTALS_STAGING_SWITCH_REHEARSAL.md`
+- `scripts/gate-backend-totals-live-authority.mjs`
+- `npm run gate:backend-totals-live`
+
+Result:
+
+- Core backend totals are computable in rehearsal.
+- Live authority remains `MANUAL_REQUIRED` because reconciliation, receivables,
+  tenant/property scope, staging comparison, and human accounting review are
+  incomplete.
+
+Next step:
+
+- P0-003D can be a local/staging shadow comparison only. Do not switch live
+  dashboard totals automatically.

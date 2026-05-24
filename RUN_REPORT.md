@@ -3046,3 +3046,38 @@ Notes:
   staging entrypoint, and staging test credentials are not present in committed
   non-secret configuration.
 - P0-001 remains Partial. Production cutover remains NO-GO.
+
+## P0-003C Backend Totals Live Authority Gate
+
+Date: 2026-05-25, Asia/Dubai
+
+Scope:
+
+- Dry-run gate for moving backend totals from rehearsal to future live
+  authority.
+- No dashboard live result switch.
+- No live financial formula change.
+- No database write.
+- No deployment or migration.
+
+Changes:
+
+- Added `P0_003C_BACKEND_TOTALS_LIVE_AUTHORITY_GATE.md`.
+- Added `scripts/gate-backend-totals-live-authority.mjs`.
+- Added `BACKEND_TOTALS_LIVE_AUTHORITY_GATE_RESULT.md`.
+- Added `NEXT_PROMPT_P0_003D_BACKEND_TOTALS_STAGING_SWITCH_REHEARSAL.md`.
+
+Verification:
+
+| Command                            | Result          |
+| ---------------------------------- | --------------- |
+| `npm run test:backend-totals`      | PASS            |
+| `npm run rehearse:backend-totals`  | PASS            |
+| `npm run gate:backend-totals-live` | MANUAL_REQUIRED |
+
+Notes:
+
+- Backend totals can be recomputed in rehearsal, but live authority still
+  requires money reconciliation, P0-008 receivables, P0-006 scope, staging
+  comparison, and human accounting approval.
+- P0-003 remains Partial.

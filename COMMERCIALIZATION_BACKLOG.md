@@ -535,3 +535,38 @@ Still forbidden:
   entrypoint are human-confirmed.
 - Production adapter cutover.
 - Marking P0-001 Verified.
+
+## P0-003C Backend Totals Live Authority Gate Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+P0-003 current status:
+
+- Partial - backend totals live authority gate ready.
+
+Completed safely:
+
+- Added backend totals live authority gate document.
+- Added backend totals live gate dry-run script.
+- Added next-step P0-003D prompt.
+
+Verification:
+
+- `npm run test:backend-totals` passed.
+- `npm run rehearse:backend-totals` passed.
+- `npm run gate:backend-totals-live` returned `MANUAL_REQUIRED` without
+  changing live responses.
+
+Still forbidden:
+
+- Live dashboard switch.
+- Live financial formula change.
+- Treating frontend totals as authority.
+- Production deployment or migration.
+
+Blockers before live authority:
+
+- P0-001 reconciliation/manual review.
+- P0-008 receivables.
+- P0-006 tenant/property scope.
+- Staging read-only comparison and human accounting review.

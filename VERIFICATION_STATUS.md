@@ -215,3 +215,16 @@ Date: 2026-05-25, Asia/Dubai
 
 P0-001 remains Partial. P0-001L prepares real staging QA only; it does not
 execute staging writes, production deployment, or migration.
+
+## P0-003C Verification Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+| Command                            | Exists | Result          | Error Summary | Log Evidence                                               | Commercial Meaning                                                                                                |
+| ---------------------------------- | ------ | --------------- | ------------- | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `npm run test:backend-totals`      | yes    | PASS            | none          | 16 tests passed                                            | Confirms backend totals helper still recomputes core totals and rejects unsafe money.                             |
+| `npm run rehearse:backend-totals`  | yes    | PASS            | none          | `BACKEND_TOTALS_AUTHORITY_REHEARSAL_RESULT.md` regenerated | Confirms local-only backend totals discrepancy rehearsal remains stable.                                          |
+| `npm run gate:backend-totals-live` | yes    | MANUAL_REQUIRED | none          | `BACKEND_TOTALS_LIVE_AUTHORITY_GATE=MANUAL_REQUIRED`       | Confirms live dashboard/authority switch is gated by reconciliation, receivables, tenant scope, and human review. |
+
+P0-003 remains Partial. No live dashboard output or live financial formula was
+changed.
