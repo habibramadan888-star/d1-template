@@ -2686,3 +2686,41 @@ Commercial meaning:
 - Source Worker local validation can continue.
 - Any staging/prod deploy through `wrangler.embedded.toml` is blocked until controlled artifact write and human diff review are approved.
 - Production deploy was not performed.
+
+## P1-006B Controlled Embedded Write
+
+Date: 2026-05-24, Asia/Dubai
+
+Scope:
+
+- Refreshed `deploy-worker/src/index.embedded.js` through controlled dry-run generated artifact.
+- Created a backup under `.tmp/embedded-worker-backups/`.
+- Added `npm run build:embedded:write`.
+- Added `npm run smoke:embedded-with-worker`.
+- Did not execute production/staging deploy.
+- Did not execute production/remote D1 migration.
+- Did not modify live financial formulas, live dashboard result, or live employee handover flow.
+
+Verification:
+
+```text
+npm run audit:worker-drift
+PASS - critical mismatches 0, route mismatches 0
+
+npm run verify:embedded-worker
+PASS - missing critical checks 0
+
+npm run build:embedded:dry-run
+PASS - current embedded missing 0, dry-run generated missing 0
+
+npm run smoke:embedded-with-worker
+PASS - embedded config runtime guard probe passed
+
+Full post-write validation chain
+PASS - from npm run check through npm run security:secrets
+```
+
+Commercial meaning:
+
+- Embedded artifact is now fresh for checked critical route/guard behavior.
+- Production deploy remains forbidden until a separate deploy approval and environment-specific smoke run.

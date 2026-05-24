@@ -48,3 +48,19 @@ This plan is for a future explicit task only. P1-006 did not overwrite `deploy-w
 - Before commit: `git restore -- deploy-worker/src/index.embedded.js`
 - After commit: revert the controlled write commit.
 - Do not use rollback as a substitute for deploy gate review.
+
+## P1-006B Execution Note
+
+Date: 2026-05-24, Asia/Dubai
+
+This controlled write plan was executed under task P1-006B.
+
+Result:
+
+- `deploy-worker/src/index.embedded.js` was refreshed from the dry-run generated artifact.
+- A backup was created under `.tmp/embedded-worker-backups/`.
+- `npm run audit:worker-drift` passed with 0 critical mismatches.
+- `npm run verify:embedded-worker` passed.
+- `npm run build:embedded:dry-run` passed.
+- `npm run smoke:embedded-with-worker` passed.
+- No production or staging deploy was executed.

@@ -206,3 +206,37 @@ Next decision:
 
 - If staging deploy uses `wrangler.embedded.toml`, review `NEXT_PROMPT_P1_006B_CONTROLLED_EMBEDDED_WRITE.md`.
 - If staging deploy uses source `wrangler.toml`, proceed to P0-001E local/staging dual-write rehearsal and keep embedded drift as a deploy-prep blocker.
+
+## P1-006B Update
+
+Date: 2026-05-24, Asia/Dubai
+
+New evidence:
+
+- `P1_006B_STARTING_CONTEXT.md`
+- `EMBEDDED_WORKER_PRE_WRITE_DIFF_REVIEW.md`
+- `EMBEDDED_WORKER_CONTROLLED_WRITE_RESULT.md`
+- `EMBEDDED_WORKER_RUNTIME_PROBE_RESULT.md`
+- `scripts/write-embedded-worker-controlled.mjs`
+- `scripts/smoke-embedded-with-worker.mjs`
+
+Verification:
+
+- `npm run build:embedded:write` passed.
+- `npm run audit:worker-drift` passed with 0 critical mismatches.
+- `npm run verify:embedded-worker` passed.
+- `npm run build:embedded:dry-run` passed.
+- `npm run smoke:embedded-with-worker` passed.
+- Full post-write validation chain passed.
+
+Meaning:
+
+- P1-006 deploy artifact freshness is verified.
+- `deploy-worker/src/index.embedded.js` was updated in a controlled write with backup.
+- This is not staging deploy approval.
+- This is not production deploy approval.
+
+Next decision:
+
+- P0-001E local/staging dual-write rehearsal can proceed if no real deploy is required.
+- If the next step is real staging deployment, first confirm Cloudflare Worker/D1/KV/secrets and run a deploy-specific approval gate.

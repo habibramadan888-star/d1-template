@@ -320,3 +320,25 @@ Safe path:
 
 - Continue local/source Worker validation through `deploy-worker/wrangler.toml`.
 - Do not deploy through `wrangler.embedded.toml` until P1-006B controlled write is approved and verified.
+
+## P1-006B update: controlled write completed; deploy still needs approval
+
+Status: Artifact freshness resolved, deployment still blocked.
+
+Evidence:
+
+- `npm run build:embedded:write` generated `EMBEDDED_WORKER_CONTROLLED_WRITE_RESULT.md` and refreshed `deploy-worker/src/index.embedded.js`.
+- `npm run audit:worker-drift` reports 0 critical mismatches and 0 route mismatches.
+- `npm run verify:embedded-worker` reports `PASS`.
+- `npm run build:embedded:dry-run` reports `PASS`.
+- `npm run smoke:embedded-with-worker` reports `PASS`.
+
+Remaining blocker:
+
+- This task did not execute staging or production deployment.
+- Actual Cloudflare staging/prod Worker, D1, KV, secrets, and deploy command are still not approved.
+
+Safe path:
+
+- P0-001E local/staging rehearsal may continue without deployment.
+- Any real deploy still needs a separate deploy approval task.

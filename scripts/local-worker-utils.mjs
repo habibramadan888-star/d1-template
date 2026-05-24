@@ -79,7 +79,14 @@ export async function waitForWorker(baseUrl = defaultBaseUrl, timeoutMs = 30000)
   );
 }
 
-export function startWorker({ port = defaultPort, persistTo = defaultPersistTo, vars = {} } = {}) {
+export function startWorker({
+  port = defaultPort,
+  persistTo = defaultPersistTo,
+  vars = {},
+  configFile = "wrangler.toml",
+  envFiles = [],
+  envName = ""
+} = {}) {
   if (!existsSync(wranglerBin)) {
     throw new Error(`Wrangler binary not found at ${wranglerBin}. Run npm install first.`);
   }
@@ -87,18 +94,22 @@ export function startWorker({ port = defaultPort, persistTo = defaultPersistTo, 
     "--var",
     `${key}:${String(value)}`
   ]);
+  const envFileArgs = envFiles.flatMap((file) => ["--env-file", file]);
+  const envNameArgs = envName ? ["--env", envName] : [];
   return spawn(
     process.execPath,
     [
       wranglerBin,
       "dev",
       "--config",
-      "wrangler.toml",
+      configFile,
+      ...envNameArgs,
       "--local",
       "--persist-to",
       persistTo,
       "--port",
       String(port),
+      ...envFileArgs,
       ...varArgs
     ],
     {

@@ -46,5 +46,23 @@ Allowed only after:
 
 - Local source Worker development: GO.
 - Staging deploy using source Worker: MANUAL_REQUIRED because deployment environment is not confirmed.
-- Staging deploy using embedded Worker: NO-GO until controlled write is approved and verified.
+- Staging deploy using embedded Worker: MANUAL_REQUIRED after P1-006B controlled write; route/guard freshness is verified, but real staging resources and deployment approval are still missing.
 - Production deploy: NO-GO.
+
+## P1-006B Controlled Write Update
+
+Date: 2026-05-24, Asia/Dubai
+
+Controlled write completed for `deploy-worker/src/index.embedded.js`.
+
+Verified:
+
+1. `npm run audit:worker-drift` reports 0 critical mismatches and 0 route mismatches.
+2. `npm run verify:embedded-worker` reports `PASS`.
+3. `npm run build:embedded:dry-run` reports `PASS`.
+4. `npm run smoke:embedded-with-worker` reports `PASS`.
+5. `/api/staging/handover/commit` exists in the embedded artifact.
+6. `ENABLE_HANDOVER_ATOMIC_STAGING` and `HSC_ALLOWED_APP_ENVS` exist in the embedded artifact.
+7. `/api/delete_session` void markers remain in the embedded artifact.
+
+This update does not approve staging or production deployment. Staging deploy still requires separate Cloudflare resource confirmation, human approval, and a deploy-specific smoke run.

@@ -19,6 +19,8 @@
     "audit:worker-drift": "node scripts/audit-worker-entrypoint-drift.mjs",
     "verify:embedded-worker": "node scripts/verify-embedded-worker-freshness.mjs",
     "build:embedded:dry-run": "node scripts/generate-embedded-worker-dry-run.mjs",
+    "build:embedded:write": "node scripts/write-embedded-worker-controlled.mjs",
+    "smoke:embedded-with-worker": "node scripts/smoke-embedded-with-worker.mjs",
     "audit:money": "node scripts/audit-money-fields.mjs",
     "triage:money": "node scripts/triage-money-audit.mjs",
     "gate:money-reconciliation": "node scripts/reconcile-money-dual-write-gate.mjs",

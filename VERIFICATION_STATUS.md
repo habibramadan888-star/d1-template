@@ -98,3 +98,18 @@ Date: 2026-05-24, Asia/Dubai
 | `npm run build:embedded:dry-run` | yes    | Pass with `WARNING` result         | none          | `EMBEDDED_WORKER_DRY_RUN_RESULT=WARNING`, `EMBEDDED_WORKER_CURRENT_MISSING=6`, `EMBEDDED_WORKER_GENERATED_MISSING=0` | Dry-run generation proves a candidate artifact can include critical items, but controlled write requires human approval. |
 
 P1-006 remains Partial. These commands do not deploy, do not overwrite `index.embedded.js`, and do not approve production.
+
+## P1-006B Verification Addendum
+
+Date: 2026-05-24, Asia/Dubai
+
+| Command                              | Exists | Result | Error Summary | Log Evidence                                                                                                        | Commercial Meaning                                                                                            |
+| ------------------------------------ | ------ | ------ | ------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `npm run build:embedded:write`       | yes    | Pass   | none          | `EMBEDDED_WORKER_CONTROLLED_WRITE_RESULT=PASS`; backup path written to `.tmp/embedded-worker-backups/`              | Controlled generated artifact write completed with rollback evidence.                                         |
+| `npm run audit:worker-drift`         | yes    | Pass   | none          | `WORKER_DRIFT_CRITICAL_MISMATCHES=0`, `WORKER_DRIFT_ROUTE_MISMATCHES=0`, `WORKER_DRIFT_STAGING_HANDOVER_MISSING=no` | Source and embedded Worker match for checked critical routes and guards.                                      |
+| `npm run verify:embedded-worker`     | yes    | Pass   | none          | `EMBEDDED_WORKER_FRESHNESS_RESULT=PASS`, `EMBEDDED_WORKER_MISSING_CRITICAL=0`                                       | Embedded artifact freshness is verified for checked critical behavior.                                        |
+| `npm run build:embedded:dry-run`     | yes    | Pass   | none          | `EMBEDDED_WORKER_DRY_RUN_RESULT=PASS`, `EMBEDDED_WORKER_CURRENT_MISSING=0`, `EMBEDDED_WORKER_GENERATED_MISSING=0`   | Current embedded artifact matches dry-run generated artifact for checked critical items.                      |
+| `npm run smoke:embedded-with-worker` | yes    | Pass   | none          | `EMBEDDED_WORKER_RUNTIME_PROBE=PASS`                                                                                | Embedded config local runtime validates production 404, feature flag 403, route reachability, and auth guard. |
+| Full post-write verification chain   | yes    | Pass   | none          | `npm run check` through `npm run security:secrets` completed successfully                                           | Controlled artifact refresh did not break the existing local P0/P1 validation suite.                          |
+
+P1-006 artifact freshness is verified. This does not approve production deployment or staging deployment.
