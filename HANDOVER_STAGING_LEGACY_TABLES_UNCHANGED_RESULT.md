@@ -1,6 +1,6 @@
 # Handover Staging Legacy Tables Unchanged Result
 
-Generated: 2026-05-24T21:01:55.153Z
+Generated: 2026-05-24T22:09:33.576Z
 
 Scope: P0-002D local verification. This script executes the stable endpoint regression test and verifies that it still contains explicit staging-table write and legacy-table non-write assertions. No production Worker, remote D1, production migration, live handover switch, live dashboard change, or legacy financial table write was performed.
 
@@ -23,12 +23,12 @@ Scope: P0-002D local verification. This script executes the stable endpoint regr
 | `entry_events`              | handover commit accepted evidence exists  | PASS   |
 
 ```text
-✔ production APP_ENV hides staging handover endpoint with 404 (1424.3637ms)
-✔ missing or disabled feature flag rejects before auth (3229.6599ms)
+✔ production APP_ENV hides staging handover endpoint with 404 (1685.8131ms)
+✔ missing or disabled feature flag rejects before auth (3241.8946ms)
 PASS local migration migrations\local\001_clean_legacy_bootstrap.sql
 PASS local migration migrations\local\002_handover_atomic_staging.sql
 PASS local dev seed app_settings for local-dev-company
-✔ enabled staging handover endpoint enforces auth, roles, idempotency, totals, and staging writes (24936.4684ms)
+✔ enabled staging handover endpoint enforces auth, roles, idempotency, totals, and staging writes (26321.2976ms)
 ℹ tests 3
 ℹ suites 0
 ℹ pass 3
@@ -36,7 +36,7 @@ PASS local dev seed app_settings for local-dev-company
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 40181.4487
+ℹ duration_ms 42102.8022
 
 ```
 

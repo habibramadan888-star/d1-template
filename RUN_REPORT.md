@@ -2972,3 +2972,41 @@ Notes:
 - P0-001 remains Partial and must not be marked Verified until production
   migration, production reconciliation, dashboard authority, and human
   accounting review are complete.
+
+## P0-001K Employee Entry Staging QA and Cutover Readiness Gate
+
+Date: 2026-05-25, Asia/Dubai
+
+Scope:
+
+- Staging QA and cutover readiness gate for `POST /api/employee/entry`.
+- No production deploy.
+- No staging deploy.
+- No production or remote D1 migration.
+- No dashboard live result switch.
+- No live financial formula replacement.
+- No legacy route or legacy field deletion.
+
+Changes:
+
+- Added manual QA/readiness docs for employee entry staging QA.
+- Added legacy-vs-adapter comparison script.
+- Added rollback drill script.
+- Added production behavior lock tests.
+- Did not modify the live route code beyond the previously committed P0-001J
+  rehearsal gate.
+
+Verification:
+
+| Command                                       | Result |
+| --------------------------------------------- | ------ |
+| `npm run compare:employee-entry-routes`       | PASS   |
+| `npm run rehearse:employee-entry-rollback`    | PASS   |
+| `npm run test:employee-entry-production-lock` | PASS   |
+
+Notes:
+
+- Legacy-vs-adapter comparison produced 0 unexpected differences.
+- Rollback by disabling `ENABLE_EMPLOYEE_ENTRY_ADAPTER_LIVE_ROUTE` passed.
+- Production behavior remains legacy.
+- P0-001 remains Partial and production cutover remains NO-GO.

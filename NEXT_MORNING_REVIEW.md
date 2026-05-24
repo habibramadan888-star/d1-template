@@ -447,3 +447,37 @@ Tomorrow first review:
 3. Decide whether the next step should be staging QA/cutover gate, P0-008
    receivables, or P0-006 tenant isolation.
 4. Do not run production or remote D1 migration.
+
+## P0-001K Update
+
+Date: 2026-05-25, Asia/Dubai
+
+What changed:
+
+- Added an employee entry staging QA guide.
+- Added a production cutover readiness checklist.
+- Added a legacy-vs-adapter comparison script and report.
+- Added a rollback drill script and report.
+- Added production behavior lock tests.
+
+Validation:
+
+- `npm run compare:employee-entry-routes` passed with 0 unexpected differences.
+- `npm run rehearse:employee-entry-rollback` passed.
+- `npm run test:employee-entry-production-lock` passed.
+
+P0-001 status:
+
+- Partial - employee entry staging QA package ready.
+- Not Verified. Real staging QA, production migration/backfill, production
+  rollback, dashboard authority, tenant isolation, receivables, and human money
+  risk review remain incomplete.
+
+Tomorrow first review:
+
+1. Review `EMPLOYEE_ENTRY_STAGING_QA_GUIDE.md`.
+2. Review `P0_001K_CUTOVER_READINESS_CHECKLIST.md`.
+3. Review `EMPLOYEE_ENTRY_LEGACY_VS_ADAPTER_COMPARISON.md`.
+4. Confirm the actual staging deploy entrypoint and D1 backup/rollback plan.
+5. Do not approve production cutover until reconciliation and money risks are
+   manually reviewed.

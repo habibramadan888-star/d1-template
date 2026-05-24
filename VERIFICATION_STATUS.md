@@ -190,3 +190,17 @@ Date: 2026-05-25, Asia/Dubai
 P0-001 remains Partial. P0-001J verifies local/staging live-route switch
 rehearsal only; it does not execute production cutover, production migration,
 dashboard authority switch, or live financial formula replacement.
+
+## P0-001K Verification Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+| Command                                       | Exists | Result | Error Summary | Log Evidence                                   | Commercial Meaning                                                                                           |
+| --------------------------------------------- | ------ | ------ | ------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `npm run compare:employee-entry-routes`       | yes    | Pass   | none          | `EMPLOYEE_ENTRY_ROUTE_COMPARISON_UNEXPECTED=0` | Compares legacy and adapter rehearsal behavior and identifies only expected differences/manual review items. |
+| `npm run rehearse:employee-entry-rollback`    | yes    | Pass   | none          | `EMPLOYEE_ENTRY_ROLLBACK_DRILL=PASS`           | Confirms disabling the route switch flag returns employee entry to legacy behavior.                          |
+| `npm run test:employee-entry-production-lock` | yes    | Pass   | none          | `tests 3`, `pass 3`                            | Confirms production and missing-env behavior do not enable adapter metadata or adapter-only writes.          |
+
+P0-001 remains Partial. P0-001K prepares real staging QA and production cutover
+readiness review only; it does not deploy, migrate, or approve production
+cutover.

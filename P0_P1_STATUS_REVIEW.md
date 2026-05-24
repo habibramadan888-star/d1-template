@@ -516,3 +516,49 @@ Next step:
 - Human review should decide whether to continue with staging QA / production
   cutover gate design or return to P0-008 receivables and P0-006 tenant
   isolation. Do not execute production or remote D1 migration automatically.
+
+## P0-001K Employee Entry Staging QA Gate Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+Current P0-001 status is now
+`Partial - employee entry staging QA package ready`.
+
+Added evidence:
+
+- `P0_001K_P0_001J_DIFF_REVIEW.md`
+- `EMPLOYEE_ENTRY_STAGING_QA_GUIDE.md`
+- `P0_001K_CUTOVER_READINESS_CHECKLIST.md`
+- `EMPLOYEE_ENTRY_LEGACY_VS_ADAPTER_COMPARISON.md`
+- `EMPLOYEE_ENTRY_ROLLBACK_DRILL_RESULT.md`
+- `EMPLOYEE_ENTRY_CUTOVER_DEPLOY_ARTIFACT_REVIEW.md`
+- `tests/employee-entry-production-behavior-lock.spec.mjs`
+- `scripts/compare-employee-entry-legacy-vs-adapter.mjs`
+- `scripts/rehearse-employee-entry-rollback.mjs`
+- `npm run compare:employee-entry-routes`
+- `npm run rehearse:employee-entry-rollback`
+- `npm run test:employee-entry-production-lock`
+
+Result:
+
+- Production behavior remains legacy for flag true and flag false.
+- Feature flag off remains legacy and is a rollback path.
+- Local/staging flag on adapter rehearsal still passes.
+- Legacy-vs-adapter comparison found 0 unexpected differences.
+- Rollback drill passed.
+- Production behavior lock passed.
+- Reconciliation gate remains `MANUAL_REQUIRED` with no FAIL or BLOCKED state.
+
+Remaining risk:
+
+- Production cutover is still NO-GO.
+- Real staging QA has not been executed.
+- Production migration/backfill has not been approved.
+- P0-008 receivables and P0-006 tenant/property isolation still block production cutover.
+- TOP_25 money risks still need human review.
+
+Next step:
+
+- Human may start real staging QA only after confirming the staging Worker
+  entrypoint, staging D1 backup/rollback plan, and feature flag settings. Do not
+  execute production deploy or migration automatically.

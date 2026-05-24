@@ -454,3 +454,50 @@ Still forbidden:
 Next allowed step:
 
 - P0-001J local/staging live-route switch rehearsal after human approval.
+
+## P0-001K Employee Entry Staging QA Gate Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+P0-001 current status:
+
+- Partial - employee entry staging QA package ready.
+- Not Verified because real staging QA, production cutover, production
+  migration/backfill, dashboard authority switch, tenant isolation, and
+  receivables are not complete.
+
+Completed safely:
+
+- Added `P0_001K_P0_001J_DIFF_REVIEW.md`.
+- Added `EMPLOYEE_ENTRY_STAGING_QA_GUIDE.md`.
+- Added `P0_001K_CUTOVER_READINESS_CHECKLIST.md`.
+- Added `EMPLOYEE_ENTRY_LEGACY_VS_ADAPTER_COMPARISON.md`.
+- Added `EMPLOYEE_ENTRY_ROLLBACK_DRILL_RESULT.md`.
+- Added `EMPLOYEE_ENTRY_CUTOVER_DEPLOY_ARTIFACT_REVIEW.md`.
+- Added `tests/employee-entry-production-behavior-lock.spec.mjs`.
+- Added `scripts/compare-employee-entry-legacy-vs-adapter.mjs`.
+- Added `scripts/rehearse-employee-entry-rollback.mjs`.
+
+Verification:
+
+- `npm run compare:employee-entry-routes` passed with 0 unexpected differences.
+- `npm run rehearse:employee-entry-rollback` passed.
+- `npm run test:employee-entry-production-lock` passed.
+- Existing P0-001J route-switch and broad safety gates remain required in final
+  validation.
+
+Still forbidden:
+
+- Production D1 migration.
+- Remote D1 migration.
+- Staging or production deploy by automation.
+- Production adapter cutover.
+- Dashboard authority switch.
+- Deleting legacy fields or route.
+- Marking P0-001 Verified.
+
+Next allowed step:
+
+- Real staging QA can be prepared after human confirmation of staging env,
+  entrypoint, D1 backup/rollback, and feature flag configuration. Production
+  cutover remains blocked.
