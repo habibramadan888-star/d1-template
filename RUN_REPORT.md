@@ -2148,3 +2148,34 @@ Full stage verification was run after this section was added and is recorded in 
 ### Status
 
 P0-002 remains `Partial - audit and atomic design complete`. The current live employee handover path is still not migrated to an atomic backend commit endpoint; this stage only creates the future contract, test plan, and non-invasive guardrail tests.
+
+## P0-008A Receivables Model Design
+
+Date: 2026-05-24
+
+### Files Added Or Updated
+
+- `RECEIVABLES_MODEL_DESIGN.md`: defines the future accounting source-of-truth model for receivables, receivable events, payment allocations, and adjustments.
+- `RECEIVABLES_LIFECYCLE_TEST_PLAN.md`: defines automated and manual tests required before a live receivables cutover.
+- `migration-drafts/004_receivables_model_draft.sql`: adds a draft-only receivables schema using integer AED fils and soft-void fields.
+- `COMMERCIALIZATION_BACKLOG.md`, `P0_P1_STATUS_REVIEW.md`: updated P0-008A status as Partial.
+
+### Verification
+
+```text
+npm run audit:db passed
+npm run check passed
+npm run smoke:with-worker passed
+npm run verify:clean-d1 passed
+```
+
+### Safety Scope
+
+- No production Worker deploy was executed.
+- No production or remote D1 migration was executed.
+- Draft SQL was not added to local clean bootstrap.
+- No live route, dashboard statistic, rent formula, handover flow, delete-session void behavior, or tenancy logic was changed.
+
+### Status
+
+P0-008 remains `Partial - receivables model designed`. The system still does not use a live receivables table as the accounting source of truth; this stage only defines the future model, draft schema, and lifecycle test plan.

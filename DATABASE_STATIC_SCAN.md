@@ -14,6 +14,7 @@ This is a static scan artifact. It does not replace `DATABASE_AUDIT.md`, which c
 - `migrations/local/001_clean_legacy_bootstrap.sql`
 - `migration-drafts/002_commercial_bootstrap.sql`
 - `migration-drafts/003_delete_session_void_fields.sql`
+- `migration-drafts/004_receivables_model_draft.sql`
 
 ## Tables Detected
 
@@ -32,10 +33,13 @@ This is a static scan artifact. It does not replace `DATABASE_AUDIT.md`, which c
 | `employee_users`           | deploy-worker/src/index.js, migrations/local/001_clean_legacy_bootstrap.sql                                                                                           |
 | `entry_events`             | deploy-worker/src/index.js, migrations/001_employee_anchor_schema.sql, migrations/local/001_clean_legacy_bootstrap.sql                                                |
 | `handover_sessions`        | migration-drafts/002_commercial_bootstrap.sql                                                                                                                         |
+| `payment_allocations`      | migration-drafts/004_receivables_model_draft.sql                                                                                                                      |
 | `payments`                 | migration-drafts/002_commercial_bootstrap.sql                                                                                                                         |
 | `properties`               | migration-drafts/002_commercial_bootstrap.sql                                                                                                                         |
 | `property_memberships`     | migration-drafts/002_commercial_bootstrap.sql                                                                                                                         |
-| `receivables`              | migration-drafts/002_commercial_bootstrap.sql                                                                                                                         |
+| `receivable_adjustments`   | migration-drafts/004_receivables_model_draft.sql                                                                                                                      |
+| `receivable_events`        | migration-drafts/004_receivables_model_draft.sql                                                                                                                      |
+| `receivables`              | migration-drafts/002_commercial_bootstrap.sql, migration-drafts/004_receivables_model_draft.sql                                                                       |
 | `schema_migrations`        | migration-drafts/002_commercial_bootstrap.sql                                                                                                                         |
 | `sessions`                 | deploy-worker/src/index.js, migrations/local/001_clean_legacy_bootstrap.sql                                                                                           |
 | `transactions`             | migration-drafts/002_commercial_bootstrap.sql, migrations/local/001_clean_legacy_bootstrap.sql                                                                        |
