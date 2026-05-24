@@ -61,6 +61,8 @@
     "rehearse:employee-entry-live-write-adapter": "node scripts/rehearse-employee-entry-live-write-adapter.mjs",
     "test:employee-entry-adapter-staging-endpoint": "node --test tests/employee-entry-adapter-staging-endpoint.spec.mjs",
     "rehearse:employee-entry-adapter-staging-endpoint": "node scripts/rehearse-employee-entry-adapter-staging-endpoint.mjs",
+    "test:employee-entry-route-switch": "node --test tests/employee-entry-route-switch-rehearsal.spec.mjs",
+    "rehearse:employee-entry-route-switch": "node scripts/rehearse-employee-entry-route-switch.mjs",
     "test:backend-totals-shadow": "node --test tests/backend-totals-shadow.spec.mjs",
     "test:backend-totals": "node --test tests/backend-totals-authority.spec.mjs",
     "rehearse:backend-totals": "node scripts/rehearse-backend-totals-authority.mjs",

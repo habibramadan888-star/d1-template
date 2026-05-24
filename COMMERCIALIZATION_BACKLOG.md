@@ -154,6 +154,43 @@ Still forbidden:
 - Generated embedded Worker expansion.
 - Deleting legacy business code.
 
+## P0-001J Employee Entry Live Route Switch Rehearsal Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+P0-001 current status:
+
+- Partial - employee entry live route switch rehearsal passed.
+- Not Verified because production cutover, production migration, dashboard
+  authority switch, and production reconciliation were not performed.
+
+Completed safely:
+
+- Added `ENABLE_EMPLOYEE_ENTRY_ADAPTER_LIVE_ROUTE` guard to
+  `POST /api/employee/entry`.
+- Production and feature-flag-off behavior continue through the legacy route.
+- Local/staging flag-on behavior runs adapter pre-validation before the
+  existing legacy write path.
+- Invalid adapter drafts are rejected before legacy write.
+- Voided rows are skipped before legacy write.
+- Adapter pre-validation records `audit_logs` and `entry_events` evidence.
+- Added `tests/employee-entry-route-switch-rehearsal.spec.mjs`.
+- Added `scripts/rehearse-employee-entry-route-switch.mjs`.
+
+Verification:
+
+- `npm run test:employee-entry-route-switch` passed.
+- `npm run rehearse:employee-entry-route-switch` passed.
+
+Still forbidden:
+
+- Production D1 migration.
+- Remote D1 migration.
+- Production deployment.
+- Dashboard/history live result switch.
+- Live financial formula replacement.
+- Deleting legacy route or legacy fields.
+
 ## P1-006 Embedded Worker Drift Gate Addendum
 
 Date: 2026-05-24, Asia/Dubai

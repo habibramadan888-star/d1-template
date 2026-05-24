@@ -2930,3 +2930,45 @@ Commercial meaning:
 - P0-001I defines the next safe cutover rehearsal boundary before any live route
   change is attempted.
 - P0-001 remains Partial because this is a review gate only.
+
+## P0-001J Employee Entry Live Route Switch Rehearsal
+
+Date: 2026-05-25, Asia/Dubai
+
+Scope:
+
+- Local/staging rehearsal for `POST /api/employee/entry`.
+- No production deploy.
+- No staging deploy.
+- No production or remote D1 migration.
+- No dashboard live result switch.
+- No live financial formula replacement.
+- No legacy route or legacy field deletion.
+
+Changes:
+
+- `deploy-worker/src/index.js`: added
+  `ENABLE_EMPLOYEE_ENTRY_ADAPTER_LIVE_ROUTE` gate. Production and flag-off
+  paths remain legacy. Local/staging flag-on path runs adapter pre-validation
+  before the existing legacy write path.
+- `tests/employee-entry-route-switch-rehearsal.spec.mjs`: added black-box
+  Worker tests for production legacy, flag-off rollback, flag-on adapter
+  pre-validation, owner rejection, invalid money rejection, voided-row skip, and
+  audit evidence.
+- `scripts/rehearse-employee-entry-route-switch.mjs`: added report-generating
+  rehearsal wrapper.
+
+Verification:
+
+| Command                                        | Result |
+| ---------------------------------------------- | ------ |
+| `npm run test:employee-entry-route-switch`     | PASS   |
+| `npm run rehearse:employee-entry-route-switch` | PASS   |
+
+Notes:
+
+- `gate:money-reconciliation` remains `MANUAL_REQUIRED`, as expected for this
+  stage.
+- P0-001 remains Partial and must not be marked Verified until production
+  migration, production reconciliation, dashboard authority, and human
+  accounting review are complete.

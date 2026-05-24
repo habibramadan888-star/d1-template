@@ -412,4 +412,38 @@ Tomorrow priority:
 
 1. Human review of P0-001I GO/NO-GO.
 2. If approved, run P0-001J using the prepared prompt.
-3. Do not run production or remote D1 migration.
+
+## P0-001J Update
+
+Date: 2026-05-25, Asia/Dubai
+
+What changed:
+
+- `POST /api/employee/entry` now has a local/staging-only adapter
+  pre-validation rehearsal gate behind
+  `ENABLE_EMPLOYEE_ENTRY_ADAPTER_LIVE_ROUTE`.
+- Production `APP_ENV=production` remains legacy even if the flag is true.
+- Feature flag off remains legacy.
+- Feature flag on in local/test/staging runs adapter pre-validation before
+  existing legacy write.
+- Invalid money and voided-row cases are blocked before legacy write.
+- Adapter pre-validation writes audit/entry evidence.
+
+Validation:
+
+- `npm run test:employee-entry-route-switch` passed.
+- `npm run rehearse:employee-entry-route-switch` passed.
+
+P0-001 status:
+
+- Partial - employee entry live route switch rehearsal passed.
+- Not Verified. Production migration, production cutover, dashboard authority
+  switch, and human accounting reconciliation are still not complete.
+
+Tomorrow first review:
+
+1. Review `EMPLOYEE_ENTRY_ROUTE_SWITCH_REHEARSAL_RESULT.md`.
+2. Review `EMPLOYEE_ENTRY_ROUTE_SWITCH_SAFETY_AUDIT.md`.
+3. Decide whether the next step should be staging QA/cutover gate, P0-008
+   receivables, or P0-006 tenant isolation.
+4. Do not run production or remote D1 migration.

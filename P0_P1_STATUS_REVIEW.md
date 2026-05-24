@@ -472,3 +472,47 @@ Next step:
 - P0-001G may build a non-invasive local/staging adapter rehearsal. Do not
   wire it into the live route and do not execute production or remote D1
   migration automatically.
+
+## P0-001J Employee Entry Live Route Switch Rehearsal Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+Current P0-001 status is now
+`Partial - employee entry live route switch rehearsal passed`.
+
+Added evidence:
+
+- `tests/employee-entry-route-switch-rehearsal.spec.mjs`
+- `scripts/rehearse-employee-entry-route-switch.mjs`
+- `EMPLOYEE_ENTRY_ROUTE_SWITCH_REHEARSAL_RESULT.md`
+- `EMPLOYEE_ENTRY_ROUTE_SWITCH_ROLLBACK_RESULT.md`
+- `EMPLOYEE_ENTRY_ROUTE_SWITCH_SAFETY_AUDIT.md`
+- `P0_001J_EMPLOYEE_ENTRY_ROUTE_SWITCH_SUMMARY.md`
+- `npm run test:employee-entry-route-switch`
+- `npm run rehearse:employee-entry-route-switch`
+
+Result:
+
+- Production `APP_ENV=production` continues through the legacy
+  `/api/employee/entry` behavior even when
+  `ENABLE_EMPLOYEE_ENTRY_ADAPTER_LIVE_ROUTE=true`.
+- Local/test with the feature flag off continues through the legacy path.
+- Local/test with the feature flag on runs adapter pre-validation before the
+  existing legacy write path.
+- Invalid three-decimal money is rejected before legacy write.
+- Owner/manager submitter is rejected in adapter rehearsal mode.
+- Voided rows are skipped before legacy write.
+- Adapter pre-validation writes `audit_logs` and `entry_events` evidence.
+
+Remaining risk:
+
+- Production schema was not migrated.
+- Production cutover was not executed.
+- Dashboard/history authority was not switched.
+- Live financial formulas remain legacy-compatible and P0-001 is not Verified.
+
+Next step:
+
+- Human review should decide whether to continue with staging QA / production
+  cutover gate design or return to P0-008 receivables and P0-006 tenant
+  isolation. Do not execute production or remote D1 migration automatically.

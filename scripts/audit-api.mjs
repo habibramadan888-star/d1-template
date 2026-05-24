@@ -166,9 +166,10 @@ const routeCatalog = {
     notes: "Deposit ledger is not yet integer-fils commercial schema."
   },
   "POST /api/employee/entry": {
-    purpose: "employee transaction entry",
+    purpose:
+      "employee transaction entry; local/staging adapter pre-validation rehearsal behind ENABLE_EMPLOYEE_ENTRY_ADAPTER_LIVE_ROUTE",
     login: "Yes",
-    roles: "employee, owner",
+    roles: "legacy employee/owner behavior; adapter rehearsal mode allows employee/staff only",
     tenantScope: "`corpid` write",
     reads: "`transactions`, `arrear_tasks`, `deposit_ledger`, `app_settings`",
     writes:
@@ -177,7 +178,8 @@ const routeCatalog = {
     delete: "No",
     audit: "Yes",
     risk: "P0",
-    notes: "Needs backend atomic handover commit and recomputed totals."
+    notes:
+      "Production and feature-flag-off behavior remain legacy. Local/staging adapter rehearsal pre-validates minor-unit plans before legacy write and rejects invalid drafts."
   },
   "POST /api/staging/handover/commit": {
     purpose: "local/staging-only atomic employee handover commit rehearsal endpoint",

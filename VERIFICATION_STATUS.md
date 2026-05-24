@@ -177,3 +177,16 @@ Date: 2026-05-24, Asia/Dubai
 | `npm run security:secrets`                                 | yes    | Pass   | none          | `Secret hygiene check passed.`                                   | Confirms the gate docs did not add tracked secrets.                                                   |
 
 P0-001 remains Partial. P0-001I is a review gate only; it does not change live route behavior or production accounting authority.
+
+## P0-001J Verification Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+| Command                                        | Exists | Result | Error Summary | Log Evidence                                                                                                                                                                                                   | Commercial Meaning                                                                                                                                                                       |
+| ---------------------------------------------- | ------ | ------ | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run test:employee-entry-route-switch`     | yes    | Pass   | none          | 6 route-switch rehearsal tests passed                                                                                                                                                                          | Verifies production and flag-off legacy behavior, local/staging flag-on adapter pre-validation, owner rejection, invalid money rejection, voided-row skip, rollback, and audit evidence. |
+| `npm run rehearse:employee-entry-route-switch` | yes    | Pass   | none          | Wrote `EMPLOYEE_ENTRY_ROUTE_SWITCH_REHEARSAL_RESULT.md`, `EMPLOYEE_ENTRY_ROUTE_SWITCH_ROLLBACK_RESULT.md`, `EMPLOYEE_ENTRY_ROUTE_SWITCH_SAFETY_AUDIT.md`, and `P0_001J_EMPLOYEE_ENTRY_ROUTE_SWITCH_SUMMARY.md` | Produces repeatable local/staging rehearsal evidence without production deployment or migration.                                                                                         |
+
+P0-001 remains Partial. P0-001J verifies local/staging live-route switch
+rehearsal only; it does not execute production cutover, production migration,
+dashboard authority switch, or live financial formula replacement.

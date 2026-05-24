@@ -1421,6 +1421,27 @@ async function handleEmployeeEntry(request,env,user){
   try{body=await request.json();}catch{return badRequest("invalid_json");}
   const entry=body?.entry||{};
   const session=body?.session||{};
+  const liveRouteGate=eeaLiveRouteGate(env);
+  let liveRouteAdapterDraft=null;
+  if(liveRouteGate.enabled){
+    if(!EEA_EMPLOYEE_ROLES.has(String(user.role||"").toLowerCase()))return hscError("FORBIDDEN","Only employee/staff may use the employee entry adapter live-route rehearsal.",403);
+    liveRouteAdapterDraft=createEmployeeEntryLiveWriteAdapterDraft(eeaBuildAdapterInput(body,user));
+    const adapterRefId=cleanId(entry.id)||liveRouteAdapterDraft.clientEntryId||empId("eea");
+    await eeaRecordLiveRoutePrevalidation(env,user,adapterRefId,liveRouteAdapterDraft,liveRouteGate);
+    if(liveRouteAdapterDraft.status==="SKIPPED_VOIDED"){
+      return json({
+        success:true,
+        skipped:true,
+        reason:"voided_row_excluded",
+        adapter_live_route_rehearsal:eeaLiveRouteSummary(liveRouteAdapterDraft,liveRouteGate,{legacyWriteContinued:false})
+      });
+    }
+    if(!liveRouteAdapterDraft.ok){
+      return hscError("EMPLOYEE_ENTRY_ADAPTER_REJECTED","Employee entry adapter pre-validation rejected the request before legacy write.",422,{
+        adapter_live_route_rehearsal:eeaLiveRouteSummary(liveRouteAdapterDraft,liveRouteGate,{legacyWriteContinued:false})
+      });
+    }
+  }
   const type=cleanText(entry.type||entry.reason_code||"R",12).toUpperCase();
   let amount=Number(String(entry.amount||0).replace(/,/g,""));
   const room=cleanText(entry.room||(type==="E"?entry.expense_category:""),40).replace(/^#+/,"");
@@ -1436,7 +1457,14 @@ async function handleEmployeeEntry(request,env,user){
     if(existingTx.type==="AP"&&existingTx.linked_task_id){
       arrearTask=await empReconcileArrearTask(env,user,existingTx.linked_task_id,authOperatorId,now);
     }
-    return json({success:true,entry_id:entryId,session_id:existingTx.session_id||sessionId,duplicate:true,arrear_task:arrearTask});
+    return json({
+      success:true,
+      entry_id:entryId,
+      session_id:existingTx.session_id||sessionId,
+      duplicate:true,
+      arrear_task:arrearTask,
+      ...(liveRouteAdapterDraft?{adapter_live_route_rehearsal:eeaLiveRouteSummary(liveRouteAdapterDraft,liveRouteGate,{legacyWriteContinued:false,duplicate:true})}: {})
+    });
   }
   if(!room||!Number.isFinite(amount)||(!amountOptional&&amount<=0))return badRequest("room_amount_required");
   let due=Number(String(entry.due||0).replace(/,/g,""));
@@ -1644,7 +1672,15 @@ async function handleEmployeeEntry(request,env,user){
   };
   await empEvent(env,user,{ref_id:entryId,ref_type:"transaction",event_type:"create",field_name:"*",new_value:JSON.stringify(finalEntryForAudit),operator_id:authOperatorId,ts:now});
   await audit(env,user,"employee.entry.create",entryId,{room,amount}).catch(()=>{});
-  return json({success:true,entry_id:entryId,session_id:sessionId,inserted,arrear_task:arrearTask,deposit_ledger:depositLedger});
+  return json({
+    success:true,
+    entry_id:entryId,
+    session_id:sessionId,
+    inserted,
+    arrear_task:arrearTask,
+    deposit_ledger:depositLedger,
+    ...(liveRouteAdapterDraft?{adapter_live_route_rehearsal:eeaLiveRouteSummary(liveRouteAdapterDraft,liveRouteGate,{legacyWriteContinued:true})}: {})
+  });
 }
 __name(handleEmployeeEntry,"handleEmployeeEntry");
 function empCloseStatusIsOpen(status){
@@ -2328,6 +2364,63 @@ function eeaEnvGate(env){
   return {ok:true,appEnv};
 }
 __name(eeaEnvGate,"eeaEnvGate");
+function eeaLiveRouteGate(env){
+  const appEnv=String(env.APP_ENV||"").trim().toLowerCase();
+  const flagEnabled=["1","true","yes","on"].includes(String(env.ENABLE_EMPLOYEE_ENTRY_ADAPTER_LIVE_ROUTE||"").trim().toLowerCase());
+  if(!flagEnabled)return {enabled:false,appEnv,reason:"feature_flag_off"};
+  if(!EEA_ALLOWED_APP_ENVS.has(appEnv))return {enabled:false,appEnv,reason:"environment_not_allowed"};
+  return {enabled:true,appEnv,reason:"enabled"};
+}
+__name(eeaLiveRouteGate,"eeaLiveRouteGate");
+function eeaLiveRouteSummary(draft,gate,extra={}){
+  return {
+    enabled:true,
+    app_env:gate.appEnv,
+    mode:draft.mode,
+    status:draft.status,
+    ok:Boolean(draft.ok),
+    adapter_writes_database:false,
+    legacy_write_continued:Boolean(extra.legacyWriteContinued),
+    duplicate:Boolean(extra.duplicate),
+    frontend_totals_authority:false,
+    production_migration:false,
+    remote_migration:false,
+    production_deploy:false,
+    transaction_fils_patch:draft.transactionPlan?.filsPatch||null,
+    session_fils_patch:draft.sessionPlan?.filsPatch||null,
+    deposit_ledger_fils_patch:draft.depositLedgerPlan?.filsPatch||null,
+    arrear_task_fils_patch:draft.arrearTaskPlan?.filsPatch||null,
+    warnings:(draft.warnings||[]).map((item)=>item.code||String(item)),
+    errors:(draft.errors||[]).map((item)=>item.code||String(item)),
+    audit_plan:(draft.auditPlan||[]).map((item)=>item.event_type||"")
+  };
+}
+__name(eeaLiveRouteSummary,"eeaLiveRouteSummary");
+async function eeaRecordLiveRoutePrevalidation(env,user,refId,draft,gate){
+  const payload={
+    route:"/api/employee/entry",
+    app_env:gate.appEnv,
+    adapter_status:draft.status,
+    adapter_ok:Boolean(draft.ok),
+    warning_codes:(draft.warnings||[]).map((item)=>item.code||String(item)),
+    error_codes:(draft.errors||[]).map((item)=>item.code||String(item)),
+    adapter_writes_database:false,
+    legacy_write_pending:Boolean(draft.ok&&draft.status!=="SKIPPED_VOIDED"),
+    frontend_totals_authority:false
+  };
+  await empEvent(env,user,{
+    ref_id:refId,
+    ref_type:"employee_entry_live_route_switch_rehearsal",
+    event_type:"employee_entry_adapter_prevalidation",
+    field_name:"adapter_status",
+    old_value:"",
+    new_value:JSON.stringify(payload),
+    operator_id:user.userid||"",
+    ts:empNow()
+  });
+  await audit(env,user,"employee.entry.adapter_prevalidation",refId,payload).catch(()=>{});
+}
+__name(eeaRecordLiveRoutePrevalidation,"eeaRecordLiveRoutePrevalidation");
 function eeaBuildAdapterInput(body,user){
   const entry=body?.entry&&typeof body.entry==="object"&&!Array.isArray(body.entry)?body.entry:{};
   const session=body?.session&&typeof body.session==="object"&&!Array.isArray(body.session)?body.session:{};

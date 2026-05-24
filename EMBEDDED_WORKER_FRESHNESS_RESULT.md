@@ -7,7 +7,7 @@ Scope: read-only P1-006 freshness gate. No deploy artifact was overwritten.
 - Result: **PASS**
 - Source Worker: `deploy-worker\src\index.js`
 - Embedded artifact: `deploy-worker\src\index.embedded.js`
-- Source SHA-256: `595458d25a45f9ad91ee58c6a0ef8320cdb825890fee2d56783d955e0894dd41`
+- Source SHA-256: `17c0e85c56f86629987c42cafe33f3b1663933fc6882b84845d15bfcc73d3207`
 - Embedded SHA-256: `b8f84fc86018c50a7799d4d4b97fe22bfd2915e65d75880d06883acb8b296e07`
 - Primary wrangler main: `src/index.js`
 - Embedded wrangler main: `src/index.embedded.js`
