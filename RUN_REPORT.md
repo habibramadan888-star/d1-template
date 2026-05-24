@@ -2272,3 +2272,30 @@ npm run verify:clean-d1 passed
 ### Status
 
 P1-004 remains `Partial - Dubai business date policy/helper/tests added`. The live frontend and Worker still contain browser-local and UTC date logic that must be migrated only after reconciliation.
+
+## P1-010A Staging And Production Separation Plan
+
+Date: 2026-05-24
+
+### Files Added Or Updated
+
+- `ENVIRONMENT_SEPARATION_PLAN.md`: defines local/dev/staging/production Worker, D1, KV, secret, deploy, rollback, and no-go requirements.
+- `PRODUCTION_DEPLOYMENT_SAFETY_CHECKLIST.md`: defines production pre-deploy, migration, secret, auth, financial, deploy, and post-deploy gates.
+- `STAGING_VALIDATION_PLAN.md`: defines staging resources, test sequence, fixture requirements, and pass/fail criteria.
+- `COMMERCIALIZATION_BACKLOG.md`, `P0_P1_STATUS_REVIEW.md`: updated P1-010A status as Partial.
+
+### Verification
+
+```text
+npm run check passed
+```
+
+### Safety Scope
+
+- No production Worker deploy was executed.
+- No production or remote D1 migration was executed.
+- No Wrangler config, D1 id, KV id, secret, dashboard formula, auth behavior, or database schema was changed.
+
+### Status
+
+P1-010 remains `Partial - separation plan and checklist added`. Actual dev/staging/production Cloudflare resources still need human provisioning and reviewed config changes.
