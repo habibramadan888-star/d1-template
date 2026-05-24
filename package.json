@@ -18,6 +18,7 @@
     "audit:db:check": "node scripts/audit-db.mjs --check",
     "audit:money": "node scripts/audit-money-fields.mjs",
     "audit:backend-totals": "node scripts/audit-backend-totals.mjs",
+    "audit:runtime-ddl": "node scripts/audit-runtime-ddl.mjs",
     "reconcile:money": "node scripts/money-shadow-reconcile.mjs",
     "audit:legacy-backfill": "node scripts/audit-legacy-backfill.mjs",
     "dev:secrets": "node scripts/generate-dev-secrets.mjs",

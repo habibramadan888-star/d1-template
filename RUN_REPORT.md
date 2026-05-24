@@ -2208,3 +2208,35 @@ npm run smoke:with-worker passed
 ### Status
 
 P0-006 remains `Partial - tenancy scope audited`. The current live system still relies on static deployment scope and legacy `corpid`; this stage only defines the migration and test requirements.
+
+## P1-002A Runtime DDL Migration Plan
+
+Date: 2026-05-24
+
+### Files Added Or Updated
+
+- `RUNTIME_DDL_MIGRATION_PLAN.md`: defines the safe sequence for moving runtime schema mutation into migrations.
+- `scripts/audit-runtime-ddl.mjs`: adds a read-only static scan of source and embedded Worker runtime DDL.
+- `RUNTIME_DDL_STATIC_SCAN.md`: generated runtime DDL findings report.
+- `package.json`: added `audit:runtime-ddl`.
+- `COMMERCIALIZATION_BACKLOG.md`, `P0_P1_STATUS_REVIEW.md`: updated P1-002A status as Partial.
+
+### Verification
+
+```text
+npm run audit:runtime-ddl passed
+npm run check passed
+npm run verify:clean-d1 passed
+npm run smoke:with-worker passed
+```
+
+### Safety Scope
+
+- No production Worker deploy was executed.
+- No production or remote D1 migration was executed.
+- No runtime DDL was removed.
+- No local bootstrap, Worker source behavior, dashboard formula, employee flow, auth behavior, or database schema was changed.
+
+### Status
+
+P1-002 remains `Partial - runtime DDL audit and migration plan added`. Runtime DDL is still present and must stay until reviewed migrations, staging rehearsal, and rollback are ready.
