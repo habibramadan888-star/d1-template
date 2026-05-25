@@ -353,3 +353,18 @@ Date: 2026-05-25, Asia/Dubai
 
 No deployment, migration, D1 execute, staging write, production config change,
 feature-flag enablement, or secret access was performed in STAGING-QA-004.
+
+## STAGING-DB-001 Verification Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+| Command                                                | Exists | Result           | Error Summary | Log Evidence                                        | Commercial Meaning                                                        |
+| ------------------------------------------------------ | ------ | ---------------- | ------------- | --------------------------------------------------- | ------------------------------------------------------------------------- |
+| `npm run check`                                        | yes    | PASS             | none          | 182 tests passed                                    | Baseline remained green after formatting the generated QA dry-run report. |
+| `npm run security:secrets`                             | yes    | PASS             | none          | `Secret hygiene check passed.`                      | No secret was committed.                                                  |
+| `npm run gate:commercial-launch`                       | yes    | PRODUCTION_NO_GO | none          | `COMMERCIAL_LAUNCH_READINESS=PRODUCTION_NO_GO`      | Production remains blocked.                                               |
+| `npm run qa:employee-entry-staging`                    | yes    | MANUAL_REQUIRED  | none          | `write execution: DRY_RUN_ONLY`                     | No staging write occurred.                                                |
+| `npx wrangler d1 execute ... SELECT sqlite_schema ...` | yes    | PASS             | none          | `_cf_KV` only; `rows_written=0`; `changed_db=false` | Staging D1 has no application schema and needs bootstrap before write QA. |
+
+No deploy, migration, D1 write, staging data write, feature-flag enablement, or
+secret access was performed.

@@ -658,3 +658,30 @@ Recommended next prompt:
 目标：只确认 staging D1 schema/migration 状态，并准备 staging-only bootstrap 计划。
 禁止 production deploy、production migration、remote production D1 execute、提交 secret、真实 staging QA。
 ```
+
+## STAGING-DB-001 Morning Review Addendum
+
+Most important result:
+
+- Staging D1 schema was inspected with a SELECT-only query. It contains only
+  Cloudflare internal `_cf_KV`; no application tables exist.
+
+Current conclusion:
+
+- Staging D1 bootstrap is required before real staging write QA.
+
+Recommended next task:
+
+```text
+进入 TASK STAGING-DB-002：Apply staging-only D1 schema migrations after backup.
+目标：先确认 backup / rollback / target DB，然后只对 homelink-finance-staging 应用 staging schema migrations。
+禁止 production deploy、production migration、remote production D1 execute、提交 secret、真实 staging QA。
+```
+
+Manual review required:
+
+- Confirm backup evidence.
+- Confirm rollback method.
+- Confirm target DB name/id in Cloudflare Dashboard.
+- Approve staging-only schema migration commands.
+- Keep production cutover NO-GO.

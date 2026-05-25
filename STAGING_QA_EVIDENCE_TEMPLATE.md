@@ -23,7 +23,9 @@ migration, production feature flag enablement, or production cutover.
 | Rollback method confirmed           | Procedure documented, not yet exercised                                                                                                                             |
 | Production URL checked and excluded | MANUAL_REQUIRED - staging URL is staging-named, but production URL/custom route was not manually confirmed                                                          |
 | Real staging write QA status        | NOT_EXECUTED                                                                                                                                                        |
-| Current QA status                   | READY_FOR_STAGING_DRY_RUN_COMPLETE_MANUAL_INPUTS_REQUIRED                                                                                                           |
+| Staging D1 schema confirmed         | Empty application schema; only Cloudflare internal `_cf_KV` found by SELECT schema query                                                                            |
+| Staging D1 bootstrap required       | Yes                                                                                                                                                                 |
+| Current QA status                   | STAGING_DB_BOOTSTRAP_REQUIRED_BEFORE_WRITE_QA                                                                                                                       |
 
 ## Autofilled Test Accounts
 
@@ -112,6 +114,7 @@ secret write target was confirmed.
 | ---------------------------------------------------- | --------------- | --------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
 | Staging URL confirmed non-production                 | MANUAL_REQUIRED | MANUAL_REQUIRED | `STAGING_URL_NON_PRODUCTION_REVIEW.md`                 | Staging URL is staging-named, but production URL/custom route still needs Dashboard confirmation. |
 | Staging D1 backup completed                          | MANUAL_REQUIRED | MANUAL_REQUIRED | MANUAL_REQUIRED                                        | No backup executed by setup task                                                                  |
+| Staging D1 schema/bootstrap approved                 | MANUAL_REQUIRED | MANUAL_REQUIRED | `STAGING_D1_SCHEMA_GAP_ANALYSIS.md`                    | Staging D1 currently lacks app schema.                                                            |
 | Rollback method exercised                            | MANUAL_REQUIRED | MANUAL_REQUIRED | MANUAL_REQUIRED                                        | Docs exist; real staging rollback not exercised                                                   |
 | Money reconciliation reviewed                        | MANUAL_REQUIRED | MANUAL_REQUIRED | `MONEY_RECONCILIATION_GATE_RESULT.md`                  | Current gate is not production approval                                                           |
 | TOP_25_MONEY_RISKS reviewed                          | MANUAL_REQUIRED | MANUAL_REQUIRED | `TOP_25_MONEY_RISKS.md`                                | Human accounting/engineering review required                                                      |
@@ -121,12 +124,12 @@ secret write target was confirmed.
 
 ## Final QA Decision
 
-| Decision                    | Value                                                                                                                           |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| GO for continued staging QA | Dry-run/preflight complete; write QA still requires manual inputs                                                               |
-| GO for production cutover   | No                                                                                                                              |
-| Blocking issues             | Staging accounts, staging secrets, backup evidence, rollback exercise, and human approvals are still required before write QA   |
-| Required follow-up task     | Complete `STAGING-DB-001` and staging secrets/accounts setup, execute backup, then run dry-run QA before approved staging write |
+| Decision                    | Value                                                                                                                         |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| GO for continued staging QA | Dry-run/preflight complete; schema bootstrap still required before write QA                                                   |
+| GO for production cutover   | No                                                                                                                            |
+| Blocking issues             | Staging schema, accounts, secrets, backup evidence, rollback exercise, and human approvals are still required before write QA |
+| Required follow-up task     | Complete `STAGING-DB-002`, staging secrets/accounts setup, backup, then run dry-run QA before approved staging write          |
 
 Production cutover remains `NO-GO` until production migration, production
 deployment, accounting reconciliation, tenant scope, receivables, rollback, and

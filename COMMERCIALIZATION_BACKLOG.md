@@ -792,3 +792,28 @@ Still required before real staging write QA:
 - Open `STAGING-DB-001` if staging schema/bootstrap is required.
 
 Production remains NO-GO.
+
+## STAGING-DB-001 Backlog Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+Current staging DB status:
+
+- Staging D1 `homelink-finance-staging` exists.
+- Remote schema SELECT found only Cloudflare internal `_cf_KV`.
+- Application schema is absent.
+- Bootstrap is required before real staging write QA.
+
+Required next actions:
+
+- Execute staging D1 backup before schema writes.
+- Human-approve target DB name/id.
+- Apply only staging-approved schema migrations:
+  `migrations/local/001_clean_legacy_bootstrap.sql` and
+  `migrations/local/002_handover_atomic_staging.sql`.
+- Verify schema after migration.
+- Keep production migration forbidden.
+- Keep real staging write QA blocked until schema, secrets, accounts, backup,
+  and rollback are complete.
+
+Production remains NO-GO.

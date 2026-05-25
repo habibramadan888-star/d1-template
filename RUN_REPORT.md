@@ -3505,3 +3505,45 @@ Conclusion:
 Real staging write QA remains blocked until staging secrets, test accounts,
 backup evidence, rollback exercise, Cloudflare Dashboard URL confirmation, and
 staging D1 schema/migration state are confirmed.
+
+## STAGING-DB-001 Schema / Bootstrap Preflight
+
+Date: 2026-05-25, Asia/Dubai
+
+Scope:
+
+- Reviewed local bootstrap migrations and staging setup evidence.
+- Confirmed target D1 name/id before remote inspection.
+- Executed one remote D1 schema query using SELECT only.
+- No deploy, migration, INSERT, UPDATE, DELETE, CREATE, ALTER, DROP, account
+  seed, staging write QA, or secret access was performed.
+
+Staging D1 schema query:
+
+```powershell
+npx wrangler d1 execute homelink-finance-staging --remote --command "SELECT name, type, sql FROM sqlite_schema WHERE type IN ('table','index','view') ORDER BY type, name;"
+```
+
+Result:
+
+- Only Cloudflare internal `_cf_KV` table exists.
+- `changes=0`
+- `changed_db=false`
+- `rows_written=0`
+
+Changes:
+
+- Added `STAGING_DB_001_LOCAL_SCHEMA_SOURCE_REVIEW.md`.
+- Added `STAGING_D1_CURRENT_SCHEMA_SNAPSHOT.md`.
+- Added `STAGING_D1_SCHEMA_GAP_ANALYSIS.md`.
+- Added `STAGING_D1_BOOTSTRAP_PLAN.md`.
+- Added `STAGING_D1_MIGRATION_APPLY_PLAN.md`.
+- Added `STAGING_D1_BACKUP_BEFORE_MIGRATION_PLAN.md`.
+- Added `NEXT_PROMPT_STAGING_DB_002_APPLY_STAGING_MIGRATIONS.md`.
+- Updated `STAGING_QA_EVIDENCE_TEMPLATE.md`.
+
+Conclusion:
+
+- Staging D1 application schema is empty.
+- Bootstrap/migration is required before real staging write QA.
+- Recommended next task: `STAGING-DB-002`, after backup and human approval.
