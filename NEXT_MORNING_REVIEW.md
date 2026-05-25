@@ -564,6 +564,19 @@ Remote D1 migration: not executed
 - `APP_ENV=staging` and feature-flag operation method.
 - Staging D1 backup and rollback plan.
 
+## Commercial Launch Gate
+
+`PRODUCTION_NO_GO`. The read-only commercial launch gate reviewed 17 areas:
+
+- 4 areas are static-ok for regression/preflight only.
+- 12 areas are confirmed production NO-GO.
+- 1 area is manual-required.
+- 0 areas are blocked by missing evidence files in the static scan.
+
+This does not block local regression work. It does block staging/prod execution
+until human staging inputs, accounting review, tenant/receivables decisions,
+rollback evidence, and deployment approval are supplied.
+
 ## Recommended Next Task
 
 Recommended next prompt:

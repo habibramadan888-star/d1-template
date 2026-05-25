@@ -726,3 +726,40 @@ Still forbidden:
 - Staging deploy by automation.
 - Production or remote D1 migration.
 - Production config modification without human approval.
+
+## Commercial Launch Readiness Gate Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+Current launch gate:
+
+- Status: `PRODUCTION_NO_GO`
+- Evidence: `COMMERCIAL_LAUNCH_READINESS_MATRIX.md`
+- Gate command: `npm run gate:commercial-launch`
+
+Blocking categories:
+
+- P0-001 money precision remains Partial and reconciliation is not production
+  approved.
+- P0-002 handover atomic remains staging/local only.
+- P0-003 backend totals authority is not live switched.
+- P0-006 tenant/property scope remains implementation-gated.
+- P0-008 receivables remains design/readiness-gated.
+- Real staging QA inputs are missing.
+- Runtime DDL removal, observability, environment separation, audit coverage,
+  rollback readiness, API permissions, and table readiness still require manual
+  approval.
+
+Allowed next work:
+
+- Local/staging dry-run validation.
+- Manual QA preparation.
+- Read-only audit expansion.
+
+Forbidden without human approval:
+
+- Production deploy.
+- Staging deploy.
+- Remote or production D1 migration.
+- Production feature flag enablement.
+- Live accounting authority switch.
