@@ -424,3 +424,20 @@ Remaining blockers for real staging write QA:
 - Runtime rollback acceptance/exercise.
 - Production URL/custom route exclusion through Cloudflare Dashboard.
 - Human approval to run write QA with `--confirm-staging-write`, `--confirm-backup`, and `--confirm-rollback`.
+
+## STAGING-SECRETS-003 Verification Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+| Command                                                                            | Exists | Result                          | Error Summary | Log Evidence                                                                    | Commercial Meaning                                                      |
+| ---------------------------------------------------------------------------------- | ------ | ------------------------------- | ------------- | ------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `npx wrangler deployments list --env staging --config deploy-worker/wrangler.toml` | yes    | Pass                            | none          | Listed staging deployments and secret-change version                            | Read-only evidence for staging Worker; no deployment executed.          |
+| `npx wrangler versions list --env staging --config deploy-worker/wrangler.toml`    | yes    | Pass                            | none          | Listed staging Worker versions                                                  | Read-only evidence for staging Worker; no deployment executed.          |
+| `npm run qa:employee-entry-staging`                                                | yes    | Pass with `DRY_RUN_ONLY` result | none          | Missing confirmation flags block writes                                         | Rollback preflight remains no-write until explicit staging QA approval. |
+| Human route confirmation                                                           | yes    | Pass                            | none          | User confirmed staging URL is non-production and has no production custom route | Production URL/custom route exclusion gate is closed for staging QA.    |
+
+Readiness:
+
+- `STAGING_QA_WRITE_READINESS_DECISION=READY_FOR_STAGING_WRITE_QA`.
+- Real staging write QA still requires explicit human approval and flags.
+- Production remains `NO-GO`.

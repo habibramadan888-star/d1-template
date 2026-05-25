@@ -3677,3 +3677,39 @@ Conclusion:
 - Staging secrets and test accounts are now prepared.
 - Real staging write QA remains `MANUAL_REQUIRED` because runtime rollback and
   production URL/custom route exclusion still need human review.
+
+## STAGING-SECRETS-003 Run Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+Scope:
+
+- Finalized production URL/custom route exclusion based on human confirmation.
+- Completed non-business-write rollback preflight.
+- Did not execute real staging write QA.
+
+Commands:
+
+| Command                                                                            | Result                         | Notes                                            |
+| ---------------------------------------------------------------------------------- | ------------------------------ | ------------------------------------------------ |
+| `npx wrangler deployments list --env staging --config deploy-worker/wrangler.toml` | PASS                           | Read-only staging deployment history; no deploy. |
+| `npx wrangler versions list --env staging --config deploy-worker/wrangler.toml`    | PASS                           | Read-only staging versions; no deploy.           |
+| `npm run qa:employee-entry-staging`                                                | MANUAL_REQUIRED / DRY_RUN_ONLY | No write confirmation flags supplied.            |
+| `npm run gate:commercial-launch`                                                   | PRODUCTION_NO_GO               | Production remains blocked.                      |
+
+Safety:
+
+- Production deploy: no.
+- Staging deploy: no.
+- Migration: no.
+- Staging business data write: no.
+- Employee entry write endpoint called: no.
+- Handover staging write endpoint called: no.
+- Secret committed: no.
+
+Conclusion:
+
+- `STAGING_QA_WRITE_READINESS_DECISION=READY_FOR_STAGING_WRITE_QA`.
+- This means only that the next staging write QA prompt may be used after
+  explicit human approval and confirmation flags.
+- Production cutover remains `NO-GO`.

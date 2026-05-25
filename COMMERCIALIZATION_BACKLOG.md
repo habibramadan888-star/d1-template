@@ -821,6 +821,26 @@ Readiness:
 - `STAGING_QA_WRITE_READINESS_DECISION`: `MANUAL_REQUIRED`.
 - Production remains `NO-GO`.
 
+## STAGING-SECRETS-003 Backlog Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+Current staging QA readiness:
+
+- Production URL/custom route exclusion is confirmed by human review.
+- Rollback preflight is ready under no-business-write constraints.
+- Staging secrets and staging test identities are configured.
+- `STAGING_QA_WRITE_READINESS_DECISION` is now `READY_FOR_STAGING_WRITE_QA`.
+
+Important boundary:
+
+- This does not approve production deploy.
+- This does not approve production migration.
+- This does not approve production cutover.
+- Real staging write QA must still be launched through
+  `NEXT_PROMPT_STAGING_QA_005_REAL_WRITE_QA_APPROVAL_REQUIRED.md` with explicit
+  confirmation flags.
+
 ## STAGING-DB-001 Backlog Addendum
 
 Date: 2026-05-25, Asia/Dubai

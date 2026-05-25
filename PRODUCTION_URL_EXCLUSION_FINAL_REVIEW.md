@@ -2,25 +2,26 @@
 
 Date: 2026-05-25, Asia/Dubai
 
-Conclusion: `MANUAL_REQUIRED`
+Conclusion: `CONFIRMED_EXCLUDED`
 
 Staging URL:
 
 - `https://homelink-finance-staging.habibramadan888.workers.dev`
 
-| Check                                                    | Result          | Evidence                                                                                    | Notes                                                               |
-| -------------------------------------------------------- | --------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| Staging URL exists                                       | PASS            | `STAGING_QA_EVIDENCE_TEMPLATE.md`                                                           | URL is staging-named.                                               |
-| Staging URL contains staging Worker name                 | PASS            | `homelink-finance-staging`                                                                  | Supports non-production intent.                                     |
-| Staging Worker name is staging-specific                  | PASS            | `homelink-finance-staging`                                                                  | Does not prove custom route exclusion by itself.                    |
-| Production URL known from current repository evidence    | MANUAL_REQUIRED | `.env.example` contains an example cloud origin                                             | Example config is not enough to prove all production custom routes. |
-| Custom route exclusion confirmed in Cloudflare Dashboard | MANUAL_REQUIRED | Not available from current safe CLI/config checks                                           | Human must verify Dashboard routes/custom domains.                  |
-| Production URL different from staging URL                | MANUAL_REQUIRED | Staging-named URL differs from example URL, but production/custom routes remain unconfirmed | Do not mark confirmed without Dashboard review.                     |
-| Production touched                                       | PASS            | No production deploy, migration, or feature flag change                                     | This task did not touch production.                                 |
+| Check                                     | Result | Evidence                                                                           | Notes                                                                                       |
+| ----------------------------------------- | ------ | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| Staging URL exists                        | PASS   | `STAGING_QA_EVIDENCE_TEMPLATE.md`                                                  | URL is staging-named.                                                                       |
+| Staging URL contains staging Worker name  | PASS   | `homelink-finance-staging`                                                         | Supports non-production intent.                                                             |
+| Staging Worker name is staging-specific   | PASS   | `homelink-finance-staging`                                                         | Worker target is not the default production Worker name.                                    |
+| Staging deployments are under staging env | PASS   | `npx wrangler deployments list --env staging --config deploy-worker/wrangler.toml` | Listed staging Worker deployments/secret-change versions only.                              |
+| Staging versions are under staging env    | PASS   | `npx wrangler versions list --env staging --config deploy-worker/wrangler.toml`    | Listed staging Worker versions only.                                                        |
+| Custom route exclusion confirmed          | PASS   | Human confirmation in this task                                                    | User confirmed the staging Worker URL is non-production and has no production custom route. |
+| Production URL different from staging URL | PASS   | Human confirmation in this task plus staging-specific URL                          | Do not infer other production URLs; this gate only confirms staging URL exclusion.          |
+| Production touched                        | PASS   | No production deploy, migration, or feature flag change                            | This task did not touch production.                                                         |
 
-Manual action required:
+Manual confirmation recorded:
 
-1. Open Cloudflare Dashboard for the account.
-2. Confirm the Worker `homelink-finance-staging` has no production custom route.
-3. Confirm the production Worker/route URL, if any, is different from the staging URL.
-4. Record screenshot or dashboard evidence outside Git if it contains sensitive account metadata.
+> I manually confirm the staging Worker URL is non-production and has no production custom route.
+
+This confirms that `https://homelink-finance-staging.habibramadan888.workers.dev`
+is acceptable for approved staging QA and is not a production route.

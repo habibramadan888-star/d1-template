@@ -8,11 +8,11 @@ migration, production feature flag enablement, or production cutover.
 
 | Field                               | Value                                                                                                                                                               |
 | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| QA run id                           | `STAGING-SECRETS-002-2026-05-25-SECRETS-ACCOUNTS-ROLLBACK`; real write QA run id still MANUAL_REQUIRED                                                              |
-| QA date/time                        | Staging secrets/accounts updated 2026-05-25 Asia/Dubai; actual write QA run time MANUAL_REQUIRED                                                                    |
+| QA run id                           | `STAGING-SECRETS-003-2026-05-25-URL-ROLLBACK-GATE`; real write QA run id still requires explicit approval                                                           |
+| QA date/time                        | Staging URL/rollback gate updated 2026-05-25 Asia/Dubai; actual write QA run time not yet executed                                                                  |
 | Reviewer                            | Codex dry-run preflight; human QA reviewer MANUAL_REQUIRED                                                                                                          |
-| Branch                              | `qa/staging-secrets-002-resolve-manual-required`                                                                                                                    |
-| Commit                              | Staging secrets/accounts commit recorded in git log after this update                                                                                               |
+| Branch                              | `qa/staging-secrets-003-remaining-manual-gate`                                                                                                                      |
+| Commit                              | Staging URL/rollback gate commit recorded in git log after this update                                                                                              |
 | Staging Worker URL                  | `https://homelink-finance-staging.habibramadan888.workers.dev`                                                                                                      |
 | Worker entrypoint                   | Staging source: `deploy-worker/wrangler.toml` `[env.staging]` -> `src/index.js`; embedded remains `deploy-worker/wrangler.embedded.toml` -> `src/index.embedded.js` |
 | APP_ENV                             | `staging` in `deploy-worker/wrangler.toml` `[env.staging.vars]`                                                                                                     |
@@ -20,8 +20,8 @@ migration, production feature flag enablement, or production cutover.
 | Staging D1 name                     | `homelink-finance-staging` (`4ff78bfc-3855-436b-aefb-6b492145d79c`)                                                                                                 |
 | Staging KV namespace                | `RATE_LIMIT_STAGING` (`9e84150246204f01b3fd8c184761303e`) bound as `RATE_LIMIT`                                                                                     |
 | Backup completed before write tests | Yes for schema bootstrap only: `./backups/homelink-finance-staging-before-schema-bootstrap.sql`; backup file is ignored and not committed                           |
-| Rollback method confirmed           | Feature flag rollback documented; runtime exercise still MANUAL_REQUIRED because write endpoints were not called                                                    |
-| Production URL checked and excluded | MANUAL_REQUIRED - staging URL is staging-named, but production URL/custom route still requires Dashboard confirmation                                               |
+| Rollback method confirmed           | ROLLBACK_READY for non-business-write preflight; future real write QA must still pass `--confirm-rollback`                                                          |
+| Production URL checked and excluded | CONFIRMED_EXCLUDED - user manually confirmed staging URL is non-production and has no production custom route                                                       |
 | Real staging write QA status        | NOT_EXECUTED                                                                                                                                                        |
 | Staging D1 schema confirmed         | Yes; core tables and handover staging tables confirmed in `STAGING_DB_002_POST_MIGRATION_SCHEMA_SNAPSHOT.md`                                                        |
 | Staging D1 bootstrap required       | Completed for staging schema bootstrap; no business test data written                                                                                               |
@@ -29,7 +29,7 @@ migration, production feature flag enablement, or production cutover.
 | Owner staging test account          | Configured through `USER_ACCOUNTS` staging secret as `owner_stg_qa_001`; plaintext password not logged                                                              |
 | Manager/admin staging test account  | Configured through `USER_ACCOUNTS` staging secret as `manager_stg_qa_001`; no separate admin role exists                                                            |
 | Password handling                   | Generated in ignored `.tmp/staging-secrets/staging-test-passwords.local.json`; set to Cloudflare staging secrets; not committed; not written to Markdown            |
-| Current QA status                   | MANUAL_REQUIRED; real write QA blocked by runtime rollback exercise, production URL exclusion, and explicit write-QA approval                                       |
+| Current QA status                   | READY_FOR_STAGING_WRITE_QA, approval required; real write QA must use `--confirm-staging-write --confirm-backup --confirm-rollback`                                 |
 
 ## Autofilled Test Accounts
 
@@ -115,28 +115,28 @@ Cloudflare staging secrets without writing values to Markdown or Git.
 
 ## Manual Approval Checklist
 
-| Approval Item                                        | Owner           | Status          | Evidence                                               | Notes                                                                                             |
-| ---------------------------------------------------- | --------------- | --------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
-| Staging URL confirmed non-production                 | MANUAL_REQUIRED | MANUAL_REQUIRED | `STAGING_URL_NON_PRODUCTION_REVIEW.md`                 | Staging URL is staging-named, but production URL/custom route still needs Dashboard confirmation. |
-| Staging D1 backup completed                          | Codex           | DONE            | `STAGING_DB_002_BACKUP_RESULT.md`                      | Backup file exists under ignored `backups/`; not committed.                                       |
-| Staging D1 schema/bootstrap approved                 | Codex           | DONE            | `STAGING_DB_002_POST_MIGRATION_SCHEMA_SNAPSHOT.md`     | Staging schema bootstrap completed; production remains untouched.                                 |
-| Staging secrets set                                  | Codex           | DONE            | `STAGING_SECRET_SETUP_RESULT.md`                       | Staging secrets set through Wrangler; values omitted from logs and Git.                           |
-| Staging test accounts confirmed                      | Codex           | DONE            | `STAGING_TEST_ACCOUNT_SETUP_RESULT.md`                 | Employee row exists; owner/manager configured through `USER_ACCOUNTS` staging secret.             |
-| Rollback method exercised                            | MANUAL_REQUIRED | MANUAL_REQUIRED | `STAGING_ROLLBACK_RUNTIME_REHEARSAL_RESULT.md`         | Config rollback documented; runtime write-path rollback still not exercised.                      |
-| Money reconciliation reviewed                        | MANUAL_REQUIRED | MANUAL_REQUIRED | `MONEY_RECONCILIATION_GATE_RESULT.md`                  | Current gate is not production approval                                                           |
-| TOP_25_MONEY_RISKS reviewed                          | MANUAL_REQUIRED | MANUAL_REQUIRED | `TOP_25_MONEY_RISKS.md`                                | Human accounting/engineering review required                                                      |
-| Tenant/property scope accepted for staging rehearsal | MANUAL_REQUIRED | MANUAL_REQUIRED | `P0_006B_TENANT_PROPERTY_SCOPE_READINESS_GATE.md`      | Tenant model remains partial                                                                      |
-| Receivables production dependency acknowledged       | MANUAL_REQUIRED | MANUAL_REQUIRED | `P0_008B_RECEIVABLES_IMPLEMENTATION_READINESS_GATE.md` | Receivables remains partial                                                                       |
-| Embedded/source artifact gate reviewed               | MANUAL_REQUIRED | MANUAL_REQUIRED | `WORKER_ENTRYPOINT_DRIFT_AUDIT.md`                     | Re-run artifact gates before deploy                                                               |
+| Approval Item                                        | Owner           | Status          | Evidence                                               | Notes                                                                                              |
+| ---------------------------------------------------- | --------------- | --------------- | ------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
+| Staging URL confirmed non-production                 | Human           | DONE            | `PRODUCTION_URL_EXCLUSION_FINAL_REVIEW.md`             | User manually confirmed staging URL is non-production and has no production custom route.          |
+| Staging D1 backup completed                          | Codex           | DONE            | `STAGING_DB_002_BACKUP_RESULT.md`                      | Backup file exists under ignored `backups/`; not committed.                                        |
+| Staging D1 schema/bootstrap approved                 | Codex           | DONE            | `STAGING_DB_002_POST_MIGRATION_SCHEMA_SNAPSHOT.md`     | Staging schema bootstrap completed; production remains untouched.                                  |
+| Staging secrets set                                  | Codex           | DONE            | `STAGING_SECRET_SETUP_RESULT.md`                       | Staging secrets set through Wrangler; values omitted from logs and Git.                            |
+| Staging test accounts confirmed                      | Codex           | DONE            | `STAGING_TEST_ACCOUNT_SETUP_RESULT.md`                 | Employee row exists; owner/manager configured through `USER_ACCOUNTS` staging secret.              |
+| Rollback method exercised                            | Codex/Human     | DONE            | `STAGING_ROLLBACK_RUNTIME_REHEARSAL_RESULT.md`         | Non-business-write rollback preflight ready; future write QA must still provide confirmation flag. |
+| Money reconciliation reviewed                        | MANUAL_REQUIRED | MANUAL_REQUIRED | `MONEY_RECONCILIATION_GATE_RESULT.md`                  | Current gate is not production approval                                                            |
+| TOP_25_MONEY_RISKS reviewed                          | MANUAL_REQUIRED | MANUAL_REQUIRED | `TOP_25_MONEY_RISKS.md`                                | Human accounting/engineering review required                                                       |
+| Tenant/property scope accepted for staging rehearsal | MANUAL_REQUIRED | MANUAL_REQUIRED | `P0_006B_TENANT_PROPERTY_SCOPE_READINESS_GATE.md`      | Tenant model remains partial                                                                       |
+| Receivables production dependency acknowledged       | MANUAL_REQUIRED | MANUAL_REQUIRED | `P0_008B_RECEIVABLES_IMPLEMENTATION_READINESS_GATE.md` | Receivables remains partial                                                                        |
+| Embedded/source artifact gate reviewed               | MANUAL_REQUIRED | MANUAL_REQUIRED | `WORKER_ENTRYPOINT_DRIFT_AUDIT.md`                     | Re-run artifact gates before deploy                                                                |
 
 ## Final QA Decision
 
-| Decision                    | Value                                                                                                                                    |
-| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| GO for continued staging QA | Schema bootstrap, staging secrets, and test account setup complete; continue to production URL exclusion and runtime rollback acceptance |
-| GO for production cutover   | No                                                                                                                                       |
-| Blocking issues             | Rollback runtime exercise, production URL exclusion, and human approvals are still required before write QA                              |
-| Required follow-up task     | Complete `STAGING-SECRETS-003`, then run dry-run QA before any approved staging write                                                    |
+| Decision                    | Value                                                                                                           |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| GO for continued staging QA | Schema bootstrap, staging secrets, test accounts, production URL exclusion, and rollback preflight are complete |
+| GO for production cutover   | No                                                                                                              |
+| Blocking issues             | Real staging write QA still requires explicit human approval and confirmation flags                             |
+| Required follow-up task     | Use `NEXT_PROMPT_STAGING_QA_005_REAL_WRITE_QA_APPROVAL_REQUIRED.md` only after human approval                   |
 
 Production cutover remains `NO-GO` until production migration, production
 deployment, accounting reconciliation, tenant scope, receivables, rollback, and

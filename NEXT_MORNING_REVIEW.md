@@ -721,6 +721,28 @@ Recommended next prompt:
 
 Production cutover remains `NO-GO`.
 
+## STAGING-SECRETS-003 Morning Review Addendum
+
+Most important result:
+
+- The remaining staging write QA blockers were closed for staging scope:
+  production URL/custom route exclusion was human-confirmed, and rollback
+  preflight is ready without business writes.
+
+Current status:
+
+- Staging write QA readiness: READY_FOR_STAGING_WRITE_QA.
+- Real staging write QA executed: no.
+- Production cutover readiness: NO-GO.
+
+Recommended next prompt:
+
+```text
+进入 TASK STAGING-QA-005：Real staging write QA with explicit confirmation.
+必须包含 --confirm-staging-write --confirm-backup --confirm-rollback。
+禁止 production deploy、production migration、production feature flag、production cutover、secret commit。
+```
+
 ## STAGING-SECRETS-002 Morning Review Addendum
 
 Most important result:
