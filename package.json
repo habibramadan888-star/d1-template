@@ -72,6 +72,7 @@
     "compare:employee-entry-routes": "node scripts/compare-employee-entry-legacy-vs-adapter.mjs",
     "rehearse:employee-entry-rollback": "node scripts/rehearse-employee-entry-rollback.mjs",
     "test:employee-entry-production-lock": "node --test tests/employee-entry-production-behavior-lock.spec.mjs",
+    "test:feature-flag-matrix": "node --test tests/feature-flag-production-lock-matrix.spec.mjs",
     "qa:employee-entry-staging": "node scripts/qa-employee-entry-real-staging.mjs",
     "test:backend-totals-shadow": "node --test tests/backend-totals-shadow.spec.mjs",
     "test:backend-totals": "node --test tests/backend-totals-authority.spec.mjs",

@@ -3266,3 +3266,41 @@ Notes:
 - Owner cases cover login, dashboard, history, arrears, deposit, rent config,
   reports, search/filter/export, voided-record audit, handover review,
   dashboard unchanged, due/overdue, and mobile/tablet review.
+
+## Deep Regression Guardrail Expansion
+
+Date: 2026-05-25, Asia/Dubai
+
+Scope:
+
+- Static regression guard for source and embedded Worker critical feature flags
+  and production locks.
+- No live behavior changed.
+- No deploy or migration executed.
+
+Changes:
+
+- Added `FEATURE_FLAG_PRODUCTION_LOCK_MATRIX.md`.
+- Added `tests/feature-flag-production-lock-matrix.spec.mjs`.
+- Added `npm run test:feature-flag-matrix`.
+
+Verification:
+
+| Command                                  | Result |
+| ---------------------------------------- | ------ |
+| `npm run test:feature-flag-matrix`       | PASS   |
+| `npm run test:handover-staging-endpoint` | PASS   |
+| `npm run check`                          | PASS   |
+
+Notes:
+
+- The test protects `/api/staging/handover/commit`,
+  `ENABLE_HANDOVER_ATOMIC_STAGING`,
+  `ENABLE_EMPLOYEE_ENTRY_ADAPTER_LIVE_ROUTE`, allowed APP_ENV gates, and
+  frontend-total non-authority markers in source Worker code.
+- Handover staging flags are also checked in the embedded Worker artifact.
+- Current embedded employee-entry adapter drift remains explicit manual deploy
+  gate evidence. If the actual staging deploy uses `src/index.embedded.js`, a
+  controlled embedded write and post-write verification remain required before
+  deploy.
+- `npm run check` passed with 182 tests after this guardrail was added.
