@@ -213,6 +213,33 @@ Next step:
 | P1-009 | Observability                   | Production needs logs, errors, trace IDs, and audit visibility | P1     | Not Started | No                         | Backlog only                               | `COMMERCIALIZATION_BACKLOG.md`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | Production incidents would be hard to diagnose                                                                                      | Add Cloudflare logs/error reporting plan before production                                                                                                     |
 | P1-010 | Staging/production separation   | Production and staging must be separated                       | P1     | Partial     | No                         | Separation plan and checklist added        | `ENVIRONMENT_SEPARATION_PLAN.md`, `PRODUCTION_DEPLOYMENT_SAFETY_CHECKLIST.md`, `STAGING_VALIDATION_PLAN.md`, `PROJECT_MAP.md`, `deploy-worker/wrangler.toml`, `deploy-worker/wrangler.embedded.toml`                                                                                                                                                                                                                                                                                                                                                                                                                             | Same config shape and static CORPID can lead to prod/test confusion; production config was not changed                              | Human must create separate dev/staging/prod Cloudflare resources before commercial rollout                                                                     |
 
+## STAGING-QA-005 Status Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+P0-001 current status remains `Partial - staging write QA blocked before feature flag enablement`.
+
+P0-002 current status remains `Partial - staging write QA blocked before feature flag enablement`.
+
+Evidence:
+
+- `STAGING_QA_005_PRE_WRITE_CONFIRMATION.md`
+- `EMPLOYEE_ENTRY_REAL_STAGING_QA_RESULT.md`
+- `HANDOVER_REAL_STAGING_QA_RESULT.md`
+- `STAGING_QA_005_DATABASE_EVIDENCE.md`
+- `STAGING_QA_005_ROLLBACK_RESULT.md`
+- `BLOCKER_REPORT.md`
+
+Result:
+
+- Real staging write QA was not executed.
+- Staging D1 business tables remained unchanged.
+- Production remains untouched and `PRODUCTION_NO_GO`.
+
+Next step:
+
+- Human must approve a staging-only runtime flag enablement and rollback task before rerunning real staging write QA.
+
 ## P1-006 Embedded Worker Drift Gate Addendum
 
 Date: 2026-05-24, Asia/Dubai

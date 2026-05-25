@@ -8,28 +8,28 @@ migration, production feature flag enablement, or production cutover.
 
 | Field                               | Value                                                                                                                                                               |
 | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| QA run id                           | `STAGING-SECRETS-003-2026-05-25-URL-ROLLBACK-GATE`; real write QA run id still requires explicit approval                                                           |
-| QA date/time                        | Staging URL/rollback gate updated 2026-05-25 Asia/Dubai; actual write QA run time not yet executed                                                                  |
-| Reviewer                            | Codex dry-run preflight; human QA reviewer MANUAL_REQUIRED                                                                                                          |
-| Branch                              | `qa/staging-secrets-003-remaining-manual-gate`                                                                                                                      |
-| Commit                              | Staging URL/rollback gate commit recorded in git log after this update                                                                                              |
+| QA run id                           | `STAGING-QA-005-2026-05-25-PRE-WRITE-BLOCKED`                                                                                                                       |
+| QA date/time                        | Pre-write runtime probe updated 2026-05-25 15:08 Asia/Dubai; real write QA not executed                                                                             |
+| Reviewer                            | Codex staging pre-write probe; human approval exists for write QA, but staging flag enablement still needs a separate approved config/deploy step                   |
+| Branch                              | `qa/staging-qa-005-real-write-qa`                                                                                                                                   |
+| Commit                              | Pending STAGING-QA-005 blocker commit                                                                                                                               |
 | Staging Worker URL                  | `https://homelink-finance-staging.habibramadan888.workers.dev`                                                                                                      |
 | Worker entrypoint                   | Staging source: `deploy-worker/wrangler.toml` `[env.staging]` -> `src/index.js`; embedded remains `deploy-worker/wrangler.embedded.toml` -> `src/index.embedded.js` |
 | APP_ENV                             | `staging` in `deploy-worker/wrangler.toml` `[env.staging.vars]`                                                                                                     |
-| Enabled feature flags               | Defaults: `ENABLE_EMPLOYEE_ENTRY_ADAPTER_LIVE_ROUTE=false`, `ENABLE_HANDOVER_ATOMIC_STAGING=false`; write QA requires later explicit staging-only approval          |
+| Enabled feature flags               | Runtime probe confirms disabled: `ENABLE_EMPLOYEE_ENTRY_ADAPTER_LIVE_ROUTE=false`, `ENABLE_HANDOVER_ATOMIC_STAGING=false`; real write QA blocked before writes      |
 | Staging D1 name                     | `homelink-finance-staging` (`4ff78bfc-3855-436b-aefb-6b492145d79c`)                                                                                                 |
 | Staging KV namespace                | `RATE_LIMIT_STAGING` (`9e84150246204f01b3fd8c184761303e`) bound as `RATE_LIMIT`                                                                                     |
 | Backup completed before write tests | Yes for schema bootstrap only: `./backups/homelink-finance-staging-before-schema-bootstrap.sql`; backup file is ignored and not committed                           |
 | Rollback method confirmed           | ROLLBACK_READY for non-business-write preflight; future real write QA must still pass `--confirm-rollback`                                                          |
 | Production URL checked and excluded | CONFIRMED_EXCLUDED - user manually confirmed staging URL is non-production and has no production custom route                                                       |
-| Real staging write QA status        | NOT_EXECUTED                                                                                                                                                        |
+| Real staging write QA status        | BLOCKED_BEFORE_WRITE; no staging business data written                                                                                                              |
 | Staging D1 schema confirmed         | Yes; core tables and handover staging tables confirmed in `STAGING_DB_002_POST_MIGRATION_SCHEMA_SNAPSHOT.md`                                                        |
 | Staging D1 bootstrap required       | Completed for staging schema bootstrap; no business test data written                                                                                               |
 | Employee staging test account       | Created/confirmed: `employee_stg_qa_001` exists in staging `employee_users` with role `staff`; plaintext password not logged                                        |
 | Owner staging test account          | Configured through `USER_ACCOUNTS` staging secret as `owner_stg_qa_001`; plaintext password not logged                                                              |
 | Manager/admin staging test account  | Configured through `USER_ACCOUNTS` staging secret as `manager_stg_qa_001`; no separate admin role exists                                                            |
 | Password handling                   | Generated in ignored `.tmp/staging-secrets/staging-test-passwords.local.json`; set to Cloudflare staging secrets; not committed; not written to Markdown            |
-| Current QA status                   | READY_FOR_STAGING_WRITE_QA, approval required; real write QA must use `--confirm-staging-write --confirm-backup --confirm-rollback`                                 |
+| Current QA status                   | BLOCKED_BEFORE_WRITE; requires human-approved staging-only flag enablement and rollback task                                                                        |
 
 ## Autofilled Test Accounts
 
@@ -56,38 +56,39 @@ Cloudflare staging secrets without writing values to Markdown or Git.
 
 ## Command Evidence
 
-| Command                             | Result           | Log Path / Screenshot                              | Notes                                                     |
-| ----------------------------------- | ---------------- | -------------------------------------------------- | --------------------------------------------------------- |
-| `npm run check`                     | PASS             | Local console / git commit evidence                | 182 tests passed; build ran Wrangler dry-run only.        |
-| `npm run security:secrets`          | PASS             | Local console / git commit evidence                | Secret hygiene check passed.                              |
-| `npm run qa:employee-entry-staging` | MANUAL_REQUIRED  | `EMPLOYEE_ENTRY_REAL_STAGING_QA_DRY_RUN_RESULT.md` | Dry-run only; no write confirmation flags.                |
-| `npm run gate:commercial-launch`    | PRODUCTION_NO_GO | Local console / git commit evidence                | Expected `PRODUCTION_NO_GO` until production gates close. |
-| `npm run audit:worker-drift`        | PASS             | `WORKER_ENTRYPOINT_DRIFT_AUDIT.md`                 | 0 critical mismatches.                                    |
-| `npm run verify:embedded-worker`    | PASS             | `EMBEDDED_WORKER_FRESHNESS_RESULT.md`              | Embedded freshness passes.                                |
-| `npm run build:embedded:dry-run`    | WARNING          | `.tmp/embedded-worker-dry-run/`                    | 0 critical missing items; warning remains non-blocking.   |
+| Command                                                                                            | Result               | Log Path / Screenshot                              | Notes                                                                                  |
+| -------------------------------------------------------------------------------------------------- | -------------------- | -------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `npm run check`                                                                                    | PASS                 | Local console / git commit evidence                | 182 tests passed; build ran Wrangler dry-run only.                                     |
+| `npm run security:secrets`                                                                         | PASS                 | Local console / git commit evidence                | Secret hygiene check passed.                                                           |
+| `npm run qa:employee-entry-staging -- --confirm-staging-write --confirm-backup --confirm-rollback` | MANUAL_REQUIRED      | `EMPLOYEE_ENTRY_REAL_STAGING_QA_DRY_RUN_RESULT.md` | Existing QA script still does not execute write scenarios.                             |
+| Runtime feature probe                                                                              | BLOCKED_BEFORE_WRITE | `STAGING_QA_005_PRE_WRITE_CONFIRMATION.md`         | Handover and employee-entry adapter staging endpoints returned `403 FEATURE_DISABLED`. |
+| `npm run gate:commercial-launch`                                                                   | PRODUCTION_NO_GO     | Local console / git commit evidence                | Expected `PRODUCTION_NO_GO` until production gates close.                              |
+| `npm run audit:worker-drift`                                                                       | PASS                 | `WORKER_ENTRYPOINT_DRIFT_AUDIT.md`                 | 0 critical mismatches.                                                                 |
+| `npm run verify:embedded-worker`                                                                   | PASS                 | `EMBEDDED_WORKER_FRESHNESS_RESULT.md`              | Embedded freshness passes.                                                             |
+| `npm run build:embedded:dry-run`                                                                   | WARNING              | `.tmp/embedded-worker-dry-run/`                    | 0 critical missing items; warning remains non-blocking.                                |
 
 ## Employee Entry Evidence
 
-| Test ID    | Scenario                               | Request Evidence | Response Evidence | DB Evidence     | Audit Evidence  | Dashboard/History Evidence | Result          | Notes                                          |
-| ---------- | -------------------------------------- | ---------------- | ----------------- | --------------- | --------------- | -------------------------- | --------------- | ---------------------------------------------- |
-| EE-STG-001 | Production remains legacy              | MANUAL_REQUIRED  | MANUAL_REQUIRED   | MANUAL_REQUIRED | MANUAL_REQUIRED | MANUAL_REQUIRED            | MANUAL_REQUIRED | Must not enable adapter in production.         |
-| EE-STG-002 | Feature flag off remains legacy        | MANUAL_REQUIRED  | MANUAL_REQUIRED   | MANUAL_REQUIRED | MANUAL_REQUIRED | MANUAL_REQUIRED            | MANUAL_REQUIRED | Rollback evidence.                             |
-| EE-STG-003 | Staging flag on uses adapter rehearsal | MANUAL_REQUIRED  | MANUAL_REQUIRED   | MANUAL_REQUIRED | MANUAL_REQUIRED | MANUAL_REQUIRED            | MANUAL_REQUIRED | Local/staging only.                            |
-| EE-STG-004 | Valid employee entry                   | MANUAL_REQUIRED  | MANUAL_REQUIRED   | MANUAL_REQUIRED | MANUAL_REQUIRED | MANUAL_REQUIRED            | MANUAL_REQUIRED | Expected legacy write with adapter guardrails. |
-| EE-STG-005 | Three-decimal amount rejected          | MANUAL_REQUIRED  | MANUAL_REQUIRED   | MANUAL_REQUIRED | MANUAL_REQUIRED | MANUAL_REQUIRED            | MANUAL_REQUIRED | No silent rounding.                            |
-| EE-STG-006 | Empty amount rejected                  | MANUAL_REQUIRED  | MANUAL_REQUIRED   | MANUAL_REQUIRED | MANUAL_REQUIRED | MANUAL_REQUIRED            | MANUAL_REQUIRED | Structured error required.                     |
-| EE-STG-007 | Owner/admin submit denied              | MANUAL_REQUIRED  | MANUAL_REQUIRED   | MANUAL_REQUIRED | MANUAL_REQUIRED | MANUAL_REQUIRED            | MANUAL_REQUIRED | No financial write.                            |
-| EE-STG-008 | Rollback by flag off                   | MANUAL_REQUIRED  | MANUAL_REQUIRED   | MANUAL_REQUIRED | MANUAL_REQUIRED | MANUAL_REQUIRED            | MANUAL_REQUIRED | Must return to legacy behavior.                |
+| Test ID    | Scenario                               | Request Evidence     | Response Evidence      | DB Evidence     | Audit Evidence  | Dashboard/History Evidence | Result          | Notes                                                            |
+| ---------- | -------------------------------------- | -------------------- | ---------------------- | --------------- | --------------- | -------------------------- | --------------- | ---------------------------------------------------------------- |
+| EE-STG-001 | Production remains legacy              | MANUAL_REQUIRED      | MANUAL_REQUIRED        | MANUAL_REQUIRED | MANUAL_REQUIRED | MANUAL_REQUIRED            | MANUAL_REQUIRED | Must not enable adapter in production.                           |
+| EE-STG-002 | Feature flag off remains legacy        | MANUAL_REQUIRED      | MANUAL_REQUIRED        | MANUAL_REQUIRED | MANUAL_REQUIRED | MANUAL_REQUIRED            | MANUAL_REQUIRED | Rollback evidence.                                               |
+| EE-STG-003 | Staging flag on uses adapter rehearsal | BLOCKED_BEFORE_WRITE | `403 FEATURE_DISABLED` | No write        | No write        | No write                   | BLOCKED         | Staging flag currently disabled.                                 |
+| EE-STG-004 | Valid employee entry                   | NOT_EXECUTED         | NOT_EXECUTED           | No write        | No write        | No write                   | BLOCKED         | Avoided partial QA because adapter flag-on path was unavailable. |
+| EE-STG-005 | Three-decimal amount rejected          | MANUAL_REQUIRED      | MANUAL_REQUIRED        | MANUAL_REQUIRED | MANUAL_REQUIRED | MANUAL_REQUIRED            | MANUAL_REQUIRED | No silent rounding.                                              |
+| EE-STG-006 | Empty amount rejected                  | MANUAL_REQUIRED      | MANUAL_REQUIRED        | MANUAL_REQUIRED | MANUAL_REQUIRED | MANUAL_REQUIRED            | MANUAL_REQUIRED | Structured error required.                                       |
+| EE-STG-007 | Owner/admin submit denied              | MANUAL_REQUIRED      | MANUAL_REQUIRED        | MANUAL_REQUIRED | MANUAL_REQUIRED | MANUAL_REQUIRED            | MANUAL_REQUIRED | No financial write.                                              |
+| EE-STG-008 | Rollback by flag off                   | MANUAL_REQUIRED      | MANUAL_REQUIRED        | MANUAL_REQUIRED | MANUAL_REQUIRED | MANUAL_REQUIRED            | MANUAL_REQUIRED | Must return to legacy behavior.                                  |
 
 ## Handover Staging Evidence
 
-| Test ID    | Scenario                        | Request Evidence | Response Evidence | DB Evidence     | Audit Evidence  | Result          | Notes                               |
-| ---------- | ------------------------------- | ---------------- | ----------------- | --------------- | --------------- | --------------- | ----------------------------------- |
-| HO-STG-001 | Employee valid staging handover | MANUAL_REQUIRED  | MANUAL_REQUIRED   | MANUAL_REQUIRED | MANUAL_REQUIRED | MANUAL_REQUIRED | Staging tables only.                |
-| HO-STG-002 | Same idempotency key replay     | MANUAL_REQUIRED  | MANUAL_REQUIRED   | MANUAL_REQUIRED | MANUAL_REQUIRED | MANUAL_REQUIRED | No duplicate financial records.     |
-| HO-STG-003 | Frontend total tamper rejected  | MANUAL_REQUIRED  | MANUAL_REQUIRED   | MANUAL_REQUIRED | MANUAL_REQUIRED | MANUAL_REQUIRED | Backend totals authority rehearsal. |
-| HO-STG-004 | Voided row rejected             | MANUAL_REQUIRED  | MANUAL_REQUIRED   | MANUAL_REQUIRED | MANUAL_REQUIRED | MANUAL_REQUIRED | No re-handover of voided rows.      |
-| HO-STG-005 | Owner/admin submit rejected     | MANUAL_REQUIRED  | MANUAL_REQUIRED   | MANUAL_REQUIRED | MANUAL_REQUIRED | MANUAL_REQUIRED | Employee/staff submit only.         |
+| Test ID    | Scenario                        | Request Evidence     | Response Evidence      | DB Evidence     | Audit Evidence  | Result          | Notes                                     |
+| ---------- | ------------------------------- | -------------------- | ---------------------- | --------------- | --------------- | --------------- | ----------------------------------------- |
+| HO-STG-001 | Employee valid staging handover | BLOCKED_BEFORE_WRITE | `403 FEATURE_DISABLED` | No write        | No write        | BLOCKED         | Staging handover flag currently disabled. |
+| HO-STG-002 | Same idempotency key replay     | MANUAL_REQUIRED      | MANUAL_REQUIRED        | MANUAL_REQUIRED | MANUAL_REQUIRED | MANUAL_REQUIRED | No duplicate financial records.           |
+| HO-STG-003 | Frontend total tamper rejected  | MANUAL_REQUIRED      | MANUAL_REQUIRED        | MANUAL_REQUIRED | MANUAL_REQUIRED | MANUAL_REQUIRED | Backend totals authority rehearsal.       |
+| HO-STG-004 | Voided row rejected             | MANUAL_REQUIRED      | MANUAL_REQUIRED        | MANUAL_REQUIRED | MANUAL_REQUIRED | MANUAL_REQUIRED | No re-handover of voided rows.            |
+| HO-STG-005 | Owner/admin submit rejected     | MANUAL_REQUIRED      | MANUAL_REQUIRED        | MANUAL_REQUIRED | MANUAL_REQUIRED | MANUAL_REQUIRED | Employee/staff submit only.               |
 
 ## Owner Flow Evidence
 
@@ -135,8 +136,8 @@ Cloudflare staging secrets without writing values to Markdown or Git.
 | --------------------------- | --------------------------------------------------------------------------------------------------------------- |
 | GO for continued staging QA | Schema bootstrap, staging secrets, test accounts, production URL exclusion, and rollback preflight are complete |
 | GO for production cutover   | No                                                                                                              |
-| Blocking issues             | Real staging write QA still requires explicit human approval and confirmation flags                             |
-| Required follow-up task     | Use `NEXT_PROMPT_STAGING_QA_005_REAL_WRITE_QA_APPROVAL_REQUIRED.md` only after human approval                   |
+| Blocking issues             | Real staging write QA now requires explicit staging-only feature flag enablement/runtime update approval        |
+| Required follow-up task     | Use `NEXT_PROMPT_STAGING_QA_005B_ENABLE_STAGING_FLAGS_AND_WRITE_QA.md` only after human approval                |
 
 Production cutover remains `NO-GO` until production migration, production
 deployment, accounting reconciliation, tenant scope, receivables, rollback, and

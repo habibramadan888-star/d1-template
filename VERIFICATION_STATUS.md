@@ -87,6 +87,22 @@ Date: 2026-05-24, Asia/Dubai
 
 P0-001 remains Partial. These commands verify review and reconciliation readiness only; they do not migrate live schema or change accounting authority.
 
+## STAGING-QA-005 Verification Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+| Command / Probe                                                                                    | Exists | Result                    | Error Summary                   | Log Evidence                                       | Commercial Meaning                                                          |
+| -------------------------------------------------------------------------------------------------- | ------ | ------------------------- | ------------------------------- | -------------------------------------------------- | --------------------------------------------------------------------------- |
+| `npm run check`                                                                                    | yes    | Pass                      | none                            | 182 tests passed                                   | Baseline remains stable before staging write QA.                            |
+| `npm run security:secrets`                                                                         | yes    | Pass                      | none                            | Secret hygiene check passed                        | No secret/password/token was committed.                                     |
+| `npm run gate:commercial-launch`                                                                   | yes    | Pass / `PRODUCTION_NO_GO` | none                            | `COMMERCIAL_LAUNCH_READINESS_RESULT.md`            | Production cutover remains blocked.                                         |
+| `npm run qa:employee-entry-staging -- --confirm-staging-write --confirm-backup --confirm-rollback` | yes    | MANUAL_REQUIRED           | write not implemented by script | `EMPLOYEE_ENTRY_REAL_STAGING_QA_DRY_RUN_RESULT.md` | Existing script is still a safe preflight and did not write staging data.   |
+| Staging handover endpoint probe                                                                    | yes    | BLOCKED_BEFORE_WRITE      | `FEATURE_DISABLED`              | `STAGING_QA_005_PRE_WRITE_CONFIRMATION.md`         | Handover staging write QA cannot run until staging flag is enabled.         |
+| Staging employee adapter draft probe                                                               | yes    | BLOCKED_BEFORE_WRITE      | `FEATURE_DISABLED`              | `STAGING_QA_005_PRE_WRITE_CONFIRMATION.md`         | Employee adapter staging write QA cannot run until staging flag is enabled. |
+| Staging D1 count snapshot                                                                          | yes    | Pass read-only            | none                            | `STAGING_QA_005_DATABASE_EVIDENCE.md`              | Staging D1 business tables remain at 0 rows; no write occurred.             |
+
+P0-001 and P0-002 remain Partial. STAGING-QA-005 did not execute real writes because the deployed staging runtime still has both required feature flags disabled.
+
 ## P1-006 Verification Addendum
 
 Date: 2026-05-24, Asia/Dubai

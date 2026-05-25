@@ -144,6 +144,37 @@ Still forbidden:
 5. Move dashboard statistics to backend-owned calculations.
 6. Promote clean schema and `/api/delete_session` production migration only after manual approval.
 
+## STAGING-QA-005 Pre-Write Blocker Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+Current staging state:
+
+- Dedicated staging Worker/D1/KV exist.
+- Staging schema is bootstrapped.
+- Staging secrets and test accounts are configured.
+- Production URL exclusion and rollback preflight were confirmed.
+- Real staging write QA did not execute because the deployed staging runtime has both write-enabling flags disabled.
+
+Blocking details:
+
+- `ENABLE_EMPLOYEE_ENTRY_ADAPTER_LIVE_ROUTE=false` blocks adapter flag-on employee entry QA.
+- `ENABLE_HANDOVER_ATOMIC_STAGING=false` blocks handover staging endpoint QA.
+- `POST /api/staging/handover/commit` returned `403 FEATURE_DISABLED`.
+- `POST /api/staging/employee-entry/adapter-draft` returned `403 FEATURE_DISABLED`.
+
+Safe next step:
+
+- Run `NEXT_PROMPT_STAGING_QA_005B_ENABLE_STAGING_FLAGS_AND_WRITE_QA.md` only after explicit human approval to change staging-only runtime flags and roll them back after QA.
+
+Still forbidden:
+
+- Production deploy.
+- Production migration.
+- Production D1 write.
+- Production feature flag enablement.
+- Production cutover.
+
 ## Items Not To Auto-Fix Without Explicit Approval
 
 - Financial formula changes.

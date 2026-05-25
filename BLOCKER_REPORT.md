@@ -374,3 +374,27 @@ Safe path:
 - Do not execute production migration or remote D1 migration.
 - Add or reconcile the missing money readiness gate document only after human
   review of the intended source of truth.
+
+## STAGING-QA-005 blocker: real staging write QA requires staging flag enablement
+
+Date: 2026-05-25, Asia/Dubai
+
+Status: BLOCKED_BEFORE_WRITE.
+
+Evidence:
+
+- `npm run qa:employee-entry-staging -- --confirm-staging-write --confirm-backup --confirm-rollback` returned `MANUAL_REQUIRED` and `write execution: NOT_EXECUTED`.
+- `POST https://homelink-finance-staging.habibramadan888.workers.dev/api/staging/handover/commit` returned `403 FEATURE_DISABLED`.
+- `POST https://homelink-finance-staging.habibramadan888.workers.dev/api/staging/employee-entry/adapter-draft` returned `403 FEATURE_DISABLED`.
+- `deploy-worker/wrangler.toml` currently sets staging vars `ENABLE_EMPLOYEE_ENTRY_ADAPTER_LIVE_ROUTE=false` and `ENABLE_HANDOVER_ATOMIC_STAGING=false`.
+
+Impact:
+
+- Real staging write QA cannot validate employee entry adapter flag-on behavior.
+- Real staging write QA cannot validate the handover staging endpoint.
+- No staging business data was written during this blocked run.
+
+Safe resolution:
+
+- Run a separate human-approved staging-only task to enable both staging flags, execute write QA, and roll both flags back to `false`.
+- Do not perform production deploy, production migration, production feature flag changes, or production cutover.

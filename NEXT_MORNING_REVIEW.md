@@ -121,6 +121,30 @@ Recommended next prompt:
 目标：不要执行 production/remote D1 migration，不切换 live 写入路径，不修改 dashboard live 结果。只 review `migration-drafts/005_money_minor_units_dual_write_draft.sql`、`MONEY_DUAL_WRITE_REHEARSAL_RESULT.md`、`MONEY_DUAL_WRITE_GO_LIVE_GATE.md`，冻结字段、回滚、reconciliation、staging 验证和人工会计确认要求。P0-001 仍保持 Partial，不能标记 Verified。
 ```
 
+## STAGING-QA-005 Update
+
+Date: 2026-05-25, Asia/Dubai
+
+The real staging write QA task reached a pre-write blocker. Staging resources,
+schema, secrets, accounts, backup, rollback preflight, and production URL
+exclusion were ready, but the deployed staging Worker still had both write
+enablement flags disabled:
+
+- `ENABLE_EMPLOYEE_ENTRY_ADAPTER_LIVE_ROUTE=false`
+- `ENABLE_HANDOVER_ATOMIC_STAGING=false`
+
+Runtime probes returned `403 FEATURE_DISABLED` for the staging handover and
+employee-entry adapter draft endpoints. No staging business data was written.
+Production remained untouched and `gate:commercial-launch` remained
+`PRODUCTION_NO_GO`.
+
+Recommended next task:
+
+```text
+进入 TASK STAGING-QA-005B：Enable staging-only feature flags, execute real staging write QA, and rollback.
+明确批准只对 staging Worker 启用 ENABLE_EMPLOYEE_ENTRY_ADAPTER_LIVE_ROUTE=true 与 ENABLE_HANDOVER_ATOMIC_STAGING=true，执行 employee entry / handover staging write QA，然后回滚两项 flag=false。禁止 production deploy、production migration、production URL、production D1 write、production cutover、secret 输出。
+```
+
 ## P0-001C Update
 
 Date: 2026-05-24, Asia/Dubai

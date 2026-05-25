@@ -6,6 +6,29 @@ Scope: governance, engineering baseline, local startup checks
 Production deploy: not executed  
 Production database mutation: not executed
 
+## STAGING-QA-005 Pre-Write Blocker Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+Scope: real staging write QA pre-write probe for `homelink-finance-staging`.
+
+| Command / Check                                                                                    | Result                    | Evidence                                           | Notes                                                                                  |
+| -------------------------------------------------------------------------------------------------- | ------------------------- | -------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `npm run check`                                                                                    | PASS                      | 182 tests passed                                   | Baseline before write QA.                                                              |
+| `npm run security:secrets`                                                                         | PASS                      | Secret hygiene check passed                        | No secret committed.                                                                   |
+| `npm run gate:commercial-launch`                                                                   | PASS / `PRODUCTION_NO_GO` | `COMMERCIAL_LAUNCH_READINESS_RESULT.md`            | Production remains blocked.                                                            |
+| `npm run audit:worker-drift`                                                                       | PASS                      | 0 critical mismatches                              | No deploy artifact critical drift.                                                     |
+| `npm run verify:embedded-worker`                                                                   | PASS                      | `EMBEDDED_WORKER_FRESHNESS_RESULT=PASS`            | Embedded freshness remains valid.                                                      |
+| `npm run build:embedded:dry-run`                                                                   | PASS with WARNING         | 0 critical missing                                 | Warning remains non-blocking for production NO-GO.                                     |
+| `npm run qa:employee-entry-staging -- --confirm-staging-write --confirm-backup --confirm-rollback` | MANUAL_REQUIRED           | `EMPLOYEE_ENTRY_REAL_STAGING_QA_DRY_RUN_RESULT.md` | Existing script intentionally did not execute writes.                                  |
+| Runtime feature probe                                                                              | BLOCKED_BEFORE_WRITE      | `STAGING_QA_005_PRE_WRITE_CONFIRMATION.md`         | Staging handover and employee-entry adapter endpoints returned `403 FEATURE_DISABLED`. |
+
+Outcome:
+
+- Real staging write QA was not executed.
+- No production deploy, production migration, production URL call, production D1 write, or staging business data write occurred.
+- Next safe task must explicitly approve staging-only feature flag enablement and rollback.
+
 ## Summary
 
 Local static/Worker startup is viable. The engineering baseline now exists, but full validation is blocked by legacy lint errors and missing local authentication secrets.
