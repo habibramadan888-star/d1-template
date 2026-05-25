@@ -801,6 +801,36 @@ Recommended next prompt:
 
 Production cutover remains `NO-GO`.
 
+## STAGING-QA-006 Morning Review Addendum
+
+Most important result:
+
+- Real staging QA evidence is locked for employee entry and handover staging
+  flows, and both staging feature flags are confirmed rolled back to `false`.
+
+Current status:
+
+- P0-001: `Partial - real staging QA passed, production cutover still NO-GO`.
+- P0-002: `Partial - handover staging QA passed, production cutover still NO-GO`.
+- Production cutover: `NO-GO`.
+- Staging QA test data: retained as evidence; cleanup not executed.
+
+Recommended next task:
+
+```text
+进入 TASK P0-003D：Backend totals staging switch gate。
+目标：只做 local/staging backend totals authority staging switch gate，记录 dashboard/history evidence 和 rollback plan。
+禁止 production deploy、production migration、production cutover、live dashboard switch、P0-003 Verified。
+```
+
+Manual review still required:
+
+- TOP_25 money risks.
+- Production reconciliation/backfill plan.
+- Production rollback plan.
+- P0-006 tenant/property scope.
+- P0-008 receivables.
+
 ## STAGING-SECRETS-003 Morning Review Addendum
 
 Most important result:

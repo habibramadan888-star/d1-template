@@ -495,3 +495,21 @@ Status:
 - P0-001 is Partial, not Verified.
 - P0-002 is Partial, not Verified.
 - Production cutover remains `NO-GO`.
+
+## STAGING-QA-006 Verification Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+| Command / Check                     | Exists | Result                          | Error Summary | Log Evidence                                            | Commercial Meaning                                          |
+| ----------------------------------- | ------ | ------------------------------- | ------------- | ------------------------------------------------------- | ----------------------------------------------------------- |
+| `npm run check`                     | yes    | Pass                            | none          | 182 tests passed during baseline                        | Local regression suite remains green after real staging QA. |
+| `npm run security:secrets`          | yes    | Pass                            | none          | Secret hygiene passed                                   | No secret was committed.                                    |
+| `npm run gate:commercial-launch`    | yes    | `PRODUCTION_NO_GO`              | none          | Gate result stayed NO-GO                                | Production cutover remains blocked.                         |
+| `npm run qa:employee-entry-staging` | yes    | Pass with `DRY_RUN_ONLY` result | none          | No confirmation flags supplied                          | Post-QA dry-run remains safe.                               |
+| `npm run audit:worker-drift`        | yes    | Pass                            | none          | 0 critical mismatches                                   | Source/embedded drift gate remains green.                   |
+| `npm run verify:embedded-worker`    | yes    | Pass                            | none          | Embedded freshness pass                                 | Not production deploy approval.                             |
+| `npm run build:embedded:dry-run`    | yes    | Warning, 0 critical missing     | none          | Dry-run warning remains non-critical                    | Re-run before any deploy.                                   |
+| Staging final flag probe            | yes    | Pass                            | none          | Both staging endpoints returned HTTP 403 after rollback | Staging flags remain disabled.                              |
+
+No production deploy, production migration, production D1 write, production URL
+call, staging cleanup, or secret exposure occurred in STAGING-QA-006.

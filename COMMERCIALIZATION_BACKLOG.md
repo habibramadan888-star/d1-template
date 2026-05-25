@@ -976,3 +976,27 @@ Required next actions:
 Real staging write QA remains MANUAL_REQUIRED.
 
 Production remains NO-GO.
+
+## STAGING-QA-006 Closure Backlog Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+Current state:
+
+- Real staging employee entry QA evidence is locked.
+- Real staging handover QA evidence is locked.
+- Staging flags are confirmed rolled back to `false`.
+- Staging QA test data is retained as evidence; cleanup is not executed.
+- Production cutover remains `NO-GO`.
+
+Recommended next task:
+
+- `P0-003D backend totals staging switch gate`.
+
+Production blockers that remain:
+
+- P0-003 backend totals live authority is not production switched.
+- P0-006 tenant/property scope remains partial.
+- P0-008 receivables remains partial.
+- TOP_25 money risks still require human review.
+- Production migration, production rollback, and production backfill remain unapproved and unrehearsed.

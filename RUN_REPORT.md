@@ -3805,3 +3805,38 @@ Status:
 - P0-001: `Partial - real staging QA passed, production cutover still NO-GO`.
 - P0-002: `Partial - handover staging QA passed, production cutover still NO-GO`.
 - Production cutover remains `NO-GO`.
+
+## STAGING-QA-006 Post Real Staging QA Closure
+
+Date: 2026-05-25, Asia/Dubai
+
+Scope: locked the STAGING-QA-005B evidence, confirmed staging flags remain
+rolled back to `false`, documented staging QA test data retention, and reviewed
+why production remains `NO-GO`.
+
+Completed:
+
+- Created `STAGING_QA_006_FINAL_FLAG_STATE_CONFIRMATION.md`.
+- Created `STAGING_QA_006_EVIDENCE_LOCK.md`.
+- Created `STAGING_QA_TEST_DATA_RETENTION_PLAN.md`.
+- Created `STAGING_QA_006_PRODUCTION_NO_GO_REVIEW.md`.
+- Created `POST_STAGING_QA_NEXT_ACTION_PLAN.md`.
+- Created `NEXT_PROMPT_P0_003D_BACKEND_TOTALS_STAGING_SWITCH_GATE.md`.
+- Updated staging QA evidence and status reports.
+
+Safety:
+
+- Production deploy: no.
+- Production migration: no.
+- Production URL called: no.
+- Production D1 written: no.
+- Staging flags final state: false / false.
+- Staging data cleanup executed: no.
+- Secret, password, token, or cookie committed: no.
+
+Status:
+
+- P0-001 remains `Partial - real staging QA passed, production cutover still NO-GO`.
+- P0-002 remains `Partial - handover staging QA passed, production cutover still NO-GO`.
+- Production cutover remains `NO-GO`.
+- Recommended next task: `P0-003D backend totals staging switch gate`.

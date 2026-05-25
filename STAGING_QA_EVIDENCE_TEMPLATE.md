@@ -12,7 +12,7 @@ migration, production feature flag enablement, or production cutover.
 | QA date/time                        | Real staging write QA executed 2026-05-25; flags were rolled back to false after QA                                                                                 |
 | Reviewer                            | Codex staging write QA runner with explicit human approval for `--confirm-staging-write --confirm-backup --confirm-rollback`                                        |
 | Branch                              | `qa/staging-qa-005b-retry-enable-flags-write-qa-rollback`                                                                                                           |
-| Commit                              | Pending STAGING-QA-005B retry commit                                                                                                                                |
+| Commit                              | `fa0f3b9`                                                                                                                                                           |
 | Staging Worker URL                  | `https://homelink-finance-staging.habibramadan888.workers.dev`                                                                                                      |
 | Worker entrypoint                   | Staging source: `deploy-worker/wrangler.toml` `[env.staging]` -> `src/index.js`; embedded remains `deploy-worker/wrangler.embedded.toml` -> `src/index.embedded.js` |
 | APP_ENV                             | `staging` in `deploy-worker/wrangler.toml` `[env.staging.vars]`                                                                                                     |
@@ -142,3 +142,19 @@ Cloudflare staging secrets without writing values to Markdown or Git.
 Production cutover remains `NO-GO` until production migration, production
 deployment, accounting reconciliation, tenant scope, receivables, rollback, and
 human approval gates are all complete.
+
+## STAGING-QA-006 Evidence Lock Addendum
+
+| Field                    | Value                                                                                    |
+| ------------------------ | ---------------------------------------------------------------------------------------- |
+| Closure branch           | `qa/staging-qa-006-post-qa-closure`                                                      |
+| Evidence lock status     | Locked in `STAGING_QA_006_EVIDENCE_LOCK.md`                                              |
+| Final staging flags      | `ENABLE_EMPLOYEE_ENTRY_ADAPTER_LIVE_ROUTE=false`, `ENABLE_HANDOVER_ATOMIC_STAGING=false` |
+| Final flag confirmation  | `STAGING_QA_006_FINAL_FLAG_STATE_CONFIRMATION.md`                                        |
+| Test data retention plan | `STAGING_QA_TEST_DATA_RETENTION_PLAN.md`; cleanup not executed                           |
+| Production NO-GO review  | `STAGING_QA_006_PRODUCTION_NO_GO_REVIEW.md`                                              |
+| Recommended next task    | `P0-003D backend totals staging switch gate`                                             |
+| Next prompt              | `NEXT_PROMPT_P0_003D_BACKEND_TOTALS_STAGING_SWITCH_GATE.md`                              |
+
+STAGING-QA-006 does not authorize production deploy, production migration,
+production feature flag enablement, production D1 writes, or production cutover.

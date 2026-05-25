@@ -831,3 +831,28 @@ Remaining blockers:
 - P0-008 receivables remains partial.
 - Production reconciliation and rollback are not exercised.
 - TOP_25 money risks still require human review.
+
+## STAGING-QA-006 Evidence Lock Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+P0-001 current status:
+
+- `Partial - real staging QA passed, production cutover still NO-GO`.
+
+P0-002 current status:
+
+- `Partial - handover staging QA passed, production cutover still NO-GO`.
+
+New evidence:
+
+- `STAGING_QA_006_FINAL_FLAG_STATE_CONFIRMATION.md`
+- `STAGING_QA_006_EVIDENCE_LOCK.md`
+- `STAGING_QA_TEST_DATA_RETENTION_PLAN.md`
+- `STAGING_QA_006_PRODUCTION_NO_GO_REVIEW.md`
+- `POST_STAGING_QA_NEXT_ACTION_PLAN.md`
+- `NEXT_PROMPT_P0_003D_BACKEND_TOTALS_STAGING_SWITCH_GATE.md`
+
+Production remains `NO-GO` because P0-003, P0-006, P0-008, TOP_25 money risk
+review, production migration, production rollback, and production backfill are
+not complete.
