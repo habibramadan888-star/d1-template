@@ -532,3 +532,18 @@ Date: 2026-05-25, Asia/Dubai
 No production deploy, production migration, production D1 write, staging D1
 write, feature flag change, dashboard mutation, live financial formula change,
 or secret exposure occurred in P0-003D.
+
+## FORMAT-REBASELINE-001 Verification Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+| Command / Check                  | Exists | Result             | Error Summary | Log Evidence                         | Commercial Meaning                            |
+| -------------------------------- | ------ | ------------------ | ------------- | ------------------------------------ | --------------------------------------------- |
+| `npm run format:check`           | yes    | Pass               | none          | All matched files use Prettier style | P0-003E formatting blocker is resolved.       |
+| `npm run check`                  | yes    | Pass               | none          | 193 tests passed                     | Baseline is restored before retrying P0-003E. |
+| `npm run security:secrets`       | yes    | Pass               | none          | Secret hygiene passed                | No secret was committed.                      |
+| `npm run gate:commercial-launch` | yes    | `PRODUCTION_NO_GO` | none          | Commercial gate stayed NO-GO         | Production cutover remains blocked.           |
+
+No production deploy, production migration, production D1 write, staging D1
+write, feature flag change, dashboard mutation, live financial formula change,
+test assertion change, or secret exposure occurred in FORMAT-REBASELINE-001.

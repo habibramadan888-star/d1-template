@@ -801,6 +801,32 @@ Recommended next prompt:
 
 Production cutover remains `NO-GO`.
 
+## FORMAT-REBASELINE-001 Morning Review Addendum
+
+Most important result:
+
+- The P0-003E baseline formatting blocker was resolved by reformatting two
+  generated reports only.
+
+Current status:
+
+- `npm run format:check`: pass.
+- `npm run check`: pass, 193 tests.
+- `npm run security:secrets`: pass.
+- `npm run gate:commercial-launch`: `PRODUCTION_NO_GO`.
+- Backend totals staging switch rehearsal executed: no.
+- Feature flags changed: no.
+- Production deploy / migration / D1 write: no.
+
+Recommended next prompt:
+
+```text
+进入 TASK P0-003E-RETRY：Backend totals staging switch rehearsal.
+Baseline npm run check has been restored.
+Continue staging/local-only rehearsal, keep production disabled, and rollback ENABLE_BACKEND_TOTALS_AUTHORITY_STAGING=false after QA.
+Do not mark P0-003 Verified.
+```
+
 ## P0-003D Morning Review Addendum
 
 Most important result:

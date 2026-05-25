@@ -1,6 +1,6 @@
 # Commercial Launch Readiness Result
 
-Generated: 2026-05-25T14:45:42.019Z
+Generated: 2026-05-25T15:11:05.235Z
 
 | Metric                | Count |
 | --------------------- | ----: |
@@ -28,3 +28,11 @@ Production remains `PRODUCTION_NO_GO`. P0-003 is `Partial - backend totals
 staging switch gate ready`; this does not approve production deploy,
 production migration, production feature flags, or a live dashboard authority
 switch.
+
+## FORMAT-REBASELINE-001 Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+The P0-003E baseline formatting blocker was resolved by reformatting generated
+reports only. `npm run check` now passes with 193 tests, and
+`gate:commercial-launch` remains `PRODUCTION_NO_GO`.

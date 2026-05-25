@@ -476,3 +476,17 @@ Safe resolution:
 - Run a dedicated formatting/rebaseline task for the two generated reports.
 - Rerun the full P0-003E baseline.
 - Do not proceed to backend totals switch rehearsal until `npm run check` passes.
+
+Resolution update:
+
+- FORMAT-REBASELINE-001 ran Prettier on
+  `BACKEND_TOTALS_AUTHORITY_REHEARSAL_RESULT.md` and
+  `EMPLOYEE_ENTRY_REAL_STAGING_QA_DRY_RUN_RESULT.md`.
+- `npm run format:check` passed.
+- `npm run check` passed with 193 tests.
+- `npm run security:secrets` passed.
+- `npm run gate:commercial-launch` returned `PRODUCTION_NO_GO`.
+- No business code, tests, dashboard logic, financial formula, deployment,
+  migration, staging write, or feature flag was changed.
+- P0-003E is unblocked for retry, but the backend totals staging switch
+  rehearsal has not been executed.

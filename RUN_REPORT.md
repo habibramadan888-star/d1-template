@@ -3873,3 +3873,29 @@ Staging comparison:
 P0-003 status:
 
 - `Partial - backend totals staging switch gate ready`.
+
+## FORMAT-REBASELINE-001 Generated Report Formatting Rebaseline
+
+Date: 2026-05-25, Asia/Dubai
+
+Scope: resolved the P0-003E baseline blocker caused by Prettier drift in two
+generated Markdown reports. No business code, tests, dashboard logic, financial
+formula, deployment, migration, staging write, or feature flag was changed.
+
+Files reformatted:
+
+- `BACKEND_TOTALS_AUTHORITY_REHEARSAL_RESULT.md`.
+- `EMPLOYEE_ENTRY_REAL_STAGING_QA_DRY_RUN_RESULT.md`.
+
+Validation:
+
+- `npm run format:check`: pass.
+- `npm run check`: pass, 193 tests.
+- `npm run security:secrets`: pass.
+- `npm run gate:commercial-launch`: `PRODUCTION_NO_GO`.
+
+Result:
+
+- The P0-003E formatting blocker is resolved.
+- Backend totals staging switch rehearsal was not executed.
+- P0-003E can be retried with the existing production safety constraints.
