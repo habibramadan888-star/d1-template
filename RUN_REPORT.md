@@ -3335,3 +3335,35 @@ Notes:
   commercial launch.
 - This is expected because static evidence cannot replace runtime authenticated
   role tests and tenant/property scope is still not implemented.
+
+## Deep Loop DB Table Readiness Audit
+
+Date: 2026-05-25, Asia/Dubai
+
+Scope:
+
+- Static table-by-table commercial readiness matrix.
+- Read-only scan of Worker source, active local migrations, and migration
+  drafts.
+- No D1 connection, deployment, migration, or schema change.
+
+Changes:
+
+- Added `DB_TABLE_COMMERCIAL_READINESS_MATRIX.md`.
+- Added `DB_TABLE_READINESS_AUDIT_RESULT.md`.
+- Added `scripts/audit-db-table-readiness.mjs`.
+- Added `npm run audit:db-readiness`.
+
+Verification:
+
+| Command                      | Result          |
+| ---------------------------- | --------------- |
+| `npm run audit:db-readiness` | MANUAL_REQUIRED |
+
+Notes:
+
+- The scan reviewed 22 expected commercial tables.
+- 0 expected tables are missing from scanned sources/drafts.
+- 10 tables still require manual review before staging/production.
+- 8 tables have runtime DDL evidence and 5 tables still show legacy `REAL`
+  money risk.

@@ -17,6 +17,7 @@
     "audit:api-permissions": "node scripts/audit-api-permissions.mjs",
     "audit:db": "node scripts/audit-db.mjs",
     "audit:db:check": "node scripts/audit-db.mjs --check",
+    "audit:db-readiness": "node scripts/audit-db-table-readiness.mjs",
     "audit:worker-drift": "node scripts/audit-worker-entrypoint-drift.mjs",
     "audit:observability": "node scripts/audit-observability-readiness.mjs",
     "audit:env-separation": "node scripts/audit-environment-separation.mjs",
