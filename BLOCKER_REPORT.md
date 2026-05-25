@@ -398,3 +398,39 @@ Safe resolution:
 
 - Run a separate human-approved staging-only task to enable both staging flags, execute write QA, and roll both flags back to `false`.
 - Do not perform production deploy, production migration, production feature flag changes, or production cutover.
+
+## STAGING-QA-005B blocker: baseline `npm run check` failed before flag enablement
+
+Date: 2026-05-25, Asia/Dubai
+
+Status: BLOCKED_BEFORE_FLAG_ENABLEMENT.
+
+Evidence:
+
+- Branch: `qa/staging-qa-005b-enable-flags-write-qa-rollback`
+- `npm run security:secrets` passed.
+- `npm run gate:commercial-launch` returned `PRODUCTION_NO_GO`.
+- `npm run audit:worker-drift` passed with 0 critical mismatches.
+- `npm run verify:embedded-worker` passed.
+- `npm run build:embedded:dry-run` returned `WARNING` with 0 critical missing items.
+- `npm run check` failed in `tests/employee-entry-adapter-staging-endpoint.spec.mjs`.
+
+Failure:
+
+```text
+missing APP_ENV or disabled flag rejects employee entry adapter staging endpoint before auth
+Error: Worker did not become ready on http://127.0.0.1:2621. Last error: fetch failed.
+```
+
+Impact:
+
+- Staging feature flags were not enabled.
+- Real staging write QA was not executed.
+- No staging business data was written.
+- Production remained untouched.
+
+Safe resolution:
+
+- Fix or stabilize the local Worker readiness timeout.
+- Rerun the full STAGING-QA-005B baseline.
+- Only after a passing baseline, enable staging-only flags and execute real staging write QA.
