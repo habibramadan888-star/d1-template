@@ -801,6 +801,36 @@ Recommended next prompt:
 
 Production cutover remains `NO-GO`.
 
+## TEST-STABILITY-002 Morning Review Addendum
+
+Most important result:
+
+- The employee-entry local Worker `ECONNRESET` blocker was fixed in the test
+  harness without changing business route behavior.
+
+Current status:
+
+- `npm run check`: PASS, 224 tests.
+- `npm run reproduce:employee-entry-econnreset`: PASS, 3 consecutive runs.
+- Target employee-entry Worker tests: PASS, 3 total runs each.
+- `gate:commercial-launch`: `PRODUCTION_NO_GO`.
+- `qa:employee-entry-staging`: `MANUAL_REQUIRED` / `DRY_RUN_ONLY`.
+- Production deploy: no.
+- Migration: no.
+- Staging write: no.
+- Feature flags enabled: no.
+- Secret committed: no.
+
+Recommended next prompt:
+
+```text
+进入 TASK P0-008D-RETRY：Receivables staging shadow gate after Worker ECONNRESET stability fix.
+目标：只做 local/staging receivables shadow gate，dashboard 保持 shadow / unchanged，production 继续 NO-GO。
+禁止 production deploy、production migration、production cutover、提交 secret、P0-008 Verified。
+```
+
+Production cutover remains `NO-GO`.
+
 ## P0-008C Morning Review Addendum
 
 Most important result:

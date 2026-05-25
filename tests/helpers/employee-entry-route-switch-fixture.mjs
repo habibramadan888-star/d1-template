@@ -10,6 +10,7 @@ import {
 } from "../../scripts/db-local-bootstrap-utils.mjs";
 import {
   defaultEnvPath,
+  fetchWithRetry,
   readDevVars,
   removeDirWithRetries,
   startWorker,
@@ -21,6 +22,7 @@ export const routeSwitchEnv = readDevVars(defaultEnvPath);
 export const routeSwitchEmployeeId = routeSwitchEnv.LOCAL_EMPLOYEE_ID || "abdul";
 export const routeSwitchEmployeePin = routeSwitchEnv.LOCAL_EMPLOYEE_PIN || "8888";
 export const routeSwitchOwnerPassword = routeSwitchEnv.LOCAL_MANAGER_PASSWORD;
+const workerDiagnosticsByBaseUrl = new Map();
 
 export function cookieHeader(response) {
   const values =
@@ -53,28 +55,59 @@ export async function startEmployeeEntryWorker({
   if (migrate) await runLocalMigrations({ persistTo });
   if (seed) runLocalDevSeed({ persistTo });
   const worker = startWorker({ port, persistTo, vars });
-  worker.stdout.on("data", () => {});
-  worker.stderr.on("data", () => {});
+  let stdout = "";
+  let stderr = "";
+  worker.stdout.on("data", (chunk) => {
+    stdout += chunk.toString("utf8");
+  });
+  worker.stderr.on("data", (chunk) => {
+    stderr += chunk.toString("utf8");
+  });
   const baseUrl = `http://127.0.0.1:${port}`;
-  await waitForWorker(baseUrl, 45000);
-  return { baseUrl, persistTo, worker, label };
+  const diagnostics = {
+    label,
+    port,
+    vars,
+    child: worker,
+    command: `wrangler dev --local --port ${port}`,
+    get stdout() {
+      return stdout;
+    },
+    get stderr() {
+      return stderr;
+    }
+  };
+  try {
+    await waitForWorker(baseUrl, Number(process.env.WORKER_READY_TIMEOUT_MS || 60000), diagnostics);
+  } catch (error) {
+    await stopProcessTree(worker, { label });
+    await removeDirWithRetries(persistTo, { label: `${label} D1` });
+    throw error;
+  }
+  workerDiagnosticsByBaseUrl.set(baseUrl, diagnostics);
+  return { baseUrl, persistTo, worker, label, diagnostics };
 }
 
 export async function cleanupEmployeeEntryWorker(run) {
   if (!run) return;
+  if (run.baseUrl) workerDiagnosticsByBaseUrl.delete(run.baseUrl);
   await stopProcessTree(run.worker, { label: run.label });
   await removeDirWithRetries(run.persistTo, { label: `${run.label} D1` });
 }
 
 export async function requestJson(baseUrl, pathName, options = {}) {
-  return fetch(`${baseUrl}${pathName}`, {
-    ...options,
-    headers: {
-      Origin: baseUrl,
-      "Content-Type": "application/json",
-      ...(options.headers || {})
-    }
-  });
+  return fetchWithRetry(
+    `${baseUrl}${pathName}`,
+    {
+      ...options,
+      headers: {
+        Origin: baseUrl,
+        "Content-Type": "application/json",
+        ...(options.headers || {})
+      }
+    },
+    { diagnostics: workerDiagnosticsByBaseUrl.get(baseUrl) }
+  );
 }
 
 export async function jsonBody(response) {

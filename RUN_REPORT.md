@@ -3966,3 +3966,39 @@ Result:
 P0-008 status:
 
 - `Partial - receivables local/staging rehearsal passed`.
+
+## TEST-STABILITY-002 Employee-Entry Worker ECONNRESET Stability
+
+Date: 2026-05-25, Asia/Dubai
+
+Scope: local Worker test harness stability. No production deploy, staging
+deploy, migration, production D1 write, staging D1 write, staging business data
+write, feature flag change, dashboard mutation, live financial formula change,
+or secret exposure occurred.
+
+Completed:
+
+- Added transient socket failure diagnostics and limited retry helper in
+  `scripts/local-worker-utils.mjs`.
+- Updated employee-entry Worker tests and shared fixture to use diagnostic
+  fetch handling.
+- Reduced local wrangler child process accumulation by cleaning test Workers at
+  test-level where applicable.
+- Added `scripts/reproduce-employee-entry-econnreset.mjs`.
+- Added `npm run reproduce:employee-entry-econnreset`.
+- Created TEST-STABILITY-002 diagnosis, concurrency, reproduction, baseline,
+  and retry prompt reports.
+
+Result:
+
+- `npm run reproduce:employee-entry-econnreset`: pass, 3 consecutive runs.
+- Target employee-entry Worker test files: pass, 3 total runs each.
+- `npm run check`: pass, 224 tests.
+- `npm run security:secrets`: pass.
+- `npm run gate:commercial-launch`: `PRODUCTION_NO_GO`.
+- `npm run qa:employee-entry-staging`: `MANUAL_REQUIRED` / `DRY_RUN_ONLY`.
+
+Next:
+
+- Retry P0-008D receivables staging shadow gate using
+  `NEXT_PROMPT_P0_008D_RETRY_RECEIVABLES_STAGING_SHADOW_GATE.md`.

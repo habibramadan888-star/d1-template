@@ -181,6 +181,85 @@ export function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function isRetryableFetchError(error) {
+  const parts = [
+    error?.code,
+    error?.errno,
+    error?.syscall,
+    error?.message,
+    error?.cause?.code,
+    error?.cause?.errno,
+    error?.cause?.syscall,
+    error?.cause?.message
+  ]
+    .filter(Boolean)
+    .join(" ");
+  return /ECONNRESET|ECONNREFUSED|UND_ERR_SOCKET|UND_ERR_CONNECT_TIMEOUT|EPIPE|fetch failed/i.test(
+    parts
+  );
+}
+
+function fetchDiagnosticsMessage({ url, method, attempts, elapsedMs, error, diagnostics = {} }) {
+  const child = diagnostics.child;
+  const details = [
+    `Worker fetch failed after ${attempts} attempt(s).`,
+    `URL: ${url}.`,
+    `Method: ${method}.`,
+    `Elapsed ms: ${elapsedMs}.`,
+    `Error: ${error?.message || String(error)}.`
+  ];
+  if (error?.cause) details.push(`Cause: ${error.cause?.message || String(error.cause)}.`);
+  if (diagnostics.label) details.push(`Label: ${diagnostics.label}.`);
+  if (diagnostics.port) details.push(`Port: ${diagnostics.port}.`);
+  if (diagnostics.command) details.push(`Command: ${diagnostics.command}.`);
+  if (diagnostics.vars) details.push(`Vars: ${safeVarsSummary(diagnostics.vars)}.`);
+  if (child) {
+    details.push(
+      `Child pid: ${child.pid || "unknown"}, exitCode: ${child.exitCode ?? "null"}, signalCode: ${
+        child.signalCode ?? "null"
+      }.`
+    );
+  }
+  if (diagnostics.stdout) details.push(`Last stdout:\n${tailText(diagnostics.stdout)}`);
+  if (diagnostics.stderr) details.push(`Last stderr:\n${tailText(diagnostics.stderr)}`);
+  return details.join("\n");
+}
+
+export async function fetchWithRetry(
+  url,
+  options = {},
+  { attempts = 4, delayMs = 200, diagnostics = {} } = {}
+) {
+  const started = Date.now();
+  const method = String(options.method || "GET").toUpperCase();
+  let lastError;
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      return await fetch(url, options);
+    } catch (error) {
+      lastError = error;
+      if (!isRetryableFetchError(error) || attempt === attempts) {
+        const enriched = new Error(
+          fetchDiagnosticsMessage({
+            url,
+            method,
+            attempts: attempt,
+            elapsedMs: Date.now() - started,
+            error,
+            diagnostics
+          })
+        );
+        enriched.cause = error;
+        throw enriched;
+      }
+      await sleep(delayMs * attempt);
+    }
+  }
+
+  throw lastError;
+}
+
 export async function stopProcessTree(child, { label = "child process", timeoutMs = 10000 } = {}) {
   if (!child?.pid) return { ok: true, skipped: true, label };
   if (child.exitCode !== null || child.signalCode !== null) {

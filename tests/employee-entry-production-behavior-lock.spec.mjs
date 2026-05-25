@@ -14,13 +14,23 @@ const workerRuns = [];
 
 after(async () => {
   for (const run of workerRuns.reverse()) {
-    await cleanupEmployeeEntryWorker(run);
+    await cleanupRun(run);
   }
 });
 
-async function startLockWorker(vars, label) {
+async function cleanupRun(run) {
+  if (!run || run.cleaned) return;
+  run.cleaned = true;
+  await cleanupEmployeeEntryWorker(run);
+}
+
+async function startLockWorker(t, vars, label) {
   const run = await startEmployeeEntryWorker({ vars, label });
+  run.cleaned = false;
   workerRuns.push(run);
+  t.after(async () => {
+    await cleanupRun(run);
+  });
   return run;
 }
 
@@ -44,24 +54,27 @@ async function assertLegacyProductionSubmit(run, payloadId) {
   assert.equal(after.adapter_event_count, before.adapter_event_count);
 }
 
-test("production APP_ENV with adapter flag true remains legacy and exposes no adapter fields", async () => {
+test("production APP_ENV with adapter flag true remains legacy and exposes no adapter fields", async (t) => {
   const run = await startLockWorker(
+    t,
     { APP_ENV: "production", ENABLE_EMPLOYEE_ENTRY_ADAPTER_LIVE_ROUTE: "true" },
     "production flag true employee entry lock worker"
   );
   await assertLegacyProductionSubmit(run, `prod-flag-true-${Date.now()}`);
 });
 
-test("production APP_ENV with adapter flag false remains legacy", async () => {
+test("production APP_ENV with adapter flag false remains legacy", async (t) => {
   const run = await startLockWorker(
+    t,
     { APP_ENV: "production", ENABLE_EMPLOYEE_ENTRY_ADAPTER_LIVE_ROUTE: "false" },
     "production flag false employee entry lock worker"
   );
   await assertLegacyProductionSubmit(run, `prod-flag-false-${Date.now()}`);
 });
 
-test("missing APP_ENV does not enable adapter even when flag is true", async () => {
+test("missing APP_ENV does not enable adapter even when flag is true", async (t) => {
   const run = await startLockWorker(
+    t,
     { APP_ENV: "", ENABLE_EMPLOYEE_ENTRY_ADAPTER_LIVE_ROUTE: "true" },
     "missing app env employee entry lock worker"
   );

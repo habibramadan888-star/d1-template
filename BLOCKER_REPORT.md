@@ -541,3 +541,24 @@ Safe resolution:
 - Rerun the full P0-008D baseline after the Worker tests are stable.
 - Do not proceed to receivables staging shadow implementation until
   `npm run check` passes.
+
+Resolution update:
+
+- TEST-STABILITY-002 added local Worker `fetchWithRetry()` diagnostics for
+  transient socket failures without retrying HTTP business responses.
+- Employee-entry Worker tests now capture stdout/stderr and clean local Worker
+  child processes at test-level where applicable.
+- `npm run reproduce:employee-entry-econnreset` passed 3 consecutive runs.
+- `npm run test:employee-entry-production-lock` passed 3 total runs.
+- `npm run test:employee-entry-route-switch` passed 3 total runs.
+- `npm run test:employee-entry-adapter-staging-endpoint` passed 3 total runs.
+- `npm run check` passed with 224 tests.
+- `npm run security:secrets` passed.
+- `npm run gate:commercial-launch` returned `PRODUCTION_NO_GO`.
+- `npm run qa:employee-entry-staging` remained `MANUAL_REQUIRED` /
+  `DRY_RUN_ONLY`.
+- No production deploy, staging deploy, migration, D1 write, staging write,
+  feature flag enablement, dashboard change, financial formula change, test
+  skip, or secret commit occurred.
+- P0-008D is unblocked for retry, but receivables staging shadow gate
+  implementation has not been executed in this task.

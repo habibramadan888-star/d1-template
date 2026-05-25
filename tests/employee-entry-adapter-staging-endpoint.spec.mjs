@@ -11,6 +11,7 @@ import {
 } from "../scripts/db-local-bootstrap-utils.mjs";
 import {
   defaultEnvPath,
+  fetchWithRetry,
   readDevVars,
   removeDirWithRetries,
   startWorker,
@@ -24,13 +25,21 @@ const employeeId = env.LOCAL_EMPLOYEE_ID || "abdul";
 const employeePin = env.LOCAL_EMPLOYEE_PIN || "8888";
 const ownerPassword = env.LOCAL_MANAGER_PASSWORD;
 const workerRuns = [];
+const workerDiagnosticsByBaseUrl = new Map();
 
 after(async () => {
   for (const run of workerRuns.reverse()) {
-    await stopProcessTree(run.worker, { label: run.label });
-    await removeDirWithRetries(run.persistTo, { label: `${run.label} D1` });
+    await cleanupRun(run);
   }
 });
+
+async function cleanupRun(run) {
+  if (!run || run.cleaned) return;
+  run.cleaned = true;
+  if (run.baseUrl) workerDiagnosticsByBaseUrl.delete(run.baseUrl);
+  await stopProcessTree(run.worker, { label: run.label });
+  await removeDirWithRetries(run.persistTo, { label: `${run.label} D1` });
+}
 
 function cookieHeader(response) {
   const values =
@@ -72,9 +81,8 @@ async function startIsolatedWorker({
   worker.stderr.on("data", (chunk) => {
     stderr += chunk.toString("utf8");
   });
-  workerRuns.push({ worker, persistTo, label });
   const baseUrl = `http://127.0.0.1:${actualPort}`;
-  await waitForWorker(baseUrl, Number(process.env.WORKER_READY_TIMEOUT_MS || 60000), {
+  const diagnostics = {
     label,
     port: actualPort,
     vars,
@@ -86,19 +94,41 @@ async function startIsolatedWorker({
       return stderr;
     },
     command: `wrangler dev --local --port ${actualPort}`
-  });
+  };
+  const run = { worker, persistTo, label, baseUrl, diagnostics, cleaned: false };
+  workerRuns.push(run);
+  try {
+    await waitForWorker(baseUrl, Number(process.env.WORKER_READY_TIMEOUT_MS || 60000), diagnostics);
+  } catch (error) {
+    await cleanupRun(run);
+    throw error;
+  }
+  workerDiagnosticsByBaseUrl.set(baseUrl, diagnostics);
   return { baseUrl, persistTo };
 }
 
-async function request(baseUrl, pathName, options = {}) {
-  return fetch(`${baseUrl}${pathName}`, {
-    ...options,
-    headers: {
-      Origin: baseUrl,
-      "Content-Type": "application/json",
-      ...(options.headers || {})
-    }
+async function startTestWorker(t, options) {
+  const run = await startIsolatedWorker(options);
+  t.after(async () => {
+    const tracked = workerRuns.find((item) => item.baseUrl === run.baseUrl);
+    await cleanupRun(tracked);
   });
+  return run;
+}
+
+async function request(baseUrl, pathName, options = {}) {
+  return fetchWithRetry(
+    `${baseUrl}${pathName}`,
+    {
+      ...options,
+      headers: {
+        Origin: baseUrl,
+        "Content-Type": "application/json",
+        ...(options.headers || {})
+      }
+    },
+    { diagnostics: workerDiagnosticsByBaseUrl.get(baseUrl) }
+  );
 }
 
 async function jsonBody(response) {
@@ -204,8 +234,8 @@ function legacyCounts(persistTo) {
   )[0];
 }
 
-test("production APP_ENV hides employee entry adapter staging endpoint with 404", async () => {
-  const { baseUrl } = await startIsolatedWorker({
+test("production APP_ENV hides employee entry adapter staging endpoint with 404", async (t) => {
+  const { baseUrl } = await startTestWorker(t, {
     vars: { APP_ENV: "production", ENABLE_EMPLOYEE_ENTRY_ADAPTER_STAGING: "true" },
     label: "production disabled employee entry adapter worker"
   });
@@ -216,8 +246,8 @@ test("production APP_ENV hides employee entry adapter staging endpoint with 404"
   assert.equal(response.status, 404);
 });
 
-test("missing APP_ENV or disabled flag rejects employee entry adapter staging endpoint before auth", async () => {
-  const missing = await startIsolatedWorker({
+test("missing APP_ENV or disabled flag rejects employee entry adapter staging endpoint before auth", async (t) => {
+  const missing = await startTestWorker(t, {
     vars: { APP_ENV: "", ENABLE_EMPLOYEE_ENTRY_ADAPTER_STAGING: "true" },
     label: "missing APP_ENV employee entry adapter worker"
   });
@@ -228,7 +258,7 @@ test("missing APP_ENV or disabled flag rejects employee entry adapter staging en
   assert.equal(missingResponse.status, 403);
   assert.equal((await jsonBody(missingResponse)).code, "FEATURE_DISABLED");
 
-  const disabled = await startIsolatedWorker({
+  const disabled = await startTestWorker(t, {
     vars: { APP_ENV: "test", ENABLE_EMPLOYEE_ENTRY_ADAPTER_STAGING: "false" },
     label: "feature disabled employee entry adapter worker"
   });
@@ -240,9 +270,9 @@ test("missing APP_ENV or disabled flag rejects employee entry adapter staging en
   assert.equal((await jsonBody(disabledResponse)).code, "FEATURE_DISABLED");
 });
 
-test("enabled employee entry adapter endpoint enforces auth, role, validation, and no live writes", async () => {
+test("enabled employee entry adapter endpoint enforces auth, role, validation, and no live writes", async (t) => {
   assert.ok(ownerPassword, "LOCAL_MANAGER_PASSWORD is required for owner rejection test");
-  const { baseUrl, persistTo } = await startIsolatedWorker({
+  const { baseUrl, persistTo } = await startTestWorker(t, {
     vars: {
       APP_ENV: "test",
       ALLOW_DEV_SEED: "true",

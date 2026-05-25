@@ -11,6 +11,7 @@ import {
 } from "../scripts/db-local-bootstrap-utils.mjs";
 import {
   defaultEnvPath,
+  fetchWithRetry,
   readDevVars,
   removeDirWithRetries,
   startWorker,
@@ -23,13 +24,21 @@ const employeeId = env.LOCAL_EMPLOYEE_ID || "abdul";
 const employeePin = env.LOCAL_EMPLOYEE_PIN || "8888";
 const ownerPassword = env.LOCAL_MANAGER_PASSWORD;
 const workerRuns = [];
+const workerDiagnosticsByBaseUrl = new Map();
 
 after(async () => {
   for (const run of workerRuns.reverse()) {
-    await stopProcessTree(run.worker, { label: run.label });
-    await removeDirWithRetries(run.persistTo, { label: `${run.label} D1` });
+    await cleanupRun(run);
   }
 });
+
+async function cleanupRun(run) {
+  if (!run || run.cleaned) return;
+  run.cleaned = true;
+  if (run.baseUrl) workerDiagnosticsByBaseUrl.delete(run.baseUrl);
+  await stopProcessTree(run.worker, { label: run.label });
+  await removeDirWithRetries(run.persistTo, { label: `${run.label} D1` });
+}
 
 function cookieHeader(response) {
   const values =
@@ -62,23 +71,61 @@ async function startIsolatedWorker({
   if (migrate) await runLocalMigrations({ persistTo });
   if (seed) runLocalDevSeed({ persistTo });
   const worker = startWorker({ port, persistTo, vars });
-  worker.stdout.on("data", () => {});
-  worker.stderr.on("data", () => {});
-  workerRuns.push({ worker, persistTo, label });
+  let stdout = "";
+  let stderr = "";
+  worker.stdout.on("data", (chunk) => {
+    stdout += chunk.toString("utf8");
+  });
+  worker.stderr.on("data", (chunk) => {
+    stderr += chunk.toString("utf8");
+  });
   const baseUrl = `http://127.0.0.1:${port}`;
-  await waitForWorker(baseUrl, 45000);
-  return { baseUrl, persistTo };
+  const diagnostics = {
+    label,
+    port,
+    vars,
+    child: worker,
+    command: `wrangler dev --local --port ${port}`,
+    get stdout() {
+      return stdout;
+    },
+    get stderr() {
+      return stderr;
+    }
+  };
+  const run = { baseUrl, persistTo, worker, label, diagnostics, cleaned: false };
+  workerRuns.push(run);
+  try {
+    await waitForWorker(baseUrl, Number(process.env.WORKER_READY_TIMEOUT_MS || 60000), diagnostics);
+  } catch (error) {
+    await cleanupRun(run);
+    throw error;
+  }
+  workerDiagnosticsByBaseUrl.set(baseUrl, diagnostics);
+  return run;
+}
+
+async function startTestWorker(t, options) {
+  const run = await startIsolatedWorker(options);
+  t.after(async () => {
+    await cleanupRun(run);
+  });
+  return run;
 }
 
 async function request(baseUrl, pathName, options = {}) {
-  return fetch(`${baseUrl}${pathName}`, {
-    ...options,
-    headers: {
-      Origin: baseUrl,
-      "Content-Type": "application/json",
-      ...(options.headers || {})
-    }
-  });
+  return fetchWithRetry(
+    `${baseUrl}${pathName}`,
+    {
+      ...options,
+      headers: {
+        Origin: baseUrl,
+        "Content-Type": "application/json",
+        ...(options.headers || {})
+      }
+    },
+    { diagnostics: workerDiagnosticsByBaseUrl.get(baseUrl) }
+  );
 }
 
 async function jsonBody(response) {
@@ -228,8 +275,8 @@ async function postEmployeeEntry(baseUrl, cookie, payload) {
   });
 }
 
-test("production APP_ENV keeps /api/employee/entry on legacy behavior even when adapter flag is true", async () => {
-  const { baseUrl, persistTo } = await startIsolatedWorker({
+test("production APP_ENV keeps /api/employee/entry on legacy behavior even when adapter flag is true", async (t) => {
+  const { baseUrl, persistTo } = await startTestWorker(t, {
     vars: { APP_ENV: "production", ENABLE_EMPLOYEE_ENTRY_ADAPTER_LIVE_ROUTE: "true" },
     label: "production legacy employee entry route switch worker"
   });
@@ -250,8 +297,8 @@ test("production APP_ENV keeps /api/employee/entry on legacy behavior even when 
   assert.equal(after.adapter_event_count, before.adapter_event_count);
 });
 
-test("local flag off keeps legacy behavior and rollback path available", async () => {
-  const { baseUrl, persistTo } = await startIsolatedWorker({
+test("local flag off keeps legacy behavior and rollback path available", async (t) => {
+  const { baseUrl, persistTo } = await startTestWorker(t, {
     vars: {
       APP_ENV: "test",
       ALLOW_DEV_SEED: "true",
@@ -276,8 +323,8 @@ test("local flag off keeps legacy behavior and rollback path available", async (
   assert.equal(after.adapter_event_count, before.adapter_event_count);
 });
 
-test("local flag on runs adapter pre-validation before continuing legacy write", async () => {
-  const { baseUrl, persistTo } = await startIsolatedWorker({
+test("local flag on runs adapter pre-validation before continuing legacy write", async (t) => {
+  const { baseUrl, persistTo } = await startTestWorker(t, {
     vars: {
       APP_ENV: "test",
       ALLOW_DEV_SEED: "true",
@@ -307,8 +354,8 @@ test("local flag on runs adapter pre-validation before continuing legacy write",
   assert.equal(after.adapter_event_count, before.adapter_event_count + 1);
 });
 
-test("local flag on rejects owner submitter before adapter rehearsal write", async () => {
-  const { baseUrl, persistTo } = await startIsolatedWorker({
+test("local flag on rejects owner submitter before adapter rehearsal write", async (t) => {
+  const { baseUrl, persistTo } = await startTestWorker(t, {
     vars: {
       APP_ENV: "test",
       ALLOW_DEV_SEED: "true",
@@ -327,8 +374,8 @@ test("local flag on rejects owner submitter before adapter rehearsal write", asy
   assert.deepEqual(counts(persistTo), beforeOwner);
 });
 
-test("local flag on rejects invalid money before legacy write", async () => {
-  const { baseUrl, persistTo } = await startIsolatedWorker({
+test("local flag on rejects invalid money before legacy write", async (t) => {
+  const { baseUrl, persistTo } = await startTestWorker(t, {
     vars: {
       APP_ENV: "test",
       ALLOW_DEV_SEED: "true",
@@ -352,8 +399,8 @@ test("local flag on rejects invalid money before legacy write", async () => {
   assert.equal(afterInvalid.adapter_event_count, beforeInvalid.adapter_event_count + 1);
 });
 
-test("local flag on skips voided rows before legacy write", async () => {
-  const { baseUrl, persistTo } = await startIsolatedWorker({
+test("local flag on skips voided rows before legacy write", async (t) => {
+  const { baseUrl, persistTo } = await startTestWorker(t, {
     vars: {
       APP_ENV: "test",
       ALLOW_DEV_SEED: "true",

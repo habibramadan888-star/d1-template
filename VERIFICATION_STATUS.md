@@ -586,3 +586,26 @@ Date: 2026-05-25, Asia/Dubai
 Final full validation for P0-008C must keep `gate:commercial-launch` at
 `PRODUCTION_NO_GO` and `qa:employee-entry-staging` in dry-run/manual-required
 mode.
+
+## TEST-STABILITY-002 Verification Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+| Command / Check                                        | Exists | Result                             | Error Summary | Log Evidence                     | Commercial Meaning                             |
+| ------------------------------------------------------ | ------ | ---------------------------------- | ------------- | -------------------------------- | ---------------------------------------------- |
+| `npm run reproduce:employee-entry-econnreset`          | yes    | Pass                               | none          | 3 consecutive runs passed        | Local Worker ECONNRESET repro loop is stable.  |
+| `npm run test:employee-entry-production-lock`          | yes    | Pass                               | none          | 3 total runs passed              | Production-lock behavior tests stable locally. |
+| `npm run test:employee-entry-route-switch`             | yes    | Pass                               | none          | 3 total runs passed              | Route-switch behavior tests stable locally.    |
+| `npm run test:employee-entry-adapter-staging-endpoint` | yes    | Pass                               | none          | 3 total runs passed              | Adapter staging endpoint tests stable locally. |
+| `npm run format:check`                                 | yes    | Pass                               | none          | Prettier check passed            | Generated reports and scripts are formatted.   |
+| `npm run check`                                        | yes    | Pass                               | none          | 224 tests passed                 | Full local regression restored.                |
+| `npm run security:secrets`                             | yes    | Pass                               | none          | Secret hygiene passed            | No secret was committed.                       |
+| `npm run gate:commercial-launch`                       | yes    | `PRODUCTION_NO_GO`                 | none          | Gate stayed NO-GO                | Production cutover remains blocked.            |
+| `npm run qa:employee-entry-staging`                    | yes    | `MANUAL_REQUIRED` / `DRY_RUN_ONLY` | none          | No confirmation flags supplied   | No staging write was executed.                 |
+| `npm run audit:worker-drift`                           | yes    | Pass                               | none          | 0 critical mismatches            | No deploy approval implied.                    |
+| `npm run verify:embedded-worker`                       | yes    | Pass                               | none          | Freshness pass                   | Embedded Worker remains in sync.               |
+| `npm run build:embedded:dry-run`                       | yes    | Warning, 0 critical missing        | none          | Existing dry-run warning remains | Not production deploy approval.                |
+
+No production deploy, staging deploy, migration, D1 write, staging data write,
+feature flag enablement, dashboard mutation, live financial formula change, or
+secret exposure occurred in TEST-STABILITY-002.
