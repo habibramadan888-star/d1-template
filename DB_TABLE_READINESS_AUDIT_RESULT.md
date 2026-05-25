@@ -1,6 +1,6 @@
 # DB Table Readiness Audit Result
 
-Generated: 2026-05-25T05:34:44.764Z
+Generated: 2026-05-25T05:44:31.009Z
 
 | Metric                           | Count |
 | -------------------------------- | ----: |

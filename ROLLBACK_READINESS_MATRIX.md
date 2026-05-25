@@ -1,6 +1,6 @@
 # Rollback Readiness Matrix
 
-Generated: 2026-05-25T05:40:41.489Z
+Generated: 2026-05-25T05:44:32.200Z
 
 Scope: static rollback/readiness audit. This script reads reports only and does not deploy, migrate, call APIs, or access D1.
 

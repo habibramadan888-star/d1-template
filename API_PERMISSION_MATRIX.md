@@ -1,6 +1,6 @@
 # API Permission Matrix
 
-Generated: 2026-05-25T05:31:55.998Z
+Generated: 2026-05-25T05:44:30.259Z
 
 Scope: static API-by-API permission audit. This script is read-only and does not call APIs, deploy, migrate, or modify Worker routes.
 

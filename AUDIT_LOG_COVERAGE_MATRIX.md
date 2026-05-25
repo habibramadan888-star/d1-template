@@ -1,6 +1,6 @@
 # Audit Log Coverage Matrix
 
-Generated: 2026-05-25T05:37:14.151Z
+Generated: 2026-05-25T05:44:31.609Z
 
 Scope: static audit coverage review for API mutations and financial routes. This script is read-only and does not call APIs, deploy, migrate, or write D1.
 

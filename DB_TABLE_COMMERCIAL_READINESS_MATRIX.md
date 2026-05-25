@@ -1,6 +1,6 @@
 # DB Table Commercial Readiness Matrix
 
-Generated: 2026-05-25T05:34:44.762Z
+Generated: 2026-05-25T05:44:31.008Z
 
 Scope: static table-by-table commercial readiness audit. This script is read-only and does not connect to D1, deploy, or run migrations.
 
