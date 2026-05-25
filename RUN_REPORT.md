@@ -3367,3 +3367,33 @@ Notes:
 - 10 tables still require manual review before staging/production.
 - 8 tables have runtime DDL evidence and 5 tables still show legacy `REAL`
   money risk.
+
+## Deep Loop Audit Log Coverage Matrix
+
+Date: 2026-05-25, Asia/Dubai
+
+Scope:
+
+- Static audit coverage review for API mutations and financial routes.
+- Read-only scan of `API_INVENTORY.md` and nearby Worker source evidence.
+- No API calls, D1 connection, deployment, migration, or route behavior change.
+
+Changes:
+
+- Added `AUDIT_LOG_COVERAGE_MATRIX.md`.
+- Added `AUDIT_LOG_COVERAGE_RESULT.md`.
+- Added `scripts/audit-audit-log-coverage.mjs`.
+- Added `npm run audit:audit-logs`.
+
+Verification:
+
+| Command                    | Result          |
+| -------------------------- | --------------- |
+| `npm run audit:audit-logs` | MANUAL_REQUIRED |
+
+Notes:
+
+- The scan reviewed 22 mutation/financial routes.
+- 11 routes still require manual audit coverage review.
+- Static evidence does not prove before/after completeness or production-grade
+  immutability.

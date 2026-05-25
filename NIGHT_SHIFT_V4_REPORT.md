@@ -39,24 +39,25 @@ Scope: 8-hour continuous commercialization engineering run. No production deploy
 
 ## Verification Ledger
 
-| Command                             | Result          | Notes                                                                             |
-| ----------------------------------- | --------------- | --------------------------------------------------------------------------------- |
-| Baseline command suite              | Pass            | See `.tmp/night-shift-v4-baseline.log`.                                           |
-| `npm run qa:employee-entry-staging` | MANUAL_REQUIRED | Safe dry-run completed; no remote write.                                          |
-| `npm run test:backend-totals`       | PASS            | 16 tests passed.                                                                  |
-| `npm run rehearse:backend-totals`   | PASS            | Local-only rehearsal regenerated evidence.                                        |
-| `npm run gate:backend-totals-live`  | MANUAL_REQUIRED | Dry-run gate only; no live result change.                                         |
-| `npm run gate:receivables`          | MANUAL_REQUIRED | Read-only gate; no migration executed.                                            |
-| `npm run gate:tenant-scope`         | MANUAL_REQUIRED | Read-only gate; no auth/schema/data change.                                       |
-| `npm run audit:runtime-ddl`         | PASS            | Static scan wrote 182 findings.                                                   |
-| `npm run gate:runtime-ddl-removal`  | MANUAL_REQUIRED | Read-only gate; no runtime DDL removed.                                           |
-| `npm run audit:observability`       | MANUAL_REQUIRED | Read-only audit; no external integration.                                         |
-| `npm run audit:env-separation`      | MANUAL_REQUIRED | Read-only audit; no Wrangler config change.                                       |
-| `npm run test:feature-flag-matrix`  | PASS            | 3 static guard tests passed.                                                      |
-| `npm run check`                     | PASS            | 182 tests passed after Stage I.                                                   |
-| `npm run security:secrets`          | PASS            | Secret hygiene check passed.                                                      |
-| `npm run audit:api-permissions`     | MANUAL_REQUIRED | Static audit scanned 29 routes; 25 need manual review before commercial launch.   |
-| `npm run audit:db-readiness`        | MANUAL_REQUIRED | Static audit reviewed 22 tables; 10 need manual review before staging/production. |
+| Command                             | Result          | Notes                                                                              |
+| ----------------------------------- | --------------- | ---------------------------------------------------------------------------------- |
+| Baseline command suite              | Pass            | See `.tmp/night-shift-v4-baseline.log`.                                            |
+| `npm run qa:employee-entry-staging` | MANUAL_REQUIRED | Safe dry-run completed; no remote write.                                           |
+| `npm run test:backend-totals`       | PASS            | 16 tests passed.                                                                   |
+| `npm run rehearse:backend-totals`   | PASS            | Local-only rehearsal regenerated evidence.                                         |
+| `npm run gate:backend-totals-live`  | MANUAL_REQUIRED | Dry-run gate only; no live result change.                                          |
+| `npm run gate:receivables`          | MANUAL_REQUIRED | Read-only gate; no migration executed.                                             |
+| `npm run gate:tenant-scope`         | MANUAL_REQUIRED | Read-only gate; no auth/schema/data change.                                        |
+| `npm run audit:runtime-ddl`         | PASS            | Static scan wrote 182 findings.                                                    |
+| `npm run gate:runtime-ddl-removal`  | MANUAL_REQUIRED | Read-only gate; no runtime DDL removed.                                            |
+| `npm run audit:observability`       | MANUAL_REQUIRED | Read-only audit; no external integration.                                          |
+| `npm run audit:env-separation`      | MANUAL_REQUIRED | Read-only audit; no Wrangler config change.                                        |
+| `npm run test:feature-flag-matrix`  | PASS            | 3 static guard tests passed.                                                       |
+| `npm run check`                     | PASS            | 182 tests passed after Stage I.                                                    |
+| `npm run security:secrets`          | PASS            | Secret hygiene check passed.                                                       |
+| `npm run audit:api-permissions`     | MANUAL_REQUIRED | Static audit scanned 29 routes; 25 need manual review before commercial launch.    |
+| `npm run audit:db-readiness`        | MANUAL_REQUIRED | Static audit reviewed 22 tables; 10 need manual review before staging/production.  |
+| `npm run audit:audit-logs`          | MANUAL_REQUIRED | Static audit reviewed 22 mutation/financial routes; 11 need audit coverage review. |
 
 ## P0 Status Changes
 
@@ -149,3 +150,26 @@ Commercial meaning:
   table shapes are not production-approved.
 - Runtime DDL, legacy `REAL` money fields, missing tenant/property scope, and
   incomplete audit fields remain launch blockers.
+
+## Deep Loop Addendum - Audit Log Coverage
+
+Commit: Pending
+
+Added:
+
+- `AUDIT_LOG_COVERAGE_MATRIX.md`
+- `AUDIT_LOG_COVERAGE_RESULT.md`
+- `scripts/audit-audit-log-coverage.mjs`
+- `npm run audit:audit-logs`
+
+Result:
+
+- `AUDIT_LOG_COVERAGE=MANUAL_REQUIRED`
+- Routes reviewed: 22
+- Manual review routes: 11
+
+Commercial meaning:
+
+- Static audit evidence exists for many mutation paths, but before/after
+  completeness and runtime audit-row assertions are still not proven.
+- Unified immutable audit events remain a P1 launch requirement.
