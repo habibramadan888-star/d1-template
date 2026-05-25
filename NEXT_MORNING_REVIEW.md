@@ -167,6 +167,38 @@ Recommended next prompt:
 ```text
 进入 TASK STAGING-QA-005B：Enable staging-only feature flags, execute real staging write QA, then rollback.
 当前 TEST-STABILITY-001 已恢复 npm run check。仍需人工批准只对 staging 开启 ENABLE_EMPLOYEE_ENTRY_ADAPTER_LIVE_ROUTE=true 和 ENABLE_HANDOVER_ATOMIC_STAGING=true，执行真实 staging write QA 后必须回滚为 false。禁止 production deploy、production migration、production URL、production D1 write、secret 输出、production cutover。
+
+## STAGING-QA-005B Retry Update
+
+Real staging write QA passed on 2026-05-25 after explicit human approval:
+
+- Temporarily enabled only staging flags:
+  `ENABLE_EMPLOYEE_ENTRY_ADAPTER_LIVE_ROUTE=true` and
+  `ENABLE_HANDOVER_ATOMIC_STAGING=true`.
+- Executed `npm run qa:employee-entry-staging -- --confirm-staging-write
+  --confirm-backup --confirm-rollback`.
+- Employee entry adapter QA passed.
+- Handover staging endpoint QA passed.
+- Database evidence passed, including no `transactions`, `deposit_ledger`, or
+  `arrears` writes from the handover staging endpoint.
+- Owner history evidence showed expected staging legacy write behavior.
+- Rolled both staging flags back to `false`.
+- Post-rollback dry-run remained `DRY_RUN_ONLY`.
+- `gate:commercial-launch` remained `PRODUCTION_NO_GO`.
+
+Current status:
+
+- P0-001: Partial - real staging QA passed, production cutover still NO-GO.
+- P0-002: Partial - handover staging QA passed, production cutover still NO-GO.
+- Production cutover: NO-GO.
+
+Morning review focus:
+
+1. Review `EMPLOYEE_ENTRY_REAL_STAGING_QA_RESULT.md`.
+2. Review `HANDOVER_REAL_STAGING_QA_RESULT.md`.
+3. Review `STAGING_QA_005_DATABASE_EVIDENCE.md`.
+4. Confirm staging flags remain false in Cloudflare Dashboard.
+5. Decide the next production cutover gate; do not deploy production automatically.
 ```
 
 ## P0-001C Update

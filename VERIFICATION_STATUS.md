@@ -472,3 +472,26 @@ Readiness:
 - `STAGING_QA_WRITE_READINESS_DECISION=READY_FOR_STAGING_WRITE_QA`.
 - Real staging write QA still requires explicit human approval and flags.
 - Production remains `NO-GO`.
+
+## STAGING-QA-005B Retry Verification Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+| Command / Check                                                                                    | Exists | Result                      | Error Summary | Log Evidence                                                                     | Commercial Meaning                                 |
+| -------------------------------------------------------------------------------------------------- | ------ | --------------------------- | ------------- | -------------------------------------------------------------------------------- | -------------------------------------------------- |
+| `npm run test:employee-entry-adapter-staging-endpoint`                                             | yes    | Pass                        | none          | Baseline restored after TEST-STABILITY-001                                       | Local readiness timeout remains fixed.             |
+| `npm run check`                                                                                    | yes    | Pass                        | none          | 182 tests passed                                                                 | Baseline passed before staging flags were enabled. |
+| `npm run security:secrets`                                                                         | yes    | Pass                        | none          | Secret hygiene passed                                                            | No password, token, cookie, or secret committed.   |
+| `npm run gate:commercial-launch`                                                                   | yes    | `PRODUCTION_NO_GO`          | none          | Gate output stayed NO-GO                                                         | Staging QA success does not authorize production.  |
+| `npm run audit:worker-drift`                                                                       | yes    | Pass                        | none          | 0 critical mismatches                                                            | Deploy artifact drift gate remains green.          |
+| `npm run verify:embedded-worker`                                                                   | yes    | Pass                        | none          | Embedded freshness pass                                                          | Not production deploy approval.                    |
+| `npm run build:embedded:dry-run`                                                                   | yes    | Warning, 0 critical missing | none          | Dry-run warning remains non-critical                                             | Re-run before any deploy.                          |
+| `npm run qa:employee-entry-staging -- --confirm-staging-write --confirm-backup --confirm-rollback` | yes    | Pass                        | none          | `EMPLOYEE_ENTRY_REAL_STAGING_QA_RESULT.md`, `HANDOVER_REAL_STAGING_QA_RESULT.md` | Real staging write QA passed.                      |
+| Rollback deploy to flags false                                                                     | yes    | Pass                        | none          | `STAGING_QA_005B_RETRY_FEATURE_FLAG_ROLLBACK_RESULT.md`                          | Staging flags were restored to false.              |
+| Post-rollback dry-run                                                                              | yes    | Pass with `DRY_RUN_ONLY`    | none          | `STAGING_QA_005B_RETRY_POST_ROLLBACK_VERIFICATION.md`                            | Staging write path is protected again.             |
+
+Status:
+
+- P0-001 is Partial, not Verified.
+- P0-002 is Partial, not Verified.
+- Production cutover remains `NO-GO`.

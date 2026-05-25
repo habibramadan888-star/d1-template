@@ -792,3 +792,42 @@ Next step:
 - Human must provide and review real staging Worker URL/name, staging D1/KV,
   staging secrets/feature flags, backup plan, and rollback plan before real
   staging QA or production deploy.
+
+## STAGING-QA-005B Retry Real Staging QA Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+Current P0-001 status is now
+`Partial - real staging QA passed, production cutover still NO-GO`.
+
+Current P0-002 status is now
+`Partial - handover staging QA passed, production cutover still NO-GO`.
+
+Evidence:
+
+- `EMPLOYEE_ENTRY_REAL_STAGING_QA_RESULT.md`
+- `HANDOVER_REAL_STAGING_QA_RESULT.md`
+- `STAGING_QA_005_DATABASE_EVIDENCE.md`
+- `STAGING_QA_005_OWNER_FLOW_EVIDENCE.md`
+- `STAGING_QA_005B_RETRY_FEATURE_FLAG_ENABLE_RESULT.md`
+- `STAGING_QA_005B_RETRY_FEATURE_FLAG_ROLLBACK_RESULT.md`
+- `STAGING_QA_005B_RETRY_POST_ROLLBACK_VERIFICATION.md`
+- `STAGING_QA_005B_RETRY_COMMERCIAL_LAUNCH_GATE_RESULT.md`
+
+Result:
+
+- Real staging employee entry adapter QA passed.
+- Real staging handover endpoint QA passed.
+- Staging DB evidence passed.
+- Owner history evidence showed the expected staging legacy write change.
+- Both staging flags were rolled back to `false`.
+- Production cutover remains `NO-GO`.
+
+Remaining blockers:
+
+- No production deploy approval.
+- No production migration approval.
+- P0-006 tenant/property scope remains partial.
+- P0-008 receivables remains partial.
+- Production reconciliation and rollback are not exercised.
+- TOP_25 money risks still require human review.

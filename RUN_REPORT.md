@@ -3757,3 +3757,51 @@ Conclusion:
 - This means only that the next staging write QA prompt may be used after
   explicit human approval and confirmation flags.
 - Production cutover remains `NO-GO`.
+
+## STAGING-QA-005B Retry Real Staging Write QA
+
+Date: 2026-05-25, Asia/Dubai
+
+Scope: real staging write QA against `homelink-finance-staging` after explicit
+human approval. The two staging-only feature flags were temporarily enabled and
+then rolled back to `false`.
+
+Completed:
+
+- Baseline passed: `npm run test:employee-entry-adapter-staging-endpoint`,
+  `npm run check`, `npm run security:secrets`, `npm run gate:commercial-launch`,
+  `npm run audit:worker-drift`, `npm run verify:embedded-worker`, and
+  `npm run build:embedded:dry-run`.
+- Staging-only deploy enabled
+  `ENABLE_EMPLOYEE_ENTRY_ADAPTER_LIVE_ROUTE=true` and
+  `ENABLE_HANDOVER_ATOMIC_STAGING=true` for Worker
+  `homelink-finance-staging`.
+- `npm run qa:employee-entry-staging -- --confirm-staging-write
+--confirm-backup --confirm-rollback` passed.
+- Employee entry staging QA passed: valid adapter/legacy write, invalid
+  three-decimal reject, empty amount reject, and owner/admin deny.
+- Handover staging QA passed: valid commit, idempotent replay, frontend totals
+  tamper reject, voided row reject, owner/admin deny, staging table writes, no
+  `transactions` / `deposit_ledger` / `arrears` writes from the handover
+  endpoint, and audit evidence.
+- Rollback deploy restored both staging flags to `false`.
+- Post-rollback probes returned HTTP 403 for the staging handover endpoint and
+  employee-entry adapter-draft endpoint.
+- Final dry-run `npm run qa:employee-entry-staging` returned
+  `MANUAL_REQUIRED` / `DRY_RUN_ONLY`.
+
+Safety:
+
+- Production deploy: no.
+- Production migration: no.
+- Production URL called: no.
+- Production D1 written: no.
+- Staging write QA executed: yes.
+- Staging flags rolled back to false: yes.
+- Secrets committed or printed: no.
+
+Status:
+
+- P0-001: `Partial - real staging QA passed, production cutover still NO-GO`.
+- P0-002: `Partial - handover staging QA passed, production cutover still NO-GO`.
+- Production cutover remains `NO-GO`.

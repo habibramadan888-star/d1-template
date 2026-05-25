@@ -824,6 +824,31 @@ Still required before real staging write QA:
 
 Production remains NO-GO.
 
+## STAGING-QA-005B Retry Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+Real staging write QA passed for the approved staging-only scope:
+
+- P0-001 employee entry adapter live-route rehearsal was executed against
+  `homelink-finance-staging` with
+  `ENABLE_EMPLOYEE_ENTRY_ADAPTER_LIVE_ROUTE=true`.
+- P0-002 handover staging endpoint was executed against
+  `homelink-finance-staging` with `ENABLE_HANDOVER_ATOMIC_STAGING=true`.
+- Both feature flags were rolled back to `false` after QA.
+- Production deploy, production migration, production URL, and production D1
+  were not touched.
+
+Backlog status updates:
+
+- P0-001 remains open as
+  `Partial - real staging QA passed, production cutover still NO-GO`.
+- P0-002 remains open as
+  `Partial - handover staging QA passed, production cutover still NO-GO`.
+- P0-006 tenant/property scope, P0-008 receivables, production reconciliation,
+  TOP_25 money risk review, production migration approval, and production
+  rollback approval still block production cutover.
+
 ## STAGING-SECRETS-002 Backlog Addendum
 
 Date: 2026-05-25, Asia/Dubai

@@ -1,18 +1,13 @@
 # Handover Real Staging QA Result
 
-Generated: 2026-05-25T15:08:40+04:00
+Generated: 2026-05-25T12:12:58.676Z
 
-Result: `BLOCKED_BEFORE_WRITE`
+Result: `PASS`
 
-| Test                                                                  | Result       | Evidence                                                                        | Notes                                                         |
-| --------------------------------------------------------------------- | ------------ | ------------------------------------------------------------------------------- | ------------------------------------------------------------- |
-| Employee valid staging handover                                       | BLOCKED      | `POST /api/staging/handover/commit` returned `403 FEATURE_DISABLED` before auth | `ENABLE_HANDOVER_ATOMIC_STAGING=false`.                       |
-| Same idempotency key replay                                           | NOT_EXECUTED | No valid handover write executed                                                | Requires feature flag-on staging endpoint.                    |
-| Frontend total tamper rejected                                        | NOT_EXECUTED | No valid handover write executed                                                | Requires feature flag-on staging endpoint.                    |
-| Voided row rejected                                                   | NOT_EXECUTED | No valid handover write executed                                                | Requires feature flag-on staging endpoint.                    |
-| Owner/admin submit rejected                                           | NOT_EXECUTED | No authenticated submit executed                                                | Requires feature flag-on staging endpoint.                    |
-| Staging handover tables written                                       | NOT_EXECUTED | Staging D1 counts remain zero                                                   | No handover write occurred.                                   |
-| Legacy live financial tables not written by handover staging endpoint | PASS         | Read-only count snapshot shows no writes                                        | No handover write occurred; legacy tables remained unchanged. |
-| Audit evidence exists                                                 | NOT_EXECUTED | No write executed                                                               | Requires feature flag-on staging endpoint.                    |
-
-Production remains untouched. The handover staging endpoint is present but disabled in the current staging runtime.
+| Test                            | Result | Evidence                                  | Notes                                        |
+| ------------------------------- | ------ | ----------------------------------------- | -------------------------------------------- |
+| employee valid staging handover | PASS   | status=201; statusText=ACCEPTED           | staging handover tables should be written    |
+| same idempotency key replay     | PASS   | status=200; statusText=IDEMPOTENT_REPLAY  | no duplicate staging commit rows             |
+| frontend total tamper rejected  | PASS   | status=422; code=FRONTEND_TOTALS_MISMATCH | frontend totals are not accounting authority |
+| voided row rejected             | PASS   | status=422; code=VOIDED_REJECTED          | voided rows cannot be committed              |
+| owner/admin submit rejected     | PASS   | status=403; code=FORBIDDEN                | manager cookie denied for employee handover  |
