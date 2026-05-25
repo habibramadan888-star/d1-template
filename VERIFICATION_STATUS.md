@@ -642,3 +642,19 @@ Date: 2026-05-25, Asia/Dubai
 No production deploy, production migration, production D1 write, production URL
 call, dashboard live switch, live financial formula change, production feature
 flag enablement, or secret exposure occurred in P0-008E.
+
+## P0-008F Verification Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+| Command / Check                                     | Exists | Result             | Error Summary | Log Evidence                                           | Commercial Meaning                                           |
+| --------------------------------------------------- | ------ | ------------------ | ------------- | ------------------------------------------------------ | ------------------------------------------------------------ |
+| `npm run test:receivables-staging-authority-switch` | yes    | Pass               | none          | 10 tests passed                                        | Production disable, flag rollback, candidate gating covered. |
+| `npm run gate:receivables-staging-authority-switch` | yes    | Pass               | none          | `RECEIVABLES_AUTHORITY_SWITCH_GATE=PASS`, 6 candidates | Staging/local authority switch gate passed.                  |
+| `npm run gate:commercial-launch`                    | yes    | `PRODUCTION_NO_GO` | none          | Launch gate stayed NO-GO                               | Production cutover remains blocked.                          |
+| Dashboard mutation                                  | yes    | No                 | none          | Dashboard live result guard stayed PASS                | No live dashboard switch occurred.                           |
+| Feature flag final state                            | yes    | False / not remote | none          | `P0_008F_ROLLBACK_RESULT.md`                           | No remote staging/prod flag was enabled.                     |
+
+No production deploy, production migration, production D1 write, production URL
+call, staging D1 write, dashboard live switch, live financial formula change,
+remote feature flag enablement, or secret exposure occurred in P0-008F.

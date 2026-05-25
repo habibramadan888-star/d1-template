@@ -1,6 +1,6 @@
 # Staging Receivables Shadow Comparison Result
 
-Generated: 2026-05-25T19:52:56.872Z
+Generated: 2026-05-25T20:19:25.255Z
 
 Scope: read-only staging receivables shadow comparison. This script does not deploy, migrate, write D1 rows, mutate dashboard output, or enable feature flags.
 

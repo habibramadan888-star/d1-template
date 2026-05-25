@@ -1136,3 +1136,38 @@ Still blocked for production:
 - Human accounting review for adjustment and due-date semantics.
 - Production receivables migration, backup, rollback, backfill, and deploy
   approval.
+
+## P0-008F Backlog Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+P0-008 current status:
+
+- `Partial - receivables staging authority switch gate passed`.
+
+Current result:
+
+- Added `ENABLE_RECEIVABLES_AUTHORITY_STAGING` staging/local-only gate
+  semantics.
+- Added `npm run test:receivables-staging-authority-switch`.
+- Added `npm run gate:receivables-staging-authority-switch`.
+- Authority switch gate passed with 6 candidate rows ready for a future
+  staging/local switch rehearsal:
+  - rent received
+  - rent due
+  - arrears outstanding
+  - due today
+  - overdue amount
+  - arrears total
+- Adjustment credit/debit and legacy warnings remain accounting-review-only.
+- Dashboard live result remained unchanged.
+- Production remains `NO-GO`.
+
+Still blocked for production:
+
+- P0-008 is not Verified.
+- P0-006 tenant/property scope implementation.
+- Human accounting review for adjustment, due-date, allocation, and authority
+  semantics.
+- Production receivables migration, backup, rollback, backfill, and deploy
+  approval.

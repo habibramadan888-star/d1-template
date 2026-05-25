@@ -860,6 +860,29 @@ Recommended next prompt:
 进入 TASK P0-008E：Receivables staging shadow rehearsal.
 目标：staging/local only，feature flag required，dashboard before/during/after evidence，rollback false。
 禁止 production deploy、production migration、production cutover、dashboard live switch、P0-008 Verified。
+
+## P0-008F Morning Review Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+Current status:
+
+- P0-008: `Partial - receivables staging authority switch gate passed`.
+- `RECEIVABLES_AUTHORITY_SWITCH_GATE=PASS`.
+- Candidate rows ready for future staging/local switch rehearsal: 6.
+- Accounting-review rows: 3.
+- Feature flag final state: `ENABLE_RECEIVABLES_AUTHORITY_STAGING=false` / not
+  enabled remotely.
+- Dashboard live result unchanged.
+- Production cutover remains `NO-GO`.
+
+Recommended next task:
+
+进入 TASK P0-008G：Receivables staging authority switch rehearsal.
+
+目标：staging/local only，feature flag required，dashboard/history before/during/after evidence，rollback false，P0-008 remains Partial。
+
+禁止 production deploy、production migration、production cutover、production feature flag、dashboard production switch、P0-008 Verified。
 ```
 
 ## TEST-STABILITY-002 Morning Review Addendum

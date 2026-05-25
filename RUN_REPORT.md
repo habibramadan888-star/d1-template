@@ -4076,3 +4076,36 @@ Result:
 P0-008 status:
 
 - `Partial - receivables staging shadow rehearsal passed`.
+
+## P0-008F Receivables Staging Authority Switch Gate
+
+Date: 2026-05-26, Asia/Dubai
+
+Scope: staging/local-only receivables authority switch gate. No production
+deploy, production migration, production D1 write, production URL call, staging
+D1 write, dashboard live switch, live financial formula change, remote feature
+flag enablement, or secret exposure occurred.
+
+Completed:
+
+- Added `scripts/gate-receivables-staging-authority-switch.mjs`.
+- Added `npm run gate:receivables-staging-authority-switch`.
+- Added `tests/receivables-staging-authority-switch-gate.spec.mjs`.
+- Added `npm run test:receivables-staging-authority-switch`.
+- Generated P0-008F starting context, dashboard/history evidence, rollback
+  result, commercial launch gate result, and next prompt.
+
+Result:
+
+- `RECEIVABLES_AUTHORITY_SWITCH_GATE=PASS`.
+- Authority candidate rows ready for staging/local switch rehearsal: 6.
+- Blocked rows: 0.
+- Accounting review rows: 3.
+- Dashboard live result remained unchanged.
+- Feature flag final state: `ENABLE_RECEIVABLES_AUTHORITY_STAGING=false` / not
+  enabled remotely.
+- Production remains `NO-GO`.
+
+P0-008 status:
+
+- `Partial - receivables staging authority switch gate passed`.
