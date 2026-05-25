@@ -368,3 +368,22 @@ Date: 2026-05-25, Asia/Dubai
 
 No deploy, migration, D1 write, staging data write, feature-flag enablement, or
 secret access was performed.
+
+## STAGING-DB-002 Verification Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+| Command                                                       | Exists | Result           | Error Summary | Log Evidence                                             | Commercial Meaning                                  |
+| ------------------------------------------------------------- | ------ | ---------------- | ------------- | -------------------------------------------------------- | --------------------------------------------------- |
+| `npm run check`                                               | yes    | PASS             | none          | 182 tests passed                                         | Baseline was green before staging schema bootstrap. |
+| `npm run security:secrets`                                    | yes    | PASS             | none          | `Secret hygiene check passed.`                           | No secret was committed.                            |
+| `npm run gate:commercial-launch`                              | yes    | PRODUCTION_NO_GO | none          | `COMMERCIAL_LAUNCH_READINESS=PRODUCTION_NO_GO`           | Production remains blocked.                         |
+| `npm run qa:employee-entry-staging`                           | yes    | MANUAL_REQUIRED  | none          | `write execution: DRY_RUN_ONLY`                          | No real staging write QA occurred.                  |
+| `npx wrangler d1 export ... homelink-finance-staging ...`     | yes    | PASS             | none          | Backup path under ignored `backups/`                     | Backup completed before schema bootstrap.           |
+| `npx wrangler d1 execute ... 001_clean_legacy_bootstrap.sql`  | yes    | PASS             | none          | 23 schema queries processed                              | Core staging schema applied.                        |
+| `npx wrangler d1 execute ... 002_handover_atomic_staging.sql` | yes    | PASS             | none          | 9 schema queries processed                               | Handover staging schema applied.                    |
+| `npx wrangler d1 execute ... SELECT sqlite_schema ...`        | yes    | PASS             | none          | Core and handover staging tables found; `rows_written=0` | Staging schema verified read-only after bootstrap.  |
+
+No production deploy, staging deploy, production migration, production D1
+execute, business data write, test account creation, feature flag enablement, or
+secret commit was performed.

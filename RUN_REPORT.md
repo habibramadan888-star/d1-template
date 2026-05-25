@@ -3547,3 +3547,49 @@ Conclusion:
 - Staging D1 application schema is empty.
 - Bootstrap/migration is required before real staging write QA.
 - Recommended next task: `STAGING-DB-002`, after backup and human approval.
+
+## STAGING-DB-002 Staging D1 Schema Bootstrap
+
+Date: 2026-05-25, Asia/Dubai
+
+Scope:
+
+- Confirmed target D1 name/id before schema write.
+- Exported staging D1 backup to ignored `backups/`.
+- Reviewed SQL for schema-only statements.
+- Applied staging-only schema bootstrap files to `homelink-finance-staging`.
+- Verified schema with read-only `sqlite_schema` SELECT.
+- Ran staging QA helper in dry-run mode only.
+
+Commands:
+
+| Command                                                                                                                            | Result           | Notes                                                                                |
+| ---------------------------------------------------------------------------------------------------------------------------------- | ---------------- | ------------------------------------------------------------------------------------ |
+| `npm run check`                                                                                                                    | PASS             | 182 tests passed before schema bootstrap.                                            |
+| `npm run security:secrets`                                                                                                         | PASS             | Secret hygiene check passed.                                                         |
+| `npm run gate:commercial-launch`                                                                                                   | PRODUCTION_NO_GO | Production remains blocked.                                                          |
+| `npm run qa:employee-entry-staging`                                                                                                | MANUAL_REQUIRED  | Dry-run only; no write confirmations supplied.                                       |
+| `npx wrangler d1 info homelink-finance-staging`                                                                                    | PASS             | Target id matched `4ff78bfc-3855-436b-aefb-6b492145d79c`.                            |
+| `npx wrangler d1 export homelink-finance-staging --remote --output ./backups/homelink-finance-staging-before-schema-bootstrap.sql` | PASS             | Backup file created and ignored by git.                                              |
+| `npx wrangler d1 execute homelink-finance-staging --remote --file migrations/local/001_clean_legacy_bootstrap.sql`                 | PASS             | Schema-only bootstrap applied to staging D1.                                         |
+| `npx wrangler d1 execute homelink-finance-staging --remote --file migrations/local/002_handover_atomic_staging.sql`                | PASS             | Handover staging schema applied to staging D1.                                       |
+| `SELECT name, type, sql FROM sqlite_schema ...`                                                                                    | PASS             | Core and handover staging tables confirmed; `rows_written=0` for verification query. |
+
+Safety:
+
+- Production deploy: no.
+- Staging deploy: no.
+- Production migration: no.
+- Staging schema migration: yes, only against `homelink-finance-staging`.
+- Business data write: no.
+- Test accounts created: no.
+- Feature flags enabled: no.
+- Backup file committed: no.
+- Secret committed: no.
+
+Conclusion:
+
+- Staging D1 schema bootstrap is complete.
+- Real staging write QA remains blocked until staging secrets, test accounts,
+  rollback exercise, production URL exclusion, and explicit human approval are
+  complete.

@@ -817,3 +817,28 @@ Required next actions:
   and rollback are complete.
 
 Production remains NO-GO.
+
+## STAGING-DB-002 Backlog Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+Current staging DB status:
+
+- Staging D1 `homelink-finance-staging` target was confirmed.
+- Backup/export completed to ignored local path:
+  `./backups/homelink-finance-staging-before-schema-bootstrap.sql`.
+- `migrations/local/001_clean_legacy_bootstrap.sql` was applied to staging D1.
+- `migrations/local/002_handover_atomic_staging.sql` was applied to staging D1.
+- Core tables and handover staging tables now exist.
+- No business test data was written.
+
+Remaining before real staging write QA:
+
+- Set staging secrets outside Git.
+- Create or confirm staging test accounts.
+- Exercise rollback by feature flag off.
+- Confirm production URL/custom route exclusion in Cloudflare Dashboard.
+- Run staging QA dry-run again after secrets/accounts setup.
+- Obtain explicit human approval before any staging write QA.
+
+Production remains NO-GO.

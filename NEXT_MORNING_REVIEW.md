@@ -685,3 +685,38 @@ Manual review required:
 - Confirm target DB name/id in Cloudflare Dashboard.
 - Approve staging-only schema migration commands.
 - Keep production cutover NO-GO.
+
+## STAGING-DB-002 Morning Review Addendum
+
+Most important result:
+
+- Staging D1 schema bootstrap was applied to `homelink-finance-staging` after
+  backup/export and target id confirmation.
+
+Current staging DB status:
+
+- Target D1: `homelink-finance-staging`
+- Target id: `4ff78bfc-3855-436b-aefb-6b492145d79c`
+- Backup path: `./backups/homelink-finance-staging-before-schema-bootstrap.sql`
+- Backup committed to git: no
+- Core tables present: yes
+- Handover staging tables present: yes
+- Business test data written: no
+
+Still blocked before real staging write QA:
+
+- Staging secrets are not configured/confirmed.
+- Test accounts are not created/confirmed.
+- Rollback by feature flag off is not exercised.
+- Production URL/custom route exclusion still needs Dashboard confirmation.
+- Explicit human approval for staging write QA is still required.
+
+Recommended next prompt:
+
+```text
+进入 TASK STAGING-SECRETS-001：Staging secrets, test accounts, and rollback rehearsal.
+目标：设置/确认 staging secrets，创建/确认测试账号，演练 feature flag rollback。
+禁止 production deploy、production migration、写 production D1、提交 secret、真实 staging write QA。
+```
+
+Production cutover remains `NO-GO`.
