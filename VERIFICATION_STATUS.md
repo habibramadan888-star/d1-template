@@ -281,3 +281,14 @@ Date: 2026-05-25, Asia/Dubai
 
 No Wrangler config was modified, no deployment was executed, and no D1/KV
 resource was changed.
+
+## Deep Loop API Permission Verification Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+| Command                         | Exists | Result          | Error Summary | Log Evidence                                                  | Commercial Meaning                                                                                                                |
+| ------------------------------- | ------ | --------------- | ------------- | ------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run audit:api-permissions` | yes    | MANUAL_REQUIRED | none          | `API_PERMISSION_ROUTES=29`; `API_PERMISSION_MANUAL_REVIEW=25` | Static API permission matrix exists, but route-level commercial launch readiness still needs human review and runtime role tests. |
+
+No API was called, no deployment was executed, no migration was executed, and no
+route behavior was changed.

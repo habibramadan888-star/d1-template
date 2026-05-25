@@ -14,6 +14,7 @@
     "security:secrets": "node scripts/check-secrets.mjs",
     "audit:api": "node scripts/audit-api.mjs",
     "audit:api:check": "node scripts/audit-api.mjs --check",
+    "audit:api-permissions": "node scripts/audit-api-permissions.mjs",
     "audit:db": "node scripts/audit-db.mjs",
     "audit:db:check": "node scripts/audit-db.mjs --check",
     "audit:worker-drift": "node scripts/audit-worker-entrypoint-drift.mjs",

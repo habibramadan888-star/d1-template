@@ -39,22 +39,23 @@ Scope: 8-hour continuous commercialization engineering run. No production deploy
 
 ## Verification Ledger
 
-| Command                             | Result          | Notes                                       |
-| ----------------------------------- | --------------- | ------------------------------------------- |
-| Baseline command suite              | Pass            | See `.tmp/night-shift-v4-baseline.log`.     |
-| `npm run qa:employee-entry-staging` | MANUAL_REQUIRED | Safe dry-run completed; no remote write.    |
-| `npm run test:backend-totals`       | PASS            | 16 tests passed.                            |
-| `npm run rehearse:backend-totals`   | PASS            | Local-only rehearsal regenerated evidence.  |
-| `npm run gate:backend-totals-live`  | MANUAL_REQUIRED | Dry-run gate only; no live result change.   |
-| `npm run gate:receivables`          | MANUAL_REQUIRED | Read-only gate; no migration executed.      |
-| `npm run gate:tenant-scope`         | MANUAL_REQUIRED | Read-only gate; no auth/schema/data change. |
-| `npm run audit:runtime-ddl`         | PASS            | Static scan wrote 182 findings.             |
-| `npm run gate:runtime-ddl-removal`  | MANUAL_REQUIRED | Read-only gate; no runtime DDL removed.     |
-| `npm run audit:observability`       | MANUAL_REQUIRED | Read-only audit; no external integration.   |
-| `npm run audit:env-separation`      | MANUAL_REQUIRED | Read-only audit; no Wrangler config change. |
-| `npm run test:feature-flag-matrix`  | PASS            | 3 static guard tests passed.                |
-| `npm run check`                     | PASS            | 182 tests passed after Stage I.             |
-| `npm run security:secrets`          | PASS            | Secret hygiene check passed.                |
+| Command                             | Result          | Notes                                                                           |
+| ----------------------------------- | --------------- | ------------------------------------------------------------------------------- |
+| Baseline command suite              | Pass            | See `.tmp/night-shift-v4-baseline.log`.                                         |
+| `npm run qa:employee-entry-staging` | MANUAL_REQUIRED | Safe dry-run completed; no remote write.                                        |
+| `npm run test:backend-totals`       | PASS            | 16 tests passed.                                                                |
+| `npm run rehearse:backend-totals`   | PASS            | Local-only rehearsal regenerated evidence.                                      |
+| `npm run gate:backend-totals-live`  | MANUAL_REQUIRED | Dry-run gate only; no live result change.                                       |
+| `npm run gate:receivables`          | MANUAL_REQUIRED | Read-only gate; no migration executed.                                          |
+| `npm run gate:tenant-scope`         | MANUAL_REQUIRED | Read-only gate; no auth/schema/data change.                                     |
+| `npm run audit:runtime-ddl`         | PASS            | Static scan wrote 182 findings.                                                 |
+| `npm run gate:runtime-ddl-removal`  | MANUAL_REQUIRED | Read-only gate; no runtime DDL removed.                                         |
+| `npm run audit:observability`       | MANUAL_REQUIRED | Read-only audit; no external integration.                                       |
+| `npm run audit:env-separation`      | MANUAL_REQUIRED | Read-only audit; no Wrangler config change.                                     |
+| `npm run test:feature-flag-matrix`  | PASS            | 3 static guard tests passed.                                                    |
+| `npm run check`                     | PASS            | 182 tests passed after Stage I.                                                 |
+| `npm run security:secrets`          | PASS            | Secret hygiene check passed.                                                    |
+| `npm run audit:api-permissions`     | MANUAL_REQUIRED | Static audit scanned 29 routes; 25 need manual review before commercial launch. |
 
 ## P0 Status Changes
 
@@ -91,3 +92,31 @@ Scope: 8-hour continuous commercialization engineering run. No production deploy
 All planned safe Night Shift V4 tasks A-J were completed. Remaining work needs
 human staging inputs, production/staging resource decisions, accounting review,
 tenant model decisions, receivables decisions, or deployment approval.
+
+## Deep Loop Addendum - API Permission Audit
+
+Commit: Pending
+
+Added:
+
+- `API_PERMISSION_MATRIX.md`
+- `API_PERMISSION_AUDIT_RESULT.md`
+- `scripts/audit-api-permissions.mjs`
+- `npm run audit:api-permissions`
+
+Result:
+
+- `API_PERMISSION_AUDIT=MANUAL_REQUIRED`
+- Total routes: 29
+- Financial routes: 15
+- Staging-only routes: 2
+- ANY-method routes: 2
+- Manual review routes: 25
+
+Commercial meaning:
+
+- Static evidence confirms global `/api` auth and multiple route-level guards,
+  but it does not replace authenticated runtime role tests.
+- Tenant scope remains `corpid` based across many routes.
+- Financial routes still require P0-001, P0-003, P0-006, and P0-008 completion
+  before commercial launch.

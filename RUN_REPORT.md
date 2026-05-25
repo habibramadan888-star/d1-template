@@ -3304,3 +3304,34 @@ Notes:
   controlled embedded write and post-write verification remain required before
   deploy.
 - `npm run check` passed with 182 tests after this guardrail was added.
+
+## Deep Loop API Permission Audit
+
+Date: 2026-05-25, Asia/Dubai
+
+Scope:
+
+- Static API-by-API permission matrix.
+- Read-only scan of `API_INVENTORY.md` and `deploy-worker/src/index.js`.
+- No API calls, deployments, migrations, or route behavior changes.
+
+Changes:
+
+- Added `API_PERMISSION_MATRIX.md`.
+- Added `API_PERMISSION_AUDIT_RESULT.md`.
+- Added `scripts/audit-api-permissions.mjs`.
+- Added `npm run audit:api-permissions`.
+
+Verification:
+
+| Command                         | Result          |
+| ------------------------------- | --------------- |
+| `npm run audit:api-permissions` | MANUAL_REQUIRED |
+
+Notes:
+
+- The scan found 29 routes, 15 financial routes, 2 staging-only routes, 2
+  ANY-method routes, and 25 routes that still require manual review before
+  commercial launch.
+- This is expected because static evidence cannot replace runtime authenticated
+  role tests and tenant/property scope is still not implemented.
