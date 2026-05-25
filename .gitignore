@@ -35,6 +35,7 @@ Thumbs.db
 .idea/
 
 # Temporary artifacts
+.tmp/
 tmp/
 temp/
 *.tmp

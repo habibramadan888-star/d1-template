@@ -842,3 +842,33 @@ Remaining before real staging write QA:
 - Obtain explicit human approval before any staging write QA.
 
 Production remains NO-GO.
+
+## STAGING-SECRETS-001 Backlog Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+Current staging secrets/account status:
+
+- Staging secrets are not set. `wrangler secret list --env staging` returned
+  `[]`.
+- Strong local ignored secret material was generated under `.tmp/`.
+- No secret value was logged or committed.
+- No matching staging QA `employee_users` rows exist.
+- Test accounts were not created because no approved staging account seed
+  script exists yet.
+- Feature flag rollback is documented with both staging flags defaulting to
+  `false`.
+
+Required next actions:
+
+- Human operator sets staging secrets from the ignored local secret material or
+  Cloudflare Dashboard.
+- Create/confirm test account rows through an approved staging-only account seed
+  task.
+- Exercise rollback by feature flag off.
+- Confirm production URL/custom route exclusion in Cloudflare Dashboard.
+- Re-run staging QA dry-run.
+
+Real staging write QA remains MANUAL_REQUIRED.
+
+Production remains NO-GO.

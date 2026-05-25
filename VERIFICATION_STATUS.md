@@ -387,3 +387,24 @@ Date: 2026-05-25, Asia/Dubai
 No production deploy, staging deploy, production migration, production D1
 execute, business data write, test account creation, feature flag enablement, or
 secret commit was performed.
+
+## STAGING-SECRETS-001 Verification Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+| Command                                                                       | Exists | Result           | Error Summary | Log Evidence                                   | Commercial Meaning                                |
+| ----------------------------------------------------------------------------- | ------ | ---------------- | ------------- | ---------------------------------------------- | ------------------------------------------------- |
+| `npm run check`                                                               | yes    | PASS             | none          | 182 tests passed                               | Baseline remained green.                          |
+| `npm run security:secrets`                                                    | yes    | PASS             | none          | `Secret hygiene check passed.`                 | No secret was committed.                          |
+| `npm run gate:commercial-launch`                                              | yes    | PRODUCTION_NO_GO | none          | `COMMERCIAL_LAUNCH_READINESS=PRODUCTION_NO_GO` | Production remains blocked.                       |
+| `npm run qa:employee-entry-staging`                                           | yes    | MANUAL_REQUIRED  | none          | `write execution: DRY_RUN_ONLY`                | No real staging write QA occurred.                |
+| `npx wrangler secret list --env staging --config deploy-worker/wrangler.toml` | yes    | PASS             | none          | `[]`                                           | Staging secrets are not set yet.                  |
+| `npm run staging:generate-passwords`                                          | yes    | PASS             | none          | `VALUES_LOGGED=no`; path under `.tmp/`         | Strong local ignored password material generated. |
+| `npx wrangler d1 execute ... SELECT employee_users ...`                       | yes    | PASS             | none          | no rows; `rows_written=0`                      | Test accounts are not confirmed.                  |
+| `npm run audit:worker-drift`                                                  | yes    | PASS             | none          | `WORKER_DRIFT_CRITICAL_MISMATCHES=0`           | Worker drift gate remains safe.                   |
+| `npm run verify:embedded-worker`                                              | yes    | PASS             | none          | `EMBEDDED_WORKER_FRESHNESS_RESULT=PASS`        | Embedded freshness remains valid.                 |
+| `npm run build:embedded:dry-run`                                              | yes    | WARNING          | none          | `EMBEDDED_WORKER_GENERATED_MISSING=0`          | Non-blocking warning remains.                     |
+
+No production deploy, staging deploy, migration, staging business-data write,
+test-account write, feature-flag enablement, secret commit, or password logging
+was performed.

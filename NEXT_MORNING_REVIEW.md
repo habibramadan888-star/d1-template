@@ -720,3 +720,31 @@ Recommended next prompt:
 ```
 
 Production cutover remains `NO-GO`.
+
+## STAGING-SECRETS-001 Morning Review Addendum
+
+Most important result:
+
+- Staging secrets, test accounts, and rollback evidence were prepared but not
+  completed. No secrets were committed and no staging write QA was executed.
+
+Current status:
+
+- Staging secrets set: no.
+- Local ignored secret material generated: yes.
+- Test accounts confirmed: no.
+- Test accounts created: no.
+- Feature flag rollback configured: yes, both flags default `false`.
+- Feature flag rollback runtime exercise: MANUAL_REQUIRED.
+- Production URL/custom route exclusion: MANUAL_REQUIRED.
+- Staging write QA readiness: MANUAL_REQUIRED.
+
+Recommended next prompt:
+
+```text
+进入 TASK STAGING-SECRETS-002：Resolve staging secrets, test accounts, rollback, and production URL manual requirements.
+目标：人工确认并设置 staging secrets，创建/确认 test accounts，演练 feature flag rollback，确认 production URL/custom route 排除。
+禁止 production deploy、staging deploy、migration、真实 staging write QA、提交 secret。
+```
+
+Production cutover remains `NO-GO`.

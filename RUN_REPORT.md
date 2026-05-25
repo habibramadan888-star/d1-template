@@ -3593,3 +3593,46 @@ Conclusion:
 - Real staging write QA remains blocked until staging secrets, test accounts,
   rollback exercise, production URL exclusion, and explicit human approval are
   complete.
+
+## STAGING-SECRETS-001 Secrets / Test Accounts / Rollback Preparation
+
+Date: 2026-05-25, Asia/Dubai
+
+Scope:
+
+- Reviewed staging secret requirements from Wrangler config, example env, and
+  Worker auth code.
+- Confirmed current remote staging secret list is empty.
+- Generated strong staging secret material to ignored local `.tmp/`.
+- Confirmed no matching staging QA employee account rows exist with read-only
+  SELECT.
+- Documented feature flag rollback method.
+- Did not call employee entry write endpoint or handover staging write endpoint.
+
+Commands:
+
+| Command                                                                       | Result           | Notes                                                       |
+| ----------------------------------------------------------------------------- | ---------------- | ----------------------------------------------------------- |
+| `npm run check`                                                               | PASS             | 182 tests passed.                                           |
+| `npm run security:secrets`                                                    | PASS             | Secret hygiene check passed.                                |
+| `npm run gate:commercial-launch`                                              | PRODUCTION_NO_GO | Production remains blocked.                                 |
+| `npm run qa:employee-entry-staging`                                           | MANUAL_REQUIRED  | Dry-run only; no write confirmations supplied.              |
+| `npx wrangler secret list --env staging --config deploy-worker/wrangler.toml` | PASS             | Returned `[]`; no staging secrets are currently set.        |
+| `npm run staging:generate-passwords`                                          | PASS             | Generated local ignored secret material; values not logged. |
+| `npx wrangler d1 execute ... SELECT employee_users ...`                       | PASS             | No matching test account rows; `rows_written=0`.            |
+
+Safety:
+
+- Production deploy: no.
+- Staging deploy: no.
+- Migration: no.
+- Staging business data write: no.
+- Test account write: no.
+- Secret committed: no.
+- Password logged: no.
+- `.tmp/` committed: no.
+
+Conclusion:
+
+- Staging secrets and test accounts remain `MANUAL_REQUIRED`.
+- Real staging write QA is not ready.
