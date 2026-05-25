@@ -228,3 +228,25 @@ Commercial meaning:
 - Real staging QA remains `MANUAL_REQUIRED` until resource, account, backup,
   rollback, and feature flag inputs are supplied.
 - Production cutover remains `NO-GO`; this gate is not deployment approval.
+
+## Deep Loop Addendum - Staging QA Evidence Template
+
+Commit: Pending
+
+Added:
+
+- `STAGING_QA_EVIDENCE_TEMPLATE.md`
+
+Result:
+
+- Human-fillable evidence packet created for real staging QA.
+- Covers review metadata, command evidence, employee entry evidence, handover
+  staging evidence, owner flow evidence, database snapshots, and approval
+  checklist.
+
+Commercial meaning:
+
+- Real staging QA can collect auditable evidence instead of relying only on
+  informal pass/fail notes.
+- The template does not authorize staging deploy, production deploy, migration,
+  production feature flag enablement, or production cutover.

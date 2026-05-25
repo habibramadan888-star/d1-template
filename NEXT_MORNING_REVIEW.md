@@ -577,6 +577,13 @@ This does not block local regression work. It does block staging/prod execution
 until human staging inputs, accounting review, tenant/receivables decisions,
 rollback evidence, and deployment approval are supplied.
 
+## Staging QA Evidence Pack
+
+`STAGING_QA_EVIDENCE_TEMPLATE.md` is ready for tomorrow's manual QA run. Use it
+to capture approved staging target, command logs, request/response evidence,
+database snapshots, audit rows, dashboard/history before/after evidence, and
+human approvals. It is an evidence template only, not deployment approval.
+
 ## Recommended Next Task
 
 Recommended next prompt:
