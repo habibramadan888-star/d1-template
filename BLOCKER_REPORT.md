@@ -342,3 +342,35 @@ Safe path:
 
 - P0-001E local/staging rehearsal may continue without deployment.
 - Any real deploy still needs a separate deploy approval task.
+
+## Night Shift V4 deep loop: rollback readiness gaps
+
+Status: MANUAL_REQUIRED / BLOCKED for specific rollback evidence only.
+
+Evidence:
+
+- `npm run audit:rollback-readiness` generated `ROLLBACK_READINESS_MATRIX.md`
+  and `ROLLBACK_READINESS_AUDIT_RESULT.md`.
+- Result: `ROLLBACK_READINESS_AUDIT=MANUAL_REQUIRED`.
+- Ready draft areas: 8.
+- Manual-required areas: 1.
+- Blocked areas: 1.
+
+Current blockers:
+
+- `MONEY_DUAL_WRITE_READINESS_GATE.md` is referenced as expected rollback
+  evidence but is not present in the current repository state.
+- Receivables implementation documents do not yet contain explicit rollback
+  wording in the scanned evidence set.
+
+Impact:
+
+- Production money migration/backfill remains NO-GO.
+- Production receivables implementation remains NO-GO.
+
+Safe path:
+
+- Continue local/staging dry-run planning.
+- Do not execute production migration or remote D1 migration.
+- Add or reconcile the missing money readiness gate document only after human
+  review of the intended source of truth.

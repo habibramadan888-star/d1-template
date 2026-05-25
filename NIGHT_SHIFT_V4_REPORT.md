@@ -39,25 +39,26 @@ Scope: 8-hour continuous commercialization engineering run. No production deploy
 
 ## Verification Ledger
 
-| Command                             | Result          | Notes                                                                              |
-| ----------------------------------- | --------------- | ---------------------------------------------------------------------------------- |
-| Baseline command suite              | Pass            | See `.tmp/night-shift-v4-baseline.log`.                                            |
-| `npm run qa:employee-entry-staging` | MANUAL_REQUIRED | Safe dry-run completed; no remote write.                                           |
-| `npm run test:backend-totals`       | PASS            | 16 tests passed.                                                                   |
-| `npm run rehearse:backend-totals`   | PASS            | Local-only rehearsal regenerated evidence.                                         |
-| `npm run gate:backend-totals-live`  | MANUAL_REQUIRED | Dry-run gate only; no live result change.                                          |
-| `npm run gate:receivables`          | MANUAL_REQUIRED | Read-only gate; no migration executed.                                             |
-| `npm run gate:tenant-scope`         | MANUAL_REQUIRED | Read-only gate; no auth/schema/data change.                                        |
-| `npm run audit:runtime-ddl`         | PASS            | Static scan wrote 182 findings.                                                    |
-| `npm run gate:runtime-ddl-removal`  | MANUAL_REQUIRED | Read-only gate; no runtime DDL removed.                                            |
-| `npm run audit:observability`       | MANUAL_REQUIRED | Read-only audit; no external integration.                                          |
-| `npm run audit:env-separation`      | MANUAL_REQUIRED | Read-only audit; no Wrangler config change.                                        |
-| `npm run test:feature-flag-matrix`  | PASS            | 3 static guard tests passed.                                                       |
-| `npm run check`                     | PASS            | 182 tests passed after Stage I.                                                    |
-| `npm run security:secrets`          | PASS            | Secret hygiene check passed.                                                       |
-| `npm run audit:api-permissions`     | MANUAL_REQUIRED | Static audit scanned 29 routes; 25 need manual review before commercial launch.    |
-| `npm run audit:db-readiness`        | MANUAL_REQUIRED | Static audit reviewed 22 tables; 10 need manual review before staging/production.  |
-| `npm run audit:audit-logs`          | MANUAL_REQUIRED | Static audit reviewed 22 mutation/financial routes; 11 need audit coverage review. |
+| Command                             | Result          | Notes                                                                                |
+| ----------------------------------- | --------------- | ------------------------------------------------------------------------------------ |
+| Baseline command suite              | Pass            | See `.tmp/night-shift-v4-baseline.log`.                                              |
+| `npm run qa:employee-entry-staging` | MANUAL_REQUIRED | Safe dry-run completed; no remote write.                                             |
+| `npm run test:backend-totals`       | PASS            | 16 tests passed.                                                                     |
+| `npm run rehearse:backend-totals`   | PASS            | Local-only rehearsal regenerated evidence.                                           |
+| `npm run gate:backend-totals-live`  | MANUAL_REQUIRED | Dry-run gate only; no live result change.                                            |
+| `npm run gate:receivables`          | MANUAL_REQUIRED | Read-only gate; no migration executed.                                               |
+| `npm run gate:tenant-scope`         | MANUAL_REQUIRED | Read-only gate; no auth/schema/data change.                                          |
+| `npm run audit:runtime-ddl`         | PASS            | Static scan wrote 182 findings.                                                      |
+| `npm run gate:runtime-ddl-removal`  | MANUAL_REQUIRED | Read-only gate; no runtime DDL removed.                                              |
+| `npm run audit:observability`       | MANUAL_REQUIRED | Read-only audit; no external integration.                                            |
+| `npm run audit:env-separation`      | MANUAL_REQUIRED | Read-only audit; no Wrangler config change.                                          |
+| `npm run test:feature-flag-matrix`  | PASS            | 3 static guard tests passed.                                                         |
+| `npm run check`                     | PASS            | 182 tests passed after Stage I.                                                      |
+| `npm run security:secrets`          | PASS            | Secret hygiene check passed.                                                         |
+| `npm run audit:api-permissions`     | MANUAL_REQUIRED | Static audit scanned 29 routes; 25 need manual review before commercial launch.      |
+| `npm run audit:db-readiness`        | MANUAL_REQUIRED | Static audit reviewed 22 tables; 10 need manual review before staging/production.    |
+| `npm run audit:audit-logs`          | MANUAL_REQUIRED | Static audit reviewed 22 mutation/financial routes; 11 need audit coverage review.   |
+| `npm run audit:rollback-readiness`  | MANUAL_REQUIRED | Static audit reviewed 10 rollback areas; 1 blocked and 1 manual-required gap remain. |
 
 ## P0 Status Changes
 
@@ -173,3 +174,29 @@ Commercial meaning:
 - Static audit evidence exists for many mutation paths, but before/after
   completeness and runtime audit-row assertions are still not proven.
 - Unified immutable audit events remain a P1 launch requirement.
+
+## Deep Loop Addendum - Rollback Readiness
+
+Commit: Pending
+
+Added:
+
+- `ROLLBACK_READINESS_MATRIX.md`
+- `ROLLBACK_READINESS_AUDIT_RESULT.md`
+- `scripts/audit-rollback-readiness.mjs`
+- `npm run audit:rollback-readiness`
+
+Result:
+
+- `ROLLBACK_READINESS_AUDIT=MANUAL_REQUIRED`
+- Areas reviewed: 10
+- READY_DRAFT areas: 8
+- MANUAL_REQUIRED areas: 1
+- BLOCKED areas: 1
+
+Blocker recorded:
+
+- `MONEY_DUAL_WRITE_READINESS_GATE.md` is expected by the rollback evidence
+  matrix but is missing from the current repository state.
+- Receivables readiness lacks explicit rollback wording in the scanned evidence
+  set.

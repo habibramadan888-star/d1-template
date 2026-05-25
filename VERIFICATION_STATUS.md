@@ -314,3 +314,14 @@ Date: 2026-05-25, Asia/Dubai
 
 No API call, D1 connection, deployment, migration, or production configuration
 change was performed.
+
+## Deep Loop Rollback Readiness Verification Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+| Command                            | Exists | Result          | Error Summary | Log Evidence                                                                 | Commercial Meaning                                                                                                  |
+| ---------------------------------- | ------ | --------------- | ------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `npm run audit:rollback-readiness` | yes    | MANUAL_REQUIRED | none          | `ROLLBACK_READY_DRAFT=8`; `ROLLBACK_MANUAL_REQUIRED=1`; `ROLLBACK_BLOCKED=1` | Rollback evidence exists for most gates, but money readiness evidence and receivables rollback wording need review. |
+
+No deployment, migration, D1 connection, API call, or production configuration
+change was performed.

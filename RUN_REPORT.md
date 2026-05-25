@@ -3397,3 +3397,34 @@ Notes:
 - 11 routes still require manual audit coverage review.
 - Static evidence does not prove before/after completeness or production-grade
   immutability.
+
+## Deep Loop Rollback Readiness Matrix
+
+Date: 2026-05-25, Asia/Dubai
+
+Scope:
+
+- Static rollback/readiness matrix for P0/P1 cutover areas.
+- Read-only report scan only.
+- No API calls, D1 connection, deployment, migration, or route behavior change.
+
+Changes:
+
+- Added `ROLLBACK_READINESS_MATRIX.md`.
+- Added `ROLLBACK_READINESS_AUDIT_RESULT.md`.
+- Added `scripts/audit-rollback-readiness.mjs`.
+- Added `npm run audit:rollback-readiness`.
+
+Verification:
+
+| Command                            | Result          |
+| ---------------------------------- | --------------- |
+| `npm run audit:rollback-readiness` | MANUAL_REQUIRED |
+
+Notes:
+
+- The scan reviewed 10 rollback areas.
+- 8 areas have draft rollback/readiness evidence.
+- 1 area is manual-required: receivables needs explicit rollback wording.
+- 1 area is blocked: expected `MONEY_DUAL_WRITE_READINESS_GATE.md` is missing
+  from the current repository state.
