@@ -1,0 +1,15 @@
+{
+  "input": {
+    "receivableId": "rec_rent_due_fully_paid",
+    "sourceType": "RENT",
+    "propertyId": "staging-property",
+    "roomId": "144",
+    "amountAed": "770.00",
+    "paidAed": "770.00",
+    "dueDate": "2026-05-25"
+  },
+  "expected": {
+    "status": "SETTLED",
+    "outstandingAed": "0.00"
+  }
+}

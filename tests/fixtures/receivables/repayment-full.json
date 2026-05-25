@@ -1,0 +1,20 @@
+{
+  "receivable": {
+    "receivableId": "rec_repayment_full",
+    "sourceType": "RENT",
+    "propertyId": "staging-property",
+    "amountAed": "770.00",
+    "paidAed": "80.00",
+    "dueDate": "2026-05-20"
+  },
+  "payment": {
+    "allocationId": "alloc_repayment_full",
+    "paymentSourceType": "TRANSACTION",
+    "paymentSourceId": "tx_repayment_full",
+    "amountAed": "690.00"
+  },
+  "expected": {
+    "status": "SETTLED",
+    "outstandingAed": "0.00"
+  }
+}

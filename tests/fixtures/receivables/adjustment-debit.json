@@ -1,0 +1,20 @@
+{
+  "receivable": {
+    "receivableId": "rec_adjustment_debit",
+    "sourceType": "RENT",
+    "propertyId": "staging-property",
+    "amountAed": "770.00",
+    "paidAed": "770.00",
+    "dueDate": "2026-05-25"
+  },
+  "adjustment": {
+    "adjustmentId": "adj_debit",
+    "adjustmentType": "DEBIT",
+    "amountAed": "30.00",
+    "reason": "CORRECTION"
+  },
+  "expected": {
+    "status": "PARTIAL",
+    "outstandingAed": "30.00"
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "input": {
+    "receivableId": "rec_rent_due_short_pay",
+    "sourceType": "RENT",
+    "propertyId": "staging-property",
+    "roomId": "144",
+    "amountAed": "770.00",
+    "paidAed": "80.00",
+    "dueDate": "2026-05-25"
+  },
+  "expected": {
+    "status": "PARTIAL",
+    "outstandingAed": "690.00"
+  }
+}

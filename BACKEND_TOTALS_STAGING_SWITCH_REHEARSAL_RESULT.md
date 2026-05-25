@@ -1,6 +1,6 @@
 # Backend Totals Staging Switch Rehearsal Result
 
-Generated: 2026-05-25T15:55:10.212Z
+Generated: 2026-05-25T16:10:24.491Z
 
 Scope: staging/local rehearsal only. This script does not deploy, migrate, change remote feature flags, write D1 rows, mutate API responses, or change dashboard output.
 

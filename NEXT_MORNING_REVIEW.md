@@ -801,6 +801,31 @@ Recommended next prompt:
 
 Production cutover remains `NO-GO`.
 
+## P0-008C Morning Review Addendum
+
+Most important result:
+
+- Receivables moved from design/readiness into local/staging rehearsal with a
+  pure module, fixtures, tests, schema draft, dry-run script, and dashboard
+  future-authority gate.
+
+Current status:
+
+- P0-008: `Partial - receivables local/staging rehearsal passed`.
+- Production deploy: no.
+- Production migration: no.
+- Production D1 write: no.
+- Staging D1 write: no.
+- Dashboard/live financial formula changed: no.
+- Production cutover: `NO-GO`.
+
+Recommended next prompt:
+
+```text
+进入 TASK P0-008D：Receivables staging shadow gate.
+目标：只做 staging/local shadow comparison，必要时 feature-flagged shadow metadata，不做 production deploy/migration/cutover，不把 P0-008 标记 Verified。
+```
+
 ## P0-003E Morning Review Addendum
 
 Most important result:

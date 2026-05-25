@@ -569,3 +569,20 @@ Date: 2026-05-25, Asia/Dubai
 No production deploy, production migration, production D1 write, production URL
 call, staging D1 write, remote feature flag change, dashboard mutation, live
 financial formula change, or secret exposure occurred in P0-003E.
+
+## P0-008C Verification Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+| Command / Check                | Exists | Result    | Error Summary | Log Evidence                                         | Commercial Meaning                                         |
+| ------------------------------ | ------ | --------- | ------------- | ---------------------------------------------------- | ---------------------------------------------------------- |
+| `npm run test:receivables`     | yes    | Pass      | none          | 18 receivables lifecycle tests passed                | Local/staging receivables pure module behavior is covered. |
+| `npm run rehearse:receivables` | yes    | Pass      | none          | `RECEIVABLES_LOCAL_STAGING_REHEARSAL=PASS`           | Dry-run rehearsal completed without D1 writes.             |
+| Production deploy              | yes    | No        | none          | No deploy command executed                           | Production untouched.                                      |
+| Production migration           | yes    | No        | none          | No migration command executed                        | Production schema untouched.                               |
+| Staging D1 write               | yes    | No        | none          | Rehearsal reported `RECEIVABLES_STAGING_D1_WRITE=no` | P0-008C stayed non-invasive.                               |
+| Dashboard/live formula         | yes    | Unchanged | none          | Only future authority gate was generated             | Live dashboard remains legacy.                             |
+
+Final full validation for P0-008C must keep `gate:commercial-launch` at
+`PRODUCTION_NO_GO` and `qa:employee-entry-staging` in dry-run/manual-required
+mode.

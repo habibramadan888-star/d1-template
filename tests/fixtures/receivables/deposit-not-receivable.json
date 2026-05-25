@@ -1,0 +1,15 @@
+{
+  "rows": [
+    {
+      "id": "deposit_1",
+      "sourceType": "DEPOSIT",
+      "property_id": "staging-property",
+      "amount": "1000.00",
+      "due_date": "2026-05-25"
+    }
+  ],
+  "expected": {
+    "receivableCount": 0,
+    "warningCode": "DEPOSIT_NOT_RECEIVABLE"
+  }
+}

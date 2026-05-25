@@ -3931,3 +3931,38 @@ Result:
 P0-003 status:
 
 - `Partial - backend totals staging switch rehearsal passed`.
+
+## P0-008C Receivables Local/Staging Rehearsal
+
+Date: 2026-05-25, Asia/Dubai
+
+Scope: local/staging receivables rehearsal. No production deploy, production
+migration, production D1 write, production URL call, staging D1 write, dashboard
+mutation, live financial formula change, or feature flag change was performed.
+
+Completed:
+
+- Extended `modules/finance/receivables.mjs` with non-invasive receivable draft,
+  allocation, adjustment, event, legacy comparison, and dashboard future-total
+  helpers.
+- Added 15 receivables fixtures under `tests/fixtures/receivables/`.
+- Added `tests/receivables.spec.mjs`.
+- Added `scripts/rehearse-receivables-local-staging.mjs`.
+- Added `npm run test:receivables`.
+- Added `npm run rehearse:receivables`.
+- Added `migration-drafts/receivables_local_staging_rehearsal_draft.sql`.
+- Created P0-008C source-of-truth, migration review, dashboard authority gate,
+  starting context, and next-prompt reports.
+
+Result:
+
+- `npm run test:receivables`: pass, 18 tests.
+- `npm run rehearse:receivables`: `PASS`.
+- Legacy arrears comparison matched the receivable draft fixture.
+- Future dashboard due/overdue/arrears authority is computable in rehearsal but
+  remains shadow/manual for production.
+- Production remains `NO-GO`.
+
+P0-008 status:
+
+- `Partial - receivables local/staging rehearsal passed`.

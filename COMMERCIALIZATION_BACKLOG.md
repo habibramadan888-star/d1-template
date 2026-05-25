@@ -1054,3 +1054,28 @@ Still blocked for production:
 - TOP_25 money risks human review.
 - Production migration, production rollback, production backfill, and live
   dashboard response switch approval.
+
+## P0-008C Backlog Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+P0-008 current status:
+
+- `Partial - receivables local/staging rehearsal passed`.
+
+Current result:
+
+- Receivables pure module, fixtures, tests, migration draft, and dry-run
+  rehearsal are available.
+- Rent due, short pay, repayment, overpayment, voided payment, deposit
+  separation, adjustments, due/overdue status, legacy arrears comparison, and
+  frontend-total non-authority are covered.
+- No production deploy, production migration, production D1 write, staging D1
+  write, dashboard mutation, or live financial formula change occurred.
+
+Still blocked for production:
+
+- P0-001 minor-unit reconciliation and live write/read migration.
+- P0-006 tenant/property scope implementation.
+- Receivables staging shadow reconciliation and human accounting review.
+- Production migration, backup, rollback, and backfill approval.

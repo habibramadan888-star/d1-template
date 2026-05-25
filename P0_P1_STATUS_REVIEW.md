@@ -823,6 +823,37 @@ Result:
 - Both staging flags were rolled back to `false`.
 - Production cutover remains `NO-GO`.
 
+## P0-008C Receivables Local/Staging Rehearsal Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+P0-008 current status:
+
+- `Partial - receivables local/staging rehearsal passed`.
+
+Evidence:
+
+- `P0_008C_STARTING_CONTEXT.md`
+- `RECEIVABLES_SOURCE_OF_TRUTH.md`
+- `RECEIVABLES_MIGRATION_DRAFT_REVIEW.md`
+- `RECEIVABLES_DASHBOARD_AUTHORITY_GATE.md`
+- `RECEIVABLES_LOCAL_STAGING_REHEARSAL_RESULT.md`
+- `migration-drafts/receivables_local_staging_rehearsal_draft.sql`
+- `modules/finance/receivables.mjs`
+- `tests/receivables.spec.mjs`
+- `scripts/rehearse-receivables-local-staging.mjs`
+- `npm run test:receivables`
+- `npm run rehearse:receivables`
+
+Result:
+
+- Local/staging receivables rehearsal passed without database writes.
+- Legacy arrears comparison matched the fixture receivable draft.
+- Dashboard due/overdue/arrears future authority is defined but not live.
+- Production remains blocked by P0-001 reconciliation, P0-006 tenant scope,
+  production migration approval, rollback/backfill planning, and human
+  accounting review.
+
 Remaining blockers:
 
 - No production deploy approval.
