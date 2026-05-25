@@ -4177,3 +4177,38 @@ Result:
 P0-006 status:
 
 - `Partial - tenant/property scope local-staging rehearsal passed`.
+
+## P0-006D Tenant Scope Staging Shadow Gate
+
+Date: 2026-05-26, Asia/Dubai
+
+Scope: read-only staging/local tenant scope shadow gate. No production deploy,
+production migration, production D1 write, production URL call, staging D1
+write, production auth change, global tenant rewrite, legacy `CORPID` fallback
+removal, dashboard mutation, remote feature flag enablement, or secret exposure
+occurred.
+
+Completed:
+
+- Added `ENABLE_TENANT_SCOPE_SHADOW_STAGING` production-disabled shadow guard.
+- Added `scripts/compare-staging-tenant-scope-shadow.mjs`.
+- Added `npm run compare:staging-tenant-scope`.
+- Added `tests/tenant-scope-staging-shadow-gate.spec.mjs`.
+- Added `npm run test:tenant-scope-staging-shadow`.
+- Generated P0-006D starting context, feature flag plan, dashboard/history
+  evidence, rollback result, commercial launch gate result, and next prompt.
+
+Result:
+
+- `TENANT_SCOPE_STAGING_SHADOW_GATE=PASS`.
+- Legacy warning rows: 8.
+- Manual-required rows: 0.
+- Blocked rows: 0.
+- Staging D1 access was read-only SELECT against `homelink-finance-staging`.
+- Dashboard/history live result remained unchanged.
+- `npm run gate:tenant-scope` remains `MANUAL_REQUIRED`, as expected.
+- Production remains `NO-GO`.
+
+P0-006 status:
+
+- `Partial - tenant scope staging shadow gate passed`.

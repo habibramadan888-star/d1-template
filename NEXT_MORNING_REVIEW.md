@@ -831,6 +831,39 @@ Forbidden: production deploy, production migration, production cutover,
 production auth change, legacy CORPID removal, P0-006 Verified.
 ```
 
+## P0-006D Morning Review Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+Most important result:
+
+- Tenant scope staging shadow gate passed using read-only staging D1 SELECT
+  evidence, while legacy `corpid` tables remained warning-only and production
+  stayed NO-GO.
+
+Current status:
+
+- P0-006: `Partial - tenant scope staging shadow gate passed`.
+- `TENANT_SCOPE_STAGING_SHADOW_GATE=PASS`.
+- Legacy warnings: 8.
+- Manual-required rows: 0.
+- Staging D1 write: no.
+- Dashboard/history mutation: no.
+- `gate:tenant-scope`: `MANUAL_REQUIRED`.
+- Production cutover remains `NO-GO`.
+
+Recommended next task:
+
+```text
+Enter TASK P0-006E: Tenant scope staging route enforcement gate.
+
+Goal: staging/local route-enforcement gate only, behind explicit feature flag
+controls and rollback false.
+
+Forbidden: production deploy, production migration, production auth changes,
+production cutover, legacy CORPID fallback removal, P0-006 Verified.
+```
+
 ## P0-008G Morning Review Addendum
 
 Date: 2026-05-26, Asia/Dubai

@@ -692,3 +692,22 @@ No production deploy, production migration, production D1 write, production URL
 call, staging D1 write, production auth change, dashboard mutation, global
 tenant rewrite, legacy `CORPID` fallback removal, or secret exposure occurred
 in P0-006C.
+
+## P0-006D Verification Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+| Command / Check                            | Exists | Result                             | Error Summary | Log Evidence                                               | Commercial Meaning                                                          |
+| ------------------------------------------ | ------ | ---------------------------------- | ------------- | ---------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `npm run test:tenant-scope-staging-shadow` | yes    | Pass                               | none          | 8 tests passed                                             | Shadow guard, production disable, warnings, and rollback false are covered. |
+| `npm run compare:staging-tenant-scope`     | yes    | Pass                               | none          | `TENANT_SCOPE_STAGING_SHADOW_GATE=PASS`, 8 legacy warnings | Read-only staging shadow comparison passed without blockers.                |
+| `npm run gate:tenant-scope`                | yes    | `MANUAL_REQUIRED`                  | none          | Static `CORPID` reliance remains                           | Production SaaS tenant readiness remains blocked.                           |
+| `npm run gate:commercial-launch`           | yes    | `PRODUCTION_NO_GO`                 | none          | Launch gate stayed NO-GO                                   | Production cutover remains blocked.                                         |
+| `npm run qa:employee-entry-staging`        | yes    | `MANUAL_REQUIRED` / `DRY_RUN_ONLY` | none          | No confirmation flags supplied                             | No staging write QA executed.                                               |
+| Staging D1 write                           | yes    | No                                 | none          | Comparison script used SELECT only                         | No staging data was written.                                                |
+| Dashboard/history mutation                 | yes    | No                                 | none          | Shadow report only                                         | Live dashboard/history behavior unchanged.                                  |
+
+No production deploy, production migration, production D1 write, production URL
+call, staging D1 write, production auth change, dashboard mutation, global
+tenant rewrite, legacy `CORPID` fallback removal, remote feature flag
+enablement, or secret exposure occurred in P0-006D.

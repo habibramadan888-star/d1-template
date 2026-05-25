@@ -1037,3 +1037,46 @@ Summary:
 - No production deploy, production migration, production D1 write, staging D1
   write, dashboard mutation, or live financial formula change occurred.
 - Production cutover remains `NO-GO`.
+
+## P0-006D Tenant Scope Staging Shadow Gate Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+P0-006 current status:
+
+- `Partial - tenant scope staging shadow gate passed`.
+
+Added evidence:
+
+- `TENANT_SCOPE_STAGING_SHADOW_GATE_RESULT.md`
+- `TENANT_SCOPE_STAGING_SHADOW_FEATURE_FLAG_PLAN.md`
+- `P0_006D_DASHBOARD_HISTORY_EVIDENCE.md`
+- `P0_006D_ROLLBACK_RESULT.md`
+- `scripts/compare-staging-tenant-scope-shadow.mjs`
+- `tests/tenant-scope-staging-shadow-gate.spec.mjs`
+- `npm run test:tenant-scope-staging-shadow`
+- `npm run compare:staging-tenant-scope`
+
+Result:
+
+- Staging tenant scope shadow gate passed with read-only SELECT evidence.
+- Handover staging tables include company/property scope columns.
+- Legacy `corpid` tables are documented as warnings and remain shadow-only.
+- Dashboard/history live result was not changed.
+- No production deploy, production migration, production D1 write, staging D1
+  write, production auth change, legacy fallback removal, or remote feature
+  flag enablement occurred.
+
+Remaining risk:
+
+- P0-006 is not Verified.
+- Live Worker dashboard/history/employee routes are not yet enforced by
+  company/property scope.
+- Production migration, backfill, route enforcement, and human tenancy model
+  decisions are not approved.
+
+Next step:
+
+- P0-006E can design a staging/local route-enforcement gate behind explicit
+  feature flag controls. Do not execute production migration, production deploy,
+  production auth changes, or legacy `CORPID` fallback removal.

@@ -2,6 +2,7 @@ const SAFE_REHEARSAL_ENVS = new Set(["local", "test", "development", "staging"])
 const OWNER_ROLES = new Set(["OWNER", "MANAGER", "ADMIN"]);
 const EMPLOYEE_ROLES = new Set(["EMPLOYEE", "STAFF"]);
 const ALL_PROPERTY = "*";
+const TENANT_SCOPE_SHADOW_STAGING_FLAG = "ENABLE_TENANT_SCOPE_SHADOW_STAGING";
 
 const ACTIONS = {
   DASHBOARD_READ: "DASHBOARD_READ",
@@ -39,6 +40,40 @@ export function isTenantScopeRehearsalAllowed(env = {}) {
 
 export function isTenantScopeProductionDisabled(env = {}) {
   return !isTenantScopeRehearsalAllowed(env);
+}
+
+export function resolveTenantScopeShadowMode(env = {}) {
+  const appEnv = String(env.APP_ENV || "")
+    .trim()
+    .toLowerCase();
+  const flag = String(env[TENANT_SCOPE_SHADOW_STAGING_FLAG] ?? "")
+    .trim()
+    .toLowerCase();
+  if (!SAFE_REHEARSAL_ENVS.has(appEnv)) {
+    return {
+      enabled: false,
+      mode: "LEGACY",
+      productionDisabled: true,
+      dashboardMutationAllowed: false,
+      reason: appEnv === "production" ? "production_always_disabled" : "env_not_allowed"
+    };
+  }
+  if (flag !== "true") {
+    return {
+      enabled: false,
+      mode: "LEGACY",
+      productionDisabled: false,
+      dashboardMutationAllowed: false,
+      reason: "flag_off"
+    };
+  }
+  return {
+    enabled: true,
+    mode: "TENANT_SCOPE_SHADOW",
+    productionDisabled: false,
+    dashboardMutationAllowed: false,
+    reason: "staging_shadow_read_only"
+  };
 }
 
 export function normalizeTenantScope(input = {}) {
@@ -233,4 +268,4 @@ export function summarizeTenantScopeScenarios(rows) {
   };
 }
 
-export { ACTIONS, ALL_PROPERTY };
+export { ACTIONS, ALL_PROPERTY, TENANT_SCOPE_SHADOW_STAGING_FLAG };

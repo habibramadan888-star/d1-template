@@ -1172,6 +1172,36 @@ Still blocked for production:
 - Production receivables migration, backup, rollback, backfill, and deploy
   approval.
 
+## P0-006D Backlog Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+P0-006 current status:
+
+- `Partial - tenant scope staging shadow gate passed`.
+
+Current result:
+
+- Added `ENABLE_TENANT_SCOPE_SHADOW_STAGING` staging/local-only shadow guard.
+- Added `npm run test:tenant-scope-staging-shadow`.
+- Added `npm run compare:staging-tenant-scope`.
+- Staging tenant scope shadow gate passed against `homelink-finance-staging`
+  with SELECT-only D1 reads.
+- Handover staging tables include `company_id` / `property_id` and passed
+  shadow readiness.
+- Eight legacy `corpid` tables remain expected warnings and are not production
+  switch candidates.
+- Dashboard/history live result remained unchanged.
+- Production remains `NO-GO`.
+
+Still blocked for production:
+
+- P0-006 is not Verified.
+- Live Worker routes still rely on static `CORPID` in key places.
+- Production tenant migration and legacy row backfill are not approved.
+- Dashboard/history SQL has not been switched to company/property scope.
+- Human tenant model and migration/backfill decisions are still required.
+
 ## P0-006C Backlog Addendum
 
 Date: 2026-05-26, Asia/Dubai
