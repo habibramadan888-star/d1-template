@@ -490,3 +490,54 @@ Resolution update:
   migration, staging write, or feature flag was changed.
 - P0-003E is unblocked for retry, but the backend totals staging switch
   rehearsal has not been executed.
+
+## P0-008D Baseline Blocker: Local Worker ECONNRESET In Existing Employee Tests
+
+Date: 2026-05-25, Asia/Dubai
+
+Status: BLOCKED_BEFORE_RECEIVABLES_STAGING_SHADOW_GATE.
+
+Evidence:
+
+- Branch: `qa/p0-008d-receivables-staging-shadow-gate`
+- Base commit: `c49900df30f833262a8dab1b404fbe79163192ec`
+- Command: `npm run check`
+- Failure stage: Node test runner during existing employee entry Worker tests.
+- `npm run format:check` passed before the failure.
+- `npm run security:secrets` passed inside `npm run check` before the failure.
+- `audit:api:check` and `audit:db:check` passed before the failure.
+
+Failing tests:
+
+```text
+tests/employee-entry-adapter-staging-endpoint.spec.mjs
+- enabled employee entry adapter endpoint enforces auth, role, validation, and no live writes
+- TypeError: fetch failed
+- cause: Error: read ECONNRESET
+
+tests/employee-entry-route-switch-rehearsal.spec.mjs
+- local flag on rejects owner submitter before adapter rehearsal write
+- TypeError: fetch failed
+- cause: Error: read ECONNRESET
+
+tests/employee-entry-route-switch-rehearsal.spec.mjs
+- local flag on rejects invalid money before legacy write
+- TypeError: fetch failed
+- cause: Error: read ECONNRESET
+```
+
+Impact:
+
+- P0-008D implementation was not started.
+- `ENABLE_RECEIVABLES_SHADOW_STAGING` was not added or enabled.
+- No staging D1 read/write was executed for receivables shadow comparison.
+- No production deploy, production migration, production D1 write, production URL
+  call, staging D1 write, dashboard mutation, or feature flag change occurred.
+
+Safe resolution:
+
+- Rebaseline or stabilize the existing local Worker test ECONNRESET before
+  retrying P0-008D.
+- Rerun the full P0-008D baseline after the Worker tests are stable.
+- Do not proceed to receivables staging shadow implementation until
+  `npm run check` passes.
