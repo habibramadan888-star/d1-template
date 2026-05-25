@@ -1172,6 +1172,34 @@ Still blocked for production:
 - Production receivables migration, backup, rollback, backfill, and deploy
   approval.
 
+## P0-006C Backlog Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+P0-006 current status:
+
+- `Partial - tenant/property scope local-staging rehearsal passed`.
+
+Current result:
+
+- Added local/staging tenant scope helper and fixtures.
+- Added `npm run test:tenant-scope`.
+- Added `npm run rehearse:tenant-scope`.
+- Rehearsal passed with 7 scenarios and 0 data leaks.
+- Owner/employee membership checks, cross-tenant denial, same bed/CID
+  isolation, missing membership denial, and dashboard/history non-mutation are
+  covered.
+- `npm run gate:tenant-scope` remains `MANUAL_REQUIRED`, as expected.
+- Production remains `NO-GO`.
+
+Still blocked for production:
+
+- P0-006 is not Verified.
+- Live Worker routes still rely on static `CORPID` in key places.
+- Production tenant migration and legacy row backfill are not approved.
+- Dashboard/history SQL has not been switched to company/property scope.
+- Human tenant model decision is still required.
+
 ## P0-008G Backlog Addendum
 
 Date: 2026-05-26, Asia/Dubai

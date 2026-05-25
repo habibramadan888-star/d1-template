@@ -801,6 +801,36 @@ Recommended next prompt:
 
 Production cutover remains `NO-GO`.
 
+## P0-006C Morning Review Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+Most important result:
+
+- Tenant/property local-staging rehearsal passed with cross-tenant denial
+  fixtures and 0 data leaks.
+
+Current status:
+
+- P0-006: `Partial - tenant/property scope local-staging rehearsal passed`.
+- `TENANT_SCOPE_LOCAL_STAGING_REHEARSAL=PASS`.
+- Scenario count: 7.
+- Data leaks: 0.
+- `gate:tenant-scope`: `MANUAL_REQUIRED`.
+- Production cutover remains `NO-GO`.
+
+Recommended next task:
+
+```text
+Enter TASK P0-006D: Tenant scope staging shadow gate.
+
+Goal: staging/local read-only tenant scope shadow comparison with
+dashboard/history evidence and no live switch.
+
+Forbidden: production deploy, production migration, production cutover,
+production auth change, legacy CORPID removal, P0-006 Verified.
+```
+
 ## P0-008G Morning Review Addendum
 
 Date: 2026-05-26, Asia/Dubai

@@ -675,3 +675,20 @@ Date: 2026-05-26, Asia/Dubai
 No production deploy, production migration, production D1 write, production URL
 call, staging D1 write, dashboard live switch, live financial formula change,
 remote feature flag enablement, or secret exposure occurred in P0-008G.
+
+## P0-006C Verification Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+| Command / Check                     | Exists | Result                             | Error Summary | Log Evidence                                         | Commercial Meaning                                              |
+| ----------------------------------- | ------ | ---------------------------------- | ------------- | ---------------------------------------------------- | --------------------------------------------------------------- |
+| `npm run test:tenant-scope`         | yes    | Pass                               | none          | 9 tests passed                                       | Local/staging cross-tenant denial and membership scope covered. |
+| `npm run rehearse:tenant-scope`     | yes    | Pass                               | none          | `TENANT_SCOPE_LOCAL_STAGING_REHEARSAL=PASS`, 0 leaks | Tenant/property rehearsal passed without D1 access.             |
+| `npm run gate:tenant-scope`         | yes    | `MANUAL_REQUIRED`                  | none          | Static `CORPID` reliance remains                     | Production SaaS tenant readiness remains blocked.               |
+| `npm run gate:commercial-launch`    | yes    | `PRODUCTION_NO_GO`                 | none          | Launch gate stayed NO-GO                             | Production cutover remains blocked.                             |
+| `npm run qa:employee-entry-staging` | yes    | `MANUAL_REQUIRED` / `DRY_RUN_ONLY` | none          | No confirmation flags supplied                       | No staging write QA executed.                                   |
+
+No production deploy, production migration, production D1 write, production URL
+call, staging D1 write, production auth change, dashboard mutation, global
+tenant rewrite, legacy `CORPID` fallback removal, or secret exposure occurred
+in P0-006C.

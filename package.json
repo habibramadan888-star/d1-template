@@ -37,6 +37,8 @@
     "compare:staging-backend-totals": "node scripts/compare-staging-backend-totals.mjs",
     "gate:receivables": "node scripts/gate-receivables-readiness.mjs",
     "gate:tenant-scope": "node scripts/gate-tenant-scope-readiness.mjs",
+    "test:tenant-scope": "node --test tests/tenant-scope-local-staging.spec.mjs",
+    "rehearse:tenant-scope": "node scripts/rehearse-tenant-scope-local-staging.mjs",
     "audit:runtime-ddl": "node scripts/audit-runtime-ddl.mjs",
     "gate:runtime-ddl-removal": "node scripts/gate-runtime-ddl-removal.mjs",
     "reconcile:money": "node scripts/money-shadow-reconcile.mjs",

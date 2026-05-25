@@ -4142,3 +4142,38 @@ Result:
 P0-008 status:
 
 - `Partial - receivables staging authority switch rehearsal passed`.
+
+## P0-006C Tenant / Property Scope Local-Staging Rehearsal
+
+Date: 2026-05-26, Asia/Dubai
+
+Scope: local/staging-only tenant/property scope rehearsal. No production deploy,
+production migration, production D1 write, production URL call, staging D1
+write, production auth change, global tenant rewrite, legacy `CORPID` fallback
+removal, dashboard mutation, or secret exposure occurred.
+
+Completed:
+
+- Added `modules/tenant/scope.mjs`.
+- Added `tests/fixtures/tenant-scope/local-staging.json`.
+- Added `tests/tenant-scope-local-staging.spec.mjs`.
+- Added `npm run test:tenant-scope`.
+- Added `scripts/rehearse-tenant-scope-local-staging.mjs`.
+- Added `npm run rehearse:tenant-scope`.
+- Generated P0-006C starting context, dashboard/history evidence, rollback
+  result, commercial launch gate result, and next prompt.
+
+Result:
+
+- `TENANT_SCOPE_LOCAL_STAGING_REHEARSAL=PASS`.
+- Scenario count: 7.
+- Data leak scenarios: 0.
+- Cross-tenant denial and same bed/CID isolation passed in local/staging
+  fixtures.
+- `npm run gate:tenant-scope` remains `MANUAL_REQUIRED`, as expected for
+  production readiness.
+- Production remains `NO-GO`.
+
+P0-006 status:
+
+- `Partial - tenant/property scope local-staging rehearsal passed`.

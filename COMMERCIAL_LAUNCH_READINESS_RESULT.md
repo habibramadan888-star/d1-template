@@ -1,6 +1,6 @@
 # Commercial Launch Readiness Result
 
-Generated: 2026-05-25T20:56:33.826Z
+Generated: 2026-05-25T21:53:09.235Z
 
 | Metric                | Count |
 | --------------------- | ----: |
@@ -16,20 +16,22 @@ Allowed next work: local/staging dry-run validation, manual QA preparation, and 
 
 Forbidden next work without human approval: production deploy, staging deploy, remote/production D1 migration, production feature flag enablement, and live accounting authority switch.
 
-## P0-008G Addendum
+## P0-006C Addendum
 
-P0-008 current status:
+P0-006 current status:
 
-- `Partial - receivables staging authority switch rehearsal passed`.
+- `Partial - tenant/property scope local-staging rehearsal passed`.
 
 Evidence:
 
-- `RECEIVABLES_STAGING_AUTHORITY_SWITCH_REHEARSAL_RESULT.md`
-- `P0_008G_DASHBOARD_HISTORY_EVIDENCE.md`
-- `P0_008G_ROLLBACK_RESULT.md`
-- `tests/receivables-staging-authority-switch-rehearsal.spec.mjs`
-- `scripts/rehearse-receivables-staging-authority-switch.mjs`
+- `TENANT_SCOPE_LOCAL_STAGING_REHEARSAL_RESULT.md`
+- `P0_006C_DASHBOARD_HISTORY_EVIDENCE.md`
+- `P0_006C_ROLLBACK_RESULT.md`
+- `modules/tenant/scope.mjs`
+- `tests/tenant-scope-local-staging.spec.mjs`
+- `scripts/rehearse-tenant-scope-local-staging.mjs`
 
-Production remains `NO-GO`. P0-008G staging/local authority switch rehearsal
-success does not approve production deploy, production migration, dashboard
-live switch, production feature flags, cleanup, or P0-008 verification.
+Production remains `NO-GO`. P0-006C local/staging rehearsal success does not
+approve production deploy, production migration, tenant backfill, production
+auth changes, dashboard/history live switch, removal of legacy `CORPID`
+fallback, or P0-006 verification.

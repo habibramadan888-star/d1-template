@@ -1,0 +1,100 @@
+{
+  "companies": [
+    { "company_id": "company_a", "name": "Company A" },
+    { "company_id": "company_b", "name": "Company B" }
+  ],
+  "properties": [
+    { "company_id": "company_a", "property_id": "property_a_1", "name": "A Building 1" },
+    { "company_id": "company_a", "property_id": "property_a_2", "name": "A Building 2" },
+    { "company_id": "company_b", "property_id": "property_b_1", "name": "B Building 1" }
+  ],
+  "actors": {
+    "ownerA": {
+      "user_id": "owner_a",
+      "role": "OWNER",
+      "company_id": "company_a",
+      "corpid": "homelink"
+    },
+    "ownerB": {
+      "user_id": "owner_b",
+      "role": "OWNER",
+      "company_id": "company_b",
+      "corpid": "homelink"
+    },
+    "employeeA1": {
+      "user_id": "employee_a_1",
+      "role": "EMPLOYEE",
+      "company_id": "company_a",
+      "property_id": "property_a_1",
+      "corpid": "homelink"
+    },
+    "employeeB1": {
+      "user_id": "employee_b_1",
+      "role": "EMPLOYEE",
+      "company_id": "company_b",
+      "property_id": "property_b_1",
+      "corpid": "homelink"
+    },
+    "orphan": {
+      "user_id": "orphan_user",
+      "role": "OWNER",
+      "company_id": "company_a",
+      "corpid": "homelink"
+    }
+  },
+  "memberships": [
+    {
+      "user_id": "owner_a",
+      "company_id": "company_a",
+      "property_id": "*",
+      "role": "OWNER"
+    },
+    {
+      "user_id": "owner_b",
+      "company_id": "company_b",
+      "property_id": "*",
+      "role": "OWNER"
+    },
+    {
+      "user_id": "employee_a_1",
+      "company_id": "company_a",
+      "property_id": "property_a_1",
+      "role": "EMPLOYEE"
+    },
+    {
+      "user_id": "employee_b_1",
+      "company_id": "company_b",
+      "property_id": "property_b_1",
+      "role": "EMPLOYEE"
+    }
+  ],
+  "rows": [
+    {
+      "id": "session_a_1",
+      "table": "sessions",
+      "company_id": "company_a",
+      "property_id": "property_a_1",
+      "bed": "101",
+      "cid": "CID-SHARED",
+      "amount_fils": 120000
+    },
+    {
+      "id": "transaction_a_2",
+      "table": "transactions",
+      "company_id": "company_a",
+      "property_id": "property_a_2",
+      "bed": "205",
+      "cid": "CID-A2",
+      "amount_fils": 90000
+    },
+    {
+      "id": "arrear_b_1",
+      "table": "arrear_tasks",
+      "company_id": "company_b",
+      "property_id": "property_b_1",
+      "bed": "101",
+      "cid": "CID-SHARED",
+      "amount_fils": 70000
+    }
+  ]
+}
