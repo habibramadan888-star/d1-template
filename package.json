@@ -80,6 +80,8 @@
     "test:feature-flag-matrix": "node --test tests/feature-flag-production-lock-matrix.spec.mjs",
     "qa:employee-entry-staging": "node scripts/qa-employee-entry-real-staging.mjs",
     "staging:generate-passwords": "node scripts/generate-staging-test-passwords.mjs",
+    "staging:set-secrets": "node scripts/set-staging-secrets-from-local.mjs",
+    "staging:setup-test-accounts": "node scripts/setup-staging-test-accounts.mjs",
     "test:backend-totals-shadow": "node --test tests/backend-totals-shadow.spec.mjs",
     "test:backend-totals": "node --test tests/backend-totals-authority.spec.mjs",
     "rehearse:backend-totals": "node scripts/rehearse-backend-totals-authority.mjs",

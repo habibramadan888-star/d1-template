@@ -1,19 +1,16 @@
-# STAGING-SECRETS-001 Test Account Setup Result
+# Staging Test Account Setup Result
 
-Date: 2026-05-25, Asia/Dubai
+Scope: `homelink-finance-staging` only. No sessions, transactions, deposit ledger, arrears, or handover rows were written.
 
-| Role          | Username              | Email                              | Created / Exists / N/A | Password Stored Where                                                             | Plain Password Logged |
-| ------------- | --------------------- | ---------------------------------- | ---------------------- | --------------------------------------------------------------------------------- | --------------------- |
-| Employee      | `employee_stg_qa_001` | `employee_stg_qa_001@example.test` | MANUAL_REQUIRED        | `.tmp/staging-secrets/staging-test-passwords.local.json` until human secret setup | no                    |
-| Owner         | `owner_stg_qa_001`    | `owner_stg_qa_001@example.test`    | MANUAL_REQUIRED        | `.tmp/staging-secrets/staging-test-passwords.local.json` until human secret setup | no                    |
-| Manager/Admin | `manager_stg_qa_001`  | `manager_stg_qa_001@example.test`  | MANUAL_REQUIRED        | `.tmp/staging-secrets/staging-test-passwords.local.json` until human secret setup | no                    |
+| Role          | Username              | Email                              | Created / Exists / N/A                                                     | Password Hash Stored | Plain Password Logged | Business Data Written |
+| ------------- | --------------------- | ---------------------------------- | -------------------------------------------------------------------------- | -------------------- | --------------------- | --------------------- |
+| Employee      | `employee_stg_qa_001` | `employee_stg_qa_001@example.test` | Created                                                                    | yes                  | no                    | no                    |
+| Owner         | `owner_stg_qa_001`    | `owner_stg_qa_001@example.test`    | Configured via USER_ACCOUNTS staging secret                                | yes                  | no                    | no                    |
+| Manager/Admin | `manager_stg_qa_001`  | `manager_stg_qa_001@example.test`  | Configured via USER_ACCOUNTS staging secret; no separate admin role exists | yes                  | no                    | no                    |
 
-Actions performed:
-
-- Generated local ignored secret material.
-- Confirmed no matching `employee_users` rows exist with a read-only SELECT.
-- Did not create any test account.
-- Did not write business data.
-- Did not write plaintext password to D1, Markdown, Git, or terminal output.
-
-Conclusion: test account setup remains `MANUAL_REQUIRED`.
+D1 target name: `homelink-finance-staging`
+D1 target id: `4ff78bfc-3855-436b-aefb-6b492145d79c`
+D1 business data written: no
+Plaintext password stored in D1: no
+Plaintext password logged: no
+Temporary SQL path: `.tmp/staging-secrets/staging-test-account-seed.sql` (ignored, not committed)

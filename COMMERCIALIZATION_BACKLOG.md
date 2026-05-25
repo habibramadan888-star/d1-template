@@ -793,6 +793,34 @@ Still required before real staging write QA:
 
 Production remains NO-GO.
 
+## STAGING-SECRETS-002 Backlog Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+Current staging secrets/account status:
+
+- Staging secrets are now set for `homelink-finance-staging`; secret values
+  were not logged or committed.
+- Employee test account `employee_stg_qa_001` exists in staging
+  `employee_users`.
+- Owner test identity `owner_stg_qa_001` and manager identity
+  `manager_stg_qa_001` are configured through staging `USER_ACCOUNTS` secret.
+- No financial business data was written.
+- No production deploy, staging code deploy, migration, employee entry write,
+  or handover write was executed.
+
+Remaining before real staging write QA:
+
+- Runtime rollback exercise or explicit acceptance.
+- Cloudflare Dashboard confirmation that production URL/custom routes are
+  excluded.
+- Explicit human approval for write QA confirmation flags.
+
+Readiness:
+
+- `STAGING_QA_WRITE_READINESS_DECISION`: `MANUAL_REQUIRED`.
+- Production remains `NO-GO`.
+
 ## STAGING-DB-001 Backlog Addendum
 
 Date: 2026-05-25, Asia/Dubai

@@ -721,6 +721,35 @@ Recommended next prompt:
 
 Production cutover remains `NO-GO`.
 
+## STAGING-SECRETS-002 Morning Review Addendum
+
+Most important result:
+
+- Staging secrets and staging test identities are now configured without
+  committing or logging secret values.
+
+Current status:
+
+- Staging secrets set: yes.
+- Employee staging test account confirmed: yes.
+- Owner/manager staging identities configured: yes, through `USER_ACCOUNTS`
+  staging secret.
+- Test financial/business data written: no.
+- Feature flag rollback configured: yes, both flags default `false`.
+- Feature flag rollback runtime exercise: MANUAL_REQUIRED.
+- Production URL/custom route exclusion: MANUAL_REQUIRED.
+- Staging write QA readiness: MANUAL_REQUIRED.
+
+Recommended next prompt:
+
+```text
+进入 TASK STAGING-SECRETS-003：Resolve remaining staging manual requirements before write QA.
+目标：人工确认 production URL/custom route 排除，接受或演练 runtime rollback，接受 backup evidence，并重新运行 dry-run QA。
+禁止 production deploy、migration、真实 staging write QA、提交 secret。
+```
+
+Production cutover remains `NO-GO`.
+
 ## STAGING-SECRETS-001 Morning Review Addendum
 
 Most important result:

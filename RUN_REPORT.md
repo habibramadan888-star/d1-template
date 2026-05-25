@@ -3636,3 +3636,44 @@ Conclusion:
 
 - Staging secrets and test accounts remain `MANUAL_REQUIRED`.
 - Real staging write QA is not ready.
+
+## STAGING-SECRETS-002 Run Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+Scope:
+
+- Set Cloudflare staging secrets from ignored local material.
+- Created/confirmed only staging test identities.
+- Did not execute real staging write QA.
+
+Commands:
+
+| Command                                                                       | Result           | Notes                                                                     |
+| ----------------------------------------------------------------------------- | ---------------- | ------------------------------------------------------------------------- |
+| `npm run check`                                                               | PASS             | 182 tests passed during baseline.                                         |
+| `npm run security:secrets`                                                    | PASS             | Secret hygiene check passed.                                              |
+| `npm run gate:commercial-launch`                                              | PRODUCTION_NO_GO | Production remains blocked.                                               |
+| `npm run qa:employee-entry-staging`                                           | MANUAL_REQUIRED  | Dry-run only; no write confirmations supplied.                            |
+| `npm run staging:set-secrets -- --confirm-staging-secrets`                    | PASS             | Set staging secrets by stdin; values not logged.                          |
+| `npm run staging:setup-test-accounts -- --confirm-staging-test-accounts`      | PASS             | Created/confirmed employee test account; no business data written.        |
+| `npx wrangler secret list --env staging --config deploy-worker/wrangler.toml` | PASS             | Secret names visible; values not readable or logged.                      |
+| `npx wrangler d1 execute ... SELECT employee_users ...`                       | PASS             | Confirmed `employee_stg_qa_001`; `rows_written=0` for confirmation query. |
+
+Safety:
+
+- Production deploy: no.
+- Staging code deploy: no `wrangler deploy` command executed.
+- Cloudflare staging secret-change version: yes, created by secret update.
+- Migration: no.
+- Staging business data write: no.
+- Test account write: yes, only `employee_users` in `homelink-finance-staging`.
+- Secret committed: no.
+- Password logged: no.
+- `.tmp/` committed: no.
+
+Conclusion:
+
+- Staging secrets and test accounts are now prepared.
+- Real staging write QA remains `MANUAL_REQUIRED` because runtime rollback and
+  production URL/custom route exclusion still need human review.

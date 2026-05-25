@@ -408,3 +408,19 @@ Date: 2026-05-25, Asia/Dubai
 No production deploy, staging deploy, migration, staging business-data write,
 test-account write, feature-flag enablement, secret commit, or password logging
 was performed.
+
+## STAGING-SECRETS-002 Verification Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+| Command                                                                  | Exists | Result                             | Error Summary | Log Evidence                                                                 | Commercial Meaning                                                                                                 |
+| ------------------------------------------------------------------------ | ------ | ---------------------------------- | ------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `npm run staging:set-secrets -- --confirm-staging-secrets`               | yes    | Pass                               | none          | `STAGING_SECRET_SETUP=PASS`; `STAGING_SECRET_VALUES_LOGGED=no`               | Staging secrets are set without committing or printing values. This is not production approval.                    |
+| `npm run staging:setup-test-accounts -- --confirm-staging-test-accounts` | yes    | Pass                               | none          | `STAGING_TEST_ACCOUNT_SETUP=PASS`; `BUSINESS_DATA_WRITTEN=no`                | Employee test account exists in staging; owner/manager identities are configured through staging secret.           |
+| `npm run qa:employee-entry-staging`                                      | yes    | Pass with `MANUAL_REQUIRED` result | none          | `EMPLOYEE_ENTRY_STAGING_QA=MANUAL_REQUIRED`; `write execution: DRY_RUN_ONLY` | Real staging write QA is still blocked until explicit confirmation flags and remaining manual review are complete. |
+
+Remaining blockers for real staging write QA:
+
+- Runtime rollback acceptance/exercise.
+- Production URL/custom route exclusion through Cloudflare Dashboard.
+- Human approval to run write QA with `--confirm-staging-write`, `--confirm-backup`, and `--confirm-rollback`.
