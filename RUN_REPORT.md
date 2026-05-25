@@ -3899,3 +3899,35 @@ Result:
 - The P0-003E formatting blocker is resolved.
 - Backend totals staging switch rehearsal was not executed.
 - P0-003E can be retried with the existing production safety constraints.
+
+## P0-003E Backend Totals Staging Switch Rehearsal
+
+Date: 2026-05-25, Asia/Dubai
+
+Scope: staging/local backend totals authority switch rehearsal. No production
+deploy, production migration, production D1 write, production URL call, remote
+feature flag change, staging D1 write, dashboard mutation, or live financial
+formula change was performed.
+
+Completed:
+
+- Added staging switch mode helpers to `scripts/compare-staging-backend-totals.mjs`.
+- Added `tests/backend-totals-staging-switch-rehearsal.spec.mjs`.
+- Added `scripts/rehearse-backend-totals-staging-switch.mjs`.
+- Added `npm run test:backend-totals-staging-switch`.
+- Added `npm run rehearse:backend-totals-staging-switch`.
+- Created P0-003E starting context, feature flag, implementation,
+  dashboard/history, rollback, and commercial gate reports.
+
+Result:
+
+- `BACKEND_TOTALS_STAGING_SWITCH_REHEARSAL=PASS`.
+- `BACKEND_TOTALS_STAGING_SWITCH_ROLLBACK=PASS`.
+- Approved candidate totals entered staging mode in rehearsal.
+- P0-001 and P0-008 blocked totals stayed legacy/shadow-only.
+- No approved candidate delta was found.
+- Production remains `NO-GO`.
+
+P0-003 status:
+
+- `Partial - backend totals staging switch rehearsal passed`.

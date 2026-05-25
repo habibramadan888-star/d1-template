@@ -8,6 +8,7 @@ import {
   computeDashboardTotalsFils,
   computeSessionTotalsFils
 } from "../modules/finance/backend-totals.mjs";
+import { normalizeHandoverCategory } from "../modules/finance/handover.mjs";
 import { filsToAedString, parseAedToFils } from "../modules/finance/money.mjs";
 
 export const BACKEND_TOTALS_STAGING_FLAG = "ENABLE_BACKEND_TOTALS_AUTHORITY_STAGING";
@@ -16,6 +17,29 @@ export const expectedStagingD1 = {
   name: "homelink-finance-staging",
   id: "4ff78bfc-3855-436b-aefb-6b492145d79c"
 };
+
+export const APPROVED_BACKEND_TOTALS_STAGING_SWITCH_TOTALS = new Set([
+  "cash total",
+  "bank transfer total",
+  "bank transfer count",
+  "gross received",
+  "rent received",
+  "handover totals",
+  "session totals",
+  "voided records exclusion",
+  "active records totals"
+]);
+
+export const BLOCKED_BACKEND_TOTALS_STAGING_SWITCH_TOTALS = new Map([
+  ["dashboard monthly income", "BLOCKED_BY_P0_001"],
+  ["history row totals", "BLOCKED_BY_P0_001"],
+  ["dashboard today due", "BLOCKED_BY_P0_008"],
+  ["dashboard overdue amount", "BLOCKED_BY_P0_008"],
+  ["dashboard arrears total", "BLOCKED_BY_P0_008"],
+  ["deposit total", "BLOCKED_BY_P0_008"],
+  ["arrears paid", "BLOCKED_BY_P0_008"],
+  ["arrears outstanding", "BLOCKED_BY_P0_008"]
+]);
 
 const reportPath = path.resolve("STAGING_BACKEND_TOTALS_COMPARISON_RESULT.md");
 
@@ -218,6 +242,114 @@ export function classifyTotalScope(total) {
   return row.blocker || "SHADOW_ONLY";
 }
 
+export function normalizeSwitchScenarioName(scenario) {
+  const value = String(scenario || "").trim();
+  if (value.startsWith("session totals:")) return "session totals";
+  if (value.startsWith("handover totals:")) return "handover totals";
+  return value;
+}
+
+export function classifyBackendTotalsSwitchScenario(scenario) {
+  const normalized = normalizeSwitchScenarioName(scenario);
+  if (APPROVED_BACKEND_TOTALS_STAGING_SWITCH_TOTALS.has(normalized)) {
+    return "STAGING_SWITCH_CANDIDATE";
+  }
+  if (BLOCKED_BACKEND_TOTALS_STAGING_SWITCH_TOTALS.has(normalized)) {
+    return BLOCKED_BACKEND_TOTALS_STAGING_SWITCH_TOTALS.get(normalized);
+  }
+  return classifyTotalScope(normalized);
+}
+
+export function createBackendTotalsStagingSwitchRows(comparisonRows, env = {}) {
+  const mode = resolveBackendTotalsStagingMode(env);
+  return comparisonRows.map((row) => {
+    const scenario = String(row.Scenario || "");
+    const scenarioClass = classifyBackendTotalsSwitchScenario(scenario);
+    const legacyTotal = row["Current / Legacy Total"] ?? "";
+    const backendTotal = row["Backend Authority Candidate"] ?? "";
+    const delta = row.Delta ?? "";
+    const status = row.Status || "MANUAL_REQUIRED";
+
+    if (!mode.enabled) {
+      return {
+        Scenario: scenario,
+        "Legacy Total": legacyTotal,
+        "Backend Total": backendTotal,
+        Mode: "LEGACY",
+        Delta: delta,
+        Result: "LEGACY",
+        Notes: "Feature flag off or environment not allowed; legacy behavior remains active."
+      };
+    }
+
+    if (scenarioClass === "STAGING_SWITCH_CANDIDATE") {
+      if (status === "MISMATCH" || status === "BLOCKED") {
+        return {
+          Scenario: scenario,
+          "Legacy Total": legacyTotal,
+          "Backend Total": backendTotal,
+          Mode: "BACKEND_TOTALS_STAGING",
+          Delta: delta,
+          Result: "BLOCKED",
+          Notes: "Approved candidate cannot switch while mismatch or blocked status is present."
+        };
+      }
+      return {
+        Scenario: scenario,
+        "Legacy Total": legacyTotal,
+        "Backend Total": backendTotal,
+        Mode: "BACKEND_TOTALS_STAGING",
+        Delta: delta,
+        Result: status === "MANUAL_REQUIRED" ? "MANUAL_REQUIRED" : "PASS",
+        Notes: "Approved staging candidate uses backend authority candidate in rehearsal only."
+      };
+    }
+
+    if (String(scenarioClass).startsWith("BLOCKED_BY_")) {
+      return {
+        Scenario: scenario,
+        "Legacy Total": legacyTotal,
+        "Backend Total": backendTotal,
+        Mode: "SHADOW_ONLY",
+        Delta: delta,
+        Result: "SHADOW_ONLY",
+        Notes: `${scenarioClass}; total remains legacy/shadow-only and is not switched.`
+      };
+    }
+
+    return {
+      Scenario: scenario,
+      "Legacy Total": legacyTotal,
+      "Backend Total": backendTotal,
+      Mode: "SHADOW_ONLY",
+      Delta: delta,
+      Result: status === "MISMATCH" ? "MANUAL_REQUIRED" : "SHADOW_ONLY",
+      Notes: "Not in approved staging switch scope; retained for evidence only."
+    };
+  });
+}
+
+export function summarizeBackendTotalsStagingSwitchRows(rows) {
+  const blocked = rows.filter((row) => row.Result === "BLOCKED");
+  const manual = rows.filter((row) => row.Result === "MANUAL_REQUIRED");
+  const unexpectedSwitches = rows.filter(
+    (row) =>
+      row.Mode === "BACKEND_TOTALS_STAGING" &&
+      classifyBackendTotalsSwitchScenario(row.Scenario) !== "STAGING_SWITCH_CANDIDATE"
+  );
+  return {
+    overall:
+      blocked.length || unexpectedSwitches.length
+        ? "BLOCKED"
+        : manual.length
+          ? "MANUAL_REQUIRED"
+          : "PASS",
+    blockedCount: blocked.length,
+    manualRequiredCount: manual.length,
+    unexpectedSwitchCount: unexpectedSwitches.length
+  };
+}
+
 export function compareAedTotals(currentAed, candidateFils) {
   const currentFils = parseAedToFils(String(currentAed ?? "0"), { allowNegative: true });
   const candidate = BigInt(candidateFils || 0n);
@@ -287,6 +419,36 @@ async function d1Select(sql) {
   return parsed?.[0]?.results || [];
 }
 
+export async function readStagingBackendTotalsData() {
+  const target = await assertStagingTarget();
+  const transactions = await d1Select(`SELECT
+    id, corpid, userid, session_id, cat, amount, paid, pay_type, created_at,
+    type, status, voided_at, linked_task_id
+    FROM transactions
+    ORDER BY created_at, id`);
+  const sessions = await d1Select(`SELECT
+    id, corpid, date, cash_handover, bank_transfer_total, bank_transfer_count,
+    gross_received, voided_at, created_at
+    FROM sessions
+    ORDER BY created_at, id`);
+  const arrearTasks = await d1Select(`SELECT
+    task_id, corpid, arrear_amount, actual_received, followup_status,
+    close_status, voided_at, created_at
+    FROM arrear_tasks
+    ORDER BY created_at, task_id`);
+  const arrears = await d1Select(`SELECT
+    id, corpid, remain, cleared, type, voided_at, created_at
+    FROM arrears
+    ORDER BY created_at, id`);
+
+  return {
+    target,
+    transactions,
+    sessions,
+    arrearRows: [...arrearTasks, ...arrears]
+  };
+}
+
 function aed(value) {
   return filsToAedString(value || 0n);
 }
@@ -295,6 +457,20 @@ function sumLegacyAed(rows, key) {
   return rows.reduce((sum, row) => {
     try {
       return sum + parseAedToFils(String(row?.[key] ?? "0"), { allowNegative: true });
+    } catch {
+      return sum;
+    }
+  }, 0n);
+}
+
+function sumTransactionsByCategory(rows, category) {
+  return rows.reduce((sum, row) => {
+    try {
+      const normalized = normalizeHandoverCategory(
+        row.category ?? row.event_type ?? row.type ?? row.code ?? row.tx_type ?? row.cat ?? ""
+      );
+      if (normalized !== category) return sum;
+      return sum + parseAedToFils(String(row.amount ?? row.paid ?? "0"), { allowNegative: true });
     } catch {
       return sum;
     }
@@ -328,6 +504,11 @@ export function createComparisonRowsFromData({ transactions, sessions, arrearRow
   const sessionCash = sumLegacyAed(sessions, "cash_handover");
   const sessionBank = sumLegacyAed(sessions, "bank_transfer_total");
   const sessionGross = sumLegacyAed(sessions, "gross_received");
+  const sessionBankCount = sessions.reduce(
+    (sum, row) => sum + Number(row.bank_transfer_count || 0),
+    0
+  );
+  const legacyRent = sumTransactionsByCategory(transactions, "rent");
   const sessionRows = new Map();
 
   for (const row of transactions) {
@@ -354,6 +535,14 @@ export function createComparisonRowsFromData({ transactions, sessions, arrearRow
       notes: "Legacy sessions bank_transfer_total vs backend active transaction recompute."
     })
   );
+  rows.push({
+    Scenario: "bank transfer count",
+    "Current / Legacy Total": String(sessionBankCount),
+    "Backend Authority Candidate": String(dashboardTotals.bankTransferCount),
+    Delta: String(sessionBankCount - dashboardTotals.bankTransferCount),
+    Status: sessionBankCount === dashboardTotals.bankTransferCount ? "MATCH" : "MISMATCH",
+    Notes: "Legacy session bank transfer count vs backend active bank-row recompute."
+  });
   rows.push(
     comparisonRow({
       scenario: "gross received",
@@ -361,6 +550,15 @@ export function createComparisonRowsFromData({ transactions, sessions, arrearRow
       candidateFils: dashboardTotals.grossReceivedFils,
       status: statusForDelta(sessionGross - dashboardTotals.grossReceivedFils),
       notes: "Legacy sessions gross_received vs backend gross received candidate."
+    })
+  );
+  rows.push(
+    comparisonRow({
+      scenario: "rent received",
+      currentFils: legacyRent,
+      candidateFils: dashboardTotals.rentReceivedFils,
+      status: statusForDelta(legacyRent - dashboardTotals.rentReceivedFils),
+      notes: "Legacy rent-category transaction total vs backend rent received candidate."
     })
   );
 
@@ -410,6 +608,15 @@ export function createComparisonRowsFromData({ transactions, sessions, arrearRow
     Notes: "Backend active totals exclude voided rows by default."
   });
 
+  rows.push({
+    Scenario: "active records totals",
+    "Current / Legacy Total": `${dashboardTotals.includedRowCount} included rows`,
+    "Backend Authority Candidate": `${dashboardTotals.includedRowCount} active rows`,
+    Delta: "0.00",
+    Status: "MATCH",
+    Notes: "Backend active totals include accepted rows and exclude voided rows."
+  });
+
   rows.push(
     comparisonRow({
       scenario: "arrears outstanding",
@@ -441,28 +648,7 @@ function markdownTable(rows, columns) {
 }
 
 async function run() {
-  const target = await assertStagingTarget();
-  const transactions = await d1Select(`SELECT
-    id, corpid, userid, session_id, cat, amount, paid, pay_type, created_at,
-    type, status, voided_at, linked_task_id
-    FROM transactions
-    ORDER BY created_at, id`);
-  const sessions = await d1Select(`SELECT
-    id, corpid, date, cash_handover, bank_transfer_total, bank_transfer_count,
-    gross_received, voided_at, created_at
-    FROM sessions
-    ORDER BY created_at, id`);
-  const arrearTasks = await d1Select(`SELECT
-    task_id, corpid, arrear_amount, actual_received, followup_status,
-    close_status, voided_at, created_at
-    FROM arrear_tasks
-    ORDER BY created_at, task_id`);
-  const arrears = await d1Select(`SELECT
-    id, corpid, remain, cleared, type, voided_at, created_at
-    FROM arrears
-    ORDER BY created_at, id`);
-
-  const arrearRows = [...arrearTasks, ...arrears];
+  const { target, transactions, sessions, arrearRows } = await readStagingBackendTotalsData();
   const rows = createComparisonRowsFromData({ transactions, sessions, arrearRows });
   const hasMismatch = rows.some((row) => row.Status === "MISMATCH");
   const hasBlocked = rows.some((row) => row.Status === "BLOCKED");

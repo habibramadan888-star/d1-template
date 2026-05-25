@@ -547,3 +547,25 @@ Date: 2026-05-25, Asia/Dubai
 No production deploy, production migration, production D1 write, staging D1
 write, feature flag change, dashboard mutation, live financial formula change,
 test assertion change, or secret exposure occurred in FORMAT-REBASELINE-001.
+
+## P0-003E Verification Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+| Command / Check                                  | Exists | Result                             | Error Summary | Log Evidence                                   | Commercial Meaning                                                      |
+| ------------------------------------------------ | ------ | ---------------------------------- | ------------- | ---------------------------------------------- | ----------------------------------------------------------------------- |
+| `npm run format:check`                           | yes    | Pass                               | none          | Prettier check passed                          | Formatting baseline is clean.                                           |
+| `npm run check`                                  | yes    | Pass                               | none          | 206 tests passed                               | Full regression suite passed.                                           |
+| `npm run security:secrets`                       | yes    | Pass                               | none          | Secret hygiene passed                          | No secret was committed.                                                |
+| `npm run gate:commercial-launch`                 | yes    | `PRODUCTION_NO_GO`                 | none          | Commercial gate stayed NO-GO                   | Production cutover remains blocked.                                     |
+| `npm run test:backend-totals`                    | yes    | Pass                               | none          | 16 tests passed                                | Existing backend totals authority remains green.                        |
+| `npm run rehearse:backend-totals`                | yes    | Pass                               | none          | Rehearsal report generated                     | Local-only authority rehearsal remains green.                           |
+| `npm run test:backend-totals-staging-gate`       | yes    | Pass                               | none          | 11 tests passed                                | Gate policy remains covered.                                            |
+| `npm run test:backend-totals-staging-switch`     | yes    | Pass                               | none          | 13 tests passed                                | Staging switch mode, blockers, and rollback are covered.                |
+| `npm run compare:staging-backend-totals`         | yes    | `MANUAL_REQUIRED`, no mismatch     | none          | `STAGING_BACKEND_TOTALS_MISMATCH=no`           | Read-only staging comparison remains mismatch-free for approved totals. |
+| `npm run rehearse:backend-totals-staging-switch` | yes    | Pass                               | none          | `BACKEND_TOTALS_STAGING_SWITCH_REHEARSAL=PASS` | Staging/local switch rehearsal passed with rollback false.              |
+| `npm run qa:employee-entry-staging`              | yes    | `MANUAL_REQUIRED` / `DRY_RUN_ONLY` | none          | No confirmation flags supplied                 | No staging write QA was executed in this task.                          |
+
+No production deploy, production migration, production D1 write, production URL
+call, staging D1 write, remote feature flag change, dashboard mutation, live
+financial formula change, or secret exposure occurred in P0-003E.

@@ -1024,3 +1024,33 @@ Still blocked for production:
 - P0-006 tenant/property scope.
 - TOP_25 money risks human review.
 - Production migration, production rollback, and production backfill.
+
+## P0-003E Backlog Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+P0-003 current status:
+
+- `Partial - backend totals staging switch rehearsal passed`.
+
+Current result:
+
+- Backend totals staging/local switch rehearsal passed.
+- Approved candidate totals switched in rehearsal only:
+  cash total, bank transfer total/count, gross received, rent received,
+  handover totals, session totals, voided records exclusion, and active records
+  totals.
+- P0-001 and P0-008 blocked totals stayed legacy/shadow-only.
+- Rollback to `ENABLE_BACKEND_TOTALS_AUTHORITY_STAGING=false` passed.
+- No production deploy, production migration, production D1 write, staging D1
+  write, remote feature flag change, dashboard mutation, or live financial
+  formula change occurred.
+
+Still blocked for production:
+
+- P0-001 minor-unit reconciliation and legacy decimal warnings.
+- P0-008 receivables for due/overdue/arrears/deposit authority.
+- P0-006 tenant/property scope.
+- TOP_25 money risks human review.
+- Production migration, production rollback, production backfill, and live
+  dashboard response switch approval.

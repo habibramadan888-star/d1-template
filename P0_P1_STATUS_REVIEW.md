@@ -881,3 +881,33 @@ Summary:
 - No staging D1 write occurred.
 - No production deploy, migration, URL call, or D1 write occurred.
 - Production cutover remains `NO-GO`.
+
+## P0-003E Status Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+P0-003 current status:
+
+- `Partial - backend totals staging switch rehearsal passed`.
+
+Evidence:
+
+- `P0_003E_RETRY_STARTING_CONTEXT.md`
+- `P0_003E_FEATURE_FLAG_IMPLEMENTATION.md`
+- `P0_003E_STAGING_SWITCH_IMPLEMENTATION.md`
+- `BACKEND_TOTALS_STAGING_SWITCH_REHEARSAL_RESULT.md`
+- `P0_003E_DASHBOARD_HISTORY_EVIDENCE.md`
+- `P0_003E_ROLLBACK_RESULT.md`
+- `P0_003E_COMMERCIAL_LAUNCH_GATE_RESULT.md`
+- `tests/backend-totals-staging-switch-rehearsal.spec.mjs`
+- `scripts/rehearse-backend-totals-staging-switch.mjs`
+
+Summary:
+
+- Approved candidate totals entered backend totals staging mode in rehearsal.
+- P0-001 and P0-008 blocked totals stayed legacy/shadow-only.
+- Rollback to `ENABLE_BACKEND_TOTALS_AUTHORITY_STAGING=false` passed.
+- No production deploy, production migration, production D1 write, staging D1
+  write, remote feature flag change, dashboard mutation, or live financial
+  formula change occurred.
+- Production cutover remains `NO-GO`.

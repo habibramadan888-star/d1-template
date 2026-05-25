@@ -801,6 +801,33 @@ Recommended next prompt:
 
 Production cutover remains `NO-GO`.
 
+## P0-003E Morning Review Addendum
+
+Most important result:
+
+- Backend totals staging/local switch rehearsal passed without production
+  changes or staging D1 writes.
+
+Current status:
+
+- P0-003: `Partial - backend totals staging switch rehearsal passed`.
+- `BACKEND_TOTALS_STAGING_SWITCH_REHEARSAL=PASS`.
+- `BACKEND_TOTALS_STAGING_SWITCH_ROLLBACK=PASS`.
+- `ENABLE_BACKEND_TOTALS_AUTHORITY_STAGING` final state: false in rehearsal.
+- Production cutover: `NO-GO`.
+
+What passed:
+
+- Approved candidate totals used backend authority candidates in rehearsal.
+- P0-001 and P0-008 blocked totals stayed legacy/shadow-only.
+- Dashboard/history API output was not mutated.
+- Commercial launch gate remained `PRODUCTION_NO_GO`.
+
+Recommended next task:
+
+- P0-008C receivables local/staging rehearsal, or P0-006C tenant/property scope
+  local/staging rehearsal. Do not enter production cutover.
+
 ## FORMAT-REBASELINE-001 Morning Review Addendum
 
 Most important result:
