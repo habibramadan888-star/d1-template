@@ -16,6 +16,7 @@ Scope: 8-hour continuous commercialization engineering run. No production deploy
 | E: P1-002B runtime DDL removal readiness gate   | Completed | `8edecbe`          | `npm run gate:runtime-ddl-removal`  | Result is MANUAL_REQUIRED. Runtime DDL static scan still reports 182 rows/findings; no DDL removed.                                                        |
 | F: P1-009A observability readiness plan         | Completed | `930adbd`          | `npm run audit:observability`       | Result is MANUAL_REQUIRED. Alert ownership, retention, and PII redaction require human approval.                                                           |
 | G: P1-010B environment separation hardening     | Completed | Pending            | `npm run audit:env-separation`      | Result is MANUAL_REQUIRED. Wrangler configs do not prove separate staging/prod Worker, D1, KV, APP_ENV, or feature-flag resources.                         |
+| H: Full owner/employee manual QA pack           | Completed | Pending            | `FULL_MANUAL_QA_PLAN.md`            | Manual QA pack covers employee login/entry/handover/money/rollback/mobile/API failures and owner dashboard/history/arrears/deposit/report/audit flows.     |
 
 ## Safety Ledger
 

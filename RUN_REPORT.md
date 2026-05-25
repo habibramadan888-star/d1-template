@@ -3236,3 +3236,33 @@ Notes:
 - Checked-in Wrangler config does not prove separate staging/prod `APP_ENV`,
   feature flags, D1, KV, or rollback ownership.
 - Real staging QA and production deploy remain manual-approved gates only.
+
+## Full Manual QA Pack
+
+Date: 2026-05-25, Asia/Dubai
+
+Scope:
+
+- Full owner and employee manual QA checklist.
+- No business logic changed.
+- No deployment or migration executed.
+
+Changes:
+
+- Added `FULL_MANUAL_QA_PLAN.md`.
+
+Verification:
+
+| Command                    | Result                   |
+| -------------------------- | ------------------------ |
+| `npm run format:check`     | Pending for stage commit |
+| `npm run security:secrets` | Pending for stage commit |
+
+Notes:
+
+- Employee cases cover login/logout, legacy entry, adapter rehearsal, handover
+  staging endpoint, invalid money, voided row, rollback, weak network,
+  duplicate submit, permission denial, mobile layout, and API failure behavior.
+- Owner cases cover login, dashboard, history, arrears, deposit, rent config,
+  reports, search/filter/export, voided-record audit, handover review,
+  dashboard unchanged, due/overdue, and mobile/tablet review.
