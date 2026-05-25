@@ -12,6 +12,8 @@ import { normalizeHandoverCategory } from "../modules/finance/handover.mjs";
 import { filsToAedString, parseAedToFils } from "../modules/finance/money.mjs";
 
 export const BACKEND_TOTALS_STAGING_FLAG = "ENABLE_BACKEND_TOTALS_AUTHORITY_STAGING";
+const RECEIVABLES_SHADOW_REHEARSAL_SOURCE = "P0-008E_RECEIVABLES_SHADOW_REHEARSAL";
+const RECEIVABLES_SHADOW_REHEARSAL_CORPID = "p0-008e-shadow";
 
 export const expectedStagingD1 = {
   name: "homelink-finance-staging",
@@ -423,7 +425,7 @@ export async function readStagingBackendTotalsData() {
   const target = await assertStagingTarget();
   const transactions = await d1Select(`SELECT
     id, corpid, userid, session_id, cat, amount, paid, pay_type, created_at,
-    type, status, voided_at, linked_task_id
+    type, status, voided_at, linked_task_id, room, note, src
     FROM transactions
     ORDER BY created_at, id`);
   const sessions = await d1Select(`SELECT
@@ -433,7 +435,8 @@ export async function readStagingBackendTotalsData() {
     ORDER BY created_at, id`);
   const arrearTasks = await d1Select(`SELECT
     task_id, corpid, arrear_amount, actual_received, followup_status,
-    close_status, promise_date AS due_date, voided_at, created_at
+    close_status, promise_date AS due_date, voided_at, created_at,
+    bed, tenant_name, arrear_reason, staff_note, owner_note, created_by
     FROM arrear_tasks
     ORDER BY created_at, task_id`);
   const arrears = await d1Select(`SELECT
@@ -484,6 +487,27 @@ function statusForDelta(delta, warnings = 0, errors = 0) {
   return "MATCH";
 }
 
+export function isReceivablesShadowRehearsalTransaction(row) {
+  return (
+    String(row?.src || "") === RECEIVABLES_SHADOW_REHEARSAL_SOURCE ||
+    String(row?.corpid || "") === RECEIVABLES_SHADOW_REHEARSAL_CORPID ||
+    String(row?.id || "").startsWith("p0_008e_")
+  );
+}
+
+export function splitBackendTotalsTransactions(rows = []) {
+  const included = [];
+  const excludedReceivablesShadowRows = [];
+  for (const row of rows) {
+    if (isReceivablesShadowRehearsalTransaction(row)) {
+      excludedReceivablesShadowRows.push(row);
+    } else {
+      included.push(row);
+    }
+  }
+  return { included, excludedReceivablesShadowRows };
+}
+
 function comparisonRow({ scenario, currentFils, candidateFils, status, notes }) {
   const delta = BigInt(currentFils || 0n) - BigInt(candidateFils || 0n);
   return {
@@ -498,7 +522,9 @@ function comparisonRow({ scenario, currentFils, candidateFils, status, notes }) 
 
 export function createComparisonRowsFromData({ transactions, sessions, arrearRows }) {
   const rows = [];
-  const dashboardTotals = computeDashboardTotalsFils(transactions, {
+  const { included: backendScopeTransactions, excludedReceivablesShadowRows } =
+    splitBackendTotalsTransactions(transactions);
+  const dashboardTotals = computeDashboardTotalsFils(backendScopeTransactions, {
     arrearsRows: arrearRows
   });
   const sessionCash = sumLegacyAed(sessions, "cash_handover");
@@ -508,10 +534,10 @@ export function createComparisonRowsFromData({ transactions, sessions, arrearRow
     (sum, row) => sum + Number(row.bank_transfer_count || 0),
     0
   );
-  const legacyRent = sumTransactionsByCategory(transactions, "rent");
+  const legacyRent = sumTransactionsByCategory(backendScopeTransactions, "rent");
   const sessionRows = new Map();
 
-  for (const row of transactions) {
+  for (const row of backendScopeTransactions) {
     const key = row.session_id || "NO_SESSION";
     if (!sessionRows.has(key)) sessionRows.set(key, []);
     sessionRows.get(key).push(row);
@@ -592,7 +618,7 @@ export function createComparisonRowsFromData({ transactions, sessions, arrearRow
 
   rows.push({
     Scenario: "legacy decimal / fils conversion",
-    "Current / Legacy Total": `${transactions.length} transaction rows`,
+    "Current / Legacy Total": `${backendScopeTransactions.length} transaction rows`,
     "Backend Authority Candidate": `${dashboardTotals.warnings.length} warnings / ${dashboardTotals.errors.length} errors`,
     Delta: "0.00",
     Status: dashboardTotals.errors.length ? "BLOCKED" : "LEGACY_WARNING",
@@ -616,6 +642,18 @@ export function createComparisonRowsFromData({ transactions, sessions, arrearRow
     Status: "MATCH",
     Notes: "Backend active totals include accepted rows and exclude voided rows."
   });
+
+  if (excludedReceivablesShadowRows.length > 0) {
+    rows.push({
+      Scenario: "staging-only receivables rehearsal rows",
+      "Current / Legacy Total": `${excludedReceivablesShadowRows.length} excluded rows`,
+      "Backend Authority Candidate": "excluded from backend totals authority comparison",
+      Delta: "0.00",
+      Status: "MATCH",
+      Notes:
+        "P0-008E receivables shadow evidence rows are isolated from backend totals switch comparison."
+    });
+  }
 
   rows.push(
     comparisonRow({

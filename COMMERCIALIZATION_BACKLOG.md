@@ -1107,3 +1107,32 @@ Still blocked for production:
 - More staging data for due/overdue/repayment/adjustment cases.
 - Human accounting review for receivables semantics.
 - Production migration, backup, rollback, backfill, and deploy approval.
+
+## P0-008E Backlog Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+P0-008 current status:
+
+- `Partial - receivables staging shadow rehearsal passed`.
+
+Current result:
+
+- Controlled staging-only receivables shadow QA rows were seeded into
+  `homelink-finance-staging`.
+- `qa_run_id=P0-008E-20260525-STAGING-SHADOW-001`.
+- Due today, overdue, short pay, partial repayment, full repayment, void impact,
+  and deposit exclusion evidence now exists.
+- Adjustment credit/debit evidence exists as explicit `EXPECTED_DIFFERENCE`
+  rows requiring accounting review.
+- `STAGING_RECEIVABLES_SHADOW_MISMATCH=no`.
+- Dashboard live result remained unchanged.
+- Production remains `NO-GO`.
+
+Still blocked for production:
+
+- P0-001 minor-unit reconciliation and live read/write migration.
+- P0-006 tenant/property scope implementation.
+- Human accounting review for adjustment and due-date semantics.
+- Production receivables migration, backup, rollback, backfill, and deploy
+  approval.

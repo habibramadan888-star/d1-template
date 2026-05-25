@@ -91,7 +91,8 @@ test("outstanding computed in fils", () => {
       {
         task_id: "outstanding-1",
         arrear_amount: "770.00",
-        actual_received: "80.00"
+        actual_received: "80.00",
+        due_date: "2026-05-25"
       }
     ]
   });

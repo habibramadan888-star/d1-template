@@ -4034,3 +4034,45 @@ Result:
 P0-008 status:
 
 - `Partial - receivables staging shadow gate passed`.
+
+## P0-008E Receivables Staging Shadow Rehearsal
+
+Date: 2026-05-25, Asia/Dubai
+
+Scope: staging/local receivables shadow rehearsal with controlled staging QA
+data. No production deploy, production migration, production D1 write,
+production URL call, dashboard live switch, live financial formula change,
+production feature flag enablement, or secret exposure occurred.
+
+QA run id:
+
+- `P0-008E-20260525-STAGING-SHADOW-001`
+
+Completed:
+
+- Added `scripts/seed-receivables-staging-shadow-data.mjs`.
+- Added `npm run seed:receivables-staging-shadow`.
+- Added `tests/receivables-staging-shadow-rehearsal.spec.mjs`.
+- Added `npm run test:receivables-staging-rehearsal`.
+- Seeded staging-only QA rows into `homelink-finance-staging`: 7
+  `arrear_tasks` rows and 2 `transactions` rows, all prefixed `p0_008e_`.
+- Re-ran `npm run compare:staging-receivables`.
+- Generated P0-008E dashboard evidence, retention plan, rollback result,
+  commercial launch gate result, and next prompt.
+
+Result:
+
+- `RECEIVABLES_STAGING_SHADOW_SEED=PASS`.
+- `STAGING_RECEIVABLES_SHADOW_COMPARISON=PASS`.
+- `STAGING_RECEIVABLES_SHADOW_MISMATCH=no`.
+- `STAGING_RECEIVABLES_SHADOW_NEEDS_MORE_DATA=0`.
+- Due today, overdue, short pay, partial repayment, full repayment, void
+  impact, and deposit exclusion matched.
+- Adjustment credit/debit produced 2 `EXPECTED_DIFFERENCE` rows for accounting
+  review.
+- Dashboard live result remained unchanged.
+- Production remains `NO-GO`.
+
+P0-008 status:
+
+- `Partial - receivables staging shadow rehearsal passed`.

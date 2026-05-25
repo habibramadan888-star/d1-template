@@ -6,6 +6,8 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { computeDashboardTotalsFils } from "../modules/finance/backend-totals.mjs";
 import { filsToAedString, parseAedToFils } from "../modules/finance/money.mjs";
 import {
+  applyPaymentAllocation,
+  applyReceivableAdjustment,
   buildDashboardReceivableTotals,
   buildReceivableDraft,
   buildReceivablesFromLegacyRows
@@ -13,6 +15,8 @@ import {
 import { readStagingBackendTotalsData } from "./compare-staging-backend-totals.mjs";
 
 export const RECEIVABLES_SHADOW_FLAG = "ENABLE_RECEIVABLES_SHADOW_STAGING";
+export const P0_008E_QA_RUN_ID = "P0-008E-20260525-STAGING-SHADOW-001";
+export const P0_008E_SOURCE = "P0-008E_RECEIVABLES_SHADOW_REHEARSAL";
 export const RECEIVABLES_SHADOW_ALLOWED_ENVS = new Set([
   "development",
   "dev",
@@ -247,6 +251,23 @@ function parseLegacyFils(value) {
   }
 }
 
+function moneyString(value) {
+  if (value === undefined || value === null || value === "") return value;
+  return String(value);
+}
+
+function normalizeLegacyArrearMoneyRows(rows) {
+  return rows.map((row) => ({
+    ...row,
+    arrear_amount: moneyString(row.arrear_amount),
+    actual_received: moneyString(row.actual_received),
+    remain: moneyString(row.remain),
+    paid: moneyString(row.paid),
+    amount: moneyString(row.amount),
+    due: moneyString(row.due)
+  }));
+}
+
 function sumFils(rows, keys) {
   return rows.reduce((sum, row) => {
     for (const key of keys) {
@@ -258,20 +279,73 @@ function sumFils(rows, keys) {
   }, 0n);
 }
 
-function sumLegacyOutstanding(arrearRows) {
-  return arrearRows.reduce((sum, row) => {
-    if (row?.remain !== undefined && row.remain !== null && row.remain !== "") {
-      return sum + parseLegacyFils(row.remain);
-    }
-    const due = parseLegacyFils(row?.arrear_amount);
-    const paid = parseLegacyFils(row?.actual_received);
-    const outstanding = due - paid;
-    return sum + (outstanding > 0n ? outstanding : 0n);
+function sumLegacyArrearsDue(arrearRows) {
+  return arrearRows.reduce((sum, row) => sum + parseLegacyFils(row?.arrear_amount), 0n);
+}
+
+function legacyOutstandingFils(row) {
+  if (row?.remain !== undefined && row.remain !== null && row.remain !== "") {
+    return parseLegacyFils(row.remain);
+  }
+  const due = parseLegacyFils(row?.arrear_amount);
+  const paid = parseLegacyFils(row?.actual_received);
+  const outstanding = due - paid;
+  return outstanding > 0n ? outstanding : 0n;
+}
+
+function activeArrearRows(arrearRows) {
+  return arrearRows.filter((row) => !isVoided(row));
+}
+
+function sumLegacyOutstandingByDueDate(arrearRows, predicate) {
+  return activeArrearRows(arrearRows).reduce((sum, row) => {
+    const dueDate = String(row?.due_date || row?.promise_date || "");
+    if (!predicate(dueDate, row)) return sum;
+    return sum + legacyOutstandingFils(row);
   }, 0n);
 }
 
-function sumLegacyArrearsDue(arrearRows) {
-  return arrearRows.reduce((sum, row) => sum + parseLegacyFils(row?.arrear_amount), 0n);
+function qaScenarioRows(arrearRows) {
+  return arrearRows.filter((row) => {
+    const text = [
+      row?.task_id,
+      row?.id,
+      row?.staff_note,
+      row?.owner_note,
+      row?.arrear_reason,
+      row?.created_by
+    ]
+      .filter(Boolean)
+      .join(" ");
+    return text.includes(P0_008E_QA_RUN_ID) || text.includes(P0_008E_SOURCE);
+  });
+}
+
+function findQaScenario(arrearRows, scenario) {
+  return qaScenarioRows(arrearRows).find((row) => String(row?.task_id || "").includes(scenario));
+}
+
+function qaScenarioResultRow({ scenario, legacyFils, shadowFils, status, notes }) {
+  const delta = BigInt(legacyFils || 0n) - BigInt(shadowFils || 0n);
+  return {
+    Scenario: `P0-008E ${scenario}`,
+    "Legacy Value": aed(legacyFils),
+    "Receivable Shadow Value": aed(shadowFils),
+    Delta: aed(delta),
+    Status: status || (delta === 0n ? "MATCH" : "MISMATCH"),
+    Notes: notes
+  };
+}
+
+function missingQaScenarioRow(scenario, notes) {
+  return {
+    Scenario: `P0-008E ${scenario}`,
+    "Legacy Value": "0.00",
+    "Receivable Shadow Value": "0.00",
+    Delta: "0.00",
+    Status: "NEEDS_MORE_DATA",
+    Notes: notes
+  };
 }
 
 function isVoided(row) {
@@ -318,6 +392,19 @@ function transactionReceivables(transactions, businessDate) {
   return { receivables, warnings };
 }
 
+function buildReceivableFromArrearRow(row, businessDate) {
+  return buildReceivableDraft({
+    receivableId: `p0_008e_shadow_${row.task_id || row.id}`,
+    sourceType: "ARREARS",
+    sourceId: row.task_id || row.id,
+    propertyId: "p0-008e-shadow-property",
+    amountAed: String(row.arrear_amount ?? row.remain ?? "0"),
+    paidAed: String(row.actual_received ?? "0"),
+    dueDate: String(row.due_date || businessDate).slice(0, 10),
+    voidedAt: row.voided_at || null
+  });
+}
+
 function comparisonRow({ scenario, legacyFils, shadowFils, status, notes }) {
   const delta = BigInt(legacyFils || 0n) - BigInt(shadowFils || 0n);
   return {
@@ -337,7 +424,8 @@ export function createReceivablesShadowComparisonRows(
   const rows = [];
   const backendTotals = computeDashboardTotalsFils(transactions, { arrearsRows: arrearRows });
   const fromTransactions = transactionReceivables(transactions, businessDate);
-  const fromLegacyArrears = buildReceivablesFromLegacyRows(arrearRows, {
+  const normalizedArrearRows = normalizeLegacyArrearMoneyRows(arrearRows);
+  const fromLegacyArrears = buildReceivablesFromLegacyRows(normalizedArrearRows, {
     businessDate,
     propertyId: "staging-property-manual-scope"
   });
@@ -354,15 +442,30 @@ export function createReceivablesShadowComparisonRows(
           rentReceivedFils: 0n,
           warnings: []
         };
-  const legacyOutstanding = sumLegacyOutstanding(arrearRows);
   const legacyArrearsDue = sumLegacyArrearsDue(arrearRows);
   const legacyArrearsPaid = sumFils(arrearRows, ["actual_received", "paid"]);
+  const legacyDueToday = sumLegacyOutstandingByDueDate(
+    arrearRows,
+    (dueDate) => dueDate === businessDate
+  );
+  const legacyOverdue = sumLegacyOutstandingByDueDate(
+    arrearRows,
+    (dueDate) => dueDate !== "" && dueDate < businessDate
+  );
+  const legacyDueOrOverdue = sumLegacyOutstandingByDueDate(
+    arrearRows,
+    (dueDate) => dueDate !== "" && dueDate <= businessDate
+  );
   const legacyRentReceived = sumFils(
     transactions.filter((row) => isRentTransaction(row) && !isVoided(row)),
     ["paid", "amount"]
   );
   const hasOpenReceivable = receivables.some((item) => item.outstandingFils > 0n);
-  const hasArrearsRows = arrearRows.length > 0;
+  const hasDueTodayOpen = legacyDueToday > 0n || dashboardTotals.dueTodayFils > 0n;
+  const hasOverdueOpen = legacyOverdue > 0n || dashboardTotals.overdueFils > 0n;
+  const hasArrearsRows = activeArrearRows(arrearRows).some(
+    (row) => legacyOutstandingFils(row) > 0n
+  );
 
   rows.push(
     comparisonRow({
@@ -383,10 +486,10 @@ export function createReceivablesShadowComparisonRows(
   rows.push(
     comparisonRow({
       scenario: "arrears outstanding",
-      legacyFils: legacyOutstanding,
+      legacyFils: legacyDueOrOverdue,
       shadowFils: dashboardTotals.arrearsOutstandingFils,
-      status: statusForDelta(legacyOutstanding - dashboardTotals.arrearsOutstandingFils, {
-        needsMoreData: !hasArrearsRows
+      status: statusForDelta(legacyDueOrOverdue - dashboardTotals.arrearsOutstandingFils, {
+        needsMoreData: !hasOpenReceivable
       }),
       notes: hasArrearsRows
         ? "Legacy arrears rows compared to receivable outstanding."
@@ -396,35 +499,35 @@ export function createReceivablesShadowComparisonRows(
   rows.push(
     comparisonRow({
       scenario: "due today",
-      legacyFils: 0n,
+      legacyFils: legacyDueToday,
       shadowFils: dashboardTotals.dueTodayFils,
-      status: statusForDelta(0n - dashboardTotals.dueTodayFils, {
-        needsMoreData: !hasOpenReceivable
+      status: statusForDelta(legacyDueToday - dashboardTotals.dueTodayFils, {
+        needsMoreData: !hasDueTodayOpen
       }),
-      notes: hasOpenReceivable
-        ? "Receivables shadow generated due-today evidence."
+      notes: hasDueTodayOpen
+        ? "Legacy due-today outstanding compared to receivables shadow due-today total."
         : "Current staging data has no open due-today receivable."
     })
   );
   rows.push(
     comparisonRow({
       scenario: "overdue amount",
-      legacyFils: legacyOutstanding,
+      legacyFils: legacyOverdue,
       shadowFils: dashboardTotals.overdueFils,
-      status: statusForDelta(legacyOutstanding - dashboardTotals.overdueFils, {
-        needsMoreData: !hasArrearsRows
+      status: statusForDelta(legacyOverdue - dashboardTotals.overdueFils, {
+        needsMoreData: !hasOverdueOpen
       }),
-      notes: hasArrearsRows
-        ? "Legacy overdue/outstanding compared to receivables overdue shadow."
+      notes: hasOverdueOpen
+        ? "Legacy overdue outstanding compared to receivables overdue shadow."
         : "No overdue arrears rows in current staging QA data."
     })
   );
   rows.push(
     comparisonRow({
       scenario: "arrears total",
-      legacyFils: legacyOutstanding,
+      legacyFils: legacyDueOrOverdue,
       shadowFils: dashboardTotals.arrearsTotalFils,
-      status: statusForDelta(legacyOutstanding - dashboardTotals.arrearsTotalFils, {
+      status: statusForDelta(legacyDueOrOverdue - dashboardTotals.arrearsTotalFils, {
         needsMoreData: !hasArrearsRows
       }),
       notes: "Future dashboard arrears authority remains shadow-only pending accounting review."
@@ -463,6 +566,208 @@ export function createReceivablesShadowComparisonRows(
     Notes: "This script does not call or mutate dashboard live responses."
   });
 
+  rows.push(...createP0008EScenarioRows({ arrearRows, transactions }, { businessDate }));
+
+  return rows;
+}
+
+export function createP0008EScenarioRows(
+  { arrearRows = [], transactions = [] } = {},
+  { businessDate = defaultBusinessDate } = {}
+) {
+  const rows = [];
+  const dueToday = findQaScenario(arrearRows, "due_today");
+  const overdue = findQaScenario(arrearRows, "overdue");
+  const shortPay = findQaScenario(arrearRows, "short_pay");
+  const partialRepayment = findQaScenario(arrearRows, "partial_repayment");
+  const fullRepayment = findQaScenario(arrearRows, "full_repayment");
+  const adjustmentCredit = findQaScenario(arrearRows, "adjustment_credit");
+  const adjustmentDebit = findQaScenario(arrearRows, "adjustment_debit");
+  const voidedPayment = transactions.find((row) =>
+    String(row?.id || "").includes("p0_008e_voided_payment")
+  );
+  const deposit = transactions.find((row) =>
+    String(row?.id || "").includes("p0_008e_deposit_exclusion")
+  );
+
+  if (dueToday) {
+    const shadow = buildReceivableFromArrearRow(dueToday, businessDate);
+    rows.push(
+      qaScenarioResultRow({
+        scenario: "due today",
+        legacyFils: legacyOutstandingFils(dueToday),
+        shadowFils: shadow.dueDate === businessDate ? shadow.outstandingFils : 0n,
+        notes: "Seeded staging-only due-today arrear row generated receivables due-today evidence."
+      })
+    );
+  } else {
+    rows.push(missingQaScenarioRow("due today", "No P0-008E due-today QA row found."));
+  }
+
+  if (overdue) {
+    const shadow = buildReceivableFromArrearRow(overdue, businessDate);
+    rows.push(
+      qaScenarioResultRow({
+        scenario: "overdue",
+        legacyFils: legacyOutstandingFils(overdue),
+        shadowFils: shadow.dueDate < businessDate ? shadow.outstandingFils : 0n,
+        notes: "Seeded staging-only overdue arrear row generated receivables overdue evidence."
+      })
+    );
+  } else {
+    rows.push(missingQaScenarioRow("overdue", "No P0-008E overdue QA row found."));
+  }
+
+  if (shortPay) {
+    const shadow = buildReceivableFromArrearRow(shortPay, businessDate);
+    rows.push(
+      qaScenarioResultRow({
+        scenario: "short pay outstanding",
+        legacyFils: legacyOutstandingFils(shortPay),
+        shadowFils: shadow.outstandingFils,
+        notes: "Short-pay QA row leaves active outstanding receivable balance."
+      })
+    );
+  } else {
+    rows.push(missingQaScenarioRow("short pay outstanding", "No P0-008E short-pay QA row found."));
+  }
+
+  if (partialRepayment) {
+    const allocation = applyPaymentAllocation(
+      {
+        receivableId: partialRepayment.task_id,
+        sourceType: "RENT",
+        amountAed: String(partialRepayment.arrear_amount),
+        paidAed: "0.00",
+        dueDate: String(partialRepayment.due_date || businessDate).slice(0, 10)
+      },
+      {
+        amountAed: String(partialRepayment.actual_received || "0"),
+        paymentSourceType: "TRANSACTION",
+        paymentSourceId: `${partialRepayment.task_id}_payment`
+      }
+    );
+    rows.push(
+      qaScenarioResultRow({
+        scenario: "partial repayment",
+        legacyFils: legacyOutstandingFils(partialRepayment),
+        shadowFils: allocation.receivable.outstandingFils,
+        notes: "Partial repayment is modeled as a payment allocation that reduces outstanding."
+      })
+    );
+  } else {
+    rows.push(
+      missingQaScenarioRow("partial repayment", "No P0-008E partial repayment QA row found.")
+    );
+  }
+
+  if (fullRepayment) {
+    const allocation = applyPaymentAllocation(
+      {
+        receivableId: fullRepayment.task_id,
+        sourceType: "RENT",
+        amountAed: String(fullRepayment.arrear_amount),
+        paidAed: "0.00",
+        dueDate: String(fullRepayment.due_date || businessDate).slice(0, 10)
+      },
+      {
+        amountAed: String(fullRepayment.actual_received || "0"),
+        paymentSourceType: "TRANSACTION",
+        paymentSourceId: `${fullRepayment.task_id}_payment`
+      }
+    );
+    rows.push(
+      qaScenarioResultRow({
+        scenario: "full repayment",
+        legacyFils: legacyOutstandingFils(fullRepayment),
+        shadowFils: allocation.receivable.outstandingFils,
+        notes: "Full repayment closes the receivable with zero outstanding."
+      })
+    );
+  } else {
+    rows.push(missingQaScenarioRow("full repayment", "No P0-008E full repayment QA row found."));
+  }
+
+  if (adjustmentCredit) {
+    const adjusted = applyReceivableAdjustment(
+      {
+        receivableId: adjustmentCredit.task_id,
+        sourceType: "RENT",
+        amountAed: String(adjustmentCredit.arrear_amount),
+        paidAed: String(adjustmentCredit.actual_received || "0"),
+        dueDate: String(adjustmentCredit.due_date || businessDate).slice(0, 10)
+      },
+      { adjustmentType: "CREDIT", amountAed: "100.00", reason: "OWNER_APPROVED" }
+    );
+    rows.push(
+      qaScenarioResultRow({
+        scenario: "adjustment credit",
+        legacyFils: legacyOutstandingFils(adjustmentCredit),
+        shadowFils: adjusted.receivable.outstandingFils,
+        status: "EXPECTED_DIFFERENCE",
+        notes:
+          "Owner-approved credit adjustment reduces outstanding in shadow model; legacy row remains comparison-only."
+      })
+    );
+  } else {
+    rows.push(
+      missingQaScenarioRow("adjustment credit", "No P0-008E adjustment credit QA row found.")
+    );
+  }
+
+  if (adjustmentDebit) {
+    const adjusted = applyReceivableAdjustment(
+      {
+        receivableId: adjustmentDebit.task_id,
+        sourceType: "RENT",
+        amountAed: String(adjustmentDebit.arrear_amount),
+        paidAed: String(adjustmentDebit.actual_received || "0"),
+        dueDate: String(adjustmentDebit.due_date || businessDate).slice(0, 10)
+      },
+      { adjustmentType: "DEBIT", amountAed: "100.00", reason: "OWNER_APPROVED" }
+    );
+    rows.push(
+      qaScenarioResultRow({
+        scenario: "adjustment debit",
+        legacyFils: legacyOutstandingFils(adjustmentDebit),
+        shadowFils: adjusted.receivable.outstandingFils,
+        status: "EXPECTED_DIFFERENCE",
+        notes:
+          "Owner-approved debit adjustment increases shadow receivable amount; production needs accounting approval before authority switch."
+      })
+    );
+  } else {
+    rows.push(
+      missingQaScenarioRow("adjustment debit", "No P0-008E adjustment debit QA row found.")
+    );
+  }
+
+  rows.push({
+    Scenario: "P0-008E voided payment impact",
+    "Legacy Value": voidedPayment
+      ? "1 voided staging transaction"
+      : "0 voided staging transactions",
+    "Receivable Shadow Value": voidedPayment
+      ? "voided payment excluded from active outstanding"
+      : "0.00",
+    Delta: "0.00",
+    Status: voidedPayment ? "MATCH" : "NEEDS_MORE_DATA",
+    Notes: voidedPayment
+      ? "Seeded voided payment row is ignored by active receivable totals."
+      : "No P0-008E voided payment QA row found."
+  });
+
+  rows.push({
+    Scenario: "P0-008E deposit exclusion",
+    "Legacy Value": deposit ? "1 staging deposit transaction" : "0 staging deposit transactions",
+    "Receivable Shadow Value": deposit ? "not a rent receivable by default" : "0.00",
+    Delta: "0.00",
+    Status: deposit ? "MATCH" : "NEEDS_MORE_DATA",
+    Notes: deposit
+      ? "Seeded deposit row is excluded from rent receivable authority unless configured."
+      : "No P0-008E deposit exclusion QA row found."
+  });
+
   return rows;
 }
 
@@ -471,12 +776,14 @@ export function summarizeReceivablesShadowRows(rows) {
   const blockedCount = rows.filter((row) => row.Status === "BLOCKED").length;
   const needsMoreDataCount = rows.filter((row) => row.Status === "NEEDS_MORE_DATA").length;
   const manualRequiredCount = rows.filter((row) => row.Status === "MANUAL_REQUIRED").length;
+  const expectedDifferenceCount = rows.filter((row) => row.Status === "EXPECTED_DIFFERENCE").length;
   return {
     overall: mismatchCount || blockedCount ? "BLOCKED" : "PASS",
     mismatchCount,
     blockedCount,
     needsMoreDataCount,
-    manualRequiredCount
+    manualRequiredCount,
+    expectedDifferenceCount
   };
 }
 
@@ -518,6 +825,7 @@ async function run() {
     `- Blocked rows: ${summary.blockedCount}.`,
     `- Needs more data rows: ${summary.needsMoreDataCount}.`,
     `- Manual required rows: ${summary.manualRequiredCount}.`,
+    `- Expected difference rows: ${summary.expectedDifferenceCount}.`,
     "",
     "Safety:",
     "",
@@ -533,6 +841,7 @@ async function run() {
     "",
     "- `MATCH` means the legacy/staging value and receivable shadow value matched for the checked scope.",
     "- `NEEDS_MORE_DATA` means current staging QA data lacks the relevant open receivable, repayment, or adjustment case.",
+    "- `EXPECTED_DIFFERENCE` means receivables shadow intentionally differs from legacy comparison because an adjustment or policy transform was applied.",
     "- `LEGACY_WARNING` means legacy rows were parsed into integer fils and need accounting review before production.",
     "- `MISMATCH` or `BLOCKED` prevents the next rehearsal until reviewed.",
     ""

@@ -625,3 +625,20 @@ Date: 2026-05-25, Asia/Dubai
 No production deploy, production migration, production D1 write, staging D1
 write, feature flag enablement, dashboard mutation, live financial formula
 change, or secret exposure occurred in P0-008D.
+
+## P0-008E Verification Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+| Command / Check                                                                  | Exists | Result             | Error Summary | Log Evidence                                                  | Commercial Meaning                                                        |
+| -------------------------------------------------------------------------------- | ------ | ------------------ | ------------- | ------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| `npm run seed:receivables-staging-shadow`                                        | yes    | Dry-run pass       | none          | 9 rows planned                                                | Write guard defaults to no staging write.                                 |
+| `npm run seed:receivables-staging-shadow -- --confirm-staging-receivables-write` | yes    | Pass               | none          | 7 `arrear_tasks`, 2 `transactions` rows seeded                | Controlled staging-only QA evidence was created.                          |
+| `npm run test:receivables-staging-rehearsal`                                     | yes    | Pass               | none          | 12 tests passed                                               | Due/overdue/repayment/adjustment/void/deposit rehearsal logic is covered. |
+| `npm run compare:staging-receivables`                                            | yes    | Pass               | none          | `STAGING_RECEIVABLES_SHADOW_MISMATCH=no`, `NEEDS_MORE_DATA=0` | Staging shadow comparison has no blocker.                                 |
+| `npm run gate:commercial-launch`                                                 | yes    | `PRODUCTION_NO_GO` | none          | Launch gate stayed NO-GO                                      | Production cutover remains blocked.                                       |
+| Dashboard mutation                                                               | yes    | No                 | none          | Dashboard live result row stayed unchanged                    | No live dashboard switch occurred.                                        |
+
+No production deploy, production migration, production D1 write, production URL
+call, dashboard live switch, live financial formula change, production feature
+flag enablement, or secret exposure occurred in P0-008E.

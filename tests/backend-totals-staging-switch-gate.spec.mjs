@@ -66,6 +66,34 @@ test("voided records are excluded in staging comparison candidates", () => {
   assert.equal(totals.comparison.matches, true);
 });
 
+test("staging-only receivables rehearsal rows are excluded from backend totals comparison", () => {
+  const comparisonRows = createComparisonRowsFromData({
+    transactions: [
+      {
+        id: "p0_008e_voided_payment",
+        session_id: "p0_008e_shadow_session",
+        corpid: "p0-008e-shadow",
+        type: "R",
+        cat: "rent",
+        amount: "450.00",
+        src: "P0-008E_RECEIVABLES_SHADOW_REHEARSAL",
+        voided_at: "2026-05-25T12:00:00.000Z"
+      }
+    ],
+    sessions: [],
+    arrearRows: []
+  });
+  const rentReceived = comparisonRows.find((row) => row.Scenario === "rent received");
+  const excludedRows = comparisonRows.find(
+    (row) => row.Scenario === "staging-only receivables rehearsal rows"
+  );
+
+  assert.equal(rentReceived.Delta, "0.00");
+  assert.equal(rentReceived.Status, "MATCH");
+  assert.equal(excludedRows["Current / Legacy Total"], "1 excluded rows");
+  assert.equal(excludedRows.Status, "MATCH");
+});
+
 test("frontend totals are not accounting authority", () => {
   const backend = computeSessionTotalsFils([
     { id: "cash", type: "R", cat: "cash", amount: "80.00" }
