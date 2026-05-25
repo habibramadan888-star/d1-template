@@ -801,6 +801,36 @@ Recommended next prompt:
 
 Production cutover remains `NO-GO`.
 
+## P0-008G Morning Review Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+Most important result:
+
+- Receivables staging/local authority switch rehearsal passed with rollback.
+
+Current status:
+
+- P0-008: `Partial - receivables staging authority switch rehearsal passed`.
+- `RECEIVABLES_AUTHORITY_SWITCH_REHEARSAL=PASS`.
+- Approved candidate rows switched in local staging-mode rehearsal: 6.
+- Blocked rows: 0.
+- Rollback failed rows: 0.
+- Feature flag final state: `ENABLE_RECEIVABLES_AUTHORITY_STAGING=false` / not
+  enabled remotely.
+- Dashboard live result unchanged.
+- Production cutover remains `NO-GO`.
+
+Recommended next task:
+
+```text
+Enter TASK P0-006C: Tenant/property scope local-staging rehearsal.
+
+Goal: local/staging-only tenant/property fixtures, scope dry-run, and
+cross-tenant denial tests. No production deploy, production migration,
+production cutover, production feature flag, or P0-006/P0-008 Verified.
+```
+
 ## P0-008E Morning Review Addendum
 
 Most important result:

@@ -28,7 +28,7 @@ The project is not yet ready for commercial SaaS launch. Static checks, local Wo
 - P0-002/P0-003: rent write plan and local D1 rehearsal now prove backend-owned handover recomputation and transaction idempotency storage are viable, but the live employee flow is still not switched. P0-002A added flow audit, future atomic design, idempotency contract tests, and a manual test plan. P0-002B added a non-invasive handover atomic module, 18 scenario fixtures, 24 rehearsal tests, a disposable local D1 rehearsal, source-of-truth/API/migration/go-live docs, and evidence for idempotent retry, duplicate warnings, frontend total tamper detection, voided-row rejection, unauthorized submitter rejection, and audit event planning. P0-002C-GATE added a human review packet and decision checklist. P0-002C implemented `POST /api/staging/handover/commit` as a local/staging-only feature-flagged endpoint with production 404, owner/admin 403, employee submit success, idempotency replay, duplicate-risk rejection, frontend-totals mismatch rejection, voided-row rejection, staging-table writes, audit/entry evidence, and no legacy `transactions`/`deposit_ledger`/`arrears` writes. P0-002D added manual QA guide, redacted PowerShell command generation, hardening audit, dashboard/history unchanged evidence, legacy-table unchanged evidence, and embedded Worker drift review. P0-003B added backend totals source-of-truth rules, non-invasive totals helper, 12 scenario fixtures, 16 authority tests, and a disposable local D1 rehearsal that produces MATCH/MISMATCH/LEGACY_WARNING discrepancy evidence.
 - P0-004: `/api/delete_session` now voids `sessions`, `transactions`, `deposit_ledger`, legacy `arrears`, and linked `arrear_tasks` instead of hard deleting them. Verification passed with unauthenticated denial, invalid JWT denial, employee 403, owner void success, idempotent second void, hidden active rows, visible audit rows, retained original rows, `audit_logs`, and `entry_events`.
 - P0-005: clean local D1 bootstrap now creates the minimum legacy-compatible tables, including `transactions`; `npm run verify:clean-d1` passes smoke, auth, owner core reads, and employee entry from an empty disposable D1. P0-005A fixed Windows cleanup stability by awaiting Worker shutdown and retrying local D1 cleanup; three consecutive `verify:clean-d1` runs passed without `EBUSY`.
-- P0-008: commercial schema draft includes `receivables`, `payments`, and formal arrear lifecycle tables; P0-008A additionally designed receivable events, payment allocations, adjustments, and lifecycle tests. This remains future accounting work and was not implemented or migrated.
+- P0-008: commercial schema draft includes `receivables`, `payments`, and formal arrear lifecycle tables; P0-008A through P0-008G now cover model design, local/staging rehearsal, staging shadow evidence, authority switch gate, and staging/local authority switch rehearsal. This remains Partial, not Verified, because production migration, production authority wiring, accounting review, rollback/backfill, and tenant/property scope are not approved.
 - P0-007: local Worker startup and auth smoke are now repeatable via `npm run smoke:with-worker`. Verified checks include unauthenticated denial, invalid JWT denial, owner login, employee login, employee denial from owner history, and employee allowed rent config. This does not close employee entry/export or owner dashboard business-flow coverage.
 
 Current closure rule:
@@ -1160,6 +1160,41 @@ Current result:
   - overdue amount
   - arrears total
 - Adjustment credit/debit and legacy warnings remain accounting-review-only.
+- Dashboard live result remained unchanged.
+- Production remains `NO-GO`.
+
+Still blocked for production:
+
+- P0-008 is not Verified.
+- P0-006 tenant/property scope implementation.
+- Human accounting review for adjustment, due-date, allocation, and authority
+  semantics.
+- Production receivables migration, backup, rollback, backfill, and deploy
+  approval.
+
+## P0-008G Backlog Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+P0-008 current status:
+
+- `Partial - receivables staging authority switch rehearsal passed`.
+
+Current result:
+
+- Added `npm run test:receivables-staging-authority-rehearsal`.
+- Added `npm run rehearse:receivables-staging-authority-switch`.
+- Rehearsal passed with 6 approved candidate rows switched in staging/local
+  evaluation:
+  - rent received
+  - rent due
+  - arrears outstanding
+  - due today
+  - overdue amount
+  - arrears total
+- Adjustment credit/debit and legacy warnings remained shadow-only /
+  accounting-review-only.
+- Rollback to `ENABLE_RECEIVABLES_AUTHORITY_STAGING=false` passed.
 - Dashboard live result remained unchanged.
 - Production remains `NO-GO`.
 

@@ -1,6 +1,6 @@
 # Receivables Staging Authority Switch Gate Result
 
-Generated: 2026-05-25T20:19:26.606Z
+Generated: 2026-05-25T20:56:32.659Z
 
 Scope: staging/local-only gate for a future receivables dashboard authority switch. This script does not deploy, migrate, write D1 rows, mutate dashboard output, call production, or enable remote feature flags.
 

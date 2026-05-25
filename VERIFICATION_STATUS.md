@@ -658,3 +658,20 @@ Date: 2026-05-26, Asia/Dubai
 No production deploy, production migration, production D1 write, production URL
 call, staging D1 write, dashboard live switch, live financial formula change,
 remote feature flag enablement, or secret exposure occurred in P0-008F.
+
+## P0-008G Verification Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+| Command / Check                                         | Exists | Result             | Error Summary | Log Evidence                                                | Commercial Meaning                                             |
+| ------------------------------------------------------- | ------ | ------------------ | ------------- | ----------------------------------------------------------- | -------------------------------------------------------------- |
+| `npm run test:receivables-staging-authority-rehearsal`  | yes    | Pass               | none          | 7 tests passed                                              | Before/during/after switch behavior and rollback are covered.  |
+| `npm run rehearse:receivables-staging-authority-switch` | yes    | Pass               | none          | `RECEIVABLES_AUTHORITY_SWITCH_REHEARSAL=PASS`, 6 candidates | Staging/local authority switch rehearsal passed.               |
+| `npm run gate:receivables-staging-authority-switch`     | yes    | Pass               | none          | `RECEIVABLES_AUTHORITY_SWITCH_GATE=PASS`                    | Gate remains clean before/after rehearsal evidence.            |
+| `npm run gate:commercial-launch`                        | yes    | `PRODUCTION_NO_GO` | none          | Launch gate stayed NO-GO                                    | Production cutover remains blocked.                            |
+| Dashboard mutation                                      | yes    | No                 | none          | `P0_008G_DASHBOARD_HISTORY_EVIDENCE.md`                     | No live dashboard/history response switch occurred.            |
+| Feature flag final state                                | yes    | False / not remote | none          | `P0_008G_ROLLBACK_RESULT.md`                                | No remote staging/prod receivables authority flag was enabled. |
+
+No production deploy, production migration, production D1 write, production URL
+call, staging D1 write, dashboard live switch, live financial formula change,
+remote feature flag enablement, or secret exposure occurred in P0-008G.
