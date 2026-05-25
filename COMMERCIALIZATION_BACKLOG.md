@@ -693,3 +693,36 @@ Still required before production:
 - Confirm production log retention.
 - Confirm PII/secrets redaction policy.
 - Decide whether Cloudflare logs are sufficient for launch.
+
+## P1-010B Environment Separation Hardening Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+P1-010 current status:
+
+- Partial - environment separation hardening review added.
+
+Completed safely:
+
+- Added `ENVIRONMENT_SEPARATION_HARDENING_REVIEW.md`.
+- Added `ENVIRONMENT_SEPARATION_AUDIT_RESULT.md`.
+- Added read-only `scripts/audit-environment-separation.mjs`.
+- Added `npm run audit:env-separation`.
+
+Verification:
+
+- `npm run audit:env-separation` returned `MANUAL_REQUIRED`.
+
+Still required before staging/prod:
+
+- Confirm separate staging Worker, D1, KV, `APP_ENV`, feature flags, secrets,
+  backup, rollback, and deploy entrypoint.
+- Do not use checked-in shared Worker/D1/KV config as evidence of environment
+  separation.
+
+Still forbidden:
+
+- Production deploy.
+- Staging deploy by automation.
+- Production or remote D1 migration.
+- Production config modification without human approval.

@@ -736,3 +736,32 @@ Result:
 - Plan and audit script are ready.
 - Alert destination, retention, and PII redaction policy remain
   `MANUAL_REQUIRED`.
+
+## P1-010B Environment Separation Hardening Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+P1-010 current status:
+
+- Partial - environment separation hardening review added.
+
+Added evidence:
+
+- `ENVIRONMENT_SEPARATION_HARDENING_REVIEW.md`
+- `ENVIRONMENT_SEPARATION_AUDIT_RESULT.md`
+- `scripts/audit-environment-separation.mjs`
+- `npm run audit:env-separation`
+
+Result:
+
+- `npm run audit:env-separation` returned `MANUAL_REQUIRED`.
+- Checked-in Wrangler configs do not prove separate staging/prod Worker, D1,
+  KV, `APP_ENV`, feature flag, backup, or rollback resources.
+- Source and embedded Wrangler configs currently share the same Worker name,
+  D1 database id, KV namespace id, and `CORPID`.
+
+Next step:
+
+- Human must provide and review real staging Worker URL/name, staging D1/KV,
+  staging secrets/feature flags, backup plan, and rollback plan before real
+  staging QA or production deploy.

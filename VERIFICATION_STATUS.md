@@ -270,3 +270,14 @@ Date: 2026-05-25, Asia/Dubai
 | `npm run audit:observability` | yes    | MANUAL_REQUIRED | none          | `OBSERVABILITY_READINESS=MANUAL_REQUIRED` | Confirms observability plan exists but alert ownership, retention, and redaction need human approval. |
 
 No external monitoring service was connected and no secrets were added.
+
+## P1-010B Verification Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+| Command                        | Exists | Result          | Error Summary | Log Evidence                                   | Commercial Meaning                                                                                                                             |
+| ------------------------------ | ------ | --------------- | ------------- | ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run audit:env-separation` | yes    | MANUAL_REQUIRED | none          | `ENVIRONMENT_SEPARATION_AUDIT=MANUAL_REQUIRED` | Confirms local/dev/staging/production separation is documented as a gate, but real staging/prod resources are not proven in checked-in config. |
+
+No Wrangler config was modified, no deployment was executed, and no D1/KV
+resource was changed.

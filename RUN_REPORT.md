@@ -3203,3 +3203,36 @@ Notes:
 - Worker source contains audit/entry event evidence, but production alert
   ownership, retention, and PII redaction must be confirmed by humans before
   launch.
+
+## P1-010B Environment Separation Hardening Review
+
+Date: 2026-05-25, Asia/Dubai
+
+Scope:
+
+- Environment separation hardening review for local/dev/staging/production.
+- No Wrangler production configuration was changed.
+- No staging or production deploy was executed.
+- No D1/KV/secrets were modified.
+
+Changes:
+
+- Added `ENVIRONMENT_SEPARATION_HARDENING_REVIEW.md`.
+- Added `scripts/audit-environment-separation.mjs`.
+- Added `ENVIRONMENT_SEPARATION_AUDIT_RESULT.md`.
+- Added `npm run audit:env-separation`.
+
+Verification:
+
+| Command                        | Result          |
+| ------------------------------ | --------------- |
+| `npm run audit:env-separation` | MANUAL_REQUIRED |
+
+Notes:
+
+- `deploy-worker/wrangler.toml` and `deploy-worker/wrangler.embedded.toml`
+  currently share the same Worker name, D1 database id, KV namespace id, and
+  deployment-wide `CORPID`.
+- Checked-in Wrangler config does not prove separate staging/prod `APP_ENV`,
+  feature flags, D1, KV, or rollback ownership.
+- Real staging QA and production deploy remain manual-approved gates only.

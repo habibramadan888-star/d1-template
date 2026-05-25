@@ -10,11 +10,12 @@ Scope: 8-hour continuous commercialization engineering run. No production deploy
 | ----------------------------------------------- | --------- | ------------------ | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Baseline                                        | Completed | Existing `f5efc5a` | `.tmp/night-shift-v4-baseline.log`  | All requested baseline commands exited 0; money reconciliation remains MANUAL_REQUIRED; embedded dry-run WARNING with 0 critical missing.                  |
 | A: P0-001L real staging QA preflight            | Completed | `c2b9417`          | `npm run qa:employee-entry-staging` | Result is MANUAL_REQUIRED. Real staging URL, D1 target, entrypoint, credentials, backup, and rollback inputs are missing from committed non-secret config. |
-| B: P0-003C backend totals live authority gate   | Completed | Pending            | `npm run gate:backend-totals-live`  | Result is MANUAL_REQUIRED. Live dashboard authority remains blocked by reconciliation, receivables, tenant scope, and human review.                        |
-| C: P0-008B receivables readiness gate           | Completed | Pending            | `npm run gate:receivables`          | Result is MANUAL_REQUIRED. Receivables design exists, but migration draft and production dependencies remain missing.                                      |
-| D: P0-006B tenant/property scope readiness gate | Completed | Pending            | `npm run gate:tenant-scope`         | Result is MANUAL_REQUIRED. Live Worker source still relies primarily on deployment-wide `corpid`.                                                          |
-| E: P1-002B runtime DDL removal readiness gate   | Completed | Pending            | `npm run gate:runtime-ddl-removal`  | Result is MANUAL_REQUIRED. Runtime DDL static scan still reports 182 rows/findings; no DDL removed.                                                        |
-| F: P1-009A observability readiness plan         | Completed | Pending            | `npm run audit:observability`       | Result is MANUAL_REQUIRED. Alert ownership, retention, and PII redaction require human approval.                                                           |
+| B: P0-003C backend totals live authority gate   | Completed | `b5cf94d`          | `npm run gate:backend-totals-live`  | Result is MANUAL_REQUIRED. Live dashboard authority remains blocked by reconciliation, receivables, tenant scope, and human review.                        |
+| C: P0-008B receivables readiness gate           | Completed | `4ab90bd`          | `npm run gate:receivables`          | Result is MANUAL_REQUIRED. Receivables design exists, but migration draft and production dependencies remain missing.                                      |
+| D: P0-006B tenant/property scope readiness gate | Completed | `b3b8cdd`          | `npm run gate:tenant-scope`         | Result is MANUAL_REQUIRED. Live Worker source still relies primarily on deployment-wide `corpid`.                                                          |
+| E: P1-002B runtime DDL removal readiness gate   | Completed | `8edecbe`          | `npm run gate:runtime-ddl-removal`  | Result is MANUAL_REQUIRED. Runtime DDL static scan still reports 182 rows/findings; no DDL removed.                                                        |
+| F: P1-009A observability readiness plan         | Completed | `930adbd`          | `npm run audit:observability`       | Result is MANUAL_REQUIRED. Alert ownership, retention, and PII redaction require human approval.                                                           |
+| G: P1-010B environment separation hardening     | Completed | Pending            | `npm run audit:env-separation`      | Result is MANUAL_REQUIRED. Wrangler configs do not prove separate staging/prod Worker, D1, KV, APP_ENV, or feature-flag resources.                         |
 
 ## Safety Ledger
 
@@ -45,6 +46,7 @@ Scope: 8-hour continuous commercialization engineering run. No production deploy
 | `npm run audit:runtime-ddl`         | PASS            | Static scan wrote 182 findings.             |
 | `npm run gate:runtime-ddl-removal`  | MANUAL_REQUIRED | Read-only gate; no runtime DDL removed.     |
 | `npm run audit:observability`       | MANUAL_REQUIRED | Read-only audit; no external integration.   |
+| `npm run audit:env-separation`      | MANUAL_REQUIRED | Read-only audit; no Wrangler config change. |
 
 ## Pending Updates
 
