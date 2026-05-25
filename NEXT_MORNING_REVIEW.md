@@ -481,3 +481,123 @@ Tomorrow first review:
 4. Confirm the actual staging deploy entrypoint and D1 backup/rollback plan.
 5. Do not approve production cutover until reconciliation and money risks are
    manually reviewed.
+
+---
+
+# Night Shift V4 Addendum
+
+Date: 2026-05-25
+Night Shift mode: V4 safe commercialization run
+Branch: `nightshift/v4-commercialization-safe-run`
+Latest V4 commit before final report: `d42fac9`
+Production deploy: not executed
+Staging deploy: not executed
+Production database mutation: not executed
+Remote D1 migration: not executed
+
+## Five Most Important V4 Outcomes
+
+1. Real staging QA preflight for employee entry was created with dry-run safety
+   and explicit `MANUAL_REQUIRED` inputs.
+2. Backend totals live authority now has a dry-run gate and next-stage prompt,
+   without changing dashboard output.
+3. Receivables and tenant/property scope readiness gates were added, keeping
+   both P0s blocked from production until schema/model decisions are approved.
+4. Runtime DDL, observability, and environment separation now have explicit P1
+   commercial launch gates.
+5. Full owner/employee manual QA and feature-flag production-lock regression
+   guardrails were added; `npm run check` passed with 182 tests.
+
+## Five Largest V4 Risks
+
+1. Real staging details are missing: Worker URL/name, D1/KV, entrypoint, test
+   accounts, backup, rollback, and feature-flag operation.
+2. Environment separation is not proven in checked-in Wrangler config; source
+   and embedded configs share Worker name, D1 id, KV id, and `CORPID`.
+3. P0-001 reconciliation gate remains `MANUAL_REQUIRED`; production money
+   cutover is still NO-GO.
+4. P0-006 and P0-008 remain design/readiness gates only; tenant isolation and
+   receivables are not live.
+5. Embedded deploy artifact must be checked against the actual deploy entrypoint
+   before any real staging or production deploy.
+
+## Current P0 Status Table
+
+| P0                         | Current Status                                                          | Production Ready                  |
+| -------------------------- | ----------------------------------------------------------------------- | --------------------------------- |
+| P0-001 Money precision     | Partial - real staging QA package ready, manual staging inputs required | No                                |
+| P0-002 Handover atomic     | Partial - staging endpoint manual validation package ready              | No                                |
+| P0-003 Backend totals      | Partial - backend totals live authority gate ready                      | No                                |
+| P0-004 Delete session void | Verified                                                                | Regression required before deploy |
+| P0-005 Clean D1 bootstrap  | Verified                                                                | Regression required before deploy |
+| P0-006 Tenant isolation    | Partial - tenant/property scope readiness gate ready                    | No                                |
+| P0-007 Worker/auth smoke   | Verified                                                                | Regression required before deploy |
+| P0-008 Receivables         | Partial - receivables implementation readiness gate ready               | No                                |
+
+## Current P1 Status Table
+
+| P1                            | Current Status                                             | Production Meaning                         |
+| ----------------------------- | ---------------------------------------------------------- | ------------------------------------------ |
+| P1-002 Runtime DDL            | Partial - removal readiness gate ready                     | Do not remove production fallback yet      |
+| P1-004 Dubai timezone         | Partial - guardrails exist                                 | Live due/overdue switch still needs review |
+| P1-006 Embedded Worker drift  | Verified for prior freshness, but must rerun before deploy | Not deploy approval                        |
+| P1-009 Observability          | Partial - plan and audit added                             | Alert owner/retention/redaction missing    |
+| P1-010 Environment separation | Partial - hardening review added                           | Real staging/prod resources not proven     |
+
+## Why Production Cutover Is Still NO-GO
+
+- No real staging QA execution has occurred.
+- Production migration/backfill is not approved.
+- P0-001 reconciliation is `MANUAL_REQUIRED`.
+- P0-003 backend totals are not live authority.
+- P0-006 tenant/property scope is not implemented.
+- P0-008 receivables are not implemented.
+- Production rollback has not been exercised.
+
+## Can Real Staging QA Start?
+
+`MANUAL_REQUIRED`. It can start only after a human provides and approves:
+
+- Staging Worker URL/name and deploy entrypoint.
+- Staging D1 and KV that are separate from production.
+- Staging owner and employee test accounts.
+- `APP_ENV=staging` and feature-flag operation method.
+- Staging D1 backup and rollback plan.
+
+## Recommended Next Task
+
+Recommended next prompt:
+
+```text
+进入 TASK STAGING-INPUTS-REVIEW：补齐 real staging QA 所需人工输入。
+目标：只确认 staging Worker URL/name、D1/KV、entrypoint、APP_ENV、feature flags、test accounts、backup 和 rollback。
+禁止 production deploy、禁止 staging deploy、禁止 remote/production D1 migration、禁止提交 secret。
+完成后运行 npm run qa:employee-entry-staging，并决定是否进入真实 staging QA。
+```
+
+## Tasks Codex Can Continue Safely
+
+- Add more read-only staging QA command examples.
+- Add API-by-API permission audit tables.
+- Add table-by-table money/tenant/receivables risk matrices.
+- Expand manual QA evidence templates.
+- Add non-production regression tests.
+
+## Tasks Requiring Human Approval
+
+- Real staging target resources and credentials.
+- Any staging write against shared resources.
+- Production migration/backfill.
+- Production deployment.
+- Tenant/company/property model decision.
+- Receivables lifecycle/accounting decision.
+- Accounting acceptance criteria for money reconciliation.
+
+## Tasks AI Must Not Auto-Execute
+
+- Production or remote D1 migration.
+- Production deploy.
+- Staging deploy without explicit approval.
+- Production feature flag enablement.
+- Deleting legacy route/fields.
+- Changing live dashboard authority or financial formulas.
