@@ -5,12 +5,46 @@ import path from "node:path";
 const args = new Set(process.argv.slice(2));
 const env = process.env;
 
+function readTextIfExists(filePath) {
+  try {
+    return fs.readFileSync(path.resolve(filePath), "utf8");
+  } catch {
+    return "";
+  }
+}
+
+function firstMatch(text, regex) {
+  const match = text.match(regex);
+  return match ? match[1] : "";
+}
+
+function readSafeDefaults() {
+  const wrangler = readTextIfExists("deploy-worker/wrangler.toml");
+  const evidence = readTextIfExists("STAGING_QA_EVIDENCE_TEMPLATE.md");
+  return {
+    STAGING_WORKER_URL: firstMatch(evidence, /`(https:\/\/homelink-finance-staging\.[^`\s]+)`/),
+    STAGING_D1_DATABASE: firstMatch(
+      wrangler,
+      /database_name\s*=\s*"([^"]*homelink-finance-staging[^"]*)"/
+    ),
+    STAGING_ENTRYPOINT: firstMatch(wrangler, /\[env\.staging\][\s\S]*?main\s*=\s*"([^"]+)"/),
+    STAGING_EMPLOYEE_USERNAME: firstMatch(evidence, /`(employee_stg_qa_001)`/),
+    STAGING_OWNER_USERNAME: firstMatch(evidence, /`(owner_stg_qa_001)`/)
+  };
+}
+
+const safeDefaults = readSafeDefaults();
+
+function valueFor(name) {
+  return env[name] || safeDefaults[name] || "";
+}
+
 const required = [
-  ["STAGING_WORKER_URL", env.STAGING_WORKER_URL],
-  ["STAGING_D1_DATABASE", env.STAGING_D1_DATABASE],
-  ["STAGING_ENTRYPOINT", env.STAGING_ENTRYPOINT],
-  ["STAGING_EMPLOYEE_USERNAME", env.STAGING_EMPLOYEE_USERNAME],
-  ["STAGING_OWNER_USERNAME", env.STAGING_OWNER_USERNAME]
+  ["STAGING_WORKER_URL", valueFor("STAGING_WORKER_URL")],
+  ["STAGING_D1_DATABASE", valueFor("STAGING_D1_DATABASE")],
+  ["STAGING_ENTRYPOINT", valueFor("STAGING_ENTRYPOINT")],
+  ["STAGING_EMPLOYEE_USERNAME", valueFor("STAGING_EMPLOYEE_USERNAME")],
+  ["STAGING_OWNER_USERNAME", valueFor("STAGING_OWNER_USERNAME")]
 ];
 
 const confirmations = [
@@ -67,7 +101,9 @@ for (const [name, value] of required) {
   }
 }
 
-if (looksProductionUrl(env.STAGING_WORKER_URL)) {
+const stagingWorkerUrl = valueFor("STAGING_WORKER_URL");
+
+if (looksProductionUrl(stagingWorkerUrl)) {
   blocked = true;
   rows.push({
     check: "production URL guard",
@@ -77,10 +113,8 @@ if (looksProductionUrl(env.STAGING_WORKER_URL)) {
 } else {
   rows.push({
     check: "production URL guard",
-    result: env.STAGING_WORKER_URL ? "PASS" : "MANUAL_REQUIRED",
-    notes: env.STAGING_WORKER_URL
-      ? "URL does not match blocked production patterns"
-      : "no URL provided"
+    result: stagingWorkerUrl ? "PASS" : "MANUAL_REQUIRED",
+    notes: stagingWorkerUrl ? "URL does not match blocked production patterns" : "no URL provided"
   });
 }
 

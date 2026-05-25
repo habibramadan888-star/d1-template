@@ -6,22 +6,22 @@ migration, production feature flag enablement, or production cutover.
 
 ## Review Metadata
 
-| Field                               | Value                                                                                                                                                                                        |
-| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| QA run id                           | MANUAL_REQUIRED - assign per real staging QA run                                                                                                                                             |
-| QA date/time                        | Discovery generated 2026-05-25; actual QA run time MANUAL_REQUIRED                                                                                                                           |
-| Reviewer                            | MANUAL_REQUIRED                                                                                                                                                                              |
-| Branch                              | `qa/staging-resource-discovery-readonly`                                                                                                                                                     |
-| Commit                              | Discovery base commit `20b3f25`; final discovery commit recorded in git log after this update                                                                                                |
-| Staging Worker URL                  | MANUAL_REQUIRED - read-only Wrangler deployment discovery found configured Worker `homelink-finance`, but did not confirm a staging URL                                                      |
-| Worker entrypoint                   | Source: `deploy-worker/wrangler.toml` -> `src/index.js`; embedded: `deploy-worker/wrangler.embedded.toml` -> `src/index.embedded.js`; actual staging entrypoint MANUAL_REQUIRED              |
-| APP_ENV                             | Expected `staging` for real staging QA; checked-in Wrangler vars do not set `APP_ENV`; examples document `development`; MANUAL_REQUIRED for Cloudflare staging var confirmation              |
-| Enabled feature flags               | Required for QA: `ENABLE_EMPLOYEE_ENTRY_ADAPTER_LIVE_ROUTE=true`, `ENABLE_HANDOVER_ATOMIC_STAGING=true`; not found in checked-in Wrangler vars; MANUAL_REQUIRED for staging var confirmation |
-| Staging D1 name                     | MANUAL_REQUIRED - read-only D1 list found `homelink` matching config and `d1-template-database`, but no confirmed staging D1                                                                 |
-| Staging KV namespace                | MANUAL_REQUIRED - read-only KV list found `RATE_LIMIT` matching config and `__homelink-app-workers_sites_assets`, but no confirmed staging KV                                                |
-| Backup completed before write tests | MANUAL_REQUIRED - no backup executed by this discovery task                                                                                                                                  |
-| Rollback method confirmed           | MANUAL_REQUIRED - rollback docs/plans exist, but real staging rollback is not exercised                                                                                                      |
-| Production URL checked and excluded | MANUAL_REQUIRED - staging URL is missing, so staging-vs-production exclusion cannot be proven                                                                                                |
+| Field                               | Value                                                                                                                                                               |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| QA run id                           | MANUAL_REQUIRED - assign per real staging QA run                                                                                                                    |
+| QA date/time                        | Discovery generated 2026-05-25; actual QA run time MANUAL_REQUIRED                                                                                                  |
+| Reviewer                            | MANUAL_REQUIRED                                                                                                                                                     |
+| Branch                              | `setup/staging-cloudflare-resources`                                                                                                                                |
+| Commit                              | Setup base commit `c73a39a`; final setup commit recorded in git log after this update                                                                               |
+| Staging Worker URL                  | `https://homelink-finance-staging.habibramadan888.workers.dev`                                                                                                      |
+| Worker entrypoint                   | Staging source: `deploy-worker/wrangler.toml` `[env.staging]` -> `src/index.js`; embedded remains `deploy-worker/wrangler.embedded.toml` -> `src/index.embedded.js` |
+| APP_ENV                             | `staging` in `deploy-worker/wrangler.toml` `[env.staging.vars]`                                                                                                     |
+| Enabled feature flags               | Defaults: `ENABLE_EMPLOYEE_ENTRY_ADAPTER_LIVE_ROUTE=false`, `ENABLE_HANDOVER_ATOMIC_STAGING=false`; write QA requires later explicit staging-only approval          |
+| Staging D1 name                     | `homelink-finance-staging` (`4ff78bfc-3855-436b-aefb-6b492145d79c`)                                                                                                 |
+| Staging KV namespace                | `RATE_LIMIT_STAGING` (`9e84150246204f01b3fd8c184761303e`) bound as `RATE_LIMIT`                                                                                     |
+| Backup completed before write tests | No - procedure documented in `STAGING_BACKUP_ROLLBACK_PROCEDURE.md`; no backup executed by this setup task                                                          |
+| Rollback method confirmed           | Procedure documented, not yet exercised                                                                                                                             |
+| Production URL checked and excluded | Yes for configured Worker name: staging URL uses `homelink-finance-staging`, distinct from the known production-like `homelink-finance` Worker name                 |
 
 ## Autofilled Test Accounts
 
@@ -51,7 +51,7 @@ secret write target was confirmed.
 | ----------------------------------- | ----------------------------------------- | -------------------------------------------------- | --------------------------------------------------------- |
 | `npm run check`                     | PASS                                      | Local console / git commit evidence                | 182 tests passed; build ran Wrangler dry-run only.        |
 | `npm run security:secrets`          | PASS                                      | Local console / git commit evidence                | Secret hygiene check passed.                              |
-| `npm run qa:employee-entry-staging` | MANUAL_REQUIRED                           | `EMPLOYEE_ENTRY_REAL_STAGING_QA_DRY_RUN_RESULT.md` | Dry-run only until real staging inputs are supplied.      |
+| `npm run qa:employee-entry-staging` | Pending final setup verification          | `EMPLOYEE_ENTRY_REAL_STAGING_QA_DRY_RUN_RESULT.md` | Dry-run only; no write confirmation flags.                |
 | `npm run gate:commercial-launch`    | PRODUCTION_NO_GO                          | Local console / git commit evidence                | Expected `PRODUCTION_NO_GO` until production gates close. |
 | `npm run audit:worker-drift`        | Previously available; rerun before deploy | `WORKER_ENTRYPOINT_DRIFT_AUDIT.md`                 | No deploy performed by autofill.                          |
 | `npm run verify:embedded-worker`    | Previously available; rerun before deploy | `EMBEDDED_WORKER_FRESHNESS_RESULT.md`              | No deploy performed by autofill.                          |
@@ -108,8 +108,8 @@ secret write target was confirmed.
 
 | Approval Item                                        | Owner           | Status          | Evidence                                               | Notes                                           |
 | ---------------------------------------------------- | --------------- | --------------- | ------------------------------------------------------ | ----------------------------------------------- |
-| Staging URL confirmed non-production                 | MANUAL_REQUIRED | MANUAL_REQUIRED | MANUAL_REQUIRED                                        | No staging URL found in committed config        |
-| Staging D1 backup completed                          | MANUAL_REQUIRED | MANUAL_REQUIRED | MANUAL_REQUIRED                                        | No backup executed by autofill                  |
+| Staging URL confirmed non-production                 | Engineering     | Confirmed       | `STAGING_WORKER_DEPLOY_RESULT.md`                      | Worker URL uses `homelink-finance-staging`.     |
+| Staging D1 backup completed                          | MANUAL_REQUIRED | MANUAL_REQUIRED | MANUAL_REQUIRED                                        | No backup executed by setup task                |
 | Rollback method exercised                            | MANUAL_REQUIRED | MANUAL_REQUIRED | MANUAL_REQUIRED                                        | Docs exist; real staging rollback not exercised |
 | Money reconciliation reviewed                        | MANUAL_REQUIRED | MANUAL_REQUIRED | `MONEY_RECONCILIATION_GATE_RESULT.md`                  | Current gate is not production approval         |
 | TOP_25_MONEY_RISKS reviewed                          | MANUAL_REQUIRED | MANUAL_REQUIRED | `TOP_25_MONEY_RISKS.md`                                | Human accounting/engineering review required    |
@@ -119,12 +119,12 @@ secret write target was confirmed.
 
 ## Final QA Decision
 
-| Decision                    | Value                                                                                                                   |
-| --------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| GO for continued staging QA | Manual Required                                                                                                         |
-| GO for production cutover   | No                                                                                                                      |
-| Blocking issues             | Missing staging URL, confirmed staging D1/KV, staging accounts, backup evidence, rollback evidence, and human approvals |
-| Required follow-up task     | Provide real staging inputs through non-committed secure channel, then run dry-run QA before any approved staging write |
+| Decision                    | Value                                                                                                                         |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| GO for continued staging QA | Manual Required for write QA; dry-run/preflight can continue                                                                  |
+| GO for production cutover   | No                                                                                                                            |
+| Blocking issues             | Staging accounts, staging secrets, backup evidence, rollback exercise, and human approvals are still required before write QA |
+| Required follow-up task     | Set staging-only secrets/accounts outside Git, execute backup, then run dry-run QA before any approved staging write          |
 
 Production cutover remains `NO-GO` until production migration, production
 deployment, accounting reconciliation, tenant scope, receivables, rollback, and

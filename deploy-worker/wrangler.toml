@@ -19,3 +19,24 @@ id = "c7c64d522d964baba2e72454e7262da9"
 APP_NAME = "Homelink Finance"
 APP_VERSION = "2.0.0"
 CORPID = "homelink"
+
+[env.staging]
+name = "homelink-finance-staging"
+main = "src/index.js"
+
+[env.staging.vars]
+APP_NAME = "Homelink Finance"
+APP_VERSION = "2.0.0"
+APP_ENV = "staging"
+CORPID = "homelink-staging"
+ENABLE_EMPLOYEE_ENTRY_ADAPTER_LIVE_ROUTE = "false"
+ENABLE_HANDOVER_ATOMIC_STAGING = "false"
+
+[[env.staging.d1_databases]]
+binding = "DB"
+database_name = "homelink-finance-staging"
+database_id = "4ff78bfc-3855-436b-aefb-6b492145d79c"
+
+[[env.staging.kv_namespaces]]
+binding = "RATE_LIMIT"
+id = "9e84150246204f01b3fd8c184761303e"
