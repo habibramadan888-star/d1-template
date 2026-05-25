@@ -801,6 +801,34 @@ Recommended next prompt:
 
 Production cutover remains `NO-GO`.
 
+## P0-003D Morning Review Addendum
+
+Most important result:
+
+- Backend totals staging switch gate is ready for the next staging-only
+  rehearsal step. Current staging QA cash, bank, and gross totals matched
+  backend recompute with no mismatch.
+
+Current status:
+
+- P0-003: `Partial - backend totals staging switch gate ready`.
+- Production cutover: `NO-GO`.
+- Comparison result: `MANUAL_REQUIRED` with `STAGING_BACKEND_TOTALS_MISMATCH=no`.
+
+Recommended next prompt:
+
+```text
+进入 TASK P0-003E：Backend totals staging switch rehearsal。
+目标：只在 staging/local 下使用 ENABLE_BACKEND_TOTALS_AUTHORITY_STAGING 做 dashboard/history evidence 和 rollback rehearsal。
+禁止 production deploy、production migration、production cutover、P0-003 Verified。
+```
+
+Manual review still required:
+
+- Dashboard/history authenticated response evidence before staging switch rehearsal.
+- KPI definitions for monthly income, gross received, operating income, deposits, and arrears.
+- P0-008 receivables and P0-006 tenant/property scope before production.
+
 ## STAGING-QA-006 Morning Review Addendum
 
 Most important result:

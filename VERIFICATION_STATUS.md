@@ -513,3 +513,22 @@ Date: 2026-05-25, Asia/Dubai
 
 No production deploy, production migration, production D1 write, production URL
 call, staging cleanup, or secret exposure occurred in STAGING-QA-006.
+
+## P0-003D Verification Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+| Command / Check                            | Exists | Result                             | Error Summary | Log Evidence                         | Commercial Meaning                                                               |
+| ------------------------------------------ | ------ | ---------------------------------- | ------------- | ------------------------------------ | -------------------------------------------------------------------------------- |
+| `npm run check`                            | yes    | Pass                               | none          | 193 tests passed after P0-003D tests | Regression suite stayed green after the staging gate tests were added.           |
+| `npm run security:secrets`                 | yes    | Pass                               | none          | Secret hygiene passed                | No secret was committed.                                                         |
+| `npm run gate:commercial-launch`           | yes    | `PRODUCTION_NO_GO`                 | none          | Commercial gate remained NO-GO       | Production cutover remains blocked.                                              |
+| `npm run test:backend-totals`              | yes    | Pass                               | none          | 16 tests passed                      | Existing backend totals authority tests remain green.                            |
+| `npm run rehearse:backend-totals`          | yes    | Pass                               | none          | Rehearsal report generated           | Local-only rehearsal still passes.                                               |
+| `npm run test:backend-totals-staging-gate` | yes    | Pass                               | none          | 11 tests passed                      | Staging gate policy, production lock, rollback, and blockers are covered.        |
+| `npm run compare:staging-backend-totals`   | yes    | `MANUAL_REQUIRED`, no mismatch     | none          | `STAGING_BACKEND_TOTALS_MISMATCH=no` | Staging core totals match; dashboard/history API response review remains manual. |
+| `npm run qa:employee-entry-staging`        | yes    | `MANUAL_REQUIRED` / `DRY_RUN_ONLY` | none          | No confirmation flags supplied       | No staging write QA was executed.                                                |
+
+No production deploy, production migration, production D1 write, staging D1
+write, feature flag change, dashboard mutation, live financial formula change,
+or secret exposure occurred in P0-003D.

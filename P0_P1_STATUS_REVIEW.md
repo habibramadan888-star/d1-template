@@ -856,3 +856,28 @@ New evidence:
 Production remains `NO-GO` because P0-003, P0-006, P0-008, TOP_25 money risk
 review, production migration, production rollback, and production backfill are
 not complete.
+
+## P0-003D Status Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+P0-003 current status:
+
+- `Partial - backend totals staging switch gate ready`.
+
+Evidence:
+
+- `P0_003D_STARTING_CONTEXT.md`
+- `P0_003D_BACKEND_TOTALS_STAGING_SCOPE.md`
+- `STAGING_BACKEND_TOTALS_COMPARISON_RESULT.md`
+- `P0_003D_BACKEND_TOTALS_STAGING_SWITCH_GATE.md`
+- `BACKEND_TOTALS_STAGING_FEATURE_FLAG_AND_ROLLBACK_PLAN.md`
+- `tests/backend-totals-staging-switch-gate.spec.mjs`
+- `scripts/compare-staging-backend-totals.mjs`
+
+Summary:
+
+- Core staging QA cash, bank, and gross totals matched backend recompute.
+- No staging D1 write occurred.
+- No production deploy, migration, URL call, or D1 write occurred.
+- Production cutover remains `NO-GO`.

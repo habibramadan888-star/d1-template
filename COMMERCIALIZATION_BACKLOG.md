@@ -1000,3 +1000,27 @@ Production blockers that remain:
 - P0-008 receivables remains partial.
 - TOP_25 money risks still require human review.
 - Production migration, production rollback, and production backfill remain unapproved and unrehearsed.
+
+## P0-003D Backlog Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+P0-003 current status:
+
+- `Partial - backend totals staging switch gate ready`.
+
+Current result:
+
+- Read-only staging backend totals comparison completed.
+- No core cash/bank/gross mismatch was found in the current staging QA data.
+- Dashboard/history authenticated response evidence remains `MANUAL_REQUIRED`.
+- Eligible totals can move to P0-003E staging switch rehearsal behind
+  `ENABLE_BACKEND_TOTALS_AUTHORITY_STAGING`.
+
+Still blocked for production:
+
+- P0-001 minor-unit reconciliation and legacy decimal warnings.
+- P0-008 receivables for due/overdue/arrears authority.
+- P0-006 tenant/property scope.
+- TOP_25 money risks human review.
+- Production migration, production rollback, and production backfill.

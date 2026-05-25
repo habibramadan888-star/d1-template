@@ -3840,3 +3840,36 @@ Status:
 - P0-002 remains `Partial - handover staging QA passed, production cutover still NO-GO`.
 - Production cutover remains `NO-GO`.
 - Recommended next task: `P0-003D backend totals staging switch gate`.
+
+## P0-003D Backend Totals Staging Switch Gate
+
+Date: 2026-05-25, Asia/Dubai
+
+Scope: read-only staging/local backend totals authority gate. No production
+deploy, production migration, production D1 write, staging D1 write, feature
+flag change, dashboard mutation, or live financial formula change was performed.
+
+Completed:
+
+- Added `scripts/compare-staging-backend-totals.mjs`.
+- Added `tests/backend-totals-staging-switch-gate.spec.mjs`.
+- Added `npm run compare:staging-backend-totals`.
+- Added `npm run test:backend-totals-staging-gate`.
+- Created `P0_003D_STARTING_CONTEXT.md`.
+- Created `P0_003D_BACKEND_TOTALS_STAGING_SCOPE.md`.
+- Created `P0_003D_BACKEND_TOTALS_STAGING_SWITCH_GATE.md`.
+- Created `BACKEND_TOTALS_STAGING_FEATURE_FLAG_AND_ROLLBACK_PLAN.md`.
+- Created `NEXT_PROMPT_P0_003E_BACKEND_TOTALS_STAGING_SWITCH_REHEARSAL.md`.
+
+Staging comparison:
+
+- `STAGING_BACKEND_TOTALS_COMPARISON=MANUAL_REQUIRED`.
+- `STAGING_BACKEND_TOTALS_MISMATCH=no`.
+- Cash, bank, and gross totals matched existing staging QA data.
+- Legacy decimal warnings remain expected until P0-001 minor-unit reconciliation.
+- Arrears/outstanding and due/overdue remain blocked by P0-008.
+- Production remains `NO-GO`.
+
+P0-003 status:
+
+- `Partial - backend totals staging switch gate ready`.

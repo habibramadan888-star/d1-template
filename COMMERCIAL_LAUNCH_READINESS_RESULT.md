@@ -1,6 +1,6 @@
 # Commercial Launch Readiness Result
 
-Generated: 2026-05-25T14:04:47.529Z
+Generated: 2026-05-25T14:45:42.019Z
 
 | Metric                | Count |
 | --------------------- | ----: |
@@ -16,17 +16,15 @@ Allowed next work: local/staging dry-run validation, manual QA preparation, and 
 
 Forbidden next work without human approval: production deploy, staging deploy, remote/production D1 migration, production feature flag enablement, and live accounting authority switch.
 
-## STAGING-QA-006 Closure Addendum
+## P0-003D Backend Totals Staging Switch Gate Addendum
 
-Real staging QA evidence is locked, and staging flags are confirmed rolled back
-to `false`.
+Date: 2026-05-25, Asia/Dubai
 
-Status:
+P0-003D added a read-only staging/local backend totals authority gate. The
+staging comparison produced `STAGING_BACKEND_TOTALS_COMPARISON=MANUAL_REQUIRED`
+with `STAGING_BACKEND_TOTALS_MISMATCH=no`.
 
-- P0-001: `Partial - real staging QA passed, production cutover still NO-GO`.
-- P0-002: `Partial - handover staging QA passed, production cutover still NO-GO`.
-- Production cutover: `NO-GO`.
-
-Production remains blocked by P0-003 backend totals authority, P0-006
-tenant/property scope, P0-008 receivables, TOP_25 money risk review, production
-migration approval, production rollback, and production backfill.
+Production remains `PRODUCTION_NO_GO`. P0-003 is `Partial - backend totals
+staging switch gate ready`; this does not approve production deploy,
+production migration, production feature flags, or a live dashboard authority
+switch.

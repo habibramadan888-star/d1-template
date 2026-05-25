@@ -1,16 +1,16 @@
 # Backend Totals Authority Rehearsal Result
 
-Generated: 2026-05-24T23:49:28.046Z
+Generated: 2026-05-25T14:46:31.040Z
 
 Scope: P0-003B local-only rehearsal. No production D1, remote D1, production Worker deploy, live dashboard output, or employee handover production path was changed.
 
-| Scenario                  |                                      Current Total |                                                       Backend Recomputed Total |   Delta | Status         | Notes                                                                   |
-| ------------------------- | -------------------------------------------------: | -----------------------------------------------------------------------------: | ------: | -------------- | ----------------------------------------------------------------------- |
-| match-session             |                   cash 620 / bank 770 / gross 1410 |     cash 620.00 / bank 770.00 / gross 1410.00 / session 1390.00 / arrears 0.00 |    0.00 | MATCH          | Session frontend totals compared to backend recompute.                  |
-| tampered-session          |                    cash 999 / bank 200 / gross 840 |       cash 640.00 / bank 200.00 / gross 840.00 / session 840.00 / arrears 0.00 |  359.00 | MISMATCH       | Session frontend totals compared to backend recompute.                  |
-| voided-session            |                    cash 1400 / bank 0 / gross 1400 |         cash 500.00 / bank 0.00 / gross 500.00 / session 500.00 / arrears 0.00 |  900.00 | MISMATCH       | Voided transaction excluded from active backend total.                  |
-| dashboard-active          | No current backend authority endpoint in rehearsal | cash 2300.00 / bank 1940.00 / gross 4360.00 / session 4240.00 / arrears 200.00 |    0.00 | LEGACY_WARNING | 13 legacy/void warnings; 0 errors.                                      |
-| synthetic-frontend-tamper |           cash 9999.99 / bank 0.00 / gross 9999.99 |       cash 640.00 / bank 200.00 / gross 840.00 / session 840.00 / arrears 0.00 | 9359.99 | MISMATCH       | Synthetic browser total is rejected as authority by discrepancy report. |
+| Scenario | Current Total | Backend Recomputed Total | Delta | Status | Notes |
+| --- | ---: | ---: | ---: | --- | --- |
+| match-session | cash 620 / bank 770 / gross 1410 | cash 620.00 / bank 770.00 / gross 1410.00 / session 1390.00 / arrears 0.00 | 0.00 | MATCH | Session frontend totals compared to backend recompute. |
+| tampered-session | cash 999 / bank 200 / gross 840 | cash 640.00 / bank 200.00 / gross 840.00 / session 840.00 / arrears 0.00 | 359.00 | MISMATCH | Session frontend totals compared to backend recompute. |
+| voided-session | cash 1400 / bank 0 / gross 1400 | cash 500.00 / bank 0.00 / gross 500.00 / session 500.00 / arrears 0.00 | 900.00 | MISMATCH | Voided transaction excluded from active backend total. |
+| dashboard-active | No current backend authority endpoint in rehearsal | cash 2300.00 / bank 1940.00 / gross 4360.00 / session 4240.00 / arrears 200.00 | 0.00 | LEGACY_WARNING | 13 legacy/void warnings; 0 errors. |
+| synthetic-frontend-tamper | cash 9999.99 / bank 0.00 / gross 9999.99 | cash 640.00 / bank 200.00 / gross 840.00 / session 840.00 / arrears 0.00 | 9359.99 | MISMATCH | Synthetic browser total is rejected as authority by discrepancy report. |
 
 ## Summary
 

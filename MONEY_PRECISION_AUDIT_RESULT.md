@@ -8,11 +8,11 @@ Scope: static source scan for P0-001A. This report is non-blocking and does not 
 
 | Metric                                                         | Count |
 | -------------------------------------------------------------- | ----: |
-| REAL / FLOAT / NUMERIC / DECIMAL risks                         |   222 |
-| JS Number / parseFloat / parseInt / toFixed / Math.round risks |   491 |
+| REAL / FLOAT / NUMERIC / DECIMAL risks                         |   236 |
+| JS Number / parseFloat / parseInt / toFixed / Math.round risks |   493 |
 | Frontend amount calculation risks                              |   435 |
 | Backend amount calculation risks                               |   169 |
-| Total money-related findings scanned                           |  3529 |
+| Total money-related findings scanned                           |  3603 |
 
 ## Notes
 
@@ -376,4 +376,4 @@ Scope: static source scan for P0-001A. This report is non-blocking and does not 
 | Frontend | `deploy-worker/public/employee.html:107`       | schema floating type | `<div class="field hidden" id="customDaysWrap"><label>自定义天数</label><input id="customDays" inputmode="numeric" placeholder="例如 10"></div>`                                                                       | Migrate commercial money storage to INTEGER fils with legacy fallback and reconciliation. |
 | Frontend | `deploy-worker/public/employee.html:121`       | money keyword        | `<section id="view-arrears" class="hidden">`                                                                                                                                                                           | Treat as display/input only; backend must parse and recompute authoritative integer fils. |
 
-Report truncated to 350 of 3529 findings. Use `npm run audit:money` to regenerate counts.
+Report truncated to 350 of 3603 findings. Use `npm run audit:money` to regenerate counts.
