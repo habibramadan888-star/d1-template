@@ -60,10 +60,26 @@ export function assertLocalDevAuthEnv(env) {
   }
 }
 
-export async function waitForWorker(baseUrl = defaultBaseUrl, timeoutMs = 30000) {
+function tailText(value, maxLength = 3000) {
+  return sanitizeLog(String(value || "").slice(-maxLength));
+}
+
+function safeVarsSummary(vars = {}) {
+  const secretLike = /secret|password|token|cookie|hash|pin|key/i;
+  return Object.entries(vars)
+    .map(
+      ([key, value]) =>
+        `${key}=${secretLike.test(key) ? "(hidden)" : JSON.stringify(String(value))}`
+    )
+    .join(", ");
+}
+
+export async function waitForWorker(baseUrl = defaultBaseUrl, timeoutMs = 30000, diagnostics = {}) {
   const started = Date.now();
   let lastError = "";
+  let attempts = 0;
   while (Date.now() - started < timeoutMs) {
+    attempts += 1;
     try {
       const response = await fetch(`${baseUrl}/api/me`, { redirect: "manual" });
       if ([200, 401, 403].includes(response.status)) return response.status;
@@ -73,9 +89,29 @@ export async function waitForWorker(baseUrl = defaultBaseUrl, timeoutMs = 30000)
     }
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
+  const elapsedMs = Date.now() - started;
+  const child = diagnostics.child;
+  const details = [
+    `Worker did not become ready on ${baseUrl}.`,
+    `Last error: ${lastError}.`,
+    `Attempts: ${attempts}.`,
+    `Elapsed ms: ${elapsedMs}.`
+  ];
+  if (diagnostics.label) details.push(`Label: ${diagnostics.label}.`);
+  if (diagnostics.port) details.push(`Port: ${diagnostics.port}.`);
+  if (diagnostics.command) details.push(`Command: ${diagnostics.command}.`);
+  if (diagnostics.vars) details.push(`Vars: ${safeVarsSummary(diagnostics.vars)}.`);
+  if (child) {
+    details.push(
+      `Child pid: ${child.pid || "unknown"}, exitCode: ${child.exitCode ?? "null"}, signalCode: ${
+        child.signalCode ?? "null"
+      }.`
+    );
+  }
+  if (diagnostics.stdout) details.push(`Last stdout:\n${tailText(diagnostics.stdout)}`);
+  if (diagnostics.stderr) details.push(`Last stderr:\n${tailText(diagnostics.stderr)}`);
   throw new Error(
-    `Worker did not become ready on ${baseUrl}. Last error: ${lastError}. ` +
-      "Run npm run dev:worker in another terminal or use npm run smoke:with-worker."
+    `${details.join("\n")}\nRun npm run dev:worker in another terminal or use npm run smoke:with-worker.`
   );
 }
 

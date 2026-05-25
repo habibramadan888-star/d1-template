@@ -103,6 +103,21 @@ Date: 2026-05-25, Asia/Dubai
 
 P0-001 and P0-002 remain Partial. STAGING-QA-005 did not execute real writes because the deployed staging runtime still has both required feature flags disabled.
 
+## TEST-STABILITY-001 Verification Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+| Command                                                      | Exists | Result                           | Error Summary | Log Evidence                                       | Commercial Meaning                                           |
+| ------------------------------------------------------------ | ------ | -------------------------------- | ------------- | -------------------------------------------------- | ------------------------------------------------------------ |
+| `npm run test:employee-entry-adapter-staging-endpoint` run 1 | yes    | Pass                             | none          | 3 tests passed                                     | Affected Worker startup test passed after harness hardening. |
+| `npm run test:employee-entry-adapter-staging-endpoint` run 2 | yes    | Pass                             | none          | 3 tests passed                                     | Confirms the timeout did not recur in immediate repeat.      |
+| `npm run test:employee-entry-adapter-staging-endpoint` run 3 | yes    | Pass                             | none          | 3 tests passed                                     | Confirms the timeout did not recur in immediate repeat.      |
+| `npm run check`                                              | yes    | Pass                             | none          | 182 tests passed                                   | Full local baseline recovered before retrying staging flags. |
+| `npm run gate:commercial-launch`                             | yes    | Pass / `PRODUCTION_NO_GO`        | none          | `COMMERCIAL_LAUNCH_READINESS_RESULT.md`            | Production cutover remains blocked.                          |
+| `npm run qa:employee-entry-staging`                          | yes    | MANUAL_REQUIRED / `DRY_RUN_ONLY` | none          | `EMPLOYEE_ENTRY_REAL_STAGING_QA_DRY_RUN_RESULT.md` | No staging write occurred during stability work.             |
+
+TEST-STABILITY-001 changes only test harness diagnostics/readiness timing; it does not change live route behavior or production/staging runtime configuration.
+
 ## P1-006 Verification Addendum
 
 Date: 2026-05-24, Asia/Dubai

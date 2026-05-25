@@ -145,6 +145,30 @@ Recommended next task:
 明确批准只对 staging Worker 启用 ENABLE_EMPLOYEE_ENTRY_ADAPTER_LIVE_ROUTE=true 与 ENABLE_HANDOVER_ATOMIC_STAGING=true，执行 employee entry / handover staging write QA，然后回滚两项 flag=false。禁止 production deploy、production migration、production URL、production D1 write、production cutover、secret 输出。
 ```
 
+## TEST-STABILITY-001 Update
+
+Date: 2026-05-25, Asia/Dubai
+
+The STAGING-QA-005B baseline blocker was traced to an intermittent local Worker
+readiness timeout at the affected test's 45-second boundary. The Worker
+readiness helper now reports attempts, elapsed time, port, command,
+non-secret vars, child process state, and sanitized stdout/stderr tails on
+failure. The affected test now captures Worker logs and waits up to 60 seconds.
+
+Verification:
+
+- `npm run test:employee-entry-adapter-staging-endpoint` passed three consecutive runs.
+- `npm run check` passed with 182 tests.
+- `npm run qa:employee-entry-staging` remained dry-run only.
+- No staging flags were enabled and no staging business data was written.
+
+Recommended next prompt:
+
+```text
+进入 TASK STAGING-QA-005B：Enable staging-only feature flags, execute real staging write QA, then rollback.
+当前 TEST-STABILITY-001 已恢复 npm run check。仍需人工批准只对 staging 开启 ENABLE_EMPLOYEE_ENTRY_ADAPTER_LIVE_ROUTE=true 和 ENABLE_HANDOVER_ATOMIC_STAGING=true，执行真实 staging write QA 后必须回滚为 false。禁止 production deploy、production migration、production URL、production D1 write、secret 输出、production cutover。
+```
+
 ## P0-001C Update
 
 Date: 2026-05-24, Asia/Dubai

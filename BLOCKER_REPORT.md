@@ -434,3 +434,10 @@ Safe resolution:
 - Fix or stabilize the local Worker readiness timeout.
 - Rerun the full STAGING-QA-005B baseline.
 - Only after a passing baseline, enable staging-only flags and execute real staging write QA.
+
+Resolution update:
+
+- TEST-STABILITY-001 hardened the Worker readiness helper and affected test diagnostics.
+- The targeted test passed three consecutive runs.
+- `npm run check` passed with 182 tests.
+- This blocker is resolved for retrying STAGING-QA-005B, but staging flags were not enabled during the fix.

@@ -29,6 +29,27 @@ Outcome:
 - No production deploy, production migration, production URL call, production D1 write, or staging business data write occurred.
 - Next safe task must explicitly approve staging-only feature flag enablement and rollback.
 
+## TEST-STABILITY-001 Worker Readiness Fix Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+| Command / Check                                              | Result                         | Evidence                                           | Notes                                         |
+| ------------------------------------------------------------ | ------------------------------ | -------------------------------------------------- | --------------------------------------------- |
+| `npm run test:employee-entry-adapter-staging-endpoint` run 1 | PASS                           | 3 tests passed                                     | Targeted reproduction after helper hardening. |
+| `npm run test:employee-entry-adapter-staging-endpoint` run 2 | PASS                           | 3 tests passed                                     | Targeted reproduction after helper hardening. |
+| `npm run test:employee-entry-adapter-staging-endpoint` run 3 | PASS                           | 3 tests passed                                     | Targeted reproduction after helper hardening. |
+| `npm run check`                                              | PASS                           | 182 tests passed                                   | Full baseline recovered.                      |
+| `npm run qa:employee-entry-staging`                          | MANUAL_REQUIRED / DRY_RUN_ONLY | `EMPLOYEE_ENTRY_REAL_STAGING_QA_DRY_RUN_RESULT.md` | No confirmation flags and no staging write.   |
+
+Safety:
+
+- No production deploy.
+- No staging deploy.
+- No migration.
+- No staging flags enabled.
+- No staging business data written.
+- No secrets committed.
+
 ## Summary
 
 Local static/Worker startup is viable. The engineering baseline now exists, but full validation is blocked by legacy lint errors and missing local authentication secrets.

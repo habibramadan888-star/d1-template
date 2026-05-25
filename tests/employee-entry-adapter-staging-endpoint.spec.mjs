@@ -64,11 +64,29 @@ async function startIsolatedWorker({
   if (migrate) await runLocalMigrations({ persistTo });
   if (seed) runLocalDevSeed({ persistTo });
   const worker = startWorker({ port: actualPort, persistTo, vars });
-  worker.stdout.on("data", () => {});
-  worker.stderr.on("data", () => {});
+  let stdout = "";
+  let stderr = "";
+  worker.stdout.on("data", (chunk) => {
+    stdout += chunk.toString("utf8");
+  });
+  worker.stderr.on("data", (chunk) => {
+    stderr += chunk.toString("utf8");
+  });
   workerRuns.push({ worker, persistTo, label });
   const baseUrl = `http://127.0.0.1:${actualPort}`;
-  await waitForWorker(baseUrl, 45000);
+  await waitForWorker(baseUrl, Number(process.env.WORKER_READY_TIMEOUT_MS || 60000), {
+    label,
+    port: actualPort,
+    vars,
+    child: worker,
+    get stdout() {
+      return stdout;
+    },
+    get stderr() {
+      return stderr;
+    },
+    command: `wrangler dev --local --port ${actualPort}`
+  });
   return { baseUrl, persistTo };
 }
 

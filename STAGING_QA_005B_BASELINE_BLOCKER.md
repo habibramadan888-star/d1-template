@@ -47,3 +47,19 @@ Error: Worker did not become ready on http://127.0.0.1:2621. Last error: fetch f
 Investigate the local Worker readiness timeout in `tests/employee-entry-adapter-staging-endpoint.spec.mjs` before retrying `STAGING-QA-005B`.
 
 Do not enable staging flags until baseline passes.
+
+## Resolution Update
+
+Date: 2026-05-25, Asia/Dubai
+
+Status: `RESOLVED_FOR_RETRY`
+
+Evidence:
+
+- `scripts/local-worker-utils.mjs` now includes richer readiness diagnostics.
+- `tests/employee-entry-adapter-staging-endpoint.spec.mjs` now captures Worker stdout/stderr and waits up to 60 seconds by default.
+- `npm run test:employee-entry-adapter-staging-endpoint` passed three consecutive runs.
+- `npm run check` passed with 182 tests.
+- `npm run qa:employee-entry-staging` remained dry-run only and did not write staging data.
+
+No staging flags were enabled during the stability fix.
