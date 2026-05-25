@@ -3,6 +3,7 @@ const OWNER_ROLES = new Set(["OWNER", "MANAGER", "ADMIN"]);
 const EMPLOYEE_ROLES = new Set(["EMPLOYEE", "STAFF"]);
 const ALL_PROPERTY = "*";
 const TENANT_SCOPE_SHADOW_STAGING_FLAG = "ENABLE_TENANT_SCOPE_SHADOW_STAGING";
+const TENANT_SCOPE_ROUTE_ENFORCEMENT_STAGING_FLAG = "ENABLE_TENANT_SCOPE_ROUTE_ENFORCEMENT_STAGING";
 
 const ACTIONS = {
   DASHBOARD_READ: "DASHBOARD_READ",
@@ -73,6 +74,43 @@ export function resolveTenantScopeShadowMode(env = {}) {
     productionDisabled: false,
     dashboardMutationAllowed: false,
     reason: "staging_shadow_read_only"
+  };
+}
+
+export function resolveTenantScopeRouteEnforcementMode(env = {}) {
+  const appEnv = String(env.APP_ENV || "")
+    .trim()
+    .toLowerCase();
+  const flag = String(env[TENANT_SCOPE_ROUTE_ENFORCEMENT_STAGING_FLAG] ?? "")
+    .trim()
+    .toLowerCase();
+  if (!SAFE_REHEARSAL_ENVS.has(appEnv)) {
+    return {
+      enabled: false,
+      mode: "LEGACY",
+      productionDisabled: true,
+      dashboardMutationAllowed: false,
+      routeMutationAllowed: false,
+      reason: appEnv === "production" ? "production_always_disabled" : "env_not_allowed"
+    };
+  }
+  if (flag !== "true") {
+    return {
+      enabled: false,
+      mode: "LEGACY",
+      productionDisabled: false,
+      dashboardMutationAllowed: false,
+      routeMutationAllowed: false,
+      reason: "flag_off"
+    };
+  }
+  return {
+    enabled: true,
+    mode: "TENANT_SCOPE_ROUTE_ENFORCEMENT_GATE",
+    productionDisabled: false,
+    dashboardMutationAllowed: false,
+    routeMutationAllowed: false,
+    reason: "staging_route_enforcement_gate_only"
   };
 }
 
@@ -257,6 +295,48 @@ export function buildTenantScopeScenario({
   };
 }
 
+export function buildTenantScopeRouteScenario({
+  name,
+  route,
+  method = "GET",
+  env = { APP_ENV: "test", [TENANT_SCOPE_ROUTE_ENFORCEMENT_STAGING_FLAG]: "true" },
+  actor,
+  memberships,
+  target,
+  action,
+  expectedAllowed
+}) {
+  const mode = resolveTenantScopeRouteEnforcementMode(env);
+  if (!mode.enabled) {
+    const pass = expectedAllowed === false;
+    return {
+      Scenario: name,
+      Route: route,
+      Method: method,
+      Action: action,
+      "Expected Allowed": expectedAllowed ? "yes" : "no",
+      "Actual Allowed": "no",
+      Mode: mode.mode,
+      Result: pass ? "PASS" : "BLOCKED",
+      Notes: mode.reason
+    };
+  }
+
+  const auth = authorizeTenantScope({ env, actor, memberships, target, action });
+  const pass = auth.allowed === expectedAllowed;
+  return {
+    Scenario: name,
+    Route: route,
+    Method: method,
+    Action: action,
+    "Expected Allowed": expectedAllowed ? "yes" : "no",
+    "Actual Allowed": auth.allowed ? "yes" : "no",
+    Mode: mode.mode,
+    Result: pass ? "PASS" : "BLOCKED",
+    Notes: auth.reason
+  };
+}
+
 export function summarizeTenantScopeScenarios(rows) {
   const blocked = rows.filter((row) => row.Result === "BLOCKED");
   const leaks = rows.filter((row) => row["Leaked Rows"] !== "none");
@@ -268,4 +348,9 @@ export function summarizeTenantScopeScenarios(rows) {
   };
 }
 
-export { ACTIONS, ALL_PROPERTY, TENANT_SCOPE_SHADOW_STAGING_FLAG };
+export {
+  ACTIONS,
+  ALL_PROPERTY,
+  TENANT_SCOPE_ROUTE_ENFORCEMENT_STAGING_FLAG,
+  TENANT_SCOPE_SHADOW_STAGING_FLAG
+};

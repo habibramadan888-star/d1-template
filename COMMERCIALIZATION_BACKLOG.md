@@ -1202,6 +1202,35 @@ Still blocked for production:
 - Dashboard/history SQL has not been switched to company/property scope.
 - Human tenant model and migration/backfill decisions are still required.
 
+## P0-006E Backlog Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+P0-006 current status:
+
+- `Partial - tenant scope staging route enforcement gate passed`.
+
+Current result:
+
+- Added `ENABLE_TENANT_SCOPE_ROUTE_ENFORCEMENT_STAGING` staging/local-only
+  route gate guard.
+- Added `npm run test:tenant-scope-route-gate`.
+- Added `npm run gate:tenant-scope-route-enforcement`.
+- Route enforcement policy gate passed with 11 owner/employee route scenarios.
+- Cross-company history and void access are denied in gate mode even with the
+  same legacy `corpid`.
+- Employee entry and staging handover routes are property-scoped in gate mode.
+- Dashboard/history live result remained unchanged.
+- Production remains `NO-GO`.
+
+Still blocked for production:
+
+- P0-006 is not Verified.
+- Live Worker routes have not been wired to tenant enforcement.
+- Production tenant migration and legacy row backfill are not approved.
+- Dashboard/history SQL has not been switched to company/property scope.
+- Human tenant model and migration/backfill decisions are still required.
+
 ## P0-006C Backlog Addendum
 
 Date: 2026-05-26, Asia/Dubai

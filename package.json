@@ -41,6 +41,8 @@
     "rehearse:tenant-scope": "node scripts/rehearse-tenant-scope-local-staging.mjs",
     "test:tenant-scope-staging-shadow": "node --test tests/tenant-scope-staging-shadow-gate.spec.mjs",
     "compare:staging-tenant-scope": "node scripts/compare-staging-tenant-scope-shadow.mjs",
+    "test:tenant-scope-route-gate": "node --test tests/tenant-scope-staging-route-enforcement-gate.spec.mjs",
+    "gate:tenant-scope-route-enforcement": "node scripts/gate-tenant-scope-staging-route-enforcement.mjs",
     "audit:runtime-ddl": "node scripts/audit-runtime-ddl.mjs",
     "gate:runtime-ddl-removal": "node scripts/gate-runtime-ddl-removal.mjs",
     "reconcile:money": "node scripts/money-shadow-reconcile.mjs",

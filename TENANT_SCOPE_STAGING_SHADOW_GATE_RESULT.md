@@ -1,6 +1,6 @@
 # Tenant Scope Staging Shadow Gate Result
 
-Generated: 2026-05-25T22:13:30.494Z
+Generated: 2026-05-25T23:05:04.315Z
 
 Scope: read-only staging/local tenant scope shadow gate. This script confirms the staging D1 target, reads table schema/counts with SELECT only, runs local cross-tenant fixture evidence, and does not deploy, migrate, write D1 rows, call production, mutate dashboard output, or change auth behavior.
 

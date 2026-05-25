@@ -1080,3 +1080,47 @@ Next step:
 - P0-006E can design a staging/local route-enforcement gate behind explicit
   feature flag controls. Do not execute production migration, production deploy,
   production auth changes, or legacy `CORPID` fallback removal.
+
+## P0-006E Tenant Scope Staging Route Enforcement Gate Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+P0-006 current status:
+
+- `Partial - tenant scope staging route enforcement gate passed`.
+
+Added evidence:
+
+- `TENANT_SCOPE_STAGING_ROUTE_ENFORCEMENT_GATE_RESULT.md`
+- `TENANT_SCOPE_STAGING_ROUTE_ENFORCEMENT_PLAN.md`
+- `P0_006E_DASHBOARD_HISTORY_EVIDENCE.md`
+- `P0_006E_ROLLBACK_RESULT.md`
+- `scripts/gate-tenant-scope-staging-route-enforcement.mjs`
+- `tests/tenant-scope-staging-route-enforcement-gate.spec.mjs`
+- `npm run test:tenant-scope-route-gate`
+- `npm run gate:tenant-scope-route-enforcement`
+
+Result:
+
+- Staging/local route enforcement policy gate passed.
+- Owner cross-company history and void attempts are denied in gate mode.
+- Employee entry and staging handover route decisions are property-scoped in
+  gate mode.
+- Employee access to owner dashboard and rent-config writes remains denied.
+- Dashboard/history live result was not changed.
+- No production deploy, production migration, production D1 write, staging D1
+  write, production auth change, legacy fallback removal, live route wiring, or
+  remote feature flag enablement occurred.
+
+Remaining risk:
+
+- P0-006 is not Verified.
+- Live Worker routes are not yet wired to company/property enforcement.
+- Production migration, backfill, route enforcement, and human tenancy model
+  decisions are not approved.
+
+Next step:
+
+- P0-006F can design a staging/local dashboard/history query scope gate. Do not
+  execute production migration, production deploy, production auth changes, or
+  legacy `CORPID` fallback removal.

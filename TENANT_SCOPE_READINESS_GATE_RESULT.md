@@ -1,6 +1,6 @@
 # Tenant Scope Readiness Gate Result
 
-Generated: 2026-05-25T22:12:48.231Z
+Generated: 2026-05-25T23:04:17.535Z
 
 Overall: `MANUAL_REQUIRED`
 

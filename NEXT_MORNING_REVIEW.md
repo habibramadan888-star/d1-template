@@ -864,6 +864,39 @@ Forbidden: production deploy, production migration, production auth changes,
 production cutover, legacy CORPID fallback removal, P0-006 Verified.
 ```
 
+## P0-006E Morning Review Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+Most important result:
+
+- Tenant scope staging route enforcement gate passed in policy-only mode, with
+  owner/employee cross-tenant route denials covered and no live route wiring.
+
+Current status:
+
+- P0-006: `Partial - tenant scope staging route enforcement gate passed`.
+- `TENANT_SCOPE_STAGING_ROUTE_ENFORCEMENT_GATE=PASS`.
+- Scenario count: 11.
+- Blocked scenarios: 0.
+- Staging D1 write: no.
+- Dashboard/history mutation: no.
+- Live route wiring: no.
+- `gate:tenant-scope`: `MANUAL_REQUIRED`.
+- Production cutover remains `NO-GO`.
+
+Recommended next task:
+
+```text
+Enter TASK P0-006F: Tenant scope staging dashboard/history query gate.
+
+Goal: staging/local dashboard/history query scope gate only, with read-only
+comparison and rollback false.
+
+Forbidden: production deploy, production migration, production auth changes,
+production cutover, legacy CORPID fallback removal, P0-006 Verified.
+```
+
 ## P0-008G Morning Review Addendum
 
 Date: 2026-05-26, Asia/Dubai

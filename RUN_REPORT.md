@@ -4212,3 +4212,40 @@ Result:
 P0-006 status:
 
 - `Partial - tenant scope staging shadow gate passed`.
+
+## P0-006E Tenant Scope Staging Route Enforcement Gate
+
+Date: 2026-05-26, Asia/Dubai
+
+Scope: staging/local-only tenant scope route enforcement gate. No production
+deploy, production migration, production D1 write, production URL call, staging
+D1 write, production auth change, global tenant rewrite, legacy `CORPID`
+fallback removal, dashboard mutation, live route wiring, remote feature flag
+enablement, or secret exposure occurred.
+
+Completed:
+
+- Added `ENABLE_TENANT_SCOPE_ROUTE_ENFORCEMENT_STAGING`
+  production-disabled route gate guard.
+- Added `scripts/gate-tenant-scope-staging-route-enforcement.mjs`.
+- Added `npm run gate:tenant-scope-route-enforcement`.
+- Added `tests/tenant-scope-staging-route-enforcement-gate.spec.mjs`.
+- Added `npm run test:tenant-scope-route-gate`.
+- Generated P0-006E starting context, route enforcement plan,
+  dashboard/history evidence, rollback result, commercial launch gate result,
+  and next prompt.
+
+Result:
+
+- `TENANT_SCOPE_STAGING_ROUTE_ENFORCEMENT_GATE=PASS`.
+- Scenario count: 11.
+- Blocked scenarios: 0.
+- Same legacy `corpid` does not grant cross-company route access in gate mode.
+- Employee route access is property-scoped in gate mode.
+- Dashboard/history live result remained unchanged.
+- `npm run gate:tenant-scope` remains `MANUAL_REQUIRED`, as expected.
+- Production remains `NO-GO`.
+
+P0-006 status:
+
+- `Partial - tenant scope staging route enforcement gate passed`.
