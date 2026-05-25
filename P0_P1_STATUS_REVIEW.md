@@ -686,3 +686,31 @@ Next step:
 
 - P0-006C can add local/staging cross-tenant fixtures and denial tests. Do not
   do a global tenant rewrite automatically.
+
+## P1-002B Runtime DDL Removal Readiness Gate Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+P1-002 current status:
+
+- Partial - runtime DDL removal readiness gate ready.
+- Not production-ready because runtime DDL remains required as production
+  compatibility fallback until migration ownership is proven.
+
+Added evidence:
+
+- `P1_002B_RUNTIME_DDL_REMOVAL_READINESS.md`
+- `RUNTIME_DDL_REMOVAL_GATE_RESULT.md`
+- `NEXT_PROMPT_P1_002C_RUNTIME_DDL_CONTROLLED_REMOVAL.md`
+- `scripts/gate-runtime-ddl-removal.mjs`
+- `npm run gate:runtime-ddl-removal`
+
+Result:
+
+- Runtime DDL static scan remains non-zero.
+- Removal is blocked by missing production migration/staging proof/rollback.
+
+Next step:
+
+- P1-002C can rehearse disabling runtime DDL locally/staging only. Do not remove
+  production fallback automatically.

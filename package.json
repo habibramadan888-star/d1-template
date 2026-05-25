@@ -30,6 +30,7 @@
     "gate:receivables": "node scripts/gate-receivables-readiness.mjs",
     "gate:tenant-scope": "node scripts/gate-tenant-scope-readiness.mjs",
     "audit:runtime-ddl": "node scripts/audit-runtime-ddl.mjs",
+    "gate:runtime-ddl-removal": "node scripts/gate-runtime-ddl-removal.mjs",
     "reconcile:money": "node scripts/money-shadow-reconcile.mjs",
     "audit:legacy-backfill": "node scripts/audit-legacy-backfill.mjs",
     "dev:secrets": "node scripts/generate-dev-secrets.mjs",

@@ -13,6 +13,7 @@ Scope: 8-hour continuous commercialization engineering run. No production deploy
 | B: P0-003C backend totals live authority gate   | Completed | Pending            | `npm run gate:backend-totals-live`  | Result is MANUAL_REQUIRED. Live dashboard authority remains blocked by reconciliation, receivables, tenant scope, and human review.                        |
 | C: P0-008B receivables readiness gate           | Completed | Pending            | `npm run gate:receivables`          | Result is MANUAL_REQUIRED. Receivables design exists, but migration draft and production dependencies remain missing.                                      |
 | D: P0-006B tenant/property scope readiness gate | Completed | Pending            | `npm run gate:tenant-scope`         | Result is MANUAL_REQUIRED. Live Worker source still relies primarily on deployment-wide `corpid`.                                                          |
+| E: P1-002B runtime DDL removal readiness gate   | Completed | Pending            | `npm run gate:runtime-ddl-removal`  | Result is MANUAL_REQUIRED. Runtime DDL static scan still reports 182 rows/findings; no DDL removed.                                                        |
 
 ## Safety Ledger
 
@@ -40,6 +41,8 @@ Scope: 8-hour continuous commercialization engineering run. No production deploy
 | `npm run gate:backend-totals-live`  | MANUAL_REQUIRED | Dry-run gate only; no live result change.   |
 | `npm run gate:receivables`          | MANUAL_REQUIRED | Read-only gate; no migration executed.      |
 | `npm run gate:tenant-scope`         | MANUAL_REQUIRED | Read-only gate; no auth/schema/data change. |
+| `npm run audit:runtime-ddl`         | PASS            | Static scan wrote 182 findings.             |
+| `npm run gate:runtime-ddl-removal`  | MANUAL_REQUIRED | Read-only gate; no runtime DDL removed.     |
 
 ## Pending Updates
 

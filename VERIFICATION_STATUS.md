@@ -249,3 +249,14 @@ Date: 2026-05-25, Asia/Dubai
 | `npm run gate:tenant-scope` | yes    | MANUAL_REQUIRED | none          | `TENANT_SCOPE_READINESS_GATE=MANUAL_REQUIRED`; `corpid=185`, `company_id=8`, `property_id=14` | Confirms tenant/property scope is designed but not implemented; static CORPID remains dominant. |
 
 P0-006 remains Partial. No auth behavior, schema, or data was changed.
+
+## P1-002B Verification Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+| Command                            | Exists | Result          | Error Summary | Log Evidence                                                  | Commercial Meaning                                                                                 |
+| ---------------------------------- | ------ | --------------- | ------------- | ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `npm run audit:runtime-ddl`        | yes    | PASS            | none          | `Runtime DDL static scan written: 182 findings`               | Confirms runtime DDL remains visible and auditable.                                                |
+| `npm run gate:runtime-ddl-removal` | yes    | MANUAL_REQUIRED | none          | `RUNTIME_DDL_REMOVAL_GATE=MANUAL_REQUIRED`; static rows `182` | Confirms runtime DDL must not be removed until migration ownership and staging proof are approved. |
+
+No runtime DDL was removed and no migration was executed.

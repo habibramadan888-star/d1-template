@@ -3142,3 +3142,34 @@ Notes:
 - Live Worker source still relies heavily on `corpid` (`corpid=185`,
   `company_id=8`, `property_id=14` in the static gate scan).
 - P0-006 remains Partial and production SaaS multi-tenant launch remains NO-GO.
+
+## P1-002B Runtime DDL Removal Readiness Gate
+
+Date: 2026-05-25, Asia/Dubai
+
+Scope:
+
+- Readiness gate for removing runtime DDL from Worker request paths.
+- No runtime DDL removed.
+- No migration executed.
+- No production behavior changed.
+
+Changes:
+
+- Added `P1_002B_RUNTIME_DDL_REMOVAL_READINESS.md`.
+- Added `scripts/gate-runtime-ddl-removal.mjs`.
+- Added `RUNTIME_DDL_REMOVAL_GATE_RESULT.md`.
+- Added `NEXT_PROMPT_P1_002C_RUNTIME_DDL_CONTROLLED_REMOVAL.md`.
+
+Verification:
+
+| Command                            | Result          |
+| ---------------------------------- | --------------- |
+| `npm run audit:runtime-ddl`        | PASS            |
+| `npm run gate:runtime-ddl-removal` | MANUAL_REQUIRED |
+
+Notes:
+
+- Runtime DDL static scan currently reports 182 table rows/findings.
+- Removal remains blocked until migration ownership, staging proof, backup, and
+  rollback are approved.

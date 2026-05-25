@@ -636,3 +636,35 @@ Blockers before production:
 - Legacy data backfill to property scope.
 - Cross-tenant denial tests.
 - Server-side scope filters on every sensitive API.
+
+## P1-002B Runtime DDL Removal Readiness Gate Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+P1-002 current status:
+
+- Partial - runtime DDL removal readiness gate ready.
+
+Completed safely:
+
+- Added runtime DDL removal readiness document.
+- Added read-only runtime DDL removal gate script.
+- Added next-step P1-002C prompt.
+
+Verification:
+
+- `npm run audit:runtime-ddl` wrote 182 findings.
+- `npm run gate:runtime-ddl-removal` returned `MANUAL_REQUIRED`.
+
+Still forbidden:
+
+- Deleting runtime DDL from production Worker.
+- Running production or remote migration.
+- Using runtime DDL to hide failed production migration.
+
+Blockers before removal:
+
+- Staging migration proof.
+- Production backup/rollback plan.
+- P0-001/P0-006/P0-008 schema decisions.
+- Embedded/source artifact verification after any future removal.
