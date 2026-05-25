@@ -441,3 +441,38 @@ Resolution update:
 - The targeted test passed three consecutive runs.
 - `npm run check` passed with 182 tests.
 - This blocker is resolved for retrying STAGING-QA-005B, but staging flags were not enabled during the fix.
+
+## P0-003E Baseline Blocker: Formatting Drift In Generated Reports
+
+Date: 2026-05-25, Asia/Dubai
+
+Status: BLOCKED_BEFORE_BACKEND_TOTALS_STAGING_SWITCH_REHEARSAL.
+
+Evidence:
+
+- Branch: `qa/p0-003e-backend-totals-staging-switch-rehearsal`
+- Base commit: `d31a91de3aa1631ef0fee84893056360d8903d5b`
+- Command: `npm run check`
+- Failure stage: `npm run format:check`
+
+Failure:
+
+```text
+[warn] BACKEND_TOTALS_AUTHORITY_REHEARSAL_RESULT.md
+[warn] EMPLOYEE_ENTRY_REAL_STAGING_QA_DRY_RUN_RESULT.md
+Code style issues found in 2 files. Run Prettier with --write to fix.
+```
+
+Impact:
+
+- P0-003E baseline failed before any implementation work.
+- `ENABLE_BACKEND_TOTALS_AUTHORITY_STAGING` was not enabled.
+- No backend totals staging switch rehearsal was executed.
+- No staging D1 write occurred.
+- Production remained untouched.
+
+Safe resolution:
+
+- Run a dedicated formatting/rebaseline task for the two generated reports.
+- Rerun the full P0-003E baseline.
+- Do not proceed to backend totals switch rehearsal until `npm run check` passes.
