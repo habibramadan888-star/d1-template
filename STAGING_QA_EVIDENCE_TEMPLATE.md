@@ -8,11 +8,11 @@ migration, production feature flag enablement, or production cutover.
 
 | Field                               | Value                                                                                                                                                               |
 | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| QA run id                           | MANUAL_REQUIRED - assign per real staging QA run                                                                                                                    |
-| QA date/time                        | Discovery generated 2026-05-25; actual QA run time MANUAL_REQUIRED                                                                                                  |
-| Reviewer                            | MANUAL_REQUIRED                                                                                                                                                     |
-| Branch                              | `setup/staging-cloudflare-resources`                                                                                                                                |
-| Commit                              | Setup base commit `c73a39a`; final setup commit recorded in git log after this update                                                                               |
+| QA run id                           | `STAGING-QA-004-2026-05-25-DRY-RUN`; real write QA run id still MANUAL_REQUIRED                                                                                     |
+| QA date/time                        | Dry-run/preflight generated 2026-05-25 Asia/Dubai; actual write QA run time MANUAL_REQUIRED                                                                         |
+| Reviewer                            | Codex dry-run preflight; human QA reviewer MANUAL_REQUIRED                                                                                                          |
+| Branch                              | `qa/staging-qa-004-preflight-dry-run`                                                                                                                               |
+| Commit                              | Dry-run base commit `5104b1e`; final dry-run commit recorded in git log after this update                                                                           |
 | Staging Worker URL                  | `https://homelink-finance-staging.habibramadan888.workers.dev`                                                                                                      |
 | Worker entrypoint                   | Staging source: `deploy-worker/wrangler.toml` `[env.staging]` -> `src/index.js`; embedded remains `deploy-worker/wrangler.embedded.toml` -> `src/index.embedded.js` |
 | APP_ENV                             | `staging` in `deploy-worker/wrangler.toml` `[env.staging.vars]`                                                                                                     |
@@ -21,7 +21,9 @@ migration, production feature flag enablement, or production cutover.
 | Staging KV namespace                | `RATE_LIMIT_STAGING` (`9e84150246204f01b3fd8c184761303e`) bound as `RATE_LIMIT`                                                                                     |
 | Backup completed before write tests | No - procedure documented in `STAGING_BACKUP_ROLLBACK_PROCEDURE.md`; no backup executed by this setup task                                                          |
 | Rollback method confirmed           | Procedure documented, not yet exercised                                                                                                                             |
-| Production URL checked and excluded | Yes for configured Worker name: staging URL uses `homelink-finance-staging`, distinct from the known production-like `homelink-finance` Worker name                 |
+| Production URL checked and excluded | MANUAL_REQUIRED - staging URL is staging-named, but production URL/custom route was not manually confirmed                                                          |
+| Real staging write QA status        | NOT_EXECUTED                                                                                                                                                        |
+| Current QA status                   | READY_FOR_STAGING_DRY_RUN_COMPLETE_MANUAL_INPUTS_REQUIRED                                                                                                           |
 
 ## Autofilled Test Accounts
 
@@ -47,15 +49,15 @@ secret write target was confirmed.
 
 ## Command Evidence
 
-| Command                             | Result                                    | Log Path / Screenshot                              | Notes                                                     |
-| ----------------------------------- | ----------------------------------------- | -------------------------------------------------- | --------------------------------------------------------- |
-| `npm run check`                     | PASS                                      | Local console / git commit evidence                | 182 tests passed; build ran Wrangler dry-run only.        |
-| `npm run security:secrets`          | PASS                                      | Local console / git commit evidence                | Secret hygiene check passed.                              |
-| `npm run qa:employee-entry-staging` | Pending final setup verification          | `EMPLOYEE_ENTRY_REAL_STAGING_QA_DRY_RUN_RESULT.md` | Dry-run only; no write confirmation flags.                |
-| `npm run gate:commercial-launch`    | PRODUCTION_NO_GO                          | Local console / git commit evidence                | Expected `PRODUCTION_NO_GO` until production gates close. |
-| `npm run audit:worker-drift`        | Previously available; rerun before deploy | `WORKER_ENTRYPOINT_DRIFT_AUDIT.md`                 | No deploy performed by autofill.                          |
-| `npm run verify:embedded-worker`    | Previously available; rerun before deploy | `EMBEDDED_WORKER_FRESHNESS_RESULT.md`              | No deploy performed by autofill.                          |
-| `npm run build:embedded:dry-run`    | Previously available; rerun before deploy | `.wrangler-dryrun/`, deploy artifact reports       | Dry-run only; no deploy.                                  |
+| Command                             | Result           | Log Path / Screenshot                              | Notes                                                     |
+| ----------------------------------- | ---------------- | -------------------------------------------------- | --------------------------------------------------------- |
+| `npm run check`                     | PASS             | Local console / git commit evidence                | 182 tests passed; build ran Wrangler dry-run only.        |
+| `npm run security:secrets`          | PASS             | Local console / git commit evidence                | Secret hygiene check passed.                              |
+| `npm run qa:employee-entry-staging` | MANUAL_REQUIRED  | `EMPLOYEE_ENTRY_REAL_STAGING_QA_DRY_RUN_RESULT.md` | Dry-run only; no write confirmation flags.                |
+| `npm run gate:commercial-launch`    | PRODUCTION_NO_GO | Local console / git commit evidence                | Expected `PRODUCTION_NO_GO` until production gates close. |
+| `npm run audit:worker-drift`        | PASS             | `WORKER_ENTRYPOINT_DRIFT_AUDIT.md`                 | 0 critical mismatches.                                    |
+| `npm run verify:embedded-worker`    | PASS             | `EMBEDDED_WORKER_FRESHNESS_RESULT.md`              | Embedded freshness passes.                                |
+| `npm run build:embedded:dry-run`    | WARNING          | `.tmp/embedded-worker-dry-run/`                    | 0 critical missing items; warning remains non-blocking.   |
 
 ## Employee Entry Evidence
 
@@ -106,25 +108,25 @@ secret write target was confirmed.
 
 ## Manual Approval Checklist
 
-| Approval Item                                        | Owner           | Status          | Evidence                                               | Notes                                           |
-| ---------------------------------------------------- | --------------- | --------------- | ------------------------------------------------------ | ----------------------------------------------- |
-| Staging URL confirmed non-production                 | Engineering     | Confirmed       | `STAGING_WORKER_DEPLOY_RESULT.md`                      | Worker URL uses `homelink-finance-staging`.     |
-| Staging D1 backup completed                          | MANUAL_REQUIRED | MANUAL_REQUIRED | MANUAL_REQUIRED                                        | No backup executed by setup task                |
-| Rollback method exercised                            | MANUAL_REQUIRED | MANUAL_REQUIRED | MANUAL_REQUIRED                                        | Docs exist; real staging rollback not exercised |
-| Money reconciliation reviewed                        | MANUAL_REQUIRED | MANUAL_REQUIRED | `MONEY_RECONCILIATION_GATE_RESULT.md`                  | Current gate is not production approval         |
-| TOP_25_MONEY_RISKS reviewed                          | MANUAL_REQUIRED | MANUAL_REQUIRED | `TOP_25_MONEY_RISKS.md`                                | Human accounting/engineering review required    |
-| Tenant/property scope accepted for staging rehearsal | MANUAL_REQUIRED | MANUAL_REQUIRED | `P0_006B_TENANT_PROPERTY_SCOPE_READINESS_GATE.md`      | Tenant model remains partial                    |
-| Receivables production dependency acknowledged       | MANUAL_REQUIRED | MANUAL_REQUIRED | `P0_008B_RECEIVABLES_IMPLEMENTATION_READINESS_GATE.md` | Receivables remains partial                     |
-| Embedded/source artifact gate reviewed               | MANUAL_REQUIRED | MANUAL_REQUIRED | `WORKER_ENTRYPOINT_DRIFT_AUDIT.md`                     | Re-run artifact gates before deploy             |
+| Approval Item                                        | Owner           | Status          | Evidence                                               | Notes                                                                                             |
+| ---------------------------------------------------- | --------------- | --------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
+| Staging URL confirmed non-production                 | MANUAL_REQUIRED | MANUAL_REQUIRED | `STAGING_URL_NON_PRODUCTION_REVIEW.md`                 | Staging URL is staging-named, but production URL/custom route still needs Dashboard confirmation. |
+| Staging D1 backup completed                          | MANUAL_REQUIRED | MANUAL_REQUIRED | MANUAL_REQUIRED                                        | No backup executed by setup task                                                                  |
+| Rollback method exercised                            | MANUAL_REQUIRED | MANUAL_REQUIRED | MANUAL_REQUIRED                                        | Docs exist; real staging rollback not exercised                                                   |
+| Money reconciliation reviewed                        | MANUAL_REQUIRED | MANUAL_REQUIRED | `MONEY_RECONCILIATION_GATE_RESULT.md`                  | Current gate is not production approval                                                           |
+| TOP_25_MONEY_RISKS reviewed                          | MANUAL_REQUIRED | MANUAL_REQUIRED | `TOP_25_MONEY_RISKS.md`                                | Human accounting/engineering review required                                                      |
+| Tenant/property scope accepted for staging rehearsal | MANUAL_REQUIRED | MANUAL_REQUIRED | `P0_006B_TENANT_PROPERTY_SCOPE_READINESS_GATE.md`      | Tenant model remains partial                                                                      |
+| Receivables production dependency acknowledged       | MANUAL_REQUIRED | MANUAL_REQUIRED | `P0_008B_RECEIVABLES_IMPLEMENTATION_READINESS_GATE.md` | Receivables remains partial                                                                       |
+| Embedded/source artifact gate reviewed               | MANUAL_REQUIRED | MANUAL_REQUIRED | `WORKER_ENTRYPOINT_DRIFT_AUDIT.md`                     | Re-run artifact gates before deploy                                                               |
 
 ## Final QA Decision
 
-| Decision                    | Value                                                                                                                         |
-| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| GO for continued staging QA | Manual Required for write QA; dry-run/preflight can continue                                                                  |
-| GO for production cutover   | No                                                                                                                            |
-| Blocking issues             | Staging accounts, staging secrets, backup evidence, rollback exercise, and human approvals are still required before write QA |
-| Required follow-up task     | Set staging-only secrets/accounts outside Git, execute backup, then run dry-run QA before any approved staging write          |
+| Decision                    | Value                                                                                                                           |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| GO for continued staging QA | Dry-run/preflight complete; write QA still requires manual inputs                                                               |
+| GO for production cutover   | No                                                                                                                              |
+| Blocking issues             | Staging accounts, staging secrets, backup evidence, rollback exercise, and human approvals are still required before write QA   |
+| Required follow-up task     | Complete `STAGING-DB-001` and staging secrets/accounts setup, execute backup, then run dry-run QA before approved staging write |
 
 Production cutover remains `NO-GO` until production migration, production
 deployment, accounting reconciliation, tenant scope, receivables, rollback, and

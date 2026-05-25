@@ -3461,3 +3461,47 @@ Notes:
 - 0 areas are blocked by missing evidence files in this static scan.
 - Local regression and QA preparation may continue, but staging/prod execution
   still requires human-supplied environment inputs and approval.
+
+## STAGING-QA-004 Dry-Run / Preflight Validation
+
+Date: 2026-05-25, Asia/Dubai
+
+Scope:
+
+- Validated committed staging evidence and Wrangler `[env.staging]`
+  configuration.
+- Ran staging QA helper in dry-run mode only.
+- No deploy, migration, D1 execute, staging write, feature-flag enablement, or
+  secret access was performed in this task.
+
+Changes:
+
+- Added `STAGING_QA_004_CONFIG_CONSISTENCY_REVIEW.md`.
+- Added `STAGING_URL_NON_PRODUCTION_REVIEW.md`.
+- Added `STAGING_QA_004_DRY_RUN_RESULT.md`.
+- Added `STAGING_QA_004_REMAINING_MANUAL_INPUTS.md`.
+- Added `STAGING_D1_SCHEMA_PREFLIGHT_PLAN.md`.
+- Added `STAGING_SECRETS_AND_TEST_ACCOUNTS_NEXT_STEPS.md`.
+- Added next prompt drafts for staging DB schema preflight and staging
+  secrets/test accounts.
+- Updated `STAGING_QA_EVIDENCE_TEMPLATE.md`.
+
+Verification:
+
+| Command                             | Result                            |
+| ----------------------------------- | --------------------------------- |
+| `npm run check`                     | PASS                              |
+| `npm run security:secrets`          | PASS                              |
+| `npm run gate:commercial-launch`    | PRODUCTION_NO_GO                  |
+| `npm run audit:worker-drift`        | PASS, 0 critical mismatches       |
+| `npm run verify:embedded-worker`    | PASS                              |
+| `npm run build:embedded:dry-run`    | WARNING, 0 critical missing items |
+| `npm run qa:employee-entry-staging` | MANUAL_REQUIRED, dry-run only     |
+
+Conclusion:
+
+`READY_FOR_STAGING_DRY_RUN_COMPLETE_MANUAL_INPUTS_REQUIRED`
+
+Real staging write QA remains blocked until staging secrets, test accounts,
+backup evidence, rollback exercise, Cloudflare Dashboard URL confirmation, and
+staging D1 schema/migration state are confirmed.

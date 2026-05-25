@@ -763,3 +763,32 @@ Forbidden without human approval:
 - Remote or production D1 migration.
 - Production feature flag enablement.
 - Live accounting authority switch.
+
+## STAGING-QA-004 Backlog Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+Current staging QA status:
+
+- `READY_FOR_STAGING_DRY_RUN_COMPLETE_MANUAL_INPUTS_REQUIRED`
+
+Completed:
+
+- Staging resource evidence is filled into
+  `STAGING_QA_EVIDENCE_TEMPLATE.md`.
+- Staging config consistency review is complete.
+- Staging URL is present and staging-named.
+- `npm run qa:employee-entry-staging` remains dry-run only without confirmation
+  flags.
+
+Still required before real staging write QA:
+
+- Set staging secrets outside Git.
+- Create or confirm staging test accounts.
+- Execute staging D1 backup and record evidence.
+- Exercise rollback by feature flag off.
+- Confirm staging D1 schema/migration state.
+- Confirm Cloudflare Dashboard Worker URL and production URL exclusion.
+- Open `STAGING-DB-001` if staging schema/bootstrap is required.
+
+Production remains NO-GO.

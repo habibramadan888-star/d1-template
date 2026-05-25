@@ -336,3 +336,20 @@ Date: 2026-05-25, Asia/Dubai
 
 No API call, D1 connection, deployment, migration, production feature flag
 change, or secret access was performed.
+
+## STAGING-QA-004 Verification Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+| Command                             | Exists | Result           | Error Summary | Log Evidence                                   | Commercial Meaning                                                             |
+| ----------------------------------- | ------ | ---------------- | ------------- | ---------------------------------------------- | ------------------------------------------------------------------------------ |
+| `npm run check`                     | yes    | PASS             | none          | 182 tests passed                               | Local regression remains green after staging dry-run evidence updates.         |
+| `npm run security:secrets`          | yes    | PASS             | none          | `Secret hygiene check passed.`                 | No secret was committed.                                                       |
+| `npm run gate:commercial-launch`    | yes    | PRODUCTION_NO_GO | none          | `COMMERCIAL_LAUNCH_READINESS=PRODUCTION_NO_GO` | Production remains blocked.                                                    |
+| `npm run audit:worker-drift`        | yes    | PASS             | none          | `WORKER_DRIFT_CRITICAL_MISMATCHES=0`           | No critical source/embedded drift.                                             |
+| `npm run verify:embedded-worker`    | yes    | PASS             | none          | `EMBEDDED_WORKER_FRESHNESS_RESULT=PASS`        | Embedded artifact freshness gate passes.                                       |
+| `npm run build:embedded:dry-run`    | yes    | WARNING          | none          | `EMBEDDED_WORKER_GENERATED_MISSING=0`          | Warning remains non-blocking for dry-run because 0 critical items are missing. |
+| `npm run qa:employee-entry-staging` | yes    | MANUAL_REQUIRED  | none          | `write execution: DRY_RUN_ONLY`                | Staging write QA is still blocked by missing confirmations and manual inputs.  |
+
+No deployment, migration, D1 execute, staging write, production config change,
+feature-flag enablement, or secret access was performed in STAGING-QA-004.

@@ -621,3 +621,40 @@ Recommended next prompt:
 - Production feature flag enablement.
 - Deleting legacy route/fields.
 - Changing live dashboard authority or financial formulas.
+
+## STAGING-QA-004 Morning Review Addendum
+
+Most important result:
+
+- Staging dry-run/preflight is complete, but real staging write QA is still
+  blocked by manual inputs.
+
+Current conclusion:
+
+- `READY_FOR_STAGING_DRY_RUN_COMPLETE_MANUAL_INPUTS_REQUIRED`
+
+Confirmed:
+
+- Staging Worker URL is present in evidence:
+  `https://homelink-finance-staging.habibramadan888.workers.dev`.
+- Staging D1 and KV are present in evidence and Wrangler config.
+- Feature flags remain default `false`.
+- `npm run qa:employee-entry-staging` does not write without explicit
+  confirmations.
+
+Manual required before write QA:
+
+- Set staging secrets.
+- Create/confirm test accounts.
+- Execute backup.
+- Exercise rollback.
+- Confirm staging D1 schema/migrations.
+- Confirm production URL/custom route exclusion in Cloudflare Dashboard.
+
+Recommended next prompt:
+
+```text
+进入 TASK STAGING-DB-001：Staging D1 schema/bootstrap preflight.
+目标：只确认 staging D1 schema/migration 状态，并准备 staging-only bootstrap 计划。
+禁止 production deploy、production migration、remote production D1 execute、提交 secret、真实 staging QA。
+```
