@@ -3173,3 +3173,33 @@ Notes:
 - Runtime DDL static scan currently reports 182 table rows/findings.
 - Removal remains blocked until migration ownership, staging proof, backup, and
   rollback are approved.
+
+## P1-009A Observability / Error Monitoring Plan
+
+Date: 2026-05-25, Asia/Dubai
+
+Scope:
+
+- Observability and monitoring readiness plan.
+- No external monitoring integration.
+- No secret added.
+- No production configuration changed.
+
+Changes:
+
+- Added `OBSERVABILITY_AND_ERROR_MONITORING_PLAN.md`.
+- Added `OBSERVABILITY_GO_NO_GO_CHECKLIST.md`.
+- Added `scripts/audit-observability-readiness.mjs`.
+- Added `OBSERVABILITY_READINESS_RESULT.md`.
+
+Verification:
+
+| Command                       | Result          |
+| ----------------------------- | --------------- |
+| `npm run audit:observability` | MANUAL_REQUIRED |
+
+Notes:
+
+- Worker source contains audit/entry event evidence, but production alert
+  ownership, retention, and PII redaction must be confirmed by humans before
+  launch.

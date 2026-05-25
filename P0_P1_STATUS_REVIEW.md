@@ -714,3 +714,25 @@ Next step:
 
 - P1-002C can rehearse disabling runtime DDL locally/staging only. Do not remove
   production fallback automatically.
+
+## P1-009A Observability / Monitoring Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+P1-009 current status:
+
+- Partial - observability and monitoring readiness plan added.
+
+Added evidence:
+
+- `OBSERVABILITY_AND_ERROR_MONITORING_PLAN.md`
+- `OBSERVABILITY_GO_NO_GO_CHECKLIST.md`
+- `OBSERVABILITY_READINESS_RESULT.md`
+- `scripts/audit-observability-readiness.mjs`
+- `npm run audit:observability`
+
+Result:
+
+- Plan and audit script are ready.
+- Alert destination, retention, and PII redaction policy remain
+  `MANUAL_REQUIRED`.

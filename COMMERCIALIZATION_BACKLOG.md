@@ -668,3 +668,28 @@ Blockers before removal:
 - Production backup/rollback plan.
 - P0-001/P0-006/P0-008 schema decisions.
 - Embedded/source artifact verification after any future removal.
+
+## P1-009A Observability / Monitoring Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+P1-009 current status:
+
+- Partial - observability and monitoring readiness plan added.
+
+Completed safely:
+
+- Added structured logging and error-monitoring plan.
+- Added observability GO/NO-GO checklist.
+- Added read-only observability readiness script.
+
+Verification:
+
+- `npm run audit:observability` returned `MANUAL_REQUIRED`.
+
+Still required before production:
+
+- Assign P0/P1 alert owner.
+- Confirm production log retention.
+- Confirm PII/secrets redaction policy.
+- Decide whether Cloudflare logs are sufficient for launch.
