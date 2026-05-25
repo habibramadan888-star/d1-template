@@ -1,6 +1,6 @@
 # Commercial Launch Readiness Result
 
-Generated: 2026-05-25T17:49:04.692Z
+Generated: 2026-05-25T18:45:27.012Z
 
 | Metric                | Count |
 | --------------------- | ----: |
@@ -16,17 +16,18 @@ Allowed next work: local/staging dry-run validation, manual QA preparation, and 
 
 Forbidden next work without human approval: production deploy, staging deploy, remote/production D1 migration, production feature flag enablement, and live accounting authority switch.
 
-## TEST-STABILITY-002 Addendum
+## P0-008D Addendum
 
-Employee-entry local Worker stability blocker is resolved for retrying P0-008D.
+P0-008 current status:
+
+- `Partial - receivables staging shadow gate passed`.
 
 Evidence:
 
-- `TEST_STABILITY_002_ECONNRESET_DIAGNOSIS.md`
-- `TEST_STABILITY_002_CONSECUTIVE_RUN_RESULT.md`
-- `TEST_STABILITY_002_BASELINE_AFTER_FIX.md`
-- `scripts/reproduce-employee-entry-econnreset.mjs`
+- `STAGING_RECEIVABLES_SHADOW_COMPARISON_RESULT.md`
+- `P0_008D_DASHBOARD_RECEIVABLES_AUTHORITY_EVIDENCE.md`
+- `P0_008D_ROLLBACK_RESULT.md`
+- `tests/receivables-staging-shadow-gate.spec.mjs`
+- `scripts/compare-staging-receivables-shadow.mjs`
 
-Production remains `NO-GO`. This stability fix does not approve production
-deploy, production migration, production feature flags, live dashboard authority
-switch, or P0-008 production cutover.
+Production remains `NO-GO`. Receivables shadow gate success does not approve production deploy, production migration, dashboard live switch, production feature flags, or P0-008 verification.

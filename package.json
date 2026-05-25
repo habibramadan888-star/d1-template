@@ -68,6 +68,8 @@
     "test:money-dual-write": "node --test tests/money-dual-write.spec.mjs",
     "test:receivables": "node --test tests/receivables.spec.mjs",
     "rehearse:receivables": "node scripts/rehearse-receivables-local-staging.mjs",
+    "test:receivables-staging-shadow": "node --test tests/receivables-staging-shadow-gate.spec.mjs",
+    "compare:staging-receivables": "node scripts/compare-staging-receivables-shadow.mjs",
     "rehearse:money-dual-write": "node scripts/rehearse-money-dual-write.mjs",
     "test:money-dual-write-local-staging": "node --test tests/money-dual-write-local-staging.spec.mjs",
     "rehearse:money-dual-write-local-staging": "node scripts/rehearse-money-dual-write-local-staging.mjs",

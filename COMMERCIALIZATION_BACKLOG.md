@@ -1079,3 +1079,31 @@ Still blocked for production:
 - P0-006 tenant/property scope implementation.
 - Receivables staging shadow reconciliation and human accounting review.
 - Production migration, backup, rollback, and backfill approval.
+
+## P0-008D Backlog Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+P0-008 current status:
+
+- `Partial - receivables staging shadow gate passed`.
+
+Current result:
+
+- Read-only staging receivables shadow comparison passed.
+- `STAGING_RECEIVABLES_SHADOW_MISMATCH=no`.
+- Rent received and rent due matched current staging shadow data.
+- Due today, overdue amount, arrears total, and arrears outstanding are
+  computable but need more staging data for open receivable/repayment cases.
+- Dashboard live result remained unchanged.
+- No production deploy, production migration, production D1 write, staging D1
+  write, feature flag enablement, dashboard mutation, or live financial formula
+  change occurred.
+
+Still blocked for production:
+
+- P0-001 minor-unit reconciliation and live read/write migration.
+- P0-006 tenant/property scope implementation.
+- More staging data for due/overdue/repayment/adjustment cases.
+- Human accounting review for receivables semantics.
+- Production migration, backup, rollback, backfill, and deploy approval.

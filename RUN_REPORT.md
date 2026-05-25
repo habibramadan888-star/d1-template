@@ -4002,3 +4002,35 @@ Next:
 
 - Retry P0-008D receivables staging shadow gate using
   `NEXT_PROMPT_P0_008D_RETRY_RECEIVABLES_STAGING_SHADOW_GATE.md`.
+
+## P0-008D Retry Receivables Staging Shadow Gate
+
+Date: 2026-05-25, Asia/Dubai
+
+Scope: read-only local/staging receivables shadow gate. No production deploy,
+production migration, remote production D1 migration, production D1 write,
+staging D1 write, feature flag enablement, dashboard mutation, live financial
+formula change, or secret exposure occurred.
+
+Completed:
+
+- Added `scripts/compare-staging-receivables-shadow.mjs`.
+- Added `npm run compare:staging-receivables`.
+- Added `tests/receivables-staging-shadow-gate.spec.mjs`.
+- Added `npm run test:receivables-staging-shadow`.
+- Generated P0-008D starting context, shadow scope, feature flag plan,
+  dashboard authority evidence, rollback result, commercial launch gate result,
+  and next prompt.
+
+Result:
+
+- `STAGING_RECEIVABLES_SHADOW_COMPARISON=PASS`.
+- `STAGING_RECEIVABLES_SHADOW_MISMATCH=no`.
+- Current staging data has 4 `NEEDS_MORE_DATA` rows for open due/overdue,
+  arrears, and repayment/adjustment-style cases.
+- Dashboard live result remained unchanged.
+- Production remains `NO-GO`.
+
+P0-008 status:
+
+- `Partial - receivables staging shadow gate passed`.

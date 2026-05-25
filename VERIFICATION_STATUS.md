@@ -609,3 +609,19 @@ Date: 2026-05-25, Asia/Dubai
 No production deploy, staging deploy, migration, D1 write, staging data write,
 feature flag enablement, dashboard mutation, live financial formula change, or
 secret exposure occurred in TEST-STABILITY-002.
+
+## P0-008D Verification Addendum
+
+Date: 2026-05-25, Asia/Dubai
+
+| Command / Check                           | Exists | Result             | Error Summary | Log Evidence                                                       | Commercial Meaning                                                                       |
+| ----------------------------------------- | ------ | ------------------ | ------------- | ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------- |
+| `npm run test:receivables-staging-shadow` | yes    | Pass               | none          | 15 tests passed                                                    | Shadow guard, production disable, no dashboard mutation, and rollback false are covered. |
+| `npm run compare:staging-receivables`     | yes    | Pass               | none          | `STAGING_RECEIVABLES_SHADOW_MISMATCH=no`                           | Read-only staging shadow comparison has no mismatch/blocker.                             |
+| `npm run gate:commercial-launch`          | yes    | `PRODUCTION_NO_GO` | none          | Launch gate stayed NO-GO                                           | Production cutover remains blocked.                                                      |
+| Staging D1 write                          | yes    | No                 | none          | Script is read-only SELECT through existing staging D1 data reader | No staging data was written.                                                             |
+| Dashboard mutation                        | yes    | No                 | none          | Dashboard live result row is `MATCH` / unchanged                   | Shadow gate did not switch live dashboard.                                               |
+
+No production deploy, production migration, production D1 write, staging D1
+write, feature flag enablement, dashboard mutation, live financial formula
+change, or secret exposure occurred in P0-008D.

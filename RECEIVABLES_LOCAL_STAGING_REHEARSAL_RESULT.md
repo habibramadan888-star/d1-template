@@ -1,6 +1,6 @@
 # Receivables Local/Staging Rehearsal Result
 
-Generated: 2026-05-25T16:26:42.012Z
+Generated: 2026-05-25T18:47:42.354Z
 
 Scope: local/staging dry-run receivables rehearsal. This script does not deploy, migrate, write production D1, write staging D1 by default, or change dashboard responses.
 

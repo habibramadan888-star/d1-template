@@ -433,11 +433,11 @@ export async function readStagingBackendTotalsData() {
     ORDER BY created_at, id`);
   const arrearTasks = await d1Select(`SELECT
     task_id, corpid, arrear_amount, actual_received, followup_status,
-    close_status, voided_at, created_at
+    close_status, promise_date AS due_date, voided_at, created_at
     FROM arrear_tasks
     ORDER BY created_at, task_id`);
   const arrears = await d1Select(`SELECT
-    id, corpid, remain, cleared, type, voided_at, created_at
+    id, corpid, remain, cleared, type, due_date, voided_at, created_at
     FROM arrears
     ORDER BY created_at, id`);
 

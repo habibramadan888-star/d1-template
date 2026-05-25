@@ -1,6 +1,6 @@
 # Staging Backend Totals Comparison Result
 
-Generated: 2026-05-25T16:27:32.596Z
+Generated: 2026-05-25T18:51:24.807Z
 
 Scope: read-only staging D1 comparison. This script does not deploy, migrate, write D1 rows, mutate API responses, or change dashboard output.
 
