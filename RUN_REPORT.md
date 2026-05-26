@@ -4462,3 +4462,39 @@ Result:
 P0-006 status:
 
 - `Partial - tenant scope staging backfill write passed`.
+
+## P0-006J Tenant Scope Staging Verification
+
+Date: 2026-05-26, Asia/Dubai
+
+Scope: staging/local tenant scope verification after approved staging
+compatibility-column backfill. No production deploy, production migration,
+production D1 write, production URL call, staging schema migration, staging
+row-level backfill write, dashboard live switch, live financial formula change,
+legacy `CORPID` removal, or secret exposure occurred.
+
+Completed:
+
+- Verified scoped staging rows in `sessions`, `transactions`, `entry_events`,
+  and `audit_logs` with read-only D1 `SELECT` queries.
+- Confirmed manual-required rows in `active_sessions`, `arrear_tasks`, and
+  `employee_users` remained untouched.
+- Confirmed legacy `corpid` values were preserved.
+- Confirmed transaction row count and amount sums remained unchanged.
+- Ran local/staging cross-tenant leakage and dashboard/history query gates.
+- Ran local/staging employee/owner route access scope gates.
+- Re-ran tenant scope staging backfill dry-run.
+- Confirmed `gate:commercial-launch` remains `PRODUCTION_NO_GO`.
+
+Result:
+
+- Tenant scope staging verification: PASS.
+- Cross-tenant leakage review: PASS.
+- Employee/owner access scope review: PASS.
+- Post-backfill dry-run: PASS, 13 tables reviewed, 0 blocked,
+  4 manual-required, 1 legacy warning.
+- Production remains `NO-GO`.
+
+P0-006 status:
+
+- `Partial - tenant scope staging verification passed`.

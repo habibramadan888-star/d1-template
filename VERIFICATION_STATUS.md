@@ -841,3 +841,20 @@ No production deploy, production migration, production D1 write, production URL
 call, dashboard mutation, live financial formula change, legacy `CORPID`
 removal, `DELETE`, `INSERT`, `DROP`, or secret exposure occurred. P0-006
 remains Partial and production remains NO-GO.
+
+## P0-006J Verification Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+| Check                              | Run? | Result                    | Blocker | Evidence                                              | Notes                                                                                     |
+| ---------------------------------- | ---- | ------------------------- | ------- | ----------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| Scoped staging data verification   | yes  | Pass                      | none    | `P0_006J_TENANT_SCOPE_STAGING_VERIFICATION_RESULT.md` | Approved rows in `sessions`, `transactions`, `entry_events`, and `audit_logs` are scoped. |
+| Cross-tenant leakage review        | yes  | Pass                      | none    | `P0_006J_CROSS_TENANT_LEAKAGE_REVIEW.md`              | Local/staging query gates remove cross-tenant rows from legacy `corpid` results.          |
+| Employee/owner access scope review | yes  | Pass                      | none    | `P0_006J_EMPLOYEE_OWNER_ACCESS_SCOPE_REVIEW.md`       | Route policy gates preserve expected owner/employee allow/deny behavior.                  |
+| Production NO-GO review            | yes  | Pass / `PRODUCTION_NO_GO` | none    | `P0_006J_PRODUCTION_NO_GO_REVIEW.md`                  | Production remains blocked despite staging verification success.                          |
+| Post-backfill dry-run              | yes  | Pass                      | none    | `TENANT_SCOPE_STAGING_BACKFILL_DRY_RUN_RESULT.md`     | 13 tables reviewed, 0 blocked, 4 manual-required, 1 legacy warning.                       |
+
+No production deploy, production migration, production D1 write, production URL
+call, staging schema migration, staging row-level backfill write, dashboard
+live switch, live financial formula change, legacy `CORPID` removal, or secret
+exposure occurred. P0-006 remains Partial and production remains NO-GO.

@@ -896,6 +896,37 @@ Next prompt:
 
 Do not enter production migration, production deploy, legacy `CORPID` removal,
 or P0-006 Verified.
+
+## P0-006J Morning Review Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+Summary:
+
+- Tenant scope staging verification passed after the approved P0-006I2
+  compatibility-column backfill.
+- Scoped staging rows were verified in `sessions`, `transactions`,
+  `entry_events`, and `audit_logs`.
+- Manual-required rows remained untouched.
+- Legacy `corpid` values were preserved.
+- Cross-tenant leakage gates passed.
+- Employee/owner access scope gates passed.
+- Post-backfill dry-run remains PASS with 0 blocked, 4 manual-required, and 1
+  legacy warning.
+- Production deploy, production migration, production D1 write, staging schema
+  migration, and staging row-level backfill write were not executed.
+
+Current status:
+
+- P0-006: `Partial - tenant scope staging verification passed`.
+- Production cutover: `NO-GO`.
+
+Next recommended work:
+
+- Continue only with a reviewed staging route/query wiring gate if explicitly
+  approved.
+- Do not enter production migration, production deploy, legacy `CORPID`
+  removal, or P0-006 Verified.
 ```
 
 ## P0-006H Morning Review Addendum

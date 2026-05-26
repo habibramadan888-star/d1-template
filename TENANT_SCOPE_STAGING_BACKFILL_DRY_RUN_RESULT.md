@@ -1,6 +1,6 @@
 # Tenant Scope Staging Backfill Dry-Run Result
 
-Generated: 2026-05-26T08:56:04.969Z
+Generated: 2026-05-26T10:57:29.614Z
 
 Scope: read-only staging tenant scope backfill dry-run. This script confirms the staging D1 target, reads table schema/counts with SELECT only, generates draft update-plan classifications, and does not deploy, migrate, write D1 rows, call production, mutate dashboard/history output, or remove legacy CORPID fallback.
 
