@@ -892,6 +892,40 @@ Recommended next prompt:
 
 Production cutover remains `NO-GO`.
 
+## P0-006M Tenant Scope Auth/Session Claim Gate Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+Current P0-006 status is now
+`Partial - tenant scope auth/session claim gate ready`.
+
+Added evidence:
+
+- `P0_006M_STARTING_CONTEXT.md`
+- `TENANT_SCOPE_AUTH_CLAIM_AUDIT.md`
+- `TENANT_SCOPE_AUTH_CLAIM_CONTRACT.md`
+- `modules/auth/tenant-claims.mjs`
+- `tests/tenant-scope-auth-claims.spec.mjs`
+- `scripts/rehearse-tenant-scope-auth-claims.mjs`
+- `TENANT_SCOPE_AUTH_CLAIM_REHEARSAL_RESULT.md`
+- `TENANT_CLAIM_TO_ROUTE_QUERY_WIRING_MATRIX.md`
+- `P0_006M_COMMERCIAL_LAUNCH_GATE_RESULT.md`
+- `NEXT_PROMPT_P0_006N_TENANT_SCOPE_AUTH_CLAIM_STAGING_REHEARSAL.md`
+
+Result:
+
+- Tenant auth claim tests passed.
+- Tenant auth claim rehearsal passed.
+- Legacy `CORPID` fallback remains preserved but warning-only.
+- Cross-tenant and cross-property access denial are verified.
+- Live login/session behavior was not changed.
+- Production remains `NO-GO`.
+
+Next step:
+
+- P0-006N can run a staging/local auth claim rehearsal only under the same
+  production NO-GO constraints.
+
 ## P0-006I Morning Review Addendum
 
 Date: 2026-05-26, Asia/Dubai

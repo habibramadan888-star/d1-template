@@ -1175,6 +1175,36 @@ Still blocked for production:
 - Production receivables migration, backup, rollback, backfill, and deploy
   approval.
 
+## P0-006M Backlog Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+P0-006 current status:
+
+- `Partial - tenant scope auth/session claim gate ready`.
+
+Current result:
+
+- Added non-invasive tenant auth claim helper.
+- Added `npm run test:tenant-claims`.
+- Added `npm run rehearse:tenant-claims`.
+- Auth claim rehearsal passed with 10 scenarios and 0 blocked scenarios.
+- Legacy `CORPID` fallback is preserved but warning-only.
+- Missing `tenant_id` is production-unsafe.
+- Cross-tenant and cross-property access denial are covered.
+- Route/query policy can consume claim-derived actor and membership without
+  hardcoded `CORPID`.
+- Production remains `NO-GO`.
+
+Still blocked for production:
+
+- P0-006 is not Verified.
+- Live Worker login/session does not yet emit authoritative tenant/property
+  claims.
+- Production tenant migration, backfill, route/query switch, and human tenancy
+  model decisions are not approved.
+- Legacy `CORPID` fallback cannot be final SaaS isolation.
+
 ## P0-006F Backlog Addendum
 
 Date: 2026-05-26, Asia/Dubai

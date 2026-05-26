@@ -1421,3 +1421,29 @@ Next step:
 
 - P0-006M can review auth/session claim shape and route/query claim
   dependencies in staging/local only.
+
+## P0-006M Status Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+P0-006 status:
+
+- `Partial - tenant scope auth/session claim gate ready`.
+
+Evidence:
+
+- `modules/auth/tenant-claims.mjs`
+- `tests/tenant-scope-auth-claims.spec.mjs`
+- `scripts/rehearse-tenant-scope-auth-claims.mjs`
+- `TENANT_SCOPE_AUTH_CLAIM_AUDIT.md`
+- `TENANT_SCOPE_AUTH_CLAIM_CONTRACT.md`
+- `TENANT_SCOPE_AUTH_CLAIM_REHEARSAL_RESULT.md`
+- `TENANT_CLAIM_TO_ROUTE_QUERY_WIRING_MATRIX.md`
+- `P0_006M_COMMERCIAL_LAUNCH_GATE_RESULT.md`
+- `NEXT_PROMPT_P0_006N_TENANT_SCOPE_AUTH_CLAIM_STAGING_REHEARSAL.md`
+
+Result:
+
+- Tenant auth claim gate passed in staging/local evidence.
+- P0-006 remains Partial, not Verified.
+- Production cutover remains `NO-GO`.

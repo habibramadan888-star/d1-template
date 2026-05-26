@@ -4532,6 +4532,42 @@ P0-006 status:
 
 - `Partial - tenant scope staging route/query wiring gate ready`.
 
+## P0-006M Tenant Scope Auth/Session Claim Gate
+
+Date: 2026-05-26, Asia/Dubai
+
+Scope: staging/local-only tenant scope auth/session claim gate. No production
+deploy, production migration, production D1 write, production URL call, staging
+D1 write, feature flag enablement, dashboard live switch, live financial formula
+change, legacy `CORPID` removal, or secret exposure occurred.
+
+Completed:
+
+- Added non-invasive `modules/auth/tenant-claims.mjs`.
+- Added `npm run test:tenant-claims`.
+- Added `npm run rehearse:tenant-claims`.
+- Defined employee, owner, manager/admin tenant claim contract.
+- Verified missing `tenant_id` is a staging warning only when legacy `corp_id`
+  fallback exists, and is production-unsafe.
+- Verified frontend-supplied `tenant_id` is ignored as authority.
+- Verified cross-tenant and cross-property access denial.
+- Verified claim-derived actor/membership can feed route/query tenant scope
+  policy without hardcoded `CORPID`.
+
+Result:
+
+- Tenant scope auth claim gate: PASS.
+- Claim rehearsal scenarios: 10.
+- Blocked scenarios: 0.
+- Legacy CORPID fallback warnings: 3.
+- Cross-tenant denied: yes.
+- Cross-property denied: yes.
+- Production remains `NO-GO`.
+
+P0-006 status:
+
+- `Partial - tenant scope auth/session claim gate ready`.
+
 ## P0-006L Tenant Scope Staging Route/Query Wiring Rehearsal
 
 Date: 2026-05-26, Asia/Dubai

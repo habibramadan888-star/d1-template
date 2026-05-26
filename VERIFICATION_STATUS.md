@@ -910,3 +910,21 @@ No production deploy, production migration, production D1 write, production URL
 call, remote staging flag write, staging D1 write, dashboard live switch, live
 financial formula change, legacy `CORPID` removal, or secret exposure occurred.
 P0-006 remains Partial and production remains NO-GO.
+
+## P0-006M Verification Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+| Check                       | Run? | Result | Blocker | Evidence                                       | Notes                                                                                                                                                                     |
+| --------------------------- | ---- | ------ | ------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Tenant auth claim tests     | yes  | Pass   | none    | `tests/tenant-scope-auth-claims.spec.mjs`      | 13 tests cover employee/owner/manager claims, legacy fallback, frontend tenant tampering, cross-tenant denial, cross-property denial, and non-invasive rollback behavior. |
+| Tenant auth claim rehearsal | yes  | Pass   | none    | `TENANT_SCOPE_AUTH_CLAIM_REHEARSAL_RESULT.md`  | 10 scenarios, 0 blocked, 3 legacy fallback warnings.                                                                                                                      |
+| Auth claim audit            | yes  | Pass   | none    | `TENANT_SCOPE_AUTH_CLAIM_AUDIT.md`             | Current JWT/session lacks authoritative tenant/property claims.                                                                                                           |
+| Claim contract              | yes  | Pass   | none    | `TENANT_SCOPE_AUTH_CLAIM_CONTRACT.md`          | Defines future employee/owner/manager/admin contract without changing live auth.                                                                                          |
+| Claim to route/query matrix | yes  | Pass   | none    | `TENANT_CLAIM_TO_ROUTE_QUERY_WIRING_MATRIX.md` | Route/query gates can consume future claims; production remains NO-GO.                                                                                                    |
+| Production NO-GO            | yes  | Pass   | none    | `P0_006M_COMMERCIAL_LAUNCH_GATE_RESULT.md`     | `gate:commercial-launch` remains `PRODUCTION_NO_GO`.                                                                                                                      |
+
+No production deploy, production migration, production D1 write, production URL
+call, staging D1 write, feature flag enablement, dashboard live switch, live
+financial formula change, legacy `CORPID` removal, or secret exposure occurred.
+P0-006 remains Partial and production remains NO-GO.
