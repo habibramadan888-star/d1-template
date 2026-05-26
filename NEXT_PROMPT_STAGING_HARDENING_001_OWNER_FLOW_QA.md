@@ -8,8 +8,11 @@ Scope:
 - No production deploy.
 - No staging deploy unless separately approved.
 - No production migration.
+- No remote production D1 migration.
 - No production D1 write.
 - No production cutover.
+- No production feature flag enablement.
+- Keep commercial launch gate `PRODUCTION_NO_GO`.
 
 Goals:
 
@@ -19,7 +22,7 @@ Goals:
 4. Verify void/delete session visibility and rollback evidence.
 5. Verify export/report behavior if available.
 6. Confirm no frontend totals are accounting authority.
-7. Keep commercial launch gate `PRODUCTION_NO_GO`.
+7. Record remaining owner-flow gaps.
 
 Required outputs:
 
@@ -27,6 +30,7 @@ Required outputs:
 - `STAGING_HARDENING_OWNER_FLOW_QA_RESULT.md`
 - `STAGING_HARDENING_AUDIT_HISTORY_EVIDENCE.md`
 - `STAGING_HARDENING_REMAINING_GAPS.md`
+- `STAGING_HARDENING_COMMERCIAL_LAUNCH_GATE_RESULT.md`
 
 Completion rule:
 

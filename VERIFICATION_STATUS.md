@@ -962,6 +962,21 @@ call, staging D1 write, feature flag enablement, dashboard live switch, live
 financial formula change, legacy `CORPID` removal, or secret exposure occurred.
 P0-006 remains Partial and production remains NO-GO.
 
+## COMMERCIAL-LAUNCH-REVIEW-002 Verification Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+| Check                        | Run? | Result             | Blocker | Evidence                                                                                       | Notes                                                                                 |
+| ---------------------------- | ---- | ------------------ | ------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| Production copy strategy     | yes  | Prepared           | none    | `PRODUCTION_COPY_DRY_RUN_STRATEGY.md`                                                          | Defines isolated copy target and forbids binding it to production Worker.             |
+| Backup/copy command draft    | yes  | Prepared, not run  | none    | `PRODUCTION_D1_BACKUP_AND_COPY_COMMAND_DRAFT.md`                                               | All production/D1 commands are marked not safe to run now and require human approval. |
+| Dry-run checklist            | yes  | Prepared           | none    | `PRODUCTION_COPY_DRY_RUN_CHECKLIST.md`                                                         | Requires backup, isolated copy, row counts, rollback, accounting, and tenant review.  |
+| Migration/backfill matrix    | yes  | Prepared           | none    | `PRODUCTION_COPY_MIGRATION_BACKFILL_DRY_RUN_MATRIX.md`                                         | Keeps all production-copy dry-run areas manual-approved.                              |
+| Human approvals              | yes  | Prepared           | none    | `PRODUCTION_COPY_DRY_RUN_HUMAN_APPROVALS.md`                                                   | Lists production D1 identification, backup, copy, rollback, accounting, and cutover.  |
+| Next approval prompt         | yes  | Prepared           | none    | `NEXT_PROMPT_COMMERCIAL_LAUNCH_REVIEW_003_CREATE_PRODUCTION_COPY_DRY_RUN_APPROVAL_REQUIRED.md` | Requires explicit approval before creating or importing a production copy.            |
+| Production command execution | yes  | Not executed       | none    | Git diff and command history for this task                                                     | No production deploy, migration, D1 export/import/execute, or cutover was executed.   |
+| Commercial launch gate       | yes  | `PRODUCTION_NO_GO` | none    | `COMMERCIAL_LAUNCH_READINESS_RESULT.md`                                                        | The review packet does not change launch status.                                      |
+
 ## P0-006S Verification Addendum
 
 Date: 2026-05-26, Asia/Dubai

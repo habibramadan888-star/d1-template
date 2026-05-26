@@ -1,6 +1,6 @@
 # Commercial Launch Readiness Matrix
 
-Generated: 2026-05-26T19:46:42.576Z
+Generated: 2026-05-26T20:06:25.703Z
 
 Scope: read-only commercial launch gate. This script reads reports only and does not deploy, migrate, call APIs, access D1, or read secrets.
 
@@ -41,5 +41,20 @@ Scope: read-only commercial launch gate. This script reads reports only and does
 | Migration / rollback packet | Prepared | `PRODUCTION_MIGRATION_ROLLBACK_REVIEW_PACKET.md` |
 | Staging evidence index      | Prepared | `STAGING_EVIDENCE_INDEX.md`                      |
 | Next-stage roadmap          | Prepared | `NEXT_STAGE_ROADMAP.md`                          |
+
+Decision: production remains `PRODUCTION_NO_GO`.
+
+## COMMERCIAL-LAUNCH-REVIEW-002 Addendum
+
+| Review Area                    | Result            | Evidence                                                                                       |
+| ------------------------------ | ----------------- | ---------------------------------------------------------------------------------------------- |
+| Starting context               | Prepared          | `COMMERCIAL_LAUNCH_REVIEW_002_STARTING_CONTEXT.md`                                             |
+| Production-copy strategy       | Prepared          | `PRODUCTION_COPY_DRY_RUN_STRATEGY.md`                                                          |
+| Backup/copy command draft      | Prepared, not run | `PRODUCTION_D1_BACKUP_AND_COPY_COMMAND_DRAFT.md`                                               |
+| Production-copy checklist      | Prepared          | `PRODUCTION_COPY_DRY_RUN_CHECKLIST.md`                                                         |
+| Migration/backfill matrix      | Prepared          | `PRODUCTION_COPY_MIGRATION_BACKFILL_DRY_RUN_MATRIX.md`                                         |
+| Human approvals                | Prepared          | `PRODUCTION_COPY_DRY_RUN_HUMAN_APPROVALS.md`                                                   |
+| Next approval prompt           | Prepared          | `NEXT_PROMPT_COMMERCIAL_LAUNCH_REVIEW_003_CREATE_PRODUCTION_COPY_DRY_RUN_APPROVAL_REQUIRED.md` |
+| Production / D1 command status | Not executed      | This task was documentation-only.                                                              |
 
 Decision: production remains `PRODUCTION_NO_GO`.

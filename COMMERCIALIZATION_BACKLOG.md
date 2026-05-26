@@ -1354,6 +1354,32 @@ Still blocked for production:
 - Production receivables migration, backup, rollback, backfill, and deploy
   approval.
 
+## COMMERCIAL-LAUNCH-REVIEW-002 Backlog Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+Production cutover remains `PRODUCTION_NO_GO`.
+
+Prepared documentation-only production-copy dry-run package:
+
+- `COMMERCIAL_LAUNCH_REVIEW_002_STARTING_CONTEXT.md`
+- `PRODUCTION_COPY_DRY_RUN_STRATEGY.md`
+- `PRODUCTION_D1_BACKUP_AND_COPY_COMMAND_DRAFT.md`
+- `PRODUCTION_COPY_DRY_RUN_CHECKLIST.md`
+- `PRODUCTION_COPY_MIGRATION_BACKFILL_DRY_RUN_MATRIX.md`
+- `PRODUCTION_COPY_DRY_RUN_HUMAN_APPROVALS.md`
+
+This does not execute or approve production work. Remaining launch blockers:
+
+- Production D1 name/id confirmation.
+- Production backup approval.
+- Production-copy creation approval.
+- Production-copy restore/import approval.
+- Migration/backfill/rollback dry-run approval on copy.
+- Tenant mapping, accounting reconciliation, receivables, and TOP_25 money-risk
+  human review.
+- Production deploy, feature flag, and cutover approval.
+
 ## P0-006S Backlog Addendum
 
 Date: 2026-05-26, Asia/Dubai
