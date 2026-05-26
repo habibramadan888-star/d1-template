@@ -4532,6 +4532,45 @@ P0-006 status:
 
 - `Partial - tenant scope staging route/query wiring gate ready`.
 
+## P0-006L Tenant Scope Staging Route/Query Wiring Rehearsal
+
+Date: 2026-05-26, Asia/Dubai
+
+Scope: approved staging/local tenant scope route/query wiring rehearsal using
+in-process feature flag values. No remote staging flag write, production
+deploy, production migration, production D1 write, production URL call, staging
+D1 write, dashboard live switch, live financial formula change, legacy
+`CORPID` removal, or secret exposure occurred.
+
+Completed:
+
+- Ran `npm run test:tenant-scope-wiring-rehearsal`.
+- Ran `npm run rehearse:tenant-scope-staging-wiring` with all required
+  confirmation flags.
+- Verified tenant scope route flag behavior from `false` to `true` and back to
+  `false`.
+- Verified dashboard/history query flag behavior from `false` to `true` and
+  back to `false`.
+- Verified 11 route allow/deny scenarios.
+- Verified 4 dashboard/history query scenarios.
+- Verified 6 cross-tenant rows are removed from legacy `CORPID` query results
+  during scoped query rehearsal.
+- Verified production stays disabled even when rehearsal flags are `true`.
+
+Result:
+
+- Tenant scope staging route/query wiring rehearsal: PASS.
+- Route scenarios: 11.
+- Query scenarios: 4.
+- Blocked scenarios: 0.
+- Missing confirmations: 0.
+- Final tenant scope flags: false / legacy.
+- Production remains `NO-GO`.
+
+P0-006 status:
+
+- `Partial - tenant scope staging route/query wiring rehearsal passed`.
+
 ## P0-006L Tenant Scope Staging Route/Query Wiring Approval Blocker
 
 Date: 2026-05-26, Asia/Dubai

@@ -1,41 +1,60 @@
 # P0-006L Route/Query Wiring Rehearsal Result
 
-Date: 2026-05-26, Asia/Dubai
+Generated: 2026-05-26T13:16:18.485Z
 
-Conclusion: `BLOCKED_PENDING_EXPLICIT_APPROVAL`
+Conclusion: `PASS`
 
-## Result
+Feature flag phases:
 
-| Scenario                                           | Expected Action          | Executed | Result  | Notes                                                     |
-| -------------------------------------------------- | ------------------------ | -------- | ------- | --------------------------------------------------------- |
-| `/api/employee/entry` tenant scope wiring          | staging-only rehearsal   | no       | BLOCKED | Missing `--confirm-staging-tenant-scope-wiring`.          |
-| `/api/staging/handover/commit` tenant scope wiring | staging-only rehearsal   | no       | BLOCKED | Missing approval and rollback confirmation.               |
-| `/api/delete_session` tenant scope wiring          | staging-only rehearsal   | no       | BLOCKED | Missing approval and backup confirmation.                 |
-| `/api/rent_config` tenant scope wiring             | staging-only rehearsal   | no       | BLOCKED | Missing auth claim review confirmation.                   |
-| `/api/history` query scope wiring                  | staging-only rehearsal   | no       | BLOCKED | Missing staging wiring confirmation.                      |
-| Owner dashboard active totals query scope          | staging shadow/rehearsal | no       | BLOCKED | Missing confirmation and dashboard mutation guard review. |
+| Phase  | Flag                                                | Expected                                         | Actual                                           | Result |
+| ------ | --------------------------------------------------- | ------------------------------------------------ | ------------------------------------------------ | ------ |
+| before | ENABLE_TENANT_SCOPE_ROUTE_ENFORCEMENT_STAGING       | false / LEGACY                                   | false / LEGACY                                   | PASS   |
+| before | ENABLE_TENANT_SCOPE_DASHBOARD_HISTORY_QUERY_STAGING | false / LEGACY                                   | false / LEGACY                                   | PASS   |
+| during | ENABLE_TENANT_SCOPE_ROUTE_ENFORCEMENT_STAGING       | true / TENANT_SCOPE_ROUTE_ENFORCEMENT_GATE       | true / TENANT_SCOPE_ROUTE_ENFORCEMENT_GATE       | PASS   |
+| during | ENABLE_TENANT_SCOPE_DASHBOARD_HISTORY_QUERY_STAGING | true / TENANT_SCOPE_DASHBOARD_HISTORY_QUERY_GATE | true / TENANT_SCOPE_DASHBOARD_HISTORY_QUERY_GATE | PASS   |
 
-## Safe Evidence Reused
+Route enforcement scenarios:
 
-P0-006K remains valid:
+| Scenario                                 | Route                        | Method | Action               | Expected Allowed | Actual Allowed | Mode                                | Result | Notes                          |
+| ---------------------------------------- | ---------------------------- | ------ | -------------------- | ---------------- | -------------- | ----------------------------------- | ------ | ------------------------------ |
+| owner A history own property             | /api/history                 | GET    | HISTORY_READ         | yes              | yes            | TENANT_SCOPE_ROUTE_ENFORCEMENT_GATE | PASS   | ALLOWED_BY_PROPERTY_MEMBERSHIP |
+| owner A denied company B history         | /api/history                 | GET    | HISTORY_READ         | no               | no             | TENANT_SCOPE_ROUTE_ENFORCEMENT_GATE | PASS   | NO_PROPERTY_MEMBERSHIP         |
+| employee A own property entry            | /api/employee/entry          | POST   | EMPLOYEE_ENTRY_WRITE | yes              | yes            | TENANT_SCOPE_ROUTE_ENFORCEMENT_GATE | PASS   | ALLOWED_BY_PROPERTY_MEMBERSHIP |
+| employee A denied other property entry   | /api/employee/entry          | POST   | EMPLOYEE_ENTRY_WRITE | no               | no             | TENANT_SCOPE_ROUTE_ENFORCEMENT_GATE | PASS   | NO_PROPERTY_MEMBERSHIP         |
+| employee A denied owner dashboard        | /api/history                 | GET    | DASHBOARD_READ       | no               | no             | TENANT_SCOPE_ROUTE_ENFORCEMENT_GATE | PASS   | ROLE_NOT_ALLOWED_FOR_ACTION    |
+| owner A rent config write own company    | /api/rent_config             | POST   | RENT_CONFIG_WRITE    | yes              | yes            | TENANT_SCOPE_ROUTE_ENFORCEMENT_GATE | PASS   | ALLOWED_BY_PROPERTY_MEMBERSHIP |
+| employee A denied rent config write      | /api/rent_config             | POST   | RENT_CONFIG_WRITE    | no               | no             | TENANT_SCOPE_ROUTE_ENFORCEMENT_GATE | PASS   | ROLE_NOT_ALLOWED_FOR_ACTION    |
+| owner A void own session                 | /api/delete_session          | POST   | VOID_SESSION         | yes              | yes            | TENANT_SCOPE_ROUTE_ENFORCEMENT_GATE | PASS   | ALLOWED_BY_PROPERTY_MEMBERSHIP |
+| owner A denied company B void            | /api/delete_session          | POST   | VOID_SESSION         | no               | no             | TENANT_SCOPE_ROUTE_ENFORCEMENT_GATE | PASS   | NO_PROPERTY_MEMBERSHIP         |
+| employee A staging handover own property | /api/staging/handover/commit | POST   | EMPLOYEE_ENTRY_WRITE | yes              | yes            | TENANT_SCOPE_ROUTE_ENFORCEMENT_GATE | PASS   | ALLOWED_BY_PROPERTY_MEMBERSHIP |
+| owner A denied staging handover submit   | /api/staging/handover/commit | POST   | EMPLOYEE_ENTRY_WRITE | no               | no             | TENANT_SCOPE_ROUTE_ENFORCEMENT_GATE | PASS   | ROLE_NOT_ALLOWED_FOR_ACTION    |
 
-- `TENANT_SCOPE_STAGING_WIRING_GATE=PASS`
-- Ready candidates: 6
-- Manual-required items: 3
-- Blocked items: 0
+Dashboard/history query scenarios:
 
-## Safety
+| Scenario                                       | Query                                    | Legacy Rows                              | Scoped Rows                  | Removed Rows                 | Cross-Tenant Removed         | Mode                                      | Result | Notes                                                                  |
+| ---------------------------------------------- | ---------------------------------------- | ---------------------------------------- | ---------------------------- | ---------------------------- | ---------------------------- | ----------------------------------------- | ------ | ---------------------------------------------------------------------- |
+| owner A history query removes company B rows   | history by legacy corpid                 | session_a_1, transaction_a_2, arrear_b_1 | session_a_1, transaction_a_2 | arrear_b_1                   | arrear_b_1                   | TENANT_SCOPE_DASHBOARD_HISTORY_QUERY_GATE | PASS   | Scoped query removes only cross-tenant rows from legacy corpid result. |
+| owner B history query removes company A rows   | history by legacy corpid                 | session_a_1, transaction_a_2, arrear_b_1 | arrear_b_1                   | session_a_1, transaction_a_2 | session_a_1, transaction_a_2 | TENANT_SCOPE_DASHBOARD_HISTORY_QUERY_GATE | PASS   | Scoped query removes only cross-tenant rows from legacy corpid result. |
+| owner A dashboard query removes company B rows | dashboard active totals by legacy corpid | session_a_1, transaction_a_2, arrear_b_1 | session_a_1, transaction_a_2 | arrear_b_1                   | arrear_b_1                   | TENANT_SCOPE_DASHBOARD_HISTORY_QUERY_GATE | PASS   | Scoped query removes only cross-tenant rows from legacy corpid result. |
+| owner B dashboard query removes company A rows | dashboard active totals by legacy corpid | session_a_1, transaction_a_2, arrear_b_1 | arrear_b_1                   | session_a_1, transaction_a_2 | session_a_1, transaction_a_2 | TENANT_SCOPE_DASHBOARD_HISTORY_QUERY_GATE | PASS   | Scoped query removes only cross-tenant rows from legacy corpid result. |
+
+Summary:
+
+- Route scenarios: 11.
+- Query scenarios: 4.
+- Cross-tenant rows removed: 6.
+- Blocked rows: 0.
+
+Safety:
 
 - Production deploy: no.
 - Production migration: no.
 - Production D1 write: no.
 - Production URL called: no.
 - Staging D1 write: no.
-- Staging flags enabled: no.
+- Remote staging flag write: no.
 - Dashboard/history live result changed: no.
 - Legacy CORPID fallback removed: no.
 - Secret/password/token/cookie printed: no.
 
-## Next Step
-
-Retry P0-006L only with explicit approval flags listed in `NEXT_PROMPT_P0_006L_TENANT_SCOPE_STAGING_ROUTE_QUERY_WIRING_REHEARSAL_APPROVAL_REQUIRED.md`.
+P0-006 remains Partial, not Verified.

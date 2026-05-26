@@ -180,6 +180,38 @@ Next prompt:
 
 - `NEXT_PROMPT_P0_006L_RETRY_TENANT_SCOPE_STAGING_ROUTE_QUERY_WIRING_REHEARSAL_APPROVAL_REQUIRED.md`
 
+## P0-006L Rehearsal Morning Review
+
+Date: 2026-05-26, Asia/Dubai
+
+P0-006 current status:
+
+- `Partial - tenant scope staging route/query wiring rehearsal passed`.
+
+Completed:
+
+- Added `scripts/rehearse-tenant-scope-staging-wiring.mjs`.
+- Added `tests/tenant-scope-staging-wiring-rehearsal.spec.mjs`.
+- Added `npm run test:tenant-scope-wiring-rehearsal`.
+- Added `npm run rehearse:tenant-scope-staging-wiring`.
+- Rehearsed tenant scope route/query flags from false to true and rolled back
+  to false.
+- Verified 11 route scenarios and 4 dashboard/history query scenarios.
+- Confirmed production remains disabled and `NO-GO`.
+
+Safety:
+
+- Production deploy: no.
+- Production migration: no.
+- Production D1 write: no.
+- Staging D1 write: no.
+- Remote staging flag write: no.
+- Legacy CORPID fallback removed: no.
+
+Next prompt:
+
+- `NEXT_PROMPT_P0_006M_TENANT_SCOPE_AUTH_SESSION_CLAIM_GATE.md`
+
 ## STAGING-QA-005 Update
 
 Date: 2026-05-25, Asia/Dubai

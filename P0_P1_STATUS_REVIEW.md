@@ -1376,3 +1376,48 @@ Result:
 Next step:
 
 - Retry P0-006L only after explicit human approval with all required flags.
+
+## P0-006L Tenant Scope Staging Route/Query Wiring Rehearsal Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+Current P0-006 status is now
+`Partial - tenant scope staging route/query wiring rehearsal passed`.
+
+Added evidence:
+
+- `P0_006L_PRE_REHEARSAL_CONFIRMATION.md`
+- `P0_006L_ROUTE_QUERY_WIRING_REHEARSAL_RESULT.md`
+- `P0_006L_DASHBOARD_HISTORY_SCOPE_EVIDENCE.md`
+- `P0_006L_ROLLBACK_RESULT.md`
+- `P0_006L_PRODUCTION_NO_GO_REVIEW.md`
+- `NEXT_PROMPT_P0_006M_TENANT_SCOPE_AUTH_SESSION_CLAIM_GATE.md`
+- `scripts/rehearse-tenant-scope-staging-wiring.mjs`
+- `tests/tenant-scope-staging-wiring-rehearsal.spec.mjs`
+- `npm run test:tenant-scope-wiring-rehearsal`
+- `npm run rehearse:tenant-scope-staging-wiring`
+
+Result:
+
+- Staging/local route/query wiring rehearsal passed.
+- Route enforcement rehearsal covered 11 owner/employee allow/deny scenarios.
+- Dashboard/history query rehearsal covered 4 scoped query scenarios and
+  removed 6 cross-tenant rows from legacy `CORPID` results.
+- Rollback to false / legacy passed for both tenant-scope rehearsal flags.
+- Production stayed disabled even when rehearsal flags were true.
+- No production deploy, production migration, production D1 write, staging D1
+  write, remote flag mutation, dashboard live switch, or legacy fallback removal
+  occurred.
+
+Remaining risk:
+
+- P0-006 is not Verified.
+- Auth/session claim source and active session compatibility still need a
+  dedicated gate before live wiring.
+- Production migration, production backfill, production route/query switch, and
+  human tenancy model decisions are not approved.
+
+Next step:
+
+- P0-006M can review auth/session claim shape and route/query claim
+  dependencies in staging/local only.

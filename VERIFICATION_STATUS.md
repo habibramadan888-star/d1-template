@@ -892,3 +892,21 @@ Date: 2026-05-26, Asia/Dubai
 | Staging D1 write              | yes  | No           | none              | Task constraints                                 | No staging data was written.                                           |
 
 P0-006 remains Partial and production remains NO-GO.
+
+## P0-006L Rehearsal Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+| Check                                     | Run? | Result | Blocker | Evidence                                               | Notes                                                                                                                                                   |
+| ----------------------------------------- | ---- | ------ | ------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Tenant scope wiring rehearsal tests       | yes  | Pass   | none    | `tests/tenant-scope-staging-wiring-rehearsal.spec.mjs` | 7 tests cover missing approval block, approved rehearsal, rollback, production disablement, route decisions, query scoping, and no production/D1 calls. |
+| Tenant scope route/query wiring rehearsal | yes  | Pass   | none    | `P0_006L_ROUTE_QUERY_WIRING_REHEARSAL_RESULT.md`       | 11 route scenarios, 4 query scenarios, 0 blocked.                                                                                                       |
+| Dashboard/history scope evidence          | yes  | Pass   | none    | `P0_006L_DASHBOARD_HISTORY_SCOPE_EVIDENCE.md`          | Scoped query rehearsal removed 6 cross-tenant rows from legacy `CORPID` results.                                                                        |
+| Rollback                                  | yes  | Pass   | none    | `P0_006L_ROLLBACK_RESULT.md`                           | Final in-process rehearsal flags are false / legacy.                                                                                                    |
+| Production NO-GO                          | yes  | Pass   | none    | `P0_006L_PRODUCTION_NO_GO_REVIEW.md`                   | Production remains disabled and untouched.                                                                                                              |
+| Staging D1 write                          | yes  | No     | none    | Script source and task scope                           | Rehearsal used fixtures and in-process env only.                                                                                                        |
+
+No production deploy, production migration, production D1 write, production URL
+call, remote staging flag write, staging D1 write, dashboard live switch, live
+financial formula change, legacy `CORPID` removal, or secret exposure occurred.
+P0-006 remains Partial and production remains NO-GO.

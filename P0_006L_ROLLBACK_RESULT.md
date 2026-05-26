@@ -1,28 +1,17 @@
 # P0-006L Rollback Result
 
-Date: 2026-05-26, Asia/Dubai
+Generated: 2026-05-26T13:16:18.485Z
 
-Conclusion: `NOT_REQUIRED_NO_FLAGS_ENABLED`
+Conclusion: `PASS`
 
-## Flag State
+| Flag                                                | Expected After | Actual After   | Result |
+| --------------------------------------------------- | -------------- | -------------- | ------ |
+| ENABLE_TENANT_SCOPE_ROUTE_ENFORCEMENT_STAGING       | false / LEGACY | false / LEGACY | PASS   |
+| ENABLE_TENANT_SCOPE_DASHBOARD_HISTORY_QUERY_STAGING | false / LEGACY | false / LEGACY | PASS   |
 
-| Flag                                                  | Expected Final State | Changed In This Task | Result |
-| ----------------------------------------------------- | -------------------- | -------------------- | ------ |
-| `ENABLE_TENANT_SCOPE_ROUTE_ENFORCEMENT_STAGING`       | `false`              | no                   | PASS   |
-| `ENABLE_TENANT_SCOPE_DASHBOARD_HISTORY_QUERY_STAGING` | `false`              | no                   | PASS   |
+Rollback notes:
 
-## Rollback Execution
-
-Rollback was not executed because no staging tenant-scope runtime flags were enabled and no runtime wiring rehearsal was performed.
-
-## Safety
-
-- Production deploy: no.
-- Production migration: no.
-- Production D1 write: no.
-- Staging D1 write: no.
-- Dashboard/history live mutation: no.
-- Legacy CORPID fallback removal: no.
-- Secret/password/token/cookie exposure: no.
-
-Production remains `NO-GO`.
+- Rehearsal used in-process env objects only.
+- Remote staging flags were not changed.
+- Final rehearsal state is false / legacy for both tenant-scope flags.
+- Production untouched.

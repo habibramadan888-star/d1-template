@@ -1,30 +1,32 @@
 # P0-006L Production NO-GO Review
 
-Date: 2026-05-26, Asia/Dubai
+Generated: 2026-05-26T13:16:18.485Z
 
 Conclusion: production remains `NO-GO`.
 
-## Reasons
+| Check                                        | Expected | Actual   | Result |
+| -------------------------------------------- | -------- | -------- | ------ |
+| production route enforcement flag true       | disabled | disabled | PASS   |
+| production dashboard/history query flag true | disabled | disabled | PASS   |
 
-| Item                                | Status                        | Reason                                                                                      |
-| ----------------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------- |
-| P0-006                              | Partial                       | P0-006K gate is ready, but P0-006L runtime rehearsal was blocked pending explicit approval. |
-| Production migration                | Not approved                  | No production tenant schema migration approval exists.                                      |
-| Production D1 write                 | Not approved                  | No production backfill or verification approval exists.                                     |
-| Production route/query switch       | Not approved                  | No production wiring or cutover approval exists.                                            |
-| Staging wiring rehearsal            | Not executed                  | Required P0-006L approval flags were missing.                                               |
-| Auth/session claim review           | Missing                       | `--confirm-auth-claim-review` was not supplied.                                             |
-| Legacy CORPID fallback preservation | Missing explicit confirmation | `--confirm-legacy-corpid-fallback-preserved` was not supplied.                              |
+Reasons:
 
-## Safety Confirmed
+- P0-006 remains Partial, not Verified.
+- This rehearsal did not deploy production.
+- This rehearsal did not execute production migration.
+- This rehearsal did not write production D1.
+- This rehearsal did not remove legacy CORPID fallback.
+- Production route/query cutover remains unapproved.
+- Production auth/session claim strategy still requires human review.
+
+Safety:
 
 - Production deploy: no.
 - Production migration: no.
 - Production D1 write: no.
 - Production URL called: no.
-- Production feature flag enabled: no.
 - Staging D1 write: no.
-- Legacy CORPID removed: no.
-- Dashboard live result changed: no.
-
-P0-006 is not Verified.
+- Remote staging flag write: no.
+- Dashboard/history live result changed: no.
+- Legacy CORPID fallback removed: no.
+- Secret/password/token/cookie printed: no.

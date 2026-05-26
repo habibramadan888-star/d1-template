@@ -1,6 +1,6 @@
 # Commercial Launch Readiness Matrix
 
-Generated: 2026-05-26T12:35:15.040Z
+Generated: 2026-05-26T13:18:33.380Z
 
 Scope: read-only commercial launch gate. This script reads reports only and does not deploy, migrate, call APIs, access D1, or read secrets.
 

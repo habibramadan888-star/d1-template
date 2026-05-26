@@ -1,21 +1,20 @@
 # P0-006L Dashboard/History Scope Evidence
 
-Date: 2026-05-26, Asia/Dubai
+Generated: 2026-05-26T13:16:18.485Z
 
-Conclusion: `NOT_EXECUTED_PENDING_APPROVAL`
+Conclusion: `PASS`
 
-## Evidence Status
+| Scenario                                       | Query                                    | Legacy Rows                              | Scoped Rows                  | Removed Rows                 | Cross-Tenant Removed         | Mode                                      | Result | Notes                                                                  |
+| ---------------------------------------------- | ---------------------------------------- | ---------------------------------------- | ---------------------------- | ---------------------------- | ---------------------------- | ----------------------------------------- | ------ | ---------------------------------------------------------------------- |
+| owner A history query removes company B rows   | history by legacy corpid                 | session_a_1, transaction_a_2, arrear_b_1 | session_a_1, transaction_a_2 | arrear_b_1                   | arrear_b_1                   | TENANT_SCOPE_DASHBOARD_HISTORY_QUERY_GATE | PASS   | Scoped query removes only cross-tenant rows from legacy corpid result. |
+| owner B history query removes company A rows   | history by legacy corpid                 | session_a_1, transaction_a_2, arrear_b_1 | arrear_b_1                   | session_a_1, transaction_a_2 | session_a_1, transaction_a_2 | TENANT_SCOPE_DASHBOARD_HISTORY_QUERY_GATE | PASS   | Scoped query removes only cross-tenant rows from legacy corpid result. |
+| owner A dashboard query removes company B rows | dashboard active totals by legacy corpid | session_a_1, transaction_a_2, arrear_b_1 | session_a_1, transaction_a_2 | arrear_b_1                   | arrear_b_1                   | TENANT_SCOPE_DASHBOARD_HISTORY_QUERY_GATE | PASS   | Scoped query removes only cross-tenant rows from legacy corpid result. |
+| owner B dashboard query removes company A rows | dashboard active totals by legacy corpid | session_a_1, transaction_a_2, arrear_b_1 | arrear_b_1                   | session_a_1, transaction_a_2 | session_a_1, transaction_a_2 | TENANT_SCOPE_DASHBOARD_HISTORY_QUERY_GATE | PASS   | Scoped query removes only cross-tenant rows from legacy corpid result. |
 
-| Check                               | Current Evidence                                              | Result       | Notes                                                                     |
-| ----------------------------------- | ------------------------------------------------------------- | ------------ | ------------------------------------------------------------------------- |
-| Dashboard/history query source gate | `TENANT_SCOPE_STAGING_DASHBOARD_HISTORY_QUERY_GATE_RESULT.md` | PASS         | Existing P0-006K source gate remains valid.                               |
-| Runtime staging wiring              | none                                                          | NOT_EXECUTED | Missing explicit P0-006L approval flags.                                  |
-| Dashboard live mutation             | none                                                          | NOT_CHANGED  | No wiring was executed.                                                   |
-| Cross-tenant row removal            | fixture gate                                                  | PASS         | Static fixture gate removes cross-tenant rows from legacy CORPID results. |
-| Production dashboard change         | none                                                          | NO           | Production untouched.                                                     |
+Evidence summary:
 
-## Decision
-
-Dashboard/history scoped query behavior is ready for a future staging rehearsal, but this task did not execute the runtime wiring rehearsal because approval flags were not supplied.
-
-P0-006 remains Partial and production remains `NO-GO`.
+- Query scenarios: 4.
+- Cross-tenant rows removed from legacy CORPID results: 6.
+- Dashboard/history live result changed: no.
+- Dashboard card formula changed: no.
+- Production dashboard changed: no.

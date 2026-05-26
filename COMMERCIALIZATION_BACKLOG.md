@@ -1311,6 +1311,32 @@ Next safe step:
 - Retry P0-006L only with explicit approval flags in
   `NEXT_PROMPT_P0_006L_RETRY_TENANT_SCOPE_STAGING_ROUTE_QUERY_WIRING_REHEARSAL_APPROVAL_REQUIRED.md`.
 
+## P0-006L Rehearsal Backlog Addendum
+
+P0-006 current status:
+
+- `Partial - tenant scope staging route/query wiring rehearsal passed`.
+
+Current result:
+
+- Added `npm run test:tenant-scope-wiring-rehearsal`.
+- Added `npm run rehearse:tenant-scope-staging-wiring`.
+- Approved staging/local rehearsal passed with 11 route scenarios and 4
+  dashboard/history query scenarios.
+- Route and query flags were rehearsed from off to on and rolled back to
+  false/legacy in process.
+- Production stayed disabled even when rehearsal flags were true.
+- Dashboard/history live result remained unchanged.
+- Legacy `CORPID` fallback remained preserved.
+
+Still blocked for production:
+
+- P0-006 is not Verified.
+- Auth/session claim source and active session compatibility still need a
+  dedicated gate.
+- Production migration and production backfill are not approved.
+- Production route/query switch and cutover are not approved.
+
 ## P0-006I Backlog Addendum
 
 Date: 2026-05-26, Asia/Dubai
