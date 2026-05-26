@@ -1,6 +1,6 @@
 # Commercial Launch Readiness Result
 
-Generated: 2026-05-26T06:56:26.677Z
+Generated: 2026-05-26T07:34:21.843Z
 
 | Metric                | Count |
 | --------------------- | ----: |
@@ -16,7 +16,7 @@ Allowed next work: local/staging dry-run validation, manual QA preparation, and 
 
 Forbidden next work without human approval: production deploy, staging deploy, remote/production D1 migration, production feature flag enablement, and live accounting authority switch.
 
-## P0-006H Addendum
+## P0-006H / P0-006H-REVIEW Addendum
 
 P0-006 current status:
 
@@ -24,15 +24,14 @@ P0-006 current status:
 
 Evidence:
 
-- `P0_006H_STARTING_CONTEXT.md`
-- `TENANT_SCOPE_STAGING_BACKFILL_DRY_RUN_PLAN.md`
 - `TENANT_SCOPE_STAGING_BACKFILL_DRY_RUN_RESULT.md`
-- `P0_006H_BACKUP_ROLLBACK_PLAN.md`
-- `P0_006H_COMMERCIAL_LAUNCH_GATE_RESULT.md`
-- `scripts/dry-run-tenant-scope-staging-backfill.mjs`
-- `tests/tenant-scope-staging-backfill-dry-run.spec.mjs`
+- `P0_006H_LEGACY_CORPID_WARNING_REVIEW.md`
+- `P0_006I_STAGING_BACKFILL_WRITE_APPROVAL_PACKET.md`
+- `P0_006I_EXACT_STAGING_BACKFILL_UPDATE_PLAN.md`
+- `NEXT_PROMPT_P0_006I_TENANT_SCOPE_STAGING_BACKFILL_WRITE_APPROVAL_REQUIRED.md`
 
-Production remains `NO-GO`. P0-006H dry-run success does not approve
-production deploy, production migration, staging tenant backfill write,
-production auth changes, dashboard/history live switch, removal of legacy
-`CORPID` fallback, live route/query wiring, or P0-006 verification.
+Production remains `NO-GO`. P0-006H-REVIEW completes warning review only; it
+does not approve production deploy, production migration, production D1 write,
+staging backfill write, production auth changes, dashboard/history live switch,
+removal of legacy `CORPID` fallback, live route/query wiring, or P0-006
+verification.
