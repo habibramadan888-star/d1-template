@@ -81,6 +81,40 @@ Next step:
 
 - P0-002D can perform staging UI/manual validation, or P0-001C can prepare minor-unit dual-write. Do not enable production cutover automatically.
 
+## P0-006H Review Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+Current P0-006 status is now
+`Partial - tenant scope staging backfill dry-run passed`.
+
+Added evidence:
+
+- `P0_006H_STARTING_CONTEXT.md`
+- `TENANT_SCOPE_STAGING_BACKFILL_DRY_RUN_PLAN.md`
+- `TENANT_SCOPE_STAGING_BACKFILL_DRY_RUN_RESULT.md`
+- `P0_006H_BACKUP_ROLLBACK_PLAN.md`
+- `P0_006H_COMMERCIAL_LAUNCH_GATE_RESULT.md`
+- `NEXT_PROMPT_P0_006I_TENANT_SCOPE_STAGING_BACKFILL_WRITE_APPROVAL_REQUIRED.md`
+- `scripts/dry-run-tenant-scope-staging-backfill.mjs`
+- `tests/tenant-scope-staging-backfill-dry-run.spec.mjs`
+
+Result:
+
+- `TENANT_SCOPE_STAGING_BACKFILL_DRY_RUN=PASS`.
+- 13 staging tables reviewed with SELECT only.
+- 0 blocked tables.
+- 9 legacy `CORPID` warning tables.
+- No staging write, production write, migration, deploy, dashboard/history
+  mutation, auth rewrite, or legacy fallback removal occurred.
+
+Remaining risk:
+
+- Legacy `CORPID` tables still need approved schema/backfill work.
+- Staging backfill writes need backup, rollback, exact update review, and
+  explicit human approval.
+- Production remains NO-GO and P0-006 is not Verified.
+
 ## P0-002D Manual Validation Addendum
 
 Date: 2026-05-24, Asia/Dubai

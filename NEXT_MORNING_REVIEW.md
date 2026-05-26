@@ -801,6 +801,39 @@ Recommended next prompt:
 
 Production cutover remains `NO-GO`.
 
+## P0-006H Morning Review Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+Most important result:
+
+- Tenant scope staging backfill dry-run passed with staging D1 SELECT-only
+  inspection. It generated draft write-plan classifications but executed no
+  staging or production writes.
+
+Current status:
+
+- P0-006: `Partial - tenant scope staging backfill dry-run passed`.
+- `TENANT_SCOPE_STAGING_BACKFILL_DRY_RUN=PASS`.
+- Tables reviewed: 13.
+- Blocked tables: 0.
+- Manual-required tables: 0.
+- Legacy `CORPID` warning tables: 9.
+- Staging D1 write: no.
+- Production cutover: NO-GO.
+
+Recommended next prompt:
+
+```text
+Enter TASK P0-006I: Tenant scope staging backfill write approval gate.
+
+Goal: prepare exact staging-only backfill write approval controls after backup,
+rollback, target confirmation, and human review. Do not execute production
+deploy, production migration, production D1 write, production auth change,
+dashboard/history live switch, legacy CORPID fallback removal, or P0-006
+Verified.
+```
+
 ## P0-006G Morning Review Addendum
 
 Date: 2026-05-26, Asia/Dubai

@@ -185,6 +185,36 @@ Still forbidden:
 - Generated embedded Worker expansion.
 - Deleting legacy business code.
 
+## P0-006H Tenant Scope Staging Backfill Dry-Run Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+P0-006 current status:
+
+- Partial - tenant scope staging backfill dry-run passed.
+- Not Verified because no staging write, production migration, live query switch,
+  production auth change, or production cutover occurred.
+
+Completed safely:
+
+- Added a read-only staging D1 dry-run script for tenant scope backfill
+  classification.
+- Confirmed staging target `homelink-finance-staging`
+  (`4ff78bfc-3855-436b-aefb-6b492145d79c`).
+- Reviewed 13 staging tables with SELECT only.
+- Found 0 blocked tables and 9 legacy `CORPID` warning tables.
+- Generated a backup/rollback plan and a next approval-gate prompt.
+
+Still forbidden:
+
+- Production deploy.
+- Production migration.
+- Production D1 write.
+- Staging tenant-scope backfill write without explicit approval.
+- Live dashboard/history query switch.
+- Removing legacy `CORPID` fallback.
+- Marking P0-006 Verified.
+
 ## P0-001J Employee Entry Live Route Switch Rehearsal Addendum
 
 Date: 2026-05-25, Asia/Dubai

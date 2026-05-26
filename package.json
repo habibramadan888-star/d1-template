@@ -47,6 +47,8 @@
     "gate:tenant-scope-dashboard-history-query": "node scripts/gate-tenant-scope-dashboard-history-query.mjs",
     "test:tenant-scope-backfill-gate": "node --test tests/tenant-scope-backfill-reconciliation-gate.spec.mjs",
     "gate:tenant-scope-backfill-reconciliation": "node scripts/gate-tenant-scope-backfill-reconciliation.mjs",
+    "test:tenant-scope-staging-backfill-dry-run": "node --test tests/tenant-scope-staging-backfill-dry-run.spec.mjs",
+    "dry-run:tenant-scope-staging-backfill": "node scripts/dry-run-tenant-scope-staging-backfill.mjs",
     "audit:runtime-ddl": "node scripts/audit-runtime-ddl.mjs",
     "gate:runtime-ddl-removal": "node scripts/gate-runtime-ddl-removal.mjs",
     "reconcile:money": "node scripts/money-shadow-reconcile.mjs",

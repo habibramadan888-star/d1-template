@@ -1,6 +1,6 @@
 # Tenant Scope Backfill Reconciliation Result
 
-Generated: 2026-05-26T06:18:24.846Z
+Generated: 2026-05-26T06:50:17.970Z
 
 Scope: staging/local-only tenant scope backfill reconciliation using static fixtures. This script does not deploy, migrate, read or write D1, call production, mutate dashboard/history output, change auth behavior, or remove legacy CORPID fallback.
 

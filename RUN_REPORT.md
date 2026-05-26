@@ -4318,3 +4318,39 @@ Result:
 P0-006 status:
 
 - `Partial - tenant scope staging backfill reconciliation gate passed`.
+
+## P0-006H Tenant Scope Staging Backfill Dry-Run
+
+Date: 2026-05-26, Asia/Dubai
+
+Scope: read-only staging tenant scope backfill dry-run. No production deploy,
+production migration, production D1 write, production URL call, staging D1
+write, production auth change, global tenant rewrite, legacy `CORPID` fallback
+removal, dashboard/history mutation, live query wiring, remote feature flag
+enablement, or secret exposure occurred.
+
+Completed:
+
+- Added `scripts/dry-run-tenant-scope-staging-backfill.mjs`.
+- Added `npm run dry-run:tenant-scope-staging-backfill`.
+- Added `tests/tenant-scope-staging-backfill-dry-run.spec.mjs`.
+- Added `npm run test:tenant-scope-staging-backfill-dry-run`.
+- Generated P0-006H starting context, staging backfill dry-run plan, backup and
+  rollback plan, commercial launch gate result, and next prompt.
+
+Result:
+
+- `TENANT_SCOPE_STAGING_BACKFILL_DRY_RUN=PASS`.
+- Tables reviewed: 13.
+- Blocked tables: 0.
+- Manual-required tables: 0.
+- Legacy `CORPID` warning tables: 9.
+- Draft write-plan classifications: 9.
+- Staging D1 write: no, SELECT only.
+- Dashboard/history live result remained unchanged.
+- `npm run gate:tenant-scope` remains `MANUAL_REQUIRED`, as expected.
+- Production remains `NO-GO`.
+
+P0-006 status:
+
+- `Partial - tenant scope staging backfill dry-run passed`.
