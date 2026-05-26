@@ -1,6 +1,6 @@
 # Tenant Scope Local/Staging Rehearsal Result
 
-Generated: 2026-05-26T05:36:37.513Z
+Generated: 2026-05-26T06:17:16.182Z
 
 Scope: local/staging-only tenant/property scope rehearsal using static fixtures. This script does not deploy, migrate, read or write D1, call production, mutate dashboard output, or change auth behavior.
 

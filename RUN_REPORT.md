@@ -4285,3 +4285,36 @@ Result:
 P0-006 status:
 
 - `Partial - tenant scope staging dashboard/history query gate passed`.
+
+## P0-006G Tenant Scope Staging Backfill Reconciliation Gate
+
+Date: 2026-05-26, Asia/Dubai
+
+Scope: staging/local-only tenant scope backfill reconciliation gate. No
+production deploy, production migration, production D1 write, production URL
+call, staging D1 write, production auth change, global tenant rewrite, legacy
+`CORPID` fallback removal, dashboard/history mutation, live query wiring, remote
+feature flag enablement, or secret exposure occurred.
+
+Completed:
+
+- Added `scripts/gate-tenant-scope-backfill-reconciliation.mjs`.
+- Added `npm run gate:tenant-scope-backfill-reconciliation`.
+- Added `tests/tenant-scope-backfill-reconciliation-gate.spec.mjs`.
+- Added `npm run test:tenant-scope-backfill-gate`.
+- Generated P0-006G starting context, backfill reconciliation plan, rollback
+  plan, commercial launch gate result, and next prompt.
+
+Result:
+
+- `TENANT_SCOPE_BACKFILL_RECONCILIATION_GATE=PASS`.
+- Rows reconciled: 3.
+- Blocked rows: 0.
+- Legacy bed/CID collision warnings resolved by canonical scope: 2.
+- Dashboard/history live result remained unchanged.
+- `npm run gate:tenant-scope` remains `MANUAL_REQUIRED`, as expected.
+- Production remains `NO-GO`.
+
+P0-006 status:
+
+- `Partial - tenant scope staging backfill reconciliation gate passed`.

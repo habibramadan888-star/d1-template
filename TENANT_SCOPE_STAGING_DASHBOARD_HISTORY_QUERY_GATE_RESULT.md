@@ -1,6 +1,6 @@
 # Tenant Scope Staging Dashboard/History Query Gate Result
 
-Generated: 2026-05-26T05:37:29.478Z
+Generated: 2026-05-26T06:18:15.571Z
 
 Scope: staging/local-only dashboard and history query gate using static fixtures. This script does not deploy, migrate, read or write D1, call production, mutate dashboard/history output, change auth behavior, or remove legacy CORPID fallback.
 

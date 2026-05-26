@@ -801,6 +801,41 @@ Recommended next prompt:
 
 Production cutover remains `NO-GO`.
 
+## P0-006G Morning Review Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+Most important result:
+
+- Tenant scope backfill reconciliation gate passed in fixture-only mode, with
+  all rows mappable to canonical company/property candidates and legacy bed/CID
+  collision warnings made explicit.
+
+Current status:
+
+- P0-006: `Partial - tenant scope staging backfill reconciliation gate passed`.
+- `TENANT_SCOPE_BACKFILL_RECONCILIATION_GATE=PASS`.
+- Rows reconciled: 3.
+- Blocked rows: 0.
+- Collision warnings: 2.
+- Dashboard/history live result changed: no.
+- Staging D1 write: no.
+- Production cutover remains `NO-GO`.
+
+Recommended next task:
+
+```text
+Enter TASK P0-006H: Tenant scope staging backfill dry-run.
+
+Goal: read-only staging backfill dry-run that confirms target D1,
+generates proposed update plans, records row-count reconciliation, and stops
+before any write.
+
+Forbidden: production deploy, production migration, production D1 write,
+production auth change, production cutover, legacy CORPID fallback removal,
+P0-006 Verified.
+```
+
 ## P0-006F Morning Review Addendum
 
 Date: 2026-05-26, Asia/Dubai

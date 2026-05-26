@@ -1168,3 +1168,46 @@ Next step:
 - P0-006G can design a staging/local backfill reconciliation gate. Do not
   execute production migration, production deploy, production auth changes, or
   legacy `CORPID` fallback removal.
+
+## P0-006G Tenant Scope Staging Backfill Reconciliation Gate Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+P0-006 current status:
+
+- `Partial - tenant scope staging backfill reconciliation gate passed`.
+
+Added evidence:
+
+- `TENANT_SCOPE_BACKFILL_RECONCILIATION_RESULT.md`
+- `TENANT_SCOPE_BACKFILL_RECONCILIATION_PLAN.md`
+- `P0_006G_ROLLBACK_PLAN.md`
+- `scripts/gate-tenant-scope-backfill-reconciliation.mjs`
+- `tests/tenant-scope-backfill-reconciliation-gate.spec.mjs`
+- `npm run test:tenant-scope-backfill-gate`
+- `npm run gate:tenant-scope-backfill-reconciliation`
+
+Result:
+
+- Static fixture backfill reconciliation passed.
+- All 3 fixture rows map to known company/property candidates.
+- 2 legacy bed/CID collision warnings are visible and resolved by canonical
+  scope rather than by `CORPID`.
+- Dashboard/history live result was not changed.
+- No production deploy, production migration, production D1 write, staging D1
+  write, production auth change, legacy fallback removal, live query wiring, or
+  remote feature flag enablement occurred.
+
+Remaining risk:
+
+- P0-006 is not Verified.
+- Live Worker dashboard/history queries are not yet wired to company/property
+  scope.
+- Staging backfill dry-run, production migration, rollback, query wiring, and
+  human tenancy model decisions are not approved.
+
+Next step:
+
+- P0-006H can design a staging read-only backfill dry-run. Do not execute
+  production migration, production deploy, production auth changes, or legacy
+  `CORPID` fallback removal.
