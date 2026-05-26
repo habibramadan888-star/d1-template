@@ -1303,3 +1303,46 @@ Next step:
 - P0-006H can design a staging read-only backfill dry-run. Do not execute
   production migration, production deploy, production auth changes, or legacy
   `CORPID` fallback removal.
+
+## P0-006K Tenant Scope Staging Route/Query Wiring Gate Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+Current P0-006 status is now
+`Partial - tenant scope staging route/query wiring gate ready`.
+
+Added evidence:
+
+- `P0_006K_STARTING_CONTEXT.md`
+- `P0_006K_STAGING_ROUTE_QUERY_WIRING_SCOPE.md`
+- `TENANT_SCOPE_STAGING_WIRING_READINESS_GATE_RESULT.md`
+- `P0_006K_ROLLBACK_PLAN.md`
+- `P0_006K_PRODUCTION_NO_GO_REVIEW.md`
+- `NEXT_PROMPT_P0_006L_TENANT_SCOPE_STAGING_ROUTE_QUERY_WIRING_REHEARSAL_APPROVAL_REQUIRED.md`
+- `scripts/gate-tenant-scope-staging-wiring-readiness.mjs`
+- `tests/tenant-scope-staging-wiring-gate.spec.mjs`
+- `npm run test:tenant-scope-wiring-gate`
+- `npm run gate:tenant-scope-staging-wiring`
+
+Result:
+
+- Staging/local route/query wiring readiness gate passed.
+- Six route/query candidates can enter a future staging wiring rehearsal after
+  explicit human approval.
+- Three auth/session/legacy fallback items remain `MANUAL_REQUIRED`.
+- Dashboard/history live result was not changed.
+- No production deploy, production migration, production D1 write, staging D1
+  write, production auth change, legacy fallback removal, live route wiring, or
+  remote feature flag enablement occurred.
+
+Remaining risk:
+
+- P0-006 is not Verified.
+- Live Worker route/query wiring has not been rehearsed.
+- Production tenant migration, backfill, route/query switch, and human tenancy
+  model decisions are not approved.
+
+Next step:
+
+- P0-006L can run a staging route/query wiring rehearsal only after explicit
+  human approval, with rollback and production NO-GO enforcement.

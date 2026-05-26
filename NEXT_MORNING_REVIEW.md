@@ -121,6 +121,37 @@ Recommended next prompt:
 目标：不要执行 production/remote D1 migration，不切换 live 写入路径，不修改 dashboard live 结果。只 review `migration-drafts/005_money_minor_units_dual_write_draft.sql`、`MONEY_DUAL_WRITE_REHEARSAL_RESULT.md`、`MONEY_DUAL_WRITE_GO_LIVE_GATE.md`，冻结字段、回滚、reconciliation、staging 验证和人工会计确认要求。P0-001 仍保持 Partial，不能标记 Verified。
 ```
 
+## P0-006K Morning Review Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+P0-006 current status:
+
+- `Partial - tenant scope staging route/query wiring gate ready`.
+
+Completed:
+
+- Added `scripts/gate-tenant-scope-staging-wiring-readiness.mjs`.
+- Added `tests/tenant-scope-staging-wiring-gate.spec.mjs`.
+- Added `npm run test:tenant-scope-wiring-gate`.
+- Added `npm run gate:tenant-scope-staging-wiring`.
+- Confirmed 6 route/query areas are ready for a future staging wiring
+  rehearsal.
+- Kept auth claim source, active session membership claims, and legacy CORPID
+  fallback removal as manual-required.
+
+Production status:
+
+- Production deploy: no.
+- Production migration: no.
+- Production D1 write: no.
+- Production cutover: `NO-GO`.
+
+Recommended next task:
+
+- Use `NEXT_PROMPT_P0_006L_TENANT_SCOPE_STAGING_ROUTE_QUERY_WIRING_REHEARSAL_APPROVAL_REQUIRED.md`
+  only after explicit human approval.
+
 ## STAGING-QA-005 Update
 
 Date: 2026-05-25, Asia/Dubai

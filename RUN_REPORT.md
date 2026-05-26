@@ -4498,3 +4498,36 @@ Result:
 P0-006 status:
 
 - `Partial - tenant scope staging verification passed`.
+
+## P0-006K Tenant Scope Staging Route/Query Wiring Gate
+
+Date: 2026-05-26, Asia/Dubai
+
+Scope: local/staging-only tenant scope route/query wiring readiness gate. No
+production deploy, production migration, production D1 write, production URL
+call, staging schema migration, staging row-level backfill write, dashboard
+live switch, live financial formula change, legacy `CORPID` removal, or secret
+exposure occurred.
+
+Completed:
+
+- Added `npm run test:tenant-scope-wiring-gate`.
+- Added `npm run gate:tenant-scope-staging-wiring`.
+- Aggregated existing route enforcement and dashboard/history query gates.
+- Identified 6 route/query areas ready for a future staging wiring rehearsal.
+- Kept auth claim source, active session membership claims, and legacy CORPID
+  fallback removal as `MANUAL_REQUIRED`.
+- Generated next P0-006L approval-required prompt.
+
+Result:
+
+- Tenant scope staging wiring gate: PASS.
+- Ready for staging wiring rehearsal: 6.
+- Manual-required items: 3.
+- Production NO-GO items: 1.
+- Blocked items: 0.
+- Production remains `NO-GO`.
+
+P0-006 status:
+
+- `Partial - tenant scope staging route/query wiring gate ready`.

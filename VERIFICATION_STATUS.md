@@ -858,3 +858,22 @@ No production deploy, production migration, production D1 write, production URL
 call, staging schema migration, staging row-level backfill write, dashboard
 live switch, live financial formula change, legacy `CORPID` removal, or secret
 exposure occurred. P0-006 remains Partial and production remains NO-GO.
+
+## P0-006K Verification Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+| Check                               | Run? | Result | Blocker | Evidence                                                      | Notes                                                                                                                               |
+| ----------------------------------- | ---- | ------ | ------- | ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Tenant scope wiring gate tests      | yes  | Pass   | none    | `tests/tenant-scope-staging-wiring-gate.spec.mjs`             | 7 tests cover production disablement, flag-off legacy mode, approved candidates, manual-required items, and no production/D1 calls. |
+| Tenant scope staging wiring gate    | yes  | Pass   | none    | `TENANT_SCOPE_STAGING_WIRING_READINESS_GATE_RESULT.md`        | 6 ready candidates, 3 manual-required items, 1 production NO-GO item, 0 blocked.                                                    |
+| Route enforcement source gate       | yes  | Pass   | none    | `TENANT_SCOPE_STAGING_ROUTE_ENFORCEMENT_GATE_RESULT.md`       | Existing route policy gate remains green.                                                                                           |
+| Dashboard/history query source gate | yes  | Pass   | none    | `TENANT_SCOPE_STAGING_DASHBOARD_HISTORY_QUERY_GATE_RESULT.md` | Existing query policy gate remains green.                                                                                           |
+| Production D1 write                 | yes  | No     | none    | Task constraints and source-only gate                         | Production untouched.                                                                                                               |
+| Staging D1 write                    | yes  | No     | none    | Static fixture-only gate                                      | No staging data was written.                                                                                                        |
+
+No production deploy, production migration, production D1 write, production URL
+call, staging schema migration, staging row-level backfill write, dashboard
+live switch, live financial formula change, legacy `CORPID` removal, remote
+feature flag enablement, or secret exposure occurred. P0-006 remains Partial
+and production remains NO-GO.

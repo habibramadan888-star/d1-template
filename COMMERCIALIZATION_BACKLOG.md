@@ -1267,6 +1267,34 @@ Still blocked for production:
 - Production receivables migration, backup, rollback, backfill, and deploy
   approval.
 
+## P0-006K Backlog Addendum
+
+P0-006 current status:
+
+- `Partial - tenant scope staging route/query wiring gate ready`.
+
+Current result:
+
+- Added `npm run test:tenant-scope-wiring-gate`.
+- Added `npm run gate:tenant-scope-staging-wiring`.
+- Wiring readiness gate passed with 6 approved route/query candidates, 3
+  manual-required items, and 0 blocked items.
+- Candidate areas are `/api/employee/entry`, `/api/staging/handover/commit`,
+  `/api/delete_session`, `/api/rent_config`, `/api/history`, and owner
+  dashboard active totals shadow/query scope.
+- Auth claim source, active session membership claims, and legacy `CORPID`
+  fallback retirement remain manual-required.
+- Dashboard/history live result remained unchanged.
+- Production remains `NO-GO`.
+
+Still blocked for production:
+
+- P0-006 is not Verified.
+- Live Worker route/query wiring has not been executed.
+- Production migration and production backfill are not approved.
+- Legacy `CORPID` fallback removal is not approved.
+- Human tenant model and auth claim review are still required.
+
 ## P0-006I Backlog Addendum
 
 Date: 2026-05-26, Asia/Dubai

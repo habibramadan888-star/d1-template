@@ -1,6 +1,6 @@
 # Tenant Scope Staging Route Enforcement Gate Result
 
-Generated: 2026-05-26T10:56:54.565Z
+Generated: 2026-05-26T11:38:17.879Z
 
 Scope: staging/local-only tenant scope route enforcement gate using static fixtures. This script does not deploy, migrate, read or write D1, call production, mutate dashboard/history output, change auth behavior, or remove legacy CORPID fallback.
 
