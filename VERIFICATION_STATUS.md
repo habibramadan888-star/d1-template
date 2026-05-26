@@ -962,6 +962,22 @@ call, staging D1 write, feature flag enablement, dashboard live switch, live
 financial formula change, legacy `CORPID` removal, or secret exposure occurred.
 P0-006 remains Partial and production remains NO-GO.
 
+## COMMERCIAL-LAUNCH-REVIEW-003 Verification Addendum
+
+Date: 2026-05-27, Asia/Dubai
+
+| Check                          | Run? | Result             | Blocker | Evidence                                  | Notes                                                                           |
+| ------------------------------ | ---- | ------------------ | ------- | ----------------------------------------- | ------------------------------------------------------------------------------- |
+| Production D1 target discovery | yes  | PASS               | none    | `PRODUCTION_D1_TARGET_CONFIRMATION.md`    | `homelink` was confirmed as production D1 by Wrangler info and Worker config.   |
+| Production D1 export backup    | yes  | PASS               | none    | `PRODUCTION_D1_EXPORT_BACKUP_RESULT.md`   | Read/export only; backup stored under ignored `backups/`.                       |
+| Production-copy D1 creation    | yes  | PASS               | none    | `PRODUCTION_COPY_D1_CREATION_RESULT.md`   | Copy D1 created and not bound to production Worker.                             |
+| Backup import into copy        | yes  | PASS               | none    | `PRODUCTION_COPY_D1_IMPORT_RESULT.md`     | 603 queries executed against copy only.                                         |
+| Copy validation                | yes  | PASS               | none    | `PRODUCTION_COPY_D1_VALIDATION_RESULT.md` | Schema and aggregate row counts verified without reading business row contents. |
+| Production D1 write            | yes  | NOT_EXECUTED       | none    | Command scope                             | No production SQL execute/import/migration/backfill was run.                    |
+| Production deploy              | yes  | NOT_EXECUTED       | none    | Command scope                             | No Worker deploy occurred.                                                      |
+| Production migration           | yes  | NOT_EXECUTED       | none    | Command scope                             | No production migration occurred.                                               |
+| Commercial launch gate         | yes  | `PRODUCTION_NO_GO` | none    | `COMMERCIAL_LAUNCH_READINESS_RESULT.md`   | Copy creation does not imply production readiness.                              |
+
 ## COMMERCIAL-LAUNCH-REVIEW-002 Verification Addendum
 
 Date: 2026-05-26, Asia/Dubai

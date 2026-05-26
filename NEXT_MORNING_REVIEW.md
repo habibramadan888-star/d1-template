@@ -892,6 +892,35 @@ Recommended next prompt:
 
 Production cutover remains `NO-GO`.
 
+## COMMERCIAL-LAUNCH-REVIEW-003 Morning Review Addendum
+
+Date: 2026-05-27, Asia/Dubai
+
+Most important result:
+
+- An isolated production-copy D1 was created and loaded from an approved
+  production export backup for future copy-only dry-run work.
+
+Current copy target:
+
+- `homelink-finance-production-copy-dryrun`
+- `c461c7f1-47bc-40cf-bbfd-1c03101943bd`
+
+Safety result:
+
+- Production D1 write: no.
+- Production migration: no.
+- Production deploy: no.
+- Production feature flags: not enabled.
+- Production cutover: `PRODUCTION_NO_GO`.
+
+Recommended next task:
+
+- Prepare exact migration/backfill/reconciliation dry-run commands targeting
+  only the production-copy D1. Require explicit human approval for SQL, expected
+  row counts, rollback verification, tenant mapping, accounting reconciliation,
+  and TOP_25 money-risk review before running anything against the copy.
+
 ## COMMERCIAL-LAUNCH-REVIEW-002 Morning Review Addendum
 
 Date: 2026-05-26, Asia/Dubai

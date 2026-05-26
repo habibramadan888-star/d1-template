@@ -1,6 +1,6 @@
 # Commercial Launch Readiness Result
 
-Generated: 2026-05-26T20:06:25.704Z
+Generated: 2026-05-26T20:36:32.582Z
 
 | Metric                | Count |
 | --------------------- | ----: |
@@ -16,21 +16,16 @@ Allowed next work: local/staging dry-run validation, manual QA preparation, and 
 
 Forbidden next work without human approval: production deploy, staging deploy, remote/production D1 migration, production feature flag enablement, and live accounting authority switch.
 
-## COMMERCIAL-LAUNCH-REVIEW-001 Addendum
+## COMMERCIAL-LAUNCH-REVIEW-003 Addendum
 
-- Full commercial launch review packet was prepared.
-- Production cutover remains `PRODUCTION_NO_GO`.
-- P0-004, P0-005, and P0-007 remain Verified regression gates.
-- P0-001, P0-002, P0-003, P0-006, and P0-008 remain Partial.
-- Production migration, production D1 backup, production rollback, production
-  tenant/property mapping, production money reconciliation, production deploy,
-  production feature flags, and business owner approval remain missing.
-- Recommended next route: Route A, continue production approval preparation.
-
-## COMMERCIAL-LAUNCH-REVIEW-002 Addendum
-
-- Production-copy dry-run preparation packet was prepared.
-- No production command, D1 export, D1 import, D1 execute, migration, deploy,
-  backfill, or cutover was executed.
-- Production-copy creation/import remains human-approval-only.
+- Production D1 target was confirmed as `homelink`
+  (`562aa079-1cca-4176-ba3b-7276a65f98fb`).
+- Production D1 export backup completed to ignored local path
+  `./backups/production-before-copy-dryrun.sql`.
+- Isolated production-copy D1 was created:
+  `homelink-finance-production-copy-dryrun`
+  (`c461c7f1-47bc-40cf-bbfd-1c03101943bd`).
+- Backup was imported into the production-copy D1 only.
+- Production D1 write, production migration, production deploy, production
+  feature flag enablement, and production cutover were not executed.
 - Production cutover remains `PRODUCTION_NO_GO`.

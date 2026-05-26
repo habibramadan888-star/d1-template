@@ -4532,6 +4532,30 @@ P0-006 status:
 
 - `Partial - tenant scope staging route/query wiring gate ready`.
 
+## COMMERCIAL-LAUNCH-REVIEW-003 Production Copy D1 Addendum
+
+Date: 2026-05-27, Asia/Dubai
+
+Scope: approved production D1 read/export and isolated production-copy D1
+creation/import only.
+
+Result:
+
+- Production D1 target confirmed: `homelink`
+  (`562aa079-1cca-4176-ba3b-7276a65f98fb`).
+- Production D1 export backup completed to
+  `./backups/production-before-copy-dryrun.sql`; backup is ignored and not
+  committed.
+- Isolated production-copy D1 created:
+  `homelink-finance-production-copy-dryrun`
+  (`c461c7f1-47bc-40cf-bbfd-1c03101943bd`).
+- Backup imported into production-copy D1 only.
+- Copy validation recorded 19 tables and key row counts.
+- Production D1 write, production migration, production deploy, production
+  feature flag enablement, and production cutover were not executed.
+
+Production cutover remains `PRODUCTION_NO_GO`.
+
 ## COMMERCIAL-LAUNCH-REVIEW-002 Production Copy Dry-Run Prep Addendum
 
 Date: 2026-05-26, Asia/Dubai

@@ -1,6 +1,6 @@
 # Commercial Launch Readiness Matrix
 
-Generated: 2026-05-26T20:06:25.703Z
+Generated: 2026-05-26T20:36:32.581Z
 
 Scope: read-only commercial launch gate. This script reads reports only and does not deploy, migrate, call APIs, access D1, or read secrets.
 
@@ -31,30 +31,17 @@ Scope: read-only commercial launch gate. This script reads reports only and does
 - Production cutover is `NO-GO` because multiple P0/P1 launch gates remain incomplete.
 - This matrix is not deployment approval.
 
-## COMMERCIAL-LAUNCH-REVIEW-001 Addendum
+## COMMERCIAL-LAUNCH-REVIEW-003 Addendum
 
-| Review Area                 | Result   | Evidence                                         |
-| --------------------------- | -------- | ------------------------------------------------ |
-| P0 status summary           | Prepared | `COMMERCIAL_LAUNCH_P0_STATUS_SUMMARY.md`         |
-| Production NO-GO reasons    | Prepared | `COMMERCIAL_LAUNCH_PRODUCTION_NO_GO_REASONS.md`  |
-| Approval matrix             | Prepared | `COMMERCIAL_LAUNCH_APPROVAL_MATRIX.md`           |
-| Migration / rollback packet | Prepared | `PRODUCTION_MIGRATION_ROLLBACK_REVIEW_PACKET.md` |
-| Staging evidence index      | Prepared | `STAGING_EVIDENCE_INDEX.md`                      |
-| Next-stage roadmap          | Prepared | `NEXT_STAGE_ROADMAP.md`                          |
+| Review Area                  | Result                       | Evidence                                  |
+| ---------------------------- | ---------------------------- | ----------------------------------------- |
+| Production D1 target         | Confirmed                    | `PRODUCTION_D1_TARGET_CONFIRMATION.md`    |
+| Production export backup     | Completed                    | `PRODUCTION_D1_EXPORT_BACKUP_RESULT.md`   |
+| Isolated production-copy D1  | Created                      | `PRODUCTION_COPY_D1_CREATION_RESULT.md`   |
+| Backup import into copy      | Completed                    | `PRODUCTION_COPY_D1_IMPORT_RESULT.md`     |
+| Copy schema / row validation | Completed                    | `PRODUCTION_COPY_D1_VALIDATION_RESULT.md` |
+| Copy dry-run readiness       | Ready for next approval gate | `PRODUCTION_COPY_DRY_RUN_READY_REPORT.md` |
 
-Decision: production remains `PRODUCTION_NO_GO`.
-
-## COMMERCIAL-LAUNCH-REVIEW-002 Addendum
-
-| Review Area                    | Result            | Evidence                                                                                       |
-| ------------------------------ | ----------------- | ---------------------------------------------------------------------------------------------- |
-| Starting context               | Prepared          | `COMMERCIAL_LAUNCH_REVIEW_002_STARTING_CONTEXT.md`                                             |
-| Production-copy strategy       | Prepared          | `PRODUCTION_COPY_DRY_RUN_STRATEGY.md`                                                          |
-| Backup/copy command draft      | Prepared, not run | `PRODUCTION_D1_BACKUP_AND_COPY_COMMAND_DRAFT.md`                                               |
-| Production-copy checklist      | Prepared          | `PRODUCTION_COPY_DRY_RUN_CHECKLIST.md`                                                         |
-| Migration/backfill matrix      | Prepared          | `PRODUCTION_COPY_MIGRATION_BACKFILL_DRY_RUN_MATRIX.md`                                         |
-| Human approvals                | Prepared          | `PRODUCTION_COPY_DRY_RUN_HUMAN_APPROVALS.md`                                                   |
-| Next approval prompt           | Prepared          | `NEXT_PROMPT_COMMERCIAL_LAUNCH_REVIEW_003_CREATE_PRODUCTION_COPY_DRY_RUN_APPROVAL_REQUIRED.md` |
-| Production / D1 command status | Not executed      | This task was documentation-only.                                                              |
-
-Decision: production remains `PRODUCTION_NO_GO`.
+Decision: production remains `PRODUCTION_NO_GO`; future migration/backfill work
+must target only `homelink-finance-production-copy-dryrun` unless a new approval
+explicitly changes the target.

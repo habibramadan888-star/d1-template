@@ -1,23 +1,23 @@
 # Production Copy Dry-Run Checklist
 
-Date: 2026-05-26, Asia/Dubai
+Date: 2026-05-27, Asia/Dubai
 
-Status: `MANUAL_REQUIRED`
+Status: `COPY_CREATED_AND_IMPORTED`
 
 Production cutover: `PRODUCTION_NO_GO`
 
 |   # | Checklist Item                                  | Required Before Copy Dry-Run | Current Status  |
 | --: | ----------------------------------------------- | ---------------------------- | --------------- |
-|   1 | Production D1 name / id confirmed               | Yes                          | MANUAL_REQUIRED |
-|   2 | Production backup completed                     | Yes                          | NOT_STARTED     |
-|   3 | Backup stored outside git                       | Yes                          | MANUAL_REQUIRED |
-|   4 | Production-copy D1 created                      | Yes                          | NOT_STARTED     |
-|   5 | Production-copy D1 restored/imported            | Yes                          | NOT_STARTED     |
-|   6 | Production-copy not bound to production Worker  | Yes                          | MANUAL_REQUIRED |
-|   7 | Production-copy feature flags disabled          | Yes                          | MANUAL_REQUIRED |
+|   1 | Production D1 name / id confirmed               | Yes                          | CONFIRMED       |
+|   2 | Production backup completed                     | Yes                          | COMPLETED       |
+|   3 | Backup stored outside git                       | Yes                          | CONFIRMED       |
+|   4 | Production-copy D1 created                      | Yes                          | COMPLETED       |
+|   5 | Production-copy D1 restored/imported            | Yes                          | COMPLETED       |
+|   6 | Production-copy not bound to production Worker  | Yes                          | CONFIRMED       |
+|   7 | Production-copy feature flags disabled          | Yes                          | NOT_BOUND       |
 |   8 | Production-copy migration dry-run plan reviewed | Yes                          | MANUAL_REQUIRED |
 |   9 | Production-copy backfill dry-run plan reviewed  | Yes                          | MANUAL_REQUIRED |
-|  10 | Row counts expected                             | Yes                          | MANUAL_REQUIRED |
+|  10 | Row counts expected                             | Yes                          | RECORDED        |
 |  11 | Rollback plan reviewed                          | Yes                          | MANUAL_REQUIRED |
 |  12 | Accounting review completed                     | Yes                          | MANUAL_REQUIRED |
 |  13 | Tenant mapping review completed                 | Yes                          | MANUAL_REQUIRED |
@@ -37,5 +37,6 @@ Stop before copy dry-run if any of the following is missing:
 - Accounting/data owner review.
 - Tenant mapping review.
 
-Conclusion: production-copy dry-run is not approved yet. This checklist defines
-the future approval gate only.
+Conclusion: production-copy D1 was created and imported. Migration/backfill,
+rollback rehearsal, accounting review, tenant mapping review, and production
+cutover remain approval-gated and `PRODUCTION_NO_GO`.
