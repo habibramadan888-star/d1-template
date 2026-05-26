@@ -866,6 +866,36 @@ Enter TASK P0-006I2: Tenant scope staging backfill write approval required.
 Goal: only after exact mapping review, backup/rollback confirmation, and human
 approval flags, execute a staging-only backfill write. Do not touch production.
 Do not mark P0-006 Verified.
+
+## P0-006I2 Morning Review Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+Summary:
+
+- Approved staging-only tenant scope compatibility-column backfill write was
+  executed against `homelink-finance-staging`.
+- Rows updated: `sessions` 1, `transactions` 1, `entry_events` 3,
+  `audit_logs` 3.
+- Pre-write backup was completed and remains ignored under `backups/`.
+- Post-write dry-run passed with 13 tables reviewed, 0 blocked,
+  4 manual-required, and 1 legacy warning.
+- Manual-required rows remain for tables/rows without exact persisted target
+  scope mapping.
+- Production deploy, production migration, and production D1 write were not
+  executed.
+
+Current status:
+
+- P0-006: `Partial - tenant scope staging backfill write passed`.
+- Production cutover: `NO-GO`.
+
+Next prompt:
+
+- `NEXT_PROMPT_P0_006J_TENANT_SCOPE_STAGING_VERIFICATION.md`
+
+Do not enter production migration, production deploy, legacy `CORPID` removal,
+or P0-006 Verified.
 ```
 
 ## P0-006H Morning Review Addendum

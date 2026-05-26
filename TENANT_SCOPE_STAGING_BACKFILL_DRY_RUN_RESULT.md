@@ -1,6 +1,6 @@
 # Tenant Scope Staging Backfill Dry-Run Result
 
-Generated: 2026-05-26T08:27:33.638Z
+Generated: 2026-05-26T08:56:04.969Z
 
 Scope: read-only staging tenant scope backfill dry-run. This script confirms the staging D1 target, reads table schema/counts with SELECT only, generates draft update-plan classifications, and does not deploy, migrate, write D1 rows, call production, mutate dashboard/history output, or remove legacy CORPID fallback.
 
@@ -13,23 +13,23 @@ Overall: `PASS`
 | app_settings              | 0         | yes        | yes         | yes          | 0                  | 0                    | 0                     | NO_UPDATE_REQUIRED                            | PASS            | No staging backfill update is needed for this dry-run row set.                   |
 | arrear_tasks              | 7         | yes        | yes         | yes          | 7                  | 7                    | 7                     | MANUAL_REVIEW_REQUIRED_BEFORE_BACKFILL        | MANUAL_REQUIRED | Manual mapping/reconciliation required before any staging write.                 |
 | arrears                   | 0         | yes        | yes         | yes          | 0                  | 0                    | 0                     | NO_UPDATE_REQUIRED                            | PASS            | No staging backfill update is needed for this dry-run row set.                   |
-| audit_logs                | 7         | yes        | yes         | yes          | 7                  | 7                    | 7                     | MANUAL_REVIEW_REQUIRED_BEFORE_BACKFILL        | MANUAL_REQUIRED | Manual mapping/reconciliation required before any staging write.                 |
+| audit_logs                | 7         | yes        | yes         | yes          | 7                  | 4                    | 4                     | MANUAL_REVIEW_REQUIRED_BEFORE_BACKFILL        | MANUAL_REQUIRED | Manual mapping/reconciliation required before any staging write.                 |
 | deposit_ledger            | 0         | yes        | yes         | yes          | 0                  | 0                    | 0                     | NO_UPDATE_REQUIRED                            | PASS            | No staging backfill update is needed for this dry-run row set.                   |
-| entry_events              | 5         | yes        | yes         | yes          | 5                  | 5                    | 5                     | MANUAL_REVIEW_REQUIRED_BEFORE_BACKFILL        | MANUAL_REQUIRED | Manual mapping/reconciliation required before any staging write.                 |
+| entry_events              | 5         | yes        | yes         | yes          | 5                  | 2                    | 2                     | MANUAL_REVIEW_REQUIRED_BEFORE_BACKFILL        | MANUAL_REQUIRED | Manual mapping/reconciliation required before any staging write.                 |
 | handover_audit_events     | 3         | no         | yes         | yes          | 0                  | 0                    | 0                     | NO_UPDATE_REQUIRED                            | PASS            | No staging backfill update is needed for this dry-run row set.                   |
 | handover_commit_rows      | 2         | no         | yes         | yes          | 0                  | 0                    | 0                     | NO_UPDATE_REQUIRED                            | PASS            | No staging backfill update is needed for this dry-run row set.                   |
 | handover_commits          | 1         | no         | yes         | yes          | 0                  | 0                    | 0                     | NO_UPDATE_REQUIRED                            | PASS            | No staging backfill update is needed for this dry-run row set.                   |
 | handover_idempotency_keys | 1         | no         | yes         | yes          | 0                  | 0                    | 0                     | NO_UPDATE_REQUIRED                            | PASS            | No staging backfill update is needed for this dry-run row set.                   |
-| sessions                  | 1         | yes        | yes         | yes          | 1                  | 1                    | 1                     | MANUAL_REVIEW_REQUIRED_BEFORE_BACKFILL        | MANUAL_REQUIRED | Manual mapping/reconciliation required before any staging write.                 |
-| transactions              | 3         | yes        | yes         | yes          | 3                  | 3                    | 3                     | MANUAL_REVIEW_REQUIRED_BEFORE_BACKFILL        | MANUAL_REQUIRED | Manual mapping/reconciliation required before any staging write.                 |
+| sessions                  | 1         | yes        | yes         | yes          | 1                  | 0                    | 0                     | NO_UPDATE_REQUIRED                            | PASS            | No staging backfill update is needed for this dry-run row set.                   |
+| transactions              | 3         | yes        | yes         | yes          | 3                  | 2                    | 2                     | MANUAL_REVIEW_REQUIRED_BEFORE_BACKFILL        | MANUAL_REQUIRED | Manual mapping/reconciliation required before any staging write.                 |
 
 Summary:
 
 - Tables reviewed: 13.
 - Blocked tables: 0.
-- Manual-required tables: 5.
+- Manual-required tables: 4.
 - Legacy-warning tables: 1.
-- Draft write-plan classifications: 6.
+- Draft write-plan classifications: 5.
 
 Command safety:
 

@@ -4424,3 +4424,41 @@ Result:
 P0-006 status:
 
 - `Partial - tenant scope staging compatibility schema applied`.
+
+## P0-006I2 Tenant Scope Staging Backfill Write
+
+Date: 2026-05-26, Asia/Dubai
+
+Scope: approved staging-only tenant/property compatibility-column backfill
+write. No production deploy, production migration, production D1 write,
+production URL call, production config change, dashboard mutation, live
+financial formula change, legacy `CORPID` removal, `DELETE`, `INSERT`, `DROP`,
+or secret exposure occurred.
+
+Completed:
+
+- Confirmed target D1 `homelink-finance-staging`
+  (`4ff78bfc-3855-436b-aefb-6b492145d79c`).
+- Exported pre-write staging backup to ignored `backups/`.
+- Reviewed exact staging mapping and narrowed writes to deterministic staging QA
+  lineage.
+- Applied approved `UPDATE ... WHERE ...` statements to compatibility scope
+  columns only.
+- Verified before/after row counts and financial sums.
+- Re-ran tenant scope staging backfill dry-run.
+- Generated the P0-006J verification prompt.
+
+Result:
+
+- Staging backfill write: yes.
+- Rows updated: `sessions` 1, `transactions` 1, `entry_events` 3,
+  `audit_logs` 3.
+- Post-write dry-run: PASS.
+- Blocked tables: 0.
+- Manual-required tables: 4.
+- Legacy-warning tables: 1.
+- Production remains `NO-GO`.
+
+P0-006 status:
+
+- `Partial - tenant scope staging backfill write passed`.

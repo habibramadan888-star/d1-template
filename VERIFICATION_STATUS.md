@@ -824,3 +824,20 @@ Date: 2026-05-26, Asia/Dubai
 P0-006I1 applied staging-only nullable compatibility columns and kept backfill
 write blocked pending exact mapping approval. P0-006 remains Partial and
 production remains NO-GO.
+
+## P0-006I2 Verification Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+| Check                       | Run? | Result | Blocker | Evidence                                      | Notes                                                                        |
+| --------------------------- | ---- | ------ | ------- | --------------------------------------------- | ---------------------------------------------------------------------------- |
+| Target D1 confirmation      | yes  | Pass   | none    | `P0_006I2_TARGET_D1_CONFIRMATION.md`          | Confirmed `homelink-finance-staging` and expected D1 id.                     |
+| Pre-write backup            | yes  | Pass   | none    | `P0_006I2_BACKUP_RESULT.md`                   | Backup stored under ignored `backups/`.                                      |
+| Staging backfill write      | yes  | Pass   | none    | `P0_006I2_BACKFILL_WRITE_RESULT.md`           | Updated only compatibility scope columns with restrictive `WHERE` clauses.   |
+| After snapshot verification | yes  | Pass   | none    | `P0_006I2_AFTER_SNAPSHOT_AND_VERIFICATION.md` | Expected rows updated; manual-required rows untouched; money sums unchanged. |
+| Post-write dry-run          | yes  | Pass   | none    | `P0_006I2_POST_BACKFILL_DRY_RUN_RESULT.md`    | 13 tables reviewed, 0 blocked, 4 manual-required, 1 legacy warning.          |
+
+No production deploy, production migration, production D1 write, production URL
+call, dashboard mutation, live financial formula change, legacy `CORPID`
+removal, `DELETE`, `INSERT`, `DROP`, or secret exposure occurred. P0-006
+remains Partial and production remains NO-GO.
