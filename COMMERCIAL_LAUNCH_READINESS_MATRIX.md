@@ -1,6 +1,6 @@
 # Commercial Launch Readiness Matrix
 
-Generated: 2026-05-26T20:36:32.581Z
+Generated: 2026-05-26T21:03:21.375Z
 
 Scope: read-only commercial launch gate. This script reads reports only and does not deploy, migrate, call APIs, access D1, or read secrets.
 
@@ -31,17 +31,16 @@ Scope: read-only commercial launch gate. This script reads reports only and does
 - Production cutover is `NO-GO` because multiple P0/P1 launch gates remain incomplete.
 - This matrix is not deployment approval.
 
-## COMMERCIAL-LAUNCH-REVIEW-003 Addendum
+## COMMERCIAL-LAUNCH-REVIEW-004 Addendum
 
-| Review Area                  | Result                       | Evidence                                  |
-| ---------------------------- | ---------------------------- | ----------------------------------------- |
-| Production D1 target         | Confirmed                    | `PRODUCTION_D1_TARGET_CONFIRMATION.md`    |
-| Production export backup     | Completed                    | `PRODUCTION_D1_EXPORT_BACKUP_RESULT.md`   |
-| Isolated production-copy D1  | Created                      | `PRODUCTION_COPY_D1_CREATION_RESULT.md`   |
-| Backup import into copy      | Completed                    | `PRODUCTION_COPY_D1_IMPORT_RESULT.md`     |
-| Copy schema / row validation | Completed                    | `PRODUCTION_COPY_D1_VALIDATION_RESULT.md` |
-| Copy dry-run readiness       | Ready for next approval gate | `PRODUCTION_COPY_DRY_RUN_READY_REPORT.md` |
+| Review Area                 | Result            | Evidence                                                                         |
+| --------------------------- | ----------------- | -------------------------------------------------------------------------------- |
+| Starting context            | Prepared          | `COMMERCIAL_LAUNCH_REVIEW_004_STARTING_CONTEXT.md`                               |
+| Copy dry-run execution plan | Prepared, not run | `PRODUCTION_COPY_DRY_RUN_EXECUTION_PLAN.md`                                      |
+| SQL review packet           | Prepared          | `PRODUCTION_COPY_DRY_RUN_SQL_REVIEW_PACKET.md`                                   |
+| Rollback plan               | Prepared          | `PRODUCTION_COPY_DRY_RUN_ROLLBACK_PLAN.md`                                       |
+| Next copy dry-run prompt    | Prepared          | `NEXT_PROMPT_COMMERCIAL_LAUNCH_REVIEW_005_RUN_COPY_DRY_RUN_APPROVAL_REQUIRED.md` |
+| D1 command status           | Not executed      | REVIEW-004 was documentation-only.                                               |
 
-Decision: production remains `PRODUCTION_NO_GO`; future migration/backfill work
-must target only `homelink-finance-production-copy-dryrun` unless a new approval
-explicitly changes the target.
+Decision: production remains `PRODUCTION_NO_GO`; copy migration/backfill dry-run
+requires a separate explicit approval task.

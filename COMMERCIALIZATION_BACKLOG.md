@@ -1380,6 +1380,31 @@ This does not execute or approve production work. Remaining launch blockers:
   human review.
 - Production deploy, feature flag, and cutover approval.
 
+## COMMERCIAL-LAUNCH-REVIEW-004 Backlog Addendum
+
+Date: 2026-05-27, Asia/Dubai
+
+Production cutover remains `PRODUCTION_NO_GO`.
+
+Prepared for next approval gate:
+
+- `COMMERCIAL_LAUNCH_REVIEW_004_STARTING_CONTEXT.md`
+- `PRODUCTION_COPY_DRY_RUN_EXECUTION_PLAN.md`
+- `PRODUCTION_COPY_DRY_RUN_SQL_REVIEW_PACKET.md`
+- `PRODUCTION_COPY_DRY_RUN_ROLLBACK_PLAN.md`
+- `NEXT_PROMPT_COMMERCIAL_LAUNCH_REVIEW_005_RUN_COPY_DRY_RUN_APPROVAL_REQUIRED.md`
+
+Still required before running any copy SQL:
+
+- Exact SQL approval.
+- Copy backup approval.
+- Rollback review.
+- Money reconciliation review.
+- Tenant mapping review.
+- Accounting review.
+- Confirmation that the only D1 target is
+  `homelink-finance-production-copy-dryrun`.
+
 ## P0-006S Backlog Addendum
 
 Date: 2026-05-26, Asia/Dubai
