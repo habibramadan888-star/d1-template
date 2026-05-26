@@ -1,6 +1,6 @@
 # Commercial Launch Readiness Matrix
 
-Generated: 2026-05-26T19:28:20.633Z
+Generated: 2026-05-26T19:46:42.576Z
 
 Scope: read-only commercial launch gate. This script reads reports only and does not deploy, migrate, call APIs, access D1, or read secrets.
 
@@ -30,3 +30,16 @@ Scope: read-only commercial launch gate. This script reads reports only and does
 - Real staging QA is `MANUAL_REQUIRED` until target resources, accounts, backup, rollback, and feature flags are provided.
 - Production cutover is `NO-GO` because multiple P0/P1 launch gates remain incomplete.
 - This matrix is not deployment approval.
+
+## COMMERCIAL-LAUNCH-REVIEW-001 Addendum
+
+| Review Area                 | Result   | Evidence                                         |
+| --------------------------- | -------- | ------------------------------------------------ |
+| P0 status summary           | Prepared | `COMMERCIAL_LAUNCH_P0_STATUS_SUMMARY.md`         |
+| Production NO-GO reasons    | Prepared | `COMMERCIAL_LAUNCH_PRODUCTION_NO_GO_REASONS.md`  |
+| Approval matrix             | Prepared | `COMMERCIAL_LAUNCH_APPROVAL_MATRIX.md`           |
+| Migration / rollback packet | Prepared | `PRODUCTION_MIGRATION_ROLLBACK_REVIEW_PACKET.md` |
+| Staging evidence index      | Prepared | `STAGING_EVIDENCE_INDEX.md`                      |
+| Next-stage roadmap          | Prepared | `NEXT_STAGE_ROADMAP.md`                          |
+
+Decision: production remains `PRODUCTION_NO_GO`.
