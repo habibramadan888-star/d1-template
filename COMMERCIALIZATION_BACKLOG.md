@@ -1137,6 +1137,34 @@ Still blocked for production:
 - Production receivables migration, backup, rollback, backfill, and deploy
   approval.
 
+## P0-006F Backlog Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+P0-006 current status:
+
+- `Partial - tenant scope staging dashboard/history query gate passed`.
+
+Current result:
+
+- Added `npm run test:tenant-scope-query-gate`.
+- Added `npm run gate:tenant-scope-dashboard-history-query`.
+- Query gate passed with 4 dashboard/history owner scenarios.
+- Cross-tenant rows removed from legacy `CORPID` query result: 6.
+- Dashboard/history live result remained unchanged.
+- No production deploy, production migration, production D1 write, staging D1
+  write, production auth change, legacy fallback removal, live query wiring, or
+  remote feature flag enablement occurred.
+- Production remains `NO-GO`.
+
+Still blocked for production:
+
+- P0-006 is not Verified.
+- Live Worker dashboard/history/employee routes are not yet wired to
+  company/property scope.
+- Production tenant migration, backfill, query wiring, rollback, and human
+  tenant model decisions are not approved.
+
 ## P0-008F Backlog Addendum
 
 Date: 2026-05-26, Asia/Dubai

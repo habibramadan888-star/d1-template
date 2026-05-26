@@ -730,3 +730,22 @@ No production deploy, production migration, production D1 write, production URL
 call, staging D1 write, production auth change, dashboard mutation, global
 tenant rewrite, legacy `CORPID` fallback removal, live route wiring, remote
 feature flag enablement, or secret exposure occurred in P0-006E.
+
+## P0-006F Verification Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+| Command / Check                                     | Exists | Result                             | Error Summary | Log Evidence                                                                               | Commercial Meaning                                                                                       |
+| --------------------------------------------------- | ------ | ---------------------------------- | ------------- | ------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
+| `npm run test:tenant-scope-query-gate`              | yes    | Pass                               | none          | 8 tests passed                                                                             | Query gate production disable, flag off, owner cross-tenant row removal, and rollback false are covered. |
+| `npm run gate:tenant-scope-dashboard-history-query` | yes    | Pass                               | none          | `TENANT_SCOPE_DASHBOARD_HISTORY_QUERY_GATE=PASS`, 4 scenarios, 6 cross-tenant rows removed | Local/staging dashboard/history query policy gate passed without live query wiring.                      |
+| `npm run gate:tenant-scope`                         | yes    | `MANUAL_REQUIRED`                  | none          | Static `CORPID` reliance remains                                                           | Production SaaS tenant readiness remains blocked.                                                        |
+| `npm run gate:commercial-launch`                    | yes    | `PRODUCTION_NO_GO`                 | none          | Launch gate stayed NO-GO                                                                   | Production cutover remains blocked.                                                                      |
+| `npm run qa:employee-entry-staging`                 | yes    | `MANUAL_REQUIRED` / `DRY_RUN_ONLY` | none          | No confirmation flags supplied                                                             | No staging write QA executed.                                                                            |
+| Staging D1 write                                    | yes    | No                                 | none          | Query gate uses static fixtures only                                                       | No staging data was written.                                                                             |
+| Dashboard/history mutation                          | yes    | No                                 | none          | No live query wiring                                                                       | Live dashboard/history behavior unchanged.                                                               |
+
+No production deploy, production migration, production D1 write, production URL
+call, staging D1 write, production auth change, dashboard mutation, global
+tenant rewrite, legacy `CORPID` fallback removal, live query wiring, remote
+feature flag enablement, or secret exposure occurred in P0-006F.

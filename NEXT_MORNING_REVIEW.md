@@ -801,6 +801,39 @@ Recommended next prompt:
 
 Production cutover remains `NO-GO`.
 
+## P0-006F Morning Review Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+Most important result:
+
+- Tenant scope staging dashboard/history query gate passed in fixture-only
+  policy mode, with cross-tenant rows removed from legacy `CORPID` query
+  results and no live query wiring.
+
+Current status:
+
+- P0-006: `Partial - tenant scope staging dashboard/history query gate passed`.
+- `TENANT_SCOPE_DASHBOARD_HISTORY_QUERY_GATE=PASS`.
+- Scenario count: 4.
+- Cross-tenant rows removed: 6.
+- Dashboard/history live result changed: no.
+- Staging D1 write: no.
+- Production cutover remains `NO-GO`.
+
+Recommended next task:
+
+```text
+Enter TASK P0-006G: Tenant scope staging backfill reconciliation gate.
+
+Goal: staging/local tenant-scope backfill mapping and reconciliation evidence
+before any migration or live dashboard/history query wiring.
+
+Forbidden: production deploy, production migration, production D1 write,
+production auth change, production cutover, legacy CORPID fallback removal,
+P0-006 Verified.
+```
+
 ## P0-006C Morning Review Addendum
 
 Date: 2026-05-26, Asia/Dubai

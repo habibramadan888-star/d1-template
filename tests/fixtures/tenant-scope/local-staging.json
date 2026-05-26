@@ -72,6 +72,7 @@
     {
       "id": "session_a_1",
       "table": "sessions",
+      "corpid": "homelink",
       "company_id": "company_a",
       "property_id": "property_a_1",
       "bed": "101",
@@ -81,6 +82,7 @@
     {
       "id": "transaction_a_2",
       "table": "transactions",
+      "corpid": "homelink",
       "company_id": "company_a",
       "property_id": "property_a_2",
       "bed": "205",
@@ -90,6 +92,7 @@
     {
       "id": "arrear_b_1",
       "table": "arrear_tasks",
+      "corpid": "homelink",
       "company_id": "company_b",
       "property_id": "property_b_1",
       "bed": "101",

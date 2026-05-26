@@ -1,6 +1,6 @@
 # Commercial Launch Readiness Result
 
-Generated: 2026-05-25T23:04:17.490Z
+Generated: 2026-05-26T05:38:15.752Z
 
 | Metric                | Count |
 | --------------------- | ----: |
@@ -16,22 +16,22 @@ Allowed next work: local/staging dry-run validation, manual QA preparation, and 
 
 Forbidden next work without human approval: production deploy, staging deploy, remote/production D1 migration, production feature flag enablement, and live accounting authority switch.
 
-## P0-006E Addendum
+## P0-006F Addendum
 
 P0-006 current status:
 
-- `Partial - tenant scope staging route enforcement gate passed`.
+- `Partial - tenant scope staging dashboard/history query gate passed`.
 
 Evidence:
 
-- `TENANT_SCOPE_STAGING_ROUTE_ENFORCEMENT_GATE_RESULT.md`
-- `TENANT_SCOPE_STAGING_ROUTE_ENFORCEMENT_PLAN.md`
-- `P0_006E_DASHBOARD_HISTORY_EVIDENCE.md`
-- `P0_006E_ROLLBACK_RESULT.md`
-- `scripts/gate-tenant-scope-staging-route-enforcement.mjs`
-- `tests/tenant-scope-staging-route-enforcement-gate.spec.mjs`
+- `TENANT_SCOPE_STAGING_DASHBOARD_HISTORY_QUERY_GATE_RESULT.md`
+- `TENANT_SCOPE_STAGING_DASHBOARD_HISTORY_QUERY_PLAN.md`
+- `P0_006F_DASHBOARD_HISTORY_EVIDENCE.md`
+- `P0_006F_ROLLBACK_RESULT.md`
+- `scripts/gate-tenant-scope-dashboard-history-query.mjs`
+- `tests/tenant-scope-staging-dashboard-history-query-gate.spec.mjs`
 
-Production remains `NO-GO`. P0-006E route enforcement gate success does not
-approve production deploy, production migration, tenant backfill, production
-auth changes, dashboard/history live switch, removal of legacy `CORPID`
-fallback, live route wiring, or P0-006 verification.
+Production remains `NO-GO`. P0-006F dashboard/history query gate success does
+not approve production deploy, production migration, tenant backfill,
+production auth changes, dashboard/history live switch, removal of legacy
+`CORPID` fallback, live query wiring, or P0-006 verification.

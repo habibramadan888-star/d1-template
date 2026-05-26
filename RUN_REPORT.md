@@ -4249,3 +4249,39 @@ Result:
 P0-006 status:
 
 - `Partial - tenant scope staging route enforcement gate passed`.
+
+## P0-006F Tenant Scope Staging Dashboard/History Query Gate
+
+Date: 2026-05-26, Asia/Dubai
+
+Scope: staging/local-only tenant scope dashboard/history query gate. No
+production deploy, production migration, production D1 write, production URL
+call, staging D1 write, production auth change, global tenant rewrite, legacy
+`CORPID` fallback removal, dashboard mutation, live query wiring, remote feature
+flag enablement, or secret exposure occurred.
+
+Completed:
+
+- Added `ENABLE_TENANT_SCOPE_DASHBOARD_HISTORY_QUERY_STAGING`
+  production-disabled query gate guard.
+- Added `scripts/gate-tenant-scope-dashboard-history-query.mjs`.
+- Added `npm run gate:tenant-scope-dashboard-history-query`.
+- Added `tests/tenant-scope-staging-dashboard-history-query-gate.spec.mjs`.
+- Added `npm run test:tenant-scope-query-gate`.
+- Generated P0-006F starting context, dashboard/history query plan,
+  dashboard/history evidence, rollback result, commercial launch gate result,
+  and next prompt.
+
+Result:
+
+- `TENANT_SCOPE_DASHBOARD_HISTORY_QUERY_GATE=PASS`.
+- Scenario count: 4.
+- Blocked scenarios: 0.
+- Cross-tenant rows removed from legacy `CORPID` results: 6.
+- Dashboard/history live result remained unchanged.
+- `npm run gate:tenant-scope` remains `MANUAL_REQUIRED`, as expected.
+- Production remains `NO-GO`.
+
+P0-006 status:
+
+- `Partial - tenant scope staging dashboard/history query gate passed`.

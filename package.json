@@ -43,6 +43,8 @@
     "compare:staging-tenant-scope": "node scripts/compare-staging-tenant-scope-shadow.mjs",
     "test:tenant-scope-route-gate": "node --test tests/tenant-scope-staging-route-enforcement-gate.spec.mjs",
     "gate:tenant-scope-route-enforcement": "node scripts/gate-tenant-scope-staging-route-enforcement.mjs",
+    "test:tenant-scope-query-gate": "node --test tests/tenant-scope-staging-dashboard-history-query-gate.spec.mjs",
+    "gate:tenant-scope-dashboard-history-query": "node scripts/gate-tenant-scope-dashboard-history-query.mjs",
     "audit:runtime-ddl": "node scripts/audit-runtime-ddl.mjs",
     "gate:runtime-ddl-removal": "node scripts/gate-runtime-ddl-removal.mjs",
     "reconcile:money": "node scripts/money-shadow-reconcile.mjs",

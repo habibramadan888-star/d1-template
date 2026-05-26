@@ -4,6 +4,8 @@ const EMPLOYEE_ROLES = new Set(["EMPLOYEE", "STAFF"]);
 const ALL_PROPERTY = "*";
 const TENANT_SCOPE_SHADOW_STAGING_FLAG = "ENABLE_TENANT_SCOPE_SHADOW_STAGING";
 const TENANT_SCOPE_ROUTE_ENFORCEMENT_STAGING_FLAG = "ENABLE_TENANT_SCOPE_ROUTE_ENFORCEMENT_STAGING";
+const TENANT_SCOPE_DASHBOARD_HISTORY_QUERY_STAGING_FLAG =
+  "ENABLE_TENANT_SCOPE_DASHBOARD_HISTORY_QUERY_STAGING";
 
 const ACTIONS = {
   DASHBOARD_READ: "DASHBOARD_READ",
@@ -111,6 +113,43 @@ export function resolveTenantScopeRouteEnforcementMode(env = {}) {
     dashboardMutationAllowed: false,
     routeMutationAllowed: false,
     reason: "staging_route_enforcement_gate_only"
+  };
+}
+
+export function resolveTenantScopeDashboardHistoryQueryMode(env = {}) {
+  const appEnv = String(env.APP_ENV || "")
+    .trim()
+    .toLowerCase();
+  const flag = String(env[TENANT_SCOPE_DASHBOARD_HISTORY_QUERY_STAGING_FLAG] ?? "")
+    .trim()
+    .toLowerCase();
+  if (!SAFE_REHEARSAL_ENVS.has(appEnv)) {
+    return {
+      enabled: false,
+      mode: "LEGACY",
+      productionDisabled: true,
+      dashboardMutationAllowed: false,
+      queryMutationAllowed: false,
+      reason: appEnv === "production" ? "production_always_disabled" : "env_not_allowed"
+    };
+  }
+  if (flag !== "true") {
+    return {
+      enabled: false,
+      mode: "LEGACY",
+      productionDisabled: false,
+      dashboardMutationAllowed: false,
+      queryMutationAllowed: false,
+      reason: "flag_off"
+    };
+  }
+  return {
+    enabled: true,
+    mode: "TENANT_SCOPE_DASHBOARD_HISTORY_QUERY_GATE",
+    productionDisabled: false,
+    dashboardMutationAllowed: false,
+    queryMutationAllowed: false,
+    reason: "staging_dashboard_history_query_gate_only"
   };
 }
 
@@ -241,6 +280,11 @@ export function filterRowsForTenantScope(rows, target) {
   });
 }
 
+export function filterRowsForLegacyCorpid(rows, corpid) {
+  const normalizedCorpid = requiredString(corpid, "corpid");
+  return rows.filter((row) => optionalString(row.corpid) === normalizedCorpid);
+}
+
 export function filterRowsForActor({
   env = { APP_ENV: "test" },
   actor,
@@ -262,6 +306,56 @@ export function filterRowsForActor({
     );
     return membership && roleCanPerform(membership.role, normalizedAction);
   });
+}
+
+export function buildTenantScopeQueryComparison({
+  name,
+  query,
+  env = {
+    APP_ENV: "test",
+    [TENANT_SCOPE_DASHBOARD_HISTORY_QUERY_STAGING_FLAG]: "true"
+  },
+  actor,
+  memberships,
+  rows,
+  action,
+  legacyCorpid = actor?.corpid ?? actor?.legacyCorpid
+}) {
+  const mode = resolveTenantScopeDashboardHistoryQueryMode(env);
+  const normalizedActor = normalizeActor(actor);
+  const legacyRows = filterRowsForLegacyCorpid(rows, legacyCorpid);
+  const scopedRows = mode.enabled
+    ? filterRowsForActor({ env, actor: normalizedActor, memberships, rows: legacyRows, action })
+    : legacyRows;
+  const scopedIds = new Set(scopedRows.map((row) => row.id || row.row_id));
+  const removedRows = legacyRows.filter((row) => !scopedIds.has(row.id || row.row_id));
+  const crossTenantRemovedRows = removedRows.filter(
+    (row) => row.company_id !== normalizedActor.sessionCompanyId
+  );
+  const sameTenantRemovedRows = removedRows.filter(
+    (row) => row.company_id === normalizedActor.sessionCompanyId
+  );
+  const pass =
+    mode.productionDisabled ||
+    !mode.enabled ||
+    (removedRows.length > 0 && sameTenantRemovedRows.length === 0);
+
+  return {
+    Scenario: name,
+    Query: query,
+    "Legacy Rows": legacyRows.map((row) => row.id || row.row_id).join(", ") || "none",
+    "Scoped Rows": scopedRows.map((row) => row.id || row.row_id).join(", ") || "none",
+    "Removed Rows": removedRows.map((row) => row.id || row.row_id).join(", ") || "none",
+    "Cross-Tenant Removed":
+      crossTenantRemovedRows.map((row) => row.id || row.row_id).join(", ") || "none",
+    Mode: mode.mode,
+    Result: pass ? "PASS" : "BLOCKED",
+    Notes: mode.enabled
+      ? sameTenantRemovedRows.length
+        ? "Scoped query removed same-tenant rows; review query membership scope."
+        : "Scoped query removes only cross-tenant rows from legacy corpid result."
+      : mode.reason
+  };
 }
 
 export function buildTenantScopeScenario({
@@ -351,6 +445,7 @@ export function summarizeTenantScopeScenarios(rows) {
 export {
   ACTIONS,
   ALL_PROPERTY,
+  TENANT_SCOPE_DASHBOARD_HISTORY_QUERY_STAGING_FLAG,
   TENANT_SCOPE_ROUTE_ENFORCEMENT_STAGING_FLAG,
   TENANT_SCOPE_SHADOW_STAGING_FLAG
 };

@@ -1124,3 +1124,47 @@ Next step:
 - P0-006F can design a staging/local dashboard/history query scope gate. Do not
   execute production migration, production deploy, production auth changes, or
   legacy `CORPID` fallback removal.
+
+## P0-006F Tenant Scope Staging Dashboard/History Query Gate Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+P0-006 current status:
+
+- `Partial - tenant scope staging dashboard/history query gate passed`.
+
+Added evidence:
+
+- `TENANT_SCOPE_STAGING_DASHBOARD_HISTORY_QUERY_GATE_RESULT.md`
+- `TENANT_SCOPE_STAGING_DASHBOARD_HISTORY_QUERY_PLAN.md`
+- `P0_006F_DASHBOARD_HISTORY_EVIDENCE.md`
+- `P0_006F_ROLLBACK_RESULT.md`
+- `scripts/gate-tenant-scope-dashboard-history-query.mjs`
+- `tests/tenant-scope-staging-dashboard-history-query-gate.spec.mjs`
+- `npm run test:tenant-scope-query-gate`
+- `npm run gate:tenant-scope-dashboard-history-query`
+
+Result:
+
+- Staging/local dashboard/history query policy gate passed.
+- Owner A and owner B legacy `CORPID` query results remove cross-tenant rows
+  when scoped by company/property membership.
+- Cross-tenant rows removed: 6.
+- Dashboard/history live result was not changed.
+- No production deploy, production migration, production D1 write, staging D1
+  write, production auth change, legacy fallback removal, live query wiring, or
+  remote feature flag enablement occurred.
+
+Remaining risk:
+
+- P0-006 is not Verified.
+- Live Worker dashboard/history queries are not yet wired to company/property
+  scope.
+- Production migration, backfill, query wiring, and human tenancy model
+  decisions are not approved.
+
+Next step:
+
+- P0-006G can design a staging/local backfill reconciliation gate. Do not
+  execute production migration, production deploy, production auth changes, or
+  legacy `CORPID` fallback removal.
