@@ -927,6 +927,23 @@ call, staging D1 write, feature flag enablement, dashboard live switch, live
 financial formula change, legacy `CORPID` removal, or secret exposure occurred.
 P0-006 remains Partial and production remains NO-GO.
 
+## P0-006Q Verification Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+| Check                        | Run? | Result                      | Blocker                | Evidence                                              | Notes                                                                                                     |
+| ---------------------------- | ---- | --------------------------- | ---------------------- | ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Tenant audit/event tests     | yes  | Pass                        | none                   | `tests/tenant-scope-audit-entry-events.spec.mjs`      | 17 tests cover audit/event access, schema validation, legacy warning, missing data, and production no-go. |
+| Tenant audit/event rehearsal | yes  | Needs staging evidence data | evidence data required | `TENANT_SCOPE_AUDIT_ENTRY_EVENTS_REHEARSAL_RESULT.md` | 21 scenarios, 17 pass, 3 evidence-data gaps, 0 fail.                                                      |
+| Audit/event scope matrix     | yes  | Needs staging evidence data | evidence data required | `AUDIT_ENTRY_EVENTS_SCOPE_MATRIX.md`                  | Owner audit and void/session event rows are missing.                                                      |
+| Coverage summary             | yes  | Needs staging evidence data | evidence data required | `P0_006Q_COVERAGE_SUMMARY.md`                         | Missing coverage remains 2 table-level gaps.                                                              |
+| Commercial launch gate       | yes  | Pass                        | none                   | `P0_006Q_COMMERCIAL_LAUNCH_GATE_RESULT.md`            | `gate:commercial-launch` remains `PRODUCTION_NO_GO`.                                                      |
+
+No production deploy, production migration, production D1 write, production URL
+call, staging D1 write, dashboard live switch, live financial formula change,
+legacy `CORPID` removal, or secret exposure occurred. P0-006 remains Partial
+and production remains NO-GO.
+
 ## P0-006P Verification Addendum
 
 Date: 2026-05-26, Asia/Dubai

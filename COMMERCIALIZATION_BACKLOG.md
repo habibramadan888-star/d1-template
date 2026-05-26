@@ -1381,6 +1381,34 @@ Still blocked for production:
 - Production tenant migration/backfill is not approved.
 - Production deploy/cutover is not approved.
 
+## P0-006Q Backlog Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+P0-006 current status:
+
+- `Partial - tenant scope audit events evidence data required`.
+
+Current result:
+
+- Added `npm run test:tenant-audit-events`.
+- Added `npm run rehearse:tenant-audit-events`.
+- Confirmed `audit_logs` and `entry_events` staging schema includes tenant/property
+  compatibility fields.
+- Confirmed scoped employee entry and handover audit/event rows exist.
+- Confirmed deterministic tenant/property audit/event access filtering.
+- Confirmed legacy `CORPID` fallback remains warning-only.
+- Did not write staging D1.
+- Production remains `NO-GO`.
+
+Still blocked for production:
+
+- P0-006 is not Verified.
+- Owner-created audit evidence with `owner_id` scope is missing.
+- Scoped `session.void` audit evidence is missing.
+- Scoped `session_void` entry event evidence is missing.
+- Production tenant migration/backfill and deploy/cutover are not approved.
+
 ## P0-006K Backlog Addendum
 
 P0-006 current status:

@@ -892,6 +892,35 @@ Recommended next prompt:
 
 Production cutover remains `NO-GO`.
 
+## P0-006Q Morning Review Addendum
+
+Most important result:
+
+- Audit/event scope rehearsal did not find policy failures, but it correctly
+  stopped at `NEEDS_STAGING_EVIDENCE_DATA` instead of fabricating PASS.
+
+Current status:
+
+- P0-006: `Partial - tenant scope audit events evidence data required`.
+- `audit_logs` schema fields: present.
+- `entry_events` schema fields: present.
+- Scoped employee entry evidence: present.
+- Scoped handover evidence: present.
+- Owner-created audit evidence: missing.
+- Scoped void audit/event evidence: missing.
+- Production cutover readiness: NO-GO.
+
+Recommended next prompt:
+
+```text
+进入 TASK P0-006Q2：Create staging-only audit_logs / entry_events evidence rows.
+目标：在明确批准、backup、rollback 后，只对 homelink-finance-staging 创建 QA evidence rows。
+禁止 production deploy、production migration、production D1 write、production cutover、secret commit。
+P0-006 仍不能标记 Verified。
+```
+
+Production cutover remains `NO-GO`.
+
 ## P0-006P Morning Review Addendum
 
 Most important result:

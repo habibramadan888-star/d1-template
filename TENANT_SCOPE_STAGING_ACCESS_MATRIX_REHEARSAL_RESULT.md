@@ -1,6 +1,6 @@
 # Tenant Scope Staging Access Matrix Rehearsal Result
 
-Generated: 2026-05-26T14:52:22.752Z
+Generated: 2026-05-26T15:24:56.142Z
 
 Overall: `PASS`
 

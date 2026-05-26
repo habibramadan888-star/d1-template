@@ -4676,6 +4676,40 @@ P0-006 status:
 
 - `Partial - tenant scope staging access matrix rehearsal passed`.
 
+## P0-006Q Tenant Scope Audit Logs / Entry Events Rehearsal
+
+Date: 2026-05-26, Asia/Dubai
+
+Scope: staging/local audit/event scope rehearsal. No production deploy,
+production migration, production D1 write, production URL call, staging D1
+write, dashboard live switch, live financial formula change, legacy `CORPID`
+removal, or secret exposure occurred.
+
+Completed:
+
+- Added `npm run test:tenant-audit-events`.
+- Added `npm run rehearse:tenant-audit-events`.
+- Read `homelink-finance-staging` `audit_logs` and `entry_events` schema/counts
+  using read-only D1 queries.
+- Verified both tables have tenant/property compatibility fields.
+- Verified deterministic tenant/property audit/event access filtering.
+- Verified legacy `CORPID` fallback remains warning-only.
+- Identified missing owner-created and void/session evidence rows.
+
+Result:
+
+- Tenant audit/event rehearsal: NEEDS_STAGING_EVIDENCE_DATA.
+- Total scenarios: 21.
+- PASS count: 17.
+- NEEDS_STAGING_EVIDENCE_DATA count: 3.
+- FAIL count: 0.
+- Missing coverage count: 2 table-level gaps: `audit_logs`, `entry_events`.
+- Production remains `NO-GO`.
+
+P0-006 status:
+
+- `Partial - tenant scope audit events evidence data required`.
+
 ## P0-006L Tenant Scope Staging Route/Query Wiring Rehearsal
 
 Date: 2026-05-26, Asia/Dubai

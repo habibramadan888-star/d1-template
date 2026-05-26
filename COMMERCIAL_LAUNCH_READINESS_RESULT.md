@@ -1,6 +1,6 @@
 # Commercial Launch Readiness Result
 
-Generated: 2026-05-26T14:51:55.313Z
+Generated: 2026-05-26T15:24:38.811Z
 
 | Metric                | Count |
 | --------------------- | ----: |
@@ -16,19 +16,19 @@ Allowed next work: local/staging dry-run validation, manual QA preparation, and 
 
 Forbidden next work without human approval: production deploy, staging deploy, remote/production D1 migration, production feature flag enablement, and live accounting authority switch.
 
-## P0-006P Tenant Scope Staging Access Matrix Rehearsal
+## P0-006Q Tenant Scope Audit Logs / Entry Events Rehearsal
 
-Result: `PASS`
+Result: `NEEDS_STAGING_EVIDENCE_DATA`
 
 Production status remains `PRODUCTION_NO_GO`.
 
-P0-006 remains `Partial - tenant scope staging access matrix rehearsal passed`;
+P0-006 remains `Partial - tenant scope audit events evidence data required`;
 it is not `Verified`, `Done`, or `Fixed`.
 
-This staging/local rehearsal confirms deterministic tenant access matrix behavior
-across employee, owner, manager, admin, unauthenticated, and invalid JWT
-scenarios. Cross-tenant and cross-property access are denied, frontend-submitted
-`tenant_id` remains non-authoritative, legacy `CORPID` fallback remains
-warning-only, and `audit_logs` / `entry_events` remain `MANUAL_REQUIRED` for
-P0-006Q. This does not approve production deploy, production migration,
+This staging/local rehearsal confirms that `audit_logs` and `entry_events`
+have tenant/property compatibility fields and that deterministic access-policy
+fixtures deny or filter cross-tenant/cross-property audit/event access. Existing
+staging rows prove partial scoped employee entry and handover evidence, but
+owner-created audit evidence and void/session audit/event evidence are still
+missing. This does not approve production deploy, production migration,
 production D1 writes, or production cutover.

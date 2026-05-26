@@ -57,6 +57,26 @@ P0-006P recalculation:
 - Close `entry_events` manual-required coverage with dedicated staging/local entry event evidence.
 - Keep production disabled and P0-006 Partial.
 
+## P0-006Q Update
+
+P0-006Q converted the two documented-only/manual-required rows into concrete
+staging evidence data gaps.
+
+| Role  | Resource / API | Coverage                    | Gap                                                      | Recommendation                                                                      |
+| ----- | -------------- | --------------------------- | -------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| owner | `audit_logs`   | NEEDS_STAGING_EVIDENCE_DATA | Owner-created audit evidence with `owner_id` is missing. | Create staging-only QA evidence rows in P0-006Q2 with backup and rollback approval. |
+| owner | `audit_logs`   | NEEDS_STAGING_EVIDENCE_DATA | Scoped `session.void` audit evidence is missing.         | Create staging-only QA evidence rows in P0-006Q2 with backup and rollback approval. |
+| owner | `entry_events` | NEEDS_STAGING_EVIDENCE_DATA | Scoped `session_void` entry event evidence is missing.   | Create staging-only QA evidence rows in P0-006Q2 with backup and rollback approval. |
+
+P0-006Q summary:
+
+- Total audit/event scenarios: 21.
+- PASS count: 17.
+- MANUAL_REQUIRED count: 0.
+- NEEDS_STAGING_EVIDENCE_DATA count: 3.
+- FAIL count: 0.
+- Missing coverage count: 2 table-level gaps: `audit_logs`, `entry_events`.
+
 ## Needs Production Decision
 
 - Production JWT/session claim issuance.

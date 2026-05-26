@@ -1526,3 +1526,30 @@ Result:
 - Missing coverage count remains 2: `audit_logs` and `entry_events`.
 - P0-006 remains Partial, not Verified.
 - Production cutover remains `NO-GO`.
+
+## P0-006Q Status Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+P0-006 status:
+
+- `Partial - tenant scope audit events evidence data required`.
+
+Evidence:
+
+- `scripts/rehearse-tenant-scope-audit-entry-events.mjs`
+- `tests/tenant-scope-audit-entry-events.spec.mjs`
+- `TENANT_SCOPE_AUDIT_ENTRY_EVENTS_REHEARSAL_RESULT.md`
+- `AUDIT_ENTRY_EVENTS_SCOPE_MATRIX.md`
+- `P0_006Q_STAGING_AUDIT_EVENT_EVIDENCE_DATA_PLAN.md`
+- `P0_006Q_COVERAGE_SUMMARY.md`
+- `P0_006Q_COMMERCIAL_LAUNCH_GATE_RESULT.md`
+- `NEXT_PROMPT_P0_006Q2_CREATE_STAGING_AUDIT_EVENT_EVIDENCE_ROWS.md`
+
+Result:
+
+- Audit/event schema and partial scoped staging rows were verified.
+- Missing evidence remains for owner-created audit and void/session audit/event
+  rows.
+- P0-006 remains Partial, not Verified.
+- Production cutover remains `NO-GO`.
