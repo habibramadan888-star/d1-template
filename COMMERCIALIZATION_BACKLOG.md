@@ -1175,6 +1175,35 @@ Still blocked for production:
 - Production receivables migration, backup, rollback, backfill, and deploy
   approval.
 
+## P0-006O Backlog Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+P0-006 current status:
+
+- `Partial - tenant scope staging access matrix gate ready`.
+
+Current result:
+
+- Added tenant access matrix coverage for employee, owner, manager, admin,
+  unauthenticated, and invalid JWT.
+- Covered employee entry, handover, sessions, transactions, deposit ledger,
+  arrears, dashboard/history, settings/app_settings, rent_config, customer/tenant
+  records, property/room/unit records, delete_session/void, export/report,
+  legacy fallback, and production disablement.
+- `npm run test:tenant-access-matrix` passed.
+- `npm run rehearse:tenant-access-matrix` passed with 31 scenarios, 29 tested
+  rows, 2 documented-only rows, and 0 blocked rows.
+- Production remains `NO-GO`.
+
+Still blocked for production:
+
+- P0-006 is not Verified.
+- Live production JWT/session claim issuance is not complete.
+- Production tenant migration/backfill are not approved.
+- Audit/event production attribution still requires review.
+- Production deploy and cutover remain unapproved.
+
 ## P0-006M Backlog Addendum
 
 Date: 2026-05-26, Asia/Dubai

@@ -1473,3 +1473,29 @@ Result:
 - Tenant auth claim staging rehearsal passed.
 - P0-006 remains Partial, not Verified.
 - Production cutover remains `NO-GO`.
+
+## P0-006O Status Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+P0-006 status:
+
+- `Partial - tenant scope staging access matrix gate ready`.
+
+Evidence:
+
+- `TENANT_SCOPE_ACCESS_MATRIX.md`
+- `TENANT_SCOPE_ACCESS_MATRIX_REHEARSAL_RESULT.md`
+- `TENANT_SCOPE_ACCESS_MATRIX_COVERAGE_GAPS.md`
+- `P0_006O_STARTING_CONTEXT.md`
+- `P0_006O_COMMERCIAL_LAUNCH_GATE_RESULT.md`
+- `scripts/rehearse-tenant-scope-access-matrix.mjs`
+- `tests/tenant-scope-access-matrix.spec.mjs`
+- `NEXT_PROMPT_P0_006P_TENANT_SCOPE_STAGING_ACCESS_MATRIX_REHEARSAL.md`
+
+Result:
+
+- Tenant access matrix gate passed.
+- Missing coverage count is 2 documented-only/manual-required rows.
+- P0-006 remains Partial, not Verified.
+- Production cutover remains `NO-GO`.

@@ -4532,6 +4532,43 @@ P0-006 status:
 
 - `Partial - tenant scope staging route/query wiring gate ready`.
 
+## P0-006O Tenant Scope Staging Access Matrix Gate
+
+Date: 2026-05-26, Asia/Dubai
+
+Scope: staging/local tenant access matrix gate. No production deploy, production
+migration, production D1 write, production URL call, staging D1 write,
+dashboard live switch, live financial formula change, legacy `CORPID`
+removal, or secret exposure occurred.
+
+Added:
+
+- `TENANT_SCOPE_ACCESS_MATRIX.md`
+- `TENANT_SCOPE_ACCESS_MATRIX_REHEARSAL_RESULT.md`
+- `TENANT_SCOPE_ACCESS_MATRIX_COVERAGE_GAPS.md`
+- `P0_006O_STARTING_CONTEXT.md`
+- `P0_006O_COMMERCIAL_LAUNCH_GATE_RESULT.md`
+- `scripts/rehearse-tenant-scope-access-matrix.mjs`
+- `tests/tenant-scope-access-matrix.spec.mjs`
+- `NEXT_PROMPT_P0_006P_TENANT_SCOPE_STAGING_ACCESS_MATRIX_REHEARSAL.md`
+
+Result:
+
+- Tenant access matrix gate: PASS.
+- Access matrix scenarios: 31.
+- Tested scenarios: 29.
+- Documented-only/manual-required rows: 2.
+- Blocked scenarios: 0.
+- Cross-tenant denial: PASS.
+- Cross-property denial: PASS.
+- Frontend `tenant_id` tamper ignored: PASS.
+- Legacy `CORPID` fallback warning preserved: PASS.
+- Production remains `NO-GO`.
+
+P0-006 status:
+
+- `Partial - tenant scope staging access matrix gate ready`.
+
 ## P0-006M Tenant Scope Auth/Session Claim Gate
 
 Date: 2026-05-26, Asia/Dubai

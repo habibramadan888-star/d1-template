@@ -892,6 +892,36 @@ Recommended next prompt:
 
 Production cutover remains `NO-GO`.
 
+## P0-006O Tenant Scope Staging Access Matrix Gate Addendum
+
+Current P0-006 status is now
+`Partial - tenant scope staging access matrix gate ready`.
+
+Evidence generated:
+
+- `TENANT_SCOPE_ACCESS_MATRIX.md`
+- `TENANT_SCOPE_ACCESS_MATRIX_REHEARSAL_RESULT.md`
+- `TENANT_SCOPE_ACCESS_MATRIX_COVERAGE_GAPS.md`
+- `P0_006O_STARTING_CONTEXT.md`
+- `P0_006O_COMMERCIAL_LAUNCH_GATE_RESULT.md`
+- `NEXT_PROMPT_P0_006P_TENANT_SCOPE_STAGING_ACCESS_MATRIX_REHEARSAL.md`
+
+Verification:
+
+- `npm run test:tenant-access-matrix`: PASS.
+- `npm run rehearse:tenant-access-matrix`: PASS.
+- Cross-tenant denial: PASS.
+- Cross-property denial: PASS.
+- Missing coverage count: 2 documented-only/manual-required rows.
+- `gate:commercial-launch`: `PRODUCTION_NO_GO`.
+
+Recommended next task:
+
+- P0-006P tenant scope staging access matrix rehearsal.
+
+Production remains `NO-GO`. Do not execute production deploy, production migration,
+production cutover, legacy fallback removal, or P0-006 Verified.
+
 ## P0-006M Tenant Scope Auth/Session Claim Gate Addendum
 
 Date: 2026-05-26, Asia/Dubai

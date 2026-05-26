@@ -910,6 +910,23 @@ call, staging D1 write, remote feature flag mutation, dashboard live switch,
 live financial formula change, legacy `CORPID` removal, or secret exposure
 occurred. P0-006 remains Partial and production remains NO-GO.
 
+## P0-006O Verification Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+| Check                          | Run? | Result | Blocker | Evidence                                         | Notes                                                                                                                                                                                                  |
+| ------------------------------ | ---- | ------ | ------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Tenant access matrix tests     | yes  | Pass   | none    | `tests/tenant-scope-access-matrix.spec.mjs`      | 17 tests cover unauthenticated, invalid JWT, employee, owner, manager/admin, frontend tamper, legacy fallback, delete_session, dashboard/history, audit/settings coverage, and production disablement. |
+| Tenant access matrix rehearsal | yes  | Pass   | none    | `TENANT_SCOPE_ACCESS_MATRIX_REHEARSAL_RESULT.md` | 31 scenarios, 29 tested, 2 documented-only/manual-required, 0 blocked.                                                                                                                                 |
+| Access matrix document         | yes  | Pass   | none    | `TENANT_SCOPE_ACCESS_MATRIX.md`                  | Covers employee, owner, manager, admin, unauthenticated, invalid JWT across core APIs/tables/resources.                                                                                                |
+| Coverage gaps                  | yes  | Pass   | none    | `TENANT_SCOPE_ACCESS_MATRIX_COVERAGE_GAPS.md`    | Two production-review rows remain: `audit_logs` and `entry_events`.                                                                                                                                    |
+| Commercial launch gate         | yes  | Pass   | none    | `P0_006O_COMMERCIAL_LAUNCH_GATE_RESULT.md`       | `gate:commercial-launch` remains `PRODUCTION_NO_GO`.                                                                                                                                                   |
+
+No production deploy, production migration, production D1 write, production URL
+call, staging D1 write, feature flag enablement, dashboard live switch, live
+financial formula change, legacy `CORPID` removal, or secret exposure occurred.
+P0-006 remains Partial and production remains NO-GO.
+
 ## P0-006L Rehearsal Addendum
 
 Date: 2026-05-26, Asia/Dubai
