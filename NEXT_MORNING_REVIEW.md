@@ -912,6 +912,22 @@ Enter TASK P0-006R: Tenant scope production readiness gate.
 Do not execute production deploy, production migration, production D1 write,
 production cutover, legacy fallback removal, or P0-006 Verified.
 
+## P0-006R Morning Review Addendum
+
+- Tenant scope production readiness gate was reviewed without production
+  actions.
+- P0-006 staging evidence chain through Q2 is complete enough for a production
+  approval packet review, not execution.
+- P0-006: `Partial - tenant scope production readiness gate reviewed, production NO-GO`.
+- Production cutover readiness: NO-GO.
+
+Next recommended task:
+
+Enter TASK P0-006S: Tenant scope production approval packet, manual-required.
+
+Do not execute production deploy, production migration, production D1 write,
+production cutover, legacy fallback removal, or P0-006 Verified.
+
 ## P0-006Q Morning Review Addendum
 
 Most important result:

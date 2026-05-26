@@ -1578,3 +1578,25 @@ Safety:
 - Business table write: no.
 - P0-006 remains Partial, not Verified.
 - Production cutover remains `NO-GO`.
+
+## P0-006R Status Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+P0-006 status:
+
+- `Partial - tenant scope production readiness gate reviewed, production NO-GO`.
+
+Evidence:
+
+- `P0_006R_TENANT_SCOPE_PRODUCTION_READINESS_GATE.md`
+- P0-006A through P0-006Q2 evidence chain reviewed.
+- Staging schema/backfill/route/query/auth/access/audit-event evidence reviewed.
+
+Production decision:
+
+- Production deploy: no.
+- Production migration: no.
+- Production D1 write: no.
+- Production cutover: NO-GO.
+- P0-006 remains Partial, not Verified.

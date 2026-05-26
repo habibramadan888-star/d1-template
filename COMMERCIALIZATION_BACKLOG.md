@@ -1371,6 +1371,21 @@ Summary:
 Next action: P0-006R tenant scope production readiness gate. P0-006 remains
 Partial and cannot be marked Verified.
 
+## P0-006R Tenant Scope Production Readiness Gate
+
+Status: `Partial - tenant scope production readiness gate reviewed, production NO-GO`
+
+Summary:
+
+- P0-006 staging evidence chain through Q2 was reviewed.
+- Staging evidence is sufficient for continued staging/local governance.
+- Production migration, backfill, auth claim switch, route/query switch, legacy
+  fallback retirement, and cutover remain unapproved.
+- Production cutover remains `NO-GO`.
+
+Next action: create a production approval packet only. Do not execute
+production.
+
 ## P0-006P Backlog Addendum
 
 Date: 2026-05-26, Asia/Dubai

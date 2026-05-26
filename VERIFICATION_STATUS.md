@@ -907,6 +907,27 @@ Date: 2026-05-26, Asia/Dubai
 
 P0-006 status: `Partial - tenant scope audit events staging evidence passed`.
 
+## P0-006R Verification Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+| Check                                           | Run? | Result                           | Blocker                                 | Evidence                                            | Notes                                            |
+| ----------------------------------------------- | ---- | -------------------------------- | --------------------------------------- | --------------------------------------------------- | ------------------------------------------------ |
+| `npm run check`                                 | yes  | Pass                             | none                                    | 404 tests                                           | Baseline remained green before readiness review. |
+| `npm run security:secrets`                      | yes  | Pass                             | none                                    | secret scanner                                      | No secret committed.                             |
+| `npm run gate:commercial-launch`                | yes  | `PRODUCTION_NO_GO`               | production approvals missing            | launch gate output                                  | Production remains blocked.                      |
+| `npm run qa:employee-entry-staging`             | yes  | `MANUAL_REQUIRED / DRY_RUN_ONLY` | confirmation flags intentionally absent | dry-run report                                      | No staging employee write executed.              |
+| `npm run rehearse:tenant-audit-events`          | yes  | Pass                             | none                                    | audit/event rehearsal report                        | Missing coverage count is 0.                     |
+| `npm run rehearse:tenant-access-matrix-staging` | yes  | Pass                             | none                                    | access matrix rehearsal report                      | Manual-required count is 0.                      |
+| `npm run audit:worker-drift`                    | yes  | Pass                             | none                                    | worker drift report                                 | 0 critical mismatches.                           |
+| `npm run verify:embedded-worker`                | yes  | Pass                             | none                                    | embedded freshness report                           | 0 critical missing.                              |
+| `npm run build:embedded:dry-run`                | yes  | Warning                          | non-blocking                            | embedded dry-run report                             | 0 current/generated missing.                     |
+| Evidence chain review                           | yes  | Pass                             | none                                    | `P0_006R_TENANT_SCOPE_PRODUCTION_READINESS_GATE.md` | P0-006A through P0-006Q2 reviewed.               |
+| Production readiness decision                   | yes  | `PRODUCTION_NO_GO`               | production approvals missing            | `P0_006R_TENANT_SCOPE_PRODUCTION_READINESS_GATE.md` | No production action approved.                   |
+
+P0-006 status:
+`Partial - tenant scope production readiness gate reviewed, production NO-GO`.
+
 ## P0-006N Verification Addendum
 
 Date: 2026-05-26, Asia/Dubai

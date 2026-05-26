@@ -4562,6 +4562,30 @@ P0-006 status:
 
 - `Partial - tenant scope audit events staging evidence passed`.
 
+## P0-006R Tenant Scope Production Readiness Gate
+
+Scope: review-only production readiness gate. No production deploy, production
+migration, production D1 write, production URL call, legacy CORPID fallback
+removal, or production cutover occurred.
+
+Artifacts:
+
+- `P0_006R_TENANT_SCOPE_PRODUCTION_READINESS_GATE.md`
+- `NEXT_PROMPT_P0_006S_TENANT_SCOPE_PRODUCTION_APPROVAL_PACKET_MANUAL_REQUIRED.md`
+
+Result:
+
+- P0-006 evidence chain through Q2 was reviewed.
+- Staging schema/backfill/route/query/auth/access/audit-event evidence is
+  sufficient for continued staging/local review.
+- Production migration, production backfill, production auth claim switch,
+  production route/query switch, and production cutover remain NO-GO.
+- Commercial launch gate remains `PRODUCTION_NO_GO`.
+
+P0-006 status:
+
+- `Partial - tenant scope production readiness gate reviewed, production NO-GO`.
+
 ## P0-006O Tenant Scope Staging Access Matrix Gate
 
 Date: 2026-05-26, Asia/Dubai
