@@ -4641,6 +4641,41 @@ P0-006 status:
 
 - `Partial - tenant scope auth claim staging rehearsal passed`.
 
+## P0-006P Tenant Scope Staging Access Matrix Rehearsal
+
+Date: 2026-05-26, Asia/Dubai
+
+Scope: staging/local tenant access matrix rehearsal. No production deploy,
+production migration, production D1 write, production URL call, staging D1
+write, feature flag enablement, dashboard live switch, live financial formula
+change, legacy `CORPID` removal, or secret exposure occurred.
+
+Completed:
+
+- Added `npm run test:tenant-access-matrix-staging`.
+- Added `npm run rehearse:tenant-access-matrix-staging`.
+- Rehearsed 31 role/resource/API access matrix scenarios.
+- Verified cross-tenant access is denied.
+- Verified cross-property access is denied.
+- Verified frontend `tenant_id` tampering is ignored.
+- Verified legacy `CORPID` fallback remains warning-only.
+- Preserved `audit_logs` and `entry_events` as `MANUAL_REQUIRED` for P0-006Q.
+
+Result:
+
+- Tenant access matrix staging rehearsal: PASS.
+- Total scenarios: 31.
+- PASS count: 28.
+- MANUAL_REQUIRED count: 2.
+- FAIL count: 0.
+- LEGACY_WARNING count: 1.
+- Missing coverage count: 2.
+- Production remains `NO-GO`.
+
+P0-006 status:
+
+- `Partial - tenant scope staging access matrix rehearsal passed`.
+
 ## P0-006L Tenant Scope Staging Route/Query Wiring Rehearsal
 
 Date: 2026-05-26, Asia/Dubai

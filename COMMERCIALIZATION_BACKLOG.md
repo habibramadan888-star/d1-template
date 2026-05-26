@@ -1354,6 +1354,33 @@ Still blocked for production:
 - Production receivables migration, backup, rollback, backfill, and deploy
   approval.
 
+## P0-006P Backlog Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+P0-006 current status:
+
+- `Partial - tenant scope staging access matrix rehearsal passed`.
+
+Current result:
+
+- Added `npm run test:tenant-access-matrix-staging`.
+- Added `npm run rehearse:tenant-access-matrix-staging`.
+- Staging/local access matrix rehearsal passed with 31 scenarios.
+- Cross-tenant and cross-property access are denied.
+- Frontend `tenant_id` tampering is ignored.
+- Legacy `CORPID` fallback remains warning-only.
+- `audit_logs` and `entry_events` remain `MANUAL_REQUIRED` for P0-006Q.
+- Production remains `NO-GO`.
+
+Still blocked for production:
+
+- P0-006 is not Verified.
+- `audit_logs` and `entry_events` still require dedicated staging scope evidence.
+- Production JWT/session tenant authority is not live.
+- Production tenant migration/backfill is not approved.
+- Production deploy/cutover is not approved.
+
 ## P0-006K Backlog Addendum
 
 P0-006 current status:

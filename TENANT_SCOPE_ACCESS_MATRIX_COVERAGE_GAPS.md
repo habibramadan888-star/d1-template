@@ -8,6 +8,15 @@ Overall result: `PASS`
 
 Missing coverage count: `2`
 
+P0-006P recalculation:
+
+- Total scenarios: 31.
+- PASS count: 28.
+- MANUAL_REQUIRED count: 2.
+- FAIL count: 0.
+- NOT_APPLICABLE count: 0.
+- LEGACY_WARNING count: 1.
+
 | Role            | Resource / API              | Coverage        | Gap                                                | Recommendation                               |
 | --------------- | --------------------------- | --------------- | -------------------------------------------------- | -------------------------------------------- |
 | unauthenticated | employee entry              | TESTED          | none                                               | Keep as regression coverage.                 |
@@ -34,11 +43,19 @@ Missing coverage count: `2`
 | all             | frontend tenant_id          | TESTED          | none                                               | Keep as critical regression.                 |
 | all             | production authority switch | TESTED          | production remains disabled                        | Do not enter production.                     |
 
-## Needs P0-006P
+## P0-006P Result
 
-- Broader staging/local rehearsal of the access matrix using route/resource groupings.
-- Confirm no role/resource combination regresses from allow/deny expectations.
-- Keep feature flags false after rehearsal if any are introduced.
+- Broader staging/local rehearsal of the access matrix passed.
+- `audit_logs` remains `MANUAL_REQUIRED`.
+- `entry_events` remains `MANUAL_REQUIRED`.
+- No role/resource combination regressed from allow/deny expectations.
+- Final feature flag state remains false / legacy in the in-process rehearsal.
+
+## Needs P0-006Q
+
+- Close `audit_logs` manual-required coverage with dedicated staging/local audit evidence.
+- Close `entry_events` manual-required coverage with dedicated staging/local entry event evidence.
+- Keep production disabled and P0-006 Partial.
 
 ## Needs Production Decision
 

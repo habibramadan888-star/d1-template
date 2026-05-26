@@ -1499,3 +1499,30 @@ Result:
 - Missing coverage count is 2 documented-only/manual-required rows.
 - P0-006 remains Partial, not Verified.
 - Production cutover remains `NO-GO`.
+
+## P0-006P Status Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+P0-006 status:
+
+- `Partial - tenant scope staging access matrix rehearsal passed`.
+
+Evidence:
+
+- `scripts/rehearse-tenant-scope-staging-access-matrix.mjs`
+- `tests/tenant-scope-staging-access-matrix-rehearsal.spec.mjs`
+- `TENANT_SCOPE_STAGING_ACCESS_MATRIX_REHEARSAL_RESULT.md`
+- `P0_006P_STAGING_ACCESS_MATRIX_REHEARSAL_SCENARIOS.md`
+- `P0_006P_AUDIT_ENTRY_EVENTS_MANUAL_REVIEW_PACKET.md`
+- `P0_006P_ACCESS_MATRIX_COVERAGE_SUMMARY.md`
+- `P0_006P_COMMERCIAL_LAUNCH_GATE_RESULT.md`
+- `NEXT_PROMPT_P0_006Q_TENANT_SCOPE_AUDIT_ENTRY_EVENTS_SCOPE_REHEARSAL.md`
+
+Result:
+
+- Tenant access matrix staging rehearsal passed.
+- Cross-tenant and cross-property access are denied.
+- Missing coverage count remains 2: `audit_logs` and `entry_events`.
+- P0-006 remains Partial, not Verified.
+- Production cutover remains `NO-GO`.

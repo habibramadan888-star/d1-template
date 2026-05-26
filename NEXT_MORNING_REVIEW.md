@@ -892,6 +892,35 @@ Recommended next prompt:
 
 Production cutover remains `NO-GO`.
 
+## P0-006P Morning Review Addendum
+
+Most important result:
+
+- Tenant scope staging access matrix rehearsal passed in staging/local scope with
+  31 role/resource/API scenarios, 28 pass rows, 2 manual-required rows, and 0
+  failures.
+
+Current status:
+
+- P0-006: `Partial - tenant scope staging access matrix rehearsal passed`.
+- Cross-tenant access: denied.
+- Cross-property access: denied.
+- Frontend `tenant_id` tamper: ignored / not authority.
+- Legacy `CORPID` fallback: preserved as warning-only.
+- Remaining manual-required rows: `audit_logs`, `entry_events`.
+- Production cutover readiness: NO-GO.
+
+Recommended next prompt:
+
+```text
+进入 TASK P0-006Q：Tenant scope audit_logs / entry_events scope rehearsal.
+目标：只在 staging/local 范围补齐 audit_logs 和 entry_events 的 tenant/property scope evidence。
+禁止 production deploy、production migration、production D1 write、production cutover、secret commit。
+P0-006 仍不能标记 Verified。
+```
+
+Production cutover remains `NO-GO`.
+
 ## P0-006O Tenant Scope Staging Access Matrix Gate Addendum
 
 Current P0-006 status is now
