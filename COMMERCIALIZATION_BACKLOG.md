@@ -1290,6 +1290,36 @@ Still blocked for production:
 - Production tenant migration, backfill, query wiring, rollback, and cutover are
   not approved.
 
+## P0-006I1 Backlog Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+P0-006 current status:
+
+- `Partial - tenant scope staging compatibility schema applied`.
+
+Current result:
+
+- Staging D1 `homelink-finance-staging` was confirmed by name/id.
+- Staging backup was exported under ignored `backups/`.
+- Nullable compatibility columns were applied to staging-only legacy
+  `CORPID` tables.
+- Post-schema dry-run passed with 0 blocked tables, 5 manual-required tables,
+  and 1 remaining legacy warning.
+- No staging backfill write, production deploy, production migration,
+  production D1 write, dashboard mutation, live financial formula change, or
+  secret exposure occurred.
+
+Still blocked for production:
+
+- P0-006 is not Verified.
+- Staging row-level backfill has not been approved or executed.
+- `active_sessions` property scope remains membership-derived and needs auth
+  design review.
+- Non-empty high-risk legacy tables need exact mapping review.
+- Production tenant migration, query wiring, rollback, and cutover are not
+  approved.
+
 ## P0-006D Backlog Addendum
 
 Date: 2026-05-26, Asia/Dubai

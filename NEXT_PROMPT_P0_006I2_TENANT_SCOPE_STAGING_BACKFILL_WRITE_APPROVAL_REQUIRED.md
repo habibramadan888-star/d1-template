@@ -18,6 +18,7 @@ Execute a reviewed staging-only tenant scope backfill write against
 6. Legacy CORPID warnings reviewed and accepted for staging rehearsal only.
 7. Production URL/D1 excluded.
 8. `gate:commercial-launch` remains `PRODUCTION_NO_GO`.
+9. Post-schema dry-run reviewed and accepted.
 
 ## Required Human Approval Flags
 
@@ -25,6 +26,7 @@ Execute a reviewed staging-only tenant scope backfill write against
 - `--confirm-backup`
 - `--confirm-rollback`
 - `--confirm-legacy-corpid-warnings-reviewed`
+- `--confirm-exact-mapping-reviewed`
 
 ## Strictly Forbidden
 
@@ -46,6 +48,8 @@ Execute a reviewed staging-only tenant scope backfill write against
 4. Audit/log evidence where applicable.
 5. Rollback verification.
 6. Final dry-run QA result with no write confirmation flags.
+7. Confirmation that `active_sessions` remains membership-derived and is not
+   property-backfilled by guesswork.
 
 ## Expected End State
 

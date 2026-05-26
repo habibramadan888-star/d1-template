@@ -834,6 +834,40 @@ after backup and rollback approval. Do not execute data backfill. Do not touch
 production. Do not mark P0-006 Verified.
 ```
 
+## P0-006I1 Morning Review Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+Current result:
+
+- Staging D1 target `homelink-finance-staging`
+  (`4ff78bfc-3855-436b-aefb-6b492145d79c`) was confirmed.
+- Staging backup was exported to
+  `./backups/homelink-finance-staging-before-tenant-scope-compatibility-schema.sql`
+  and not committed.
+- Staging-only nullable compatibility columns were applied.
+- Post-schema dry-run result: PASS, 13 tables reviewed, 0 blocked, 5
+  manual-required, 1 legacy warning.
+- Staging backfill write was not executed.
+- Production deploy, production migration, and production D1 write were not
+  executed.
+
+Current status:
+
+- P0-006: `Partial - tenant scope staging compatibility schema applied`.
+- Staging backfill write: `NO_GO` until exact mapping and human approval.
+- Production cutover: `NO-GO`.
+
+Recommended next prompt:
+
+```text
+Enter TASK P0-006I2: Tenant scope staging backfill write approval required.
+
+Goal: only after exact mapping review, backup/rollback confirmation, and human
+approval flags, execute a staging-only backfill write. Do not touch production.
+Do not mark P0-006 Verified.
+```
+
 ## P0-006H Morning Review Addendum
 
 Date: 2026-05-26, Asia/Dubai

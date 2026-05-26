@@ -1,6 +1,6 @@
 # Commercial Launch Readiness Result
 
-Generated: 2026-05-26T08:13:13.439Z
+Generated: 2026-05-26T08:33:55.060Z
 
 | Metric                | Count |
 | --------------------- | ----: |
@@ -16,26 +16,25 @@ Allowed next work: local/staging dry-run validation, manual QA preparation, and 
 
 Forbidden next work without human approval: production deploy, staging deploy, remote/production D1 migration, production feature flag enablement, and live accounting authority switch.
 
-## P0-006I Addendum
+## P0-006I1 Addendum
 
 P0-006 current status:
 
-- `Partial - tenant scope schema compatibility gate ready`.
+- `Partial - tenant scope staging compatibility schema applied`.
 
 Evidence:
 
-- `P0_006I_GATE_STARTING_CONTEXT.md`
-- `TENANT_SCOPE_COMPATIBILITY_COLUMN_MATRIX.md`
-- `TENANT_SCOPE_STAGING_SCHEMA_MIGRATION_PLAN.md`
-- `migration-drafts/tenant_scope_staging_compatibility_columns_draft.sql`
-- `P0_006I_EXACT_STAGING_BACKFILL_UPDATE_PLAN_V2.md`
-- `P0_006I_SCHEMA_COMPATIBILITY_BACKUP_ROLLBACK_CHECKLIST.md`
-- `P0_006I_SCHEMA_COMPATIBILITY_GO_NO_GO.md`
-- `NEXT_PROMPT_P0_006I1_APPLY_STAGING_COMPATIBILITY_SCHEMA.md`
+- `P0_006I1_TARGET_D1_CONFIRMATION.md`
+- `P0_006I1_BACKUP_RESULT.md`
+- `P0_006I1_SCHEMA_MIGRATION_SQL_REVIEW.md`
+- `P0_006I1_SCHEMA_MIGRATION_APPLY_RESULT.md`
+- `P0_006I1_POST_SCHEMA_SNAPSHOT.md`
+- `P0_006I1_POST_SCHEMA_BACKFILL_DRY_RUN_RESULT.md`
+- `TENANT_SCOPE_STAGING_BACKFILL_DRY_RUN_RESULT.md`
 - `NEXT_PROMPT_P0_006I2_TENANT_SCOPE_STAGING_BACKFILL_WRITE_APPROVAL_REQUIRED.md`
 
-Production remains `NO-GO`. P0-006I is a staging/local compatibility schema
-gate only; it does not approve production deploy, production migration,
-production D1 write, staging schema migration, staging backfill write,
-tenant/property row-level update, production auth changes, dashboard/history
-live switch, removal of legacy `CORPID` fallback, or P0-006 verification.
+Production remains `NO-GO`. P0-006I1 applied staging-only nullable
+compatibility columns to `homelink-finance-staging`; it does not approve
+production deploy, production migration, production D1 write, staging backfill
+write, production auth changes, dashboard/history live switch, removal of
+legacy `CORPID` fallback, or P0-006 verification.

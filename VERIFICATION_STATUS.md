@@ -806,3 +806,21 @@ P0-006I converted the 9 legacy `CORPID` warnings into a nullable compatibility
 column plan and exact mapping gate. Staging compatibility schema migration is a
 future human-approved task; staging backfill write remains NO-GO until schema,
 backup, rollback, and row-level mapping are approved.
+
+## P0-006I1 Verification Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+| Command / Check                                                                                                                                     | Exists | Result | Error Summary | Log Evidence                                              | Commercial Meaning                                           |
+| --------------------------------------------------------------------------------------------------------------------------------------------------- | ------ | ------ | ------------- | --------------------------------------------------------- | ------------------------------------------------------------ |
+| `npx wrangler d1 info homelink-finance-staging`                                                                                                     | yes    | PASS   | none          | D1 name/id matched                                        | Target was staging D1, not production.                       |
+| `npx wrangler d1 export homelink-finance-staging --remote --output ./backups/homelink-finance-staging-before-tenant-scope-compatibility-schema.sql` | yes    | PASS   | none          | Backup file exists and is ignored                         | Rollback prerequisite completed.                             |
+| `npx wrangler d1 execute homelink-finance-staging --remote --file migration-drafts/tenant_scope_staging_compatibility_columns_draft.sql`            | yes    | PASS   | none          | 29 schema statements executed                             | Nullable compatibility columns applied to staging only.      |
+| `sqlite_schema` SELECT                                                                                                                              | yes    | PASS   | none          | Compatibility columns present                             | Read-only schema verification passed.                        |
+| `npm run dry-run:tenant-scope-staging-backfill`                                                                                                     | yes    | PASS   | none          | 13 tables, 0 blocked, 5 manual-required, 1 legacy warning | Backfill planning improved but write remains approval-gated. |
+| Staging backfill write                                                                                                                              | yes    | No     | none          | Dry-run only                                              | No row-level data update occurred.                           |
+| Production D1 write                                                                                                                                 | yes    | No     | none          | No production command                                     | Production untouched.                                        |
+
+P0-006I1 applied staging-only nullable compatibility columns and kept backfill
+write blocked pending exact mapping approval. P0-006 remains Partial and
+production remains NO-GO.

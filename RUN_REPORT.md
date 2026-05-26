@@ -4388,3 +4388,39 @@ Result:
 P0-006 status:
 
 - `Partial - tenant scope schema compatibility gate ready`.
+
+## P0-006I1 Apply Staging Compatibility Schema
+
+Date: 2026-05-26, Asia/Dubai
+
+Scope: staging-only tenant scope compatibility schema migration. No production
+deploy, production migration, production D1 write, production URL call,
+staging backfill write, `INSERT` / `UPDATE` / `DELETE` business data,
+dashboard mutation, live financial formula change, legacy `CORPID` removal, or
+secret exposure occurred.
+
+Completed:
+
+- Confirmed target D1 `homelink-finance-staging`
+  (`4ff78bfc-3855-436b-aefb-6b492145d79c`).
+- Exported staging backup to ignored `backups/`.
+- Reviewed migration SQL for nullable `ALTER TABLE ADD COLUMN` only.
+- Applied `migration-drafts/tenant_scope_staging_compatibility_columns_draft.sql`
+  to staging D1.
+- Verified compatibility columns through read-only `sqlite_schema` query.
+- Re-ran tenant scope staging backfill dry-run with no write confirmation.
+- Updated next P0-006I2 approval prompt.
+
+Result:
+
+- Compatibility columns exist in staging schema.
+- Backfill dry-run: PASS.
+- Blocked tables: 0.
+- Manual-required tables: 5.
+- Legacy-warning tables: 1.
+- Staging backfill write: no.
+- Production remains `NO-GO`.
+
+P0-006 status:
+
+- `Partial - tenant scope staging compatibility schema applied`.
