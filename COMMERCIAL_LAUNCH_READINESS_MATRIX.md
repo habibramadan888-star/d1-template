@@ -1,8 +1,22 @@
 # Commercial Launch Readiness Matrix
 
-Generated: 2026-05-26T21:03:21.375Z
+Generated: 2026-05-26T22:01:38.322Z
 
 Scope: read-only commercial launch gate. This script reads reports only and does not deploy, migrate, call APIs, access D1, or read secrets.
+
+## Commercial Launch Review 005 Addendum
+
+Date: 2026-05-27, Asia/Dubai
+
+| Area                             | REVIEW-005 Copy Dry-Run Result | Launch Meaning                                                    |
+| -------------------------------- | ------------------------------ | ----------------------------------------------------------------- |
+| Production-copy schema migration | PASS                           | Copy-only schema compatibility improved; not production approval. |
+| Business row counts              | PASS                           | Existing copy business rows unchanged.                            |
+| Money value backfill             | MANUAL_REQUIRED                | Accounting approval still required.                               |
+| Tenant/property backfill         | MANUAL_REQUIRED                | Production mapping approval still required.                       |
+| Receivables data backfill        | MANUAL_REQUIRED                | Accounting lifecycle approval still required.                     |
+| Audit/event scope                | MANUAL_REQUIRED                | Audit visibility mapping still required.                          |
+| Commercial launch gate           | `PRODUCTION_NO_GO`             | Cutover remains blocked.                                          |
 
 | Area                            | Evidence                                                                                          | Required Markers                                                   | Missing        | Result          | Production Gate        |
 | ------------------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ | -------------- | --------------- | ---------------------- |
@@ -30,17 +44,3 @@ Scope: read-only commercial launch gate. This script reads reports only and does
 - Real staging QA is `MANUAL_REQUIRED` until target resources, accounts, backup, rollback, and feature flags are provided.
 - Production cutover is `NO-GO` because multiple P0/P1 launch gates remain incomplete.
 - This matrix is not deployment approval.
-
-## COMMERCIAL-LAUNCH-REVIEW-004 Addendum
-
-| Review Area                 | Result            | Evidence                                                                         |
-| --------------------------- | ----------------- | -------------------------------------------------------------------------------- |
-| Starting context            | Prepared          | `COMMERCIAL_LAUNCH_REVIEW_004_STARTING_CONTEXT.md`                               |
-| Copy dry-run execution plan | Prepared, not run | `PRODUCTION_COPY_DRY_RUN_EXECUTION_PLAN.md`                                      |
-| SQL review packet           | Prepared          | `PRODUCTION_COPY_DRY_RUN_SQL_REVIEW_PACKET.md`                                   |
-| Rollback plan               | Prepared          | `PRODUCTION_COPY_DRY_RUN_ROLLBACK_PLAN.md`                                       |
-| Next copy dry-run prompt    | Prepared          | `NEXT_PROMPT_COMMERCIAL_LAUNCH_REVIEW_005_RUN_COPY_DRY_RUN_APPROVAL_REQUIRED.md` |
-| D1 command status           | Not executed      | REVIEW-004 was documentation-only.                                               |
-
-Decision: production remains `PRODUCTION_NO_GO`; copy migration/backfill dry-run
-requires a separate explicit approval task.

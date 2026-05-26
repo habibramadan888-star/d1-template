@@ -2,6 +2,22 @@
 
 Generated: 2026-05-23, Asia/Dubai
 
+## Commercial Launch Review 005 Addendum
+
+Date: 2026-05-27, Asia/Dubai
+
+Production-copy dry-run was executed only on
+`homelink-finance-production-copy-dryrun`.
+
+| Area                  | Current Status     | Evidence                                                       | Production Meaning                                             |
+| --------------------- | ------------------ | -------------------------------------------------------------- | -------------------------------------------------------------- |
+| Copy schema dry-run   | PASS               | `PRODUCTION_COPY_DRY_RUN_005_EXECUTION_RESULT.md`              | Schema drafts can apply to the copy shape.                     |
+| Money reconciliation  | MANUAL_REQUIRED    | `PRODUCTION_COPY_RECONCILIATION_RESULT.md`                     | P0-001 remains Partial; accounting conversion not approved.    |
+| Backend totals        | PASS_WITH_WARNINGS | `PRODUCTION_COPY_DRY_RUN_005_DELTA_REPORT.md`                  | P0-003 remains Partial; authority switch not approved.         |
+| Tenant/property scope | MANUAL_REQUIRED    | `PRODUCTION_COPY_RECONCILIATION_RESULT.md`                     | P0-006 remains Partial; production mapping not approved.       |
+| Receivables           | MANUAL_REQUIRED    | `PRODUCTION_COPY_RECONCILIATION_RESULT.md`                     | P0-008 remains Partial; data backfill/allocation not approved. |
+| Production cutover    | `PRODUCTION_NO_GO` | `PRODUCTION_COPY_DRY_RUN_005_COMMERCIAL_LAUNCH_GATE_RESULT.md` | No production migration/deploy/write was executed.             |
+
 Status vocabulary:
 
 - Planned: documented only.

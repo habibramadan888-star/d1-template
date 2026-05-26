@@ -2,28 +2,28 @@
 
 Date: 2026-05-27, Asia/Dubai
 
-Status: `COPY_CREATED_AND_IMPORTED`
+Status: `COPY_SCHEMA_DRY_RUN_COMPLETE_RECONCILIATION_MANUAL_REQUIRED`
 
 Production cutover: `PRODUCTION_NO_GO`
 
-|   # | Checklist Item                                  | Required Before Copy Dry-Run | Current Status  |
-| --: | ----------------------------------------------- | ---------------------------- | --------------- |
-|   1 | Production D1 name / id confirmed               | Yes                          | CONFIRMED       |
-|   2 | Production backup completed                     | Yes                          | COMPLETED       |
-|   3 | Backup stored outside git                       | Yes                          | CONFIRMED       |
-|   4 | Production-copy D1 created                      | Yes                          | COMPLETED       |
-|   5 | Production-copy D1 restored/imported            | Yes                          | COMPLETED       |
-|   6 | Production-copy not bound to production Worker  | Yes                          | CONFIRMED       |
-|   7 | Production-copy feature flags disabled          | Yes                          | NOT_BOUND       |
-|   8 | Production-copy migration dry-run plan reviewed | Yes                          | MANUAL_REQUIRED |
-|   9 | Production-copy backfill dry-run plan reviewed  | Yes                          | MANUAL_REQUIRED |
-|  10 | Row counts expected                             | Yes                          | RECORDED        |
-|  11 | Rollback plan reviewed                          | Yes                          | MANUAL_REQUIRED |
-|  12 | Accounting review completed                     | Yes                          | MANUAL_REQUIRED |
-|  13 | Tenant mapping review completed                 | Yes                          | MANUAL_REQUIRED |
-|  14 | Receivables review completed                    | Yes                          | MANUAL_REQUIRED |
-|  15 | TOP_25_MONEY_RISKS reviewed                     | Yes                          | MANUAL_REQUIRED |
-|  16 | Commercial launch gate still `PRODUCTION_NO_GO` | Yes                          | CONFIRMED       |
+|   # | Checklist Item                                  | Required Before Copy Dry-Run | Current Status    |
+| --: | ----------------------------------------------- | ---------------------------- | ----------------- |
+|   1 | Production D1 name / id confirmed               | Yes                          | CONFIRMED         |
+|   2 | Production backup completed                     | Yes                          | COMPLETED         |
+|   3 | Backup stored outside git                       | Yes                          | CONFIRMED         |
+|   4 | Production-copy D1 created                      | Yes                          | COMPLETED         |
+|   5 | Production-copy D1 restored/imported            | Yes                          | COMPLETED         |
+|   6 | Production-copy not bound to production Worker  | Yes                          | CONFIRMED         |
+|   7 | Production-copy feature flags disabled          | Yes                          | NOT_BOUND         |
+|   8 | Production-copy migration dry-run plan reviewed | Yes                          | COMPLETED_ON_COPY |
+|   9 | Production-copy backfill dry-run plan reviewed  | Yes                          | MANUAL_REQUIRED   |
+|  10 | Row counts expected                             | Yes                          | RECORDED          |
+|  11 | Rollback plan reviewed                          | Yes                          | MANUAL_REQUIRED   |
+|  12 | Accounting review completed                     | Yes                          | MANUAL_REQUIRED   |
+|  13 | Tenant mapping review completed                 | Yes                          | MANUAL_REQUIRED   |
+|  14 | Receivables review completed                    | Yes                          | MANUAL_REQUIRED   |
+|  15 | TOP_25_MONEY_RISKS reviewed                     | Yes                          | MANUAL_REQUIRED   |
+|  16 | Commercial launch gate still `PRODUCTION_NO_GO` | Yes                          | CONFIRMED         |
 
 ## Stop Conditions
 
@@ -40,3 +40,11 @@ Stop before copy dry-run if any of the following is missing:
 Conclusion: production-copy D1 was created and imported. Migration/backfill,
 rollback rehearsal, accounting review, tenant mapping review, and production
 cutover remain approval-gated and `PRODUCTION_NO_GO`.
+
+## REVIEW-005 Update
+
+Schema-only dry-run migrations were applied to
+`homelink-finance-production-copy-dryrun` after copy backup. Existing business
+row counts did not change. Backfill and reconciliation remain
+`MANUAL_REQUIRED` because money conversion, tenant mapping, receivables
+allocation, audit/event scope, and TOP_25 money risks still need human approval.

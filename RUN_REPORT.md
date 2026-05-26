@@ -6,6 +6,35 @@ Scope: governance, engineering baseline, local startup checks
 Production deploy: not executed  
 Production database mutation: not executed
 
+## Commercial Launch Review 005 Production-Copy Dry-Run Addendum
+
+Date: 2026-05-27, Asia/Dubai
+
+Scope: approved migration/backfill/reconciliation dry-run on isolated
+production-copy D1 only.
+
+| Command / Check                              | Result                         | Evidence                                                       | Notes                                                           |
+| -------------------------------------------- | ------------------------------ | -------------------------------------------------------------- | --------------------------------------------------------------- |
+| Baseline `npm run format:check`              | PASS                           | Pre-dry-run baseline                                           | No formatting blocker.                                          |
+| Baseline `npm run check`                     | PASS                           | 404 tests                                                      | No production deploy; Worker build commands remained dry-run.   |
+| Baseline `npm run security:secrets`          | PASS                           | Secret hygiene check passed                                    | No secret committed.                                            |
+| Baseline `npm run gate:commercial-launch`    | PASS / `PRODUCTION_NO_GO`      | `COMMERCIAL_LAUNCH_READINESS_RESULT.md`                        | Production remains blocked.                                     |
+| Baseline `npm run qa:employee-entry-staging` | MANUAL_REQUIRED / DRY_RUN_ONLY | `EMPLOYEE_ENTRY_REAL_STAGING_QA_DRY_RUN_RESULT.md`             | No staging write.                                               |
+| Target confirmation                          | PASS                           | `PRODUCTION_COPY_DRY_RUN_005_TARGET_CONFIRMATION.md`           | Confirmed `homelink-finance-production-copy-dryrun`.            |
+| Copy backup                                  | PASS                           | `PRODUCTION_COPY_DRY_RUN_005_BEFORE_SNAPSHOT.md`               | Backup stored under ignored `backups/`.                         |
+| Copy schema dry-run                          | PASS                           | `PRODUCTION_COPY_DRY_RUN_005_EXECUTION_RESULT.md`              | Applied approved schema-only drafts to copy D1.                 |
+| Copy reconciliation                          | MANUAL_REQUIRED                | `PRODUCTION_COPY_RECONCILIATION_RESULT.md`                     | Row-level money/tenant/receivables backfill remains unapproved. |
+| Final commercial gate                        | PASS / `PRODUCTION_NO_GO`      | `PRODUCTION_COPY_DRY_RUN_005_COMMERCIAL_LAUNCH_GATE_RESULT.md` | Copy dry-run did not change launch status.                      |
+
+Safety:
+
+- Production deploy: no.
+- Production migration: no.
+- Production D1 write: no.
+- Staging D1 write: no.
+- Production-copy D1 write: yes, schema-only dry-run on the isolated copy.
+- Production cutover: `PRODUCTION_NO_GO`.
+
 ## STAGING-QA-005 Pre-Write Blocker Addendum
 
 Date: 2026-05-25, Asia/Dubai

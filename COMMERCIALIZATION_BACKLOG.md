@@ -9,6 +9,29 @@ Production database mutation: not executed
 
 The project is not yet ready for commercial SaaS launch. Static checks, local Worker startup, and unauthenticated smoke checks now pass, but commercial blockers remain in finance precision, tenant isolation, migration discipline, and audited financial mutation flows.
 
+## Commercial Launch Review 005 Addendum
+
+Date: 2026-05-27, Asia/Dubai
+
+Production-copy dry-run status: `MANUAL_REQUIRED`.
+
+Completed:
+
+- Confirmed isolated target D1 `homelink-finance-production-copy-dryrun`.
+- Exported a copy backup to ignored `backups/`.
+- Applied schema-only migration dry-run drafts to production-copy only.
+- Verified existing business row counts did not change.
+- Ran read-only money, backend totals, receivables, tenant scope, and audit/event evidence queries.
+
+Remaining blockers:
+
+- Money `*_fils` value backfill is not approved.
+- Tenant/property row mapping is not approved.
+- Receivables data/allocation backfill is not approved.
+- Audit/event scope row mapping is not approved.
+- TOP_25 money risks and accounting signoff remain manual-required.
+- Production cutover remains `PRODUCTION_NO_GO`.
+
 ## P0: Cannot Launch
 
 | ID     | Area         | Problem                                                                                                                        | Impact                                                                                                                  | Required Fix                                                                                                                        | Verification                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |

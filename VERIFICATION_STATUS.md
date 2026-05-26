@@ -4,6 +4,21 @@ Generated: 2026-05-23, Asia/Dubai
 
 This file records the safety verification commands rerun during project status reconciliation. Commands were run without modifying business logic, production configuration, or production database data.
 
+## Commercial Launch Review 005 Verification Addendum
+
+Date: 2026-05-27, Asia/Dubai
+
+| Verification                        | Result                    | Evidence                                                       | Commercial Meaning                                                                   |
+| ----------------------------------- | ------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| Production-copy target confirmation | PASS                      | `PRODUCTION_COPY_DRY_RUN_005_TARGET_CONFIRMATION.md`           | Dry-run target was the isolated copy, not `homelink` production.                     |
+| Production-copy backup              | PASS                      | `./backups/production-copy-before-review-005-dryrun.sql`       | Backup exists outside git before copy SQL.                                           |
+| Production-copy schema dry-run      | PASS                      | `PRODUCTION_COPY_DRY_RUN_005_EXECUTION_RESULT.md`              | Future nullable columns/tables can be applied to the copy shape.                     |
+| Business row-count delta            | PASS                      | `PRODUCTION_COPY_DRY_RUN_005_AFTER_SNAPSHOT.md`                | Existing business row counts were unchanged.                                         |
+| Copy reconciliation                 | MANUAL_REQUIRED           | `PRODUCTION_COPY_RECONCILIATION_RESULT.md`                     | Money, tenant scope, receivables, and audit/event row backfills still need approval. |
+| Commercial launch gate              | PASS / `PRODUCTION_NO_GO` | `PRODUCTION_COPY_DRY_RUN_005_COMMERCIAL_LAUNCH_GATE_RESULT.md` | Copy dry-run is not production approval.                                             |
+
+Production D1 write, production migration, production deploy, and production cutover were not executed.
+
 | Command                                      | Exists | Result                       | Error Summary       | Log Evidence                                                                                                                                                                                                                                                                                                                                          | Commercial Meaning                                                                                                                     |
 | -------------------------------------------- | ------ | ---------------------------- | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
 | `npm run format:check`                       | yes    | Pass                         | none                | `Checking formatting... All matched files use Prettier code style!`                                                                                                                                                                                                                                                                                   | Static formatting gate passes. This does not validate runtime behavior.                                                                |

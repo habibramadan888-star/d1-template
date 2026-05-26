@@ -9,6 +9,24 @@ Production deploy: not executed
 Production database mutation: not executed
 Remote D1 migration: not executed
 
+## Commercial Launch Review 005 Addendum
+
+Date: 2026-05-27, Asia/Dubai
+
+The isolated production-copy D1 dry-run was executed against
+`homelink-finance-production-copy-dryrun` only. Schema-only drafts for
+void/session columns, money `*_fils` columns, tenant compatibility columns,
+handover atomic tables, and receivables tables applied successfully to the copy.
+
+Existing business row counts did not change. Row-level money backfill, tenant
+mapping backfill, receivables data backfill, and audit/event scoping remain
+`MANUAL_REQUIRED` because production accounting and tenant mapping approvals are
+not closed.
+
+Production remains `PRODUCTION_NO_GO`. No production deploy, production
+migration, production D1 write, staging D1 write, or production cutover was
+executed.
+
 ## Five Most Important Outcomes
 
 1. Money precision now has a shadow validation and reconciliation guardrail. This does not fix live legacy money writes, but it creates a repeatable way to inspect legacy decimal values before migration.
