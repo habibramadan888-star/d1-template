@@ -152,6 +152,34 @@ Recommended next task:
 - Use `NEXT_PROMPT_P0_006L_TENANT_SCOPE_STAGING_ROUTE_QUERY_WIRING_REHEARSAL_APPROVAL_REQUIRED.md`
   only after explicit human approval.
 
+## P0-006L Approval Blocker Morning Review
+
+Date: 2026-05-26, Asia/Dubai
+
+P0-006L was not executed because the user did not provide the required explicit
+approval flags.
+
+Current P0-006 status remains:
+
+- `Partial - tenant scope staging route/query wiring gate ready`.
+
+Baseline:
+
+- `npm run check` passed with 320 tests.
+
+Safety:
+
+- Production deploy: no.
+- Production migration: no.
+- Production D1 write: no.
+- Staging D1 write: no.
+- Tenant scope staging flags enabled: no.
+- Legacy CORPID fallback removed: no.
+
+Next prompt:
+
+- `NEXT_PROMPT_P0_006L_RETRY_TENANT_SCOPE_STAGING_ROUTE_QUERY_WIRING_REHEARSAL_APPROVAL_REQUIRED.md`
+
 ## STAGING-QA-005 Update
 
 Date: 2026-05-25, Asia/Dubai

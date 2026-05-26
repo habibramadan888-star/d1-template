@@ -877,3 +877,18 @@ call, staging schema migration, staging row-level backfill write, dashboard
 live switch, live financial formula change, legacy `CORPID` removal, remote
 feature flag enablement, or secret exposure occurred. P0-006 remains Partial
 and production remains NO-GO.
+
+## P0-006L Approval Blocker Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+| Check                         | Run? | Result       | Blocker           | Evidence                                         | Notes                                                                  |
+| ----------------------------- | ---- | ------------ | ----------------- | ------------------------------------------------ | ---------------------------------------------------------------------- |
+| Baseline `npm run check`      | yes  | Pass         | none              | 320 tests passed                                 | Baseline remained green before approval blocker was recorded.          |
+| Required P0-006L approvals    | yes  | Missing      | approval required | `P0_006L_PRE_REHEARSAL_CONFIRMATION.md`          | Runtime rehearsal was not allowed without explicit confirmation flags. |
+| Staging tenant scope flags    | yes  | Not enabled  | none              | `P0_006L_ROLLBACK_RESULT.md`                     | Rollback not required because no flags changed.                        |
+| Route/query runtime rehearsal | no   | Not executed | approval required | `P0_006L_ROUTE_QUERY_WIRING_REHEARSAL_RESULT.md` | P0-006K gate remains the latest safe readiness evidence.               |
+| Production D1 write           | yes  | No           | none              | Task constraints                                 | Production untouched.                                                  |
+| Staging D1 write              | yes  | No           | none              | Task constraints                                 | No staging data was written.                                           |
+
+P0-006 remains Partial and production remains NO-GO.

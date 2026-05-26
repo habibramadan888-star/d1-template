@@ -1295,6 +1295,22 @@ Still blocked for production:
 - Legacy `CORPID` fallback removal is not approved.
 - Human tenant model and auth claim review are still required.
 
+## P0-006L Backlog Addendum
+
+P0-006L was stopped before runtime rehearsal because explicit approval flags
+were not supplied. P0-006 remains at:
+
+- `Partial - tenant scope staging route/query wiring gate ready`.
+
+No production deploy, production migration, production D1 write, staging D1
+write, feature flag enablement, dashboard mutation, live financial formula
+change, or legacy `CORPID` fallback removal occurred.
+
+Next safe step:
+
+- Retry P0-006L only with explicit approval flags in
+  `NEXT_PROMPT_P0_006L_RETRY_TENANT_SCOPE_STAGING_ROUTE_QUERY_WIRING_REHEARSAL_APPROVAL_REQUIRED.md`.
+
 ## P0-006I Backlog Addendum
 
 Date: 2026-05-26, Asia/Dubai

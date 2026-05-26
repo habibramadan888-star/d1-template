@@ -4531,3 +4531,28 @@ Result:
 P0-006 status:
 
 - `Partial - tenant scope staging route/query wiring gate ready`.
+
+## P0-006L Tenant Scope Staging Route/Query Wiring Approval Blocker
+
+Date: 2026-05-26, Asia/Dubai
+
+Scope: approval preflight for tenant scope staging route/query wiring
+rehearsal. No runtime wiring, feature flag enablement, staging D1 write,
+production deploy, production migration, production D1 write, production URL
+call, dashboard live switch, live financial formula change, legacy `CORPID`
+removal, or secret exposure occurred.
+
+Result:
+
+- `npm run check` passed with 320 tests.
+- P0-006L runtime rehearsal was not executed.
+- Required approval flags were missing:
+  `--confirm-staging-tenant-scope-wiring`, `--confirm-backup`,
+  `--confirm-rollback`, `--confirm-auth-claim-review`, and
+  `--confirm-legacy-corpid-fallback-preserved`.
+- Staging tenant scope flags were not enabled.
+- Production remains `NO-GO`.
+
+P0-006 status:
+
+- `Partial - tenant scope staging route/query wiring gate ready`.

@@ -1346,3 +1346,33 @@ Next step:
 
 - P0-006L can run a staging route/query wiring rehearsal only after explicit
   human approval, with rollback and production NO-GO enforcement.
+
+## P0-006L Approval Blocker Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+Current P0-006 status remains
+`Partial - tenant scope staging route/query wiring gate ready`.
+
+Added evidence:
+
+- `P0_006L_PRE_REHEARSAL_CONFIRMATION.md`
+- `P0_006L_ROUTE_QUERY_WIRING_REHEARSAL_RESULT.md`
+- `P0_006L_DASHBOARD_HISTORY_SCOPE_EVIDENCE.md`
+- `P0_006L_ROLLBACK_RESULT.md`
+- `P0_006L_PRODUCTION_NO_GO_REVIEW.md`
+- `NEXT_PROMPT_P0_006L_RETRY_TENANT_SCOPE_STAGING_ROUTE_QUERY_WIRING_REHEARSAL_APPROVAL_REQUIRED.md`
+
+Result:
+
+- `npm run check` passed with 320 tests.
+- P0-006L runtime rehearsal was not executed because the required approval
+  flags were missing.
+- Staging tenant scope feature flags were not enabled.
+- No production deploy, production migration, production D1 write, staging D1
+  write, live route wiring, dashboard mutation, or legacy fallback removal
+  occurred.
+
+Next step:
+
+- Retry P0-006L only after explicit human approval with all required flags.
