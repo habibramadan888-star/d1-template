@@ -1259,6 +1259,37 @@ Still blocked for production:
 - Production receivables migration, backup, rollback, backfill, and deploy
   approval.
 
+## P0-006I Backlog Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+P0-006 current status:
+
+- `Partial - tenant scope schema compatibility gate ready`.
+
+Current result:
+
+- Reviewed the 9 legacy `CORPID` warning tables from P0-006H.
+- Added a staging/local-only nullable compatibility-column matrix.
+- Added a draft schema migration under `migration-drafts/`.
+- Added a revised exact mapping plan showing staging backfill write is still
+  NO-GO.
+- Added backup, rollback, and approval gates for future staging schema
+  migration and later backfill.
+- No production deploy, production migration, production D1 write, staging D1
+  write, staging schema migration, staging backfill write, dashboard mutation,
+  live financial formula change, or secret exposure occurred.
+
+Still blocked for production:
+
+- P0-006 is not Verified.
+- Compatibility schema has not been applied to staging.
+- Staging backfill write has not been executed.
+- Row-level mapping remains manual-required for non-empty high-risk legacy
+  tables.
+- Production tenant migration, backfill, query wiring, rollback, and cutover are
+  not approved.
+
 ## P0-006D Backlog Addendum
 
 Date: 2026-05-26, Asia/Dubai

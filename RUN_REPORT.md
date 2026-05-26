@@ -4354,3 +4354,37 @@ Result:
 P0-006 status:
 
 - `Partial - tenant scope staging backfill dry-run passed`.
+
+## P0-006I Tenant Scope Schema Compatibility Gate
+
+Date: 2026-05-26, Asia/Dubai
+
+Scope: staging/local schema compatibility gate only. No production deploy,
+production migration, production D1 write, production URL call, staging D1
+write, staging schema migration, staging backfill write, tenant/property
+row-level update, legacy `CORPID` fallback removal, dashboard mutation, live
+financial formula change, or secret exposure occurred.
+
+Completed:
+
+- Reviewed the 9 legacy `CORPID` warning tables from P0-006H.
+- Added `P0_006I_GATE_STARTING_CONTEXT.md`.
+- Added `TENANT_SCOPE_COMPATIBILITY_COLUMN_MATRIX.md`.
+- Added `TENANT_SCOPE_STAGING_SCHEMA_MIGRATION_PLAN.md`.
+- Added `migration-drafts/tenant_scope_staging_compatibility_columns_draft.sql`.
+- Added `P0_006I_EXACT_STAGING_BACKFILL_UPDATE_PLAN_V2.md`.
+- Added `P0_006I_SCHEMA_COMPATIBILITY_BACKUP_ROLLBACK_CHECKLIST.md`.
+- Added `P0_006I_SCHEMA_COMPATIBILITY_GO_NO_GO.md`.
+- Added next prompts for staging schema compatibility migration and later
+  backfill write approval.
+
+Result:
+
+- 9 legacy `CORPID` warnings were resolved into a schema compatibility plan.
+- Staging schema migration remains `MANUAL_REQUIRED`.
+- Staging backfill write remains `NO_GO`.
+- Production remains `NO-GO`.
+
+P0-006 status:
+
+- `Partial - tenant scope schema compatibility gate ready`.

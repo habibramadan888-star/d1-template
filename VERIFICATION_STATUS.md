@@ -787,3 +787,22 @@ No production deploy, production migration, production D1 write, production URL
 call, staging D1 write, production auth change, dashboard mutation, global
 tenant rewrite, legacy `CORPID` fallback removal, live query wiring, remote
 feature flag enablement, or secret exposure occurred in P0-006H.
+
+## P0-006I Verification Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+| Command / Check                     | Exists | Result                             | Error Summary | Log Evidence                                  | Commercial Meaning                                    |
+| ----------------------------------- | ------ | ---------------------------------- | ------------- | --------------------------------------------- | ----------------------------------------------------- |
+| `npm run check`                     | yes    | Pass                               | none          | 313 tests passed in baseline before this gate | Existing suite remained green before schema planning. |
+| `npm run security:secrets`          | yes    | Pass                               | none          | Secret hygiene check passed                   | No secret exposure detected.                          |
+| `npm run gate:commercial-launch`    | yes    | `PRODUCTION_NO_GO`                 | none          | Launch gate stayed NO-GO                      | Production cutover remains blocked.                   |
+| `npm run qa:employee-entry-staging` | yes    | `MANUAL_REQUIRED` / `DRY_RUN_ONLY` | none          | No confirmation flags supplied                | No staging write QA executed.                         |
+| Staging schema migration            | yes    | No                                 | none          | Draft only                                    | No D1 schema write occurred.                          |
+| Staging backfill write              | yes    | No                                 | none          | Plan only                                     | No tenant/property row-level update occurred.         |
+| Production D1 write                 | yes    | No                                 | none          | Task constraints and no production command    | Production untouched.                                 |
+
+P0-006I converted the 9 legacy `CORPID` warnings into a nullable compatibility
+column plan and exact mapping gate. Staging compatibility schema migration is a
+future human-approved task; staging backfill write remains NO-GO until schema,
+backup, rollback, and row-level mapping are approved.

@@ -801,6 +801,39 @@ Recommended next prompt:
 
 Production cutover remains `NO-GO`.
 
+## P0-006I Morning Review Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+Current result:
+
+- 9 legacy `CORPID` warning tables were reviewed into a staging/local schema
+  compatibility plan.
+- `migration-drafts/tenant_scope_staging_compatibility_columns_draft.sql` was
+  added as a draft only.
+- Staging schema migration was not executed.
+- Staging backfill write was not executed.
+- Production deploy, production migration, and production D1 write were not
+  executed.
+
+Current status:
+
+- P0-006: `Partial - tenant scope schema compatibility gate ready`.
+- Staging compatibility schema migration: `MANUAL_REQUIRED`.
+- Staging backfill write: `NO_GO`.
+- Production cutover: `NO-GO`.
+
+Recommended next prompt:
+
+```text
+Enter TASK P0-006I1: Apply staging tenant-scope compatibility schema after
+human approval.
+
+Goal: apply only nullable compatibility columns to homelink-finance-staging
+after backup and rollback approval. Do not execute data backfill. Do not touch
+production. Do not mark P0-006 Verified.
+```
+
 ## P0-006H Morning Review Addendum
 
 Date: 2026-05-26, Asia/Dubai

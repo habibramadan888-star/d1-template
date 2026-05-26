@@ -25,6 +25,35 @@ Status vocabulary:
 | P0-007 | Auth/smoke               | Local Worker + owner/employee auth smoke must be repeatable                          | P0 launch blocker | Verified | Yes        | `npm run smoke:with-worker` passed                    | `LOCAL_WORKER_SMOKE_DIAGNOSIS.md`; `npm run smoke:with-worker` passed Worker startup, pages, unauthenticated denial, invalid JWT denial, owner login, employee login, employee owner-API denial                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | Business-flow smoke for employee entry/export and owner dashboard remains outside P0-007A and is still blocked by P0-005 clean bootstrap                                                                                       | Use `npm run smoke:with-worker` as the preflight before P0-004/P0-005/P0-008 work                                                                                                                                                                              |
 | P0-008 | Receivables              | Receivables model not fully closed for rent, arrears, tail payments, follow-up       | P0 launch blocker | Partial  | No         | Receivables staging authority switch rehearsal passed | `RECEIVABLES_SOURCE_OF_TRUTH.md`, `modules/finance/receivables.mjs`, `tests/receivables.spec.mjs`, `tests/receivables-staging-shadow-gate.spec.mjs`, `tests/receivables-staging-shadow-rehearsal.spec.mjs`, `tests/receivables-staging-authority-switch-gate.spec.mjs`, `tests/receivables-staging-authority-switch-rehearsal.spec.mjs`, `scripts/compare-staging-receivables-shadow.mjs`, `scripts/seed-receivables-staging-shadow-data.mjs`, `scripts/gate-receivables-staging-authority-switch.mjs`, `scripts/rehearse-receivables-staging-authority-switch.mjs`, `STAGING_RECEIVABLES_SHADOW_COMPARISON_RESULT.md`, `RECEIVABLES_STAGING_AUTHORITY_SWITCH_GATE_RESULT.md`, `RECEIVABLES_STAGING_AUTHORITY_SWITCH_REHEARSAL_RESULT.md`, `P0_008G_DASHBOARD_HISTORY_EVIDENCE.md`                                                | Live route and database do not yet guarantee receivable/payment/arrears consistency; staging authority rehearsal passed with six candidate rows and rollback, but adjustment expected differences and accounting review remain | Continue with P0-006C tenant/property scope local-staging rehearsal and accounting review before any production wiring; do not wire production until P0-001/P0-003/P0-006 gates, accounting review, backup, rollback, migration, and deploy approval are ready |
 
+## P0-006I Schema Compatibility Gate Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+Current P0-006 status is now
+`Partial - tenant scope schema compatibility gate ready`.
+
+Added evidence:
+
+- `P0_006I_GATE_STARTING_CONTEXT.md`
+- `TENANT_SCOPE_COMPATIBILITY_COLUMN_MATRIX.md`
+- `TENANT_SCOPE_STAGING_SCHEMA_MIGRATION_PLAN.md`
+- `migration-drafts/tenant_scope_staging_compatibility_columns_draft.sql`
+- `P0_006I_EXACT_STAGING_BACKFILL_UPDATE_PLAN_V2.md`
+- `P0_006I_SCHEMA_COMPATIBILITY_BACKUP_ROLLBACK_CHECKLIST.md`
+- `P0_006I_SCHEMA_COMPATIBILITY_GO_NO_GO.md`
+- `NEXT_PROMPT_P0_006I1_APPLY_STAGING_COMPATIBILITY_SCHEMA.md`
+- `NEXT_PROMPT_P0_006I2_TENANT_SCOPE_STAGING_BACKFILL_WRITE_APPROVAL_REQUIRED.md`
+
+Result:
+
+- 9 legacy `CORPID` warning tables were resolved into a nullable
+  compatibility-column schema plan.
+- Staging schema compatibility migration is eligible only for a future
+  human-approved task after backup and target D1 confirmation.
+- Staging backfill write remains NO-GO.
+- Production remains NO-GO.
+- P0-006 is not Verified.
+
 ## P0-002C Review Gate Addendum
 
 Date: 2026-05-24, Asia/Dubai

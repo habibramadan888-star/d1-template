@@ -19,6 +19,7 @@ This is a static scan artifact. It does not replace `DATABASE_AUDIT.md`, which c
 - `migration-drafts/005_money_minor_units_dual_write_draft.sql`
 - `migration-drafts/handover_atomic_commit_draft.sql`
 - `migration-drafts/receivables_local_staging_rehearsal_draft.sql`
+- `migration-drafts/tenant_scope_staging_compatibility_columns_draft.sql`
 
 ## Tables Detected
 
