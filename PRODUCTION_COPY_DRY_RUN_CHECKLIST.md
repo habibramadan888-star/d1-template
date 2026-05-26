@@ -48,3 +48,10 @@ Schema-only dry-run migrations were applied to
 row counts did not change. Backfill and reconciliation remain
 `MANUAL_REQUIRED` because money conversion, tenant mapping, receivables
 allocation, audit/event scope, and TOP_25 money risks still need human approval.
+
+## REVIEW-006 Update
+
+Row-level backfill approval packet is ready. Execution remains NO-GO until the
+future task receives explicit approvals for copy target, backup, row counts,
+money conversion, TOP_25 money risks, tenant mapping, receivables mapping,
+audit/event scope, rollback, and no-production-write constraints.

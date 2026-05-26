@@ -2,6 +2,18 @@
 
 Generated: 2026-05-23, Asia/Dubai
 
+## Commercial Launch Review 006 Addendum
+
+Date: 2026-05-27, Asia/Dubai
+
+| Area                     | REVIEW-006 Status                    | Evidence                                                | Production Meaning                             |
+| ------------------------ | ------------------------------------ | ------------------------------------------------------- | ---------------------------------------------- |
+| Money row-level backfill | MANUAL_REQUIRED                      | `PRODUCTION_COPY_ROW_LEVEL_BACKFILL_MAPPING_MATRIX.md`  | P0-001 remains Partial.                        |
+| Backend totals           | PASS_WITH_WARNINGS / MANUAL_REQUIRED | `PRODUCTION_COPY_RECONCILIATION_RESULT.md`              | P0-003 remains Partial.                        |
+| Tenant/property scope    | MANUAL_REQUIRED                      | `PRODUCTION_COPY_ROW_LEVEL_BACKFILL_APPROVAL_PACKET.md` | P0-006 remains Partial.                        |
+| Receivables              | MANUAL_REQUIRED                      | `PRODUCTION_COPY_ROW_LEVEL_BACKFILL_MAPPING_MATRIX.md`  | P0-008 remains Partial.                        |
+| Production cutover       | `PRODUCTION_NO_GO`                   | `PRODUCTION_COPY_ROW_LEVEL_BACKFILL_GO_NO_GO.md`        | No production migration/deploy/write approved. |
+
 ## Commercial Launch Review 005 Addendum
 
 Date: 2026-05-27, Asia/Dubai

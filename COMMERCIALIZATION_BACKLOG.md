@@ -9,6 +9,21 @@ Production database mutation: not executed
 
 The project is not yet ready for commercial SaaS launch. Static checks, local Worker startup, and unauthenticated smoke checks now pass, but commercial blockers remain in finance precision, tenant isolation, migration discipline, and audited financial mutation flows.
 
+## Commercial Launch Review 006 Addendum
+
+Date: 2026-05-27, Asia/Dubai
+
+Row-level production-copy backfill status: `APPROVAL_PACKET_READY`.
+
+Prepared:
+
+- `PRODUCTION_COPY_ROW_LEVEL_BACKFILL_APPROVAL_PACKET.md`
+- `PRODUCTION_COPY_ROW_LEVEL_BACKFILL_MAPPING_MATRIX.md`
+- `PRODUCTION_COPY_ROW_LEVEL_BACKFILL_SQL_APPROVAL_REQUIREMENTS.md`
+- `PRODUCTION_COPY_ROW_LEVEL_BACKFILL_GO_NO_GO.md`
+
+Execution remains blocked until human approvals are provided for money conversion, TOP_25 money risks, tenant mapping, receivables mapping, audit/event scope, rollback, and no-production-write constraints.
+
 ## Commercial Launch Review 005 Addendum
 
 Date: 2026-05-27, Asia/Dubai

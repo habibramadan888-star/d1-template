@@ -6,6 +6,29 @@ Scope: governance, engineering baseline, local startup checks
 Production deploy: not executed  
 Production database mutation: not executed
 
+## Commercial Launch Review 006 Row-Level Backfill Approval Packet Addendum
+
+Date: 2026-05-27, Asia/Dubai
+
+Scope: review REVIEW-005 production-copy dry-run results and prepare row-level backfill approval packet. No D1 export/import/execute was run in REVIEW-006.
+
+| Item                     | Result | Evidence                                                          | Notes                                                                        |
+| ------------------------ | ------ | ----------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| REVIEW-005 result review | PASS   | `COMMERCIAL_LAUNCH_REVIEW_006_STARTING_CONTEXT.md`                | Schema dry-run passed; row-level reconciliation remains manual-required.     |
+| Approval packet          | READY  | `PRODUCTION_COPY_ROW_LEVEL_BACKFILL_APPROVAL_PACKET.md`           | Defines approval flags and required owners.                                  |
+| Mapping matrix           | READY  | `PRODUCTION_COPY_ROW_LEVEL_BACKFILL_MAPPING_MATRIX.md`            | Money, tenant, receivables, audit/event, and handover candidates documented. |
+| SQL requirements         | READY  | `PRODUCTION_COPY_ROW_LEVEL_BACKFILL_SQL_APPROVAL_REQUIREMENTS.md` | Future SQL must be copy-only, reviewed, and reversible.                      |
+| GO / NO-GO               | READY  | `PRODUCTION_COPY_ROW_LEVEL_BACKFILL_GO_NO_GO.md`                  | GO for approval prep; NO-GO for execution until approvals close.             |
+
+Safety:
+
+- Production deploy: no.
+- Production migration: no.
+- Production D1 write: no.
+- Staging D1 write: no.
+- Production-copy D1 write: no.
+- Production cutover: `PRODUCTION_NO_GO`.
+
 ## Commercial Launch Review 005 Production-Copy Dry-Run Addendum
 
 Date: 2026-05-27, Asia/Dubai

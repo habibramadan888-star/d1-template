@@ -9,6 +9,20 @@ Production deploy: not executed
 Production database mutation: not executed
 Remote D1 migration: not executed
 
+## Commercial Launch Review 006 Addendum
+
+Date: 2026-05-27, Asia/Dubai
+
+REVIEW-006 prepared the row-level backfill approval packet after reviewing the REVIEW-005 production-copy dry-run result. It did not execute D1 export, import, execute, migration, deploy, or cutover.
+
+Current decision:
+
+- Approval packet: ready.
+- Row-level execution: NO-GO until explicit approvals close.
+- Production: `PRODUCTION_NO_GO`.
+
+Remaining manual approvals include money conversion, TOP_25 money risk closure, tenant/property mapping, receivables lifecycle/allocation mapping, audit/event visibility mapping, and rollback review.
+
 ## Commercial Launch Review 005 Addendum
 
 Date: 2026-05-27, Asia/Dubai
