@@ -1553,3 +1553,28 @@ Result:
   rows.
 - P0-006 remains Partial, not Verified.
 - Production cutover remains `NO-GO`.
+
+## P0-006Q2 Status Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+P0-006 status:
+
+- `Partial - tenant scope audit events staging evidence passed`.
+
+Evidence:
+
+- `audit_logs` QA evidence rows inserted: 5.
+- `entry_events` QA evidence rows inserted: 6.
+- Tenant audit/event rehearsal: PASS.
+- Missing coverage count: 0.
+
+Safety:
+
+- Production deploy: no.
+- Production migration: no.
+- Production D1 write: no.
+- Staging D1 write: yes, QA evidence rows only.
+- Business table write: no.
+- P0-006 remains Partial, not Verified.
+- Production cutover remains `NO-GO`.

@@ -892,6 +892,26 @@ Recommended next prompt:
 
 Production cutover remains `NO-GO`.
 
+## P0-006Q2 Morning Review Addendum
+
+- Approved staging-only audit/event QA evidence rows were created in
+  `homelink-finance-staging`.
+- `audit_logs` result: PASS.
+- `entry_events` result: PASS.
+- Missing coverage count: 0.
+- Backup exists at
+  `./backups/homelink-finance-staging-before-audit-event-evidence.sql` and is
+  ignored.
+- P0-006: `Partial - tenant scope audit events staging evidence passed`.
+- Production cutover readiness: NO-GO.
+
+Next recommended task:
+
+Enter TASK P0-006R: Tenant scope production readiness gate.
+
+Do not execute production deploy, production migration, production D1 write,
+production cutover, legacy fallback removal, or P0-006 Verified.
+
 ## P0-006Q Morning Review Addendum
 
 Most important result:

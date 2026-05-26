@@ -893,6 +893,20 @@ Date: 2026-05-26, Asia/Dubai
 
 P0-006 remains Partial and production remains NO-GO.
 
+## P0-006Q2 Verification Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+| Check                                  | Run? | Result             | Blocker | Evidence                                              | Notes                                                       |
+| -------------------------------------- | ---- | ------------------ | ------- | ----------------------------------------------------- | ----------------------------------------------------------- |
+| Target D1 confirmation                 | yes  | Pass               | none    | `P0_006Q2_TARGET_D1_CONFIRMATION.md`                  | Target was `homelink-finance-staging`; id matched approval. |
+| Backup                                 | yes  | Pass               | none    | `P0_006Q2_BACKUP_RESULT.md`                           | Backup file exists and is ignored.                          |
+| Evidence write                         | yes  | Pass               | none    | `P0_006Q2_EVIDENCE_WRITE_RESULT.md`                   | Wrote only QA evidence rows to staging.                     |
+| `npm run rehearse:tenant-audit-events` | yes  | Pass               | none    | `TENANT_SCOPE_AUDIT_ENTRY_EVENTS_REHEARSAL_RESULT.md` | Missing coverage count is 0.                                |
+| `npm run gate:commercial-launch`       | yes  | `PRODUCTION_NO_GO` | none    | `P0_006Q2_COMMERCIAL_LAUNCH_GATE_RESULT.md`           | Production remains blocked.                                 |
+
+P0-006 status: `Partial - tenant scope audit events staging evidence passed`.
+
 ## P0-006N Verification Addendum
 
 Date: 2026-05-26, Asia/Dubai

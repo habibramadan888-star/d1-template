@@ -113,10 +113,19 @@ async function writeReport(result) {
     `- Legacy CORPID fallback warning preserved: ${result.summary.legacyFallbackWarning ? "yes" : "no"}.`,
     `- Final access matrix flag false / legacy: ${result.summary.finalFlagFalse ? "yes" : "no"}.`,
     "",
-    "Manual-required rows:",
-    "",
-    "- `audit_logs`: audit attribution requires dedicated staging evidence and review.",
-    "- `entry_events`: live write-path event scope requires dedicated staging evidence and review.",
+    result.summary.manualRequiredCount
+      ? [
+          "Manual-required rows:",
+          "",
+          "- Manual-required rows remain; review scenario table above."
+        ].join("\n")
+      : [
+          "Coverage closure:",
+          "",
+          "- `audit_logs`: P0-006Q2 staging QA evidence rows close staging access matrix coverage.",
+          "- `entry_events`: P0-006Q2 staging QA evidence rows close staging access matrix coverage.",
+          "- Missing coverage count: 0."
+        ].join("\n"),
     "",
     "Safety:",
     "",

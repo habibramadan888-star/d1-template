@@ -1354,6 +1354,23 @@ Still blocked for production:
 - Production receivables migration, backup, rollback, backfill, and deploy
   approval.
 
+## P0-006Q2 Tenant Scope Audit/Event Evidence Rows
+
+Status: `Partial - tenant scope audit events staging evidence passed`
+
+Summary:
+
+- Approved staging-only QA evidence rows were inserted into `audit_logs` and
+  `entry_events`.
+- `audit_logs` result: PASS.
+- `entry_events` result: PASS.
+- Missing coverage count: 0.
+- Production deploy/migration/D1 write: no.
+- Production cutover remains `NO-GO`.
+
+Next action: P0-006R tenant scope production readiness gate. P0-006 remains
+Partial and cannot be marked Verified.
+
 ## P0-006P Backlog Addendum
 
 Date: 2026-05-26, Asia/Dubai

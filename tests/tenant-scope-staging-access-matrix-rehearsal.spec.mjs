@@ -118,14 +118,15 @@ test("settings/app_settings scope handled", () => {
   assert.equal(other.Actual, "DENY_403");
 });
 
-test("audit_logs and entry_events remain manual-required when not safely automatable", () => {
-  const audit = scenario("audit logs require manual production mapping");
-  const entry = scenario("entry events require manual production mapping");
+test("audit_logs and entry_events staging coverage is closed by Q2 evidence", () => {
+  const audit = scenario("audit logs staging evidence covered");
+  const entry = scenario("entry events staging evidence covered");
   const result = createTenantScopeStagingAccessMatrixRehearsal();
 
-  assert.equal(audit.Result, "MANUAL_REQUIRED");
-  assert.equal(entry.Result, "MANUAL_REQUIRED");
-  assert.equal(result.summary.manualRequiredCount, 2);
+  assert.equal(audit.Result, "PASS");
+  assert.equal(entry.Result, "PASS");
+  assert.equal(result.summary.manualRequiredCount, 0);
+  assert.equal(result.summary.missingCoverageCount, 0);
 });
 
 test("production env remains no-go", () => {

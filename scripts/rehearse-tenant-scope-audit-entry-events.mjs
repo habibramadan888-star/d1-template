@@ -81,7 +81,7 @@ const ENTRY_REQUIRED_FIELDS = [
 ];
 
 const DEFAULT_STAGING_EVIDENCE = {
-  source: "read-only staging D1 evidence captured during P0-006Q",
+  source: "read-only staging D1 evidence captured after P0-006Q2 staging-only QA evidence rows",
   target: {
     name: STAGING_D1_NAME,
     id: STAGING_D1_ID
@@ -92,40 +92,40 @@ const DEFAULT_STAGING_EVIDENCE = {
   },
   counts: {
     audit_logs: {
-      total: 7,
-      company_scoped: 3,
-      property_scoped: 3,
-      employee_scoped: 3,
-      owner_scoped: 0,
-      legacy_corpid: 7
+      total: 12,
+      company_scoped: 8,
+      property_scoped: 8,
+      employee_scoped: 6,
+      owner_scoped: 3,
+      legacy_corpid: 12
     },
     entry_events: {
-      total: 5,
-      company_scoped: 3,
-      property_scoped: 3,
-      employee_scoped: 3,
+      total: 11,
+      company_scoped: 9,
+      property_scoped: 9,
+      employee_scoped: 9,
       owner_scoped: null,
-      legacy_corpid: 5
+      legacy_corpid: 11
     }
   },
   eventCounts: {
     audit_logs: {
-      total: 7,
-      employee_entry_rows: 4,
-      scoped_employee_entry_rows: 2,
+      total: 12,
+      employee_entry_rows: 5,
+      scoped_employee_entry_rows: 3,
       handover_rows: 3,
       scoped_handover_rows: 1,
-      void_rows: 0,
-      scoped_void_rows: 0
+      void_rows: 1,
+      scoped_void_rows: 1
     },
     entry_events: {
-      total: 5,
-      employee_entry_rows: 3,
-      scoped_employee_entry_rows: 1,
-      handover_rows: 1,
-      scoped_handover_rows: 1,
-      void_rows: 0,
-      scoped_void_rows: 0
+      total: 11,
+      employee_entry_rows: 4,
+      scoped_employee_entry_rows: 2,
+      handover_rows: 2,
+      scoped_handover_rows: 2,
+      void_rows: 1,
+      scoped_void_rows: 1
     }
   }
 };
@@ -749,11 +749,22 @@ async function writeReport(result) {
     `- audit_logs result: ${result.summary.auditLogsResult}.`,
     `- entry_events result: ${result.summary.entryEventsResult}.`,
     "",
-    "Evidence data still required:",
-    "",
-    "- Owner-created audit row with `owner_id` scope.",
-    "- Scoped `session.void` audit row.",
-    "- Scoped `session_void` entry event row.",
+    result.summary.needsStagingEvidenceDataCount
+      ? [
+          "Evidence data still required:",
+          "",
+          "- Owner-created audit row with `owner_id` scope.",
+          "- Scoped `session.void` audit row.",
+          "- Scoped `session_void` entry event row."
+        ].join("\n")
+      : [
+          "Evidence coverage:",
+          "",
+          "- Owner-created audit row with `owner_id` scope: present.",
+          "- Scoped `session.void` audit row: present.",
+          "- Scoped `session_void` entry event row: present.",
+          "- Missing coverage count: 0."
+        ].join("\n"),
     "",
     "Safety:",
     "",

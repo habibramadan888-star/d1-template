@@ -403,22 +403,26 @@ function createRows() {
       notes: "Manager lacks property_a_2 membership."
     }),
     matrixRow({
-      scenario: "audit logs require manual production mapping",
+      scenario: "audit logs staging evidence covered",
       role: "owner",
       resource: "audit_logs",
       claim: claims.owner,
-      expected: "MANUAL_REQUIRED",
-      coverage: "DOCUMENTED_ONLY",
-      notes: "Staging compatibility columns exist, but production audit attribution needs review."
+      action: ACTIONS.HISTORY_READ,
+      expected: "ALLOW",
+      coverage: "TESTED",
+      notes:
+        "P0-006Q2 staging QA evidence rows close audit_logs staging coverage; production audit attribution still needs readiness review."
     }),
     matrixRow({
-      scenario: "entry events require manual production mapping",
+      scenario: "entry events staging evidence covered",
       role: "employee",
       resource: "entry_events",
       claim: claims.employee,
-      expected: "MANUAL_REQUIRED",
-      coverage: "DOCUMENTED_ONLY",
-      notes: "Entry event scope needs live write-path review before production."
+      action: ACTIONS.EMPLOYEE_ENTRY_WRITE,
+      expected: "ALLOW",
+      coverage: "TESTED",
+      notes:
+        "P0-006Q2 staging QA evidence rows close entry_events staging coverage; production write-path review remains NO-GO."
     }),
     matrixRow({
       scenario: "legacy CORPID fallback warning preserved",

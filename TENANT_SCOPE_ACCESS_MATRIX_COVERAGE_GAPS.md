@@ -86,3 +86,25 @@ P0-006Q summary:
 - Production cutover approval.
 
 Production remains `NO-GO`.
+
+## P0-006Q2 Update
+
+P0-006Q2 created approved staging-only QA evidence rows in
+`homelink-finance-staging` to close the audit/event evidence gaps.
+
+| Role  | Resource / API | Coverage | Gap  | Recommendation                             |
+| ----- | -------------- | -------- | ---- | ------------------------------------------ |
+| owner | `audit_logs`   | TESTED   | none | Keep as staging QA evidence until signoff. |
+| owner | `entry_events` | TESTED   | none | Keep as staging QA evidence until signoff. |
+
+P0-006Q2 summary:
+
+- `audit_logs` QA evidence rows inserted: 5.
+- `entry_events` QA evidence rows inserted: 6.
+- Tenant audit/event rehearsal result: PASS.
+- NEEDS_STAGING_EVIDENCE_DATA count: 0.
+- Missing coverage count: 0.
+- Staging D1 write: yes, QA evidence rows only.
+- Production D1 write: no.
+
+Production remains `NO-GO`; P0-006 remains Partial, not Verified.

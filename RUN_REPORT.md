@@ -4532,6 +4532,36 @@ P0-006 status:
 
 - `Partial - tenant scope staging route/query wiring gate ready`.
 
+## P0-006Q2 Tenant Scope Audit/Event Evidence Rows
+
+Scope: approved staging-only QA evidence rows for `audit_logs` and
+`entry_events`. No production deploy, production migration, production D1 write,
+production URL call, dashboard mutation, financial formula mutation, or business
+table write occurred.
+
+Artifacts:
+
+- `P0_006Q2_TARGET_D1_CONFIRMATION.md`
+- `P0_006Q2_BACKUP_RESULT.md`
+- `P0_006Q2_STAGING_EVIDENCE_ROWS_PLAN.md`
+- `P0_006Q2_EVIDENCE_WRITE_RESULT.md`
+- `P0_006Q2_AFTER_SNAPSHOT_AND_REHEARSAL.md`
+- `P0_006Q2_COVERAGE_SUMMARY.md`
+- `P0_006Q2_AUDIT_EVENT_EVIDENCE_RETENTION_PLAN.md`
+
+Result:
+
+- `audit_logs` QA evidence rows inserted: 5.
+- `entry_events` QA evidence rows inserted: 6.
+- Tenant audit/event rehearsal: PASS.
+- Missing coverage count: 0.
+- Commercial launch gate: `PRODUCTION_NO_GO`.
+- Production remains `NO-GO`.
+
+P0-006 status:
+
+- `Partial - tenant scope audit events staging evidence passed`.
+
 ## P0-006O Tenant Scope Staging Access Matrix Gate
 
 Date: 2026-05-26, Asia/Dubai

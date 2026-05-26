@@ -115,11 +115,16 @@ test("dashboard/history respects scope", () => {
   assert.equal(employeeDenied.Actual, "DENY_403");
 });
 
-test("audit_logs scoped or marked manual_required", () => {
-  const row = scenario("audit logs require manual production mapping");
+test("audit_logs and entry_events staging evidence covered", () => {
+  const audit = scenario("audit logs staging evidence covered");
+  const entry = scenario("entry events staging evidence covered");
+  const result = createTenantScopeAccessMatrixGate();
 
-  assert.equal(row.Result, "PASS");
-  assert.equal(row.Actual, "MANUAL_REQUIRED");
+  assert.equal(audit.Result, "PASS");
+  assert.equal(audit.Actual, "ALLOW");
+  assert.equal(entry.Result, "PASS");
+  assert.equal(entry.Actual, "ALLOW");
+  assert.equal(result.summary.missingCoverageCount, 0);
 });
 
 test("settings/app_settings scoped or marked blocked/manual_required", () => {

@@ -126,13 +126,14 @@ test("production env remains NO-GO", () => {
   assert.equal(result.summary.productionNoGo, true);
 });
 
-test("current staging evidence still needs scoped owner and void event rows", () => {
+test("current staging evidence closes scoped owner and void event rows", () => {
   const result = createTenantScopeAuditEntryEventsRehearsal();
 
-  assert.equal(result.overall, "NEEDS_STAGING_EVIDENCE_DATA");
-  assert.equal(result.summary.auditLogsResult, "NEEDS_STAGING_EVIDENCE_DATA");
-  assert.equal(result.summary.entryEventsResult, "NEEDS_STAGING_EVIDENCE_DATA");
-  assert.equal(result.summary.missingCoverageCount, 2);
+  assert.equal(result.overall, "PASS");
+  assert.equal(result.summary.auditLogsResult, "PASS");
+  assert.equal(result.summary.entryEventsResult, "PASS");
+  assert.equal(result.summary.missingCoverageCount, 0);
+  assert.equal(result.summary.needsStagingEvidenceDataCount, 0);
 });
 
 test("access helper rejects missing tenant claims for direct access", () => {
