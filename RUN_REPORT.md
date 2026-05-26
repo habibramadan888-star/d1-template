@@ -4532,6 +4532,42 @@ P0-006 status:
 
 - `Partial - tenant scope staging route/query wiring gate ready`.
 
+## P0-006S Tenant Scope Production Approval Packet
+
+Date: 2026-05-26, Asia/Dubai
+
+Scope: manual approval packet only. No production deploy, production migration,
+remote production D1 migration, production D1 write, production URL call,
+production feature flag enablement, production auth/session switch, production
+route/query switch, legacy `CORPID` fallback removal, or production cutover
+occurred.
+
+Completed:
+
+- Created `P0_006S_TENANT_SCOPE_PRODUCTION_APPROVAL_PACKET.md`.
+- Defined production D1 target confirmation requirements.
+- Defined production backup, schema migration, row-level backfill, and rollback
+  approval checklists.
+- Defined production auth/session claim switch and route/query switch
+  approval checklists.
+- Preserved legacy `CORPID` fallback as warning-only compatibility, not final
+  SaaS authority.
+- Listed accounting/data review requirements.
+- Listed explicit human approval flags required before any production action.
+
+Result:
+
+- Production approval packet: prepared.
+- Production deploy: no.
+- Production migration: no.
+- Production D1 write: no.
+- Production cutover: NO-GO.
+- Commercial launch gate remains `PRODUCTION_NO_GO`.
+
+P0-006 status:
+
+- `Partial - tenant scope production approval packet prepared, production NO-GO`.
+
 ## P0-006Q2 Tenant Scope Audit/Event Evidence Rows
 
 Scope: approved staging-only QA evidence rows for `audit_logs` and

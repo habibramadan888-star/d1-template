@@ -892,6 +892,36 @@ Recommended next prompt:
 
 Production cutover remains `NO-GO`.
 
+## P0-006S Next Morning Review Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+Status:
+
+- P0-006 remains
+  `Partial - tenant scope production approval packet prepared, production NO-GO`.
+- Production cutover remains `NO-GO`.
+
+Evidence:
+
+- `P0_006S_TENANT_SCOPE_PRODUCTION_APPROVAL_PACKET.md`
+
+Review required before any production work:
+
+- Human-confirm production D1 target name and id.
+- Human-approve production backup and restore plan.
+- Human-review production schema migration SQL.
+- Human-review exact production row-level backfill mapping and row counts.
+- Human-approve rollback plan.
+- Human-approve production auth/session claim switch.
+- Human-approve production route/query switch.
+- Human-review legacy `CORPID` fallback policy.
+- Human-complete accounting/data review.
+
+No production deploy, production migration, production D1 write, production URL
+call, production feature flag enablement, legacy fallback removal, or
+production cutover has been approved.
+
 ## P0-006Q2 Morning Review Addendum
 
 - Approved staging-only audit/event QA evidence rows were created in

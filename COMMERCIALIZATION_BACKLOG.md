@@ -1354,6 +1354,35 @@ Still blocked for production:
 - Production receivables migration, backup, rollback, backfill, and deploy
   approval.
 
+## P0-006S Backlog Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+P0-006 current status:
+
+- `Partial - tenant scope production approval packet prepared, production NO-GO`.
+
+Current result:
+
+- Prepared `P0_006S_TENANT_SCOPE_PRODUCTION_APPROVAL_PACKET.md`.
+- Defined manual approval requirements for production D1 target, backup,
+  schema migration, row-level backfill, rollback, auth/session claim switch,
+  route/query switch, legacy `CORPID` fallback policy, and accounting/data
+  review.
+- No production deploy, production migration, production D1 write, production
+  URL call, production feature flag enablement, legacy fallback removal, or
+  production cutover occurred.
+
+Still blocked for production:
+
+- Production D1 target is not human-confirmed.
+- Production backup/restore is not human-approved.
+- Production schema migration and row-level backfill are not approved.
+- Production auth/session claim switch and route/query switch are not approved.
+- Legacy `CORPID` fallback policy still requires production signoff.
+- Accounting/data review remains required.
+- Commercial launch remains `PRODUCTION_NO_GO`.
+
 ## P0-006Q2 Tenant Scope Audit/Event Evidence Rows
 
 Status: `Partial - tenant scope audit events staging evidence passed`

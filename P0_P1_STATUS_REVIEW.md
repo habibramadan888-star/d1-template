@@ -1600,3 +1600,26 @@ Production decision:
 - Production D1 write: no.
 - Production cutover: NO-GO.
 - P0-006 remains Partial, not Verified.
+
+## P0-006S Status Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+P0-006 status:
+
+- `Partial - tenant scope production approval packet prepared, production NO-GO`.
+
+Evidence:
+
+- `P0_006S_TENANT_SCOPE_PRODUCTION_APPROVAL_PACKET.md`
+- `P0_006R_TENANT_SCOPE_PRODUCTION_READINESS_GATE.md`
+
+Result:
+
+- Production approval packet was prepared.
+- Production deploy, production migration, production D1 write, production URL
+  call, production feature flag enablement, production auth/session switch,
+  production route/query switch, legacy `CORPID` fallback removal, and
+  production cutover were not executed.
+- P0-006 remains Partial, not Verified.
+- Production cutover remains `NO-GO`.

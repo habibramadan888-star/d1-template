@@ -962,6 +962,23 @@ call, staging D1 write, feature flag enablement, dashboard live switch, live
 financial formula change, legacy `CORPID` removal, or secret exposure occurred.
 P0-006 remains Partial and production remains NO-GO.
 
+## P0-006S Verification Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+| Check                               | Run? | Result             | Blocker                         | Evidence                                             | Notes                                   |
+| ----------------------------------- | ---- | ------------------ | ------------------------------- | ---------------------------------------------------- | --------------------------------------- |
+| Production approval packet          | yes  | Prepared           | manual production approval      | `P0_006S_TENANT_SCOPE_PRODUCTION_APPROVAL_PACKET.md` | Packet only; no production action.      |
+| Production D1 target confirmation   | no   | MANUAL_REQUIRED    | target not approved             | packet checklist                                     | No production D1 command allowed.       |
+| Production backup approval          | no   | MANUAL_REQUIRED    | backup not approved             | packet checklist                                     | Required before migration/backfill.     |
+| Production schema/backfill approval | no   | MANUAL_REQUIRED    | migration/backfill not approved | packet checklist                                     | No production migration/write executed. |
+| Production auth/route switch        | no   | MANUAL_REQUIRED    | runtime switch not approved     | packet checklist                                     | Legacy behavior remains required.       |
+| Commercial launch gate              | yes  | `PRODUCTION_NO_GO` | production approvals missing    | launch gate output                                   | Production cutover remains blocked.     |
+
+P0-006 status:
+
+- `Partial - tenant scope production approval packet prepared, production NO-GO`.
+
 ## P0-006Q Verification Addendum
 
 Date: 2026-05-26, Asia/Dubai
