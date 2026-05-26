@@ -926,6 +926,39 @@ Next step:
 - P0-006N can run a staging/local auth claim rehearsal only under the same
   production NO-GO constraints.
 
+## P0-006N Tenant Scope Auth Claim Staging Rehearsal Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+Current P0-006 status is now
+`Partial - tenant scope auth claim staging rehearsal passed`.
+
+Added evidence:
+
+- `P0_006N_STARTING_CONTEXT.md`
+- `P0_006N_STAGING_REHEARSAL_SCENARIOS.md`
+- `scripts/rehearse-tenant-scope-auth-claim-staging.mjs`
+- `tests/tenant-scope-auth-claim-staging-rehearsal.spec.mjs`
+- `TENANT_SCOPE_AUTH_CLAIM_STAGING_REHEARSAL_RESULT.md`
+- `P0_006N_AUTH_CLAIM_STAGING_EVIDENCE.md`
+- `P0_006N_PRODUCTION_AUTH_SCOPE_NO_GO.md`
+- `P0_006N_COMMERCIAL_LAUNCH_GATE_RESULT.md`
+- `NEXT_PROMPT_P0_006O_TENANT_SCOPE_STAGING_ACCESS_MATRIX_GATE.md`
+
+Result:
+
+- Tenant auth claim staging rehearsal passed.
+- Cross-tenant and cross-property denial are verified.
+- Frontend `tenant_id` tampering is ignored.
+- Legacy `CORPID` fallback remains warning-only.
+- Guard rollback to false / legacy passed.
+- Production remains `NO-GO`.
+
+Next step:
+
+- P0-006O can build a staging/local role/resource access matrix. P0-006 must
+  remain Partial.
+
 ## P0-006I Morning Review Addendum
 
 Date: 2026-05-26, Asia/Dubai

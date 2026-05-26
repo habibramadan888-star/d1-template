@@ -893,6 +893,23 @@ Date: 2026-05-26, Asia/Dubai
 
 P0-006 remains Partial and production remains NO-GO.
 
+## P0-006N Verification Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+| Check                               | Run? | Result | Blocker | Evidence                                                   | Notes                                                                                                        |
+| ----------------------------------- | ---- | ------ | ------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Tenant auth claim staging tests     | yes  | Pass   | none    | `tests/tenant-scope-auth-claim-staging-rehearsal.spec.mjs` | 13 tests cover role/resource access, production disablement, frontend tamper, legacy fallback, and rollback. |
+| Tenant auth claim staging rehearsal | yes  | Pass   | none    | `TENANT_SCOPE_AUTH_CLAIM_STAGING_REHEARSAL_RESULT.md`      | 15 scenarios, 0 blocked.                                                                                     |
+| Claim staging evidence              | yes  | Pass   | none    | `P0_006N_AUTH_CLAIM_STAGING_EVIDENCE.md`                   | Employee, owner, manager/admin, cross-tenant, cross-property, fallback, and route/query evidence recorded.   |
+| Production NO-GO                    | yes  | Pass   | none    | `P0_006N_PRODUCTION_AUTH_SCOPE_NO_GO.md`                   | Production remains blocked.                                                                                  |
+| Commercial launch gate              | yes  | Pass   | none    | `P0_006N_COMMERCIAL_LAUNCH_GATE_RESULT.md`                 | `gate:commercial-launch` remains `PRODUCTION_NO_GO`.                                                         |
+
+No production deploy, production migration, production D1 write, production URL
+call, staging D1 write, remote feature flag mutation, dashboard live switch,
+live financial formula change, legacy `CORPID` removal, or secret exposure
+occurred. P0-006 remains Partial and production remains NO-GO.
+
 ## P0-006L Rehearsal Addendum
 
 Date: 2026-05-26, Asia/Dubai

@@ -1205,6 +1205,34 @@ Still blocked for production:
   model decisions are not approved.
 - Legacy `CORPID` fallback cannot be final SaaS isolation.
 
+## P0-006N Backlog Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+P0-006 current status:
+
+- `Partial - tenant scope auth claim staging rehearsal passed`.
+
+Current result:
+
+- Added staging/local auth claim rehearsal script and tests.
+- Rehearsal passed with 15 scenarios and 0 blocked scenarios.
+- Employee, owner, and manager/admin tenant/property claim behavior is covered.
+- Cross-tenant and cross-property access denial are verified.
+- Frontend `tenant_id` tampering is ignored.
+- Legacy `CORPID` fallback remains preserved but warning-only.
+- Auth claim guard rollback to false / legacy passed.
+- Production remains `NO-GO`.
+
+Still blocked for production:
+
+- P0-006 is not Verified.
+- Live Worker login/session does not yet emit authoritative tenant/property
+  claims.
+- Production tenant migration, production backfill, production route/query switch,
+  and human tenancy model decisions are not approved.
+- Legacy `CORPID` fallback cannot be final SaaS isolation.
+
 ## P0-006F Backlog Addendum
 
 Date: 2026-05-26, Asia/Dubai

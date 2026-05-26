@@ -1,6 +1,6 @@
 # Commercial Launch Readiness Result
 
-Generated: 2026-05-26T13:39:26.444Z
+Generated: 2026-05-26T14:06:41.964Z
 
 | Metric                | Count |
 | --------------------- | ----: |
@@ -16,24 +16,12 @@ Allowed next work: local/staging dry-run validation, manual QA preparation, and 
 
 Forbidden next work without human approval: production deploy, staging deploy, remote/production D1 migration, production feature flag enablement, and live accounting authority switch.
 
-## P0-006M Addendum
+## P0-006N Tenant Scope Auth Claim Staging Rehearsal
 
-Date: 2026-05-26, Asia/Dubai
+Result: `PASS`
 
-Commercial launch readiness remains `PRODUCTION_NO_GO`.
+Production status remains `PRODUCTION_NO_GO`.
 
-P0-006 tenant scope auth/session claim gate is now:
+P0-006 remains `Partial - tenant scope auth claim staging rehearsal passed`; it is not `Verified`, `Done`, or `Fixed`.
 
-- `Partial - tenant scope auth/session claim gate ready`.
-
-This does not approve production because:
-
-- Live auth/session does not yet emit authoritative tenant/property claims.
-- Production tenant migration is not approved.
-- Production route/query cutover is not approved.
-- Legacy `CORPID` fallback remains compatibility-only.
-- P0-006 is not Verified.
-
-No production deploy, production migration, production D1 write, staging D1
-write, dashboard live switch, live financial formula change, or secret exposure
-occurred.
+This staging/local rehearsal confirms auth claims can drive tenant/property scope in controlled route/query scenarios, cross-tenant and cross-property access is denied, frontend-supplied `tenant_id` is ignored, and legacy CORPID fallback remains warning-only. It does not approve production deploy, production migration, production D1 writes, or production cutover.

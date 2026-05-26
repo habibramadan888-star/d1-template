@@ -1447,3 +1447,29 @@ Result:
 - Tenant auth claim gate passed in staging/local evidence.
 - P0-006 remains Partial, not Verified.
 - Production cutover remains `NO-GO`.
+
+## P0-006N Status Addendum
+
+Date: 2026-05-26, Asia/Dubai
+
+P0-006 status:
+
+- `Partial - tenant scope auth claim staging rehearsal passed`.
+
+Evidence:
+
+- `scripts/rehearse-tenant-scope-auth-claim-staging.mjs`
+- `tests/tenant-scope-auth-claim-staging-rehearsal.spec.mjs`
+- `TENANT_SCOPE_AUTH_CLAIM_STAGING_REHEARSAL_RESULT.md`
+- `P0_006N_STARTING_CONTEXT.md`
+- `P0_006N_STAGING_REHEARSAL_SCENARIOS.md`
+- `P0_006N_AUTH_CLAIM_STAGING_EVIDENCE.md`
+- `P0_006N_PRODUCTION_AUTH_SCOPE_NO_GO.md`
+- `P0_006N_COMMERCIAL_LAUNCH_GATE_RESULT.md`
+- `NEXT_PROMPT_P0_006O_TENANT_SCOPE_STAGING_ACCESS_MATRIX_GATE.md`
+
+Result:
+
+- Tenant auth claim staging rehearsal passed.
+- P0-006 remains Partial, not Verified.
+- Production cutover remains `NO-GO`.
