@@ -39,6 +39,21 @@ production write, production deploy, or production cutover from this list.
 
 Production remains `PRODUCTION_NO_GO`.
 
+## REVIEW-020 Production Preflight Execution Plan
+
+Date: 2026-05-27, Asia/Dubai
+
+The next safe work is blocker reduction and optional production-copy refresh,
+not production execution.
+
+| Priority | Action                                      | Evidence File                                    | Decision Needed                                                                                            | Suggested Status           |
+| -------: | ------------------------------------------- | ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------- | -------------------------- |
+|        1 | Reduce 20 production blockers by group      | `PRODUCTION_BLOCKER_REDUCTION_PLAN.md`           | Decide which approval packet to prepare next; do not approve production execution.                         | MANUAL_REQUIRED            |
+|        2 | Refresh production-copy dry-run if approved | `PRODUCTION_PREFLIGHT_EXECUTION_SEQUENCE.md`     | Decide whether a copy-only evidence refresh is needed; production D1 remains untouched.                    | REQUIRES_EXPLICIT_APPROVAL |
+|        3 | Prepare final preflight packet later        | `COMMERCIAL_LAUNCH_APPROVAL_DEPENDENCY_GRAPH.md` | Use only after blocker reduction and any copy refresh; still not production write/deploy/cutover approval. | WAIT_FOR_BLOCKER_REDUCTION |
+
+Production remains `PRODUCTION_NO_GO`.
+
 ## REVIEW-019 Applied Preflight-Only Decisions
 
 Date: 2026-05-27, Asia/Dubai

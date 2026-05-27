@@ -1,64 +1,34 @@
 # NEXT PROMPT: COMMERCIAL-LAUNCH-REVIEW-021 Production Blocker Reduction Plan
 
-Use this prompt to reduce remaining commercial launch blockers one by one
-through documentation, review packets, and explicit owner decisions. This prompt
-does not authorize production execution.
+Use after REVIEW-020 production preflight execution plan is complete.
 
-## Goal
+Goal: reduce the 20 remaining production blockers one group at a time without
+executing production.
 
-Prepare an itemized plan to reduce the 20 production-blocking signoffs without
-executing production changes.
-
-## Strict Limits
+Strict limits:
 
 1. Do not execute production deploy.
 2. Do not execute staging deploy.
 3. Do not execute production migration.
-4. Do not execute remote production D1 migration.
-5. Do not write production D1.
-6. Do not write staging D1.
-7. Do not write production-copy D1.
-8. Do not execute D1 export/import/execute.
-9. Do not call production URL.
-10. Do not modify production config.
-11. Do not enable production feature flags.
-12. Do not commit secrets.
-13. Do not print password, token, or cookie values.
-14. Do not mark commercial launch GO.
-15. Do not mark any Partial P0 Verified.
-16. Do not treat preflight-only approval as production approval.
-17. Do not modify business code, dashboard, or financial formula.
+4. Do not write production D1.
+5. Do not write staging D1.
+6. Do not write production-copy D1 unless a later prompt explicitly approves a
+   copy-only dry-run.
+7. Do not execute D1 export/import/execute.
+8. Do not call production URL.
+9. Do not modify production config.
+10. Do not enable production feature flags.
+11. Do not mark commercial launch GO.
+12. Do not mark Partial P0 items Verified.
+13. Do not treat `APPROVED_FOR_PREFLIGHT_ONLY` as production approval.
 
-## Required Focus Areas
+Required work:
 
-Cover all 20 production blockers:
-
-- Production D1 target confirmation.
-- Production backup.
-- Production restore / rollback.
-- Production migration SQL.
-- Production backfill.
-- Money reconciliation and TOP_25 risks.
-- Tenant/property mapping and legacy CORPID fallback.
-- Receivables lifecycle and allocation.
-- Audit/event scope.
-- Backend totals authority.
-- Employee entry and handover cutover.
-- Feature flags.
-- Deploy.
-- Cutover window.
-- Monitoring.
-- Rollback owner.
-
-## Required Outputs
-
-Generate:
-
-1. `PRODUCTION_BLOCKER_REDUCTION_PLAN.md`
-2. `PRODUCTION_BLOCKER_OWNER_DECISION_QUEUE.md`
-3. `PRODUCTION_BLOCKER_EVIDENCE_GAP_MATRIX.md`
-4. Next prompt for the highest-priority unresolved blocker.
-
-Production status must remain `PRODUCTION_NO_GO`.
-
-Stop after documentation. Do not enter production.
+1. Read `PRODUCTION_BLOCKER_REDUCTION_PLAN.md`.
+2. Read `PRODUCTION_BLOCKER_MATRIX_AFTER_PREFLIGHT_PACKET.md`.
+3. Read `COMMERCIAL_LAUNCH_HUMAN_SIGNOFF_TRACKER.md`.
+4. Classify blockers by evidence gap, Ramadan decision gap, backup/rollback
+   gap, SQL gap, deploy gap, monitoring gap, and cutover gap.
+5. Generate individual approval packets for the next safest blocker group.
+6. Keep all production execution forbidden.
+7. Keep production cutover `PRODUCTION_NO_GO`.
