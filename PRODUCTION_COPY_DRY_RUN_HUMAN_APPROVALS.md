@@ -82,3 +82,23 @@ Updated status:
 Next approval task:
 
 - `NEXT_PROMPT_COMMERCIAL_LAUNCH_REVIEW_009_COPY_ROLLBACK_REHEARSAL_APPROVAL_REQUIRED.md`
+
+## REVIEW-009 Approval Update
+
+Approval flags supplied for COMMERCIAL-LAUNCH-REVIEW-009:
+
+- `--confirm-copy-rollback-rehearsal`
+- `--confirm-copy-d1-target`
+- `--confirm-no-production-write`
+- `--confirm-no-production-deploy`
+- `--confirm-no-production-migration`
+- `--confirm-backup-available`
+- `--confirm-rollback-review`
+
+Execution result:
+
+- Copy-only rollback rehearsal executed.
+- Production D1 write, production migration, production deploy, and production
+  cutover remain not approved.
+- Final production approval packet remains documentation-only unless a later
+  task provides explicit production approval.

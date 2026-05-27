@@ -89,3 +89,22 @@ Result:
 - Production deploy: no.
 - Production migration: no.
 - Production cutover: `PRODUCTION_NO_GO`.
+
+## REVIEW-009 Update
+
+Copy rollback rehearsal was executed on
+`homelink-finance-production-copy-dryrun` only.
+
+Result:
+
+- Target confirmation: PASS.
+- Reverse-update rollback: PASS_WITH_WARNINGS.
+- Row counts after rollback: unchanged.
+- Money `*_fils` populated rows after rollback: 0.
+- Tenant compatibility populated rows after rollback: 0.
+- Audit/event compatibility populated rows after rollback: 0.
+- Receivables rows: still 0 / manual-required.
+- Production D1 write: no.
+- Production deploy: no.
+- Production migration: no.
+- Production cutover: `PRODUCTION_NO_GO`.

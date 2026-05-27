@@ -6,6 +6,30 @@ Scope: governance, engineering baseline, local startup checks
 Production deploy: not executed  
 Production database mutation: not executed
 
+## Commercial Launch Review 009 Rollback Rehearsal Addendum
+
+Date: 2026-05-27, Asia/Dubai
+
+Scope: explicit-approved rollback rehearsal on isolated production-copy D1 only.
+
+| Item                | Result             | Evidence                                                        | Notes                                                                            |
+| ------------------- | ------------------ | --------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| Target confirmation | PASS               | `PRODUCTION_COPY_ROLLBACK_009_TARGET_CONFIRMATION.md`           | Target was `homelink-finance-production-copy-dryrun`, not production or staging. |
+| Before snapshot     | PASS               | `PRODUCTION_COPY_ROLLBACK_009_BEFORE_SNAPSHOT.md`               | REVIEW-007 compatibility fields were populated before rollback.                  |
+| Rollback execution  | PASS_WITH_WARNINGS | `PRODUCTION_COPY_ROLLBACK_009_EXECUTION_RESULT.md`              | 12 copy-only `UPDATE ... WHERE ...` statements executed.                         |
+| After snapshot      | PASS               | `PRODUCTION_COPY_ROLLBACK_009_AFTER_SNAPSHOT.md`                | Row counts unchanged and rollback target fields cleared.                         |
+| Rollback readiness  | PASS_WITH_WARNINGS | `PRODUCTION_COPY_ROLLBACK_009_READINESS_RESULT.md`              | Production rollback still requires fresh backup and human approval.              |
+| Commercial gate     | `PRODUCTION_NO_GO` | `PRODUCTION_COPY_ROLLBACK_009_COMMERCIAL_LAUNCH_GATE_RESULT.md` | Copy rollback does not approve production cutover.                               |
+
+Safety:
+
+- Production deploy: no.
+- Production migration: no.
+- Production D1 write: no.
+- Staging D1 write: no.
+- Production-copy D1 write: yes, rollback rehearsal only.
+- Production cutover: `PRODUCTION_NO_GO`.
+
 ## Commercial Launch Review 009 Approval Blocker Addendum
 
 Date: 2026-05-27, Asia/Dubai

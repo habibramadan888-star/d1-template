@@ -33,6 +33,14 @@ Resolution:
 
 - Retry REVIEW-009 only after the required explicit approval flags are provided.
 
+Resolution update, 2026-05-27:
+
+- Required approval flags were later provided in
+  COMMERCIAL-LAUNCH-REVIEW-009.
+- Copy rollback rehearsal executed only on
+  `homelink-finance-production-copy-dryrun`.
+- Production remains `PRODUCTION_NO_GO`.
+
 ## Blocking Risks
 
 ### P0: Local authentication setup was blocking authenticated flows

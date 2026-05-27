@@ -1,19 +1,31 @@
 # Commercial Launch Readiness Matrix
 
-Generated: 2026-05-27T09:09:40.510Z
+Generated: 2026-05-27T10:02:40.782Z
 
 Scope: read-only commercial launch gate. This script reads reports only and does not deploy, migrate, call APIs, access D1, or read secrets.
+
+## Commercial Launch Review 009 Rollback Rehearsal Addendum
+
+Date: 2026-05-27, Asia/Dubai
+
+| Area                                   | REVIEW-009 Status  | Launch Meaning                                                      |
+| -------------------------------------- | ------------------ | ------------------------------------------------------------------- |
+| Copy rollback rehearsal                | PASS_WITH_WARNINGS | Copy-only reverse update rollback succeeded.                        |
+| Money rollback                         | PASS               | Copy `*_fils` populated rows reverted to 0.                         |
+| Tenant/property compatibility rollback | PASS_WITH_WARNINGS | Compatibility fields reverted, but final SaaS mapping remains open. |
+| Audit/event compatibility rollback     | PASS_WITH_WARNINGS | Compatibility fields reverted, but visibility review remains open.  |
+| Receivables                            | MANUAL_REQUIRED    | Receivables lifecycle/allocation remains open.                      |
+| Commercial launch gate                 | `PRODUCTION_NO_GO` | Cutover remains blocked.                                            |
 
 ## Commercial Launch Review 009 Approval Blocker Addendum
 
 Date: 2026-05-27, Asia/Dubai
 
-| Area                     | REVIEW-009 Status                 | Launch Meaning                             |
-| ------------------------ | --------------------------------- | ------------------------------------------ |
-| Copy rollback rehearsal  | BLOCKED_BY_MISSING_HUMAN_APPROVAL | Required approval flags were not provided. |
-| Production D1 write      | NOT_EXECUTED                      | Production remains untouched.              |
-| Production-copy D1 write | NOT_EXECUTED                      | Rollback rehearsal was not run.            |
-| Commercial launch gate   | `PRODUCTION_NO_GO`                | Cutover remains blocked.                   |
+| Area                             | REVIEW-009 Status             | Launch Meaning                                 |
+| -------------------------------- | ----------------------------- | ---------------------------------------------- |
+| Copy rollback rehearsal approval | RESOLVED_BY_EXPLICIT_APPROVAL | Initial blocker was resolved before execution. |
+| Production D1 write              | NOT_EXECUTED                  | Production remains untouched.                  |
+| Commercial launch gate           | `PRODUCTION_NO_GO`            | Cutover remains blocked.                       |
 
 ## Commercial Launch Review 008 Addendum
 
@@ -26,7 +38,6 @@ Date: 2026-05-27, Asia/Dubai
 | Tenant/property compatibility | COMPATIBILITY_ONLY     | Final SaaS tenant authority remains manual-required.         |
 | Audit/event compatibility     | COMPATIBILITY_ONLY     | Visibility policy remains manual-required before production. |
 | Receivables data backfill     | MANUAL_REQUIRED        | Lifecycle/allocation rows remain unapproved.                 |
-| Copy rollback rehearsal       | APPROVAL_REQUIRED      | Next task needs explicit copy-only rollback approval.        |
 | Commercial launch gate        | `PRODUCTION_NO_GO`     | Cutover remains blocked.                                     |
 
 | Area                            | Evidence                                                                                          | Required Markers                                                   | Missing        | Result          | Production Gate        |

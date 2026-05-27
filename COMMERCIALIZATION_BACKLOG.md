@@ -9,6 +9,29 @@ Production database mutation: not executed
 
 The project is not yet ready for commercial SaaS launch. Static checks, local Worker startup, and unauthenticated smoke checks now pass, but commercial blockers remain in finance precision, tenant isolation, migration discipline, and audited financial mutation flows.
 
+## Commercial Launch Review 009 Rollback Rehearsal Addendum
+
+Date: 2026-05-27, Asia/Dubai
+
+Production-copy rollback rehearsal status: `PASS_WITH_WARNINGS`.
+
+Completed:
+
+- Confirmed target D1 was `homelink-finance-production-copy-dryrun`.
+- Executed 12 copy-only reverse-update statements with `WHERE` clauses.
+- Verified row counts stayed unchanged.
+- Verified money/scope/audit compatibility fields returned to zero populated rows.
+- Confirmed commercial launch remains `PRODUCTION_NO_GO`.
+
+Remaining blockers:
+
+- Production backup/restore approval.
+- Production migration approval.
+- Accounting signoff and TOP_25 money risk closure.
+- Tenant/property final SaaS mapping approval.
+- Receivables lifecycle/allocation decision.
+- Production deploy/cutover approval.
+
 ## Commercial Launch Review 009 Approval Blocker Addendum
 
 Date: 2026-05-27, Asia/Dubai

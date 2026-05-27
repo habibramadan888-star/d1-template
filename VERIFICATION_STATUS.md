@@ -4,6 +4,18 @@ Generated: 2026-05-23, Asia/Dubai
 
 This file records the safety verification commands rerun during project status reconciliation. Commands were run without modifying business logic, production configuration, or production database data.
 
+## Commercial Launch Review 009 Rollback Rehearsal Verification Addendum
+
+Date: 2026-05-27, Asia/Dubai
+
+| Verification            | Result             | Evidence                                                        | Commercial Meaning                                                              |
+| ----------------------- | ------------------ | --------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| Target confirmation     | PASS               | `PRODUCTION_COPY_ROLLBACK_009_TARGET_CONFIRMATION.md`           | Rollback target was isolated production-copy only.                              |
+| Copy rollback execution | PASS_WITH_WARNINGS | `PRODUCTION_COPY_ROLLBACK_009_EXECUTION_RESULT.md`              | Copy row-level compatibility fields were reverted.                              |
+| Comparison              | PASS_WITH_WARNINGS | `PRODUCTION_COPY_ROLLBACK_009_COMPARISON_RESULT.md`             | Row counts stayed stable; compatibility fields returned to zero populated rows. |
+| Rollback readiness      | PASS_WITH_WARNINGS | `PRODUCTION_COPY_ROLLBACK_009_READINESS_RESULT.md`              | Production rollback remains approval-gated.                                     |
+| Commercial launch gate  | `PRODUCTION_NO_GO` | `PRODUCTION_COPY_ROLLBACK_009_COMMERCIAL_LAUNCH_GATE_RESULT.md` | Copy rollback is not production approval.                                       |
+
 ## Commercial Launch Review 009 Approval Blocker Addendum
 
 Date: 2026-05-27, Asia/Dubai

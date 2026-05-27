@@ -9,6 +9,27 @@ Production deploy: not executed
 Production database mutation: not executed
 Remote D1 migration: not executed
 
+## Commercial Launch Review 009 Rollback Rehearsal Addendum
+
+Date: 2026-05-27, Asia/Dubai
+
+The explicit-approved copy rollback rehearsal ran only against
+`homelink-finance-production-copy-dryrun`. It used reverse updates with `WHERE`
+clauses to clear REVIEW-007 compatibility row-level fields.
+
+Current decision:
+
+- Copy rollback rehearsal: `PASS_WITH_WARNINGS`.
+- Production deploy: no.
+- Production migration: no.
+- Production D1 write: no.
+- Production-copy D1 write: yes, rollback rehearsal only.
+- Production: `PRODUCTION_NO_GO`.
+
+Next recommended prompt:
+
+- `NEXT_PROMPT_COMMERCIAL_LAUNCH_REVIEW_010_FINAL_PRODUCTION_APPROVAL_PACKET.md`
+
 ## Commercial Launch Review 009 Approval Blocker Addendum
 
 Date: 2026-05-27, Asia/Dubai

@@ -2,6 +2,19 @@
 
 Generated: 2026-05-23, Asia/Dubai
 
+## Commercial Launch Review 009 Rollback Rehearsal Addendum
+
+Date: 2026-05-27, Asia/Dubai
+
+| Area                           | REVIEW-009 Status  | Evidence                                                        | Production Meaning                                                   |
+| ------------------------------ | ------------------ | --------------------------------------------------------------- | -------------------------------------------------------------------- |
+| Copy rollback rehearsal        | PASS_WITH_WARNINGS | `PRODUCTION_COPY_ROLLBACK_009_READINESS_RESULT.md`              | Copy rollback is feasible; production rollback still needs approval. |
+| Money row-level rollback       | PASS               | `PRODUCTION_COPY_ROLLBACK_009_AFTER_SNAPSHOT.md`                | P0-001 remains Partial; accounting signoff still required.           |
+| Tenant/property scope rollback | PASS_WITH_WARNINGS | `PRODUCTION_COPY_ROLLBACK_009_COMPARISON_RESULT.md`             | P0-006 remains Partial; final SaaS authority not approved.           |
+| Audit/event scope rollback     | PASS_WITH_WARNINGS | `PRODUCTION_COPY_ROLLBACK_009_COMPARISON_RESULT.md`             | Visibility policy remains manual-required.                           |
+| Receivables                    | MANUAL_REQUIRED    | `PRODUCTION_COPY_ROLLBACK_009_READINESS_RESULT.md`              | P0-008 remains Partial.                                              |
+| Production cutover             | `PRODUCTION_NO_GO` | `PRODUCTION_COPY_ROLLBACK_009_COMMERCIAL_LAUNCH_GATE_RESULT.md` | No production migration/deploy/write approved.                       |
+
 ## Commercial Launch Review 009 Approval Blocker Addendum
 
 Date: 2026-05-27, Asia/Dubai
