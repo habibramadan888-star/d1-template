@@ -9,6 +9,30 @@ Production deploy: not executed
 Production database mutation: not executed
 Remote D1 migration: not executed
 
+## INTERNAL-QA-001 Morning Review Addendum
+
+Most important result:
+
+- Full internal staging QA package is ready for manual employee/owner testing.
+
+Current status:
+
+- Internal staging QA plan: READY.
+- Employee manual QA script: READY.
+- Owner manual QA script: READY.
+- Staging test data plan: READY.
+- Bug report, daily report, and signoff templates: READY.
+- Production cutover: `PRODUCTION_NO_GO`.
+
+Recommended next action:
+
+```text
+Run internal staging QA manually using FULL_INTERNAL_QA_TEST_PLAN.md.
+Record bugs in BUG_REPORT_TEMPLATE.md.
+Record daily status in INTERNAL_QA_DAILY_REPORT_TEMPLATE.md.
+Do not use production and do not treat internal QA as public beta or launch approval.
+```
+
 ## COMMERCIAL-LAUNCH-REVIEW-021A Morning Review Addendum
 
 Most important result:

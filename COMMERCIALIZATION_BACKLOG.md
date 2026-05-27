@@ -1594,6 +1594,30 @@ Still blocked for production:
 - Production receivables migration, backup, rollback, backfill, and deploy
   approval.
 
+## INTERNAL-QA-001 Backlog Addendum
+
+Date: 2026-05-27, Asia/Dubai
+
+Internal staging QA package is ready:
+
+- `INTERNAL_STAGING_QA_PACKAGE_INDEX.md`
+- `FULL_INTERNAL_QA_TEST_PLAN.md`
+- `EMPLOYEE_INTERNAL_TEST_SCRIPT.md`
+- `OWNER_INTERNAL_TEST_SCRIPT.md`
+- `STAGING_TEST_DATA_PLAN.md`
+- `BUG_REPORT_TEMPLATE.md`
+- `INTERNAL_QA_SIGNOFF_CHECKLIST.md`
+- `INTERNAL_QA_DAILY_REPORT_TEMPLATE.md`
+- `INTERNAL_QA_TEST_SCOPE_AND_ACCOUNTS.md`
+
+Production remains blocked:
+
+- Internal QA is staging-only.
+- Internal QA does not approve public beta or commercial launch.
+- Production deploy, migration, D1 write, feature flags, dashboard switch, and
+  cutover remain unapproved.
+- Commercial launch gate remains `PRODUCTION_NO_GO`.
+
 ## Commercial Launch Review 018 Backlog Addendum
 
 Date: 2026-05-27, Asia/Dubai

@@ -274,3 +274,18 @@ Date: 2026-05-27, Asia/Dubai
 | Batch 4 write/deploy/cutover     | 3 blockers         | Not processed and remains last-stage blocked.                           |
 | Approved for production          | 0                  | No production write, migration, deploy, dashboard switch, or cutover.   |
 | Commercial launch gate           | `PRODUCTION_NO_GO` | Cutover remains blocked.                                                |
+
+## INTERNAL-QA-001 Addendum
+
+Date: 2026-05-27, Asia/Dubai
+
+| Area                        | INTERNAL-QA-001 Status | Launch Meaning                                                        |
+| --------------------------- | ---------------------- | --------------------------------------------------------------------- |
+| Internal staging QA package | READY                  | Manual staging QA can proceed.                                        |
+| Employee test script        | READY                  | Employee flow can be tested in staging only.                          |
+| Owner test script           | READY                  | Owner dashboard/history/report flows can be tested in staging only.   |
+| Test data plan              | READY                  | QA data must be marked and is not production accounting.              |
+| Bug and signoff templates   | READY                  | Internal QA can record defects and signoff status.                    |
+| Public beta approval        | NOT_APPROVED           | Internal QA is not public beta.                                       |
+| Production approval         | 0                      | No production write, migration, deploy, dashboard switch, or cutover. |
+| Commercial launch gate      | `PRODUCTION_NO_GO`     | Cutover remains blocked.                                              |

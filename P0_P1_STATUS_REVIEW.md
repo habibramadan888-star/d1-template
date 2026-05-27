@@ -1926,3 +1926,29 @@ P0 status remains unchanged:
 No production deploy, production migration, production D1 write, production-copy
 D1 write, D1 export/import/execute, dashboard switch, financial formula change,
 or cutover occurred in REVIEW-021.
+
+## INTERNAL-QA-001 Status Addendum
+
+Date: 2026-05-27, Asia/Dubai
+
+Commercial launch status:
+
+- `PRODUCTION_NO_GO`.
+
+Internal QA package:
+
+- Full internal staging QA test plan prepared.
+- Employee and owner manual test scripts prepared.
+- Staging test data plan prepared.
+- Bug report, daily report, account-scope summary, and signoff checklist
+  prepared.
+
+P0 status remains unchanged:
+
+- P0-004, P0-005, and P0-007 remain Verified.
+- P0-001, P0-002, P0-003, P0-006, and P0-008 remain Partial.
+- No Partial P0 was marked Verified.
+
+No production deploy, production migration, production D1 write,
+production-copy D1 write, D1 export/import/execute, dashboard switch,
+financial formula change, or cutover occurred in INTERNAL-QA-001.
