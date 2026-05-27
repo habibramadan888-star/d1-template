@@ -1,8 +1,21 @@
 # Commercial Launch Readiness Matrix
 
-Generated: 2026-05-27T12:32:26.248Z
+Generated: 2026-05-27T12:56:05.163Z
 
 Scope: read-only commercial launch gate. This script reads reports only and does not deploy, migrate, call APIs, access D1, or read secrets.
+
+## Commercial Launch Review 013 TOP_25 Money Risk Addendum
+
+Date: 2026-05-27, Asia/Dubai
+
+| Area                   | REVIEW-013 Status  | Launch Meaning                                                     |
+| ---------------------- | ------------------ | ------------------------------------------------------------------ |
+| TOP_25 reviewed        | YES                | Risks are classified for Ramadan review, not approved.             |
+| Approve candidates     | 3                  | Non-money scan-hit closure candidates still need Ramadan decision. |
+| Pending review risks   | 5                  | Evidence exists, but accounting decision is not recorded.          |
+| Manual-required risks  | 17                 | Legacy money fields require explicit accounting/migration review.  |
+| Approved signoffs      | 0                  | No production action is approved.                                  |
+| Commercial launch gate | `PRODUCTION_NO_GO` | Cutover remains blocked.                                           |
 
 ## Commercial Launch Review 012 Signoff Status Addendum
 

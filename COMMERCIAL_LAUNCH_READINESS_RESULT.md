@@ -1,6 +1,30 @@
 # Commercial Launch Readiness Result
 
-Generated: 2026-05-27T12:32:26.250Z
+Generated: 2026-05-27T12:56:05.164Z
+
+## Commercial Launch Review 013 TOP_25 Money Risk Addendum
+
+Date: 2026-05-27, Asia/Dubai
+
+Result:
+
+- TOP_25 money risks reviewed for Ramadan signoff support.
+- Recommended TOP_25 status counts: 3 `APPROVE_CANDIDATE`, 5
+  `PENDING_REVIEW`, 17 `MANUAL_REQUIRED`, 0 `BLOCKED`, 0
+  `REJECTED_CANDIDATE`.
+- Ramadan decisions recorded: 0.
+- Approved production signoffs: 0.
+- Pending review signoffs: 6.
+- Manual-required signoffs: 12.
+- Blocked signoffs: 2.
+- Missing production-blocking signoffs: 20.
+- Production deploy: no.
+- Production migration: no.
+- Production D1 write: no.
+- Staging D1 write: no.
+- Production-copy D1 write: no.
+- D1 export/import/execute: no.
+- Production cutover: `PRODUCTION_NO_GO`.
 
 ## Commercial Launch Review 012 Signoff Status Addendum
 

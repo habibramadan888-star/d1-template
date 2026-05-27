@@ -9,6 +9,32 @@ Production deploy: not executed
 Production database mutation: not executed
 Remote D1 migration: not executed
 
+## Commercial Launch Review 013 TOP_25 Money Risk Addendum
+
+Date: 2026-05-27, Asia/Dubai
+
+REVIEW-013 reviewed TOP_25 money risks for Ramadan signoff support only. It did
+not execute production deploy, staging deploy, migration, D1 export/import,
+D1 execute, D1 write, feature flags, dashboard changes, business code changes,
+or financial formula changes.
+
+Current decision:
+
+- TOP_25 reviewed: yes.
+- APPROVE_CANDIDATE risks: 3.
+- PENDING_REVIEW risks: 5.
+- MANUAL_REQUIRED risks: 17.
+- BLOCKED risks: 0.
+- Ramadan approvals recorded: 0.
+- Approved production signoffs: 0.
+- Pending review signoffs: 6.
+- Manual-required signoffs: 12.
+- Production: `PRODUCTION_NO_GO`.
+
+Next recommended prompt:
+
+- `NEXT_PROMPT_COMMERCIAL_LAUNCH_REVIEW_013A_APPLY_RAMADAN_MONEY_RISK_DECISIONS.md`
+
 ## Commercial Launch Review 012 Signoff Status Addendum
 
 Date: 2026-05-27, Asia/Dubai

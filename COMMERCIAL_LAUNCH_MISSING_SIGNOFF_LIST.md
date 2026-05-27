@@ -7,11 +7,11 @@ Result: `PRODUCTION_NO_GO`
 Unified responsible owner: Ramadan Habib. Each missing signoff below remains a
 separate approval category and must receive its own decision.
 
-REVIEW-012 status update:
+REVIEW-013 money risk review update:
 
 - Approved signoffs: 0.
-- Pending review signoffs: 5.
-- Manual-required signoffs: 13.
+- Pending review signoffs: 6.
+- Manual-required signoffs: 12.
 - Blocked signoffs: 2.
 - Missing production-blocking signoffs: 20.
 - Production remains `PRODUCTION_NO_GO`.
@@ -27,12 +27,12 @@ REVIEW-012 status update:
 
 ## Must-have before production migration
 
-| Priority | Missing Signoff                     | Responsible Owner | Why Required                                                 | Blocks Which Step    | Evidence Needed                                        |
-| -------: | ----------------------------------- | ----------------- | ------------------------------------------------------------ | -------------------- | ------------------------------------------------------ |
-|        1 | Fresh production D1 backup approval | Ramadan Habib     | Production write cannot proceed without a restorable backup. | Production migration | Backup command approval and integrity record.          |
-|        2 | Final production SQL approval       | Ramadan Habib     | Copy SQL is not production authorization.                    | Production migration | Exact SQL, WHERE clauses, row counts, rollback method. |
-|        3 | TOP_25 money risks approval         | Ramadan Habib     | Money risks affect financial correctness.                    | Production migration | Closed or explicitly accepted risk list.               |
-|        4 | Data migration owner signoff        | Ramadan Habib     | Row-level updates need accountable approval.                 | Production migration | Migration/backfill owner signoff.                      |
+| Priority | Missing Signoff                     | Responsible Owner | Why Required                                                 | Blocks Which Step    | Evidence Needed                                                               |
+| -------: | ----------------------------------- | ----------------- | ------------------------------------------------------------ | -------------------- | ----------------------------------------------------------------------------- |
+|        1 | Fresh production D1 backup approval | Ramadan Habib     | Production write cannot proceed without a restorable backup. | Production migration | Backup command approval and integrity record.                                 |
+|        2 | Final production SQL approval       | Ramadan Habib     | Copy SQL is not production authorization.                    | Production migration | Exact SQL, WHERE clauses, row counts, rollback method.                        |
+|        3 | TOP_25 money risks approval         | Ramadan Habib     | Money risks affect financial correctness.                    | Production migration | Ramadan item-by-item decisions against `TOP_25_MONEY_RISKS_REVIEW_MATRIX.md`. |
+|        4 | Data migration owner signoff        | Ramadan Habib     | Row-level updates need accountable approval.                 | Production migration | Migration/backfill owner signoff.                                             |
 
 ## Must-have before production deploy
 

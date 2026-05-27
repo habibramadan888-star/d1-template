@@ -6,6 +6,33 @@ Scope: governance, engineering baseline, local startup checks
 Production deploy: not executed  
 Production database mutation: not executed
 
+## Commercial Launch Review 013 TOP_25 Money Risk Addendum
+
+Date: 2026-05-27, Asia/Dubai
+
+Scope: documentation-only TOP_25 money risk review for Ramadan signoff support.
+No production deploy, staging deploy, migration, D1 export/import/execute, D1
+write, production URL call, production config change, feature flag enablement,
+business code change, dashboard change, or financial formula change occurred.
+
+| Item                   | Result             | Evidence                                           | Notes                                                                             |
+| ---------------------- | ------------------ | -------------------------------------------------- | --------------------------------------------------------------------------------- |
+| Starting context       | READY              | `COMMERCIAL_LAUNCH_REVIEW_013_STARTING_CONTEXT.md` | Production remains NO-GO because money/accounting decisions are not approved.     |
+| TOP_25 review matrix   | REVIEW_READY       | `TOP_25_MONEY_RISKS_REVIEW_MATRIX.md`              | 3 approve candidates, 5 pending review, 17 manual-required.                       |
+| Category summary       | READY              | `TOP_25_MONEY_RISKS_CATEGORY_SUMMARY.md`           | Summarizes precision, backend totals, receivables, deposits, and false positives. |
+| Ramadan checklist      | READY              | `MONEY_RISK_RAMADAN_REVIEW_CHECKLIST.md`           | Defines item-by-item decisions Ramadan must make.                                 |
+| Signoff tracker update | `PRODUCTION_NO_GO` | `MONEY_RISK_SIGNOFF_UPDATE_RESULT.md`              | SO-007 moved to pending review; no signoff approved.                              |
+
+Safety:
+
+- Production deploy: no.
+- Production migration: no.
+- Production D1 write: no.
+- Staging D1 write: no.
+- Production-copy D1 write: no.
+- D1 export/import/execute: no.
+- Production cutover: `PRODUCTION_NO_GO`.
+
 ## Commercial Launch Review 011 Human Signoff Tracker Addendum
 
 Date: 2026-05-27, Asia/Dubai
