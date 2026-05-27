@@ -10,7 +10,9 @@ flags, public beta, or commercial launch.
 | ---------------------- | ---------------------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Overall test plan      | `FULL_INTERNAL_QA_TEST_PLAN.md`          | READY  | Defines corrected role links, QA boundaries, roles, cycles, pass criteria, and failure handling.                                                               |
 | Real links review      | `INTERNAL_QA_REAL_LINKS_REVIEW.md`       | READY  | Confirms the employee entry link, owner/main app candidate links, and Worker/D1 binding risk from local project files.                                         |
-| Start guide            | `INTERNAL_QA_START_GUIDE.md`             | READY  | Gives testers the corrected employee and owner links plus no-write safety boundary.                                                                            |
+| Unified login design   | `UNIFIED_LOGIN_DESIGN.md`                | READY  | Defines `/api/me` authority, role routing, security rules, and compatibility paths.                                                                            |
+| Unified links          | `UNIFIED_INTERNAL_QA_LINKS.md`           | READY  | Gives testers one login link and documents destination links and write-risk boundaries.                                                                        |
+| Start guide            | `INTERNAL_QA_START_GUIDE.md`             | READY  | Gives testers the unified login link plus no-write safety boundary.                                                                                            |
 | Employee script        | `EMPLOYEE_INTERNAL_TEST_SCRIPT.md`       | READY  | Covers login, rent, deposit, arrears, short-pay, repayment, void, handover, duplicate, weak network, invalid money, permissions, mobile, and refresh behavior. |
 | Owner script           | `OWNER_INTERNAL_TEST_SCRIPT.md`          | READY  | Covers dashboard, due, overdue, arrears, income, deposits, history, filters, voids, handover review, export/report, mobile, permissions, and reconciliation.   |
 | Test data plan         | `STAGING_TEST_DATA_PLAN.md`              | READY  | Defines QA-marked staging data and retention/cleanup boundary.                                                                                                 |
@@ -21,11 +23,13 @@ flags, public beta, or commercial launch.
 
 ## Boundary
 
-The confirmed employee link is
-`https://homelink-finance.habibramadan888.workers.dev/employee-v3.html`.
-Local project files show that this Worker name is configured with the `homelink`
-D1 binding, so it is not safe for write-style QA unless production D1 writes are
-separately approved. This documentation task did not execute any D1 command and
-did not write production, staging, or production-copy D1.
+The unified login link is
+`https://homelink-finance.habibramadan888.workers.dev/unified-login.html`.
+Employee and owner destinations remain compatibility paths, but testers should
+not start from separate role-specific links. Local project files show that this
+Worker name is configured with the `homelink` D1 binding, so it is not safe for
+write-style QA unless production D1 writes are separately approved. This task did
+not execute any D1 command and did not write production, staging, or
+production-copy D1.
 
 Production remains `PRODUCTION_NO_GO`.

@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Homelink Unified Login</title>
+<style>
+:root{
+  --ink:#101820;
+  --muted:#5e6b76;
+  --line:#dce5df;
+  --paper:#fffdf7;
+  --green:#078d42;
+  --green2:#0fb35c;
+  --danger:#b42318;
+  --warn:#8a5a00;
+  --shadow:0 24px 70px rgba(18,48,31,.16);
+}
+*{box-sizing:border-box}
+body{
+  margin:0;
+  min-height:100vh;
+  display:grid;
+  place-items:center;
+  padding:28px;
+  color:var(--ink);
+  font-family:"Trebuchet MS",Verdana,sans-serif;
+  background:
+    radial-gradient(circle at 12% 18%,rgba(15,179,92,.18),transparent 30%),
+    radial-gradient(circle at 88% 14%,rgba(245,190,80,.22),transparent 32%),
+    linear-gradient(135deg,#f6fbf4,#fff8ea 62%,#eef8f2);
+}
+.shell{
+  width:min(980px,100%);
+  display:grid;
+  grid-template-columns:1.05fr .95fr;
+  gap:24px;
+  align-items:stretch;
+}
+.hero,.card{
+  border:1px solid rgba(220,229,223,.88);
+  border-radius:34px;
+  background:rgba(255,255,255,.78);
+  box-shadow:var(--shadow);
+  backdrop-filter:blur(18px);
+}
+.hero{
+  padding:40px;
+  position:relative;
+  overflow:hidden;
+}
+.hero:after{
+  content:"";
+  position:absolute;
+  inset:auto -40px -70px auto;
+  width:260px;
+  height:260px;
+  border-radius:80px;
+  background:linear-gradient(135deg,rgba(7,141,66,.18),rgba(255,204,92,.22));
+  transform:rotate(18deg);
+}
+.eyebrow{
+  color:var(--green);
+  font-size:13px;
+  font-weight:900;
+  letter-spacing:.16em;
+  text-transform:uppercase;
+}
+h1{
+  max-width:620px;
+  margin:20px 0 18px;
+  font-size:clamp(42px,6vw,72px);
+  line-height:.92;
+  letter-spacing:-.06em;
+}
+.hero p{
+  max-width:560px;
+  color:var(--muted);
+  font-size:18px;
+  line-height:1.65;
+}
+.routes{
+  position:relative;
+  z-index:1;
+  display:grid;
+  gap:12px;
+  margin-top:34px;
+}
+.route{
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+  padding:15px 17px;
+  border:1px solid var(--line);
+  border-radius:18px;
+  background:rgba(255,255,255,.72);
+  font-weight:900;
+}
+.route span{
+  color:var(--muted);
+  font-family:Consolas,"Courier New",monospace;
+  font-size:13px;
+  font-weight:800;
+}
+.card{padding:32px}
+.logo{
+  width:68px;
+  height:68px;
+  display:grid;
+  place-items:center;
+  border-radius:22px;
+  color:#fff;
+  font-weight:950;
+  letter-spacing:-.08em;
+  background:linear-gradient(135deg,var(--green),var(--green2));
+  box-shadow:0 16px 34px rgba(7,141,66,.22);
+}
+.card h2{
+  margin:22px 0 8px;
+  font-size:32px;
+  letter-spacing:-.04em;
+}
+.card p{
+  margin:0 0 22px;
+  color:var(--muted);
+  line-height:1.6;
+}
+label{
+  display:block;
+  margin:15px 0 8px;
+  color:#26352d;
+  font-size:13px;
+  font-weight:950;
+  letter-spacing:.04em;
+  text-transform:uppercase;
+}
+input{
+  width:100%;
+  border:1px solid var(--line);
+  border-radius:18px;
+  padding:17px 16px;
+  color:var(--ink);
+  background:var(--paper);
+  font:inherit;
+  font-size:17px;
+  outline:none;
+}
+input:focus{
+  border-color:rgba(7,141,66,.65);
+  box-shadow:0 0 0 5px rgba(7,141,66,.12);
+}
+.actions{
+  display:flex;
+  flex-wrap:wrap;
+  gap:12px;
+  margin-top:20px;
+}
+button{
+  border:0;
+  border-radius:999px;
+  padding:15px 20px;
+  cursor:pointer;
+  font:inherit;
+  font-weight:950;
+}
+.primary{
+  flex:1;
+  min-width:190px;
+  color:#fff;
+  background:linear-gradient(180deg,var(--green2),var(--green));
+}
+.ghost{
+  color:#294235;
+  background:#eef8f2;
+  border:1px solid rgba(7,141,66,.18);
+}
+button:disabled{
+  opacity:.64;
+  cursor:not-allowed;
+}
+.status{
+  min-height:56px;
+  margin-top:18px;
+  padding:14px 15px;
+  border-radius:18px;
+  color:#294235;
+  background:#f1fbf5;
+  border:1px solid #d8efdf;
+  line-height:1.45;
+}
+.status.error{
+  color:var(--danger);
+  background:#fff4f2;
+  border-color:#ffd8d2;
+}
+.status.warn{
+  color:var(--warn);
+  background:#fff8e6;
+  border-color:#f5dfaa;
+}
+.boundary{
+  margin-top:20px;
+  padding:14px 16px;
+  border:1px dashed #d9c483;
+  border-radius:18px;
+  color:#6b4a00;
+  background:#fff9df;
+  font-size:13px;
+  line-height:1.55;
+}
+@media(max-width:820px){
+  body{padding:18px}
+  .shell{grid-template-columns:1fr}
+  .hero,.card{border-radius:26px;padding:24px}
+  .hero{order:2}
+  .card{order:1}
+  .route{display:block}
+  .route span{display:block;margin-top:5px}
+}
+</style>
+</head>
+<body>
+<main class="shell">
+  <section class="hero" aria-label="Unified login overview">
+    <div class="eyebrow">Homelink Finance</div>
+    <h1>One login for every internal role.</h1>
+    <p>
+      Sign in once. The server session decides whether you go to the employee
+      entry page or the owner dashboard. Frontend role, tenant, and property
+      values are not authority.
+    </p>
+    <div class="routes">
+      <div class="route">Employee <span>server role: staff / employee -> employee-v3.html</span></div>
+      <div class="route">Owner / Manager <span>server role: manager / owner / admin -> index.html</span></div>
+      <div class="route">Unknown role <span>denied, no business page redirect</span></div>
+    </div>
+  </section>
+
+  <section class="card" aria-label="Login form">
+    <div class="logo">HL</div>
+    <h2>Unified login</h2>
+    <p>
+      Employees enter employee ID and PIN. Owner or manager users can leave the
+      ID blank and enter the owner password.
+    </p>
+    <form id="loginForm">
+      <label for="accountId">Employee ID, if applicable</label>
+      <input id="accountId" name="accountId" autocomplete="username" placeholder="Employee ID or blank for owner">
+      <label for="secret">Password / PIN</label>
+      <input id="secret" name="secret" type="password" autocomplete="current-password" required>
+      <div class="actions">
+        <button class="primary" id="loginButton" type="submit">Sign in and route by role</button>
+        <button class="ghost" id="logoutButton" type="button">Clear session</button>
+      </div>
+    </form>
+    <div class="status" id="status" role="status">Checking existing session...</div>
+    <div class="boundary">
+      Production cutover remains PRODUCTION_NO_GO. The current homelink-finance
+      Worker is bound to DB = homelink, so write-style QA needs separate
+      approval.
+    </div>
+  </section>
+</main>
+
+<script>
+const API_ORIGIN = "https://homelink-finance.habibramadan888.workers.dev";
+const EMPLOYEE_DESTINATION = "./employee-v3.html";
+const OWNER_DESTINATION = "./index.html";
+const EMPLOYEE_ROLES = new Set(["employee", "staff"]);
+const OWNER_ROLES = new Set(["owner", "manager", "admin"]);
+
+const statusEl = document.getElementById("status");
+const form = document.getElementById("loginForm");
+const accountId = document.getElementById("accountId");
+const secret = document.getElementById("secret");
+const loginButton = document.getElementById("loginButton");
+const logoutButton = document.getElementById("logoutButton");
+
+function apiUrl(path) {
+  if (/^https?:\/\//i.test(path)) return path;
+  const servedOverHttp = location.protocol === "http:" || location.protocol === "https:";
+  return servedOverHttp ? path : API_ORIGIN + path;
+}
+
+function setStatus(message, tone) {
+  statusEl.textContent = message;
+  statusEl.className = "status" + (tone ? " " + tone : "");
+}
+
+function destinationForRole(role) {
+  const normalized = String(role || "").trim().toLowerCase();
+  if (EMPLOYEE_ROLES.has(normalized)) return EMPLOYEE_DESTINATION;
+  if (OWNER_ROLES.has(normalized)) return OWNER_DESTINATION;
+  return null;
+}
+
+async function requestJson(path, options = {}) {
+  const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
+  const token = localStorage.getItem("homelink:cloud_token");
+  if (token && !headers.Authorization) headers.Authorization = "Bearer " + token;
+  const response = await fetch(apiUrl(path), {
+    credentials: "include",
+    ...options,
+    headers
+  });
+  const body = await response.json().catch(() => null);
+  return { response, body };
+}
+
+async function fetchMe() {
+  const { response, body } = await requestJson("/api/me", { method: "GET" });
+  if (response.status === 401 || response.status === 403) return null;
+  if (!response.ok) throw new Error(body?.error || "me_failed");
+  return body;
+}
+
+function routeFromServerClaim(me) {
+  const destination = destinationForRole(me?.role);
+  if (!destination) {
+    setStatus("Login succeeded, but this role is not enabled for unified routing.", "error");
+    return;
+  }
+  setStatus("Signed in as " + me.role + ". Redirecting...");
+  location.assign(destination);
+}
+
+async function checkExistingSession() {
+  try {
+    const me = await fetchMe();
+    if (me) {
+      routeFromServerClaim(me);
+      return;
+    }
+    setStatus("Session expired or not signed in. Please sign in.");
+  } catch (error) {
+    setStatus("Could not check current session. You can still sign in.", "warn");
+  }
+}
+
+async function signIn(event) {
+  event.preventDefault();
+  const id = accountId.value.trim();
+  const password = secret.value.trim();
+  if (!password) {
+    setStatus("Enter a password or PIN.", "error");
+    return;
+  }
+  loginButton.disabled = true;
+  setStatus("Signing in...");
+  try {
+    let authResult;
+    if (id) {
+      authResult = await requestJson("/auth/employee-login", {
+        method: "POST",
+        body: JSON.stringify({ employee_id: id, pin: password })
+      });
+    } else {
+      authResult = await requestJson("/auth/login", {
+        method: "POST",
+        body: JSON.stringify({ password })
+      });
+    }
+    if (!authResult.response.ok) {
+      throw new Error(authResult.body?.error || "invalid_credentials");
+    }
+
+    // Do not trust the login response role. /api/me is the routing authority.
+    const me = await fetchMe();
+    if (!me) throw new Error("session_expired");
+    secret.value = "";
+    routeFromServerClaim(me);
+  } catch (error) {
+    setStatus("Login failed. Check the account and password, then try again.", "error");
+  } finally {
+    loginButton.disabled = false;
+  }
+}
+
+async function clearSession() {
+  logoutButton.disabled = true;
+  try {
+    await requestJson("/auth/logout", { method: "POST" });
+  } catch {}
+  localStorage.removeItem("homelink:cloud_token");
+  setStatus("Session cleared. Please sign in again.");
+  logoutButton.disabled = false;
+}
+
+form.addEventListener("submit", signIn);
+logoutButton.addEventListener("click", clearSession);
+checkExistingSession();
+</script>
+</body>
+</html>

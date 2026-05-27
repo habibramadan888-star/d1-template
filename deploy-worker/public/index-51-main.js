@@ -133,6 +133,10 @@ async function submitCode(){
     loginData=await res.json();
     if(loginData.token)LS.set('homelink:cloud_token',loginData.token);
     else LS.del('homelink:cloud_token');
+    if(['staff','employee'].includes(String(loginData.role||'').toLowerCase())){
+      location.href='./employee-v3.html';
+      return;
+    }
     /* 线上使用 httpOnly Cookie；本地 file:// 使用服务端返回的短期 Bearer token */
   }catch(e){
     console.error('[Login] 网络错误:', e);

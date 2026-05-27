@@ -2,19 +2,20 @@
 
 Date: 2026-05-27, Asia/Dubai
 
-Scope: internal QA planning only. The employee entry point must use the
-Ramadan-confirmed employee URL below, but this plan does not approve public
-beta, production migration, production deploy, production D1 write, production
-feature flags, dashboard production authority switch, or commercial launch.
+Scope: internal QA planning with unified login. Testers should start from one
+login portal and allow the server-confirmed role to route them. This plan does
+not approve public beta, production migration, production deploy, production D1
+write, production feature flags, dashboard production authority switch, or
+commercial launch.
 
 ## Environment
 
 | Item                           | Value                                                                     |
 | ------------------------------ | ------------------------------------------------------------------------- |
 | QA package environment         | Internal QA planning; not production approval                             |
-| Employee app URL               | `https://homelink-finance.habibramadan888.workers.dev/employee-v3.html`   |
-| Owner/main app URL             | `https://homelink-finance.habibramadan888.workers.dev/`                   |
-| Owner explicit asset URL       | `https://homelink-finance.habibramadan888.workers.dev/index.html`         |
+| Unified login URL              | `https://homelink-finance.habibramadan888.workers.dev/unified-login.html` |
+| Employee destination URL       | `https://homelink-finance.habibramadan888.workers.dev/employee-v3.html`   |
+| Owner destination URL          | `https://homelink-finance.habibramadan888.workers.dev/index.html`         |
 | Staging Worker URL             | `https://homelink-finance-staging.habibramadan888.workers.dev`            |
 | Current Worker D1 binding risk | `homelink-finance` is configured with `DB = homelink`; writes affect prod |
 | Production used?               | No production command was executed by this task                           |
@@ -25,11 +26,11 @@ feature flags, dashboard production authority switch, or commercial launch.
 
 ## Roles
 
-| Role          | Purpose                                                      | Account Handling                                                        |
-| ------------- | ------------------------------------------------------------ | ----------------------------------------------------------------------- |
-| employee      | Staff entry, rent/deposit/arrears/handover flows             | Secure channel only; no write test unless target is explicitly approved |
-| owner         | Dashboard, history, reports, reconciliation, review flows    | Secure channel only; no production write or cutover approval            |
-| manager/admin | Tenant/property permission boundary checks if account exists | Secure channel only; use only if target scope is explicitly approved    |
+| Role          | Purpose                                                      | Account Handling                                                           |
+| ------------- | ------------------------------------------------------------ | -------------------------------------------------------------------------- |
+| employee      | Staff entry, rent/deposit/arrears/handover flows             | Start at unified login; no write test unless target is explicitly approved |
+| owner         | Dashboard, history, reports, reconciliation, review flows    | Start at unified login; no production write or cutover approval            |
+| manager/admin | Tenant/property permission boundary checks if account exists | Start at unified login; use only if target scope is explicitly approved    |
 
 ## Test Cycle
 

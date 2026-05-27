@@ -2,25 +2,27 @@
 
 Date: 2026-05-27, Asia/Dubai
 
-Scope: corrected link guide for internal QA. This file does not approve
+Scope: unified login guide for internal QA. This file does not approve
 production deploy, staging deploy, production migration, D1 export/import/execute,
 D1 write, feature flags, dashboard authority switch, public beta, or commercial
 launch.
 
 ## Correct Links
 
-| Role                 | Link                                                                    | Status                                      | Notes                                                                 |
-| -------------------- | ----------------------------------------------------------------------- | ------------------------------------------- | --------------------------------------------------------------------- |
-| Employee             | `https://homelink-finance.habibramadan888.workers.dev/employee-v3.html` | Confirmed by Ramadan and local asset exists | Do not use the staging Worker URL as the default employee entry link. |
-| Owner / boss         | `https://homelink-finance.habibramadan888.workers.dev/`                 | Confirmed local main SPA asset exists       | Use for owner/manager dashboard/history review.                       |
-| Owner explicit asset | `https://homelink-finance.habibramadan888.workers.dev/index.html`       | Confirmed local asset exists                | Equivalent explicit path for the main SPA.                            |
-| Versioned main SPA   | `https://homelink-finance.habibramadan888.workers.dev/index-51.html`    | Confirmed local asset exists                | Candidate fallback only if the root/index route needs comparison.     |
+| Role / Path          | Link                                                                      | Status                                      | Notes                                                              |
+| -------------------- | ------------------------------------------------------------------------- | ------------------------------------------- | ------------------------------------------------------------------ |
+| Unified login        | `https://homelink-finance.habibramadan888.workers.dev/unified-login.html` | New internal QA start link                  | All testers should start here.                                     |
+| Employee destination | `https://homelink-finance.habibramadan888.workers.dev/employee-v3.html`   | Confirmed by Ramadan and local asset exists | Automatic destination after employee/staff role is confirmed.      |
+| Owner destination    | `https://homelink-finance.habibramadan888.workers.dev/index.html`         | Confirmed local main SPA asset exists       | Automatic destination after owner/manager/admin role is confirmed. |
+| Owner/root legacy    | `https://homelink-finance.habibramadan888.workers.dev/`                   | Preserved compatibility path                | Do not use as the default QA login path.                           |
+| Versioned main SPA   | `https://homelink-finance.habibramadan888.workers.dev/index-51.html`      | Confirmed local asset exists                | Candidate fallback only if the root/index route needs comparison.  |
 
 ## Before Testing
 
 | Check                     | Requirement                                                                                                     |
 | ------------------------- | --------------------------------------------------------------------------------------------------------------- |
 | Production cutover status | Must remain `PRODUCTION_NO_GO`.                                                                                 |
+| Start link                | Open unified login first; do not split employee and owner login links.                                          |
 | Credentials               | Receive through secure channel only; do not write passwords in docs.                                            |
 | Evidence                  | Mask passwords, tokens, cookies, and sensitive customer data.                                                   |
 | Write actions             | Do not run write-style QA against `homelink-finance` unless production D1 write approval is explicitly granted. |

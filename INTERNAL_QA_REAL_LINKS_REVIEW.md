@@ -10,6 +10,7 @@ migrate, execute D1 commands, or write any D1.
 
 | Item                            | Result                                                                                    |
 | ------------------------------- | ----------------------------------------------------------------------------------------- |
+| Unified login link              | `https://homelink-finance.habibramadan888.workers.dev/unified-login.html`                 |
 | Employee real link              | `https://homelink-finance.habibramadan888.workers.dev/employee-v3.html`                   |
 | Source of confirmation          | Ramadan-confirmed link plus local asset `deploy-worker/public/employee-v3.html`           |
 | Old default to avoid            | `https://homelink-finance-staging.habibramadan888.workers.dev` as the employee entry link |
@@ -62,13 +63,17 @@ asset directory.
 
 ## Required QA Package Correction
 
-Use the Ramadan-confirmed employee link:
+Use the unified login link first:
+
+`https://homelink-finance.habibramadan888.workers.dev/unified-login.html`
+
+The Ramadan-confirmed employee destination remains:
 
 `https://homelink-finance.habibramadan888.workers.dev/employee-v3.html`
 
-Use the main SPA for owner/boss review:
+The owner/boss destination remains:
 
-`https://homelink-finance.habibramadan888.workers.dev/`
+`https://homelink-finance.habibramadan888.workers.dev/index.html`
 
 Do not treat these links as approval for production D1 writes, production
 migration, production deploy, dashboard authority switch, public beta, or
