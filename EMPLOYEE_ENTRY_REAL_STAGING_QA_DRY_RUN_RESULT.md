@@ -1,6 +1,6 @@
 # Employee Entry Real Staging QA Dry-Run Result
 
-Generated: 2026-05-27T13:52:42.865Z
+Generated: 2026-05-27T14:18:41.992Z
 
 Result: `MANUAL_REQUIRED`
 

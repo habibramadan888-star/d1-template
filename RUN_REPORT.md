@@ -6,6 +6,34 @@ Scope: governance, engineering baseline, local startup checks
 Production deploy: not executed  
 Production database mutation: not executed
 
+## Commercial Launch Review 015 Receivables Accounting Rules Addendum
+
+Date: 2026-05-27, Asia/Dubai
+
+Scope: documentation-only receivables/accounting rules review for Ramadan
+signoff support. No production deploy, staging deploy, migration, D1
+export/import/execute, D1 write, production URL call, production config change,
+feature flag enablement, business code change, dashboard change, or financial
+formula change occurred.
+
+| Item                   | Result             | Evidence                                             | Notes                                                                                |
+| ---------------------- | ------------------ | ---------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| Starting context       | READY              | `COMMERCIAL_LAUNCH_REVIEW_015_STARTING_CONTEXT.md`   | Production remains NO-GO because receivables/accounting rules are not approved.      |
+| Decision sheet         | REVIEW_READY       | `RAMADAN_RECEIVABLES_ACCOUNTING_DECISION_SHEET.md`   | 23 accounting areas prepared for Ramadan item-by-item decision.                      |
+| Risk summary           | READY              | `RECEIVABLES_ACCOUNTING_RISK_SUMMARY.md`             | Highlights lifecycle, allocation, deposit, dashboard, migration, and rollback risks. |
+| Ramadan checklist      | READY              | `RAMADAN_RECEIVABLES_ACCOUNTING_REVIEW_CHECKLIST.md` | Defines non-technical receivables/accounting approval questions.                     |
+| Signoff tracker update | `PRODUCTION_NO_GO` | `RECEIVABLES_ACCOUNTING_SIGNOFF_UPDATE_RESULT.md`    | SO-010 and SO-011 moved to pending review; no receivables signoff approved.          |
+
+Safety:
+
+- Production deploy: no.
+- Production migration: no.
+- Production D1 write: no.
+- Staging D1 write: no.
+- Production-copy D1 write: no.
+- D1 export/import/execute: no.
+- Production cutover: `PRODUCTION_NO_GO`.
+
 ## Commercial Launch Review 014 Tenant Mapping Review Addendum
 
 Date: 2026-05-27, Asia/Dubai

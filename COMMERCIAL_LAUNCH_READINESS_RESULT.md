@@ -1,6 +1,42 @@
 # Commercial Launch Readiness Result
 
-Generated: 2026-05-27T13:52:38.440Z
+Generated: 2026-05-27T14:18:36.290Z
+
+| Metric                | Count |
+| --------------------- | ----: |
+| Areas reviewed        |    17 |
+| STATIC_OK areas       |     4 |
+| NO_GO_CONFIRMED areas |    12 |
+| MANUAL_REQUIRED areas |     1 |
+| BLOCKED areas         |     0 |
+
+Overall: `PRODUCTION_NO_GO`
+
+## Commercial Launch Review 015 Receivables Accounting Rules Addendum
+
+Date: 2026-05-27, Asia/Dubai
+
+REVIEW-015 prepared receivables/accounting rule decision material for Ramadan
+Habib. It did not approve production, migration, D1 writes, dashboard authority,
+or financial formula changes.
+
+Current signoff impact:
+
+- SO-010 receivables lifecycle approval: `PENDING_REVIEW`.
+- SO-011 receivables allocation approval: `PENDING_REVIEW`.
+- Approved signoffs: 0.
+- Pending review signoffs: 10.
+- Manual-required signoffs: 8.
+- Blocked signoffs: 2.
+- Production cutover: `PRODUCTION_NO_GO`.
+
+Evidence:
+
+- `COMMERCIAL_LAUNCH_REVIEW_015_STARTING_CONTEXT.md`
+- `RAMADAN_RECEIVABLES_ACCOUNTING_DECISION_SHEET.md`
+- `RECEIVABLES_ACCOUNTING_RISK_SUMMARY.md`
+- `RAMADAN_RECEIVABLES_ACCOUNTING_REVIEW_CHECKLIST.md`
+- `RECEIVABLES_ACCOUNTING_SIGNOFF_UPDATE_RESULT.md`
 
 ## Commercial Launch Review 014 Tenant Mapping Addendum
 
@@ -222,16 +258,6 @@ Result:
 - Receivables data/allocation decision: MANUAL_REQUIRED.
 - Copy rollback rehearsal: completed later in REVIEW-009 with warnings.
 - Production cutover: `PRODUCTION_NO_GO`.
-
-| Metric                | Count |
-| --------------------- | ----: |
-| Areas reviewed        |    17 |
-| STATIC_OK areas       |     4 |
-| NO_GO_CONFIRMED areas |    12 |
-| MANUAL_REQUIRED areas |     1 |
-| BLOCKED areas         |     0 |
-
-Overall: `PRODUCTION_NO_GO`
 
 Allowed next work: local/staging dry-run validation, manual QA preparation, and read-only audit expansion.
 

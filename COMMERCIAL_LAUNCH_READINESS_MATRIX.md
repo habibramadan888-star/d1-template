@@ -1,8 +1,19 @@
 # Commercial Launch Readiness Matrix
 
-Generated: 2026-05-27T13:52:38.439Z
+Generated: 2026-05-27T14:18:36.289Z
 
 Scope: read-only commercial launch gate. This script reads reports only and does not deploy, migrate, call APIs, access D1, or read secrets.
+
+## Commercial Launch Review 015 Receivables Accounting Rules Addendum
+
+Date: 2026-05-27, Asia/Dubai
+
+| Area                            | Evidence                                                                                         | Current Status                                                 | Production Gate |
+| ------------------------------- | ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------- | --------------- |
+| Receivables lifecycle approval  | `RAMADAN_RECEIVABLES_ACCOUNTING_DECISION_SHEET.md`; `RECEIVABLES_ACCOUNTING_RISK_SUMMARY.md`     | `PENDING_REVIEW`; no approval recorded                         | NO-GO           |
+| Receivables allocation approval | `RAMADAN_RECEIVABLES_ACCOUNTING_REVIEW_CHECKLIST.md`; `MONEY_RISK_RAMADAN_REVIEW_CHECKLIST.md`   | `PENDING_REVIEW`; no approval recorded                         | NO-GO           |
+| Deposit/refund accounting rules | `BACKEND_TOTALS_SOURCE_OF_TRUTH.md`; `RECEIVABLES_SOURCE_OF_TRUTH.md`                            | `PENDING_REVIEW`; liability semantics require Ramadan decision | NO-GO           |
+| Dashboard receivables authority | `RECEIVABLES_DASHBOARD_AUTHORITY_GATE.md`; `P0_008E_DASHBOARD_RECEIVABLES_AUTHORITY_EVIDENCE.md` | shadow evidence only; live dashboard unchanged                 | NO-GO           |
 
 ## Commercial Launch Review 014 Tenant Mapping Addendum
 

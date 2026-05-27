@@ -34,24 +34,35 @@ REVIEW-014 tenant/property mapping review update:
 - Missing production-blocking signoffs: 20.
 - Production remains `PRODUCTION_NO_GO`.
 
+REVIEW-015 receivables/accounting rules review update:
+
+- SO-010 receivables lifecycle approval: `PENDING_REVIEW`.
+- SO-011 receivables allocation approval: `PENDING_REVIEW`.
+- Approved signoffs: 0.
+- Pending review signoffs: 10.
+- Manual-required signoffs: 8.
+- Blocked signoffs: 2.
+- Missing production-blocking signoffs: 20.
+- Production remains `PRODUCTION_NO_GO`.
+
 ## Must-have before production copy final dry-run
 
-| Priority | Missing Signoff                           | Responsible Owner | Why Required                                                                          | Blocks Which Step             | Evidence Needed                                                                                    |
-| -------: | ----------------------------------------- | ----------------- | ------------------------------------------------------------------------------------- | ----------------------------- | -------------------------------------------------------------------------------------------------- |
-|        1 | Accounting review of money conversion     | Ramadan Habib     | Final copy dry-run should use approved reconciliation expectations.                   | Production-copy final dry-run | Accounting signoff against `FINAL_PRODUCTION_APPROVAL_CHECKLIST.md`.                               |
-|        2 | Tenant/property mapping review            | Ramadan Habib     | Copy final dry-run must reflect approved mapping, not compatibility-only assumptions. | Production-copy final dry-run | `RAMADAN_TENANT_PROPERTY_MAPPING_DECISION_SHEET.md` and `TENANT_PROPERTY_MAPPING_RISK_SUMMARY.md`. |
-|        3 | Receivables lifecycle/allocation decision | Ramadan Habib     | Copy final dry-run must know whether receivables are deferred or backfilled.          | Production-copy final dry-run | Receivables owner decision.                                                                        |
-|        4 | Rollback owner assignment                 | Ramadan Habib     | Final dry-run should validate rollback criteria and ownership.                        | Production-copy final dry-run | Rollback owner signoff.                                                                            |
+| Priority | Missing Signoff                           | Responsible Owner | Why Required                                                                          | Blocks Which Step             | Evidence Needed                                                                                                                                     |
+| -------: | ----------------------------------------- | ----------------- | ------------------------------------------------------------------------------------- | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+|        1 | Accounting review of money conversion     | Ramadan Habib     | Final copy dry-run should use approved reconciliation expectations.                   | Production-copy final dry-run | Accounting signoff against `FINAL_PRODUCTION_APPROVAL_CHECKLIST.md`.                                                                                |
+|        2 | Tenant/property mapping review            | Ramadan Habib     | Copy final dry-run must reflect approved mapping, not compatibility-only assumptions. | Production-copy final dry-run | `RAMADAN_TENANT_PROPERTY_MAPPING_DECISION_SHEET.md` and `TENANT_PROPERTY_MAPPING_RISK_SUMMARY.md`.                                                  |
+|        3 | Receivables lifecycle/allocation decision | Ramadan Habib     | Copy final dry-run must know whether receivables are deferred or backfilled.          | Production-copy final dry-run | `RAMADAN_RECEIVABLES_ACCOUNTING_DECISION_SHEET.md`; `RECEIVABLES_ACCOUNTING_RISK_SUMMARY.md`; `RAMADAN_RECEIVABLES_ACCOUNTING_REVIEW_CHECKLIST.md`. |
+|        4 | Rollback owner assignment                 | Ramadan Habib     | Final dry-run should validate rollback criteria and ownership.                        | Production-copy final dry-run | Rollback owner signoff.                                                                                                                             |
 
 ## Must-have before production migration
 
-| Priority | Missing Signoff                     | Responsible Owner | Why Required                                                 | Blocks Which Step    | Evidence Needed                                                                                                              |
-| -------: | ----------------------------------- | ----------------- | ------------------------------------------------------------ | -------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-|        1 | Fresh production D1 backup approval | Ramadan Habib     | Production write cannot proceed without a restorable backup. | Production migration | Backup command approval and integrity record.                                                                                |
-|        2 | Final production SQL approval       | Ramadan Habib     | Copy SQL is not production authorization.                    | Production migration | Exact SQL, WHERE clauses, row counts, rollback method.                                                                       |
-|        3 | TOP_25 money risks approval         | Ramadan Habib     | Money risks affect financial correctness.                    | Production migration | Three false positives are closed; 22 remaining items need accounting decision against `TOP_25_MONEY_RISKS_REVIEW_MATRIX.md`. |
-|        4 | Data migration owner signoff        | Ramadan Habib     | Row-level updates need accountable approval.                 | Production migration | Migration/backfill owner signoff.                                                                                            |
-|        5 | Legacy CORPID fallback policy       | Ramadan Habib     | Legacy fallback cannot become final SaaS tenant authority.   | Production migration | Explicit decision against `RAMADAN_TENANT_MAPPING_REVIEW_CHECKLIST.md`.                                                      |
+| Priority | Missing Signoff                     | Responsible Owner | Why Required                                                 | Blocks Which Step    | Evidence Needed                                                                                                                                                                           |
+| -------: | ----------------------------------- | ----------------- | ------------------------------------------------------------ | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+|        1 | Fresh production D1 backup approval | Ramadan Habib     | Production write cannot proceed without a restorable backup. | Production migration | Backup command approval and integrity record.                                                                                                                                             |
+|        2 | Final production SQL approval       | Ramadan Habib     | Copy SQL is not production authorization.                    | Production migration | Exact SQL, WHERE clauses, row counts, rollback method.                                                                                                                                    |
+|        3 | TOP_25 money risks approval         | Ramadan Habib     | Money risks affect financial correctness.                    | Production migration | Three false positives are closed; 22 remaining items need accounting decision against `TOP_25_MONEY_RISKS_REVIEW_MATRIX.md`, including receivables/deposit rules now itemized for review. |
+|        4 | Data migration owner signoff        | Ramadan Habib     | Row-level updates need accountable approval.                 | Production migration | Migration/backfill owner signoff.                                                                                                                                                         |
+|        5 | Legacy CORPID fallback policy       | Ramadan Habib     | Legacy fallback cannot become final SaaS tenant authority.   | Production migration | Explicit decision against `RAMADAN_TENANT_MAPPING_REVIEW_CHECKLIST.md`.                                                                                                                   |
 
 ## Must-have before production deploy
 

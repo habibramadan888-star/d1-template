@@ -9,6 +9,29 @@ Production deploy: not executed
 Production database mutation: not executed
 Remote D1 migration: not executed
 
+## Commercial Launch Review 015 Receivables Accounting Rules Addendum
+
+Date: 2026-05-27, Asia/Dubai
+
+REVIEW-015 prepared receivables/accounting rule review materials for Ramadan
+signoff support only. It did not execute production deploy, staging deploy,
+migration, D1 export/import, D1 execute, D1 write, feature flags, dashboard
+changes, business code changes, or financial formula changes.
+
+Current decision:
+
+- Receivables/accounting decision sheet: ready.
+- Receivables/accounting risk summary: ready.
+- Ramadan receivables/accounting checklist: ready.
+- SO-010 receivables lifecycle approval: `PENDING_REVIEW`.
+- SO-011 receivables allocation approval: `PENDING_REVIEW`.
+- Approved production signoffs: 0.
+- Production: `PRODUCTION_NO_GO`.
+
+Next recommended prompt:
+
+- `NEXT_PROMPT_COMMERCIAL_LAUNCH_REVIEW_015A_APPLY_RAMADAN_RECEIVABLES_ACCOUNTING_DECISIONS.md`
+
 ## Commercial Launch Review 014 Tenant Mapping Review Addendum
 
 Date: 2026-05-27, Asia/Dubai
