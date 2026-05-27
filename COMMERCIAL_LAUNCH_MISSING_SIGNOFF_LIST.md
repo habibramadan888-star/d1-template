@@ -45,14 +45,27 @@ REVIEW-015 receivables/accounting rules review update:
 - Missing production-blocking signoffs: 20.
 - Production remains `PRODUCTION_NO_GO`.
 
+REVIEW-015A Ramadan receivables/accounting decision update:
+
+- Q1-Q9 receivables/accounting decisions were applied.
+- Accepted for future rule direction and production preflight input only.
+- SO-010 receivables lifecycle approval remains `PENDING_REVIEW`.
+- SO-011 receivables allocation approval remains `PENDING_REVIEW`.
+- Approved production signoffs: 0.
+- Pending review signoffs: 10.
+- Manual-required signoffs: 8.
+- Blocked signoffs: 2.
+- Missing production-blocking signoffs: 20.
+- Production remains `PRODUCTION_NO_GO`.
+
 ## Must-have before production copy final dry-run
 
-| Priority | Missing Signoff                           | Responsible Owner | Why Required                                                                          | Blocks Which Step             | Evidence Needed                                                                                                                                     |
-| -------: | ----------------------------------------- | ----------------- | ------------------------------------------------------------------------------------- | ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
-|        1 | Accounting review of money conversion     | Ramadan Habib     | Final copy dry-run should use approved reconciliation expectations.                   | Production-copy final dry-run | Accounting signoff against `FINAL_PRODUCTION_APPROVAL_CHECKLIST.md`.                                                                                |
-|        2 | Tenant/property mapping review            | Ramadan Habib     | Copy final dry-run must reflect approved mapping, not compatibility-only assumptions. | Production-copy final dry-run | `RAMADAN_TENANT_PROPERTY_MAPPING_DECISION_SHEET.md` and `TENANT_PROPERTY_MAPPING_RISK_SUMMARY.md`.                                                  |
-|        3 | Receivables lifecycle/allocation decision | Ramadan Habib     | Copy final dry-run must know whether receivables are deferred or backfilled.          | Production-copy final dry-run | `RAMADAN_RECEIVABLES_ACCOUNTING_DECISION_SHEET.md`; `RECEIVABLES_ACCOUNTING_RISK_SUMMARY.md`; `RAMADAN_RECEIVABLES_ACCOUNTING_REVIEW_CHECKLIST.md`. |
-|        4 | Rollback owner assignment                 | Ramadan Habib     | Final dry-run should validate rollback criteria and ownership.                        | Production-copy final dry-run | Rollback owner signoff.                                                                                                                             |
+| Priority | Missing Signoff                           | Responsible Owner | Why Required                                                                                                                                               | Blocks Which Step             | Evidence Needed                                                                                                                                                                                        |
+| -------: | ----------------------------------------- | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+|        1 | Accounting review of money conversion     | Ramadan Habib     | Final copy dry-run should use approved reconciliation expectations.                                                                                        | Production-copy final dry-run | Accounting signoff against `FINAL_PRODUCTION_APPROVAL_CHECKLIST.md`.                                                                                                                                   |
+|        2 | Tenant/property mapping review            | Ramadan Habib     | Copy final dry-run must reflect approved mapping, not compatibility-only assumptions.                                                                      | Production-copy final dry-run | `RAMADAN_TENANT_PROPERTY_MAPPING_DECISION_SHEET.md` and `TENANT_PROPERTY_MAPPING_RISK_SUMMARY.md`.                                                                                                     |
+|        3 | Receivables lifecycle/allocation decision | Ramadan Habib     | Q1-Q9 rules are accepted for preflight input, but copy final dry-run still needs exact row-level scope, SQL, rollback, and dashboard authority boundaries. | Production-copy final dry-run | `RAMADAN_RECEIVABLES_ACCOUNTING_DECISION_SHEET.md`; `RECEIVABLES_ACCOUNTING_RISK_SUMMARY.md`; `RAMADAN_RECEIVABLES_ACCOUNTING_REVIEW_CHECKLIST.md`; `RECEIVABLES_ACCOUNTING_SIGNOFF_UPDATE_RESULT.md`. |
+|        4 | Rollback owner assignment                 | Ramadan Habib     | Final dry-run should validate rollback criteria and ownership.                                                                                             | Production-copy final dry-run | Rollback owner signoff.                                                                                                                                                                                |
 
 ## Must-have before production migration
 

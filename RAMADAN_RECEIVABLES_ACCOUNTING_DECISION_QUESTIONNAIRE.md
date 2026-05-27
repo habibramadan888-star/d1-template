@@ -52,9 +52,12 @@ If unsure:
 
 Choose `KEEP_OPEN`.
 
-Decision:
+Decision: APPROVE
 
-Reason:
+Reason: Rent due should automatically become a formal receivable so the system
+can accurately track who owes money, how much is owed, and whether it is
+overdue. This approves future receivables rule direction only, not production
+cutover.
 
 ## Q2. Should short pay create outstanding?
 
@@ -82,9 +85,10 @@ If unsure:
 
 Choose `KEEP_OPEN`.
 
-Decision:
+Decision: APPROVE
 
-Reason:
+Reason: Short pay is not a discount. The unpaid balance should remain recorded
+as outstanding debt until it is repaid, adjusted, or manually handled.
 
 ## Q3. Which receivable should repayment pay first?
 
@@ -113,9 +117,10 @@ If unsure:
 
 Choose `KEEP_OPEN`.
 
-Decision:
+Decision: APPROVE with oldest-due-first
 
-Reason:
+Reason: Repayment should apply to the oldest due balance first. This gives the
+clearest aging history and is easiest to explain in overdue / arrears views.
 
 ## Q4. How should overpayment be handled?
 
@@ -142,9 +147,11 @@ If unsure:
 
 Choose `KEEP_OPEN`.
 
-Decision:
+Decision: APPROVE as separate credit/review item
 
-Reason:
+Reason: Overpayment should not create negative debt and should not
+automatically become deposit or income. It should close the current receivable
+and leave the extra amount as separate credit/manual-review evidence.
 
 ## Q5. Should voided payments restore outstanding?
 
@@ -171,9 +178,11 @@ If unsure:
 
 Choose `KEEP_OPEN`.
 
-Decision:
+Decision: APPROVE
 
-Reason:
+Reason: If a payment is voided or cancelled, it should no longer reduce debt.
+Outstanding should be restored so dashboard and receivables do not treat an
+invalid payment as effective income.
 
 ## Q6. Should deposits always be excluded from rent income?
 
@@ -201,9 +210,11 @@ If unsure:
 
 Choose `KEEP_OPEN`.
 
-Decision:
+Decision: APPROVE
 
-Reason:
+Reason: Deposits are guarantee/liability money and should not be counted as
+rent income by default. They should be managed through deposit ledger to avoid
+overstating dashboard income.
 
 ## Q7. How should deposit refund and deduction be handled?
 
@@ -231,9 +242,11 @@ If unsure:
 
 Choose `KEEP_OPEN`.
 
-Decision:
+Decision: APPROVE as separate deposit ledger movement
 
-Reason:
+Reason: Deposit refund is a deposit-liability reduction / cash outflow. Deposit
+deduction should also be recorded in deposit ledger first. It should affect rent
+receivable or debt only when an explicit offset/adjustment is approved.
 
 ## Q8. Which business date defines overdue?
 
@@ -261,9 +274,11 @@ If unsure:
 
 Choose `KEEP_OPEN`.
 
-Decision:
+Decision: APPROVE Dubai business date
 
-Reason:
+Reason: Business operations happen in the UAE, so due today / overdue should be
+judged by Asia/Dubai business date. A receivable is overdue only when its due
+date is before the Dubai business date.
 
 ## Q9. Should dashboard due, overdue, and arrears eventually come from receivables?
 
@@ -292,9 +307,12 @@ If unsure:
 
 Choose `KEEP_OPEN`.
 
-Decision:
+Decision: APPROVE for future authority only
 
-Reason:
+Reason: Future dashboard due / overdue / arrears should eventually use
+receivables as authority, but this is not an immediate production switch. It
+requires production preflight, migration/backfill, rollback, and independent
+human cutover approval first.
 
 ## Production Guard
 

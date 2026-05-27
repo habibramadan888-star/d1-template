@@ -5,32 +5,45 @@ Date: 2026-05-27, Asia/Dubai
 Owner: Ramadan Habib
 
 Scope: manual business/accounting review only. This checklist does not approve
-production.
+production deploy, production migration, production D1 write, dashboard switch,
+or commercial cutover.
 
-| Item | Question for Ramadan                                                              | Evidence File                                                                                                                                              | If Approved Means                                                                             | If Not Approved Means                                                    | Suggested Status |
-| ---- | --------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ | ---------------- |
-| 1    | Should rent due automatically create a receivable?                                | `RECEIVABLES_SOURCE_OF_TRUTH.md`; `RECEIVABLES_LOCAL_STAGING_REHEARSAL_RESULT.md`                                                                          | Production preflight may model rent due as a receivable obligation.                           | Keep production receivables authority blocked or change generation rule. | PENDING_REVIEW   |
-| 2    | Should short pay always leave an outstanding balance?                             | `RECEIVABLES_LOCAL_STAGING_REHEARSAL_RESULT.md`; `STAGING_RECEIVABLES_SHADOW_COMPARISON_RESULT.md`                                                         | Partial payment is not treated as discount.                                                   | Define a separate discount/waiver policy before production.              | PENDING_REVIEW   |
-| 3    | Which receivable should repayment apply to first?                                 | `P0_008E_DASHBOARD_RECEIVABLES_AUTHORITY_EVIDENCE.md`; `RAMADAN_TOP_5_MONEY_DECISIONS.md`                                                                  | Allocation priority can be encoded for production preflight.                                  | Keep allocations manual or require a new policy rule.                    | PENDING_REVIEW   |
-| 4    | How should overpayment be handled?                                                | `RECEIVABLES_SOURCE_OF_TRUTH.md`; local overpayment rehearsal                                                                                              | Overpayment stays separate from rent receivable and does not create negative arrears.         | Define refund/credit handling before production.                         | PENDING_REVIEW   |
-| 5    | Should voided payments restore outstanding debt?                                  | P0-008E void impact evidence                                                                                                                               | Voided payments do not reduce active outstanding.                                             | Define alternate void/correction behavior before production.             | PENDING_REVIEW   |
-| 6    | Should deposits always stay out of rent income by default?                        | `BACKEND_TOTALS_SOURCE_OF_TRUTH.md`; `RECEIVABLES_SOURCE_OF_TRUTH.md`                                                                                      | Deposits remain liability unless an approved offset/deduction exists.                         | Dashboard and ledger formulas need policy changes before production.     | PENDING_REVIEW   |
-| 7    | How should deposit refund and deduction be handled?                               | `MONEY_RISK_RAMADAN_REVIEW_CHECKLIST.md`; `RAMADAN_TOP_5_MONEY_DECISIONS.md`                                                                               | Refunds/deductions can be reviewed separately from rent income.                               | Deposit ledger and refund semantics stay production-blocking.            | PENDING_REVIEW   |
-| 8    | Which business date defines overdue?                                              | `RECEIVABLES_SOURCE_OF_TRUTH.md`; P0-008E due/overdue evidence                                                                                             | Dubai business date can be used consistently for due/overdue.                                 | Timezone/date policy must be revised before authority switch.            | PENDING_REVIEW   |
-| 9    | Should dashboard due/overdue/arrears be provided by receivables?                  | `RECEIVABLES_DASHBOARD_AUTHORITY_GATE.md`; `P0_008E_DASHBOARD_RECEIVABLES_AUTHORITY_EVIDENCE.md`                                                           | Receivables may become dashboard authority only after production preflight and final signoff. | Dashboard remains legacy and P0-008 stays NO-GO.                         | PENDING_REVIEW   |
-| 10   | Is current staging receivables evidence acceptable as production preflight input? | `STAGING_RECEIVABLES_SHADOW_COMPARISON_RESULT.md`; `PRODUCTION_COPY_RECONCILIATION_RESULT.md`; `PRODUCTION_COPY_ROW_BACKFILL_007_RECONCILIATION_RESULT.md` | The team can prepare production-copy/preflight decisions using this evidence.                 | More staging evidence or remapping is required before preflight.         | PENDING_REVIEW   |
+Production remains `PRODUCTION_NO_GO`.
 
-## Required Ramadan Output
+## First-Pass Decision Record
 
-For each item, record one of:
+| Item | Question for Ramadan                                             | Ramadan Decision                            | Reason Summary                                                                                   | Preflight Meaning                                                      | Production Status                    |
+| ---- | ---------------------------------------------------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------- | ------------------------------------ |
+| 1    | Should rent due automatically create a receivable?               | APPROVE                                     | Rent due should become a formal receivable so debt can be tracked.                               | Use automatic receivable creation as future-rule input.                | Not production cutover approval.     |
+| 2    | Should short pay always leave an outstanding balance?            | APPROVE                                     | Short pay is not a discount; unpaid amount remains debt.                                         | Treat short pay as outstanding in preflight.                           | Not production cutover approval.     |
+| 3    | Which receivable should repayment apply to first?                | APPROVE with oldest-due-first               | Oldest-due-first gives clear aging and arrears explanation.                                      | Use oldest-due-first allocation in preflight design.                   | Not production cutover approval.     |
+| 4    | How should overpayment be handled?                               | APPROVE as separate credit/review item      | Extra payment should not create negative debt, deposit, or income automatically.                 | Close current receivable and hold excess as credit/manual-review item. | Not production cutover approval.     |
+| 5    | Should voided payments restore outstanding debt?                 | APPROVE                                     | Invalid payments must not reduce receivable/outstanding.                                         | Restore outstanding when payment is voided/cancelled.                  | Not production cutover approval.     |
+| 6    | Should deposits always stay out of rent income by default?       | APPROVE                                     | Deposits are liability/guarantee money, not rent income by default.                              | Keep deposits in deposit ledger and out of rent income.                | Not production cutover approval.     |
+| 7    | How should deposit refund and deduction be handled?              | APPROVE as separate deposit ledger movement | Refunds/deductions reduce deposit liability; rent impact requires explicit offset/adjustment.    | Model refund/deduction in deposit ledger first.                        | Not production cutover approval.     |
+| 8    | Which business date defines overdue?                             | APPROVE Dubai business date                 | UAE business operations should use Asia/Dubai business date.                                     | Use Dubai business date for due today/overdue logic.                   | Not production cutover approval.     |
+| 9    | Should dashboard due/overdue/arrears be provided by receivables? | APPROVE for future authority only           | Receivables should eventually be dashboard authority, but only after all production gates close. | Use receivables as target future authority in preflight.               | Live dashboard switch remains NO-GO. |
 
-- `APPROVE`
-- `KEEP_OPEN`
-- `NEEDS_FIX`
-- `NEEDS_ACCOUNTING_DECISION`
-- `NOT_PRODUCTION_BLOCKING`
-- `BLOCK_PRODUCTION`
+## Remaining Review Items
 
-Approving this checklist still does not authorize production deploy, production
-migration, production D1 write, dashboard switch, or commercial cutover. Those
-remain separate signoffs.
+| Item                             | Question for Ramadan                                                                                | Evidence File                                                                                           | If Approved Means                                                               | If Not Approved Means                                     | Current Status               |
+| -------------------------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- | --------------------------------------------------------- | ---------------------------- |
+| Production receivables preflight | Should these Q1-Q9 decisions be used in the next production-copy/preflight planning packet?         | `RAMADAN_RECEIVABLES_ACCOUNTING_DECISION_SHEET.md`; `RECEIVABLES_ACCOUNTING_RISK_SUMMARY.md`            | Codex can prepare copy/preflight mapping using the accepted rules.              | Keep receivables production preflight blocked.            | READY_FOR_PREFLIGHT_PLANNING |
+| Production migration/backfill    | Should production SQL/backfill be prepared from these rules?                                        | `PRODUCTION_COPY_RECONCILIATION_RESULT.md`; `PRODUCTION_COPY_ROW_BACKFILL_007_RECONCILIATION_RESULT.md` | A later approval packet may define exact SQL, row counts, backup, and rollback. | No production receivables migration/backfill can proceed. | MANUAL_REQUIRED              |
+| Dashboard authority switch       | Should the live dashboard switch to receivables after migration/backfill and rollback are approved? | `RECEIVABLES_DASHBOARD_AUTHORITY_GATE.md`; `P0_008E_DASHBOARD_RECEIVABLES_AUTHORITY_EVIDENCE.md`        | A later cutover gate may propose exact flags and rollback.                      | Dashboard remains legacy.                                 | MANUAL_REQUIRED              |
+| Rollback/correction              | Is rollback/correction acceptable for production receivables changes?                               | `PRODUCTION_BACKUP_RESTORE_APPROVAL_CHECKLIST.md`; `PRODUCTION_CUTOVER_GO_NO_GO_MATRIX.md`              | A later production preflight can define rollback triggers and restore method.   | Production remains blocked.                               | MANUAL_REQUIRED              |
+
+## Required Ramadan Output For Future Tasks
+
+For any future production task, Ramadan must still separately approve:
+
+- Production D1 target.
+- Fresh production backup.
+- Exact production migration/backfill SQL.
+- Exact row counts.
+- Rollback method and owner.
+- Feature flags and final states.
+- Dashboard authority switch.
+- Cutover window.
+
+These Q1-Q9 decisions are accepted for production preflight input only.

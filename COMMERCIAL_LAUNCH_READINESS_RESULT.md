@@ -1,6 +1,6 @@
 # Commercial Launch Readiness Result
 
-Generated: 2026-05-27T14:35:20.364Z
+Generated: 2026-05-27T15:03:50.749Z
 
 | Metric                | Count |
 | --------------------- | ----: |
@@ -11,6 +11,40 @@ Generated: 2026-05-27T14:35:20.364Z
 | BLOCKED areas         |     0 |
 
 Overall: `PRODUCTION_NO_GO`
+
+Allowed next work: local/staging dry-run validation, manual QA preparation, and read-only audit expansion.
+
+Forbidden next work without human approval: production deploy, staging deploy, remote/production D1 migration, production feature flag enablement, and live accounting authority switch.
+
+## Commercial Launch Review 015A Ramadan Receivables Accounting Decision Addendum
+
+Date: 2026-05-27, Asia/Dubai
+
+Ramadan Habib's Q1-Q9 receivables/accounting decisions were applied to the
+review packet and signoff tracker. These decisions approve rule direction and
+production preflight input only. They do not approve production deploy,
+production migration, production D1 write, dashboard authority switch, financial
+formula change, or commercial cutover.
+
+Current signoff impact:
+
+- Q1-Q9 decisions applied: yes.
+- SO-010 receivables lifecycle approval: `PENDING_REVIEW`.
+- SO-011 receivables allocation approval: `PENDING_REVIEW`.
+- Approved production signoffs: 0.
+- Pending review signoffs: 10.
+- Manual-required signoffs: 8.
+- Blocked signoffs: 2.
+- P0-008 current status: Partial.
+- Production cutover: `PRODUCTION_NO_GO`.
+
+Remaining receivables/accounting blockers:
+
+- Production receivables migration/backfill SQL and row counts are not
+  approved.
+- Production D1 backup/restore/rollback is not approved.
+- Dashboard receivables authority switch is not approved.
+- Production feature flags and cutover window are not approved.
 
 ## Commercial Launch Review 015 Receivables Accounting Rules Addendum
 

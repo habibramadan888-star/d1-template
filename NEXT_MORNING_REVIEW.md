@@ -9,6 +9,32 @@ Production deploy: not executed
 Production database mutation: not executed
 Remote D1 migration: not executed
 
+## Commercial Launch Review 015A Ramadan Receivables Accounting Decisions Addendum
+
+Date: 2026-05-27, Asia/Dubai
+
+REVIEW-015A applied Ramadan Habib's first-pass receivables/accounting decisions
+to documentation and signoff trackers only. It did not execute production
+deploy, staging deploy, migration, D1 export/import, D1 execute, D1 write,
+feature flags, dashboard changes, business code changes, or financial formula
+changes.
+
+Current decision:
+
+- Q1-Q9 receivables/accounting decisions: applied.
+- Rules accepted for production preflight input only.
+- SO-010 receivables lifecycle approval: `PENDING_REVIEW`.
+- SO-011 receivables allocation approval: `PENDING_REVIEW`.
+- P0-008 current status: Partial.
+- Production: `PRODUCTION_NO_GO`.
+
+Remaining blockers:
+
+- Production receivables migration/backfill SQL and row counts are not approved.
+- Production D1 backup/restore/rollback is not approved.
+- Dashboard receivables authority switch is not approved.
+- Commercial cutover remains blocked.
+
 ## Commercial Launch Review 015 Receivables Accounting Rules Addendum
 
 Date: 2026-05-27, Asia/Dubai
