@@ -1,8 +1,20 @@
 # Commercial Launch Readiness Matrix
 
-Generated: 2026-05-27T13:30:08.127Z
+Generated: 2026-05-27T13:52:38.439Z
 
 Scope: read-only commercial launch gate. This script reads reports only and does not deploy, migrate, call APIs, access D1, or read secrets.
+
+## Commercial Launch Review 014 Tenant Mapping Addendum
+
+Date: 2026-05-27, Asia/Dubai
+
+| Area                   | REVIEW-014 Status  | Launch Meaning                                                                        |
+| ---------------------- | ------------------ | ------------------------------------------------------------------------------------- |
+| Mapping decision sheet | READY              | Ramadan can review 20 tenant/property mapping areas.                                  |
+| Risk summary           | READY              | Tenant authority, property mapping, CORPID fallback, and rollback risks are explicit. |
+| SO-008 status          | PENDING_REVIEW     | Final SaaS tenant/property mapping is not approved.                                   |
+| SO-009 status          | PENDING_REVIEW     | Legacy CORPID fallback policy is not approved.                                        |
+| Commercial launch gate | `PRODUCTION_NO_GO` | Cutover remains blocked.                                                              |
 
 ## Commercial Launch Review 013C Ramadan Money Decision Addendum
 
