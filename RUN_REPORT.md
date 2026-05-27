@@ -4584,6 +4584,43 @@ P0-006 status:
 
 - `Partial - tenant scope staging route/query wiring gate ready`.
 
+## COMMERCIAL-LAUNCH-REVIEW-007 Copy Row-Level Backfill Dry-Run
+
+Date: 2026-05-27, Asia/Dubai
+
+Scope: explicitly approved row-level dry-run on isolated production-copy D1
+only: `homelink-finance-production-copy-dryrun`.
+
+Completed:
+
+- Confirmed target D1 name/id.
+- Exported production-copy backup to ignored `backups/`.
+- Captured before snapshot.
+- Reviewed SQL safety: only `UPDATE`, every `UPDATE` has `WHERE`, no `DELETE`,
+  no `DROP`, no production target.
+- Executed copy-only row-level compatibility backfill.
+- Captured after snapshot and reconciliation result.
+
+Rows updated / populated:
+
+- Money compatibility: `transactions` 232 rows, `arrears` 6 rows,
+  `arrear_tasks` 1 row.
+- Tenant/scope compatibility: `sessions` 25 rows, `transactions` 232 rows,
+  `arrears` 6 rows, `arrear_tasks` 1 row, `employee_users` 1 row,
+  `active_sessions` 118 rows, `app_settings` 1 row, `audit_logs` 108 rows,
+  `entry_events` 8 rows.
+- Receivables row creation/allocation: not executed.
+
+Result:
+
+- Reconciliation: `MANUAL_REQUIRED`.
+- Production D1 write: no.
+- Staging D1 write: no.
+- Production-copy D1 write: yes, copy-only.
+- Production deploy: no.
+- Production migration: no.
+- Production cutover: `PRODUCTION_NO_GO`.
+
 ## COMMERCIAL-LAUNCH-REVIEW-003 Production Copy D1 Addendum
 
 Date: 2026-05-27, Asia/Dubai

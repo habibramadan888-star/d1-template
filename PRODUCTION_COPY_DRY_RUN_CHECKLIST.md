@@ -55,3 +55,21 @@ Row-level backfill approval packet is ready. Execution remains NO-GO until the
 future task receives explicit approvals for copy target, backup, row counts,
 money conversion, TOP_25 money risks, tenant mapping, receivables mapping,
 audit/event scope, rollback, and no-production-write constraints.
+
+## REVIEW-007 Update
+
+Copy-only row-level compatibility backfill was executed on
+`homelink-finance-production-copy-dryrun` after copy backup and target
+confirmation.
+
+Result:
+
+- Money `*_fils` compatibility backfill: PASS on copy.
+- Tenant/property compatibility backfill: PASS_WITH_WARNINGS on copy.
+- Audit/event scope compatibility backfill: PASS_WITH_WARNINGS on copy.
+- Receivables data backfill: MANUAL_REQUIRED, not executed.
+- Rollback execution: MANUAL_REQUIRED, not executed.
+- Production D1 write: no.
+- Production deploy: no.
+- Production migration: no.
+- Production cutover: `PRODUCTION_NO_GO`.

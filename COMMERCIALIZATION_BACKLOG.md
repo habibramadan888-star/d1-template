@@ -1392,6 +1392,30 @@ Still blocked for production:
 - Production receivables migration, backup, rollback, backfill, and deploy
   approval.
 
+## COMMERCIAL-LAUNCH-REVIEW-007 Backlog Addendum
+
+Date: 2026-05-27, Asia/Dubai
+
+Copy-only row-level backfill dry-run:
+
+- Money `*_fils` compatibility backfill: executed on production-copy.
+- Tenant/property compatibility backfill: executed on production-copy with
+  legacy fallback warnings.
+- Audit/event compatibility backfill: executed on production-copy with
+  visibility policy warnings.
+- Receivables data backfill: not executed, remains MANUAL_REQUIRED.
+- Rollback execution: not executed, remains MANUAL_REQUIRED.
+
+Remaining blockers:
+
+- Manual reconciliation review.
+- Accounting signoff for money conversions and TOP_25 risks.
+- Tenant/property final SaaS mapping approval.
+- Audit/event visibility policy approval.
+- Receivables lifecycle/allocation production-copy task or explicit deferral.
+- Copy rollback rehearsal.
+- Production approval remains absent.
+
 ## COMMERCIAL-LAUNCH-REVIEW-002 Backlog Addendum
 
 Date: 2026-05-26, Asia/Dubai

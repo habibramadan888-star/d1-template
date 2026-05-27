@@ -924,6 +924,34 @@ Recommended next prompt:
 
 Production cutover remains `NO-GO`.
 
+## COMMERCIAL-LAUNCH-REVIEW-007 Morning Review Addendum
+
+Most important result:
+
+- Copy-only row-level compatibility backfill executed on
+  `homelink-finance-production-copy-dryrun`.
+
+Current status:
+
+- Money `*_fils` compatibility rows populated on copy.
+- Tenant/property compatibility rows populated on copy with legacy fallback
+  warnings.
+- Audit/event scope compatibility rows populated on copy with visibility policy
+  warnings.
+- Receivables data backfill remains MANUAL_REQUIRED.
+- Rollback execution remains MANUAL_REQUIRED.
+- Production D1 write: no.
+- Production deploy/migration/cutover: no.
+- Commercial launch gate: `PRODUCTION_NO_GO`.
+
+Recommended next prompt:
+
+```text
+进入 TASK COMMERCIAL-LAUNCH-REVIEW-008：Manual reconciliation review after copy row-level backfill.
+目标：审查 copy-only money conversion、tenant/property compatibility mapping、audit/event visibility warnings、receivables manual-required 和 rollback readiness。
+禁止 production deploy、production migration、production D1 write、production cutover。
+```
+
 ## COMMERCIAL-LAUNCH-REVIEW-003 Morning Review Addendum
 
 Date: 2026-05-27, Asia/Dubai

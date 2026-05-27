@@ -1,21 +1,22 @@
 # Commercial Launch Readiness Matrix
 
-Generated: 2026-05-26T22:20:12.670Z
+Generated: 2026-05-27T06:42:52.601Z
 
 Scope: read-only commercial launch gate. This script reads reports only and does not deploy, migrate, call APIs, access D1, or read secrets.
 
-## Commercial Launch Review 006 Addendum
+## Commercial Launch Review 007 Addendum
 
 Date: 2026-05-27, Asia/Dubai
 
-| Area                      | REVIEW-006 Status  | Launch Meaning                                                          |
-| ------------------------- | ------------------ | ----------------------------------------------------------------------- |
-| Row-level approval packet | READY              | Safe to request human approval for future copy-only row-level backfill. |
-| Money conversion          | MANUAL_REQUIRED    | Accounting approval still required.                                     |
-| Tenant/property mapping   | MANUAL_REQUIRED    | Business owner and engineering approval still required.                 |
-| Receivables mapping       | MANUAL_REQUIRED    | Accounting lifecycle approval still required.                           |
-| Audit/event scope         | MANUAL_REQUIRED    | Visibility mapping approval still required.                             |
-| Commercial launch gate    | `PRODUCTION_NO_GO` | Cutover remains blocked.                                                |
+| Area                          | REVIEW-007 Status  | Launch Meaning                                                   |
+| ----------------------------- | ------------------ | ---------------------------------------------------------------- |
+| Copy row-level backfill       | EXECUTED           | Copy-only evidence improved; not production approval.            |
+| Money conversion              | PASS_WITH_WARNINGS | Values match legacy decimal-to-fils conversion on copy.          |
+| Tenant/property compatibility | PASS_WITH_WARNINGS | Legacy fallback mapping only; final SaaS authority still manual. |
+| Audit/event compatibility     | PASS_WITH_WARNINGS | Visibility policy still requires review.                         |
+| Receivables data backfill     | MANUAL_REQUIRED    | Lifecycle/allocation rows were not inserted.                     |
+| Rollback execution            | MANUAL_REQUIRED    | Review complete; execution not performed.                        |
+| Commercial launch gate        | `PRODUCTION_NO_GO` | Cutover remains blocked.                                         |
 
 | Area                            | Evidence                                                                                          | Required Markers                                                   | Missing        | Result          | Production Gate        |
 | ------------------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ | -------------- | --------------- | ---------------------- |

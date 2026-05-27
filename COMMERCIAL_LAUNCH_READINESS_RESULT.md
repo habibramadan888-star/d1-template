@@ -1,18 +1,22 @@
 # Commercial Launch Readiness Result
 
-Generated: 2026-05-26T22:20:12.671Z
+Generated: 2026-05-27T06:42:52.602Z
 
-## Commercial Launch Review 006 Addendum
+## Commercial Launch Review 007 Addendum
 
 Date: 2026-05-27, Asia/Dubai
 
 Result:
 
-- Row-level backfill approval packet: READY.
-- Row-level execution: NO-GO until explicit approval.
+- Copy-only row-level backfill dry-run: EXECUTED.
+- Target D1: `homelink-finance-production-copy-dryrun`.
+- Money `*_fils` compatibility backfill: PASS_WITH_WARNINGS.
+- Tenant/property compatibility backfill: PASS_WITH_WARNINGS.
+- Audit/event compatibility backfill: PASS_WITH_WARNINGS.
+- Receivables data backfill: MANUAL_REQUIRED.
+- Rollback execution: MANUAL_REQUIRED.
 - Production D1 write: no.
 - Staging D1 write: no.
-- Production-copy D1 write: no in REVIEW-006.
 - Production deploy: no.
 - Production migration: no.
 - Production cutover: `PRODUCTION_NO_GO`.

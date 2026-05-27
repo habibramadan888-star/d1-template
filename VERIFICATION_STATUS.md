@@ -922,6 +922,25 @@ Date: 2026-05-26, Asia/Dubai
 
 P0-006 remains Partial and production remains NO-GO.
 
+## COMMERCIAL-LAUNCH-REVIEW-007 Verification Addendum
+
+Date: 2026-05-27, Asia/Dubai
+
+| Check                    | Run? | Result             | Blocker              | Evidence                                                            | Notes                                                         |
+| ------------------------ | ---- | ------------------ | -------------------- | ------------------------------------------------------------------- | ------------------------------------------------------------- |
+| Target D1 confirmation   | yes  | Pass               | none                 | `PRODUCTION_COPY_ROW_BACKFILL_007_TARGET_CONFIRMATION.md`           | Target was isolated production-copy D1.                       |
+| Copy backup              | yes  | Pass               | none                 | `PRODUCTION_COPY_ROW_BACKFILL_007_BACKUP_RESULT.md`                 | Backup stored under ignored `backups/`.                       |
+| SQL final review         | yes  | Pass               | none                 | `PRODUCTION_COPY_ROW_BACKFILL_007_SQL_FINAL_REVIEW.md`              | No DELETE/DROP; every UPDATE had WHERE.                       |
+| Copy row-level execution | yes  | Pass with warnings | receivables manual   | `PRODUCTION_COPY_ROW_BACKFILL_007_EXECUTION_RESULT.md`              | Money/scope compatibility populated on copy only.             |
+| After snapshot           | yes  | Pass with warnings | receivables manual   | `PRODUCTION_COPY_ROW_BACKFILL_007_AFTER_SNAPSHOT.md`                | Missing fils/scope rows reduced to 0 for updated tables.      |
+| Reconciliation           | yes  | Manual required    | receivables/rollback | `PRODUCTION_COPY_ROW_BACKFILL_007_RECONCILIATION_RESULT.md`         | Receivables rows and rollback execution remain manual.        |
+| Rollback review          | yes  | Manual required    | rollback execution   | `PRODUCTION_COPY_ROW_BACKFILL_007_ROLLBACK_REVIEW.md`               | Backup restore/reverse update are feasible but not exercised. |
+| Commercial launch gate   | yes  | `PRODUCTION_NO_GO` | production blockers  | `PRODUCTION_COPY_ROW_BACKFILL_007_COMMERCIAL_LAUNCH_GATE_RESULT.md` | Cutover remains blocked.                                      |
+
+No production deploy, production migration, production D1 write, staging D1
+write, production feature flag, production URL call, dashboard change,
+financial formula change, or secret exposure occurred.
+
 ## P0-006Q2 Verification Addendum
 
 Date: 2026-05-26, Asia/Dubai
