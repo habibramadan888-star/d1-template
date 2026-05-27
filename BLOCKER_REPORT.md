@@ -5,6 +5,34 @@ Mode: NIGHT SHIFT
 Production deploy: not executed  
 Production database mutation: not executed
 
+## Commercial Launch Review 009 Approval Blocker
+
+Date: 2026-05-27, Asia/Dubai
+
+Finding:
+
+- REVIEW-009 copy rollback rehearsal requires explicit human approval flags.
+- The latest user message did not include the required flags.
+- Rollback rehearsal was not executed.
+
+Evidence:
+
+- `COMMERCIAL_LAUNCH_REVIEW_009_APPROVAL_BLOCKER.md`
+- `NEXT_PROMPT_COMMERCIAL_LAUNCH_REVIEW_009_COPY_ROLLBACK_REHEARSAL_APPROVAL_REQUIRED.md`
+
+Safety:
+
+- Production deploy: no.
+- Production migration: no.
+- Production D1 write: no.
+- Production-copy D1 write: no.
+- Staging D1 write: no.
+- Commercial launch remains `PRODUCTION_NO_GO`.
+
+Resolution:
+
+- Retry REVIEW-009 only after the required explicit approval flags are provided.
+
 ## Blocking Risks
 
 ### P0: Local authentication setup was blocking authenticated flows

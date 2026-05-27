@@ -9,6 +9,28 @@ Production deploy: not executed
 Production database mutation: not executed
 Remote D1 migration: not executed
 
+## Commercial Launch Review 009 Approval Blocker Addendum
+
+Date: 2026-05-27, Asia/Dubai
+
+REVIEW-009 copy rollback rehearsal was not executed because the required
+explicit human approval flags were not provided.
+
+Current decision:
+
+- Copy rollback rehearsal: blocked by missing approval.
+- Production deploy: no.
+- Production migration: no.
+- Production D1 write: no.
+- Production-copy D1 write: no.
+- Production: `PRODUCTION_NO_GO`.
+
+Next safe action:
+
+- Retry
+  `NEXT_PROMPT_COMMERCIAL_LAUNCH_REVIEW_009_COPY_ROLLBACK_REHEARSAL_APPROVAL_REQUIRED.md`
+  with the required approval flags.
+
 ## Commercial Launch Review 008 Addendum
 
 Date: 2026-05-27, Asia/Dubai

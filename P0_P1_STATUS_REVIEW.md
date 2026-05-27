@@ -2,6 +2,15 @@
 
 Generated: 2026-05-23, Asia/Dubai
 
+## Commercial Launch Review 009 Approval Blocker Addendum
+
+Date: 2026-05-27, Asia/Dubai
+
+| Area                    | REVIEW-009 Status                 | Evidence                                           | Production Meaning                             |
+| ----------------------- | --------------------------------- | -------------------------------------------------- | ---------------------------------------------- |
+| Copy rollback rehearsal | BLOCKED_BY_MISSING_HUMAN_APPROVAL | `COMMERCIAL_LAUNCH_REVIEW_009_APPROVAL_BLOCKER.md` | No rollback rehearsal was executed.            |
+| Production cutover      | `PRODUCTION_NO_GO`                | `BLOCKER_REPORT.md`                                | No production migration/deploy/write approved. |
+
 ## Commercial Launch Review 008 Addendum
 
 Date: 2026-05-27, Asia/Dubai

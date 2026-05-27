@@ -6,6 +6,27 @@ Scope: governance, engineering baseline, local startup checks
 Production deploy: not executed  
 Production database mutation: not executed
 
+## Commercial Launch Review 009 Approval Blocker Addendum
+
+Date: 2026-05-27, Asia/Dubai
+
+Scope: attempted continuation into REVIEW-009 copy rollback rehearsal, but
+required approval flags were not provided. No rollback or D1 command was run.
+
+| Item                     | Result             | Evidence                                                                                | Notes                                          |
+| ------------------------ | ------------------ | --------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| REVIEW-009 approval gate | BLOCKED            | `COMMERCIAL_LAUNCH_REVIEW_009_APPROVAL_BLOCKER.md`                                      | Missing explicit copy rollback approval flags. |
+| Copy rollback rehearsal  | NOT_EXECUTED       | `NEXT_PROMPT_COMMERCIAL_LAUNCH_REVIEW_009_COPY_ROLLBACK_REHEARSAL_APPROVAL_REQUIRED.md` | Must be retried with approvals.                |
+| Production cutover       | `PRODUCTION_NO_GO` | Commercial launch gate remains no-go                                                    | No production action approved.                 |
+
+Safety:
+
+- Production deploy: no.
+- Production migration: no.
+- Production D1 write: no.
+- Production-copy D1 write: no.
+- Staging D1 write: no.
+
 ## Commercial Launch Review 008 Manual Reconciliation Addendum
 
 Date: 2026-05-27, Asia/Dubai
