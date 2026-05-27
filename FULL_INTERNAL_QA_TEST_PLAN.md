@@ -65,6 +65,7 @@ commercial launch.
 | P3 usability issue                   | Record notes and screenshots; group for later UI cleanup.                                                         |
 | Unclear accounting behavior          | Mark `MANUAL_REQUIRED`; do not invent pass/fail.                                                                  |
 | Second login after unified login     | Record as a unified-login handoff bug; do not continue role-flow testing until triaged.                           |
+| Owner login flicker or back-loop     | Record as a unified-login UX bug. Expected behavior is auth-loading first and signed-in panel on browser back.    |
 | Successful live login smoke          | Requires separate approval because successful login writes production D1 `active_sessions`.                       |
 
 ## Evidence Rules

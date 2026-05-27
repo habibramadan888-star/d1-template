@@ -4,6 +4,24 @@ Generated: 2026-05-23, Asia/Dubai
 
 This file records the safety verification commands rerun during project status reconciliation. Commands were run without modifying business logic, production configuration, or production database data.
 
+## UNIFIED-LOGIN-UX-004 Verification Addendum
+
+Date: 2026-05-28, Asia/Dubai
+
+| Verification            | Result             | Evidence                                                       | Commercial Meaning                                                                            |
+| ----------------------- | ------------------ | -------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Owner flicker diagnosis | READY              | `UNIFIED_LOGIN_OWNER_LOADING_FLICKER_DIAGNOSIS.md`             | UX issue isolated to auth bootstrap/loading, not finance logic.                               |
+| Owner loading fix       | READY              | `UNIFIED_LOGIN_OWNER_BOOTSTRAP_LOADING_FIX.md`                 | Legacy login no longer appears before `/api/me` completes.                                    |
+| Back-button fix         | READY              | `UNIFIED_LOGIN_BACK_BUTTON_BEHAVIOR_FIX.md`                    | Existing session shows signed-in panel instead of redirect loop.                              |
+| Owner UX tests          | READY              | `tests/unified-login-owner-ux.spec.mjs`                        | Covers loading state, signed-in panel, denied roles, and NO-GO status.                        |
+| Auth guard tests        | READY              | `tests/unified-login-auth-guard.spec.mjs`                      | Covers `/api/me` authority and role boundary behavior.                                        |
+| Live deploy             | PASS               | `UNIFIED_LOGIN_OWNER_UX_DEPLOY_RESULT.md`                      | Uploaded login/UX assets only; no D1 write or migration.                                      |
+| Live read-only smoke    | PASS_WITH_BOUNDARY | `INTERNAL_QA_005G_UNIFIED_LOGIN_OWNER_UX_LIVE_SMOKE_RESULT.md` | Static/unauth/wrong-login checks passed; successful login skipped due session-write boundary. |
+
+Production cutover remains `PRODUCTION_NO_GO`. Successful live credential-login
+smoke remains a separate approval item because it can write production D1
+`active_sessions`.
+
 ## UNIFIED-LOGIN-FIX-003 Verification Addendum
 
 Date: 2026-05-28, Asia/Dubai

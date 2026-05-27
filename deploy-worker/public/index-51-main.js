@@ -52,12 +52,76 @@ async function fetchCurrentAuthUser(){
   if(!r.ok)throw new Error('me_failed_'+r.status);
   return r.json();
 }
-async function resumeUnifiedOwnerSession(){
+function ownerAuthElements(){
+  return {
+    overlay:document.getElementById('lockOverlay'),
+    message:document.getElementById('ownerAuthMessage'),
+    loading:document.getElementById('ownerAuthLoading'),
+    loginPanel:document.getElementById('ownerLoginPanel')||document.querySelector('.code-input-wrap'),
+    codeErr:document.getElementById('codeErr'),
+    empCode:document.getElementById('empCode')
+  };
+}
+function setOwnerAuthMessage(text, sub=''){
+  const el=ownerAuthElements().message;
+  if(!el)return;
+  el.innerHTML=esc(text||'')+(sub?`<span class="en-sub" style="margin-top:3px">${esc(sub)}</span>`:'');
+}
+function showOwnerAuthChecking(){
+  const els=ownerAuthElements();
+  if(els.overlay)els.overlay.style.display='flex';
+  if(els.loading)els.loading.hidden=false;
+  if(els.loginPanel)els.loginPanel.style.display='none';
+  if(els.codeErr)els.codeErr.style.display='none';
+  setOwnerAuthMessage('Checking session','正在验证登录状态');
+}
+function showOwnerLoginFallback(message='请输入员工代码'){
+  const els=ownerAuthElements();
+  if(els.overlay)els.overlay.style.display='flex';
+  if(els.loading)els.loading.hidden=true;
+  if(els.loginPanel)els.loginPanel.style.display='block';
+  setOwnerAuthMessage(message,'ENTER EMPLOYEE CODE');
+  if(els.empCode)els.empCode.focus();
+}
+function showOwnerAuthError(message='Could not verify session. Please try again.'){
+  const els=ownerAuthElements();
+  if(els.overlay)els.overlay.style.display='flex';
+  if(els.loading)els.loading.hidden=true;
+  if(els.loginPanel)els.loginPanel.style.display='block';
+  if(els.codeErr){els.codeErr.textContent=message;els.codeErr.style.display='block';}
+  setOwnerAuthMessage('Session check failed','请重试登录');
+}
+function showOwnerAppShell(appRole){
   const overlay=document.getElementById('lockOverlay');
   if(overlay)overlay.style.display='none';
+  document.getElementById('topbar').style.display='block';
+  document.getElementById('mainApp').style.display='block';
+  document.getElementById('footerEl').style.display='block';
+  const badge=document.getElementById('roleBadge');
+  const isManager=appRole==='manager';
+  if(isManager){
+    badge.textContent='鑰佹澘';
+    badge.className='role-badge manager';
+    document.getElementById('navHistory')?.classList.remove('locked');
+    document.getElementById('navAnalysis')?.classList.remove('locked');
+    document.getElementById('navClients')?.classList.remove('locked');
+    document.getElementById('navWifi')?.classList.remove('locked');
+  }else{
+    badge.textContent='鍛樺伐';
+    badge.className='role-badge staff';
+    document.getElementById('navHistory')?.classList.add('locked');
+    document.getElementById('navAnalysis')?.classList.add('locked');
+    document.getElementById('navClients')?.classList.add('locked');
+    document.getElementById('navWifi')?.classList.add('locked');
+  }
+  const db=document.getElementById('btnDashboard');
+  if(db)db.style.display=isManager?'':'none';
+}
+async function resumeUnifiedOwnerSession(){
+  showOwnerAuthChecking();
   try{
     const me=await fetchCurrentAuthUser();
-    if(!me){if(overlay)overlay.style.display='flex';return false;}
+    if(!me){showOwnerLoginFallback();return false;}
     if(isOwnerAppRole(me.role)){
       await enterAs(toOwnerSpaRole(me.role));
       return true;
@@ -67,18 +131,18 @@ async function resumeUnifiedOwnerSession(){
       return true;
     }
     console.warn('[UnifiedLogin] unsupported role for owner app');
-    if(overlay)overlay.style.display='flex';
+    showOwnerLoginFallback('This account cannot access the owner dashboard.');
     return false;
   }catch(e){
     console.warn('[UnifiedLogin] owner session handoff failed:',e);
-    if(overlay)overlay.style.display='flex';
+    showOwnerAuthError();
     return false;
   }
 }
 function showAuthExpired(){
   toast('登录已过期，请重新进入系统','err');
   role=null;
-  document.getElementById('lockOverlay').style.display='flex';
+  showOwnerLoginFallback('Session expired. Please sign in again.');
   document.getElementById('topbar').style.display='none';
   document.getElementById('mainApp').style.display='none';
   document.getElementById('footerEl').style.display='none';
@@ -206,18 +270,16 @@ async function submitCode(){
   }
 }
 async function enterAs(r){
-  role=r;
-  await loadAll();
-  document.getElementById('lockOverlay').style.display='none';
-  document.getElementById('topbar').style.display='block';
-  document.getElementById('mainApp').style.display='block';
-  document.getElementById('footerEl').style.display='block';
-  const badge=document.getElementById('roleBadge');
-  const isManager=r==='manager';
-  if(isManager){badge.textContent='老板';badge.className='role-badge manager';document.getElementById('navHistory').classList.remove('locked');document.getElementById('navAnalysis').classList.remove('locked');document.getElementById('navClients').classList.remove('locked');document.getElementById('navWifi').classList.remove('locked');}
-  else{badge.textContent='员工';badge.className='role-badge staff';document.getElementById('navHistory').classList.add('locked');document.getElementById('navAnalysis').classList.add('locked');document.getElementById('navClients').classList.add('locked');document.getElementById('navWifi').classList.add('locked');}
-  const db=document.getElementById('btnDashboard');if(db)db.style.display=isManager?'':'none';
-  renderEntryView();
+  role=toOwnerSpaRole(r);
+  showOwnerAppShell(role);
+  try{renderEntryView();}catch(e){console.error('[OwnerBootstrap] initial shell render failed:',e);}
+  try{
+    await loadAll();
+    renderEntryView();
+  }catch(e){
+    console.error('[OwnerBootstrap] data load failed:', e);
+    toast('Some dashboard data failed to load. Refresh and try again.','err');
+  }
 }
 async function logout(){
   /* 1. 通知服务端清除 httpOnly Cookie（Max-Age=0）*/
@@ -237,7 +299,7 @@ async function logout(){
   const ec=document.getElementById('empCode');if(ec)ec.value='';
   const ce=document.getElementById('codeErr');if(ce)ce.style.display='none';
   const db=document.getElementById('btnDashboard');if(db)db.style.display='none';
-  document.getElementById('lockOverlay').style.display='flex';
+  showOwnerLoginFallback();
   document.getElementById('topbar').style.display='none';
   document.getElementById('mainApp').style.display='none';
   document.getElementById('footerEl').style.display='none';

@@ -198,6 +198,18 @@ button:disabled{
   background:#fff8e6;
   border-color:#f5dfaa;
 }
+.signed-in{
+  display:grid;
+  gap:12px;
+  margin-top:18px;
+  padding:16px;
+  border:1px solid #d8efdf;
+  border-radius:20px;
+  background:#f1fbf5;
+}
+.signed-in[hidden]{display:none}
+.signed-in strong{font-size:17px}
+.signed-in p{margin:0;color:var(--muted);line-height:1.5}
 .boundary{
   margin-top:20px;
   padding:14px 16px;
@@ -253,6 +265,14 @@ button:disabled{
         <button class="ghost" id="logoutButton" type="button">Clear session</button>
       </div>
     </form>
+    <div class="signed-in" id="signedInPanel" hidden>
+      <strong id="signedInTitle">Signed in</strong>
+      <p id="signedInText">A valid server session was found.</p>
+      <div class="actions">
+        <button class="primary" id="continueButton" type="button">Continue</button>
+        <button class="ghost" id="clearSessionButton" type="button">Clear session / Sign out</button>
+      </div>
+    </div>
     <div class="status" id="status" role="status">Checking existing session...</div>
     <div class="boundary">
       Production cutover remains PRODUCTION_NO_GO. The current homelink-finance
@@ -275,6 +295,12 @@ const accountId = document.getElementById("accountId");
 const secret = document.getElementById("secret");
 const loginButton = document.getElementById("loginButton");
 const logoutButton = document.getElementById("logoutButton");
+const signedInPanel = document.getElementById("signedInPanel");
+const signedInTitle = document.getElementById("signedInTitle");
+const signedInText = document.getElementById("signedInText");
+const continueButton = document.getElementById("continueButton");
+const clearSessionButton = document.getElementById("clearSessionButton");
+let currentSessionDestination = null;
 
 function apiUrl(path) {
   if (/^https?:\/\//i.test(path)) return path;
@@ -285,6 +311,10 @@ function apiUrl(path) {
 function setStatus(message, tone) {
   statusEl.textContent = message;
   statusEl.className = "status" + (tone ? " " + tone : "");
+}
+
+function shouldAutoRedirectExistingSession() {
+  return new URLSearchParams(location.search).get("auto") === "1";
 }
 
 function destinationForRole(role) {
@@ -314,26 +344,51 @@ async function fetchMe() {
   return body;
 }
 
-function routeFromServerClaim(me) {
+function routeFromServerClaim(me, options = {}) {
   const destination = destinationForRole(me?.role);
   if (!destination) {
     setStatus("Login succeeded, but this role is not enabled for unified routing.", "error");
     return;
   }
   setStatus("Signed in as " + me.role + ". Redirecting...");
-  location.assign(destination);
+  const nav = options.replace ? location.replace.bind(location) : location.assign.bind(location);
+  nav(destination);
+}
+
+function showLoginForm(message, tone) {
+  currentSessionDestination = null;
+  signedInPanel.hidden = true;
+  form.style.display = "block";
+  setStatus(message, tone);
+}
+
+function showSignedInPanel(me) {
+  const destination = destinationForRole(me?.role);
+  if (!destination) {
+    showLoginForm("This signed-in role is not enabled for unified routing.", "error");
+    return;
+  }
+  currentSessionDestination = destination;
+  form.style.display = "none";
+  signedInPanel.hidden = false;
+  const role = String(me.role || "user");
+  signedInTitle.textContent = "Signed in as " + role;
+  signedInText.textContent = "Use Continue to open the correct workspace, or clear the session to sign in as someone else.";
+  continueButton.textContent = destination === OWNER_DESTINATION ? "Continue to owner dashboard" : "Continue to employee entry";
+  setStatus("Session active. No automatic redirect will run unless the URL includes ?auto=1.");
 }
 
 async function checkExistingSession() {
   try {
     const me = await fetchMe();
     if (me) {
-      routeFromServerClaim(me);
+      if (shouldAutoRedirectExistingSession()) routeFromServerClaim(me, { replace: true });
+      else showSignedInPanel(me);
       return;
     }
-    setStatus("Session expired or not signed in. Please sign in.");
+    showLoginForm("Session expired or not signed in. Please sign in.");
   } catch (error) {
-    setStatus("Could not check current session. You can still sign in.", "warn");
+    showLoginForm("Could not check current session. You can still sign in.", "warn");
   }
 }
 
@@ -368,7 +423,7 @@ async function signIn(event) {
     const me = await fetchMe();
     if (!me) throw new Error("session_expired");
     secret.value = "";
-    routeFromServerClaim(me);
+    routeFromServerClaim(me, { replace: true });
   } catch (error) {
     setStatus("Login failed. Check the account and password, then try again.", "error");
   } finally {
@@ -382,12 +437,20 @@ async function clearSession() {
     await requestJson("/auth/logout", { method: "POST" });
   } catch {}
   localStorage.removeItem("homelink:cloud_token");
-  setStatus("Session cleared. Please sign in again.");
+  sessionStorage.removeItem("homelink:cloud_token");
+  accountId.value = "";
+  secret.value = "";
+  showLoginForm("Session cleared. Please sign in again.");
   logoutButton.disabled = false;
 }
 
 form.addEventListener("submit", signIn);
 logoutButton.addEventListener("click", clearSession);
+clearSessionButton.addEventListener("click", clearSession);
+continueButton.addEventListener("click", () => {
+  if (currentSessionDestination) location.assign(currentSessionDestination);
+  else checkExistingSession();
+});
 checkExistingSession();
 </script>
 </body>

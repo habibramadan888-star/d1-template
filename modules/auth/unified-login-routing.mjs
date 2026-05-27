@@ -57,6 +57,61 @@ export function resolveUnifiedPostLoginRoute({
   };
 }
 
+export function resolveUnifiedExistingSessionUx({ meStatus, meClaim, autoRedirect = false } = {}) {
+  if (meStatus === 401 || meStatus === 403 || !meClaim) {
+    return {
+      page: "unified-login",
+      action: "SHOW_LOGIN",
+      authority: "/api/me",
+      autoRedirect: false
+    };
+  }
+
+  const decision = getUnifiedLoginDestination(meClaim);
+  if (!decision.ok) {
+    return {
+      page: "unified-login",
+      action: "DENY",
+      authority: "/api/me",
+      autoRedirect: false,
+      reason: decision.reason
+    };
+  }
+
+  return {
+    page: "unified-login",
+    action: autoRedirect ? "AUTO_REDIRECT" : "SHOW_SIGNED_IN_PANEL",
+    roleGroup: decision.roleGroup,
+    destination: decision.destination,
+    authority: "/api/me",
+    autoRedirect
+  };
+}
+
+export function resolveOwnerBootstrapUx({ meStatus, meClaim, mePending = false } = {}) {
+  if (mePending) {
+    return {
+      page: "owner",
+      action: "SHOW_AUTH_LOADING",
+      showLegacyLogin: false,
+      authority: "/api/me"
+    };
+  }
+
+  const handoff = resolveOwnerSessionHandoff({ meStatus, meClaim });
+  if (handoff.action === "SHOW_LOGIN") {
+    return {
+      ...handoff,
+      showLegacyLogin: true
+    };
+  }
+
+  return {
+    ...handoff,
+    showLegacyLogin: false
+  };
+}
+
 export function shouldRedirectUnauthenticatedToUnifiedLogin({ meStatus, hasAuthClaim } = {}) {
   return meStatus === 401 || meStatus === 403 || hasAuthClaim === false;
 }

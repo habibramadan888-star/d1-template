@@ -42,6 +42,17 @@ or write any D1.
 | Live deployment status             | Deployed in UNIFIED-LOGIN-FIX-003 to `homelink-finance` Worker assets.                                  |
 | Successful login smoke             | Not executed in UNIFIED-LOGIN-FIX-003 because successful login writes production D1 `active_sessions`.  |
 
+## Owner UX Review
+
+| Item                        | Result                                                                              |
+| --------------------------- | ----------------------------------------------------------------------------------- |
+| Owner loading flicker       | Fixed in UNIFIED-LOGIN-UX-004 by starting owner SPA in auth-loading state.          |
+| Legacy login fallback       | Preserved, but only shown after `/api/me` returns unauthenticated/expired.          |
+| Back-button behavior        | Unified login now shows a signed-in panel instead of immediate redirect loop.       |
+| Continue action             | Routes to owner dashboard or employee page based on server-confirmed role.          |
+| Clear session action        | Calls logout and returns to the login form.                                         |
+| Successful live login smoke | Still requires separate approval because successful login writes `active_sessions`. |
+
 ## Owner / Boss Candidate Links
 
 | Candidate Link                                                        | Local Evidence                                                               | Confirmed Exists Locally | Notes                                      |

@@ -7,6 +7,36 @@ Production deploy: unified-login static route/session handoff deploys executed
 under explicit approval; no commercial cutover.
 Production database mutation: not executed
 
+## UNIFIED-LOGIN-UX-004 Owner Session UX
+
+Date: 2026-05-28, Asia/Dubai
+
+Scope: owner auth loading flicker and unified-login browser-back behavior. No
+production D1 migration, production D1 write, D1 export/import/execute, employee
+entry write, handover submit, void/delete, settings change, dashboard formula
+change, financial formula change, commercial launch GO, or production cutover
+was approved by this task.
+
+Completed:
+
+- Diagnosed the owner flicker as legacy login markup rendering before `/api/me`
+  completed.
+- Changed owner bootstrap to show auth-loading first and reveal fallback login
+  only after unauthenticated/expired `/api/me`.
+- Changed owner app entry to show the shell before slow read-only dashboard data
+  loads complete.
+- Changed unified login to show a signed-in panel on browser back instead of
+  immediately redirecting.
+- Added auth-guard and owner UX tests.
+
+Result:
+
+- Owner login flicker: fixed in code and deployed to live Worker assets.
+- Back-button redirect loop: fixed in code and deployed to live Worker assets.
+- Live successful credential login: not executed because it can write
+  production D1 `active_sessions`.
+- Production cutover: `PRODUCTION_NO_GO`.
+
 ## UNIFIED-LOGIN-FIX-003 Live Session Handoff Deploy
 
 Date: 2026-05-28, Asia/Dubai

@@ -69,6 +69,21 @@ Successful live login testing is also a production D1 session-write action under
 the current implementation. Treat it as a separate approval item if the test
 must prove the live browser path with real credentials.
 
+## Owner UX Expectation
+
+After UNIFIED-LOGIN-UX-004, the owner destination must not flash the legacy
+password panel before checking the server session. Expected behavior:
+
+| Scenario                                            | Expected Result                                                                                          |
+| --------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| Owner opens destination after unified login         | Owner page first shows `Checking session`, then enters the dashboard shell.                              |
+| Browser back to unified login while still signed in | Unified login shows a signed-in panel with `Continue to owner dashboard` and `Clear session / Sign out`. |
+| Expired or missing session                          | Login form appears only after `/api/me` returns unauthenticated or expired.                              |
+| Second login prompt appears after unified login     | Record as a bug and do not continue role-flow testing until triaged.                                     |
+
+The live Worker is still bound to `DB = homelink`; full write testing and
+successful-login smoke that creates `active_sessions` require separate approval.
+
 ## Stop Immediately If
 
 | Condition                                                                 | Action                                                  |

@@ -241,6 +241,10 @@ body { overflow-x: hidden; max-width: 100vw; }
 .lock-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);padding:28px;width:100%;max-width:340px;box-shadow:var(--shadow)}
 .lock-title{font-size:20px;font-weight:800;margin-bottom:3px;letter-spacing:0;color:var(--text)}
 .lock-sub{font-size:12px;color:var(--text2);margin-bottom:22px}
+.owner-auth-loading{display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center;padding:14px;border:1px solid var(--border);border-radius:var(--r);background:var(--surface2);color:var(--text2);font-size:13px;line-height:1.45;margin-bottom:12px}
+.owner-auth-loading[hidden]{display:none}
+.owner-auth-spinner{width:22px;height:22px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:999px;animation:owner-auth-spin .8s linear infinite}
+@keyframes owner-auth-spin{to{transform:rotate(360deg)}}
 .lock-choices{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
 .lock-choice{padding:22px 10px;border-radius:var(--r);border:2px solid var(--border);background:var(--surface2);cursor:pointer;text-align:center;transition:all 0.15s}
 .lock-choice:hover{border-color:var(--border2);background:var(--surface3)}
@@ -927,8 +931,12 @@ body::before{
         <div style="font-size:11px;color:var(--text3);font-family:JetBrains Mono,monospace;letter-spacing:0.05em">FINANCE LEDGER</div>
       </div>
     </div>
-    <div class="lock-sub">请输入员工代码<span class="en-sub" style="margin-top:3px">ENTER EMPLOYEE CODE</span></div>
-    <div class="code-input-wrap">
+    <div class="lock-sub" id="ownerAuthMessage">Checking session<span class="en-sub" style="margin-top:3px">正在验证登录状态</span></div>
+    <div class="owner-auth-loading" id="ownerAuthLoading">
+      <div class="owner-auth-spinner" aria-hidden="true"></div>
+      <div>Checking session...<span class="en-sub" style="margin-top:3px">正在验证登录状态</span></div>
+    </div>
+    <div class="code-input-wrap" id="ownerLoginPanel" style="display:none">
       <input class="code-inp" id="empCode" type="password" maxlength="16" placeholder="• • • •" autocomplete="off" onkeydown="if(event.key==='Enter')submitCode()">
       <div id="codeErr" style="display:none;color:var(--red);font-size:12px;margin-top:10px;text-align:center">⚠ 代码错误，请重试</div>
       <button class="btn btn-primary btn-block" style="margin-top:16px;font-size:15px;padding:13px" onclick="submitCode()">进入系统<span class="en-sub">ENTER</span></button>
