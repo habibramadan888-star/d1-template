@@ -1,6 +1,6 @@
 # Full Internal QA Test Plan
 
-Date: 2026-05-27, Asia/Dubai
+Date: 2026-05-28, Asia/Dubai
 
 Scope: internal QA planning with unified login. Testers should start from one
 login portal and allow the server-confirmed role to route them. This plan does
@@ -10,19 +10,20 @@ commercial launch.
 
 ## Environment
 
-| Item                           | Value                                                                     |
-| ------------------------------ | ------------------------------------------------------------------------- |
-| QA package environment         | Internal QA planning; not production approval                             |
-| Unified login URL              | `https://homelink-finance.habibramadan888.workers.dev/unified-login.html` |
-| Employee destination URL       | `https://homelink-finance.habibramadan888.workers.dev/employee-v3.html`   |
-| Owner destination URL          | `https://homelink-finance.habibramadan888.workers.dev/index.html`         |
-| Staging Worker URL             | `https://homelink-finance-staging.habibramadan888.workers.dev`            |
-| Current Worker D1 binding risk | `homelink-finance` is configured with `DB = homelink`; writes affect prod |
-| Production used?               | No production command was executed by this task                           |
-| Production equivalent?         | No                                                                        |
-| Production cutover status      | `PRODUCTION_NO_GO`                                                        |
-| Test data policy               | QA-marked evidence only; no production writes without separate approval   |
-| Password / token handling      | Never paste into docs, screenshots, tickets, or chat                      |
+| Item                           | Value                                                                                      |
+| ------------------------------ | ------------------------------------------------------------------------------------------ |
+| QA package environment         | Internal QA planning; not production approval                                              |
+| Unified login URL              | `https://homelink-finance.habibramadan888.workers.dev/unified-login.html`                  |
+| Employee destination URL       | `https://homelink-finance.habibramadan888.workers.dev/employee-v3.html`                    |
+| Owner destination URL          | `https://homelink-finance.habibramadan888.workers.dev/index.html`                          |
+| Staging Worker URL             | `https://homelink-finance-staging.habibramadan888.workers.dev`                             |
+| Current Worker D1 binding risk | `homelink-finance` is configured with `DB = homelink`; writes affect prod                  |
+| Production used?               | Live Worker static route deploy executed under explicit approval; no D1 write or migration |
+| Production equivalent?         | No                                                                                         |
+| Production cutover status      | `PRODUCTION_NO_GO`                                                                         |
+| Test data policy               | QA-marked evidence only; no production writes without separate approval                    |
+| Password / token handling      | Never paste into docs, screenshots, tickets, or chat                                       |
+| Live unified-login route       | Verified HTTP 200 `text/html` in `INTERNAL_QA_005B_UNIFIED_LOGIN_LIVE_SMOKE_RESULT.md`     |
 
 ## Roles
 

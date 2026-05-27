@@ -3,8 +3,35 @@
 Date: 2026-05-23  
 Mode: NIGHT SHIFT local validation  
 Scope: governance, engineering baseline, local startup checks  
-Production deploy: not executed  
+Production deploy: unified-login static route deploy executed later under explicit approval; no commercial cutover.
 Production database mutation: not executed
+
+## UNIFIED-LOGIN-DEPLOY-001 Live Unified Login Static Route
+
+Date: 2026-05-28, Asia/Dubai
+
+Scope: approved deployment of the unified login static route/assets to the live
+`homelink-finance` Worker only. No production D1 write, D1 migration,
+D1 export/import/execute, employee entry write, handover submit, void/delete,
+settings change, dashboard formula change, financial formula change, feature
+flag cutover, or commercial launch GO occurred.
+
+Completed:
+
+- Diagnosed live `/unified-login.html` returning API fallback text.
+- Confirmed local `deploy-worker/public/unified-login.html` exists.
+- Ran embedded Worker and Wrangler deploy dry-runs.
+- Deployed the `homelink-finance` Worker with current static assets.
+- Verified live `/unified-login.html` returns HTTP 200 `text/html`.
+- Verified `/api/me` unauthenticated remains HTTP 401.
+- Verified invalid login remains HTTP 401 `invalid_credentials` using fake credentials.
+
+Result:
+
+- Unified login live route: PASS.
+- Production D1 write: no.
+- Production migration: no.
+- Production cutover: `PRODUCTION_NO_GO`.
 
 ## INTERNAL-QA-001 Full Internal Staging QA Test Package
 

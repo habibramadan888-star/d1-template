@@ -4,6 +4,20 @@ Generated: 2026-05-23, Asia/Dubai
 
 This file records the safety verification commands rerun during project status reconciliation. Commands were run without modifying business logic, production configuration, or production database data.
 
+## UNIFIED-LOGIN-DEPLOY-001 Verification Addendum
+
+Date: 2026-05-28, Asia/Dubai
+
+| Verification         | Result | Evidence                                              | Commercial Meaning                                                                     |
+| -------------------- | ------ | ----------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Live route diagnosis | READY  | `UNIFIED_LOGIN_LIVE_ROUTE_DIAGNOSIS.md`               | `/unified-login.html` was missing from live assets before deploy.                      |
+| Deploy dry-run       | PASS   | `UNIFIED_LOGIN_DEPLOY_DRY_RUN_RESULT.md`              | Wrangler packaged Worker assets without D1 migration/write.                            |
+| Live deploy          | PASS   | `UNIFIED_LOGIN_LIVE_DEPLOY_RESULT.md`                 | Static route/assets deployed to `homelink-finance`; no D1 write occurred.              |
+| Live read-only smoke | PASS   | `INTERNAL_QA_005B_UNIFIED_LOGIN_LIVE_SMOKE_RESULT.md` | Unified login now serves `text/html`; `/api/me` authority remains 401 unauthenticated. |
+
+Production cutover remains `PRODUCTION_NO_GO`. Full write QA is still not
+approved because the live Worker binds `DB = homelink`.
+
 ## INTERNAL-QA-001 Verification Addendum
 
 Date: 2026-05-27, Asia/Dubai

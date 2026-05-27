@@ -1,10 +1,12 @@
 # Internal QA Real Links Review
 
-Date: 2026-05-27, Asia/Dubai
+Date: 2026-05-28, Asia/Dubai
 
-Scope: documentation-only link correction. This review used local project files,
-routes, HTML assets, and wrangler config. It did not call production URLs, deploy,
-migrate, execute D1 commands, or write any D1.
+Scope: real-link review plus UNIFIED-LOGIN-DEPLOY-001 live route verification.
+The original review used local project files, routes, HTML assets, and wrangler
+config. UNIFIED-LOGIN-DEPLOY-001 later performed the approved static Worker
+asset deploy and read-only live smoke. It did not migrate, execute D1 commands,
+or write any D1.
 
 ## Confirmed Employee Link
 
@@ -14,7 +16,20 @@ migrate, execute D1 commands, or write any D1.
 | Employee real link              | `https://homelink-finance.habibramadan888.workers.dev/employee-v3.html`                   |
 | Source of confirmation          | Ramadan-confirmed link plus local asset `deploy-worker/public/employee-v3.html`           |
 | Old default to avoid            | `https://homelink-finance-staging.habibramadan888.workers.dev` as the employee entry link |
-| Remote URL called by this task? | No                                                                                        |
+| Remote URL called by this task? | Yes, read-only after approved static route deploy.                                        |
+
+## Live Unified Login Verification
+
+| Item                            | Result                                                                    |
+| ------------------------------- | ------------------------------------------------------------------------- |
+| Live unified login URL          | `https://homelink-finance.habibramadan888.workers.dev/unified-login.html` |
+| HTTP status                     | 200                                                                       |
+| Content-Type                    | `text/html`                                                               |
+| Contains Homelink login content | Yes                                                                       |
+| Returns API fallback text       | No                                                                        |
+| Evidence                        | `INTERNAL_QA_005B_UNIFIED_LOGIN_LIVE_SMOKE_RESULT.md`                     |
+| Production D1 write             | No                                                                        |
+| Production migration            | No                                                                        |
 
 ## Owner / Boss Candidate Links
 

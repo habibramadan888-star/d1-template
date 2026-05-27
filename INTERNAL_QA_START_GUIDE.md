@@ -1,6 +1,6 @@
 # Internal QA Start Guide
 
-Date: 2026-05-27, Asia/Dubai
+Date: 2026-05-28, Asia/Dubai
 
 Scope: unified login guide for internal QA. This file does not approve
 production deploy, staging deploy, production migration, D1 export/import/execute,
@@ -11,7 +11,7 @@ launch.
 
 | Role / Path          | Link                                                                      | Status                                      | Notes                                                              |
 | -------------------- | ------------------------------------------------------------------------- | ------------------------------------------- | ------------------------------------------------------------------ |
-| Unified login        | `https://homelink-finance.habibramadan888.workers.dev/unified-login.html` | New internal QA start link                  | All testers should start here.                                     |
+| Unified login        | `https://homelink-finance.habibramadan888.workers.dev/unified-login.html` | Live route verified after static deploy     | All testers should start here.                                     |
 | Employee destination | `https://homelink-finance.habibramadan888.workers.dev/employee-v3.html`   | Confirmed by Ramadan and local asset exists | Automatic destination after employee/staff role is confirmed.      |
 | Owner destination    | `https://homelink-finance.habibramadan888.workers.dev/index.html`         | Confirmed local main SPA asset exists       | Automatic destination after owner/manager/admin role is confirmed. |
 | Owner/root legacy    | `https://homelink-finance.habibramadan888.workers.dev/`                   | Preserved compatibility path                | Do not use as the default QA login path.                           |
@@ -35,6 +35,14 @@ Local `deploy-worker/wrangler.toml` config shows the default
 That means employee or owner write flows on the confirmed links can affect
 production data. This guide is safe for link correction, navigation, login, and
 read-only smoke planning only under current restrictions.
+
+## Live Route Verification
+
+`INTERNAL_QA_005B_UNIFIED_LOGIN_LIVE_SMOKE_RESULT.md` confirms the live unified
+login route now returns HTTP 200 with `text/html`, contains Homelink login
+content, and no longer returns the API fallback text. This verification was
+read-only and did not execute employee entry, handover, void/delete, settings,
+migration, D1 export/import/execute, or any D1 write.
 
 ## Stop Immediately If
 
