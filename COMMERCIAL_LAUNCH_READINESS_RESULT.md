@@ -1,6 +1,27 @@
 # Commercial Launch Readiness Result
 
-Generated: 2026-05-27T12:06:59.974Z
+Generated: 2026-05-27T12:32:26.250Z
+
+## Commercial Launch Review 012 Signoff Status Addendum
+
+Date: 2026-05-27, Asia/Dubai
+
+Result:
+
+- Signoff status review: completed item by item.
+- Approved production signoffs: 0.
+- Pending review signoffs: 5.
+- Manual-required signoffs: 13.
+- Blocked signoffs: 2.
+- Rejected signoffs: 0.
+- Missing production-blocking signoffs: 20.
+- Production deploy: no.
+- Production migration: no.
+- Production D1 write: no.
+- Staging D1 write: no.
+- Production-copy D1 write: no.
+- D1 export/import/execute: no.
+- Production cutover: `PRODUCTION_NO_GO`.
 
 ## Commercial Launch Review 011A Single Owner Signoff Model Addendum
 

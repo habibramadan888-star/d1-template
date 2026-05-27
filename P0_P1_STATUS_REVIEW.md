@@ -2,6 +2,21 @@
 
 Generated: 2026-05-23, Asia/Dubai
 
+## Commercial Launch Review 012 Signoff Status Addendum
+
+Date: 2026-05-27, Asia/Dubai
+
+| Area                         | REVIEW-012 Status  | Evidence                                            | Production Meaning                                      |
+| ---------------------------- | ------------------ | --------------------------------------------------- | ------------------------------------------------------- |
+| Approved production signoffs | 0                  | `COMMERCIAL_LAUNCH_SIGNOFF_STATUS_UPDATE_RESULT.md` | No production execution can proceed.                    |
+| Pending review signoffs      | 5                  | `COMMERCIAL_LAUNCH_SIGNOFF_EVIDENCE_REVIEW.md`      | Evidence exists, but no production approval is granted. |
+| Manual-required signoffs     | 13                 | `RAMADAN_SIGNOFF_ACTION_LIST.md`                    | Ramadan Habib must make explicit decisions.             |
+| Blocked signoffs             | 2                  | `COMMERCIAL_LAUNCH_HUMAN_SIGNOFF_TRACKER.md`        | Production deploy and cutover remain blocked.           |
+| P0-001 money precision       | MANUAL_REQUIRED    | `COMMERCIAL_LAUNCH_SIGNOFF_EVIDENCE_REVIEW.md`      | Accounting/TOP_25 approval missing; remains Partial.    |
+| P0-006 tenant/property scope | MANUAL_REQUIRED    | `RAMADAN_SIGNOFF_ACTION_LIST.md`                    | Final SaaS mapping approval missing; remains Partial.   |
+| P0-008 receivables           | MANUAL_REQUIRED    | `RAMADAN_SIGNOFF_ACTION_LIST.md`                    | Accounting lifecycle/allocation approval missing.       |
+| Production cutover           | `PRODUCTION_NO_GO` | `COMMERCIAL_LAUNCH_READINESS_RESULT.md`             | No production migration/deploy/write approved.          |
+
 ## Commercial Launch Review 011 Human Signoff Tracker Addendum
 
 Date: 2026-05-27, Asia/Dubai

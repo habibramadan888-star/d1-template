@@ -7,6 +7,15 @@ Result: `PRODUCTION_NO_GO`
 Unified responsible owner: Ramadan Habib. Each missing signoff below remains a
 separate approval category and must receive its own decision.
 
+REVIEW-012 status update:
+
+- Approved signoffs: 0.
+- Pending review signoffs: 5.
+- Manual-required signoffs: 13.
+- Blocked signoffs: 2.
+- Missing production-blocking signoffs: 20.
+- Production remains `PRODUCTION_NO_GO`.
+
 ## Must-have before production copy final dry-run
 
 | Priority | Missing Signoff                           | Responsible Owner | Why Required                                                                          | Blocks Which Step             | Evidence Needed                                                      |

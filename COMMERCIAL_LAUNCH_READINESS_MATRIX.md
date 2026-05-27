@@ -1,8 +1,20 @@
 # Commercial Launch Readiness Matrix
 
-Generated: 2026-05-27T12:06:59.972Z
+Generated: 2026-05-27T12:32:26.248Z
 
 Scope: read-only commercial launch gate. This script reads reports only and does not deploy, migrate, call APIs, access D1, or read secrets.
+
+## Commercial Launch Review 012 Signoff Status Addendum
+
+Date: 2026-05-27, Asia/Dubai
+
+| Area                   | REVIEW-012 Status  | Launch Meaning                                                 |
+| ---------------------- | ------------------ | -------------------------------------------------------------- |
+| Approved signoffs      | 0                  | No production action is approved.                              |
+| Pending review         | 5                  | Evidence exists for review, but no signoff is approved.        |
+| Manual-required        | 13                 | Ramadan Habib must make explicit decisions.                    |
+| Blocked signoffs       | 2                  | Production deploy and cutover remain blocked by upstream gaps. |
+| Commercial launch gate | `PRODUCTION_NO_GO` | Cutover remains blocked.                                       |
 
 ## Commercial Launch Review 011A Single Owner Signoff Model Addendum
 
