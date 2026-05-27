@@ -31,6 +31,16 @@ or write any D1.
 | Production D1 write             | No                                                                        |
 | Production migration            | No                                                                        |
 
+## Session Handoff Review
+
+| Item                               | Result                                                                                                  |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Owner destination session check    | `index-51-main.js` now starts by checking `/api/me` and enters owner UI for owner/manager/admin claims. |
+| Employee destination session check | `employee-v3.html` now starts by checking `/api/me` and enters employee UI for staff/employee claims.   |
+| Fallback behavior                  | Old owner login and employee PIN login remain available when `/api/me` is unauthenticated or expired.   |
+| Authority                          | `/api/me`; frontend role/local storage is not authority.                                                |
+| Live deployment status             | Requires separate deploy approval before this handoff fix affects live Worker assets.                   |
+
 ## Owner / Boss Candidate Links
 
 | Candidate Link                                                        | Local Evidence                                                               | Confirmed Exists Locally | Notes                                      |

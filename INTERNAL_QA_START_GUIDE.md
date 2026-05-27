@@ -44,6 +44,21 @@ content, and no longer returns the API fallback text. This verification was
 read-only and did not execute employee entry, handover, void/delete, settings,
 migration, D1 export/import/execute, or any D1 write.
 
+## Session Handoff Expectation
+
+After the session handoff fix is deployed, unified login should be a one-time
+login for both role destinations:
+
+| Role                    | Expected Handoff                                                                                                     |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Owner / manager / admin | Unified login routes to `index.html`; the owner SPA reads `/api/me` and must not show a second password prompt.      |
+| Employee / staff        | Unified login routes to `employee-v3.html`; the employee page reads `/api/me` and must not show a second PIN prompt. |
+
+If either destination shows a second login prompt after a successful unified
+login, record it as a bug with role, URL, time, and screenshot. Do not perform
+write-style testing on `homelink-finance` without separate production D1 write
+approval.
+
 ## Stop Immediately If
 
 | Condition                                                                 | Action                                                  |

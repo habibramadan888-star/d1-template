@@ -91,3 +91,80 @@ export function canSubmitEmployeeWorkflow(authClaim, options = {}) {
 export function getCommercialLaunchStatusForUnifiedLogin() {
   return PRODUCTION_CUTOVER_STATUS;
 }
+
+export function resolveOwnerSessionHandoff({ meStatus, meClaim } = {}) {
+  if (meStatus === 401 || meStatus === 403 || !meClaim) {
+    return {
+      page: "owner",
+      action: "SHOW_LOGIN",
+      showSecondLogin: true,
+      authority: "/api/me"
+    };
+  }
+
+  const decision = getUnifiedLoginDestination(meClaim);
+  if (decision.roleGroup === "owner") {
+    return {
+      page: "owner",
+      action: "ENTER_OWNER_APP",
+      roleForApp: "manager",
+      showSecondLogin: false,
+      authority: "/api/me"
+    };
+  }
+
+  if (decision.roleGroup === "employee") {
+    return {
+      page: "owner",
+      action: "REDIRECT",
+      destination: EMPLOYEE_DESTINATION,
+      showSecondLogin: false,
+      authority: "/api/me"
+    };
+  }
+
+  return {
+    page: "owner",
+    action: "DENY",
+    showSecondLogin: true,
+    authority: "/api/me"
+  };
+}
+
+export function resolveEmployeeSessionHandoff({ meStatus, meClaim } = {}) {
+  if (meStatus === 401 || meStatus === 403 || !meClaim) {
+    return {
+      page: "employee",
+      action: "SHOW_PIN_LOGIN",
+      showSecondLogin: true,
+      authority: "/api/me"
+    };
+  }
+
+  const decision = getUnifiedLoginDestination(meClaim);
+  if (decision.roleGroup === "employee") {
+    return {
+      page: "employee",
+      action: "ENTER_EMPLOYEE_APP",
+      showSecondLogin: false,
+      authority: "/api/me"
+    };
+  }
+
+  if (decision.roleGroup === "owner") {
+    return {
+      page: "employee",
+      action: "REDIRECT",
+      destination: OWNER_DESTINATION,
+      showSecondLogin: false,
+      authority: "/api/me"
+    };
+  }
+
+  return {
+    page: "employee",
+    action: "DENY",
+    showSecondLogin: true,
+    authority: "/api/me"
+  };
+}

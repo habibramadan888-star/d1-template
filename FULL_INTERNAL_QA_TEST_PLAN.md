@@ -47,6 +47,7 @@ commercial launch.
 | --------------------- | ---------------------------------------------------------------------------------------------------------------------- |
 | Employee flow         | Rent, deposit, arrears, short-pay, repayment, void, and handover scenarios are completed or have documented blockers.  |
 | Owner flow            | Dashboard, history, search/filter, handover review, and report/export behavior are reviewed with screenshots or notes. |
+| Unified login handoff | Owner and employee each log in once through unified login; no second password/PIN prompt appears after routing.        |
 | Finance flow          | Rent income, deposit liability, arrears, overdue, overpayment, and void behavior match the accepted staging rules.     |
 | Tenant/property scope | Employee, owner, and manager/admin access is constrained to expected tenant/property boundaries.                       |
 | Mobile usability      | Required employee and owner flows are usable on phone viewport.                                                        |
@@ -62,6 +63,7 @@ commercial launch.
 | P2 functional defect                 | Record steps, expected/actual result, screenshot, and continue unrelated tests if safe.                           |
 | P3 usability issue                   | Record notes and screenshots; group for later UI cleanup.                                                         |
 | Unclear accounting behavior          | Mark `MANUAL_REQUIRED`; do not invent pass/fail.                                                                  |
+| Second login after unified login     | Record as a unified-login handoff bug; do not continue role-flow testing until triaged.                           |
 
 ## Evidence Rules
 

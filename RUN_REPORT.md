@@ -6,6 +6,28 @@ Scope: governance, engineering baseline, local startup checks
 Production deploy: unified-login static route deploy executed later under explicit approval; no commercial cutover.
 Production database mutation: not executed
 
+## UNIFIED-LOGIN-FIX-002 Session Handoff
+
+Date: 2026-05-28, Asia/Dubai
+
+Scope: local/static fix for unified login session handoff across owner and employee destinations. No production D1 write, production migration, D1 export/import/execute, employee entry write, handover submit, void/delete, dashboard calculation change, financial formula change, feature flag cutover, or commercial launch GO occurred.
+
+Completed:
+
+- Diagnosed owner double-login as destination SPA startup not reading `/api/me`.
+- Added owner destination startup handoff through `/api/me`.
+- Added employee destination startup handoff through `/api/me`.
+- Preserved legacy owner password and employee PIN fallback for unauthenticated/expired sessions.
+- Added `test:unified-login-session-handoff`.
+- Ran static deploy dry-run only; no live deploy was executed.
+
+Result:
+
+- Owner double-login fix: ready locally.
+- Employee double-login risk fix: ready locally.
+- Live deploy required for production Worker to receive updated static assets.
+- Production cutover: `PRODUCTION_NO_GO`.
+
 ## UNIFIED-LOGIN-DEPLOY-001 Live Unified Login Static Route
 
 Date: 2026-05-28, Asia/Dubai

@@ -118,6 +118,7 @@
     "reproduce:employee-entry-econnreset": "node scripts/reproduce-employee-entry-econnreset.mjs",
     "test:feature-flag-matrix": "node --test tests/feature-flag-production-lock-matrix.spec.mjs",
     "test:unified-login": "node --test tests/unified-login-role-routing.spec.mjs",
+    "test:unified-login-session-handoff": "node --test tests/unified-login-session-handoff.spec.mjs",
     "qa:employee-entry-staging": "node scripts/qa-employee-entry-real-staging.mjs",
     "staging:generate-passwords": "node scripts/generate-staging-test-passwords.mjs",
     "staging:set-secrets": "node scripts/set-staging-secrets-from-local.mjs",

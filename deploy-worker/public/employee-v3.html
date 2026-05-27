@@ -1919,6 +1919,15 @@ function readSessionId(userid){
 const state={lockCards:[],current:null,depositBalance:null,rentConfig:{},rentConfigLoaded:false,drafts:[],tasks:[],followupItems:[],sessionId:'',user:null};
 function apiUrl(path){return location.protocol!=='file:'&&location.host.includes('workers.dev')?path:API_ORIGIN+path}
 async function apiFetch(path,opts={}){return fetch(apiUrl(path),{credentials:'include',...opts,headers:{'Content-Type':'application/json',...(opts.headers||{})}})}
+function normalizeAuthRole(r){return String(r||'').trim().toLowerCase()}
+function isEmployeeAuthRole(r){return ['staff','employee'].includes(normalizeAuthRole(r))}
+function isOwnerAuthRole(r){return ['manager','owner','admin'].includes(normalizeAuthRole(r))}
+async function fetchCurrentAuthUser(){
+  const r=await apiFetch('/api/me',{method:'GET'});
+  if(r.status===401||r.status===403)return null;
+  if(!r.ok)throw new Error('me_failed_'+r.status);
+  return r.json();
+}
 function toast(msg,duration=2600){const el=$('toast');el.textContent=msg;el.style.display='block';clearTimeout(window.__toast);window.__toast=setTimeout(()=>el.style.display='none',duration)}
 function showStatus(msg,type='ok'){
   const box=$('validationBox');
@@ -1994,7 +2003,7 @@ function applyEmployeeUser(user){
   }
   refreshSessionViews();
 }
-async function checkEmployeeSession(){
+async function checkEmployeeSessionLegacyDisabled(){
   try{
     const cached=JSON.parse(localStorage.getItem('empv3:user')||'null');
     const last=localStorage.getItem('empv3:lastEmployeeId')||cached?.userid||localStorage.getItem('empv3:operator')||'';
@@ -3183,6 +3192,34 @@ function renderContext(){
       <div class="secondary-box"><h4>核对说明<small>CHECK GUIDE</small></h4>${contextLine('优先级','PRIORITY','床位 → 历史欠款 → 日期 → 押金 → 月租')}${contextLine('备注锚点','REMARK SNAPSHOT',remark)}</div>
     </div>
   </div>`;
+}
+async function checkEmployeeSession(){
+  try{
+    const cached=JSON.parse(localStorage.getItem('empv3:user')||'null');
+    const last=localStorage.getItem('empv3:lastEmployeeId')||cached?.userid||localStorage.getItem('empv3:operator')||'';
+    if(last)$('loginEmployeeId').value=last;
+    localStorage.removeItem('empv3:user');
+  }catch{}
+  applyEmployeeUser(null);
+  $('loginOverlay').classList.add('hidden');
+  try{
+    const me=await fetchCurrentAuthUser();
+    if(!me){$('loginOverlay').classList.remove('hidden');return}
+    if(isEmployeeAuthRole(me.role)){
+      applyEmployeeUser({userid:me.userid,employee_name:me.employee_name||me.userid,role:me.role});
+      $('loginPin').value='';
+      return;
+    }
+    if(isOwnerAuthRole(me.role)){
+      location.replace('./index.html');
+      return;
+    }
+    $('loginHint').innerHTML='<span class="bad">This account role is not allowed on the employee entry page.</span>';
+    $('loginOverlay').classList.remove('hidden');
+  }catch(e){
+    console.warn('[UnifiedLogin] employee session handoff failed:',e);
+    $('loginOverlay').classList.remove('hidden');
+  }
 }
 applyBilingualUI();
 renderContext();syncForm();refreshSessionViews();

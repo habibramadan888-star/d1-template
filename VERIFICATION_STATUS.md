@@ -18,6 +18,21 @@ Date: 2026-05-28, Asia/Dubai
 Production cutover remains `PRODUCTION_NO_GO`. Full write QA is still not
 approved because the live Worker binds `DB = homelink`.
 
+## UNIFIED-LOGIN-FIX-002 Verification Addendum
+
+Date: 2026-05-28, Asia/Dubai
+
+| Verification           | Result   | Evidence                                                    | Commercial Meaning                                                                     |
+| ---------------------- | -------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Double-login diagnosis | READY    | `UNIFIED_LOGIN_DOUBLE_LOGIN_DIAGNOSIS.md`                   | Server session exists; target pages did not reuse `/api/me`.                           |
+| Owner handoff fix      | READY    | `UNIFIED_LOGIN_OWNER_SESSION_HANDOFF_FIX.md`                | Owner destination now reuses `/api/me` session before showing fallback login.          |
+| Employee handoff fix   | READY    | `UNIFIED_LOGIN_EMPLOYEE_SESSION_HANDOFF_FIX.md`             | Employee destination can reuse `/api/me` session before showing PIN fallback.          |
+| Session handoff tests  | PASS     | `tests/unified-login-session-handoff.spec.mjs`              | Covers owner/employee session reuse, role denial, tamper resistance, and NO-GO status. |
+| Deploy dry-run         | PASS     | `UNIFIED_LOGIN_SESSION_HANDOFF_DEPLOY_DRY_RUN.md`           | Static asset deploy dry-run only; no D1 write/migration.                               |
+| Deploy approval        | REQUIRED | `UNIFIED_LOGIN_SESSION_HANDOFF_DEPLOY_APPROVAL_REQUIRED.md` | Live Worker still requires explicit deploy approval for the fix to take effect online. |
+
+Production cutover remains `PRODUCTION_NO_GO`.
+
 ## INTERNAL-QA-001 Verification Addendum
 
 Date: 2026-05-27, Asia/Dubai

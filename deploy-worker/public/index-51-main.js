@@ -42,6 +42,39 @@ async function apiFetch(url, opts = {}) {
   const target=apiUrl(url);
   return fetch(target,{...opts,headers,credentials:'include'});
 }
+function normalizeAuthRole(r){return String(r||'').trim().toLowerCase();}
+function isOwnerAppRole(r){return ['manager','owner','admin'].includes(normalizeAuthRole(r));}
+function isEmployeeAppRole(r){return ['staff','employee'].includes(normalizeAuthRole(r));}
+function toOwnerSpaRole(r){return isOwnerAppRole(r)?'manager':normalizeAuthRole(r);}
+async function fetchCurrentAuthUser(){
+  const r=await apiFetch('/api/me',{method:'GET'});
+  if(r.status===401||r.status===403)return null;
+  if(!r.ok)throw new Error('me_failed_'+r.status);
+  return r.json();
+}
+async function resumeUnifiedOwnerSession(){
+  const overlay=document.getElementById('lockOverlay');
+  if(overlay)overlay.style.display='none';
+  try{
+    const me=await fetchCurrentAuthUser();
+    if(!me){if(overlay)overlay.style.display='flex';return false;}
+    if(isOwnerAppRole(me.role)){
+      await enterAs(toOwnerSpaRole(me.role));
+      return true;
+    }
+    if(isEmployeeAppRole(me.role)){
+      location.replace('./employee-v3.html');
+      return true;
+    }
+    console.warn('[UnifiedLogin] unsupported role for owner app');
+    if(overlay)overlay.style.display='flex';
+    return false;
+  }catch(e){
+    console.warn('[UnifiedLogin] owner session handoff failed:',e);
+    if(overlay)overlay.style.display='flex';
+    return false;
+  }
+}
 function showAuthExpired(){
   toast('登录已过期，请重新进入系统','err');
   role=null;
@@ -4653,5 +4686,5 @@ function hydrateInlineHandlers(root=document){
 new MutationObserver(list=>list.forEach(m=>m.addedNodes.forEach(n=>hydrateInlineHandlers(n)))).observe(document.documentElement,{childList:true,subtree:true});
 
 /* ── INIT ── */
-function init(){bindEvents();hydrateInlineHandlers(document);}
+function init(){bindEvents();hydrateInlineHandlers(document);resumeUnifiedOwnerSession();}
 init();
