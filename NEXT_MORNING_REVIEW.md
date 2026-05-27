@@ -1194,6 +1194,32 @@ Recommended next prompt:
 
 Production cutover remains `NO-GO`.
 
+## COMMERCIAL-LAUNCH-REVIEW-016 Morning Review Addendum
+
+Most important result:
+
+- Remaining production signoffs were classified for preflight planning without
+  approving production execution.
+
+Current status:
+
+- Approved production signoffs: 0.
+- Ready for preflight review: 9.
+- Pending Ramadan review: 1.
+- Manual-required signoffs: 8.
+- Blocked signoffs: 2.
+- Production-blocking signoffs remaining: 20.
+- Production cutover: `PRODUCTION_NO_GO`.
+
+Recommended next prompt:
+
+```text
+进入 TASK COMMERCIAL-LAUNCH-REVIEW-017：Apply Ramadan preflight signoff decisions.
+只更新文档和 signoff tracker。
+禁止 production deploy、production migration、production D1 write、D1 export/import/execute、dashboard switch、commercial cutover。
+不得自动批准未明确填写的 decision。
+```
+
 ## COMMERCIAL-LAUNCH-REVIEW-007 Morning Review Addendum
 
 Most important result:

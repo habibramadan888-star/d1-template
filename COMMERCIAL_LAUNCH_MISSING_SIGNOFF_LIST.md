@@ -58,6 +58,16 @@ REVIEW-015A Ramadan receivables/accounting decision update:
 - Missing production-blocking signoffs: 20.
 - Production remains `PRODUCTION_NO_GO`.
 
+REVIEW-016 remaining preflight signoff classification update:
+
+- No production signoff was changed to `APPROVED`.
+- `READY_FOR_PREFLIGHT_REVIEW`: 9.
+- `PENDING_RAMADAN_REVIEW`: 1.
+- `MANUAL_REQUIRED`: 8.
+- `BLOCKED`: 2.
+- Missing production-blocking signoffs: 20.
+- Production remains `PRODUCTION_NO_GO`.
+
 ## Must-have before production copy final dry-run
 
 | Priority | Missing Signoff                           | Responsible Owner | Why Required                                                                                                                                               | Blocks Which Step             | Evidence Needed                                                                                                                                                                                        |

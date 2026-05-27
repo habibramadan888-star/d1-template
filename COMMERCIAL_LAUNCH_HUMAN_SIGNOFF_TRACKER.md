@@ -44,3 +44,23 @@ Summary:
 - Rejected signoffs: 0.
 - Unified owner: Ramadan Habib.
 - Approval categories remain separate.
+
+## REVIEW-016 Preflight Classification Addendum
+
+Date: 2026-05-27, Asia/Dubai
+
+No `Current Status` value was changed to `APPROVED`. REVIEW-016 only classifies
+which signoffs can be reviewed for production preflight planning.
+
+| Classification             | Count | Signoffs                                                               |
+| -------------------------- | ----: | ---------------------------------------------------------------------- |
+| READY_FOR_PREFLIGHT_REVIEW |     9 | SO-006, SO-008, SO-009, SO-010, SO-011, SO-012, SO-013, SO-014, SO-015 |
+| PENDING_RAMADAN_REVIEW     |     1 | SO-007                                                                 |
+| MANUAL_REQUIRED            |     8 | SO-001, SO-002, SO-003, SO-004, SO-005, SO-016, SO-019, SO-020         |
+| BLOCKED                    |     2 | SO-017, SO-018                                                         |
+| NOT_PRODUCTION_BLOCKING    |     0 | none                                                                   |
+| NEEDS_FIX                  |     0 | none                                                                   |
+
+Production-blocking signoffs remaining: 20.
+
+Production cutover remains `PRODUCTION_NO_GO`.

@@ -21,3 +21,20 @@ Scope: manual signoff preparation only. This file does not approve production.
 
 Production remains `PRODUCTION_NO_GO` until each required signoff is separately
 approved.
+
+## REVIEW-016 Preflight Decision Order
+
+Date: 2026-05-27, Asia/Dubai
+
+The next safe decision type is **approve for preflight only**. Do not approve
+production write, production deploy, or production cutover from this list.
+
+| Priority | Action                                                                            | Evidence File                                                                                           | Decision Needed                                                                             | Suggested Status           |
+| -------: | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | -------------------------- |
+|        1 | Decide remaining TOP_25 money/accounting risks                                    | `RAMADAN_TOP_25_MONEY_RISK_DECISION_SHEET.md`; `COMMERCIAL_LAUNCH_REMAINING_SIGNOFF_CLASSIFICATION.md`  | Close, keep open, or require fix for the remaining 22 money/accounting risks.               | PENDING_RAMADAN_REVIEW     |
+|        2 | Decide preflight-only acceptance for tenant/property mapping                      | `RAMADAN_TENANT_PROPERTY_MAPPING_DECISION_SHEET.md`; `PRODUCTION_PREFLIGHT_READINESS_MAP.md`            | Decide whether mapping can be used to prepare a production preflight packet only.           | READY_FOR_PREFLIGHT_REVIEW |
+|        3 | Decide preflight-only acceptance for receivables/accounting                       | `RAMADAN_RECEIVABLES_ACCOUNTING_DECISION_SHEET.md`; `RECEIVABLES_ACCOUNTING_SIGNOFF_UPDATE_RESULT.md`   | Confirm Q1-Q9 may drive production preflight planning only.                                 | READY_FOR_PREFLIGHT_REVIEW |
+|        4 | Decide preflight-only acceptance for backend totals, employee entry, and handover | `PRODUCTION_PREFLIGHT_READINESS_MAP.md`; `COMMERCIAL_LAUNCH_P0_STATUS_SUMMARY.md`                       | Decide whether these can enter production preflight packet preparation without live switch. | READY_FOR_PREFLIGHT_REVIEW |
+|        5 | Prepare manual-required production D1 backup/rollback/SQL approvals               | `RAMADAN_PRODUCTION_PREFLIGHT_DECISION_CHECKLIST.md`; `PRODUCTION_BACKUP_RESTORE_APPROVAL_CHECKLIST.md` | Do not approve execution yet; prepare exact approval packets.                               | MANUAL_REQUIRED            |
+
+Production remains `PRODUCTION_NO_GO`.

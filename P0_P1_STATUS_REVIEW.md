@@ -1833,3 +1833,19 @@ P0 status remains unchanged:
 
 Next required review: manual reconciliation review and copy rollback rehearsal
 approval before any production consideration.
+
+## Commercial Launch Review 016 Remaining Preflight Signoffs Addendum
+
+Date: 2026-05-27, Asia/Dubai
+
+| Area                         | REVIEW-016 Status  | Evidence                                                | Production Meaning                                                                      |
+| ---------------------------- | ------------------ | ------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| Approved production signoffs | 0                  | `COMMERCIAL_LAUNCH_REVIEW_016_SIGNOFF_UPDATE_RESULT.md` | No production execution can proceed.                                                    |
+| Ready for preflight review   | 9                  | `COMMERCIAL_LAUNCH_REMAINING_SIGNOFF_CLASSIFICATION.md` | These can be reviewed for preflight-only planning, not production execution.            |
+| Pending Ramadan review       | 1                  | `RAMADAN_PRODUCTION_PREFLIGHT_DECISION_CHECKLIST.md`    | TOP_25 residual money decisions remain open.                                            |
+| Manual-required signoffs     | 8                  | `PRODUCTION_PREFLIGHT_READINESS_MAP.md`                 | Production target/backup/rollback/SQL/flags/monitoring details remain missing.          |
+| Blocked signoffs             | 2                  | `COMMERCIAL_LAUNCH_HUMAN_SIGNOFF_TRACKER.md`            | Production deploy and cutover remain blocked.                                           |
+| P0-001 money precision       | Partial            | Signoff tracker and TOP_25 evidence                     | Accounting/TOP_25 approval remains open.                                                |
+| P0-006 tenant/property scope | Partial            | Tenant mapping decision sheet                           | Final SaaS mapping is not production-approved.                                          |
+| P0-008 receivables           | Partial            | Receivables accounting decision evidence                | Q1-Q9 are preflight input only; production backfill/dashboard switch remain unapproved. |
+| Production cutover           | `PRODUCTION_NO_GO` | Commercial launch gate                                  | No production migration/deploy/write/cutover is approved.                               |

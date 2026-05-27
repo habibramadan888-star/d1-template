@@ -1,6 +1,6 @@
 # Commercial Launch Readiness Matrix
 
-Generated: 2026-05-27T15:03:50.748Z
+Generated: 2026-05-27T15:33:23.582Z
 
 Scope: read-only commercial launch gate. This script reads reports only and does not deploy, migrate, call APIs, access D1, or read secrets.
 
@@ -30,6 +30,19 @@ Scope: read-only commercial launch gate. This script reads reports only and does
 - Real staging QA is `MANUAL_REQUIRED` until target resources, accounts, backup, rollback, and feature flags are provided.
 - Production cutover is `NO-GO` because multiple P0/P1 launch gates remain incomplete.
 - This matrix is not deployment approval.
+
+## Commercial Launch Review 016 Remaining Preflight Signoff Addendum
+
+Date: 2026-05-27, Asia/Dubai
+
+| Area                         | REVIEW-016 Status  | Launch Meaning                                                                                                        |
+| ---------------------------- | ------------------ | --------------------------------------------------------------------------------------------------------------------- |
+| Ready for preflight review   | 9 signoffs         | Evidence can be reviewed for preflight-only planning; not production approval.                                        |
+| Pending Ramadan review       | 1 signoff          | TOP_25 money risks still need item-by-item decisions.                                                                 |
+| Manual-required signoffs     | 8 signoffs         | Production D1 target, backup, rollback, SQL, feature flags, monitoring, and rollback owner details are still missing. |
+| Blocked signoffs             | 2 signoffs         | Production deploy and cutover remain blocked by upstream signoffs.                                                    |
+| Approved production signoffs | 0                  | No production write, migration, deploy, dashboard switch, or cutover is approved.                                     |
+| Commercial launch gate       | `PRODUCTION_NO_GO` | Cutover remains blocked.                                                                                              |
 
 ## Commercial Launch Review 015A Ramadan Receivables Accounting Decision Addendum
 

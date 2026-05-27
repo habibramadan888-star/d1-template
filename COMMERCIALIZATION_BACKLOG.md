@@ -34,6 +34,31 @@ Current signoff counts:
 
 Production remains `PRODUCTION_NO_GO`.
 
+## Commercial Launch Review 016 Remaining Preflight Signoffs Addendum
+
+Date: 2026-05-27, Asia/Dubai
+
+Remaining signoff review status: `PRODUCTION_NO_GO`.
+
+Completed:
+
+- Classified all 20 non-approved production signoffs.
+- Identified 9 signoffs ready for preflight-only review.
+- Identified 1 signoff pending Ramadan item-by-item review.
+- Preserved 8 manual-required signoffs and 2 blocked signoffs.
+- Generated Ramadan production preflight decision checklist.
+
+Remaining blockers:
+
+- No signoff is approved for production execution.
+- Production D1 target/backup/restore/rollback approval is missing.
+- Final production SQL and row counts are missing.
+- TOP_25 residual money decisions are incomplete.
+- Production feature flags, deploy, cutover window, and post-cutover monitoring
+  remain unapproved.
+
+Production remains `PRODUCTION_NO_GO`.
+
 ## Commercial Launch Review 011 Human Signoff Tracker Addendum
 
 Date: 2026-05-27, Asia/Dubai
