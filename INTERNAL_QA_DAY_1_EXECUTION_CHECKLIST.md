@@ -2,9 +2,10 @@
 
 Date: 2026-05-27, Asia/Dubai
 
-Scope: Day 1 internal staging QA only. This checklist does not approve public
-beta, production deploy, production migration, production D1 write, staging D1
-write by Codex, feature flags, dashboard authority switch, or commercial launch.
+Scope: Day 1 internal QA checklist with corrected role links. This checklist
+does not approve public beta, production deploy, production migration,
+production D1 write, staging D1 write by Codex, feature flags, dashboard
+authority switch, or commercial launch.
 
 Production status must remain `PRODUCTION_NO_GO`.
 
@@ -12,9 +13,10 @@ Production status must remain `PRODUCTION_NO_GO`.
 
 | Item                           | Required Check                                                                 | Result | Notes |
 | ------------------------------ | ------------------------------------------------------------------------------ | ------ | ----- |
-| Confirm environment            | Use staging only.                                                              |        |       |
-| Confirm URL                    | `https://homelink-finance-staging.habibramadan888.workers.dev`                 |        |       |
-| Confirm production not used    | Do not open production URL.                                                    |        |       |
+| Confirm environment            | Use corrected internal QA links; production write remains forbidden.           |        |       |
+| Confirm employee URL           | `https://homelink-finance.habibramadan888.workers.dev/employee-v3.html`        |        |       |
+| Confirm owner/main app URL     | `https://homelink-finance.habibramadan888.workers.dev/`                        |        |       |
+| Confirm production write ban   | Do not submit production-affecting writes without explicit approval.           |        |       |
 | Confirm test data label        | Use `QA_INTERNAL_STAGING_2026_05_27` where possible.                           |        |       |
 | Confirm evidence folder        | Prepare local folder for screenshots/videos.                                   |        |       |
 | Confirm bug template           | Use `BUG_REPORT_TEMPLATE.md`.                                                  |        |       |
@@ -35,29 +37,32 @@ Do not write passwords, tokens, cookies, or recovery codes in this file.
 
 ## 3. Test URL
 
-| Environment | URL                                                            | Use                     |
-| ----------- | -------------------------------------------------------------- | ----------------------- |
-| staging     | `https://homelink-finance-staging.habibramadan888.workers.dev` | Day 1 internal QA       |
-| production  | Do not use                                                     | Forbidden for this task |
+| Role / Environment | URL                                                                     | Use                                                |
+| ------------------ | ----------------------------------------------------------------------- | -------------------------------------------------- |
+| employee           | `https://homelink-finance.habibramadan888.workers.dev/employee-v3.html` | Confirmed employee entry link                      |
+| owner / boss       | `https://homelink-finance.habibramadan888.workers.dev/`                 | Confirmed local main SPA owner/manager entry       |
+| owner explicit     | `https://homelink-finance.habibramadan888.workers.dev/index.html`       | Explicit main SPA asset path                       |
+| staging Worker     | `https://homelink-finance-staging.habibramadan888.workers.dev`          | Do not use as default employee entry link          |
+| production writes  | Not approved                                                            | Forbidden unless a separate approval is documented |
 
 ## 4. Desktop Test Steps
 
-| Step  | Action                                  | Expected Result                                                | Evidence                                           |
-| ----- | --------------------------------------- | -------------------------------------------------------------- | -------------------------------------------------- |
-| D-001 | Open staging URL in desktop browser.    | Page loads without production redirect.                        | Screenshot of landing/login page with URL visible. |
-| D-002 | Login as employee.                      | Employee view opens and owner-only controls are not visible.   | Screenshot after login.                            |
-| D-003 | Run employee main flow checklist below. | Employee flow produces expected QA evidence or documented bug. | Screenshots per flow.                              |
-| D-004 | Logout employee.                        | User returns to login or unauthenticated state.                | Screenshot.                                        |
-| D-005 | Login as owner.                         | Owner dashboard/history area opens.                            | Screenshot after login.                            |
-| D-006 | Run owner main flow checklist below.    | Owner flow produces expected QA evidence or documented bug.    | Screenshots per flow.                              |
-| D-007 | Refresh dashboard/history.              | Data remains consistent after reload.                          | Before/after screenshots.                          |
-| D-008 | Logout owner.                           | User returns to login or unauthenticated state.                | Screenshot.                                        |
+| Step  | Action                                          | Expected Result                                                | Evidence                                           |
+| ----- | ----------------------------------------------- | -------------------------------------------------------------- | -------------------------------------------------- |
+| D-001 | Open corrected employee URL in desktop browser. | Employee page loads at the confirmed link.                     | Screenshot of landing/login page with URL visible. |
+| D-002 | Login as employee.                              | Employee view opens and owner-only controls are not visible.   | Screenshot after login.                            |
+| D-003 | Run employee main flow checklist below.         | Employee flow produces expected QA evidence or documented bug. | Screenshots per flow.                              |
+| D-004 | Logout employee.                                | User returns to login or unauthenticated state.                | Screenshot.                                        |
+| D-005 | Open owner/main app URL and login as owner.     | Owner dashboard/history area opens.                            | Screenshot after login.                            |
+| D-006 | Run owner main flow checklist below.            | Owner flow produces expected QA evidence or documented bug.    | Screenshots per flow.                              |
+| D-007 | Refresh dashboard/history.                      | Data remains consistent after reload.                          | Before/after screenshots.                          |
+| D-008 | Logout owner.                                   | User returns to login or unauthenticated state.                | Screenshot.                                        |
 
 ## 5. Mobile Test Steps
 
 | Step  | Action                                                                     | Expected Result                                      | Evidence                   |
 | ----- | -------------------------------------------------------------------------- | ---------------------------------------------------- | -------------------------- |
-| M-001 | Open staging URL on phone or mobile viewport.                              | Login page is usable without horizontal blocking.    | Mobile screenshot.         |
+| M-001 | Open corrected employee URL on phone or mobile viewport.                   | Login page is usable without horizontal blocking.    | Mobile screenshot.         |
 | M-002 | Login as employee.                                                         | Employee controls are reachable.                     | Mobile screenshot.         |
 | M-003 | Submit or dry-run one safe QA rent/deposit flow if approved for manual QA. | Form is usable and validation messages are readable. | Mobile screenshots.        |
 | M-004 | Open handover flow.                                                        | Handover content and submit controls are visible.    | Mobile screenshot.         |
@@ -101,7 +106,7 @@ Do not write passwords, tokens, cookies, or recovery codes in this file.
 
 | Screenshot ID | Required Screenshot                          | Role           | Timing                       |
 | ------------- | -------------------------------------------- | -------------- | ---------------------------- |
-| SS-001        | Staging URL login page                       | all            | Before login                 |
+| SS-001        | Corrected employee or owner login page       | all            | Before login                 |
 | SS-002        | Employee login success                       | employee       | After login                  |
 | SS-003        | Employee rent/deposit/short-pay form         | employee       | Before submit                |
 | SS-004        | Employee submit result or validation message | employee       | After submit attempt         |
@@ -142,7 +147,7 @@ Do not write passwords, tokens, cookies, or recovery codes in this file.
 | Owner sees another tenant/property data                          | P1       | Stop owner permission tests and open bug.                                     |
 | Export/report leaks out-of-scope data                            | P1       | Stop export/report tests and open bug.                                        |
 | Password/token/cookie appears in UI, screenshot, logs, or export | P1       | Stop, redact evidence, open security bug.                                     |
-| Staging redirects to production or production URL is used        | P1       | Stop all tests and correct environment before continuing.                     |
+| Unapproved production write is attempted                         | P1       | Stop all tests and request explicit production D1 write approval.             |
 
 ## 11. Can Record And Continue
 
@@ -159,7 +164,7 @@ Do not write passwords, tokens, cookies, or recovery codes in this file.
 
 | Area              | Day 1 Pass Standard                                                      |
 | ----------------- | ------------------------------------------------------------------------ |
-| Environment       | Only staging URL used; production remains untouched.                     |
+| Environment       | Corrected role links used; production write remains untouched.           |
 | Accounts          | Employee and owner staging accounts confirmed without secrets in docs.   |
 | Desktop employee  | Login, at least one safe entry path, validation path, and logout tested. |
 | Desktop owner     | Dashboard, history, due/overdue/arrears, and logout tested.              |
@@ -175,15 +180,16 @@ production is touched.
 
 ## 13. End-of-Day Report Template
 
-| Field                     | Value                                                          |
-| ------------------------- | -------------------------------------------------------------- |
-| QA Date                   |                                                                |
-| Tester(s)                 |                                                                |
-| Environment               | staging                                                        |
-| Staging URL               | `https://homelink-finance-staging.habibramadan888.workers.dev` |
-| Roles Tested              | employee / owner / manager-admin                               |
-| Production Used?          | no                                                             |
-| Production Cutover Status | `PRODUCTION_NO_GO`                                             |
+| Field                     | Value                                                                   |
+| ------------------------- | ----------------------------------------------------------------------- |
+| QA Date                   |                                                                         |
+| Tester(s)                 |                                                                         |
+| Environment               | internal QA; production writes not approved                             |
+| Employee URL              | `https://homelink-finance.habibramadan888.workers.dev/employee-v3.html` |
+| Owner/main app URL        | `https://homelink-finance.habibramadan888.workers.dev/`                 |
+| Roles Tested              | employee / owner / manager-admin                                        |
+| Production Write Used?    | no                                                                      |
+| Production Cutover Status | `PRODUCTION_NO_GO`                                                      |
 
 | Area                        | Planned | Run | Pass | Fail | Blocked | Notes |
 | --------------------------- | ------: | --: | ---: | ---: | ------: | ----- |

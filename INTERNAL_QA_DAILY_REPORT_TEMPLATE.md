@@ -3,16 +3,17 @@
 Use one copy per internal staging QA day. Do not include passwords, tokens,
 cookies, or unmasked sensitive screenshots.
 
-| Field                     | Value                                                               |
-| ------------------------- | ------------------------------------------------------------------- |
-| QA Date                   |                                                                     |
-| Tester(s)                 |                                                                     |
-| Environment               | staging                                                             |
-| Staging URL               | `https://homelink-finance-staging.habibramadan888.workers.dev`      |
-| Roles Tested              | employee / owner / manager-admin                                    |
-| Test Cycle                | Round 1 functional / Round 2 finance / Round 3 permission-exception |
-| Production Used?          | no                                                                  |
-| Production Cutover Status | `PRODUCTION_NO_GO`                                                  |
+| Field                     | Value                                                                   |
+| ------------------------- | ----------------------------------------------------------------------- |
+| QA Date                   |                                                                         |
+| Tester(s)                 |                                                                         |
+| Environment               | internal QA; production writes not approved                             |
+| Employee URL              | `https://homelink-finance.habibramadan888.workers.dev/employee-v3.html` |
+| Owner/main app URL        | `https://homelink-finance.habibramadan888.workers.dev/`                 |
+| Roles Tested              | employee / owner / manager-admin                                        |
+| Test Cycle                | Round 1 functional / Round 2 finance / Round 3 permission-exception     |
+| Production Write Used?    | no                                                                      |
+| Production Cutover Status | `PRODUCTION_NO_GO`                                                      |
 
 ## Summary
 
