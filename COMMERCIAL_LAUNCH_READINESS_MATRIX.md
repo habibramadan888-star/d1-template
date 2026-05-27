@@ -1,22 +1,22 @@
 # Commercial Launch Readiness Matrix
 
-Generated: 2026-05-27T06:42:52.601Z
+Generated: 2026-05-27T07:03:50.373Z
 
 Scope: read-only commercial launch gate. This script reads reports only and does not deploy, migrate, call APIs, access D1, or read secrets.
 
-## Commercial Launch Review 007 Addendum
+## Commercial Launch Review 008 Addendum
 
 Date: 2026-05-27, Asia/Dubai
 
-| Area                          | REVIEW-007 Status  | Launch Meaning                                                   |
-| ----------------------------- | ------------------ | ---------------------------------------------------------------- |
-| Copy row-level backfill       | EXECUTED           | Copy-only evidence improved; not production approval.            |
-| Money conversion              | PASS_WITH_WARNINGS | Values match legacy decimal-to-fils conversion on copy.          |
-| Tenant/property compatibility | PASS_WITH_WARNINGS | Legacy fallback mapping only; final SaaS authority still manual. |
-| Audit/event compatibility     | PASS_WITH_WARNINGS | Visibility policy still requires review.                         |
-| Receivables data backfill     | MANUAL_REQUIRED    | Lifecycle/allocation rows were not inserted.                     |
-| Rollback execution            | MANUAL_REQUIRED    | Review complete; execution not performed.                        |
-| Commercial launch gate        | `PRODUCTION_NO_GO` | Cutover remains blocked.                                         |
+| Area                          | REVIEW-008 Status      | Launch Meaning                                               |
+| ----------------------------- | ---------------------- | ------------------------------------------------------------ |
+| Manual reconciliation review  | COMPLETED              | Documentation-only review; no D1 command executed.           |
+| Money conversion              | ACCEPT_FOR_COPY_REVIEW | Accounting signoff and TOP_25 review still required.         |
+| Tenant/property compatibility | COMPATIBILITY_ONLY     | Final SaaS tenant authority remains manual-required.         |
+| Audit/event compatibility     | COMPATIBILITY_ONLY     | Visibility policy remains manual-required before production. |
+| Receivables data backfill     | MANUAL_REQUIRED        | Lifecycle/allocation rows remain unapproved.                 |
+| Copy rollback rehearsal       | APPROVAL_REQUIRED      | Next task needs explicit copy-only rollback approval.        |
+| Commercial launch gate        | `PRODUCTION_NO_GO`     | Cutover remains blocked.                                     |
 
 | Area                            | Evidence                                                                                          | Required Markers                                                   | Missing        | Result          | Production Gate        |
 | ------------------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ | -------------- | --------------- | ---------------------- |

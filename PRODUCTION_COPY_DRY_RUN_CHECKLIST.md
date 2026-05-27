@@ -73,3 +73,19 @@ Result:
 - Production deploy: no.
 - Production migration: no.
 - Production cutover: `PRODUCTION_NO_GO`.
+
+## REVIEW-008 Update
+
+Manual reconciliation review was completed without running any D1 command.
+
+Result:
+
+- Money conversion evidence: acceptable for copy review; accounting signoff still required.
+- Tenant/property compatibility evidence: accepted as compatibility-only; final SaaS mapping still required.
+- Audit/event compatibility evidence: accepted as compatibility-only; visibility policy still requires review.
+- Receivables data/allocation backfill: MANUAL_REQUIRED.
+- Copy rollback rehearsal: APPROVAL_REQUIRED.
+- Production D1 write: no.
+- Production deploy: no.
+- Production migration: no.
+- Production cutover: `PRODUCTION_NO_GO`.

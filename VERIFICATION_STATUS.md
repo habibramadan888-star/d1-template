@@ -4,6 +4,21 @@ Generated: 2026-05-23, Asia/Dubai
 
 This file records the safety verification commands rerun during project status reconciliation. Commands were run without modifying business logic, production configuration, or production database data.
 
+## Commercial Launch Review 008 Verification Addendum
+
+Date: 2026-05-27, Asia/Dubai
+
+| Verification                   | Result                      | Evidence                                                                                | Commercial Meaning                                                          |
+| ------------------------------ | --------------------------- | --------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| REVIEW-007 result review       | PASS                        | `PRODUCTION_COPY_ROW_BACKFILL_008_MANUAL_RECONCILIATION_REVIEW.md`                      | Copy row-level backfill evidence was reviewed without production execution. |
+| Accounting signoff checklist   | ACCOUNTING_SIGNOFF_REQUIRED | `PRODUCTION_COPY_ROW_BACKFILL_008_ACCOUNTING_SIGNOFF_CHECKLIST.md`                      | Money values need accounting and TOP_25 risk acceptance before production.  |
+| Tenant mapping review          | COMPATIBILITY_ONLY          | `PRODUCTION_COPY_ROW_BACKFILL_008_TENANT_MAPPING_REVIEW.md`                             | Legacy mapping is copy-compatible but not production SaaS authority.        |
+| Receivables decision           | MANUAL_REQUIRED             | `PRODUCTION_COPY_ROW_BACKFILL_008_RECEIVABLES_DECISION.md`                              | No receivables row/allocation backfill is approved for production.          |
+| Rollback rehearsal next prompt | READY                       | `NEXT_PROMPT_COMMERCIAL_LAUNCH_REVIEW_009_COPY_ROLLBACK_REHEARSAL_APPROVAL_REQUIRED.md` | REVIEW-009 requires explicit copy-only rollback approval.                   |
+
+No production D1 write, staging D1 write, production-copy D1 write, migration,
+deploy, export/import/execute, or cutover occurred in REVIEW-008.
+
 ## Commercial Launch Review 006 Verification Addendum
 
 Date: 2026-05-27, Asia/Dubai

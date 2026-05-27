@@ -9,6 +9,27 @@ Production deploy: not executed
 Production database mutation: not executed
 Remote D1 migration: not executed
 
+## Commercial Launch Review 008 Addendum
+
+Date: 2026-05-27, Asia/Dubai
+
+REVIEW-008 reviewed the REVIEW-007 production-copy row-level backfill evidence.
+It did not run D1 export, import, execute, migration, deploy, rollback, or
+cutover.
+
+Current decision:
+
+- Copy row-level money/scope compatibility evidence: acceptable for manual review only.
+- Accounting signoff: required.
+- Tenant/property SaaS authority mapping: required.
+- Receivables data/allocation decision: required.
+- Copy rollback rehearsal: ready for a separate explicit approval task.
+- Production: `PRODUCTION_NO_GO`.
+
+Recommended next prompt:
+
+- `NEXT_PROMPT_COMMERCIAL_LAUNCH_REVIEW_009_COPY_ROLLBACK_REHEARSAL_APPROVAL_REQUIRED.md`
+
 ## Commercial Launch Review 006 Addendum
 
 Date: 2026-05-27, Asia/Dubai

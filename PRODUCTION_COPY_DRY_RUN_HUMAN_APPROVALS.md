@@ -63,3 +63,22 @@ Execution result:
 - Rollback execution remains manual-required.
 - Production approval, production migration, production D1 write, production
   deploy, and production cutover remain not approved.
+
+## REVIEW-008 Approval Update
+
+REVIEW-008 was documentation-only manual reconciliation review. No new D1
+approval was consumed and no D1 command was executed.
+
+Updated status:
+
+- Accounting reconciliation: MANUAL_REQUIRED.
+- TOP_25 money risks: MANUAL_REQUIRED.
+- Tenant mapping: COMPATIBILITY_ONLY / MANUAL_REQUIRED for production SaaS authority.
+- Receivables mapping: MANUAL_REQUIRED.
+- Rollback dry-run: APPROVAL_REQUIRED.
+- Production deploy approval: MANUAL_REQUIRED.
+- Cutover approval: MANUAL_REQUIRED.
+
+Next approval task:
+
+- `NEXT_PROMPT_COMMERCIAL_LAUNCH_REVIEW_009_COPY_ROLLBACK_REHEARSAL_APPROVAL_REQUIRED.md`

@@ -9,6 +9,27 @@ Production database mutation: not executed
 
 The project is not yet ready for commercial SaaS launch. Static checks, local Worker startup, and unauthenticated smoke checks now pass, but commercial blockers remain in finance precision, tenant isolation, migration discipline, and audited financial mutation flows.
 
+## Commercial Launch Review 008 Addendum
+
+Date: 2026-05-27, Asia/Dubai
+
+Production-copy row-level reconciliation status: `MANUAL_REQUIRED`.
+
+Reviewed:
+
+- `PRODUCTION_COPY_ROW_BACKFILL_008_MANUAL_RECONCILIATION_REVIEW.md`
+- `PRODUCTION_COPY_ROW_BACKFILL_008_ACCOUNTING_SIGNOFF_CHECKLIST.md`
+- `PRODUCTION_COPY_ROW_BACKFILL_008_TENANT_MAPPING_REVIEW.md`
+- `PRODUCTION_COPY_ROW_BACKFILL_008_RECEIVABLES_DECISION.md`
+
+Remaining blockers:
+
+- Accounting signoff and TOP_25 money risk acceptance are not complete.
+- Tenant/property mapping remains compatibility-only and not final SaaS authority.
+- Receivables row/allocation backfill remains manual-required.
+- Copy rollback rehearsal has not been executed.
+- Production cutover remains `PRODUCTION_NO_GO`.
+
 ## Commercial Launch Review 006 Addendum
 
 Date: 2026-05-27, Asia/Dubai

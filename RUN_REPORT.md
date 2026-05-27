@@ -6,6 +6,31 @@ Scope: governance, engineering baseline, local startup checks
 Production deploy: not executed  
 Production database mutation: not executed
 
+## Commercial Launch Review 008 Manual Reconciliation Addendum
+
+Date: 2026-05-27, Asia/Dubai
+
+Scope: review REVIEW-007 production-copy row-level backfill results and prepare
+manual reconciliation / rollback rehearsal decision packet. No D1 export,
+import, execute, migration, deploy, or cutover was run in REVIEW-008.
+
+| Item                  | Result          | Evidence                                                                                | Notes                                                                  |
+| --------------------- | --------------- | --------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| Manual reconciliation | MANUAL_REQUIRED | `PRODUCTION_COPY_ROW_BACKFILL_008_MANUAL_RECONCILIATION_REVIEW.md`                      | Money and scope compatibility are acceptable for copy review only.     |
+| Accounting checklist  | REQUIRED        | `PRODUCTION_COPY_ROW_BACKFILL_008_ACCOUNTING_SIGNOFF_CHECKLIST.md`                      | TOP_25 money risks and accounting signoff remain open.                 |
+| Tenant mapping review | COMPAT_ONLY     | `PRODUCTION_COPY_ROW_BACKFILL_008_TENANT_MAPPING_REVIEW.md`                             | Legacy compatibility mapping is not final SaaS tenant authority.       |
+| Receivables decision  | MANUAL_REQUIRED | `PRODUCTION_COPY_ROW_BACKFILL_008_RECEIVABLES_DECISION.md`                              | Receivables data/allocation backfill remains a separate approval item. |
+| Next prompt           | READY           | `NEXT_PROMPT_COMMERCIAL_LAUNCH_REVIEW_009_COPY_ROLLBACK_REHEARSAL_APPROVAL_REQUIRED.md` | Copy rollback rehearsal requires explicit approval before execution.   |
+
+Safety:
+
+- Production deploy: no.
+- Production migration: no.
+- Production D1 write: no.
+- Staging D1 write: no.
+- Production-copy D1 write in REVIEW-008: no.
+- Production cutover: `PRODUCTION_NO_GO`.
+
 ## Commercial Launch Review 006 Row-Level Backfill Approval Packet Addendum
 
 Date: 2026-05-27, Asia/Dubai

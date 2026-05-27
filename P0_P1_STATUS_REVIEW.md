@@ -2,6 +2,19 @@
 
 Generated: 2026-05-23, Asia/Dubai
 
+## Commercial Launch Review 008 Addendum
+
+Date: 2026-05-27, Asia/Dubai
+
+| Area                     | REVIEW-008 Status      | Evidence                                                                                | Production Meaning                                      |
+| ------------------------ | ---------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| Money row-level backfill | ACCEPT_FOR_COPY_REVIEW | `PRODUCTION_COPY_ROW_BACKFILL_008_ACCOUNTING_SIGNOFF_CHECKLIST.md`                      | P0-001 remains Partial; accounting signoff required.    |
+| Backend totals           | ACCEPT_WITH_WARNING    | `PRODUCTION_COPY_ROW_BACKFILL_008_MANUAL_RECONCILIATION_REVIEW.md`                      | P0-003 remains Partial; authority switch not approved.  |
+| Tenant/property scope    | COMPATIBILITY_ONLY     | `PRODUCTION_COPY_ROW_BACKFILL_008_TENANT_MAPPING_REVIEW.md`                             | P0-006 remains Partial; final SaaS authority not ready. |
+| Receivables              | MANUAL_REQUIRED        | `PRODUCTION_COPY_ROW_BACKFILL_008_RECEIVABLES_DECISION.md`                              | P0-008 remains Partial; lifecycle mapping still open.   |
+| Rollback rehearsal       | APPROVAL_REQUIRED      | `NEXT_PROMPT_COMMERCIAL_LAUNCH_REVIEW_009_COPY_ROLLBACK_REHEARSAL_APPROVAL_REQUIRED.md` | Copy rollback has not been executed.                    |
+| Production cutover       | `PRODUCTION_NO_GO`     | `PRODUCTION_COPY_ROW_BACKFILL_008_MANUAL_RECONCILIATION_REVIEW.md`                      | No production migration/deploy/write approved.          |
+
 ## Commercial Launch Review 006 Addendum
 
 Date: 2026-05-27, Asia/Dubai
