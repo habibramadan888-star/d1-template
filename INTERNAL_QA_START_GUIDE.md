@@ -44,6 +44,12 @@ content, and no longer returns the API fallback text. This verification was
 read-only and did not execute employee entry, handover, void/delete, settings,
 migration, D1 export/import/execute, or any D1 write.
 
+`INTERNAL_QA_005D_SESSION_HANDOFF_LIVE_SMOKE_RESULT.md` confirms the deployed
+live assets now contain the owner and employee `/api/me` session handoff code.
+The smoke deliberately did not execute a successful owner/employee login because
+the current live login implementation writes a server session row to production
+D1 table `active_sessions`.
+
 ## Session Handoff Expectation
 
 After the session handoff fix is deployed, unified login should be a one-time
@@ -58,6 +64,10 @@ If either destination shows a second login prompt after a successful unified
 login, record it as a bug with role, URL, time, and screenshot. Do not perform
 write-style testing on `homelink-finance` without separate production D1 write
 approval.
+
+Successful live login testing is also a production D1 session-write action under
+the current implementation. Treat it as a separate approval item if the test
+must prove the live browser path with real credentials.
 
 ## Stop Immediately If
 

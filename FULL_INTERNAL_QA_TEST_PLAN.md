@@ -24,6 +24,7 @@ commercial launch.
 | Test data policy               | QA-marked evidence only; no production writes without separate approval                    |
 | Password / token handling      | Never paste into docs, screenshots, tickets, or chat                                       |
 | Live unified-login route       | Verified HTTP 200 `text/html` in `INTERNAL_QA_005B_UNIFIED_LOGIN_LIVE_SMOKE_RESULT.md`     |
+| Live session handoff assets    | Verified deployed in `INTERNAL_QA_005D_SESSION_HANDOFF_LIVE_SMOKE_RESULT.md`               |
 
 ## Roles
 
@@ -64,6 +65,7 @@ commercial launch.
 | P3 usability issue                   | Record notes and screenshots; group for later UI cleanup.                                                         |
 | Unclear accounting behavior          | Mark `MANUAL_REQUIRED`; do not invent pass/fail.                                                                  |
 | Second login after unified login     | Record as a unified-login handoff bug; do not continue role-flow testing until triaged.                           |
+| Successful live login smoke          | Requires separate approval because successful login writes production D1 `active_sessions`.                       |
 
 ## Evidence Rules
 

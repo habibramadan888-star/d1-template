@@ -39,7 +39,8 @@ or write any D1.
 | Employee destination session check | `employee-v3.html` now starts by checking `/api/me` and enters employee UI for staff/employee claims.   |
 | Fallback behavior                  | Old owner login and employee PIN login remain available when `/api/me` is unauthenticated or expired.   |
 | Authority                          | `/api/me`; frontend role/local storage is not authority.                                                |
-| Live deployment status             | Requires separate deploy approval before this handoff fix affects live Worker assets.                   |
+| Live deployment status             | Deployed in UNIFIED-LOGIN-FIX-003 to `homelink-finance` Worker assets.                                  |
+| Successful login smoke             | Not executed in UNIFIED-LOGIN-FIX-003 because successful login writes production D1 `active_sessions`.  |
 
 ## Owner / Boss Candidate Links
 

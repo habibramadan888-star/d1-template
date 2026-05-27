@@ -3,8 +3,42 @@
 Date: 2026-05-23  
 Mode: NIGHT SHIFT local validation  
 Scope: governance, engineering baseline, local startup checks  
-Production deploy: unified-login static route deploy executed later under explicit approval; no commercial cutover.
+Production deploy: unified-login static route/session handoff deploys executed
+under explicit approval; no commercial cutover.
 Production database mutation: not executed
+
+## UNIFIED-LOGIN-FIX-003 Live Session Handoff Deploy
+
+Date: 2026-05-28, Asia/Dubai
+
+Scope: approved deployment of unified login session handoff static/JS assets to
+the live `homelink-finance` Worker. No production D1 migration, production D1
+write, D1 export/import/execute, employee entry write, handover submit,
+void/delete, settings change, dashboard calculation change, financial formula
+change, feature flag cutover, commercial launch GO, or production cutover
+occurred.
+
+Completed:
+
+- Ran pre-deploy gates: format, check, secrets, commercial launch gate, unified
+  login tests, session handoff tests, and employee staging dry-run QA.
+- Ran embedded dry-run, embedded freshness verify, and worker drift audit.
+- Deployed `homelink-finance` Worker with explicit top-level env selection:
+  `--env="" --keep-vars`.
+- Uploaded `/employee-v3.html` and `/index-51-main.js`.
+- Verified live unified login route and destination assets by non-D1-write smoke
+  checks.
+- Did not execute successful owner/employee login because current successful
+  login writes production D1 `active_sessions`.
+
+Result:
+
+- Session handoff live assets: deployed.
+- Successful-login live browser smoke: not executed due production D1
+  session-write boundary.
+- Production D1 write: no.
+- Production migration: no.
+- Production cutover: `PRODUCTION_NO_GO`.
 
 ## UNIFIED-LOGIN-FIX-002 Session Handoff
 

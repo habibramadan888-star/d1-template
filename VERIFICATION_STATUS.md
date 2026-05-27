@@ -4,6 +4,22 @@ Generated: 2026-05-23, Asia/Dubai
 
 This file records the safety verification commands rerun during project status reconciliation. Commands were run without modifying business logic, production configuration, or production database data.
 
+## UNIFIED-LOGIN-FIX-003 Verification Addendum
+
+Date: 2026-05-28, Asia/Dubai
+
+| Verification           | Result             | Evidence                                                 | Commercial Meaning                                                                                             |
+| ---------------------- | ------------------ | -------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Pre-deploy gates       | PASS               | `npm run check`, `security:secrets`, unified-login tests | 426 tests passed; no production D1 write or migration.                                                         |
+| Embedded dry-run       | PASS_WITH_WARNING  | `UNIFIED_LOGIN_SESSION_HANDOFF_LIVE_DEPLOY_RESULT.md`    | 0 current/generated missing assets; no D1 commands.                                                            |
+| Live deploy            | PASS               | `UNIFIED_LOGIN_SESSION_HANDOFF_LIVE_DEPLOY_RESULT.md`    | Static/session handoff assets deployed to `homelink-finance`.                                                  |
+| Live non-D1 smoke      | PASS_WITH_BOUNDARY | `INTERNAL_QA_005D_SESSION_HANDOFF_LIVE_SMOKE_RESULT.md`  | Live assets contain `/api/me` handoff; successful login smoke was skipped because it writes `active_sessions`. |
+| Commercial launch gate | `PRODUCTION_NO_GO` | `COMMERCIAL_LAUNCH_READINESS_RESULT.md`                  | Deploy does not approve launch, migration, D1 write, or cutover.                                               |
+
+Production cutover remains `PRODUCTION_NO_GO`. Full live successful-login smoke
+requires separate approval because the current login implementation writes a
+server session row to production D1.
+
 ## UNIFIED-LOGIN-DEPLOY-001 Verification Addendum
 
 Date: 2026-05-28, Asia/Dubai
