@@ -64,3 +64,25 @@ which signoffs can be reviewed for production preflight planning.
 Production-blocking signoffs remaining: 20.
 
 Production cutover remains `PRODUCTION_NO_GO`.
+
+## REVIEW-018 Preflight-Only Packet Addendum
+
+Date: 2026-05-27, Asia/Dubai
+
+REVIEW-018 prepared a production preflight-only approval packet. No signoff was
+changed to `APPROVED`, and no production approval was granted.
+
+| Packet Result                      | Count | Signoffs                                                               |
+| ---------------------------------- | ----: | ---------------------------------------------------------------------- |
+| Included for preflight-only review |     9 | SO-006, SO-008, SO-009, SO-010, SO-011, SO-012, SO-013, SO-014, SO-015 |
+| Still production-blocking          |    20 | SO-001 through SO-020                                                  |
+| Approved for production write      |     0 | none                                                                   |
+| Approved for deploy                |     0 | none                                                                   |
+| Approved for cutover               |     0 | none                                                                   |
+
+Required owner remains Ramadan Habib for all signoffs. Approval categories
+remain separate. Any Ramadan approval from this packet must be recorded only as
+preflight-only approval unless a later task explicitly approves production
+write, deploy, or cutover.
+
+Production cutover remains `PRODUCTION_NO_GO`.

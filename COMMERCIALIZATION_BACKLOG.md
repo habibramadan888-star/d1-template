@@ -1550,6 +1550,40 @@ Still blocked for production:
 - Production receivables migration, backup, rollback, backfill, and deploy
   approval.
 
+## Commercial Launch Review 018 Backlog Addendum
+
+Date: 2026-05-27, Asia/Dubai
+
+Commercial launch status:
+
+- `PRODUCTION_NO_GO`.
+
+Prepared evidence:
+
+- `PRODUCTION_PREFLIGHT_ONLY_APPROVAL_PACKET.md`
+- `READY_FOR_PREFLIGHT_REVIEW_MATRIX.md`
+- `PRODUCTION_BLOCKER_MATRIX_AFTER_PREFLIGHT_PACKET.md`
+
+Current blocker summary:
+
+- Ready for preflight-only review: 9 signoffs.
+- Still blocking production: 20 signoffs.
+- Production-approved signoffs: 0.
+
+Next safe step:
+
+- Ramadan Habib may decide which REVIEW-018 items are
+  `APPROVED_FOR_PREFLIGHT_ONLY`.
+
+Still forbidden:
+
+- Production D1 write.
+- Production migration.
+- Production deploy.
+- Production feature flag enablement.
+- Dashboard authority switch.
+- Business cutover.
+
 ## COMMERCIAL-LAUNCH-REVIEW-007 Backlog Addendum
 
 Date: 2026-05-27, Asia/Dubai

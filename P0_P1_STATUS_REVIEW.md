@@ -1849,3 +1849,28 @@ Date: 2026-05-27, Asia/Dubai
 | P0-006 tenant/property scope | Partial            | Tenant mapping decision sheet                           | Final SaaS mapping is not production-approved.                                          |
 | P0-008 receivables           | Partial            | Receivables accounting decision evidence                | Q1-Q9 are preflight input only; production backfill/dashboard switch remain unapproved. |
 | Production cutover           | `PRODUCTION_NO_GO` | Commercial launch gate                                  | No production migration/deploy/write/cutover is approved.                               |
+
+## Commercial Launch Review 018 Preflight-Only Status Addendum
+
+Date: 2026-05-27, Asia/Dubai
+
+Commercial launch status:
+
+- `PRODUCTION_NO_GO`.
+
+P0 status remains unchanged:
+
+- P0-004, P0-005, and P0-007 remain Verified.
+- P0-001, P0-002, P0-003, P0-006, and P0-008 remain Partial.
+- No Partial P0 was marked Verified.
+
+REVIEW-018 prepared a preflight-only approval packet:
+
+- `PRODUCTION_PREFLIGHT_ONLY_APPROVAL_PACKET.md`
+- `READY_FOR_PREFLIGHT_REVIEW_MATRIX.md`
+- `PRODUCTION_BLOCKER_MATRIX_AFTER_PREFLIGHT_PACKET.md`
+
+No production deploy, production migration, production D1 write, staging D1
+write, production-copy D1 write, D1 export/import/execute, production feature
+flag enablement, dashboard switch, business code change, financial formula
+change, or cutover occurred.

@@ -205,3 +205,17 @@ Date: 2026-05-27, Asia/Dubai
 | Audit/event compatibility     | COMPATIBILITY_ONLY     | Visibility policy remains manual-required before production. |
 | Receivables data backfill     | MANUAL_REQUIRED        | Lifecycle/allocation rows remain unapproved.                 |
 | Commercial launch gate        | `PRODUCTION_NO_GO`     | Cutover remains blocked.                                     |
+
+## Commercial Launch Review 018 Addendum
+
+Date: 2026-05-27, Asia/Dubai
+
+| Area                               | REVIEW-018 Status  | Launch Meaning                                                              |
+| ---------------------------------- | ------------------ | --------------------------------------------------------------------------- |
+| Preflight-only approval packet     | PREPARED           | Ramadan may review 9 items for preflight-only approval.                     |
+| Ready-for-preflight review items   | 9                  | SO-006, SO-008, SO-009, SO-010, SO-011, SO-012, SO-013, SO-014, and SO-015. |
+| Still production-blocking signoffs | 20                 | All signoffs still block production until separately approved.              |
+| Approved for production write      | 0                  | No production D1 write is approved.                                         |
+| Approved for deploy                | 0                  | No production deploy is approved.                                           |
+| Approved for cutover               | 0                  | No commercial launch GO is approved.                                        |
+| Commercial launch gate             | `PRODUCTION_NO_GO` | Cutover remains blocked.                                                    |

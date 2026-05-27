@@ -1194,6 +1194,33 @@ Recommended next prompt:
 
 Production cutover remains `NO-GO`.
 
+## Commercial Launch Review 018 Morning Review Addendum
+
+Most important result:
+
+- A production preflight-only approval packet is ready for Ramadan Habib. It
+  covers 9 ready-for-preflight items and explicitly does not approve production
+  write, migration, deploy, feature flags, dashboard authority switch, or
+  cutover.
+
+Current status:
+
+- Ready-for-preflight review items: 9.
+- Still production-blocking signoffs: 20.
+- Production-approved signoffs: 0.
+- Production cutover: `PRODUCTION_NO_GO`.
+
+Recommended next prompt:
+
+```text
+进入 TASK COMMERCIAL-LAUNCH-REVIEW-019：Apply Ramadan preflight-only decisions.
+只更新文档和 signoff tracker。
+不得执行 production、migration、deploy、D1 write。
+不得把 preflight-only approval 当 production approval。
+```
+
+Production remains `PRODUCTION_NO_GO`.
+
 ## COMMERCIAL-LAUNCH-REVIEW-016 Morning Review Addendum
 
 Most important result:

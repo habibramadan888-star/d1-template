@@ -38,3 +38,17 @@ production write, production deploy, or production cutover from this list.
 |        5 | Prepare manual-required production D1 backup/rollback/SQL approvals               | `RAMADAN_PRODUCTION_PREFLIGHT_DECISION_CHECKLIST.md`; `PRODUCTION_BACKUP_RESTORE_APPROVAL_CHECKLIST.md` | Do not approve execution yet; prepare exact approval packets.                               | MANUAL_REQUIRED            |
 
 Production remains `PRODUCTION_NO_GO`.
+
+## REVIEW-018 Preflight-Only Decision Packet
+
+Date: 2026-05-27, Asia/Dubai
+
+The next Ramadan decision is whether the 9 ready items may be approved for
+preflight review only. This is not production approval.
+
+| Priority | Action                                  | Evidence File                                                                          | Decision Needed                                                                                                                          | Suggested Status |
+| -------: | --------------------------------------- | -------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ---------------- |
+|        1 | Decide REVIEW-018 preflight-only packet | `PRODUCTION_PREFLIGHT_ONLY_APPROVAL_PACKET.md`; `READY_FOR_PREFLIGHT_REVIEW_MATRIX.md` | Mark each included item as `APPROVED_FOR_PREFLIGHT_ONLY`, `KEEP_OPEN`, `NEEDS_FIX`, `MANUAL_REQUIRED`, or `BLOCKED`.                     | PENDING_REVIEW   |
+|        2 | Keep production write approval separate | `PRODUCTION_BLOCKER_MATRIX_AFTER_PREFLIGHT_PACKET.md`                                  | Confirm that preflight-only approval does not allow production D1 write, migration, deploy, feature flags, dashboard switch, or cutover. | MANUAL_REQUIRED  |
+
+Production remains `PRODUCTION_NO_GO`.

@@ -1040,6 +1040,24 @@ Date: 2026-05-26, Asia/Dubai
 
 P0-006 remains Partial and production remains NO-GO.
 
+## COMMERCIAL-LAUNCH-REVIEW-018 Verification Addendum
+
+Date: 2026-05-27, Asia/Dubai
+
+| Check                          | Run? | Result   | Blocker | Evidence                                                                             | Notes                                               |
+| ------------------------------ | ---- | -------- | ------- | ------------------------------------------------------------------------------------ | --------------------------------------------------- |
+| Preflight-only approval packet | yes  | Prepared | none    | `PRODUCTION_PREFLIGHT_ONLY_APPROVAL_PACKET.md`                                       | Packet only; no production approval.                |
+| Ready-for-preflight matrix     | yes  | Prepared | none    | `READY_FOR_PREFLIGHT_REVIEW_MATRIX.md`                                               | 9 items included for preflight-only review.         |
+| Production blocker matrix      | yes  | Prepared | none    | `PRODUCTION_BLOCKER_MATRIX_AFTER_PREFLIGHT_PACKET.md`                                | 20 signoffs still block production.                 |
+| Signoff update result          | yes  | Prepared | none    | `COMMERCIAL_LAUNCH_REVIEW_018_SIGNOFF_UPDATE_RESULT.md`                              | No signoff changed to `APPROVED`.                   |
+| Next prompt                    | yes  | Prepared | none    | `NEXT_PROMPT_COMMERCIAL_LAUNCH_REVIEW_019_APPLY_RAMADAN_PREFLIGHT_ONLY_DECISIONS.md` | Requires explicit Ramadan preflight-only decisions. |
+
+No production deploy, staging deploy, production migration, staging migration,
+D1 export/import/execute, production D1 write, staging D1 write,
+production-copy D1 write, production URL call, business code change, dashboard
+change, financial formula change, or secret exposure occurred. Production
+remains `PRODUCTION_NO_GO`.
+
 ## COMMERCIAL-LAUNCH-REVIEW-016 Verification Addendum
 
 Date: 2026-05-27, Asia/Dubai
