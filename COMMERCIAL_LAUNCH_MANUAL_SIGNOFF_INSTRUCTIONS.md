@@ -2,17 +2,25 @@
 
 Date: 2026-05-27, Asia/Dubai
 
-Audience: project owner, accounting/finance reviewer, engineering owner,
-operations owner, rollback owner, deployment owner, and business owner.
+Audience: Ramadan Habib, acting separately as project owner, engineering owner,
+accounting/finance reviewer, data migration reviewer, security/secrets
+reviewer, operations/business reviewer, rollback owner, deployment owner, and
+business owner.
+
+Although the same person owns every category, each approval category must be
+reviewed independently. Do not use one general approval to approve all signoff
+IDs.
 
 ## How To Review
 
 1. Open `COMMERCIAL_LAUNCH_HUMAN_SIGNOFF_TRACKER.md`.
 2. For each signoff ID assigned to you, open the evidence file listed in that
    row.
-3. Decide whether the evidence supports one of these outcomes:
+3. Review the approval category for that signoff ID, even if the same person
+   owns another category.
+4. Decide whether the evidence supports one of these outcomes:
    `APPROVED`, `REJECTED`, `MANUAL_REQUIRED`, or `BLOCKED`.
-4. Record the decision, reviewer name/team, date, and notes in the next signoff
+5. Record the decision, reviewer name/team, date, and notes in the next signoff
    update task.
 
 ## When To Reject
@@ -61,8 +69,9 @@ production mutation, deploy, feature flags, or cutover.
 Each signoff should include:
 
 - Signoff ID.
+- Approval category.
 - Decision: `APPROVED`, `REJECTED`, `MANUAL_REQUIRED`, or `BLOCKED`.
-- Reviewer person/team.
+- Reviewer person/team: Ramadan Habib.
 - Date/time.
 - Evidence file reviewed.
 - Scope: dry-run only or production approval.
