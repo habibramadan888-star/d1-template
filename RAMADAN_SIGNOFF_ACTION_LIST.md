@@ -54,6 +54,22 @@ not production execution.
 
 Production remains `PRODUCTION_NO_GO`.
 
+## REVIEW-021 Production Blocker Closure Plan
+
+Date: 2026-05-27, Asia/Dubai
+
+The next safe action is choosing which blocker batch to process. None of these
+actions approves production execution.
+
+| Priority | Action                                       | Evidence File                                    | Decision Needed                                                     | Suggested Status           |
+| -------: | -------------------------------------------- | ------------------------------------------------ | ------------------------------------------------------------------- | -------------------------- |
+|        1 | Close document/Ramadan signoff blockers      | `PRODUCTION_BLOCKER_REDUCTION_BATCHES.md`        | Decide whether to prepare document-only packets for 12 blockers.    | MANUAL_REQUIRED            |
+|        2 | Decide if copy dry-run blockers need refresh | `PRODUCTION_BLOCKER_CLOSURE_PLAN.md`             | If needed, approve copy-only dry-run refresh for 2 blockers.        | REQUIRES_EXPLICIT_APPROVAL |
+|        3 | Prepare backup/rollback approval blockers    | `PRODUCTION_BLOCKER_REDUCTION_BATCHES.md`        | Prepare backup/rollback approval packets; do not execute D1 export. | MANUAL_REQUIRED            |
+|        4 | Keep write/deploy/cutover blockers last      | `COMMERCIAL_LAUNCH_APPROVAL_DEPENDENCY_GRAPH.md` | Do not process until previous batches close.                        | BLOCKED                    |
+
+Production remains `PRODUCTION_NO_GO`.
+
 ## REVIEW-019 Applied Preflight-Only Decisions
 
 Date: 2026-05-27, Asia/Dubai

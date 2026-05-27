@@ -149,3 +149,18 @@ Date: 2026-05-27, Asia/Dubai
 - Production-approved signoffs remain: 0.
 - Missing production-blocking signoffs remain: 20.
 - Production remains `PRODUCTION_NO_GO`.
+
+## REVIEW-021 Production Blocker Closure Plan Update
+
+Date: 2026-05-27, Asia/Dubai
+
+- `PRODUCTION_BLOCKER_CLOSURE_PLAN.md` covers all 20 blockers.
+- `PRODUCTION_BLOCKER_REDUCTION_BATCHES.md` partitions the blockers:
+  - Batch 1 document/Ramadan signoff only: 12 blockers.
+  - Batch 2 production-copy dry-run required: 2 blockers.
+  - Batch 3 production backup/rollback required: 3 blockers.
+  - Batch 4 production write/deploy/cutover blockers: 3 blockers.
+- No blocker was closed automatically.
+- Production-approved signoffs remain: 0.
+- Missing production-blocking signoffs remain: 20.
+- Production remains `PRODUCTION_NO_GO`.
