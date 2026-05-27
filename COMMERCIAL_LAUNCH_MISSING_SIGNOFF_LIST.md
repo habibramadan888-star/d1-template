@@ -150,6 +150,19 @@ Date: 2026-05-27, Asia/Dubai
 - Missing production-blocking signoffs remain: 20.
 - Production remains `PRODUCTION_NO_GO`.
 
+## REVIEW-021A Batch 1 Document Signoff Update
+
+Date: 2026-05-27, Asia/Dubai
+
+- Batch 1 document/Ramadan signoff blockers reviewed: 12.
+- Preflight-only approval notes reaffirmed: 9 signoffs.
+- Batch 1 production approvals granted: 0.
+- Batch 2 production-copy dry-run blockers were not processed.
+- Batch 3 backup/rollback blockers were not processed.
+- Batch 4 production write/deploy/cutover blockers were not processed.
+- Missing production-blocking signoffs remain: 20.
+- Production remains `PRODUCTION_NO_GO`.
+
 ## REVIEW-021 Production Blocker Closure Plan Update
 
 Date: 2026-05-27, Asia/Dubai

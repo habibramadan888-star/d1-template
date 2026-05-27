@@ -1,10 +1,15 @@
 # NEXT PROMPT: COMMERCIAL-LAUNCH-REVIEW-021B Production-Copy Dry-Run Blockers
 
-Use after REVIEW-021 is complete and Ramadan explicitly approves copy-only
-dry-run refresh.
+Use only after REVIEW-021A is complete and Ramadan explicitly approves
+copy-only blocker reduction for Batch 2.
 
-Goal: reduce blockers that need refreshed production-copy evidence. Production
-D1 must remain untouched.
+Target blockers:
+
+- SO-004: production migration approval.
+- SO-005: production backfill approval.
+
+Goal: refresh isolated production-copy evidence for SO-004 and SO-005 only.
+Production D1 must remain untouched.
 
 Strict limits:
 
@@ -15,17 +20,30 @@ Strict limits:
 5. Do not write staging D1.
 6. Do not call production URL.
 7. Do not enable production feature flags.
-8. Do not treat copy evidence as production approval.
+8. Do not treat production-copy evidence as production approval.
 9. Keep production cutover `PRODUCTION_NO_GO`.
 
-Allowed only with explicit confirmation:
+Approval required before any D1 command:
 
-1. Confirm target D1 is `homelink-finance-production-copy-dryrun`.
-2. Run copy-only schema/migration dry-run refresh.
-3. Run copy-only row-level backfill dry-run refresh.
-4. Run copy-only reconciliation for money, tenant/property, receivables,
-   audit/event, and backend totals.
-5. Generate evidence for SO-004, SO-005, SO-006, SO-010, SO-011, SO-012, and
-   SO-013.
-6. Do not close production blockers without a later Ramadan production
-   decision.
+1. Explicitly confirm target D1 is `homelink-finance-production-copy-dryrun`.
+2. Explicitly confirm no production write.
+3. Explicitly confirm no production deploy.
+4. Explicitly confirm no production migration.
+5. Explicitly confirm backup / rollback review boundary.
+
+Allowed after explicit approval:
+
+1. Run copy-only schema/migration dry-run refresh for SO-004.
+2. Run copy-only row-level backfill dry-run refresh for SO-005.
+3. Run copy-only row count / delta / reconciliation checks.
+4. Generate refreshed evidence and blocker reduction report.
+
+Forbidden:
+
+1. Production D1 write.
+2. Production migration.
+3. Production deploy.
+4. Production feature flag enablement.
+5. Production cutover.
+6. Closing SO-004 or SO-005 for production without a later explicit Ramadan
+   production decision.

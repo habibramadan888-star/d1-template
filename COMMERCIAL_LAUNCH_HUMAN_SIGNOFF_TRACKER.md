@@ -65,6 +65,27 @@ Production-blocking signoffs remaining: 20.
 
 Production cutover remains `PRODUCTION_NO_GO`.
 
+## REVIEW-021A Batch 1 Document Signoff Addendum
+
+Date: 2026-05-27, Asia/Dubai
+
+REVIEW-021A reviewed Batch 1 document / Ramadan signoff blockers only. The
+tracker status enum remains unchanged, and no signoff was marked production
+`APPROVED`.
+
+| Batch 1 Result                     | Count | Signoffs                                                                                       |
+| ---------------------------------- | ----: | ---------------------------------------------------------------------------------------------- |
+| Batch 1 blockers reviewed          |    12 | SO-001, SO-006, SO-007, SO-008, SO-009, SO-010, SO-011, SO-012, SO-013, SO-014, SO-015, SO-019 |
+| Reaffirmed preflight-only approval |     9 | SO-006, SO-008, SO-009, SO-010, SO-011, SO-012, SO-013, SO-014, SO-015                         |
+| Kept pending review                |    10 | SO-006, SO-007, SO-008, SO-009, SO-010, SO-011, SO-012, SO-013, SO-014, SO-015                 |
+| Kept manual-required               |     2 | SO-001, SO-019                                                                                 |
+| Production-approved signoffs       |     0 | none                                                                                           |
+| Batch 2 / 3 / 4 signoffs updated   |     0 | none                                                                                           |
+
+Production-blocking signoffs remaining: 20.
+
+Production cutover remains `PRODUCTION_NO_GO`.
+
 ## REVIEW-019 Ramadan Preflight-Only Approval Addendum
 
 Date: 2026-05-27, Asia/Dubai

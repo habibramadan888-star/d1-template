@@ -1,9 +1,16 @@
-# NEXT PROMPT: COMMERCIAL-LAUNCH-REVIEW-021C Backup Rollback Approval Blockers
+# NEXT PROMPT: COMMERCIAL-LAUNCH-REVIEW-021C Backup / Rollback Approval Blockers
 
-Use after REVIEW-021 is complete.
+Use only after REVIEW-021A is complete.
 
-Goal: prepare backup and rollback approval packets for SO-002, SO-003, and
-SO-020. This prompt is for approval preparation only.
+Target blockers:
+
+- SO-002: production D1 backup approval.
+- SO-003: production D1 restore / rollback approval.
+- SO-020: rollback owner approval.
+
+Goal: prepare backup and rollback approval packets only. This prompt does not
+authorize production write, production export, restore/import, migration,
+deploy, feature flags, or cutover.
 
 Strict limits:
 
@@ -22,8 +29,14 @@ Strict limits:
 
 Required outputs:
 
-1. Production backup approval packet.
-2. Restore/reverse-update rollback approval packet.
-3. Rollback owner and trigger criteria packet.
+1. Production backup approval packet for SO-002.
+2. Restore / reverse-update rollback approval packet for SO-003.
+3. Rollback owner and trigger criteria packet for SO-020.
 4. Explicit statement that no production backup/export/restore/import/execute
    was run in this task.
+
+Approval boundary:
+
+This task may prepare approval documents only. Any future production backup,
+restore rehearsal, production D1 write, production migration, production deploy,
+or cutover requires a separate explicit Ramadan approval task.
