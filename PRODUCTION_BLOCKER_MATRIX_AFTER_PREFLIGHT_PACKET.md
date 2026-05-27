@@ -29,3 +29,27 @@ packet. All listed items still block production.
 | SO-020  | Rollback owner approval                     | Accountable rollback owner and trigger criteria are missing.        | Assign owner and approve rollback triggers.                                           | `PRODUCTION_BACKUP_RESTORE_APPROVAL_CHECKLIST.md`.                                              |
 
 Still-production-blocking signoffs: 20.
+
+## REVIEW-019 Preflight-Only Approval Update
+
+Date: 2026-05-27, Asia/Dubai
+
+The following 9 items are no longer waiting for preflight review approval. They
+are approved for preflight planning only, while their production blockers remain
+open:
+
+| Signoff | Preflight Review Status     | Still Blocks Production | Production Blocker                                                          |
+| ------- | --------------------------- | ----------------------- | --------------------------------------------------------------------------- |
+| SO-006  | APPROVED_FOR_PREFLIGHT_ONLY | Yes                     | Production money reconciliation and accounting approval are not granted.    |
+| SO-008  | APPROVED_FOR_PREFLIGHT_ONLY | Yes                     | Final production tenant/property mapping is not approved.                   |
+| SO-009  | APPROVED_FOR_PREFLIGHT_ONLY | Yes                     | Production legacy CORPID fallback policy is not approved.                   |
+| SO-010  | APPROVED_FOR_PREFLIGHT_ONLY | Yes                     | Production receivables migration/backfill/dashboard switch is not approved. |
+| SO-011  | APPROVED_FOR_PREFLIGHT_ONLY | Yes                     | Production allocation/backfill/dashboard switch is not approved.            |
+| SO-012  | APPROVED_FOR_PREFLIGHT_ONLY | Yes                     | Production audit/event visibility and query enforcement are not approved.   |
+| SO-013  | APPROVED_FOR_PREFLIGHT_ONLY | Yes                     | Production backend totals/dashboard authority switch is not approved.       |
+| SO-014  | APPROVED_FOR_PREFLIGHT_ONLY | Yes                     | Production employee entry route switch and rollback are not approved.       |
+| SO-015  | APPROVED_FOR_PREFLIGHT_ONLY | Yes                     | Production handover endpoint switch and rollback are not approved.          |
+
+Still-production-blocking signoffs remain: 20.
+
+Production cutover remains `PRODUCTION_NO_GO`.

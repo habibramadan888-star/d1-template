@@ -123,3 +123,16 @@ Date: 2026-05-27, Asia/Dubai
 - Production write, migration, deploy, feature flags, dashboard switch, and
   cutover remain unapproved.
 - Production remains `PRODUCTION_NO_GO`.
+
+## REVIEW-019 Ramadan Preflight-Only Decision Update
+
+Date: 2026-05-27, Asia/Dubai
+
+- Ramadan Habib approved 9 items as `APPROVED_FOR_PREFLIGHT_ONLY`.
+- These 9 items are no longer pending preflight-only review approval.
+- They remain production-blocking because production write, migration, deploy,
+  feature flags, dashboard authority switch, rollback, and cutover were not
+  approved.
+- Production-approved signoffs: 0.
+- Missing production-blocking signoffs: 20.
+- Production remains `PRODUCTION_NO_GO`.

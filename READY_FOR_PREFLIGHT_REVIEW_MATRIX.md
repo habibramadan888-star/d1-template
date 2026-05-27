@@ -18,3 +18,12 @@ deploy, migration, feature flags, dashboard authority switch, or cutover.
 | SO-015 | Handover atomic cutover approval            | `COMMERCIAL_LAUNCH_P0_STATUS_SUMMARY.md`; handover staging evidence                                   | Review handover atomic cutover conditions for preflight packet preparation.                              | Production endpoint switch, rollback, and deploy remain unapproved.                             | Approve for preflight only or request more staging/manual QA.               |
 
 Ready-for-preflight review count: 9.
+
+## REVIEW-019 Decision Applied
+
+Date: 2026-05-27, Asia/Dubai
+
+All 9 items are now `APPROVED_FOR_PREFLIGHT_ONLY` by Ramadan Habib. This allows
+preflight planning and review only. It does not approve production write,
+production migration, production deploy, production feature flags, dashboard
+authority switch, business cutover, or commercial launch GO.

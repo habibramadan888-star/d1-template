@@ -39,6 +39,20 @@ production write, production deploy, or production cutover from this list.
 
 Production remains `PRODUCTION_NO_GO`.
 
+## REVIEW-019 Applied Preflight-Only Decisions
+
+Date: 2026-05-27, Asia/Dubai
+
+Ramadan approved the REVIEW-018 9-item packet for preflight only. The next
+actions are planning tasks, not production execution.
+
+| Priority | Action                                          | Evidence File                                                                                           | Decision Needed                                                                                           | Suggested Status            |
+| -------: | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | --------------------------- |
+|        1 | Prepare production preflight execution plan     | `COMMERCIAL_LAUNCH_REVIEW_019_SIGNOFF_UPDATE_RESULT.md`; `PRODUCTION_PREFLIGHT_ONLY_APPROVAL_PACKET.md` | Plan final SQL, backup, rollback, verification, and production-copy dry-run steps without executing them. | APPROVED_FOR_PREFLIGHT_ONLY |
+|        2 | Reduce remaining production blockers one by one | `PRODUCTION_BLOCKER_MATRIX_AFTER_PREFLIGHT_PACKET.md`; `COMMERCIAL_LAUNCH_MISSING_SIGNOFF_LIST.md`      | Decide which blocker packet to prepare next; do not approve production execution.                         | MANUAL_REQUIRED             |
+
+Production remains `PRODUCTION_NO_GO`.
+
 ## REVIEW-018 Preflight-Only Decision Packet
 
 Date: 2026-05-27, Asia/Dubai
