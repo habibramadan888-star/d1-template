@@ -8,6 +8,14 @@ Scope: human decision sheet only. This file does not approve production,
 execute migration, deploy, write D1, change dashboard behavior, or change
 financial formulas.
 
+## Ramadan First-Pass Decisions Applied
+
+| Decision                  | Ranks              | Production Meaning                                                                                                                                                          |
+| ------------------------- | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| FALSE_POSITIVE            | 1, 19, 22          | Closed as non-money scan hits: lock sorting, Dubai date formatting, and pagination page count. These are removed from production-blocking money authority risks.            |
+| NEEDS_ACCOUNTING_DECISION | 2-18, 20-21, 23-25 | Legacy AED-to-fils conversion, backend/session totals authority, deposit liability/refund handling, and receivables lifecycle/allocation remain open for accounting review. |
+| APPROVED                  | none               | No money risk is approved for production migration, deploy, dashboard switch, or cutover.                                                                                   |
+
 Allowed decision values:
 
 - APPROVE
@@ -47,5 +55,6 @@ Allowed decision values:
 
 ## Decision Rule
 
-This sheet does not record final approval. Ramadan Habib must provide a decision
-for each rank before Codex may update the tracker in the next task.
+This sheet records Ramadan Habib's first-pass risk classification only. It does
+not grant SO-007 approval. SO-007 remains `PENDING_REVIEW` until the remaining
+`NEEDS_ACCOUNTING_DECISION` items are separately approved or remediated.

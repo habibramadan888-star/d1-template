@@ -1,8 +1,20 @@
 # Commercial Launch Readiness Matrix
 
-Generated: 2026-05-27T13:13:02.841Z
+Generated: 2026-05-27T13:30:08.127Z
 
 Scope: read-only commercial launch gate. This script reads reports only and does not deploy, migrate, call APIs, access D1, or read secrets.
+
+## Commercial Launch Review 013C Ramadan Money Decision Addendum
+
+Date: 2026-05-27, Asia/Dubai
+
+| Area                           | REVIEW-013C Status | Launch Meaning                                                                               |
+| ------------------------------ | ------------------ | -------------------------------------------------------------------------------------------- |
+| False-positive ranks closed    | 3                  | Ranks 1, 19, and 22 are removed from production-blocking money risks.                        |
+| Remaining accounting decisions | 22                 | Legacy conversion, backend totals, deposit/refund, and receivables rules still need signoff. |
+| SO-007 status                  | PENDING_REVIEW     | TOP_25 approval is not granted.                                                              |
+| Production action              | NOT_EXECUTED       | No deploy, migration, D1 write, dashboard change, or formula change occurred.                |
+| Commercial launch gate         | `PRODUCTION_NO_GO` | Cutover remains blocked.                                                                     |
 
 ## Commercial Launch Review 013B Ramadan Decision Sheet Addendum
 

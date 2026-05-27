@@ -16,6 +16,13 @@ REVIEW-013 money risk review update:
 - Missing production-blocking signoffs: 20.
 - Production remains `PRODUCTION_NO_GO`.
 
+REVIEW-013C first-pass Ramadan decision update:
+
+- Ranks 1, 19, and 22 are closed as `FALSE_POSITIVE` non-money scan hits.
+- Remaining TOP_25 money risks requiring accounting decision: 22.
+- SO-007 TOP_25 money risks approval remains `PENDING_REVIEW`.
+- Production remains `PRODUCTION_NO_GO`.
+
 ## Must-have before production copy final dry-run
 
 | Priority | Missing Signoff                           | Responsible Owner | Why Required                                                                          | Blocks Which Step             | Evidence Needed                                                      |
@@ -27,12 +34,12 @@ REVIEW-013 money risk review update:
 
 ## Must-have before production migration
 
-| Priority | Missing Signoff                     | Responsible Owner | Why Required                                                 | Blocks Which Step    | Evidence Needed                                                               |
-| -------: | ----------------------------------- | ----------------- | ------------------------------------------------------------ | -------------------- | ----------------------------------------------------------------------------- |
-|        1 | Fresh production D1 backup approval | Ramadan Habib     | Production write cannot proceed without a restorable backup. | Production migration | Backup command approval and integrity record.                                 |
-|        2 | Final production SQL approval       | Ramadan Habib     | Copy SQL is not production authorization.                    | Production migration | Exact SQL, WHERE clauses, row counts, rollback method.                        |
-|        3 | TOP_25 money risks approval         | Ramadan Habib     | Money risks affect financial correctness.                    | Production migration | Ramadan item-by-item decisions against `TOP_25_MONEY_RISKS_REVIEW_MATRIX.md`. |
-|        4 | Data migration owner signoff        | Ramadan Habib     | Row-level updates need accountable approval.                 | Production migration | Migration/backfill owner signoff.                                             |
+| Priority | Missing Signoff                     | Responsible Owner | Why Required                                                 | Blocks Which Step    | Evidence Needed                                                                                                              |
+| -------: | ----------------------------------- | ----------------- | ------------------------------------------------------------ | -------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+|        1 | Fresh production D1 backup approval | Ramadan Habib     | Production write cannot proceed without a restorable backup. | Production migration | Backup command approval and integrity record.                                                                                |
+|        2 | Final production SQL approval       | Ramadan Habib     | Copy SQL is not production authorization.                    | Production migration | Exact SQL, WHERE clauses, row counts, rollback method.                                                                       |
+|        3 | TOP_25 money risks approval         | Ramadan Habib     | Money risks affect financial correctness.                    | Production migration | Three false positives are closed; 22 remaining items need accounting decision against `TOP_25_MONEY_RISKS_REVIEW_MATRIX.md`. |
+|        4 | Data migration owner signoff        | Ramadan Habib     | Row-level updates need accountable approval.                 | Production migration | Migration/backfill owner signoff.                                                                                            |
 
 ## Must-have before production deploy
 
