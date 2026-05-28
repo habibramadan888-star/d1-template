@@ -1601,3 +1601,29 @@ No production deploy, production migration, production D1 write, production URL
 call, staging D1 write, feature flag enablement, dashboard live switch, live
 financial formula change, legacy `CORPID` removal, or secret exposure occurred.
 P0-006 remains Partial and production remains NO-GO.
+
+## AUTH-UI-STABILIZATION-002 Verification Addendum
+
+Date: 2026-05-29, Asia/Dubai
+
+| Check                 | Required Result                           | Status |
+| --------------------- | ----------------------------------------- | ------ |
+| Old login visibility  | Old employee/owner login not user-visible | PASS   |
+| Lock/logout routing   | Routes to `/unified-login.html`           | PASS   |
+| Employee display name | Does not render `staff` as name           | PASS   |
+| Employee top nav      | Consistent Chinese-over-English layout    | PASS   |
+| Control panel layout  | Mobile-safe                               | PASS   |
+| Arrears detail modal  | Mobile-readable card/list layout          | PASS   |
+| History performance   | Skeleton and recent 20 first              | PASS   |
+| Network/WiFi entry    | Present or manual-required                | PASS   |
+| Production cutover    | `PRODUCTION_NO_GO`                        | PASS   |
+
+Evidence:
+
+- `npm run check`: PASS, 550 tests.
+- `npm run gate:commercial-launch`: `PRODUCTION_NO_GO`.
+- `npm run qa:employee-entry-staging`: `MANUAL_REQUIRED / DRY_RUN_ONLY`.
+- `AUTH_UI_STABILIZATION_LIVE_DEPLOY_RESULT.md`.
+- `AUTH_UI_STABILIZATION_LIVE_SMOKE_RESULT.md`.
+
+No production D1 write, migration, D1 export/import/execute, employee entry write, handover submit, void/delete, settings change, dashboard calculation change, or financial formula change occurred.

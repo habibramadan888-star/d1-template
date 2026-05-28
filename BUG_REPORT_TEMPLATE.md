@@ -72,3 +72,16 @@ Use these expected results when reporting unified-login bugs:
 | Employee header displays `staff` as the person name          | P1                 | UI should show display name, username, or employee id; `staff` is only a role.                                          |
 | Owner history shows no feedback for more than 5 seconds      | P1                 | History should show skeleton/loading quickly and load recent records first.                                             |
 | Owner network/WiFi entry is missing                          | P2/P1              | Entry should be visible or documented as manual-required; severity depends on operational impact.                       |
+
+## AUTH-UI-STABILIZATION-002 Bug Classification Addendum
+
+| Condition                                                    | Severity |
+| ------------------------------------------------------------ | -------- |
+| Old employee PIN login is visible to a user                  | P0/P1    |
+| Old owner login is visible to a user                         | P0/P1    |
+| Lock/logout routes anywhere except unified login             | P1       |
+| Employee identity displays `staff` instead of actual account | P1       |
+| Owner history shows no feedback for more than 5 seconds      | P1       |
+| Owner control panel mobile layout breaks                     | P1/P2    |
+| Arrears detail modal is unreadable on mobile                 | P1/P2    |
+| Employee top tab labels are inconsistent or truncated        | P2       |

@@ -534,7 +534,7 @@ label .en-sub{letter-spacing:0.04em;font-size:8.5px}
 }
 #modalOverlay .modal-title .t{font-size:17px;font-weight:700;}
 #modalOverlay .modal-title .s{font-size:11px;font-family:var(--mono);color:var(--text3);margin-top:2px;}
-#modalOverlay .modal-actions{display:flex;gap:8px;}
+#modalOverlay .modal-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;}
 #modalOverlay .modal-close{background:none;border:none;cursor:pointer;font-size:20px;color:var(--text3);line-height:1;padding:4px;}
 #modalOverlay .modal-body{overflow-y:auto;flex:1;}
 #modalOverlay .modal-table{width:100%;border-collapse:collapse;}
@@ -543,6 +543,15 @@ label .en-sub{letter-spacing:0.04em;font-size:8.5px}
 #modalOverlay .modal-table tr:last-child td{border-bottom:none;}
 #modalOverlay .modal-table tbody tr:hover{background:var(--surface2);}
 #modalOverlay .modal-empty{padding:40px;text-align:center;color:var(--text3);}
+#modalOverlay .modal-list{display:grid;gap:10px;padding:14px 16px 16px;}
+#modalOverlay .arrears-detail-card{border:1px solid var(--border);border-radius:16px;background:linear-gradient(145deg,rgba(255,255,255,.92),rgba(246,250,248,.78));padding:13px;box-shadow:0 8px 22px rgba(15,23,42,.06);}
+#modalOverlay .arrears-detail-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:10px;}
+#modalOverlay .arrears-detail-room{font-size:18px;font-weight:850;color:var(--text);}
+#modalOverlay .arrears-detail-tenant{font-size:13px;color:var(--text2);line-height:1.45;margin-top:3px;word-break:break-word;}
+#modalOverlay .arrears-detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
+#modalOverlay .arrears-detail-field{border:1px solid rgba(207,216,220,.68);border-radius:12px;background:rgba(255,255,255,.64);padding:8px 9px;min-width:0;}
+#modalOverlay .arrears-detail-field span{display:block;font-size:10px;color:var(--text3);letter-spacing:.06em;text-transform:uppercase;margin-bottom:3px;}
+#modalOverlay .arrears-detail-field b{display:block;font-size:13px;color:var(--text);font-weight:760;word-break:break-word;}
 #modalOverlay .tag-room{background:var(--surface3);color:var(--text2);border-radius:6px;padding:2px 7px;font-size:11px;font-family:var(--mono);}
 #modalOverlay .status-lbl{font-weight:700;}
 #modalOverlay .status-lbl.red{color:var(--red);}
@@ -885,9 +894,30 @@ body::before{
   #cp-overlay .kpi-alerts{grid-template-columns:1fr!important}
   #cp-overlay .kpi-stats{grid-template-columns:repeat(2,minmax(0,1fr))!important}
   #cp-overlay .kpi-val{font-size:28px!important}
+  #cp-overlay .topbar-inner{display:grid!important;grid-template-columns:1fr!important;gap:10px!important}
+  #cp-overlay .topbar-actions{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:8px!important;width:100%!important}
+  #cp-overlay .topbar-actions .btn{width:100%!important;min-height:38px!important;border-radius:14px!important;padding:9px 10px!important;font-size:12px!important}
+  #cp-overlay .filter-pills{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:7px!important}
+  #cp-overlay .pill{width:100%!important;justify-content:center!important;padding:9px 6px!important;font-size:11px!important}
   #cp-overlay .room-header{align-items:flex-start}
-  #cp-overlay table{min-width:520px}
-  #cp-overlay .room-body{overflow-x:auto}
+  #cp-overlay .room-body{overflow:visible!important}
+  #cp-overlay .room-body table,
+  #cp-overlay .room-body thead,
+  #cp-overlay .room-body tbody,
+  #cp-overlay .room-body tr,
+  #cp-overlay .room-body td{display:block!important;width:100%!important}
+  #cp-overlay .room-body thead{display:none!important}
+  #cp-overlay .room-body tbody{padding:10px;display:grid!important;gap:8px!important}
+  #cp-overlay .room-body tr{border:1px solid var(--border)!important;border-radius:14px!important;background:rgba(255,255,255,.78)!important;padding:10px!important}
+  #cp-overlay .room-body td{border:0!important;padding:4px 0!important;font-size:12px!important}
+  #cp-overlay .room-body td::before{content:attr(data-label);display:block;font-size:9px;color:var(--text3);letter-spacing:.06em;text-transform:uppercase;margin-bottom:2px}
+  #modalOverlay .modal-sheet{max-height:88vh!important;border-radius:22px 22px 0 0!important}
+  #modalOverlay .modal-head{align-items:flex-start!important;padding:12px 14px!important}
+  #modalOverlay .modal-actions{width:100%;display:grid!important;grid-template-columns:1fr 1fr 42px;gap:8px!important}
+  #modalOverlay .modal-actions .btn{width:100%!important;min-height:38px!important;font-size:12px!important;padding:8px 10px!important}
+  #modalOverlay .modal-close{min-height:38px!important;border-radius:12px!important;background:rgba(255,255,255,.72)!important;border:1px solid var(--border)!important}
+  #modalOverlay .modal-list{padding:12px!important}
+  #modalOverlay .arrears-detail-grid{grid-template-columns:1fr!important}
 }
 
 /* === Unified employee-aligned owner layer === */
@@ -1835,10 +1865,7 @@ body::before{
       </div>
     </div>
     <div class="modal-body">
-      <table class="modal-table">
-        <thead><tr><th>房间</th><th>租客 / 卡片</th><th>截止日期</th><th>状态</th></tr></thead>
-        <tbody id="modalBody"></tbody>
-      </table>
+      <div class="modal-list" id="modalBody"></div>
     </div>
     <div class="modal-footer" id="modalFooter"></div>
   </div>

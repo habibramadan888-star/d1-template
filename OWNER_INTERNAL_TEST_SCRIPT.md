@@ -83,3 +83,13 @@ Additional stop conditions:
 | Test ID | Scenario                     | Steps                                                   | Expected Result                                                                                     | Evidence Needed             | Pass/Fail | Notes |
 | ------- | ---------------------------- | ------------------------------------------------------- | --------------------------------------------------------------------------------------------------- | --------------------------- | --------- | ----- |
 | OWN-023 | Owner entry block regression | Open owner homepage/default view on mobile after login. | Owner homepage does not show `添加记录 ADD ENTRY`, `现金收款`, or `银行转账` primary entry buttons. | Mobile homepage screenshot. |           |       |
+
+## AUTH-UI-STABILIZATION-002 Owner Checks
+
+| Test ID        | Scenario             | Steps                        | Expected Result                                                                  | Evidence Needed     | Pass/Fail | Notes                          |
+| -------------- | -------------------- | ---------------------------- | -------------------------------------------------------------------------------- | ------------------- | --------- | ------------------------------ |
+| OWNER-AUTH-001 | Lock icon logout     | Tap owner lock icon          | Browser lands on `/unified-login.html`; no old login page appears                | Screenshot / URL    |           | Read-only                      |
+| OWNER-AUTH-002 | Control panel layout | Open control panel on mobile | Header, tools, filters, and room details fit viewport                            | Screenshot          |           | No settings change             |
+| OWNER-AUTH-003 | Arrears detail modal | Open overdue / due detail    | Modal shows readable cards and usable close/copy/export controls                 | Screenshot          |           | No write                       |
+| OWNER-AUTH-004 | History feedback     | Open history                 | Skeleton appears quickly; recent 20 records load first or retry feedback appears | Screenshot / timing |           | No delete                      |
+| OWNER-AUTH-005 | Network entry        | Find network/WiFi entry      | `网络 / NETWORK` entry is visible for authorized owner session                   | Screenshot          |           | Do not change network settings |

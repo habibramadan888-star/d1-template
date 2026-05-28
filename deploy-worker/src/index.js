@@ -2491,6 +2491,16 @@ async function handleRequest(request, env, ctx) {
       headers: { "Cache-Control": "public, max-age=86400" }
     });
   }
+  if (method === "GET" && [
+    "/employee.html",
+    "/employee",
+    "/login",
+    "/staff-login",
+    "/employee-login",
+    "/owner-login"
+  ].includes(path)) {
+    return Response.redirect(new URL("/unified-login.html", request.url), 302);
+  }
   const originError = enforceTrustedOrigin(request, env);
   if (originError) return originError;
   if (path === "/auth/login" && method === "POST") {
@@ -2524,9 +2534,13 @@ async function handleRequest(request, env, ctx) {
     const employeeApiResponse = await handleEmployeeApi(request, env, user);
     if (employeeApiResponse) return employeeApiResponse;
     if (path === "/api/me") {
+      const displayName = user.employee_name && user.employee_name !== user.role ? user.employee_name : user.userid;
       return json({
         userid: user.userid,
-        employee_name: user.employee_name || user.userid,
+        username: user.userid,
+        employee_id: user.userid,
+        display_name: displayName,
+        employee_name: displayName,
         corpid: user.corpid,
         role: user.role,
         isManager: user.role === "manager"

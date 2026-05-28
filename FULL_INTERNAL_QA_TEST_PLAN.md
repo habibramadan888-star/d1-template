@@ -135,3 +135,16 @@ pause role-flow QA until retested. Production cutover remains
 | Owner topbar icon/text is garbled                    | Record as P1 UX bug and attach phone screenshot.                                                        |
 | Owner homepage shows `添加记录 ADD ENTRY`            | Record as P1 UX/IA bug; employee entry must not be exposed as an owner homepage block.                  |
 | Owner homepage shows `现金收款` / `银行转账` buttons | Record as P1 UX/IA bug; payment entry actions belong to employee entry flow unless separately approved. |
+
+## AUTH-UI-STABILIZATION-002 Scope
+
+- Confirm the unified login is the only visible login flow.
+- Confirm unauthenticated owner and employee business pages redirect to unified login.
+- Confirm lock/logout does not route to old employee PIN login or old owner login.
+- Confirm employee identity displays the actual user, for example `abdul`, not `staff`.
+- Confirm employee top tabs use one consistent Chinese-over-English layout.
+- Confirm owner control panel and arrears detail modal are readable on mobile.
+- Confirm owner history shows skeleton feedback quickly and loads recent records first.
+- Confirm WiFi/network entry is present or explicitly marked manual-required.
+- Do not perform employee entry write, handover submit, void/delete, settings changes, D1 write, or migration.
+- Production cutover remains `PRODUCTION_NO_GO`.

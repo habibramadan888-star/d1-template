@@ -99,6 +99,29 @@ function cp_computeMetrics(){
 ════════════════════════════════════ */
 let currentModalType='';
 
+function cp_modalStatusLabel(info){
+  const type=String(info?.type||'');
+  if(type==='overdue')return '已逾期';
+  if(type==='today')return '今日到期';
+  if(type==='soon')return '3天内到期';
+  if(type==='active')return '正常';
+  if(type==='vacant')return '空置';
+  if(type==='staff')return '员工';
+  return info?.label||'-';
+}
+function cp_modalOverdueDays(card){
+  const end=Number(card?.endDate||0);
+  if(!end)return '-';
+  const diff=Math.floor((Date.now()-end)/86400000);
+  return diff>0?`${diff} 天`:'未逾期';
+}
+function cp_modalAmount(card){
+  const raw=card?.amount??card?.rent??card?.remain??card?.arrears??card?.totalRent??'';
+  const num=Number(raw);
+  if(Number.isFinite(num)&&raw!=='')return `AED ${num.toFixed(2)}`;
+  return '未接入';
+}
+
 function cp_openModal(type){
   currentModalType=type;
   const map={
@@ -112,16 +135,28 @@ function cp_openModal(type){
 
   const tbody=document.getElementById('modalBody');
   if(cfg.list.length===0){
-    tbody.innerHTML='<tr><td colspan="4" class="modal-empty">暂无数据</td></tr>';
+    tbody.innerHTML='<div class="modal-empty">暂无数据</div>';
   } else {
     tbody.innerHTML=cfg.list.map(({room,card,info})=>{
       const endStr=cp_fmtEndDate(card.endDate);
-      return `<tr>
-        <td><span class="tag-room">${esc(room)}</span></td>
-        <td>${esc(card.cardName)}</td>
-        <td style="font-family:var(--mono);font-size:12px">${endStr}</td>
-        <td><span class="status-lbl ${cfg.cls}">${esc(info.label)}</span></td>
-      </tr>`;
+      const status=cp_modalStatusLabel(info);
+      const overdue=cp_modalOverdueDays(card);
+      const amount=cp_modalAmount(card);
+      return `<article class="arrears-detail-card">
+        <div class="arrears-detail-top">
+          <div>
+            <div class="arrears-detail-room">${esc(room||'-')}</div>
+            <div class="arrears-detail-tenant">${esc(card.cardName||'未命名卡片')}</div>
+          </div>
+          <span class="status-lbl ${cfg.cls}">${esc(status)}</span>
+        </div>
+        <div class="arrears-detail-grid">
+          <div class="arrears-detail-field"><span>截止日期</span><b>${esc(endStr)}</b></div>
+          <div class="arrears-detail-field"><span>逾期天数</span><b>${esc(overdue)}</b></div>
+          <div class="arrears-detail-field"><span>金额</span><b>${esc(amount)}</b></div>
+          <div class="arrears-detail-field"><span>卡片 / 租客</span><b>${esc(card.cardName||'-')}</b></div>
+        </div>
+      </article>`;
     }).join('');
   }
   document.getElementById('modalFooter').textContent=`共 ${cfg.list.length} 条 · 数据更新于 ${document.getElementById('lastUpdate').textContent}`;
@@ -338,7 +373,7 @@ function cp_render(){
 
     const rows=processed.map(c=>{
       const endStr=cp_fmtEndDate(c.endDate);
-      return`<tr class="${c.info.cls}" data-status="${c.info.type}"><td>${esc(c.cardName)}</td><td>${endStr}</td><td>${esc(c.info.label)}</td></tr>`;
+      return`<tr class="${c.info.cls}" data-status="${c.info.type}"><td data-label="卡片 / 租客">${esc(c.cardName)}</td><td data-label="截止日期">${endStr}</td><td data-label="状态">${esc(c.info.label)}</td></tr>`;
     }).join('');
 
     const el=document.createElement('div');

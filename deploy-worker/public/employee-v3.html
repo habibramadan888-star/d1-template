@@ -25,8 +25,10 @@ button,input,select,textarea{font:inherit}
 .actions{display:flex;align-items:center;gap:12px}.pill{border:1.5px solid rgba(9,166,79,.24);color:var(--green2);background:#fff;border-radius:999px;padding:11px 18px;font-weight:950}.pill.main{background:linear-gradient(180deg,#10ad5a,#078d42);color:#fff;border:0}
 .operator{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px;font-weight:900}.operator input{width:92px;border:1px solid var(--line);border-radius:12px;padding:8px 10px}
 .tabs{max-width:980px;margin:0 auto;padding:0 28px 20px;display:flex;overflow-x:auto;scrollbar-width:none}.tabs::-webkit-scrollbar{display:none}
-.tab{min-width:190px;height:86px;border:1px solid var(--line);border-right:0;background:rgba(255,255,255,.94);cursor:pointer;color:#243044;font-size:25px;font-weight:950;display:flex;align-items:center;justify-content:center;gap:10px;letter-spacing:.05em}
+.tab{min-width:190px;height:86px;border:1px solid var(--line);border-right:0;background:rgba(255,255,255,.94);cursor:pointer;color:#243044;font-size:25px;font-weight:950;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;letter-spacing:.05em;text-align:center}
 .tab:first-child{border-radius:27px 0 0 27px}.tab:last-child{border-right:1px solid var(--line);border-radius:0 27px 27px 0}.tab.active{background:linear-gradient(180deg,#10ad5a,#078d42);color:#fff;border-color:rgba(9,166,79,.7);box-shadow:0 12px 26px rgba(9,166,79,.24)}.en{font-family:Consolas,"JetBrains Mono",monospace;font-size:13px;font-weight:700;letter-spacing:.08em;opacity:.78}
+.tab .tab-cn{display:block;line-height:1.05}
+.tab .en{display:block;white-space:nowrap;overflow:visible;text-overflow:clip;max-width:none}
 .wrap{max-width:980px;margin:0 auto;padding:52px 28px 110px}.page-title{font-size:50px;font-weight:950;letter-spacing:-.04em;margin:0 0 12px}.page-title .en{display:block;color:#697386;font-size:23px;margin-top:14px}.page-sub{font-size:22px;line-height:1.45;color:#586273;font-weight:850;margin-bottom:30px}
 .card{background:rgba(255,255,255,.94);border:1px solid var(--line);border-radius:var(--r2);box-shadow:var(--shadow);margin-bottom:24px;overflow:hidden}.head{padding:22px 26px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:12px}.title{font-size:26px;font-weight:950}.body{padding:26px}
 .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.field{margin-bottom:16px}label{display:block;color:#435168;font-size:14px;font-weight:900;margin-bottom:8px}input,select,textarea{width:100%;border:1.5px solid #d4dde0;border-radius:16px;padding:16px 17px;background:#fff;color:var(--text);outline:none}textarea{min-height:104px;resize:vertical}input:focus,select:focus,textarea:focus{border-color:var(--green);box-shadow:0 0 0 4px rgba(9,166,79,.12)}input[readonly],select:disabled{background:#f2f6f4;color:#607086;border-style:dashed;cursor:not-allowed}
@@ -1341,12 +1343,13 @@ label .label-en{
     box-shadow:0 10px 24px rgba(15,23,42,.08),inset 0 1px 0 rgba(255,255,255,.9)!important;
   }
   .tab .en{
-    font-size:8px!important;
-    letter-spacing:.06em!important;
+    font-size:7.5px!important;
+    letter-spacing:.025em!important;
     line-height:1.05!important;
-    max-width:48px;
-    overflow:hidden;
-    text-overflow:ellipsis;
+    max-width:none!important;
+    overflow:visible!important;
+    text-overflow:clip!important;
+    white-space:nowrap!important;
   }
   .wrap{
     padding:14px 9px 72px!important;
@@ -1724,12 +1727,12 @@ label .label-en{
 <div class="top">
   <div class="brand">
     <div class="logo"><div class="badge"><div>HOME<small>LINK.</small></div></div><div class="word"><span class="g">HOME</span><span>LINK</span><i>.</i><em>流水管理</em></div></div>
-    <div class="actions"><div class="operator">当前员工 <input id="operatorId" placeholder="A01"></div><span class="pill">员工</span><span class="pill main">已登录<span class="label-en">SIGNED IN</span></span></div>
+    <div class="actions"><div class="operator"><span class="employee-identity-label">当前员工</span><input id="operatorId" placeholder="未登录" readonly></div><span class="pill">员工</span><span class="pill main">已登录<span class="label-en">SIGNED IN</span></span></div>
   </div>
   <div class="tabs">
-    <button class="tab active" data-view="entry">录入<span class="en">ENTRY</span></button>
-    <button class="tab" data-view="arrears">跟进<span class="en">FOLLOW-UP</span></button>
-    <button class="tab" data-view="export">导出<span class="en">EXPORT</span></button>
+    <button class="tab active" data-view="entry"><span class="tab-cn">录入</span><span class="en">ENTRY</span></button>
+    <button class="tab" data-view="arrears"><span class="tab-cn">跟进</span><span class="en">FOLLOW-UP</span></button>
+    <button class="tab" data-view="export"><span class="tab-cn">导出</span><span class="en">EXPORT</span></button>
   </div>
 </div>
 <main class="wrap">
@@ -1945,13 +1948,13 @@ function employeeDisplayName(user){
   return [
     user?.display_name,
     user?.displayName,
-    user?.employee_name,
     user?.name,
     user?.username,
-    user?.userid,
+    user?.employee_name,
     user?.employee_id,
-    user?.role
-  ].map(v=>String(v||'').trim()).find(Boolean)||'EMP';
+    user?.userid,
+    user?.login_id
+  ].map(v=>String(v||'').trim()).filter(v=>!['staff','employee'].includes(v.toLowerCase())).find(Boolean)||'unknown';
 }
 function toast(msg,duration=2600){const el=$('toast');el.textContent=msg;el.style.display='block';clearTimeout(window.__toast);window.__toast=setTimeout(()=>el.style.display='none',duration)}
 function showStatus(msg,type='ok'){
@@ -3238,8 +3241,10 @@ async function checkEmployeeSession(){
       applyEmployeeUser({
         userid:me.userid,
         employee_name:me.employee_name||me.name||me.username||me.userid,
-        display_name:me.display_name||me.displayName||me.employee_name||me.name||me.username,
+        display_name:me.display_name||me.displayName||me.name||me.username||me.employee_name||me.employee_id||me.userid,
         username:me.username,
+        employee_id:me.employee_id||me.userid,
+        login_id:me.login_id,
         role:me.role
       });
       $('loginPin').value='';

@@ -5830,3 +5830,32 @@ Result:
 P0-006 status:
 
 - `Partial - tenant scope staging route/query wiring gate ready`.
+
+## AUTH-UI-STABILIZATION-002 Run Addendum
+
+Date: 2026-05-29, Asia/Dubai
+
+Scope: fixed user-visible auth routing regressions, old-login fallback paths, employee identity display, employee top tab alignment, owner control panel mobile layout, owner arrears detail modal layout, owner history feedback timeout, and owner network entry coverage.
+
+Safety:
+
+- No production D1 write.
+- No migration.
+- No D1 export/import/execute.
+- No employee entry write, handover submit, void/delete, or settings change.
+- No dashboard calculation or financial formula change.
+- Production cutover remains `PRODUCTION_NO_GO`.
+
+Validation and deploy:
+
+- `npm run format:check`: PASS.
+- `npm run check`: PASS, 550 tests.
+- `npm run security:secrets`: PASS.
+- `npm run gate:commercial-launch`: `PRODUCTION_NO_GO`.
+- Required AUTH-UI-STABILIZATION-002 targeted tests: PASS.
+- `npm run qa:employee-entry-staging`: `MANUAL_REQUIRED / DRY_RUN_ONLY`.
+- `npm run build:embedded:dry-run`: warning only, 0 missing current/generated assets.
+- `npm run verify:embedded-worker`: PASS.
+- `npm run audit:worker-drift`: PASS, 0 critical mismatches.
+- Live deploy: PASS, `homelink-finance` version `438859f7-a6a9-4482-bd48-b05e5f5b8656`.
+- Live read-only smoke: PASS for unified login, old employee static route redirect stub, employee identity/top nav assets, owner modal/control assets, `/api/me` 401, and wrong-login 401.

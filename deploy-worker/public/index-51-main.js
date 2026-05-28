@@ -27,7 +27,7 @@ const CUSTOMER_KEY='apt:customers';
 const CC_GRACE=3;
 const DEFAULT_PRICES=[600,650,700,750];
 const HISTORY_PAGE_SIZE=20;
-const HISTORY_FETCH_TIMEOUT_MS=8000;
+const HISTORY_FETCH_TIMEOUT_MS=4500;
 
 /* ── CLOUD AUTH ── */
 /* window.authToken 已移除：Token 存于 httpOnly Cookie，JS 不可读取 */
@@ -235,69 +235,7 @@ function sanitizeHtml(html){
 /* ── AUTH (密码登录 → Worker JWT) ── */
 let role=null;
 async function submitCode(){
-  const code=(document.getElementById('empCode').value||'').trim();
-  const err=document.getElementById('codeErr');
-  err.style.display='none';
-  if(!code){err.style.display='block';return;}
-
-  /* ── Step 1: 密码验证（credentials:'include' 让浏览器自动接收 httpOnly Cookie）── */
-  let loginData;
-  try{
-    const loginUrl=apiUrl('/auth/login');
-    const res=await fetch(loginUrl,{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({password:code}),
-      credentials:'include'
-    });
-    if(!res.ok){
-      const j=await res.json().catch(()=>({}));
-      console.error('[Login] HTTP',res.status, j);
-      err.style.display='block';
-      document.getElementById('empCode').value='';
-      document.getElementById('empCode').focus();
-      return;
-    }
-    loginData=await res.json();
-    if(loginData.token)LS.set('homelink:cloud_token',loginData.token);
-    else LS.del('homelink:cloud_token');
-    if(['staff','employee'].includes(String(loginData.role||'').toLowerCase())){
-      location.href='./employee-v3.html';
-      return;
-    }
-    /* 线上使用 httpOnly Cookie；本地 file:// 使用服务端返回的短期 Bearer token */
-  }catch(e){
-    console.error('[Login] 网络错误:', e);
-    err.style.display='block';
-    document.getElementById('empCode').value='';
-    document.getElementById('empCode').focus();
-    return;
-  }
-
-  /* ── Step 2: 密码正确，用 role 初始化界面（不存储 token）── */
-  try{
-    await enterAs(loginData.role);
-  }catch(e){
-    /* enterAs 出错不等于密码错误，强制显示主界面 */
-    console.error('[Login] enterAs 出错:', e);
-    role=toOwnerSpaRole(loginData.role);
-    document.getElementById('lockOverlay').style.display='none';
-    document.getElementById('topbar').style.display='block';
-    document.getElementById('mainApp').style.display='block';
-    document.getElementById('footerEl').style.display='block';
-    const badge=document.getElementById('roleBadge');
-    const isMgr=isOwnerShellRole();
-    if(badge){badge.textContent='';badge.hidden=true;badge.setAttribute('aria-hidden','true');}
-    if(isMgr){
-      document.getElementById('navOverview')?.classList.remove('locked');
-      document.getElementById('navHistory')?.classList.remove('locked');
-      document.getElementById('navAnalysis')?.classList.remove('locked');
-      document.getElementById('navClients')?.classList.remove('locked');
-    }
-    const db=document.getElementById('btnDashboard');
-    if(db) db.style.display=isMgr?'':'none';
-    try{switchView(defaultViewForRole());}catch(e2){console.error('[Login] initial switchView:', e2);}
-  }
+  redirectToUnifiedLogin('legacy_owner_login_disabled');
 }
 async function enterAs(r){
   role=toOwnerSpaRole(r);
@@ -1581,7 +1519,7 @@ async function renderHistory(){
     const timedOut=e?.name==='AbortError';
     wrap.innerHTML=`<div class="card owner-history-timeout" style="padding:24px;text-align:center;color:var(--red)">
       <div style="font-weight:800;margin-bottom:8px">${timedOut?'历史记录加载超时':'历史记录加载失败'}</div>
-      <div style="color:var(--text2);font-size:13px;line-height:1.6;margin-bottom:14px">${timedOut?'最近 20 条历史超过 8 秒仍未返回，请重试或稍后刷新。':'网络异常，请重试。'}</div>
+      <div style="color:var(--text2);font-size:13px;line-height:1.6;margin-bottom:14px">${timedOut?'最近 20 条历史超过 4.5 秒仍未返回，请重试或稍后刷新。':'网络异常，请重试。'}</div>
       <button class="btn btn-primary" id="btnHistoryRetry" type="button">重试加载</button>
     </div>`;
     const retry=document.getElementById('btnHistoryRetry');

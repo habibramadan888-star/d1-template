@@ -61,3 +61,11 @@ Additional stop conditions:
 | Employee design baseline    | Employee page remains visually modern and unchanged in product feel. | Use as reference for owner UI comparison.             |
 | Shared font                 | Employee page continues using the shared product font stack.         | Report if text rendering regresses.                   |
 | Shared buttons/inputs/cards | Employee controls still look consistent after token extraction.      | Report as P1 UX if employee visual quality regresses. |
+
+## AUTH-UI-STABILIZATION-002 Employee Checks
+
+| Test ID      | Scenario                      | Steps                                   | Expected Result                                                                     | Evidence Needed  | Pass/Fail | Notes                 |
+| ------------ | ----------------------------- | --------------------------------------- | ----------------------------------------------------------------------------------- | ---------------- | --------- | --------------------- |
+| EMP-AUTH-001 | Unauthenticated employee page | Open `employee-v3.html` without session | Redirects unified login; old PIN login does not appear                              | Screenshot / URL |           | Read-only             |
+| EMP-AUTH-002 | Employee identity             | Login as a test employee                | Header shows actual account / employee id, not `staff`                              | Screenshot       |           | Do not submit entries |
+| EMP-AUTH-003 | Top navigation                | View `录入 / 跟进 / 导出` tabs          | All three buttons show Chinese above English consistently; English is not truncated | Screenshot       |           | No write              |

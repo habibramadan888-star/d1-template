@@ -1,25 +1,15 @@
-# Owner History Load Performance Fix Result
+# AUTH-UI-STABILIZATION-002 Owner History Load Performance Fix Result
 
-Date: 2026-05-28, Asia/Dubai
+Date: 2026-05-29, Asia/Dubai
 
-| Item                                    | Result           |
-| --------------------------------------- | ---------------- |
-| Skeleton shown before data              | yes              |
-| First request limited                   | yes, 20 sessions |
-| Load more available                     | yes              |
-| API supports read-only limit            | yes              |
-| Full data render avoided on first paint | yes              |
-| Dashboard calculation changed           | no               |
-| Financial formula changed               | no               |
-| D1 write                                | no               |
+| Question                                        | Answer                                                                                |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------- |
+| Will history still show a 30 second blank wait? | No blank wait is expected. The shell and skeleton render before the network result.   |
+| Is there a skeleton?                            | Yes, `owner-history-skeleton` renders immediately.                                    |
+| Is first load limited to 20 records?            | Yes, first load calls `/api/history?limit=20`.                                        |
+| Is load more supported?                         | Yes, `btnHistoryLoadMore` increments by 20 records.                                   |
+| Is backend pagination needed?                   | Already supported by `limit` / `offset`; future UI can add explicit offset if needed. |
+| Timeout                                         | Reduced from 8 seconds to 4.5 seconds before showing retry feedback.                  |
+| Data mouth / calculation impact                 | No. History data meaning and calculations are unchanged.                              |
 
-## Implementation
-
-- `renderHistory()` now renders a skeleton immediately.
-- The first owner history API call uses `/api/history?limit=20`.
-- The UI exposes `加载更多历史`, increasing the limit in 20-row steps.
-- `/api/history` accepts optional `limit` and `offset`, capped at 100 rows per request.
-- Existing session ordering remains newest first.
-- Existing void filtering remains unchanged unless the existing `include_voided=1` parameter is used.
-
-Production cutover remains `PRODUCTION_NO_GO`.
+No D1 write or migration occurred.

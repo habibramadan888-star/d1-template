@@ -75,3 +75,17 @@ If a real phone screenshot still shows any item below, UI acceptance fails and t
 | Owner homepage shows `添加记录 ADD ENTRY`             | Must not appear on owner homepage.                        |           |       |
 | Owner homepage directly shows `现金收款` / `银行转账` | Must not appear as owner homepage primary action buttons. |           |       |
 | Employee page entry is broken                         | Must remain available on `employee-v3.html`.              |           |       |
+
+## AUTH-UI-STABILIZATION-002 Screenshot Checks
+
+| Check                                                          | Pass/Fail | Notes |
+| -------------------------------------------------------------- | --------- | ----- |
+| Old employee PIN login never appears                           |           |       |
+| Old owner login never appears                                  |           |       |
+| Lock icon goes to unified login                                |           |       |
+| Employee identity is real account, not `staff`                 |           |       |
+| Employee tabs are consistent and not truncated                 |           |       |
+| Owner control panel mobile layout fits viewport                |           |       |
+| Owner arrears detail modal is readable                         |           |       |
+| Owner history has quick skeleton/loading feedback              |           |       |
+| Network/WiFi entry is visible or documented as manual-required |           |       |

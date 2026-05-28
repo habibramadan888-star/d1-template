@@ -25,7 +25,16 @@ test("owner nav uses employee-style pill tabs and owner information architecture
 test("employee entry nav remains intact on employee-v3", async () => {
   const employee = await readFile("deploy-worker/public/employee-v3.html", "utf8");
 
-  assert.match(employee, /data-view="entry">录入<span class="en">ENTRY<\/span>/);
-  assert.match(employee, /data-view="arrears">跟进<span class="en">FOLLOW-UP<\/span>/);
-  assert.match(employee, /data-view="export">导出<span class="en">EXPORT<\/span>/);
+  assert.match(
+    employee,
+    /data-view="entry"><span class="tab-cn">录入<\/span><span class="en">ENTRY<\/span>/
+  );
+  assert.match(
+    employee,
+    /data-view="arrears"><span class="tab-cn">跟进<\/span><span class="en">FOLLOW-UP<\/span>/
+  );
+  assert.match(
+    employee,
+    /data-view="export"><span class="tab-cn">导出<\/span><span class="en">EXPORT<\/span>/
+  );
 });

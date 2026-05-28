@@ -8,10 +8,15 @@ test("employee identity display prefers name or userid over role staff", async (
   assert.match(html, /function employeeDisplayName\(user\)/);
   assert.match(
     html,
-    /user\?\.display_name[\s\S]*user\?\.employee_name[\s\S]*user\?\.name[\s\S]*user\?\.username[\s\S]*user\?\.userid[\s\S]*user\?\.role/
+    /user\?\.display_name[\s\S]*user\?\.name[\s\S]*user\?\.username[\s\S]*user\?\.employee_name[\s\S]*user\?\.employee_id[\s\S]*user\?\.userid[\s\S]*user\?\.login_id/
   );
-  assert.match(html, /当前员工 <input id="operatorId"/);
+  assert.doesNotMatch(html, /user\?\.role/);
+  assert.match(
+    html,
+    /<span class="employee-identity-label">当前员工<\/span><input id="operatorId"/
+  );
   assert.match(html, /employee_name:me\.employee_name\|\|me\.name\|\|me\.username\|\|me\.userid/);
+  assert.match(html, /employee_id:me\.employee_id\|\|me\.userid/);
   assert.doesNotMatch(html, /员工编号 <input id="operatorId"/);
 });
 

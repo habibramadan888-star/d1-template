@@ -6,7 +6,7 @@ test("history page renders immediate skeleton and uses timeout feedback", async 
   const js = await readFile("deploy-worker/public/index-51-main.js", "utf8");
 
   assert.match(js, /owner-history-skeleton/);
-  assert.match(js, /const HISTORY_FETCH_TIMEOUT_MS=8000/);
+  assert.match(js, /const HISTORY_FETCH_TIMEOUT_MS=4500/);
   assert.match(js, /apiFetchWithTimeout/);
   assert.match(js, /owner-history-timeout/);
   assert.match(js, /btnHistoryRetry/);

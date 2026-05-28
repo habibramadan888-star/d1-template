@@ -194,3 +194,14 @@ remains `PRODUCTION_NO_GO`.
 Do not run successful live credential login, employee entry, handover, void,
 settings, or any other write-style QA unless a separate write approval is
 granted. Production cutover remains `PRODUCTION_NO_GO`.
+
+## AUTH-UI-STABILIZATION-002 QA Rules
+
+- Only `/unified-login.html` is a valid login entry.
+- Any visible old employee PIN page or old owner password page is a P0/P1 auth-routing bug.
+- Lock / logout / clear session must end at `/unified-login.html`, never an old login page.
+- Employee header must show the real account name / employee id, not `staff`.
+- History taking more than 5 seconds without visible feedback is a P1 UX/performance bug.
+- Control panel or arrears detail modal broken on mobile is a P1/P2 QA bug.
+- Full write-style QA still requires separate approval.
+- Production cutover remains `PRODUCTION_NO_GO`.
