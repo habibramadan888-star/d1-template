@@ -61,22 +61,23 @@ commercial launch.
 
 ## Failure Handling
 
-| Failure Type                                                       | Required Action                                                                                                   |
-| ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
-| P0 financial or data corruption risk                               | Stop the affected flow, create bug report, notify Ramadan Habib, and do not continue related tests until triaged. |
-| P1 permission or cross-tenant risk                                 | Stop permission testing, preserve evidence, create bug report, and keep production NO-GO.                         |
-| P2 functional defect                                               | Record steps, expected/actual result, screenshot, and continue unrelated tests if safe.                           |
-| P3 usability issue                                                 | Record notes and screenshots; group for later UI cleanup.                                                         |
-| Unclear accounting behavior                                        | Mark `MANUAL_REQUIRED`; do not invent pass/fail.                                                                  |
-| Second login after unified login                                   | Record as a unified-login handoff bug; do not continue role-flow testing until triaged.                           |
-| Owner login flicker or back-loop                                   | Record as a unified-login UX bug. Expected behavior is auth-loading first and signed-in panel on browser back.    |
-| Owner visually looks old                                           | Record as a P1 UX bug if the owner UI no longer appears to belong to the same product as employee.                |
-| Owner mobile layout is cramped                                     | Record as P1 if it blocks core use, P2 if readable with workaround.                                               |
-| Owner primary nav shows `录入`                                     | Record as P1 UX/IA bug; owner entry must not appear as a main tab or homepage action.                             |
-| Owner topbar icon/text is garbled                                  | Record as P1 UX bug and attach phone screenshot.                                                                  |
-| Owner right-side topbar overflows                                  | Record as P1 if it blocks use, P2 if cosmetic but readable.                                                       |
-| Successful live login smoke                                        | Requires separate approval because successful login writes production D1 `active_sessions`.                       |
-| Login page shows production/D1/cutover/role-routing technical text | Record as P1 UX bug; visible login UI must stay minimal and user-facing.                                          |
+| Failure Type                                                            | Required Action                                                                                                      |
+| ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| P0 financial or data corruption risk                                    | Stop the affected flow, create bug report, notify Ramadan Habib, and do not continue related tests until triaged.    |
+| P1 permission or cross-tenant risk                                      | Stop permission testing, preserve evidence, create bug report, and keep production NO-GO.                            |
+| P2 functional defect                                                    | Record steps, expected/actual result, screenshot, and continue unrelated tests if safe.                              |
+| P3 usability issue                                                      | Record notes and screenshots; group for later UI cleanup.                                                            |
+| Unclear accounting behavior                                             | Mark `MANUAL_REQUIRED`; do not invent pass/fail.                                                                     |
+| Second login after unified login                                        | Record as a unified-login handoff bug; do not continue role-flow testing until triaged.                              |
+| Owner login flicker or back-loop                                        | Record as a unified-login UX bug. Expected behavior is auth-loading first and signed-in panel on browser back.       |
+| Owner visually looks old                                                | Record as a P1 UX bug if the owner UI no longer appears to belong to the same product as employee.                   |
+| Owner mobile layout is cramped                                          | Record as P1 if it blocks core use, P2 if readable with workaround.                                                  |
+| Owner primary nav shows `录入`                                          | Record as P1 UX/IA bug; owner entry must not appear as a main tab or homepage action.                                |
+| Owner topbar icon/text is garbled                                       | Record as P1 UX bug and attach phone screenshot.                                                                     |
+| Owner right-side topbar overflows                                       | Record as P1 if it blocks use, P2 if cosmetic but readable.                                                          |
+| Successful live login smoke                                             | Requires separate approval because successful login writes production D1 `active_sessions`.                          |
+| Login page shows production/D1/cutover/role-routing technical text      | Record as P1 UX bug; visible login UI must stay minimal and user-facing.                                             |
+| Login page shows helper paragraphs, route explanations, or second cards | Record as P1 UX bug; the visible login page may show only logo, title, username, password, login, and clear session. |
 
 ## Evidence Rules
 

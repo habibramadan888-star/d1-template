@@ -15,29 +15,39 @@ async function readLoginHtml() {
   return readFile(LOGIN_HTML_PATH, "utf8");
 }
 
+function visibleLoginHtml(html) {
+  return html.slice(html.indexOf("<main"), html.indexOf("<script>"));
+}
+
 test("unified-login still loads a single minimal login form", async () => {
   const html = await readLoginHtml();
+  const visible = visibleLoginHtml(html);
 
-  assert.match(html, /<main class="login-overlay unified-login-shell"/);
-  assert.match(html, /<form id="loginForm">/);
-  assert.match(html, /id="accountId"/);
-  assert.match(html, /id="secret"/);
-  assert.match(html, /id="loginButton"/);
-  assert.match(html, /Homelink 登录/);
-  assert.match(html, /员工 \/ 老板 \/ 管理员统一入口/);
-  assert.match(html, /员工请输入编号和 PIN；老板可留空编号。/);
+  assert.match(visible, /<main class="login-overlay unified-login-shell"/);
+  assert.match(visible, /<form id="loginForm">/);
+  assert.match(visible, /id="accountId"/);
+  assert.match(visible, /placeholder="用户名"/);
+  assert.match(visible, /id="secret"/);
+  assert.match(visible, /placeholder="密码"/);
+  assert.match(visible, /id="loginButton"/);
+  assert.match(visible, /Homelink 登录/);
+  assert.match(visible, /清除会话/);
 });
 
 test("unified-login visible copy removes technical QA and production notes", async () => {
   const html = await readLoginHtml();
+  const visible = visibleLoginHtml(html);
 
-  assert.doesNotMatch(html, /One login for every internal role/);
-  assert.doesNotMatch(html, /server role/i);
-  assert.doesNotMatch(html, /PRODUCTION_NO_GO/);
-  assert.doesNotMatch(html, /DB = homelink/i);
-  assert.doesNotMatch(html, /write-style QA/i);
-  assert.doesNotMatch(html, /Production cutover/i);
-  assert.doesNotMatch(html, /route by role/i);
+  assert.doesNotMatch(visible, /One login for every internal role/);
+  assert.doesNotMatch(visible, /server role/i);
+  assert.doesNotMatch(visible, /PRODUCTION_NO_GO/);
+  assert.doesNotMatch(visible, /DB = homelink/i);
+  assert.doesNotMatch(visible, /write-style QA/i);
+  assert.doesNotMatch(visible, /Production cutover/i);
+  assert.doesNotMatch(visible, /route by role/i);
+  assert.doesNotMatch(visible, /employee-v3\.html|index\.html/);
+  assert.doesNotMatch(visible, /员工请输入|老板可留空|管理员|统一入口/);
+  assert.doesNotMatch(visible, /class="hint"|class="signed-in"|boundary/);
 });
 
 test("unified-login keeps employee role routing through server authority", () => {
@@ -65,7 +75,6 @@ test("unified-login still supports explicit clear session action", async () => {
   const html = await readLoginHtml();
 
   assert.match(html, /id="logoutButton"/);
-  assert.match(html, /id="clearSessionButton"/);
   assert.match(html, /async function clearSession\(\)/);
   assert.match(html, /\/auth\/logout/);
   assert.match(html, /localStorage\.removeItem\("homelink:cloud_token"\)/);

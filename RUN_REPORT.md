@@ -21,6 +21,8 @@ Completed locally:
 - Removed visible production/D1/cutover/write-QA warnings from the login page.
 - Removed visible role-routing and server-role explanation copy from the login
   page.
+- Removed the remaining subtitle, helper paragraph, persistent status card, and
+  signed-in explanation panel from the visible login page.
 - Kept one minimal Homelink login card matching the employee-login visual
   direction.
 - Moved technical notes to internal QA documents.

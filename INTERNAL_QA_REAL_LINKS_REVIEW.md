@@ -76,7 +76,7 @@ approval details. Those details remain in this document for testers only.
 | `DB = homelink` warning               | Not shown on `unified-login.html`; kept in QA docs only                |
 | `PRODUCTION_NO_GO` or cutover warning | Not shown on `unified-login.html`; kept in QA docs only                |
 | Write-style QA approval warning       | Not shown on `unified-login.html`; kept in QA docs only                |
-| Normal user-facing copy               | Minimal Chinese login copy matching the employee-login visual standard |
+| Normal user-facing copy               | Only logo, title, username, password, login, and clear-session actions |
 
 | Item                      | Result                                                                                                 |
 | ------------------------- | ------------------------------------------------------------------------------------------------------ |

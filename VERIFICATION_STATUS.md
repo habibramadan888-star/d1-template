@@ -8,14 +8,15 @@ This file records the safety verification commands rerun during project status r
 
 Date: 2026-05-28, Asia/Dubai
 
-| Verification                | Result | Evidence                                            | Commercial Meaning                                                     |
-| --------------------------- | ------ | --------------------------------------------------- | ---------------------------------------------------------------------- |
-| Visible text cleanup        | READY  | `UNIFIED_LOGIN_VISIBLE_TEXT_CLEANUP_RESULT.md`      | Login page no longer exposes production/D1/cutover/role-routing notes. |
-| Minimal card result         | READY  | `UNIFIED_LOGIN_MINIMAL_CARD_RESULT.md`              | User-facing login UI is a compact single card.                         |
-| QA docs migration           | READY  | `UNIFIED_LOGIN_TECHNICAL_NOTES_MOVED_TO_QA_DOCS.md` | Technical notes remain available to testers only.                      |
-| Minimal UI regression tests | READY  | `tests/unified-login-minimal-ui.spec.mjs`           | Guards against reintroducing public technical login-page copy.         |
-| Static login deploy         | PASS   | `UNIFIED_LOGIN_MINIMAL_UI_DEPLOY_RESULT.md`         | Live Worker received only the simplified login asset.                  |
-| Live read-only smoke        | PASS   | `UNIFIED_LOGIN_MINIMAL_UI_LIVE_SMOKE_RESULT.md`     | Live login page no longer shows the technical blocks from screenshot.  |
+| Verification                | Result | Evidence                                            | Commercial Meaning                                                       |
+| --------------------------- | ------ | --------------------------------------------------- | ------------------------------------------------------------------------ |
+| Visible text cleanup        | READY  | `UNIFIED_LOGIN_VISIBLE_TEXT_CLEANUP_RESULT.md`      | Login page no longer exposes production/D1/cutover/role-routing notes.   |
+| Minimal card result         | READY  | `UNIFIED_LOGIN_MINIMAL_CARD_RESULT.md`              | User-facing login UI is a compact single card.                           |
+| Minimal final result        | READY  | `UNIFIED_LOGIN_MINIMAL_FINAL_RESULT.md`             | Visible login UI is limited to logo/title/username/password/login/clear. |
+| QA docs migration           | READY  | `UNIFIED_LOGIN_TECHNICAL_NOTES_MOVED_TO_QA_DOCS.md` | Technical notes remain available to testers only.                        |
+| Minimal UI regression tests | READY  | `tests/unified-login-minimal-ui.spec.mjs`           | Guards against reintroducing public technical login-page copy.           |
+| Static login deploy         | PASS   | `UNIFIED_LOGIN_MINIMAL_UI_DEPLOY_RESULT.md`         | Live Worker received only the simplified login asset.                    |
+| Live read-only smoke        | PASS   | `UNIFIED_LOGIN_MINIMAL_UI_LIVE_SMOKE_RESULT.md`     | Live login page no longer shows the technical blocks from screenshot.    |
 
 Production cutover remains `PRODUCTION_NO_GO`. No D1 write, migration,
 D1 export/import/execute, dashboard calculation change, financial formula

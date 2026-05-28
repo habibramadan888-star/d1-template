@@ -26,36 +26,38 @@ Production status: `PRODUCTION_NO_GO`. This checklist is for internal visual QA 
 
 ## Manual Checks
 
-| Check                                               | Pass/Fail | Notes |
-| --------------------------------------------------- | --------- | ----- |
-| Font family matches employee                        |           |       |
-| Font sizes feel from same hierarchy                 |           |       |
-| Button radius/height/weight matches employee        |           |       |
-| Inputs match employee style and focus state         |           |       |
-| Cards match employee glass/radius/shadow            |           |       |
-| Page background matches employee product feel       |           |       |
-| Spacing matches employee rhythm                     |           |       |
-| Radius scale is consistent                          |           |       |
-| Shadow/elevation is consistent                      |           |       |
-| Loading state is consistent                         |           |       |
-| Mobile layout is consistent                         |           |       |
-| Owner no longer looks like an old system            |           |       |
-| Owner no longer flashes a second login page         |           |       |
-| Owner primary nav no longer shows `录入`            |           |       |
-| Control panel icon/text is not garbled              |           |       |
-| Right-side topbar controls stay in viewport         |           |       |
-| Owner client page matches employee card style       |           |       |
-| Unified login uses employee login background        |           |       |
-| Unified login uses employee login card style        |           |       |
-| Unified login uses employee input/button style      |           |       |
-| Unified login has no production/D1/cutover warning  |           |       |
-| Unified login has no role-routing explanation card  |           |       |
-| Unified login first screen shows only login content |           |       |
-| Only `unified-login.html` is treated as login entry |           |       |
-| Back-button experience is clear                     |           |       |
-| First load has visible feedback                     |           |       |
-| No write test performed                             |           |       |
-| Production remains `PRODUCTION_NO_GO`               |           |       |
+| Check                                                                            | Pass/Fail | Notes |
+| -------------------------------------------------------------------------------- | --------- | ----- |
+| Font family matches employee                                                     |           |       |
+| Font sizes feel from same hierarchy                                              |           |       |
+| Button radius/height/weight matches employee                                     |           |       |
+| Inputs match employee style and focus state                                      |           |       |
+| Cards match employee glass/radius/shadow                                         |           |       |
+| Page background matches employee product feel                                    |           |       |
+| Spacing matches employee rhythm                                                  |           |       |
+| Radius scale is consistent                                                       |           |       |
+| Shadow/elevation is consistent                                                   |           |       |
+| Loading state is consistent                                                      |           |       |
+| Mobile layout is consistent                                                      |           |       |
+| Owner no longer looks like an old system                                         |           |       |
+| Owner no longer flashes a second login page                                      |           |       |
+| Owner primary nav no longer shows `录入`                                         |           |       |
+| Control panel icon/text is not garbled                                           |           |       |
+| Right-side topbar controls stay in viewport                                      |           |       |
+| Owner client page matches employee card style                                    |           |       |
+| Unified login uses employee login background                                     |           |       |
+| Unified login uses employee login card style                                     |           |       |
+| Unified login uses employee input/button style                                   |           |       |
+| Unified login has no production/D1/cutover warning                               |           |       |
+| Unified login has no role-routing explanation card                               |           |       |
+| Unified login first screen shows only login content                              |           |       |
+| Unified login has no helper paragraph or status card                             |           |       |
+| Unified login visible elements are only logo/title/username/password/login/clear |           |       |
+| Only `unified-login.html` is treated as login entry                              |           |       |
+| Back-button experience is clear                                                  |           |       |
+| First load has visible feedback                                                  |           |       |
+| No write test performed                                                          |           |       |
+| Production remains `PRODUCTION_NO_GO`                                            |           |       |
 
 ## Real Screenshot Regression Checks
 

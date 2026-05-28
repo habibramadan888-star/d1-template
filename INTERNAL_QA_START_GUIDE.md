@@ -40,8 +40,9 @@ read-only smoke planning only under current restrictions.
 
 The live `unified-login.html` page must stay minimal for normal employees,
 owners, and administrators. The page should show only the Homelink logo, title,
-short unified-entry subtitle, employee-ID field, password/PIN field, login
-button, small clear-session action, and one short helper sentence.
+username field, password field, login button, and small clear-session action.
+It must not show a subtitle, helper paragraph, signed-in panel, production
+warning, D1 warning, QA warning, or role-routing explanation.
 
 Do not show these internal QA notes on the visible login page:
 

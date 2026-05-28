@@ -66,7 +66,7 @@ body:before{
   display:flex;
   align-items:center;
   gap:12px;
-  margin-bottom:24px;
+  margin-bottom:26px;
 }
 .badge{
   width:48px;
@@ -102,6 +102,17 @@ body:before{
   font-weight:520;
   letter-spacing:.12em;
   text-transform:uppercase;
+}
+.sr-only{
+  position:absolute;
+  width:1px;
+  height:1px;
+  padding:0;
+  margin:-1px;
+  overflow:hidden;
+  clip:rect(0,0,0,0);
+  white-space:nowrap;
+  border:0;
 }
 .field{margin-bottom:16px}
 .field label{
@@ -193,7 +204,7 @@ button:disabled{
   opacity:.64;
   cursor:not-allowed;
 }
-.hint,.status,.signed-in{
+.status{
   font-size:14px;
   color:#566174;
   line-height:1.75;
@@ -201,9 +212,6 @@ button:disabled{
   border:1px dashed #d7e3dd;
   border-radius:18px;
   padding:16px 18px;
-}
-.hint{
-  margin-top:16px;
 }
 .status{
   margin-top:12px;
@@ -225,17 +233,6 @@ button:disabled{
   background:#fff8e6;
   border-color:#f5dfaa;
 }
-.signed-in{
-  display:grid;
-  gap:12px;
-  margin-top:16px;
-  background:#f1fbf5;
-  border-style:solid;
-  border-color:#d8efdf;
-}
-.signed-in[hidden]{display:none}
-.signed-in strong{font-size:17px}
-.signed-in p{margin:0;color:var(--muted);line-height:1.5}
 @media(max-width:720px){
   body{
     background:
@@ -257,34 +254,23 @@ button:disabled{
   <section class="login-card employee-login-match" aria-label="Login form">
     <div class="login-brand">
       <div class="badge"><div>HOME<small>LINK.</small></div></div>
-      <div class="login-title">Homelink 登录<small>员工 / 老板 / 管理员统一入口</small></div>
+      <div class="login-title">Homelink 登录</div>
     </div>
     <form id="loginForm">
       <div class="field">
-        <label for="accountId">员工编号（老板可留空）</label>
-        <input id="accountId" name="accountId" autocomplete="username" placeholder="员工编号；老板可留空">
+        <label class="sr-only" for="accountId">用户名</label>
+        <input id="accountId" name="accountId" autocomplete="username" placeholder="用户名">
       </div>
       <div class="field">
-        <label for="secret">密码 / PIN</label>
-        <input id="secret" name="secret" type="password" autocomplete="current-password" required>
+        <label class="sr-only" for="secret">密码</label>
+        <input id="secret" name="secret" type="password" autocomplete="current-password" placeholder="密码" required>
       </div>
       <div class="login-actions">
         <button class="btn primary" id="loginButton" type="submit">登录</button>
-        <button class="btn ghost" id="logoutButton" type="button">清除登录状态</button>
+        <button class="btn ghost" id="logoutButton" type="button">清除会话</button>
       </div>
     </form>
-    <div class="signed-in" id="signedInPanel" hidden>
-      <strong id="signedInTitle">已登录</strong>
-      <p id="signedInText">可以继续进入系统，或退出后切换账号。</p>
-      <div class="actions">
-        <button class="btn primary" id="continueButton" type="button">继续进入系统</button>
-        <button class="btn ghost" id="clearSessionButton" type="button">退出登录</button>
-      </div>
-    </div>
     <div class="status" id="status" role="status" hidden></div>
-    <div class="hint">
-      员工请输入编号和 PIN；老板可留空编号。
-    </div>
   </section>
 </main>
 
@@ -301,12 +287,6 @@ const accountId = document.getElementById("accountId");
 const secret = document.getElementById("secret");
 const loginButton = document.getElementById("loginButton");
 const logoutButton = document.getElementById("logoutButton");
-const signedInPanel = document.getElementById("signedInPanel");
-const signedInTitle = document.getElementById("signedInTitle");
-const signedInText = document.getElementById("signedInText");
-const continueButton = document.getElementById("continueButton");
-const clearSessionButton = document.getElementById("clearSessionButton");
-let currentSessionDestination = null;
 
 function apiUrl(path) {
   if (/^https?:\/\//i.test(path)) return path;
@@ -364,25 +344,8 @@ function routeFromServerClaim(me, options = {}) {
 }
 
 function showLoginForm(message, tone) {
-  currentSessionDestination = null;
-  signedInPanel.hidden = true;
   form.style.display = "block";
   setStatus(message, tone);
-}
-
-function showSignedInPanel(me) {
-  const destination = destinationForRole(me?.role);
-  if (!destination) {
-    showLoginForm("当前账号暂不能进入系统。", "error");
-    return;
-  }
-  currentSessionDestination = destination;
-  form.style.display = "none";
-  signedInPanel.hidden = false;
-  signedInTitle.textContent = "已登录";
-  signedInText.textContent = "可以继续进入系统，或退出后切换账号。";
-  continueButton.textContent = "继续进入系统";
-  setStatus("");
 }
 
 async function checkExistingSession() {
@@ -390,7 +353,7 @@ async function checkExistingSession() {
     const me = await fetchMe();
     if (me) {
       if (shouldAutoRedirectExistingSession()) routeFromServerClaim(me, { replace: true });
-      else showSignedInPanel(me);
+      else showLoginForm("");
       return;
     }
     showLoginForm("");
@@ -432,7 +395,7 @@ async function signIn(event) {
     secret.value = "";
     routeFromServerClaim(me, { replace: true });
   } catch (error) {
-    setStatus("登录失败，请检查编号或密码。", "error");
+    setStatus("用户名或密码错误", "error");
   } finally {
     loginButton.disabled = false;
   }
@@ -447,17 +410,12 @@ async function clearSession() {
   sessionStorage.removeItem("homelink:cloud_token");
   accountId.value = "";
   secret.value = "";
-  showLoginForm("已退出，请重新登录。");
+  showLoginForm("");
   logoutButton.disabled = false;
 }
 
 form.addEventListener("submit", signIn);
 logoutButton.addEventListener("click", clearSession);
-clearSessionButton.addEventListener("click", clearSession);
-continueButton.addEventListener("click", () => {
-  if (currentSessionDestination) location.assign(currentSessionDestination);
-  else checkExistingSession();
-});
 checkExistingSession();
 </script>
 </body>

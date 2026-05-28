@@ -80,7 +80,7 @@ export function resolveUnifiedExistingSessionUx({ meStatus, meClaim, autoRedirec
 
   return {
     page: "unified-login",
-    action: autoRedirect ? "AUTO_REDIRECT" : "SHOW_SIGNED_IN_PANEL",
+    action: autoRedirect ? "AUTO_REDIRECT" : "SHOW_MINIMAL_LOGIN",
     roleGroup: decision.roleGroup,
     destination: decision.destination,
     authority: "/api/me",

@@ -44,13 +44,13 @@ test("employee session does not enter owner dashboard", () => {
   assert.equal(decision.showLegacyLogin, false);
 });
 
-test("unified-login with existing owner session shows signed-in panel", () => {
+test("unified-login with existing owner session stays minimal unless auto redirect is requested", () => {
   const decision = resolveUnifiedExistingSessionUx({
     meStatus: 200,
     meClaim: { role: "owner" }
   });
 
-  assert.equal(decision.action, "SHOW_SIGNED_IN_PANEL");
+  assert.equal(decision.action, "SHOW_MINIMAL_LOGIN");
   assert.equal(decision.autoRedirect, false);
   assert.equal(decision.destination, "/index.html");
 });
@@ -87,16 +87,18 @@ test("owner app asset contains loading state and not initial login flicker", asy
   assert.match(js, /showOwnerAppShell/);
 });
 
-test("unified login asset uses signed-in panel instead of immediate redirect loop", async () => {
+test("unified login asset stays minimal and avoids signed-in explanation panels", async () => {
   const html = await readFile("deploy-worker/public/unified-login.html", "utf8");
 
   assert.match(html, /shared-design-tokens\.css/);
   assert.match(html, /hl-page unified-login-page/);
-  assert.match(html, /signedInPanel/);
-  assert.match(html, /继续进入系统/);
+  assert.match(html, /placeholder="用户名"/);
+  assert.match(html, /placeholder="密码"/);
+  assert.doesNotMatch(html, /signedInPanel/);
+  assert.doesNotMatch(html, /继续进入系统/);
   assert.match(html, /shouldAutoRedirectExistingSession/);
   assert.match(html, /get\("auto"\) === "1"/);
-  assert.match(html, /showSignedInPanel\(me\)/);
+  assert.match(html, /showLoginForm\(""\)/);
 });
 
 test("production cutover remains PRODUCTION_NO_GO", () => {
