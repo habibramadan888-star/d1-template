@@ -7,6 +7,40 @@ Production deploy: unified-login static route/session handoff deploys executed
 under explicit approval; no commercial cutover.
 Production database mutation: not executed
 
+## UNIFIED-LOGIN-STYLE-001 Single Login Visual Match
+
+Date: 2026-05-28, Asia/Dubai
+
+Scope: static unified-login visual alignment to the original employee login
+screen. This task keeps `unified-login.html` as the only login entry and treats
+`employee-v3.html` and `index.html` as role-based business destinations.
+
+Completed:
+
+- Rebuilt `deploy-worker/public/unified-login.html` from the old two-column
+  hero/card layout into the employee-login-equivalent single glass login card.
+- Matched employee login background, blur/glow, HOME/LINK badge, card width,
+  radius, padding, shadow, inputs, green primary button, helper cards, and
+  mobile spacing.
+- Preserved `/api/me` as routing authority after login.
+- Added single-entry and visual-match tests.
+- Corrected internal QA docs to avoid separate owner/employee login-page
+  language.
+
+Result:
+
+- Single login entry: `unified-login.html`.
+- Employee destination: `employee-v3.html`, business page only.
+- Owner destination: `index.html`, business page only.
+- Production D1 write: no.
+- Production migration: no.
+- D1 export/import/execute: no.
+- Dashboard calculation change: no.
+- Financial formula change: no.
+- Deploy executed: no.
+- Deploy required for live: yes, pending separate static UI approval.
+- Production cutover: `PRODUCTION_NO_GO`.
+
 ## UI-UNIFICATION-003 Owner Mobile UI Pass 2
 
 Date: 2026-05-28, Asia/Dubai

@@ -7,7 +7,7 @@ Production status: `PRODUCTION_NO_GO`. This checklist is for internal visual QA 
 | Screenshot                    | Required | Pass/Fail | Notes                                                    |
 | ----------------------------- | -------- | --------- | -------------------------------------------------------- |
 | Unified login desktop         | Yes      |           |                                                          |
-| Unified login mobile          | Yes      |           |                                                          |
+| Unified login mobile          | Yes      |           | Must match the original employee login screenshot.       |
 | Employee-v3 desktop           | Yes      |           |                                                          |
 | Employee-v3 mobile            | Yes      |           |                                                          |
 | Employee home mobile          | Yes      |           | Confirm owner/employee design language match.            |
@@ -26,26 +26,30 @@ Production status: `PRODUCTION_NO_GO`. This checklist is for internal visual QA 
 
 ## Manual Checks
 
-| Check                                         | Pass/Fail | Notes |
-| --------------------------------------------- | --------- | ----- |
-| Font family matches employee                  |           |       |
-| Font sizes feel from same hierarchy           |           |       |
-| Button radius/height/weight matches employee  |           |       |
-| Inputs match employee style and focus state   |           |       |
-| Cards match employee glass/radius/shadow      |           |       |
-| Page background matches employee product feel |           |       |
-| Spacing matches employee rhythm               |           |       |
-| Radius scale is consistent                    |           |       |
-| Shadow/elevation is consistent                |           |       |
-| Loading state is consistent                   |           |       |
-| Mobile layout is consistent                   |           |       |
-| Owner no longer looks like an old system      |           |       |
-| Owner no longer flashes a second login page   |           |       |
-| Owner primary nav no longer shows `录入`      |           |       |
-| Control panel icon/text is not garbled        |           |       |
-| Right-side topbar controls stay in viewport   |           |       |
-| Owner client page matches employee card style |           |       |
-| Back-button experience is clear               |           |       |
-| First load has visible feedback               |           |       |
-| No write test performed                       |           |       |
-| Production remains `PRODUCTION_NO_GO`         |           |       |
+| Check                                               | Pass/Fail | Notes |
+| --------------------------------------------------- | --------- | ----- |
+| Font family matches employee                        |           |       |
+| Font sizes feel from same hierarchy                 |           |       |
+| Button radius/height/weight matches employee        |           |       |
+| Inputs match employee style and focus state         |           |       |
+| Cards match employee glass/radius/shadow            |           |       |
+| Page background matches employee product feel       |           |       |
+| Spacing matches employee rhythm                     |           |       |
+| Radius scale is consistent                          |           |       |
+| Shadow/elevation is consistent                      |           |       |
+| Loading state is consistent                         |           |       |
+| Mobile layout is consistent                         |           |       |
+| Owner no longer looks like an old system            |           |       |
+| Owner no longer flashes a second login page         |           |       |
+| Owner primary nav no longer shows `录入`            |           |       |
+| Control panel icon/text is not garbled              |           |       |
+| Right-side topbar controls stay in viewport         |           |       |
+| Owner client page matches employee card style       |           |       |
+| Unified login uses employee login background        |           |       |
+| Unified login uses employee login card style        |           |       |
+| Unified login uses employee input/button style      |           |       |
+| Only `unified-login.html` is treated as login entry |           |       |
+| Back-button experience is clear                     |           |       |
+| First load has visible feedback                     |           |       |
+| No write test performed                             |           |       |
+| Production remains `PRODUCTION_NO_GO`               |           |       |

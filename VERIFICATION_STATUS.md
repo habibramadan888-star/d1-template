@@ -4,6 +4,23 @@ Generated: 2026-05-23, Asia/Dubai
 
 This file records the safety verification commands rerun during project status reconciliation. Commands were run without modifying business logic, production configuration, or production database data.
 
+## UNIFIED-LOGIN-STYLE-001 Verification Addendum
+
+Date: 2026-05-28, Asia/Dubai
+
+| Verification                  | Result   | Evidence                                                                            | Commercial Meaning                                                                  |
+| ----------------------------- | -------- | ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| Single-entry model            | READY    | `UNIFIED_LOGIN_SINGLE_ENTRY_MODEL.md`; `tests/unified-login-single-entry.spec.mjs`  | `unified-login.html` is the only login entry; role destinations are business pages. |
+| Employee visual standard      | READY    | `EMPLOYEE_LOGIN_VISUAL_STANDARD.md`                                                 | Original employee login design is the visual source of truth.                       |
+| Unified login visual match    | READY    | `UNIFIED_LOGIN_VISUAL_MATCH_RESULT.md`; `tests/unified-login-visual-match.spec.mjs` | Login background/card/input/button typography align to employee login standard.     |
+| Copy/documentation correction | READY    | `UNIFIED_LOGIN_COPY_REVIEW.md`; `UNIFIED_LOGIN_DOCUMENTATION_CORRECTION.md`         | Internal QA docs use unified login language and avoid split-login guidance.         |
+| Deploy boundary               | REQUIRED | `UNIFIED_LOGIN_STYLE_DEPLOY_APPROVAL_REQUIRED.md`                                   | Live visibility requires separate static UI deploy approval.                        |
+
+Production cutover remains `PRODUCTION_NO_GO`. No production D1 write,
+migration, D1 export/import/execute, dashboard calculation change, financial
+formula change, business write test, handover submit, void/delete, settings
+change, or commercial launch GO occurred.
+
 ## UI-UNIFICATION-003 Verification Addendum
 
 Date: 2026-05-28, Asia/Dubai

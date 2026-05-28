@@ -9,20 +9,20 @@ launch.
 
 ## Correct Links
 
-| Role / Path          | Link                                                                      | Status                                      | Notes                                                              |
-| -------------------- | ------------------------------------------------------------------------- | ------------------------------------------- | ------------------------------------------------------------------ |
-| Unified login        | `https://homelink-finance.habibramadan888.workers.dev/unified-login.html` | Live route verified after static deploy     | All testers should start here.                                     |
-| Employee destination | `https://homelink-finance.habibramadan888.workers.dev/employee-v3.html`   | Confirmed by Ramadan and local asset exists | Automatic destination after employee/staff role is confirmed.      |
-| Owner destination    | `https://homelink-finance.habibramadan888.workers.dev/index.html`         | Confirmed local main SPA asset exists       | Automatic destination after owner/manager/admin role is confirmed. |
-| Owner/root legacy    | `https://homelink-finance.habibramadan888.workers.dev/`                   | Preserved compatibility path                | Do not use as the default QA login path.                           |
-| Versioned main SPA   | `https://homelink-finance.habibramadan888.workers.dev/index-51.html`      | Confirmed local asset exists                | Candidate fallback only if the root/index route needs comparison.  |
+| Role / Path            | Link                                                                      | Status                                      | Notes                                                                                         |
+| ---------------------- | ------------------------------------------------------------------------- | ------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Unified login          | `https://homelink-finance.habibramadan888.workers.dev/unified-login.html` | Live route verified after static deploy     | All testers should start here.                                                                |
+| Employee business page | `https://homelink-finance.habibramadan888.workers.dev/employee-v3.html`   | Confirmed by Ramadan and local asset exists | Automatic destination after employee/staff role is confirmed; not a primary login entry.      |
+| Owner business page    | `https://homelink-finance.habibramadan888.workers.dev/index.html`         | Confirmed local main SPA asset exists       | Automatic destination after owner/manager/admin role is confirmed; not a primary login entry. |
+| Owner/root legacy      | `https://homelink-finance.habibramadan888.workers.dev/`                   | Preserved compatibility path                | Do not use as the default QA login path.                                                      |
+| Versioned main SPA     | `https://homelink-finance.habibramadan888.workers.dev/index-51.html`      | Confirmed local asset exists                | Candidate fallback only if the root/index route needs comparison.                             |
 
 ## Before Testing
 
 | Check                     | Requirement                                                                                                     |
 | ------------------------- | --------------------------------------------------------------------------------------------------------------- |
 | Production cutover status | Must remain `PRODUCTION_NO_GO`.                                                                                 |
-| Start link                | Open unified login first; do not split employee and owner login links.                                          |
+| Start link                | Open the single unified login first; do not split employee and owner login pages.                               |
 | Credentials               | Receive through secure channel only; do not write passwords in docs.                                            |
 | Evidence                  | Mask passwords, tokens, cookies, and sensitive customer data.                                                   |
 | Write actions             | Do not run write-style QA against `homelink-finance` unless production D1 write approval is explicitly granted. |
@@ -52,15 +52,15 @@ D1 table `active_sessions`.
 
 ## Session Handoff Expectation
 
-After the session handoff fix is deployed, unified login should be a one-time
-login for both role destinations:
+Unified login is the only QA/product login entry. After sign-in, the
+server-confirmed role routes the tester to a business destination:
 
-| Role                    | Expected Handoff                                                                                                     |
-| ----------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| Owner / manager / admin | Unified login routes to `index.html`; the owner SPA reads `/api/me` and must not show a second password prompt.      |
-| Employee / staff        | Unified login routes to `employee-v3.html`; the employee page reads `/api/me` and must not show a second PIN prompt. |
+| Role                    | Expected Handoff                                                                                                                                            |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Owner / manager / admin | Unified login routes to the owner business page `index.html`; the page reads `/api/me` and must not behave as a separate owner login page.                  |
+| Employee / staff        | Unified login routes to the employee business page `employee-v3.html`; the page reads `/api/me` and must not be treated as the primary employee login page. |
 
-If either destination shows a second login prompt after a successful unified
+If either destination shows another credential prompt after a successful unified
 login, record it as a bug with role, URL, time, and screenshot. Do not perform
 write-style testing on `homelink-finance` without separate production D1 write
 approval.
@@ -74,12 +74,12 @@ must prove the live browser path with real credentials.
 After UNIFIED-LOGIN-UX-004, the owner destination must not flash the legacy
 password panel before checking the server session. Expected behavior:
 
-| Scenario                                            | Expected Result                                                                                          |
-| --------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| Owner opens destination after unified login         | Owner page first shows `Checking session`, then enters the dashboard shell.                              |
-| Browser back to unified login while still signed in | Unified login shows a signed-in panel with `Continue to owner dashboard` and `Clear session / Sign out`. |
-| Expired or missing session                          | Login form appears only after `/api/me` returns unauthenticated or expired.                              |
-| Second login prompt appears after unified login     | Record as a bug and do not continue role-flow testing until triaged.                                     |
+| Scenario                                             | Expected Result                                                                                         |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Owner opens destination after unified login          | Owner business page first shows `Checking session`, then enters the dashboard shell.                    |
+| Browser back to unified login while still signed in  | Unified login shows a signed-in panel with continue and clear-session actions.                          |
+| Expired or missing session                           | QA should return to `unified-login.html`; destination-side credential UI is not a separate login entry. |
+| Second credential prompt appears after unified login | Record as a bug and do not continue role-flow testing until triaged.                                    |
 
 The live Worker is still bound to `DB = homelink`; full write testing and
 successful-login smoke that creates `active_sessions` require separate approval.
@@ -89,15 +89,16 @@ successful-login smoke that creates `active_sessions` require separate approval.
 After UI-UNIFICATION-NIGHT-001, owner and employee pages must look like the same
 commercial SaaS product. Required visual checks:
 
-| Area          | Expected Result                                                                                   |
-| ------------- | ------------------------------------------------------------------------------------------------- |
-| Design system | Owner, employee, and unified login load `shared-design-tokens.css`.                               |
-| Font          | Owner uses the same Apple/SF + PingFang/Microsoft YaHei stack as employee.                        |
-| Buttons       | Owner primary/secondary/danger buttons match employee radius, height, weight, and green gradient. |
-| Inputs        | Owner inputs/selects/textareas match employee rounded glass field and focus halo.                 |
-| Cards         | Owner dashboard cards match employee glass/radius/shadow style.                                   |
-| Mobile        | Owner mobile dashboard must not look like a squeezed desktop table.                               |
-| Loading       | Owner shows auth-loading first; no legacy second login flash.                                     |
+| Area          | Expected Result                                                                                        |
+| ------------- | ------------------------------------------------------------------------------------------------------ |
+| Design system | Owner, employee, and unified login load `shared-design-tokens.css`.                                    |
+| Font          | Owner uses the same Apple/SF + PingFang/Microsoft YaHei stack as employee.                             |
+| Buttons       | Owner primary/secondary/danger buttons match employee radius, height, weight, and green gradient.      |
+| Inputs        | Owner inputs/selects/textareas match employee rounded glass field and focus halo.                      |
+| Cards         | Owner dashboard cards match employee glass/radius/shadow style.                                        |
+| Mobile        | Owner mobile dashboard must not look like a squeezed desktop table.                                    |
+| Loading       | Owner shows auth-loading first; no legacy second login flash.                                          |
+| Unified login | `unified-login.html` visually matches the original employee login card/background/input/button design. |
 
 If owner UI still looks visibly old compared with employee UI, record it as a
 P1 UX bug. If owner shows a second login flash, record it as a P1 UX bug. If

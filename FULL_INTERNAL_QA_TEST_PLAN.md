@@ -2,8 +2,10 @@
 
 Date: 2026-05-28, Asia/Dubai
 
-Scope: internal QA planning with unified login. Testers should start from one
-login portal and allow the server-confirmed role to route them. This plan does
+Scope: internal QA planning with one unified login page. Testers must start
+from `unified-login.html` and allow the server-confirmed role to route them.
+`employee-v3.html` and `index.html` are business destinations, not separate
+login pages. This plan does
 not approve public beta, production migration, production deploy, production D1
 write, production feature flags, dashboard production authority switch, or
 commercial launch.
@@ -14,8 +16,8 @@ commercial launch.
 | ------------------------------ | ------------------------------------------------------------------------------------------ |
 | QA package environment         | Internal QA planning; not production approval                                              |
 | Unified login URL              | `https://homelink-finance.habibramadan888.workers.dev/unified-login.html`                  |
-| Employee destination URL       | `https://homelink-finance.habibramadan888.workers.dev/employee-v3.html`                    |
-| Owner destination URL          | `https://homelink-finance.habibramadan888.workers.dev/index.html`                          |
+| Employee business destination  | `https://homelink-finance.habibramadan888.workers.dev/employee-v3.html`                    |
+| Owner business destination     | `https://homelink-finance.habibramadan888.workers.dev/index.html`                          |
 | Staging Worker URL             | `https://homelink-finance-staging.habibramadan888.workers.dev`                             |
 | Current Worker D1 binding risk | `homelink-finance` is configured with `DB = homelink`; writes affect prod                  |
 | Production used?               | Live Worker static route deploy executed under explicit approval; no D1 write or migration |
@@ -49,6 +51,7 @@ commercial launch.
 | Employee flow         | Rent, deposit, arrears, short-pay, repayment, void, and handover scenarios are completed or have documented blockers.  |
 | Owner flow            | Dashboard, history, search/filter, handover review, and report/export behavior are reviewed with screenshots or notes. |
 | Unified login handoff | Owner and employee each log in once through unified login; no second password/PIN prompt appears after routing.        |
+| Unified login visual  | `unified-login.html` matches the original employee login background, card, input, button, type, and mobile layout.     |
 | Unified design system | Owner and employee use the same font, button, input, card, loading, and mobile visual language.                        |
 | Finance flow          | Rent income, deposit liability, arrears, overdue, overpayment, and void behavior match the accepted staging rules.     |
 | Tenant/property scope | Employee, owner, and manager/admin access is constrained to expected tenant/property boundaries.                       |

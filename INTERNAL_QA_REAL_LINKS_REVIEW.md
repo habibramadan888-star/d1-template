@@ -13,7 +13,7 @@ or write any D1.
 | Item                            | Result                                                                                    |
 | ------------------------------- | ----------------------------------------------------------------------------------------- |
 | Unified login link              | `https://homelink-finance.habibramadan888.workers.dev/unified-login.html`                 |
-| Employee real link              | `https://homelink-finance.habibramadan888.workers.dev/employee-v3.html`                   |
+| Employee business page          | `https://homelink-finance.habibramadan888.workers.dev/employee-v3.html`                   |
 | Source of confirmation          | Ramadan-confirmed link plus local asset `deploy-worker/public/employee-v3.html`           |
 | Old default to avoid            | `https://homelink-finance-staging.habibramadan888.workers.dev` as the employee entry link |
 | Remote URL called by this task? | Yes, read-only after approved static route deploy.                                        |
@@ -33,14 +33,14 @@ or write any D1.
 
 ## Session Handoff Review
 
-| Item                               | Result                                                                                                  |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| Owner destination session check    | `index-51-main.js` now starts by checking `/api/me` and enters owner UI for owner/manager/admin claims. |
-| Employee destination session check | `employee-v3.html` now starts by checking `/api/me` and enters employee UI for staff/employee claims.   |
-| Fallback behavior                  | Old owner login and employee PIN login remain available when `/api/me` is unauthenticated or expired.   |
-| Authority                          | `/api/me`; frontend role/local storage is not authority.                                                |
-| Live deployment status             | Deployed in UNIFIED-LOGIN-FIX-003 to `homelink-finance` Worker assets.                                  |
-| Successful login smoke             | Not executed in UNIFIED-LOGIN-FIX-003 because successful login writes production D1 `active_sessions`.  |
+| Item                                 | Result                                                                                                  |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| Owner business page session check    | `index-51-main.js` now starts by checking `/api/me` and enters owner UI for owner/manager/admin claims. |
+| Employee business page session check | `employee-v3.html` now starts by checking `/api/me` and enters employee UI for staff/employee claims.   |
+| Single-entry behavior                | QA guidance treats `unified-login.html` as the only login entry; destination pages are business pages.  |
+| Authority                            | `/api/me`; frontend role/local storage is not authority.                                                |
+| Live deployment status               | Deployed in UNIFIED-LOGIN-FIX-003 to `homelink-finance` Worker assets.                                  |
+| Successful login smoke               | Not executed in UNIFIED-LOGIN-FIX-003 because successful login writes production D1 `active_sessions`.  |
 
 ## Owner UX Review
 
@@ -54,6 +54,16 @@ or write any D1.
 | Successful live login smoke | Still requires separate approval because successful login writes `active_sessions`. |
 
 ## Owner / Employee UI Unification Review
+
+## Unified Login Style Review
+
+| Item                | Result                                                                                           |
+| ------------------- | ------------------------------------------------------------------------------------------------ |
+| Single login entry  | `unified-login.html`                                                                             |
+| Employee page role  | Employee business destination, not primary login entry                                           |
+| Owner page role     | Owner business destination, not primary login entry                                              |
+| Visual target       | Original employee login screen: green glass background, HOME/LINK badge, one centered login card |
+| Production boundary | `PRODUCTION_NO_GO`; no D1 write or migration                                                     |
 
 | Item                      | Result                                                                                                 |
 | ------------------------- | ------------------------------------------------------------------------------------------------------ |
