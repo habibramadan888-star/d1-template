@@ -1033,31 +1033,308 @@ body::before{
 .owner-ui-unified .cc-card{margin-bottom:0;border-radius:var(--radius-lg)!important}
 .owner-ui-unified .cc-card-head{padding:18px}
 .owner-ui-unified .cc-badge{border-radius:999px;padding:3px 8px;font-size:var(--font-size-xs);font-weight:var(--font-weight-bold)}
+
+/* === Final employee-first mobile product shell === */
+.owner-ui-unified .topbar{
+  position:sticky;
+  top:0;
+  z-index:50;
+  background:linear-gradient(100deg,rgba(255,255,255,.97),rgba(237,250,244,.95));
+  border-bottom:1px solid rgba(177,204,191,.55);
+  box-shadow:0 2px 14px rgba(20,32,51,.06);
+  overflow:hidden;
+}
+.owner-ui-unified .topbar-row1,
+.owner-ui-unified .topbar-row2{
+  width:min(980px,100%);
+  margin:0 auto;
+}
+.owner-ui-unified .topbar-row1{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+  padding:22px 28px 12px;
+}
+.owner-ui-unified .topbar-row2{
+  padding:0 28px 20px;
+  border-top:0;
+}
+.owner-ui-unified .brand{
+  display:flex;
+  align-items:center;
+  min-width:0;
+  gap:16px;
+}
+.owner-ui-unified .brand-icon{
+  width:70px;
+  height:70px;
+  border-radius:17px;
+  box-shadow:inset 0 -10px 20px rgba(0,0,0,.08);
+}
+.owner-ui-unified .brand-name{
+  display:flex;
+  align-items:baseline;
+  gap:10px;
+  min-width:0;
+  color:#142033;
+  font-size:32px;
+  font-weight:950;
+  letter-spacing:-.04em;
+  line-height:1;
+}
+.owner-ui-unified .brand-business{
+  color:#142033;
+  font-size:.72em;
+  font-weight:760;
+  letter-spacing:-.04em;
+  white-space:nowrap;
+}
+.owner-ui-unified .topbar-right{
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  gap:12px;
+  min-width:0;
+  flex-shrink:1;
+}
+.owner-ui-unified .role-badge{
+  display:inline-flex;
+  align-items:center;
+  min-height:42px;
+  padding:11px 18px;
+  border-radius:999px;
+  font-family:var(--font-family);
+  font-size:var(--font-size-base);
+  font-weight:950;
+  background:#fff!important;
+  color:var(--color-primary-hover)!important;
+  border:1.5px solid rgba(9,166,79,.24)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.8);
+}
+.owner-ui-unified .owner-dashboard-btn{
+  min-height:46px;
+  border-radius:999px!important;
+  padding:11px 18px!important;
+  font-weight:950;
+}
+.owner-ui-unified .topbar-right .btn-ghost{
+  min-width:46px;
+  min-height:46px;
+  border-radius:18px!important;
+}
+.owner-ui-unified .nav{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:0;
+  padding:0;
+  overflow:hidden;
+  border:1px solid var(--line);
+  border-radius:27px;
+  background:rgba(255,255,255,.94);
+  box-shadow:var(--shadow-card);
+}
+.owner-ui-unified .nav-btn{
+  min-width:0!important;
+  width:100%;
+  min-height:86px;
+  border-radius:0;
+  border:0;
+  border-right:1px solid var(--line);
+  background:rgba(255,255,255,.94);
+  color:#243044;
+  font-size:25px;
+  font-weight:950;
+  letter-spacing:.05em;
+  gap:10px;
+  flex-direction:row;
+}
+.owner-ui-unified .nav-btn:first-child{border-radius:27px 0 0 27px}
+.owner-ui-unified .nav-btn:last-child{border-right:0;border-radius:0 27px 27px 0}
+.owner-ui-unified .nav-btn .ico{display:none}
+.owner-ui-unified .nav-btn .en-sub{
+  margin-top:0;
+  color:inherit;
+  font-size:13px;
+  font-weight:700;
+  letter-spacing:.08em;
+  opacity:.78;
+}
+.owner-ui-unified .nav-btn.active{
+  background:linear-gradient(180deg,#10ad5a,#078d42);
+  color:#fff;
+  border-color:rgba(9,166,79,.7);
+  box-shadow:0 12px 26px rgba(9,166,79,.24);
+}
+.owner-ui-unified .container{
+  width:min(980px,100%);
+  padding:52px 28px 110px;
+}
+.owner-ui-unified .page-title{
+  font-size:50px;
+  font-weight:950;
+  line-height:1.08;
+  letter-spacing:-.04em;
+  margin:0 0 12px;
+}
+.owner-ui-unified .page-title .en-sub{
+  display:block;
+  margin-top:14px!important;
+  color:#697386;
+  font-size:23px!important;
+  font-weight:700;
+  letter-spacing:.10em!important;
+}
+.owner-ui-unified .page-sub{
+  margin-bottom:30px!important;
+  color:#586273;
+  font-size:22px;
+  font-weight:850;
+  line-height:1.45;
+}
+.owner-ui-unified .card,
+.owner-ui-unified .hist-card,
+.owner-ui-unified .hist-month,
+.owner-ui-unified .import-panel,
+.owner-ui-unified .chips-bar,
+.owner-ui-unified .ana-kpi,
+.owner-ui-unified .cc-card,
+.owner-ui-unified .billing-widget,
+.owner-ui-unified .owner-overview-card{
+  border:1px solid var(--line);
+  border-radius:var(--radius-xl);
+  background:rgba(255,255,255,.94);
+  box-shadow:var(--shadow-card);
+}
+.owner-ui-unified .card-head,
+.owner-ui-unified .hist-month-head{
+  padding:22px 26px;
+}
+.owner-ui-unified .card-body{padding:26px}
+.owner-ui-unified .card-title{
+  font-size:26px;
+  font-weight:950;
+  line-height:1.15;
+}
+.owner-ui-unified .card-sub{
+  margin-top:6px;
+  color:#697386;
+  font-size:13px;
+  font-weight:700;
+  letter-spacing:.08em;
+}
+.owner-ui-unified .owner-overview-grid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:16px;
+}
+.owner-ui-unified .owner-overview-card{
+  padding:22px;
+}
+.owner-ui-unified .owner-overview-card strong{
+  display:block;
+  color:#142033;
+  font-size:18px;
+  font-weight:950;
+}
+.owner-ui-unified .owner-overview-card span{
+  display:block;
+  margin-top:6px;
+  color:#697386;
+  font-family:Consolas,"JetBrains Mono",monospace;
+  font-size:12px;
+  letter-spacing:.08em;
+}
+.owner-ui-unified .owner-overview-card b{
+  display:block;
+  margin-top:20px;
+  color:var(--color-primary);
+  font-size:36px;
+  font-weight:950;
+  line-height:1;
+}
+.owner-ui-unified .import-panel{
+  padding:0;
+}
+.owner-ui-unified .import-actions{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:12px;
+  padding:18px;
+  border-bottom:0;
+}
+.owner-ui-unified .import-tab{
+  min-height:92px;
+  border:1.5px solid rgba(148,163,184,.28)!important;
+  border-radius:22px;
+  background:rgba(255,255,255,.66);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.9);
+  color:#263246;
+  font-size:18px;
+  font-weight:780;
+}
+.owner-ui-unified .import-tab.active{
+  background:rgba(9,166,79,.12);
+  color:var(--color-primary);
+  border-color:rgba(9,166,79,.32)!important;
+}
+.owner-ui-unified .import-tab .itab-lbl{
+  font-size:18px;
+  font-weight:850;
+}
+.owner-ui-unified .import-body{
+  padding:0 18px 18px;
+}
+.owner-ui-unified .import-body textarea,
+.owner-ui-unified .ta{
+  min-height:150px;
+  border-radius:24px;
+  font-size:18px;
+  line-height:1.65;
+}
+.owner-ui-unified .detail-row,
+.owner-ui-unified .entry-row,
+.owner-ui-unified .cc-pay-row{
+  border-radius:18px;
+  padding:14px 16px;
+  background:rgba(255,255,255,.72);
+}
+.owner-ui-unified .empty-state{
+  border-radius:26px;
+}
 @media(max-width:720px){
   .owner-ui-unified .topbar{overflow:hidden}
-  .owner-ui-unified .topbar-row1{display:grid;grid-template-columns:minmax(0,1fr) auto;padding:14px 12px 8px;gap:8px}
-  .owner-ui-unified .topbar-row2{padding:6px 16px 14px}
+  .owner-ui-unified .topbar-row1{display:grid;grid-template-columns:minmax(0,1fr) auto;padding:10px 24px 4px;gap:8px;min-height:54px}
+  .owner-ui-unified .topbar-row2{padding:0 24px 16px}
   .owner-ui-unified .brand-icon{width:42px;height:42px;border-radius:13px}
-  .owner-ui-unified .brand-name{font-size:22px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .owner-ui-unified .brand-name{font-size:20px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .owner-ui-unified .brand-business{font-size:.68em}
   .owner-ui-unified .topbar-right{justify-content:flex-end;gap:5px;max-width:100%;overflow:hidden}
-  .owner-ui-unified .role-badge{max-width:54px;overflow:hidden;text-overflow:ellipsis;padding:6px 10px}
-  .owner-ui-unified .owner-dashboard-btn{max-width:110px;min-height:42px!important;padding:8px 9px!important;font-size:12px!important;border-radius:14px!important}
+  .owner-ui-unified .role-badge{max-width:54px;overflow:hidden;text-overflow:ellipsis;padding:6px 10px;font-size:12px;min-height:34px}
+  .owner-ui-unified .owner-dashboard-btn{max-width:96px;min-height:38px!important;padding:7px 9px!important;font-size:12px!important;border-radius:14px!important}
   .owner-ui-unified .owner-dashboard-btn .ico{width:15px;height:15px;flex-basis:15px}
-  .owner-ui-unified .topbar-right .btn-ghost{min-width:40px;min-height:42px!important;padding:8px!important;border-radius:14px!important}
-  .owner-ui-unified .container{width:100%;padding:18px 14px 72px}
+  .owner-ui-unified .topbar-right .btn-ghost{min-width:40px;min-height:40px!important;padding:8px!important;border-radius:14px!important}
+  .owner-ui-unified .container{width:100%;padding:34px 28px 92px}
   .owner-ui-unified .topbar-row2{overflow:hidden}
-  .owner-ui-unified .nav{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));width:100%;min-width:0;gap:6px;padding:5px;border-radius:20px;overflow:hidden}
-  .owner-ui-unified .nav-btn{min-width:0!important;width:100%;height:58px;font-size:16px;padding:7px 4px;line-height:1.05}
-  .owner-ui-unified .nav-btn .ico{width:16px;height:16px}
+  .owner-ui-unified .nav{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));width:100%;min-width:0;gap:0;padding:0;border-radius:24px;overflow:hidden}
+  .owner-ui-unified .nav-btn{min-width:0!important;width:100%;height:74px;font-size:21px;padding:8px 4px;line-height:1.05;flex-direction:column;gap:5px}
+  .owner-ui-unified .nav-btn .ico{display:none}
+  .owner-ui-unified .nav-btn .en-sub{font-size:10px}
   .owner-ui-unified .owner-admin-tool{display:none}
   .owner-ui-unified .card{border-radius:26px}
   .owner-ui-unified .card-head,.owner-ui-unified .card-body{padding:18px}
+  .owner-ui-unified .page-title{font-size:38px}
+  .owner-ui-unified .page-title .en-sub{font-size:16px!important;margin-top:8px!important}
+  .owner-ui-unified .page-sub{font-size:17px;margin-bottom:22px!important}
+  .owner-ui-unified .owner-overview-grid{grid-template-columns:1fr}
   .owner-ui-unified .kpi-strip{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
   .owner-ui-unified .kpi{min-height:100px;padding:16px;border-radius:20px}
   .owner-ui-unified .kpi-lbl{font-size:13px}
   .owner-ui-unified .kpi-val{font-size:21px}
   .owner-ui-unified .form-row{grid-template-columns:1fr}
   .owner-ui-unified .inp,.owner-ui-unified .sel,.owner-ui-unified .ta{font-size:16px}
+  .owner-ui-unified .import-actions{grid-template-columns:1fr;gap:10px;padding:14px}
+  .owner-ui-unified .import-tab{min-height:70px}
   .owner-ui-unified .tx-table{min-width:620px}
   .owner-ui-unified .cc-toolbar{grid-template-columns:1fr;padding:12px;gap:9px}
   .owner-ui-unified .cc-summary{grid-template-columns:repeat(2,minmax(0,1fr))}
@@ -1135,23 +1412,23 @@ body::before{
           <text x="50%" y="70%" dominant-baseline="middle" text-anchor="middle" font-family="Arial Black,Arial,sans-serif" font-weight="900" font-size="9" fill="#d4e800" letter-spacing="1">LINK.</text>
         </svg>
       </div>
-      <div class="brand-name"><span style="color:#1a9e3f">HOME</span><span style="color:#1a1d23">LINK</span><span style="color:#c8b800;font-size:16px">.</span></div>
+      <div class="brand-name"><span style="color:#1a9e3f">HOME</span><span style="color:#1a1d23">LINK</span><span style="color:#c8b800">.</span><span class="brand-business">流水管理</span></div>
     </div>
     <div class="topbar-right">
       <span class="role-badge" id="roleBadge"></span>
-      <button class="btn btn-primary owner-dashboard-btn" id="btnDashboard" style="display:none" onclick="openPanel()" aria-label="打开控制面板"><svg class="ico"><use href="#i-chart"/></svg><span class="btn-label">控制台</span></button>
+      <button class="btn btn-primary owner-dashboard-btn" id="btnDashboard" style="display:none" onclick="openPanel()" aria-label="打开控制台"><svg class="ico"><use href="#i-chart"/></svg><span class="btn-label">控制台</span></button>
       <button class="btn btn-ghost" style="padding:6px 10px;font-size:12px" onclick="logout()" title="退出登录"><svg class="ico"><use href="#i-lock"/></svg></button>
     </div>
   </div>
   <!-- Row 2: Nav tabs full width -->
   <div class="topbar-row2">
     <nav class="nav" id="navTabs">
-      <button class="nav-btn active" data-view="analysis" id="navAnalysis"><svg class="ico"><use href="#i-chart"/></svg>总览<span class="en-sub">OVERVIEW</span></button>
+      <button class="nav-btn active" data-view="overview" id="navOverview"><svg class="ico"><use href="#i-chart"/></svg>总览<span class="en-sub">OVERVIEW</span></button>
       <button class="nav-btn" data-view="history" id="navHistory"><svg class="ico"><use href="#i-history"/></svg>历史<span class="en-sub">HISTORY</span></button>
+      <button class="nav-btn locked" data-view="analysis" id="navAnalysis"><svg class="ico"><use href="#i-trend"/></svg>分析<span class="en-sub">ANALYTICS</span></button>
       <button class="nav-btn locked" data-view="clients" id="navClients"><svg class="ico"><use href="#i-users"/></svg>客户<span class="en-sub">CLIENTS</span></button>
-      <button class="nav-btn locked" data-view="wifi" id="navWifi"><svg class="ico"><use href="#i-spark"/></svg>网络<span class="en-sub">TOOLS</span></button>
     </nav>
-    <button class="owner-admin-tool" id="ownerEntryTool" type="button" hidden aria-hidden="true" title="已下线：员工录入请使用 employee-v3.html">管理工具</button>
+    <button class="owner-admin-tool" id="ownerEntryTool" type="button" hidden aria-hidden="true" title="员工业务请使用 employee-v3.html">管理工具</button>
   </div>
 </header>
 
@@ -1276,6 +1553,13 @@ body::before{
     </div>
   </section>
 
+  <!-- OVERVIEW -->
+  <section id="view-overview" class="view">
+    <div class="page-title">总览<span class="en-sub" style="font-size:12px;letter-spacing:0.08em;margin-top:3px">OVERVIEW</span></div>
+    <div class="page-sub">今日重点 · 收款状态 · 待处理提醒</div>
+    <div id="ownerOverviewContent"></div>
+  </section>
+
   <!-- HISTORY -->
   <section id="view-history" class="view hidden">
     <div class="page-title">历史记录<span class="en-sub" style="font-size:12px;letter-spacing:0.08em;margin-top:3px">HISTORY</span></div>
@@ -1284,7 +1568,7 @@ body::before{
   </section>
 
   <!-- ANALYSIS -->
-  <section id="view-analysis" class="view">
+  <section id="view-analysis" class="view hidden">
     <div class="page-title">阶段性分析<span class="en-sub" style="font-size:12px;letter-spacing:0.08em;margin-top:3px">PERIOD ANALYSIS</span></div>
     <div class="page-sub">导入 TXT 锚点文档 · 选择时间段 · 生成报告</div>
 

@@ -47,7 +47,7 @@ function isOwnerAppRole(r){return ['manager','owner','admin'].includes(normalize
 function isEmployeeAppRole(r){return ['staff','employee'].includes(normalizeAuthRole(r));}
 function toOwnerSpaRole(r){return isOwnerAppRole(r)?'manager':normalizeAuthRole(r);}
 function isOwnerShellRole(){return role==='manager';}
-function defaultViewForRole(){return isOwnerShellRole()?'analysis':'entry';}
+function defaultViewForRole(){return isOwnerShellRole()?'overview':'entry';}
 async function fetchCurrentAuthUser(){
   const r=await apiFetch('/api/me',{method:'GET'});
   if(r.status===401||r.status===403)return null;
@@ -104,17 +104,17 @@ function showOwnerAppShell(appRole){
   if(isManager){
     badge.textContent='老板';
     badge.className='role-badge manager';
+    document.getElementById('navOverview')?.classList.remove('locked');
     document.getElementById('navHistory')?.classList.remove('locked');
     document.getElementById('navAnalysis')?.classList.remove('locked');
     document.getElementById('navClients')?.classList.remove('locked');
-    document.getElementById('navWifi')?.classList.remove('locked');
   }else{
     badge.textContent='员工';
     badge.className='role-badge staff';
+    document.getElementById('navOverview')?.classList.add('locked');
     document.getElementById('navHistory')?.classList.add('locked');
     document.getElementById('navAnalysis')?.classList.add('locked');
     document.getElementById('navClients')?.classList.add('locked');
-    document.getElementById('navWifi')?.classList.add('locked');
   }
   const db=document.getElementById('btnDashboard');
   if(db)db.style.display=isManager?'':'none';
@@ -261,10 +261,10 @@ async function submitCode(){
     badge.textContent=isMgr?'老板':'员工';
     badge.className='role-badge '+(isMgr?'manager':'staff');
     if(isMgr){
+      document.getElementById('navOverview')?.classList.remove('locked');
       document.getElementById('navHistory')?.classList.remove('locked');
       document.getElementById('navAnalysis')?.classList.remove('locked');
       document.getElementById('navClients')?.classList.remove('locked');
-      document.getElementById('navWifi')?.classList.remove('locked');
     }
     const db=document.getElementById('btnDashboard');
     if(db) db.style.display=isMgr?'':'none';
@@ -591,7 +591,7 @@ function totals(entries){
 
 /* ── STATE ── */
 const state={
-  view:'analysis',session:{id:newId(),date:fmtDT(new Date()),entries:[]},saved:[],
+  view:'overview',session:{id:newId(),date:fmtDT(new Date()),entries:[]},saved:[],
   activeCat:'cash',formTag:'Old',formPayType:null,
   analysisSessions:[],
   dateMode:'all',month:(()=>{const d=new Date();return `${d.getFullYear()}-${pad(d.getMonth()+1)}`;})(),
@@ -3411,6 +3411,50 @@ function buildCharts(a){
   }
 }
 
+function renderOwnerOverview(){
+  const wrap=document.getElementById('ownerOverviewContent');
+  if(!wrap)return;
+  const sessions=state.analysisSessions&&state.analysisSessions.length?state.analysisSessions:state.saved;
+  const entries=sessions.flatMap(s=>Array.isArray(s.entries)?s.entries:[]);
+  const t=totals(entries);
+  const openArrears=(state.arrears||[]).filter(a=>!a.cleared);
+  const latest=sessions.slice().sort((a,b)=>(b.date||'').localeCompare(a.date||'')).slice(0,3);
+  const kpi=(label,en,value,color='var(--color-primary)',note='')=>`
+    <div class="owner-overview-card hl-card">
+      <strong>${esc(label)}</strong>
+      <span>${esc(en)}</span>
+      <b style="color:${color}">${esc(value)}</b>
+      ${note?`<span>${esc(note)}</span>`:''}
+    </div>`;
+  const arrearsHtml=openArrears.length?openArrears.slice(0,4).map(a=>`
+    <div class="detail-row owner-mobile-row">
+      <div class="room">${esc(a.room||'—')}</div>
+      <div class="note">${esc(a.note||a.type||'待收尾款')}</div>
+      <div class="amount" style="color:var(--color-warning)">${fmtMoney(a.remain||0)}</div>
+    </div>`).join(''):`<div class="empty-state hl-empty-state"><div class="empty-title">暂无待收尾款</div><div class="empty-text">加载通通锁和流水后会在这里显示需要关注的项目。</div></div>`;
+  const latestHtml=latest.length?latest.map(s=>`
+    <div class="detail-row owner-mobile-row">
+      <div class="room">${esc((s.date||'').slice(0,10)||'—')}</div>
+      <div class="note">${esc(s.anchorId||s.id||'会话')}</div>
+      <div class="amount">${Array.isArray(s.entries)?s.entries.length:0} 笔</div>
+    </div>`).join(''):`<div class="empty-state hl-empty-state"><div class="empty-title">暂无历史会话</div><div class="empty-text">导入或刷新数据后会在这里显示最近会话。</div></div>`;
+  wrap.innerHTML=`
+    <div class="owner-overview-grid">
+      ${kpi('会话数量','SESSIONS',String(sessions.length),'#142033','当前可用于分析的会话')}
+      ${kpi('流水记录','LEDGER ROWS',String(entries.length),'#142033','当前会话内记录数')}
+      ${kpi('总收入','GROSS IN',fmtMoney(t.total),'var(--color-primary)','现金收入 + 银行转账')}
+      ${kpi('现金结余','CASH BALANCE',fmtMoney(t.cashBal),'#1a73e8','现金 - 退款 - 支出')}
+    </div>
+    <div class="card hl-card" style="margin-top:24px">
+      <div class="card-head"><div><div class="card-title">待收尾款</div><div class="card-sub">OUTSTANDING FOLLOW-UP</div></div></div>
+      <div class="card-body"><div class="detail-list">${arrearsHtml}</div></div>
+    </div>
+    <div class="card hl-card" style="margin-top:24px">
+      <div class="card-head"><div><div class="card-title">最近会话</div><div class="card-sub">RECENT SESSIONS</div></div></div>
+      <div class="card-body"><div class="detail-list">${latestHtml}</div></div>
+    </div>`;
+}
+
 /* ── ANALYSIS IMPORT — 双重去重：锚点ID + 内容指纹 ── */
 
 // 内容指纹：日期 + 笔数 + 各类总额（四舍五入到分）
@@ -4575,13 +4619,14 @@ function switchImportTab(tab){
 function switchView(v){
   if(isOwnerShellRole()&&v==='entry'){
     toast('老板端录入入口已移至员工端，请使用员工业务页提交流水。','info');
-    v='analysis';
+    v='overview';
   }
-  if(role==='staff'&&(v==='history'||v==='analysis'||v==='clients'||v==='wifi')){toast('员工账户无此权限','err');return;}
+  if(role==='staff'&&(v==='overview'||v==='history'||v==='analysis'||v==='clients'||v==='wifi')){toast('员工账户无此权限','err');return;}
   state.view=v;
   document.querySelectorAll('#navTabs .nav-btn').forEach(b=>b.classList.toggle('active',b.dataset.view===v));
-  ['entry','history','analysis','clients','wifi'].forEach(n=>{document.getElementById('view-'+n).classList.toggle('hidden',n!==v);});
+  ['entry','overview','history','analysis','clients','wifi'].forEach(n=>{document.getElementById('view-'+n)?.classList.toggle('hidden',n!==v);});
   if(v==='entry'){renderEntryView();refreshArrearsFromCloud();}
+  if(v==='overview'){renderOwnerOverview();updateHistCount();}
   if(v==='history')renderHistory();
   if(v==='analysis'){const bw=document.getElementById('billingWidget');if(bw)bw.innerHTML='';renderFilterControls();renderAnalysis();updateHistCount();}
   if(v==='clients'){ccRender();}

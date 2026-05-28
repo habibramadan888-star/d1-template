@@ -1,0 +1,36 @@
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import test from "node:test";
+
+test("owner cards, overview cards, and page titles follow employee card system", async () => {
+  const owner = await readFile("deploy-worker/public/index.html", "utf8");
+
+  assert.match(owner, /\.owner-ui-unified \.card,\n\.owner-ui-unified \.hist-card/);
+  assert.match(owner, /border-radius:var\(--radius-xl\)/);
+  assert.match(owner, /background:rgba\(255,255,255,\.94\)/);
+  assert.match(owner, /box-shadow:var\(--shadow-card\)/);
+  assert.match(owner, /\.owner-ui-unified \.owner-overview-grid/);
+  assert.match(owner, /\.owner-ui-unified \.owner-overview-card/);
+  assert.match(owner, /\.owner-ui-unified \.page-title\{\n  font-size:50px/);
+  assert.match(owner, /\.owner-ui-unified \.card-title\{\n  font-size:26px/);
+});
+
+test("owner analysis import tool is card-like instead of old backend form", async () => {
+  const owner = await readFile("deploy-worker/public/index.html", "utf8");
+
+  assert.match(owner, /\.owner-ui-unified \.import-actions\{\n  display:grid/);
+  assert.match(owner, /\.owner-ui-unified \.import-tab\{\n  min-height:92px/);
+  assert.match(owner, /\.owner-ui-unified \.import-body textarea,\n\.owner-ui-unified \.ta\{/);
+  assert.match(owner, /border-radius:24px/);
+});
+
+test("owner mobile rows use card-like treatment", async () => {
+  const owner = await readFile("deploy-worker/public/index.html", "utf8");
+
+  assert.match(
+    owner,
+    /\.owner-ui-unified \.detail-row,\n\.owner-ui-unified \.entry-row,\n\.owner-ui-unified \.cc-pay-row\{/
+  );
+  assert.match(owner, /border-radius:18px/);
+  assert.match(owner, /background:rgba\(255,255,255,\.72\)/);
+});

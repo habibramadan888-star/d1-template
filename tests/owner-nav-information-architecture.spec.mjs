@@ -8,9 +8,11 @@ test("owner primary nav no longer exposes employee-style entry as a main tab", a
 
   assert.doesNotMatch(nav, /data-view="entry"/);
   assert.doesNotMatch(nav, />\s*录入\s*</);
-  assert.match(nav, /data-view="analysis" id="navAnalysis"/);
+  assert.match(nav, /data-view="overview" id="navOverview"/);
   assert.match(nav, />总览<span class="en-sub">OVERVIEW<\/span>/);
   assert.match(nav, /data-view="history"/);
+  assert.match(nav, /data-view="analysis" id="navAnalysis"/);
+  assert.match(nav, />分析<span class="en-sub">ANALYTICS<\/span>/);
   assert.match(nav, /data-view="clients"/);
 });
 
@@ -20,7 +22,8 @@ test("legacy owner proxy entry remains hidden, not primary navigation", async ()
 
   assert.match(owner, /id="ownerEntryTool"/);
   assert.match(owner, /hidden aria-hidden="true"/);
-  assert.match(owner, /title="已下线：员工录入请使用 employee-v3\.html"/);
+  assert.match(owner, /title="[^"]*employee-v3\.html"/);
+  assert.doesNotMatch(owner, /title="[^"]*录入[^"]*"/);
   assert.match(owner, /\.owner-ui-unified \.owner-admin-tool\{display:none!important\}/);
   assert.doesNotMatch(nav, /ownerEntryTool|代录入|管理工具/);
 });

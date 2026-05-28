@@ -33,8 +33,10 @@ test("owner primary navigation does not expose employee entry", async () => {
 
   assert.doesNotMatch(nav, /data-view="entry"/);
   assert.doesNotMatch(nav, />\s*录入\s*</);
-  assert.match(nav, /data-view="analysis" id="navAnalysis"/);
+  assert.match(nav, /data-view="overview" id="navOverview"/);
   assert.match(nav, />总览<span class="en-sub">OVERVIEW<\/span>/);
+  assert.match(nav, /data-view="analysis" id="navAnalysis"/);
+  assert.match(nav, />分析<span class="en-sub">ANALYTICS<\/span>/);
 });
 
 test("owner homepage shell does not show Add Entry or direct payment buttons", async () => {
@@ -58,7 +60,7 @@ test("owner entry route is hidden and guarded for owner roles", async () => {
   assert.match(owner, /id="ownerEntryTool"[^>]*hidden aria-hidden="true"/);
   assert.match(owner, /\.owner-ui-unified \.owner-admin-tool\{display:none!important\}/);
   assert.match(ownerJs, /if\(isOwnerShellRole\(\)&&v==='entry'\)/);
-  assert.match(ownerJs, /v='analysis'/);
+  assert.match(ownerJs, /v='overview'/);
 });
 
 test("control panel button uses stable inline SVG and no emoji fallback", async () => {
@@ -78,7 +80,7 @@ test("mobile topbar remains constrained inside viewport", async () => {
 
   assert.match(owner, /\.owner-ui-unified \.topbar\{overflow:hidden\}/);
   assert.match(owner, /grid-template-columns:minmax\(0,1fr\) auto/);
-  assert.match(owner, /\.owner-ui-unified \.owner-dashboard-btn\{max-width:110px/);
+  assert.match(owner, /\.owner-ui-unified \.owner-dashboard-btn\{max-width:96px/);
   assert.match(owner, /\.owner-ui-unified \.topbar-right \.btn-ghost\{min-width:40px/);
 });
 
