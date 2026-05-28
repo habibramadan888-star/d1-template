@@ -49,6 +49,7 @@ commercial launch.
 | Employee flow         | Rent, deposit, arrears, short-pay, repayment, void, and handover scenarios are completed or have documented blockers.  |
 | Owner flow            | Dashboard, history, search/filter, handover review, and report/export behavior are reviewed with screenshots or notes. |
 | Unified login handoff | Owner and employee each log in once through unified login; no second password/PIN prompt appears after routing.        |
+| Unified design system | Owner and employee use the same font, button, input, card, loading, and mobile visual language.                        |
 | Finance flow          | Rent income, deposit liability, arrears, overdue, overpayment, and void behavior match the accepted staging rules.     |
 | Tenant/property scope | Employee, owner, and manager/admin access is constrained to expected tenant/property boundaries.                       |
 | Mobile usability      | Required employee and owner flows are usable on phone viewport.                                                        |
@@ -66,6 +67,8 @@ commercial launch.
 | Unclear accounting behavior          | Mark `MANUAL_REQUIRED`; do not invent pass/fail.                                                                  |
 | Second login after unified login     | Record as a unified-login handoff bug; do not continue role-flow testing until triaged.                           |
 | Owner login flicker or back-loop     | Record as a unified-login UX bug. Expected behavior is auth-loading first and signed-in panel on browser back.    |
+| Owner visually looks old             | Record as a P1 UX bug if the owner UI no longer appears to belong to the same product as employee.                |
+| Owner mobile layout is cramped       | Record as P1 if it blocks core use, P2 if readable with workaround.                                               |
 | Successful live login smoke          | Requires separate approval because successful login writes production D1 `active_sessions`.                       |
 
 ## Evidence Rules

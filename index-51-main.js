@@ -600,7 +600,7 @@ function renderSummary(){
     const lbl2=parts[0];const en=parts[1]||'';
     const extra=span2?'style="grid-column:span 2"':'';
     const subHtml=sub?`<div style="font-size:9px;color:#aaa;margin-top:2px">${sub}</div>`:'';
-    return `<div class="kpi${hi.replace(' span2','')}" ${extra}><div class="kpi-lbl">${lbl2}${en?'<span class="en-sub">'+en+'</span>':''}</div><div class="kpi-val" style="color:${col}">${fmtMoney(val)}</div>${subHtml}</div>`;
+    return `<div class="kpi hl-stat-card${hi.replace(' span2','')}" ${extra}><div class="kpi-lbl hl-stat-label">${lbl2}${en?'<span class="en-sub">'+en+'</span>':''}</div><div class="kpi-val hl-stat-value" style="color:${col}">${fmtMoney(val)}</div>${subHtml}</div>`;
   };
 
   document.getElementById('summaryGrid').innerHTML=

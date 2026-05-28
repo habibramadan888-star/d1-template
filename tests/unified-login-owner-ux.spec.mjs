@@ -90,6 +90,8 @@ test("owner app asset contains loading state and not initial login flicker", asy
 test("unified login asset uses signed-in panel instead of immediate redirect loop", async () => {
   const html = await readFile("deploy-worker/public/unified-login.html", "utf8");
 
+  assert.match(html, /shared-design-tokens\.css/);
+  assert.match(html, /hl-page unified-login-page/);
   assert.match(html, /signedInPanel/);
   assert.match(html, /Continue to owner dashboard/);
   assert.match(html, /shouldAutoRedirectExistingSession/);

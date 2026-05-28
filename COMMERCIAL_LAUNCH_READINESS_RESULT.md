@@ -505,3 +505,40 @@ Evidence:
 INTERNAL-QA-001 prepares internal staging QA only. It does not approve public
 beta, production write, migration, deploy, feature flags, dashboard switch,
 business cutover, or commercial launch GO.
+
+## UI-UNIFICATION-NIGHT-001 Addendum
+
+Date: 2026-05-28, Asia/Dubai
+
+Result:
+
+- Owner/employee shared design tokens: prepared and applied to owner UI surfaces.
+- Owner dashboard shell, stat cards, forms, buttons, loading states, and mobile wrappers: aligned to employee design language.
+- Unified login back-button and owner loading UX: preserved from session UX fix and covered by tests.
+- Owner visual QA checklist: ready for manual screenshot review.
+- Deploy executed: no.
+- Production D1 write: no.
+- Staging D1 write: no.
+- Production-copy D1 write: no.
+- D1 export/import/execute: no.
+- Production migration: no.
+- Dashboard calculation changes: no.
+- Financial formula changes: no.
+- Production cutover: `PRODUCTION_NO_GO`.
+
+Evidence:
+
+- `EMPLOYEE_DESIGN_SYSTEM_DEEP_EXTRACT.md`
+- `OWNER_UI_DEEP_GAP_AUDIT.md`
+- `UNIFIED_DESIGN_TOKENS.md`
+- `UNIFIED_UI_COMPONENT_CLASSES.md`
+- `OWNER_UI_GLOBAL_ALIGNMENT_RESULT.md`
+- `OWNER_DASHBOARD_VISUAL_REFRESH_RESULT.md`
+- `UNIFIED_LOGIN_AND_OWNER_LOADING_UX_RESULT.md`
+- `OWNER_MOBILE_UI_ALIGNMENT_RESULT.md`
+- `OWNER_EMPLOYEE_UI_VISUAL_QA_CHECKLIST.md`
+- `OWNER_UI_UNIFICATION_DEPLOY_APPROVAL_REQUIRED.md`
+
+UI-UNIFICATION-NIGHT-001 improves static UI and auth/session UX only. It does
+not approve production write, migration, deploy, feature flags, dashboard
+authority switch, business cutover, or commercial launch GO.

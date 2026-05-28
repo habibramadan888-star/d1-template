@@ -31,12 +31,16 @@ production customer data in evidence.
 | OWN-015 | Permission isolation                | Attempt to view another tenant/property if test identity supports negative case.                    | Access is denied or rows are filtered out.                                            | Denial or filtered-result screenshot.                              |           |       |
 | OWN-016 | Refresh consistency                 | Refresh dashboard/history after QA entries and voids.                                               | Data remains consistent after reload.                                                 | Before/after screenshots.                                          |           |       |
 | OWN-017 | Dashboard vs history reconciliation | Compare dashboard totals to history rows for selected QA date/property.                             | Differences are explainable and no unsupported dashboard authority switch occurs.     | Reconciliation notes and screenshots.                              |           |       |
+| OWN-018 | Design-system parity                | Compare owner dashboard, cards, buttons, inputs, loading, and mobile view against employee page.    | Owner and employee feel like one SaaS product, not two generations of UI.             | Desktop/mobile screenshots beside employee reference.              |           |       |
+| OWN-019 | Auth loading visual                 | Open owner destination with valid or expired session.                                               | Shows checking/loading first; legacy password panel does not flash before `/api/me`.  | Screenshot or short clip if issue appears.                         |           |       |
 
 ## Stop Conditions
 
-| Condition                                       | Required Response                   |
-| ----------------------------------------------- | ----------------------------------- |
-| Owner sees another tenant/property data         | Stop and open P1 permission bug.    |
-| Dashboard totals include deposit as rent income | Stop and open finance bug.          |
-| Voided records remain in active totals          | Stop and open finance bug.          |
-| Export leaks data outside owner scope           | Stop and open P1 security/data bug. |
+| Condition                                       | Required Response                        |
+| ----------------------------------------------- | ---------------------------------------- |
+| Owner sees another tenant/property data         | Stop and open P1 permission bug.         |
+| Dashboard totals include deposit as rent income | Stop and open finance bug.               |
+| Voided records remain in active totals          | Stop and open finance bug.               |
+| Export leaks data outside owner scope           | Stop and open P1 security/data bug.      |
+| Owner UI visibly old versus employee            | Open P1 UX bug and attach screenshots.   |
+| Owner mobile layout blocks core review          | Open P1/P2 UX bug depending on severity. |

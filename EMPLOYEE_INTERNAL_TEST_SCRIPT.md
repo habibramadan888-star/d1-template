@@ -37,3 +37,11 @@ production customer data in evidence.
 | Employee can access another tenant/property      | Stop permission tests and open P1 bug.    |
 | Duplicate submit creates duplicate financial row | Stop related flow and open P0/P1 bug.     |
 | Password/token appears in UI or logs             | Stop and report security bug immediately. |
+
+## Visual Comparison Checks
+
+| Check                       | Expected Result                                                      | Notes                                                 |
+| --------------------------- | -------------------------------------------------------------------- | ----------------------------------------------------- |
+| Employee design baseline    | Employee page remains visually modern and unchanged in product feel. | Use as reference for owner UI comparison.             |
+| Shared font                 | Employee page continues using the shared product font stack.         | Report if text rendering regresses.                   |
+| Shared buttons/inputs/cards | Employee controls still look consistent after token extraction.      | Report as P1 UX if employee visual quality regresses. |

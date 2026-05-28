@@ -7,6 +7,38 @@ Production deploy: unified-login static route/session handoff deploys executed
 under explicit approval; no commercial cutover.
 Production database mutation: not executed
 
+## UI-UNIFICATION-NIGHT-001 Owner / Employee Design System
+
+Date: 2026-05-28, Asia/Dubai
+
+Scope: owner UI visual unification with employee design system. No production D1
+migration, production D1 write, D1 export/import/execute, employee entry write,
+handover submit, void/delete, settings change, dashboard formula change,
+financial formula change, commercial launch GO, or production cutover was
+approved by this task.
+
+Completed:
+
+- Extracted employee typography, colors, spacing, component, and mobile design
+  standards.
+- Added `deploy-worker/public/shared-design-tokens.css`.
+- Linked shared tokens from employee, owner, versioned owner, and unified login
+  pages.
+- Added owner `owner-ui-unified` visual alignment layer.
+- Updated owner dynamic dashboard KPI cards to include shared stat-card classes.
+- Added owner design alignment and mobile alignment tests.
+- Added manual visual QA checklist and deploy approval boundary.
+
+Result:
+
+- Owner UI alignment: local/static assets updated.
+- Deploy required for live: yes, separate approval required.
+- Production D1 write: no.
+- Production migration: no.
+- Dashboard calculation change: no.
+- Financial formula change: no.
+- Production cutover: `PRODUCTION_NO_GO`.
+
 ## UNIFIED-LOGIN-UX-004 Owner Session UX
 
 Date: 2026-05-28, Asia/Dubai

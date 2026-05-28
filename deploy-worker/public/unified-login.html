@@ -4,14 +4,15 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Homelink Unified Login</title>
+<link rel="stylesheet" href="./shared-design-tokens.css">
 <style>
 :root{
-  --ink:#101820;
-  --muted:#5e6b76;
-  --line:#dce5df;
-  --paper:#fffdf7;
-  --green:#078d42;
-  --green2:#0fb35c;
+  --ink:var(--color-text-primary);
+  --muted:var(--color-text-secondary);
+  --line:var(--color-border);
+  --paper:var(--color-surface);
+  --green:var(--color-primary-hover);
+  --green2:#20bf6b;
   --danger:#b42318;
   --warn:#8a5a00;
   --shadow:0 24px 70px rgba(18,48,31,.16);
@@ -24,11 +25,12 @@ body{
   place-items:center;
   padding:28px;
   color:var(--ink);
-  font-family:"Trebuchet MS",Verdana,sans-serif;
+  font-family:var(--font-family);
   background:
     radial-gradient(circle at 12% 18%,rgba(15,179,92,.18),transparent 30%),
-    radial-gradient(circle at 88% 14%,rgba(245,190,80,.22),transparent 32%),
-    linear-gradient(135deg,#f6fbf4,#fff8ea 62%,#eef8f2);
+    radial-gradient(circle at 88% 14%,rgba(245,190,80,.16),transparent 32%),
+    radial-gradient(circle at 12% 72%,rgba(26,115,232,.12),transparent 24rem),
+    linear-gradient(145deg,#f7fbf9 0%,#eef7f3 42%,#e9f0ef 100%);
 }
 .shell{
   width:min(980px,100%);
@@ -231,9 +233,9 @@ button:disabled{
 }
 </style>
 </head>
-<body>
-<main class="shell">
-  <section class="hero" aria-label="Unified login overview">
+<body class="hl-page unified-login-page">
+<main class="shell hl-shell">
+  <section class="hero hl-card" aria-label="Unified login overview">
     <div class="eyebrow">Homelink Finance</div>
     <h1>One login for every internal role.</h1>
     <p>
@@ -248,7 +250,7 @@ button:disabled{
     </div>
   </section>
 
-  <section class="card" aria-label="Login form">
+  <section class="card hl-card" aria-label="Login form">
     <div class="logo">HL</div>
     <h2>Unified login</h2>
     <p>
@@ -262,15 +264,15 @@ button:disabled{
       <input id="secret" name="secret" type="password" autocomplete="current-password" required>
       <div class="actions">
         <button class="primary" id="loginButton" type="submit">Sign in and route by role</button>
-        <button class="ghost" id="logoutButton" type="button">Clear session</button>
+        <button class="ghost hl-button hl-button-secondary" id="logoutButton" type="button">Clear session</button>
       </div>
     </form>
     <div class="signed-in" id="signedInPanel" hidden>
       <strong id="signedInTitle">Signed in</strong>
       <p id="signedInText">A valid server session was found.</p>
       <div class="actions">
-        <button class="primary" id="continueButton" type="button">Continue</button>
-        <button class="ghost" id="clearSessionButton" type="button">Clear session / Sign out</button>
+        <button class="primary hl-button hl-button-primary" id="continueButton" type="button">Continue</button>
+        <button class="ghost hl-button hl-button-secondary" id="clearSessionButton" type="button">Clear session / Sign out</button>
       </div>
     </div>
     <div class="status" id="status" role="status">Checking existing session...</div>

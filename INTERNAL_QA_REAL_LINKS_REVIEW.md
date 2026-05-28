@@ -53,6 +53,19 @@ or write any D1.
 | Clear session action        | Calls logout and returns to the login form.                                         |
 | Successful live login smoke | Still requires separate approval because successful login writes `active_sessions`. |
 
+## Owner / Employee UI Unification Review
+
+| Item                      | Result                                                                                                 |
+| ------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Shared design tokens      | Added in `deploy-worker/public/shared-design-tokens.css`.                                              |
+| Employee page             | Links shared tokens while preserving existing employee look.                                           |
+| Unified login             | Uses shared font/background/card/button classes.                                                       |
+| Owner page                | Uses `hl-page owner-ui-unified` and shared owner alignment layer.                                      |
+| Owner dashboard KPI cards | Dynamic summary cards include `.hl-stat-card`, `.hl-stat-label`, `.hl-stat-value`.                     |
+| Owner visual QA checklist | `OWNER_EMPLOYEE_UI_VISUAL_QA_CHECKLIST.md`.                                                            |
+| Deploy status             | Not deployed by UI-UNIFICATION-NIGHT-001; live visibility requires separate approved static UI deploy. |
+| Production status         | `PRODUCTION_NO_GO`.                                                                                    |
+
 ## Owner / Boss Candidate Links
 
 | Candidate Link                                                        | Local Evidence                                                               | Confirmed Exists Locally | Notes                                      |

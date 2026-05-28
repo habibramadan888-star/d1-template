@@ -289,3 +289,17 @@ Date: 2026-05-27, Asia/Dubai
 | Public beta approval        | NOT_APPROVED           | Internal QA is not public beta.                                       |
 | Production approval         | 0                      | No production write, migration, deploy, dashboard switch, or cutover. |
 | Commercial launch gate      | `PRODUCTION_NO_GO`     | Cutover remains blocked.                                              |
+
+## UI-UNIFICATION-NIGHT-001 Addendum
+
+Date: 2026-05-28, Asia/Dubai
+
+| Area                           | UI-UNIFICATION-NIGHT-001 Status | Launch Meaning                                                               |
+| ------------------------------ | ------------------------------- | ---------------------------------------------------------------------------- |
+| Shared design tokens           | APPLIED                         | Owner UI now references employee-derived typography, colors, spacing, cards. |
+| Shared component classes       | APPLIED                         | Buttons, inputs, cards, stats, loading, empty states have shared classes.    |
+| Owner dashboard visual refresh | APPLIED                         | Dashboard calculations remain unchanged; presentation layer was aligned.     |
+| Unified login UX               | PRESERVED                       | Owner loading/back-button fixes remain covered by regression tests.          |
+| Mobile owner UI                | ALIGNED_FOR_QA                  | Code-level mobile alignment is ready for manual screenshot QA.               |
+| Production action              | NOT_EXECUTED                    | No D1 write, migration, deploy, business write, or feature flag change.      |
+| Commercial launch gate         | `PRODUCTION_NO_GO`              | UI unification is not production approval.                                   |

@@ -1,19 +1,16 @@
 # Owner Dashboard Initial Load Review
 
-Date: 2026-05-28, Asia/Dubai
+Scope: owner auth bootstrap and dashboard first visible state.
 
-## Review
+| Question                                                      | Answer                                                                                                                                                                                             |
+| ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Why did a second login page appear for a few seconds?         | The owner app previously had a legacy login fallback as the visible initial state. Prior session handoff fixed the control path; this pass keeps the fallback hidden and styles the loading state. |
+| Is the remaining wait auth check or dashboard initialization? | Auth check is now explicit. Any remaining long wait is likely dashboard data/API initialization after owner shell entry.                                                                           |
+| Which JS/API can block perceived first screen?                | `enterAs()` loads session/history/arrears/room configuration before all dashboard widgets are complete.                                                                                            |
+| Minimum safe fix                                              | Show auth loading first, then show shell and progressive states without changing API payloads or calculations.                                                                                     |
+| Formula impact                                                | None.                                                                                                                                                                                              |
+| D1 impact                                                     | None.                                                                                                                                                                                              |
 
-| Area                   | Finding                                                                        | Action                                                            |
-| ---------------------- | ------------------------------------------------------------------------------ | ----------------------------------------------------------------- |
-| Auth bootstrap         | Legacy login panel rendered before `/api/me` completed.                        | Fixed by showing auth-loading first.                              |
-| Owner shell            | `enterAs()` previously waited for all `loadAll()` data before showing the app. | Fixed by displaying the app shell before async data loads finish. |
-| Slow APIs              | Customers, arrears, and room config can still be slow.                         | Leave formulas/API unchanged; optimize separately if needed.      |
-| Dashboard calculations | No formula or result semantics changed.                                        | No action in this task.                                           |
-| D1 writes              | No business write path touched.                                                | No D1 write approved or executed.                                 |
+## Follow-Up Prompt
 
-## Remaining Performance Work
-
-The first usable shell should appear faster after this fix, but detailed
-dashboard sections can still wait on backend reads. If the owner dashboard still
-feels slow after deployment, use `NEXT_PROMPT_OWNER_DASHBOARD_LOAD_PERFORMANCE.md`.
+See `NEXT_PROMPT_OWNER_DASHBOARD_LOAD_PERFORMANCE.md` for a separate performance-only task that must preserve calculations and avoid writes.

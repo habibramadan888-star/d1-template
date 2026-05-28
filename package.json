@@ -121,6 +121,8 @@
     "test:unified-login-session-handoff": "node --test tests/unified-login-session-handoff.spec.mjs",
     "test:unified-login-auth-guard": "node --test tests/unified-login-auth-guard.spec.mjs",
     "test:unified-login-owner-ux": "node --test tests/unified-login-owner-ux.spec.mjs",
+    "test:owner-ui": "node --test tests/owner-ui-design-alignment.spec.mjs",
+    "test:owner-mobile-ui": "node --test tests/owner-mobile-ui-alignment.spec.mjs",
     "qa:employee-entry-staging": "node scripts/qa-employee-entry-real-staging.mjs",
     "staging:generate-passwords": "node scripts/generate-staging-test-passwords.mjs",
     "staging:set-secrets": "node scripts/set-staging-secrets-from-local.mjs",

@@ -22,6 +22,8 @@ flags, public beta, or commercial launch.
 | Daily report template  | `INTERNAL_QA_DAILY_REPORT_TEMPLATE.md`                                                                                                   | READY  | Provides day-by-day QA status and evidence summary.                                                                                                            |
 | Scope/accounts summary | `INTERNAL_QA_TEST_SCOPE_AND_ACCOUNTS.md`                                                                                                 | READY  | Summarizes corrected role links, role slots, and no-secret handling.                                                                                           |
 | Live smoke result      | `INTERNAL_QA_005B_UNIFIED_LOGIN_LIVE_SMOKE_RESULT.md`                                                                                    | PASS   | Confirms live `/unified-login.html` returns `text/html`; no D1 write or business write occurred.                                                               |
+| UI unification audit   | `EMPLOYEE_DESIGN_SYSTEM_DEEP_EXTRACT.md`; `OWNER_UI_DEEP_GAP_AUDIT.md`; `UNIFIED_DESIGN_TOKENS.md`                                       | READY  | Extracts employee design language and documents owner gaps plus shared tokens.                                                                                 |
+| UI visual QA checklist | `OWNER_EMPLOYEE_UI_VISUAL_QA_CHECKLIST.md`                                                                                               | READY  | Required screenshots and manual checks for owner/employee visual parity.                                                                                       |
 
 ## Boundary
 
@@ -39,3 +41,8 @@ Production remains `PRODUCTION_NO_GO`.
 Unified login should require only one login after the session handoff fix is
 deployed. A second owner password prompt or employee PIN prompt after successful
 unified login is a bug, not expected QA behavior.
+
+Owner and employee UI must now be reviewed as one design system. If owner pages
+still look visibly old, if owner loading flashes the old login panel, or if
+mobile owner screens are cramped, record the issue as a P1/P2 UX bug using
+`BUG_REPORT_TEMPLATE.md`.

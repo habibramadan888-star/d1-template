@@ -84,6 +84,26 @@ password panel before checking the server session. Expected behavior:
 The live Worker is still bound to `DB = homelink`; full write testing and
 successful-login smoke that creates `active_sessions` require separate approval.
 
+## Owner / Employee Visual Unification Expectation
+
+After UI-UNIFICATION-NIGHT-001, owner and employee pages must look like the same
+commercial SaaS product. Required visual checks:
+
+| Area          | Expected Result                                                                                   |
+| ------------- | ------------------------------------------------------------------------------------------------- |
+| Design system | Owner, employee, and unified login load `shared-design-tokens.css`.                               |
+| Font          | Owner uses the same Apple/SF + PingFang/Microsoft YaHei stack as employee.                        |
+| Buttons       | Owner primary/secondary/danger buttons match employee radius, height, weight, and green gradient. |
+| Inputs        | Owner inputs/selects/textareas match employee rounded glass field and focus halo.                 |
+| Cards         | Owner dashboard cards match employee glass/radius/shadow style.                                   |
+| Mobile        | Owner mobile dashboard must not look like a squeezed desktop table.                               |
+| Loading       | Owner shows auth-loading first; no legacy second login flash.                                     |
+
+If owner UI still looks visibly old compared with employee UI, record it as a
+P1 UX bug. If owner shows a second login flash, record it as a P1 UX bug. If
+mobile layout is broken or cramped, record it as P1/P2 depending on whether the
+main flow is blocked.
+
 ## Stop Immediately If
 
 | Condition                                                                 | Action                                                  |

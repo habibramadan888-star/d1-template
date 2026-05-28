@@ -32,6 +32,16 @@ tokens, cookies, or unmasked sensitive screenshots.
 | P2       | Important functional bug with workaround                               | Track and decide whether pilot can continue.             |
 | P3       | Usability, copy, layout, or minor display issue                        | Track for cleanup; does not block internal QA by itself. |
 
+## Design-System UX Bug Notes
+
+| Scenario                                            | Suggested Severity | Expected Result                                                                                                    |
+| --------------------------------------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| Owner UI still visibly looks older than employee UI | P1                 | Owner and employee should feel like one SaaS product with same typography, cards, buttons, inputs, and background. |
+| Owner second login panel flashes before auth check  | P1                 | Owner should show auth loading first, then dashboard or fallback login after `/api/me`.                            |
+| Owner mobile layout blocks dashboard/history review | P1                 | Mobile owner dashboard must remain usable and readable.                                                            |
+| Owner mobile layout is awkward but usable           | P2                 | Record screenshots and affected viewport.                                                                          |
+| Shared token styling regresses employee page        | P1                 | Employee page should remain the visual baseline.                                                                   |
+
 ## Unified Login UX Bug Notes
 
 Use these expected results when reporting unified-login bugs:
