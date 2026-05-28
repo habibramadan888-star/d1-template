@@ -53,3 +53,15 @@ Production status: `PRODUCTION_NO_GO`. This checklist is for internal visual QA 
 | First load has visible feedback                     |           |       |
 | No write test performed                             |           |       |
 | Production remains `PRODUCTION_NO_GO`               |           |       |
+
+## Real Screenshot Regression Checks
+
+If a real phone screenshot still shows any item below, UI acceptance fails and the issue remains open.
+
+| Regression                                            | Expected Result                                           | Pass/Fail | Notes |
+| ----------------------------------------------------- | --------------------------------------------------------- | --------- | ----- |
+| Owner primary nav shows `录入`                        | Must not appear as a main owner tab.                      |           |       |
+| Control panel left icon is garbled                    | Must use stable SVG/text only.                            |           |       |
+| Owner homepage shows `添加记录 ADD ENTRY`             | Must not appear on owner homepage.                        |           |       |
+| Owner homepage directly shows `现金收款` / `银行转账` | Must not appear as owner homepage primary action buttons. |           |       |
+| Employee page entry is broken                         | Must remain available on `employee-v3.html`.              |           |       |

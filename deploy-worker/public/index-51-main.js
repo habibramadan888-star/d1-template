@@ -46,6 +46,8 @@ function normalizeAuthRole(r){return String(r||'').trim().toLowerCase();}
 function isOwnerAppRole(r){return ['manager','owner','admin'].includes(normalizeAuthRole(r));}
 function isEmployeeAppRole(r){return ['staff','employee'].includes(normalizeAuthRole(r));}
 function toOwnerSpaRole(r){return isOwnerAppRole(r)?'manager':normalizeAuthRole(r);}
+function isOwnerShellRole(){return role==='manager';}
+function defaultViewForRole(){return isOwnerShellRole()?'analysis':'entry';}
 async function fetchCurrentAuthUser(){
   const r=await apiFetch('/api/me',{method:'GET'});
   if(r.status===401||r.status===403)return null;
@@ -249,13 +251,13 @@ async function submitCode(){
   }catch(e){
     /* enterAs 出错不等于密码错误，强制显示主界面 */
     console.error('[Login] enterAs 出错:', e);
-    role=loginData.role;
+    role=toOwnerSpaRole(loginData.role);
     document.getElementById('lockOverlay').style.display='none';
     document.getElementById('topbar').style.display='block';
     document.getElementById('mainApp').style.display='block';
     document.getElementById('footerEl').style.display='block';
     const badge=document.getElementById('roleBadge');
-    const isMgr=role==='manager';
+    const isMgr=isOwnerShellRole();
     badge.textContent=isMgr?'老板':'员工';
     badge.className='role-badge '+(isMgr?'manager':'staff');
     if(isMgr){
@@ -266,16 +268,16 @@ async function submitCode(){
     }
     const db=document.getElementById('btnDashboard');
     if(db) db.style.display=isMgr?'':'none';
-    try{switchView(isMgr?'analysis':'entry');}catch(e2){console.error('[Login] initial switchView:', e2);}
+    try{switchView(defaultViewForRole());}catch(e2){console.error('[Login] initial switchView:', e2);}
   }
 }
 async function enterAs(r){
   role=toOwnerSpaRole(r);
   showOwnerAppShell(role);
-  try{switchView(role==='manager'?'analysis':'entry');}catch(e){console.error('[OwnerBootstrap] initial shell render failed:',e);}
+  try{switchView(defaultViewForRole());}catch(e){console.error('[OwnerBootstrap] initial shell render failed:',e);}
   try{
     await loadAll();
-    switchView(role==='manager'?'analysis':'entry');
+    switchView(defaultViewForRole());
   }catch(e){
     console.error('[OwnerBootstrap] data load failed:', e);
     toast('Some dashboard data failed to load. Refresh and try again.','err');
@@ -4571,6 +4573,10 @@ function switchImportTab(tab){
   if(tab==='hist') updateHistCount();
 }
 function switchView(v){
+  if(isOwnerShellRole()&&v==='entry'){
+    toast('老板端录入入口已移至员工端，请使用员工业务页提交流水。','info');
+    v='analysis';
+  }
   if(role==='staff'&&(v==='history'||v==='analysis'||v==='clients'||v==='wifi')){toast('员工账户无此权限','err');return;}
   state.view=v;
   document.querySelectorAll('#navTabs .nav-btn').forEach(b=>b.classList.toggle('active',b.dataset.view===v));
@@ -4593,7 +4599,11 @@ function bindEvents(){
   const dashboardBtn=document.getElementById('btnDashboard');
   if(dashboardBtn)dashboardBtn.addEventListener('click',e=>{e.preventDefault();openPanel();});
   const ownerEntryTool=document.getElementById('ownerEntryTool');
-  if(ownerEntryTool)ownerEntryTool.addEventListener('click',e=>{e.preventDefault();switchView('entry');});
+  if(ownerEntryTool){
+    ownerEntryTool.hidden=true;
+    ownerEntryTool.setAttribute('aria-hidden','true');
+    ownerEntryTool.addEventListener('click',e=>{e.preventDefault();toast('请使用员工业务页 employee-v3.html 录入流水。','info');});
+  }
   document.querySelector('.topbar-right .btn-ghost')?.addEventListener('click',e=>{e.preventDefault();logout();});
   document.getElementById('navTabs').addEventListener('click',e=>{const b=e.target.closest('.nav-btn');if(b)switchView(b.dataset.view);});
   document.getElementById('catTabs').addEventListener('click',e=>{const b=e.target.closest('.cat-tab');if(b){state.activeCat=b.dataset.cat;state.formPayType=null;state.formTag='Old';document.querySelectorAll('#entryForm .tag-btn').forEach(x=>x.classList.toggle('active',x.dataset.tag==='Old'));renderCatTabs();}});

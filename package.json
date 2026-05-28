@@ -128,6 +128,7 @@
     "test:owner-mobile-nav": "node --test tests/owner-mobile-nav-layout.spec.mjs",
     "test:owner-nav-ia": "node --test tests/owner-nav-information-architecture.spec.mjs",
     "test:owner-client-credit-ui": "node --test tests/owner-client-credit-ui.spec.mjs",
+    "test:owner-real-screenshot-regression": "node --test tests/owner-real-screenshot-regression.spec.mjs",
     "qa:employee-entry-staging": "node scripts/qa-employee-entry-real-staging.mjs",
     "staging:generate-passwords": "node scripts/generate-staging-test-passwords.mjs",
     "staging:set-secrets": "node scripts/set-staging-secrets-from-local.mjs",

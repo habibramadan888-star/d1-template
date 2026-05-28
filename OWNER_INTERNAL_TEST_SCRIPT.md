@@ -40,13 +40,20 @@ production customer data in evidence.
 
 ## Stop Conditions
 
-| Condition                                       | Required Response                        |
-| ----------------------------------------------- | ---------------------------------------- |
-| Owner sees another tenant/property data         | Stop and open P1 permission bug.         |
-| Dashboard totals include deposit as rent income | Stop and open finance bug.               |
-| Voided records remain in active totals          | Stop and open finance bug.               |
-| Export leaks data outside owner scope           | Stop and open P1 security/data bug.      |
-| Owner UI visibly old versus employee            | Open P1 UX bug and attach screenshots.   |
-| Owner mobile layout blocks core review          | Open P1/P2 UX bug depending on severity. |
-| Owner main nav shows `录入`                     | Open P1 UX/IA bug.                       |
-| Owner topbar has garbled icon/text or overflow  | Open P1 UX bug.                          |
+| Condition                                                 | Required Response                        |
+| --------------------------------------------------------- | ---------------------------------------- |
+| Owner sees another tenant/property data                   | Stop and open P1 permission bug.         |
+| Dashboard totals include deposit as rent income           | Stop and open finance bug.               |
+| Voided records remain in active totals                    | Stop and open finance bug.               |
+| Export leaks data outside owner scope                     | Stop and open P1 security/data bug.      |
+| Owner UI visibly old versus employee                      | Open P1 UX bug and attach screenshots.   |
+| Owner mobile layout blocks core review                    | Open P1/P2 UX bug depending on severity. |
+| Owner main nav shows `录入`                               | Open P1 UX/IA bug.                       |
+| Owner topbar has garbled icon/text or overflow            | Open P1 UX bug.                          |
+| Owner homepage shows ADD ENTRY or cash/bank entry buttons | Open P1 UX/IA bug.                       |
+
+## Real Screenshot Retest
+
+| Test ID | Scenario                     | Steps                                                   | Expected Result                                                                                     | Evidence Needed             | Pass/Fail | Notes |
+| ------- | ---------------------------- | ------------------------------------------------------- | --------------------------------------------------------------------------------------------------- | --------------------------- | --------- | ----- |
+| OWN-023 | Owner entry block regression | Open owner homepage/default view on mobile after login. | Owner homepage does not show `添加记录 ADD ENTRY`, `现金收款`, or `银行转账` primary entry buttons. | Mobile homepage screenshot. |           |       |

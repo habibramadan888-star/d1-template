@@ -927,11 +927,13 @@ body::before{
 .owner-ui-unified .brand{min-width:0}
 .owner-ui-unified .topbar-right{min-width:0;flex-shrink:1}
 .owner-ui-unified .owner-dashboard-btn{gap:8px}
+.owner-ui-unified .owner-dashboard-btn .ico{flex:0 0 18px}
 .owner-ui-unified .owner-dashboard-btn .btn-label{display:inline-block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .owner-ui-unified .nav{gap:10px;padding:6px;border-radius:22px;background:rgba(255,255,255,.64);border:1px solid rgba(255,255,255,.72)}
 .owner-ui-unified .nav-btn{min-height:58px;border-radius:18px;font-size:18px;font-weight:760}
 .owner-ui-unified .nav-btn.active{background:linear-gradient(180deg,#20bf6b 0%,var(--color-primary-hover) 100%);box-shadow:0 18px 40px rgba(9,166,79,.24),inset 0 1px 0 rgba(255,255,255,.25)}
-.owner-ui-unified .owner-admin-tool{flex:0 0 auto;min-height:58px;border-radius:18px;border:1px solid rgba(255,255,255,.72);padding:0 16px;background:rgba(255,255,255,.58);color:var(--color-text-secondary);font-weight:var(--font-weight-bold);box-shadow:var(--shadow-sm);cursor:pointer}
+.owner-ui-unified .owner-admin-tool{display:none!important}
+.owner-ui-unified #view-entry.owner-entry-disabled{display:none!important}
 .owner-ui-unified .card,
 .owner-ui-unified .hist-card,
 .owner-ui-unified .hist-month,
@@ -1033,14 +1035,15 @@ body::before{
 .owner-ui-unified .cc-badge{border-radius:999px;padding:3px 8px;font-size:var(--font-size-xs);font-weight:var(--font-weight-bold)}
 @media(max-width:720px){
   .owner-ui-unified .topbar{overflow:hidden}
-  .owner-ui-unified .topbar-row1{display:grid;grid-template-columns:minmax(0,1fr) auto;padding:14px 14px 8px;gap:10px}
+  .owner-ui-unified .topbar-row1{display:grid;grid-template-columns:minmax(0,1fr) auto;padding:14px 12px 8px;gap:8px}
   .owner-ui-unified .topbar-row2{padding:6px 16px 14px}
   .owner-ui-unified .brand-icon{width:42px;height:42px;border-radius:13px}
   .owner-ui-unified .brand-name{font-size:22px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .owner-ui-unified .topbar-right{justify-content:flex-end;gap:6px;max-width:100%;overflow:hidden}
-  .owner-ui-unified .role-badge{max-width:58px;overflow:hidden;text-overflow:ellipsis}
-  .owner-ui-unified .owner-dashboard-btn{max-width:118px;min-height:44px!important;padding:9px 10px!important;font-size:12px!important;border-radius:14px!important}
-  .owner-ui-unified .topbar-right .btn-ghost{min-width:44px;min-height:44px!important;padding:9px!important;border-radius:14px!important}
+  .owner-ui-unified .topbar-right{justify-content:flex-end;gap:5px;max-width:100%;overflow:hidden}
+  .owner-ui-unified .role-badge{max-width:54px;overflow:hidden;text-overflow:ellipsis;padding:6px 10px}
+  .owner-ui-unified .owner-dashboard-btn{max-width:110px;min-height:42px!important;padding:8px 9px!important;font-size:12px!important;border-radius:14px!important}
+  .owner-ui-unified .owner-dashboard-btn .ico{width:15px;height:15px;flex-basis:15px}
+  .owner-ui-unified .topbar-right .btn-ghost{min-width:40px;min-height:42px!important;padding:8px!important;border-radius:14px!important}
   .owner-ui-unified .container{width:100%;padding:18px 14px 72px}
   .owner-ui-unified .topbar-row2{overflow:hidden}
   .owner-ui-unified .nav{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));width:100%;min-width:0;gap:6px;padding:5px;border-radius:20px;overflow:hidden}
@@ -1148,7 +1151,7 @@ body::before{
       <button class="nav-btn locked" data-view="clients" id="navClients"><svg class="ico"><use href="#i-users"/></svg>客户<span class="en-sub">CLIENTS</span></button>
       <button class="nav-btn locked" data-view="wifi" id="navWifi"><svg class="ico"><use href="#i-spark"/></svg>网络<span class="en-sub">TOOLS</span></button>
     </nav>
-    <button class="owner-admin-tool" id="ownerEntryTool" type="button" title="管理工具：老板代录入入口">管理工具</button>
+    <button class="owner-admin-tool" id="ownerEntryTool" type="button" hidden aria-hidden="true" title="已下线：员工录入请使用 employee-v3.html">管理工具</button>
   </div>
 </header>
 
@@ -1156,7 +1159,7 @@ body::before{
 
 <main class="container hl-shell" id="mainApp" style="display:none">
   <!-- ENTRY -->
-  <section id="view-entry" class="view hidden">
+  <section id="view-entry" class="view hidden owner-entry-disabled" aria-hidden="true">
     <div class="kpi-strip" id="summaryGrid"></div>
     <!-- 欠款提醒面板 -->
     <div id="arrearsPanel"></div>

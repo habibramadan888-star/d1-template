@@ -129,3 +129,16 @@ but the main flow remains usable, record it as P2 unless it blocks testing.
 | A tester sees another tenant/property data                                | Stop and open a P1 permission/data bug.                 |
 | A screenshot exposes password, token, cookie, or secret                   | Stop, redact, and open a security bug.                  |
 | Production cutover is marked GO by mistake                                | Stop and correct status to `PRODUCTION_NO_GO`.          |
+
+## Owner Real Screenshot Regression Boundary
+
+After OWNER-UI-REAL-SCREENSHOT-FIX-001, owner mobile QA must use real phone screenshots as acceptance evidence.
+
+| Regression                                            | Expected Result                                            |
+| ----------------------------------------------------- | ---------------------------------------------------------- |
+| Main tab `录入`                                       | Not present in owner primary navigation.                   |
+| Garbled glyph before `控制台` / `控制面板`            | Stable inline SVG/text only.                               |
+| `添加记录 ADD ENTRY` on owner homepage                | Not visible. Employee entry belongs to `employee-v3.html`. |
+| Direct `现金收款` / `银行转账` owner homepage buttons | Not visible on owner homepage.                             |
+
+If any item remains visible in a live phone screenshot, mark visual QA as failed. Full write testing still requires separate approval because the live Worker is bound to `DB = homelink`. Production cutover remains `PRODUCTION_NO_GO`.

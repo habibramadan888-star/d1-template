@@ -72,7 +72,7 @@ commercial launch.
 | Owner login flicker or back-loop     | Record as a unified-login UX bug. Expected behavior is auth-loading first and signed-in panel on browser back.    |
 | Owner visually looks old             | Record as a P1 UX bug if the owner UI no longer appears to belong to the same product as employee.                |
 | Owner mobile layout is cramped       | Record as P1 if it blocks core use, P2 if readable with workaround.                                               |
-| Owner primary nav shows `录入`       | Record as P1 UX/IA bug; owner entry must be demoted to management tools, not a main tab.                          |
+| Owner primary nav shows `录入`       | Record as P1 UX/IA bug; owner entry must not appear as a main tab or homepage action.                             |
 | Owner topbar icon/text is garbled    | Record as P1 UX bug and attach phone screenshot.                                                                  |
 | Owner right-side topbar overflows    | Record as P1 if it blocks use, P2 if cosmetic but readable.                                                       |
 | Successful live login smoke          | Requires separate approval because successful login writes production D1 `active_sessions`.                       |
@@ -96,3 +96,12 @@ commercial launch.
 | Staging D1 write from Codex | This package is documentation only; manual QA may create QA-marked staging evidence through the app if separately approved. |
 | Public beta                 | Internal QA is not public beta.                                                                                             |
 | Commercial launch GO        | Launch gate remains `PRODUCTION_NO_GO`.                                                                                     |
+
+## Owner Real Screenshot Regression Stop Items
+
+| Regression                                           | Required Handling                                                                                       |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Owner primary nav shows `录入`                       | Record as P1 UX/IA bug; owner entry must not be a main tab.                                             |
+| Owner topbar icon/text is garbled                    | Record as P1 UX bug and attach phone screenshot.                                                        |
+| Owner homepage shows `添加记录 ADD ENTRY`            | Record as P1 UX/IA bug; employee entry must not be exposed as an owner homepage block.                  |
+| Owner homepage shows `现金收款` / `银行转账` buttons | Record as P1 UX/IA bug; payment entry actions belong to employee entry flow unless separately approved. |

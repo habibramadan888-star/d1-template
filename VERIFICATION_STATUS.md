@@ -4,6 +4,22 @@ Generated: 2026-05-23, Asia/Dubai
 
 This file records the safety verification commands rerun during project status reconciliation. Commands were run without modifying business logic, production configuration, or production database data.
 
+## OWNER-UI-REAL-SCREENSHOT-FIX-001 Verification Addendum
+
+Date: 2026-05-28, Asia/Dubai
+
+| Verification                | Result  | Evidence                                                                                           | Commercial Meaning                                                                             |
+| --------------------------- | ------- | -------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| Real screenshot gap review  | READY   | `OWNER_UI_REAL_SCREENSHOT_GAP_REVIEW.md`                                                           | Live screenshot regressions are acknowledged as still existing before deploy.                  |
+| Control icon final fix      | READY   | `OWNER_CONTROL_PANEL_GARBLED_ICON_FINAL_FIX.md`; `tests/owner-real-screenshot-regression.spec.mjs` | Owner control button uses stable inline SVG/text locally.                                      |
+| Owner nav entry removal     | READY   | `OWNER_PRIMARY_NAV_ENTRY_REMOVAL_FINAL_RESULT.md`                                                  | Owner primary nav does not expose employee-style entry locally.                                |
+| Owner ADD ENTRY downgrade   | READY   | `OWNER_ADD_ENTRY_BLOCK_FINAL_DOWNGRADE_RESULT.md`                                                  | Owner homepage shell no longer exposes employee entry locally.                                 |
+| Design alignment final pass | PARTIAL | `OWNER_EMPLOYEE_DESIGN_ALIGNMENT_FINAL_PASS.md`                                                    | Local UI is improved; live phone screenshot must confirm after deploy.                         |
+| Static UI deploy            | PASS    | `OWNER_UI_REAL_SCREENSHOT_FIX_DEPLOY_RESULT.md`                                                    | Live Worker received the owner UI static fix; no D1 write or migration.                        |
+| Live read-only smoke        | PASS    | `OWNER_UI_REAL_SCREENSHOT_FIX_LIVE_SMOKE_RESULT.md`                                                | Served HTML/JS no longer exposes owner `录入`, garbled control icon, or owner ADD ENTRY shell. |
+
+Production cutover remains `PRODUCTION_NO_GO`. No D1 write, migration, D1 export/import/execute, dashboard calculation change, financial formula change, employee entry write, handover submit, void/delete, settings change, or commercial launch GO occurred.
+
 ## UNIFIED-LOGIN-STYLE-001 Verification Addendum
 
 Date: 2026-05-28, Asia/Dubai

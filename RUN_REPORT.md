@@ -7,6 +7,40 @@ Production deploy: unified-login static route/session handoff deploys executed
 under explicit approval; no commercial cutover.
 Production database mutation: not executed
 
+## OWNER-UI-REAL-SCREENSHOT-FIX-001 Real Screenshot Regression Fix
+
+Date: 2026-05-28, Asia/Dubai
+
+Scope: real live screenshot-driven owner UI regression fix. The task treats the phone screenshots as source of truth because live owner UI still showed a garbled control-panel glyph, main `录入` tab, and owner-visible employee entry surface.
+
+Completed locally:
+
+- Added `tests/owner-real-screenshot-regression.spec.mjs`.
+- Kept owner control panel on stable inline SVG/text.
+- Hid and deprecated `ownerEntryTool`.
+- Marked legacy `#view-entry` as disabled for owner shell.
+- Added owner/manager `switchView('entry')` guard that redirects to `analysis`.
+- Tightened owner mobile topbar widths/gaps.
+- Preserved employee `employee-v3.html` entry workflow.
+
+Safety:
+
+- Production D1 write: no.
+- Migration: no.
+- D1 export/import/execute: no.
+- Dashboard calculation change: no.
+- Financial formula change: no.
+- Business write flow change: no.
+- Production cutover: `PRODUCTION_NO_GO`.
+
+Deploy/live result:
+
+- Deploy executed: yes, static UI assets only.
+- Target Worker: `homelink-finance`.
+- Version ID: `970241c4-7230-4e45-90a7-6daffad0b3da`.
+- Live smoke: PASS for nav `录入` removal, control-panel SVG/text, hidden owner entry surface, employee/unified-login availability.
+- Real phone screenshot revalidation: still required for final visual acceptance.
+
 ## UNIFIED-LOGIN-STYLE-001 Single Login Visual Match
 
 Date: 2026-05-28, Asia/Dubai
@@ -58,8 +92,10 @@ Completed:
   overflow.
 - Removed owner primary nav `录入 / ENTRY`; owner primary nav now starts at
   `总览 / OVERVIEW`.
-- Demoted legacy owner proxy-entry access to a desktop-only `管理工具` secondary
-  control without changing write logic.
+- Earlier pass demoted legacy owner proxy-entry access to a desktop-only
+  `管理工具` secondary control without changing write logic. OWNER-UI-REAL-
+  SCREENSHOT-FIX-001 later hid that owner entry surface entirely after live
+  screenshots showed it was still confusing.
 - Updated the owner client credit page search, filter, refresh, legend, and card
   spacing to use shared UI tokens/classes.
 - Added owner mobile nav, navigation IA, and client credit UI tests.

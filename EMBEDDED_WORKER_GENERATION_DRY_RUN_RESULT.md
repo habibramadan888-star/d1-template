@@ -8,9 +8,9 @@ Scope: P1-006 dry-run generation. This script writes only to `.tmp/embedded-work
 - Generated artifact: `.tmp\embedded-worker-dry-run\index.embedded.generated.js`
 - Embedded assets included: 9
 - Current embedded size: 1077580 bytes
-- Dry-run generated size: 1142018 bytes
+- Dry-run generated size: 1152066 bytes
 - Current embedded SHA-256: `b8f84fc86018c50a7799d4d4b97fe22bfd2915e65d75880d06883acb8b296e07`
-- Dry-run generated SHA-256: `51452204c81163b97a12184d169d6d881cdd01f7d53a35a2116f57a6cc26115f`
+- Dry-run generated SHA-256: `f53b3d8f6dce5821ed5b1dc3356218908a1f413488e21d18ccbf73a5f5518664`
 - Hashes match: No
 
 ## Critical Item Presence

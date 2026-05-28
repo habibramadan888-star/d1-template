@@ -14,13 +14,14 @@ test("owner primary nav no longer exposes employee-style entry as a main tab", a
   assert.match(nav, /data-view="clients"/);
 });
 
-test("legacy owner proxy entry remains demoted to management tools, not primary navigation", async () => {
+test("legacy owner proxy entry remains hidden, not primary navigation", async () => {
   const owner = await readFile("deploy-worker/public/index.html", "utf8");
   const nav = owner.match(/<nav class="nav" id="navTabs">[\s\S]*?<\/nav>/)?.[0] || "";
 
   assert.match(owner, /id="ownerEntryTool"/);
-  assert.match(owner, /title="管理工具：老板代录入入口"/);
-  assert.match(owner, /\.owner-ui-unified \.owner-admin-tool\{display:none\}/);
+  assert.match(owner, /hidden aria-hidden="true"/);
+  assert.match(owner, /title="已下线：员工录入请使用 employee-v3\.html"/);
+  assert.match(owner, /\.owner-ui-unified \.owner-admin-tool\{display:none!important\}/);
   assert.doesNotMatch(nav, /ownerEntryTool|代录入|管理工具/);
 });
 
