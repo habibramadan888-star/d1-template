@@ -65,6 +65,19 @@ or write any D1.
 | Visual target       | Original employee login screen: green glass background, HOME/LINK badge, one centered login card |
 | Production boundary | `PRODUCTION_NO_GO`; no D1 write or migration                                                     |
 
+## Unified Login Minimal UI Boundary
+
+The visible login page must not display engineering, production, D1, or QA
+approval details. Those details remain in this document for testers only.
+
+| Visible Login Page Item               | Expected Result                                                        |
+| ------------------------------------- | ---------------------------------------------------------------------- |
+| Technical role-routing explanation    | Not shown on `unified-login.html`; kept in QA docs only                |
+| `DB = homelink` warning               | Not shown on `unified-login.html`; kept in QA docs only                |
+| `PRODUCTION_NO_GO` or cutover warning | Not shown on `unified-login.html`; kept in QA docs only                |
+| Write-style QA approval warning       | Not shown on `unified-login.html`; kept in QA docs only                |
+| Normal user-facing copy               | Minimal Chinese login copy matching the employee-login visual standard |
+
 | Item                      | Result                                                                                                 |
 | ------------------------- | ------------------------------------------------------------------------------------------------------ |
 | Shared design tokens      | Added in `deploy-worker/public/shared-design-tokens.css`.                                              |

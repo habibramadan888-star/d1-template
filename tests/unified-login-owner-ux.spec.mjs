@@ -93,7 +93,7 @@ test("unified login asset uses signed-in panel instead of immediate redirect loo
   assert.match(html, /shared-design-tokens\.css/);
   assert.match(html, /hl-page unified-login-page/);
   assert.match(html, /signedInPanel/);
-  assert.match(html, /继续进入老板工作台/);
+  assert.match(html, /继续进入系统/);
   assert.match(html, /shouldAutoRedirectExistingSession/);
   assert.match(html, /get\("auto"\) === "1"/);
   assert.match(html, /showSignedInPanel\(me\)/);

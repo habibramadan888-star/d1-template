@@ -123,6 +123,7 @@
     "test:unified-login-owner-ux": "node --test tests/unified-login-owner-ux.spec.mjs",
     "test:unified-login-single-entry": "node --test tests/unified-login-single-entry.spec.mjs",
     "test:unified-login-visual-match": "node --test tests/unified-login-visual-match.spec.mjs",
+    "test:unified-login-minimal-ui": "node --test tests/unified-login-minimal-ui.spec.mjs",
     "test:owner-ui": "node --test tests/owner-ui-design-alignment.spec.mjs",
     "test:owner-mobile-ui": "node --test tests/owner-mobile-ui-alignment.spec.mjs",
     "test:owner-mobile-nav": "node --test tests/owner-mobile-nav-layout.spec.mjs",

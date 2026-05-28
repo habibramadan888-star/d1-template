@@ -48,6 +48,9 @@ Production status: `PRODUCTION_NO_GO`. This checklist is for internal visual QA 
 | Unified login uses employee login background        |           |       |
 | Unified login uses employee login card style        |           |       |
 | Unified login uses employee input/button style      |           |       |
+| Unified login has no production/D1/cutover warning  |           |       |
+| Unified login has no role-routing explanation card  |           |       |
+| Unified login first screen shows only login content |           |       |
 | Only `unified-login.html` is treated as login entry |           |       |
 | Back-button experience is clear                     |           |       |
 | First load has visible feedback                     |           |       |

@@ -124,8 +124,8 @@ test("owner auth loading and unified login back-button UX remain present", async
   assert.match(owner, /ownerAuthLoading/);
   assert.match(owner, /ownerLoginPanel" style="display:none"/);
   assert.match(login, /signedInPanel/);
-  assert.match(login, /继续进入老板工作台/);
-  assert.match(login, /清除会话 \/ 退出/);
+  assert.match(login, /继续进入系统/);
+  assert.match(login, /退出登录/);
 });
 
 test("dashboard calculation and money formula markers are unchanged", async () => {

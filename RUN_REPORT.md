@@ -7,6 +7,39 @@ Production deploy: unified-login static route/session handoff deploys executed
 under explicit approval; no commercial cutover.
 Production database mutation: not executed
 
+## UNIFIED-LOGIN-CLEANUP-001 Minimal Visible Login UI
+
+Date: 2026-05-28, Asia/Dubai
+
+Scope: visible `unified-login.html` copy and card simplification. No production
+D1 write, migration, D1 export/import/execute, dashboard calculation change,
+financial formula change, business write test, handover submit, void/delete, or
+settings change was approved.
+
+Completed locally:
+
+- Removed visible production/D1/cutover/write-QA warnings from the login page.
+- Removed visible role-routing and server-role explanation copy from the login
+  page.
+- Kept one minimal Homelink login card matching the employee-login visual
+  direction.
+- Moved technical notes to internal QA documents.
+- Added `tests/unified-login-minimal-ui.spec.mjs`.
+- Deployed the static `/unified-login.html` asset to `homelink-finance`.
+- Verified the live login page no longer shows production/D1/cutover/write-QA
+  or role-routing explanation text.
+
+Safety:
+
+- Production D1 write: no.
+- Migration: no.
+- D1 export/import/execute: no.
+- Dashboard calculation change: no.
+- Financial formula change: no.
+- Deploy executed: yes, static login asset only.
+- Live smoke: PASS.
+- Production cutover: `PRODUCTION_NO_GO`.
+
 ## OWNER-UI-REAL-SCREENSHOT-FIX-001 Real Screenshot Regression Fix
 
 Date: 2026-05-28, Asia/Dubai

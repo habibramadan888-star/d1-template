@@ -36,6 +36,22 @@ That means employee or owner write flows on the confirmed links can affect
 production data. This guide is safe for link correction, navigation, login, and
 read-only smoke planning only under current restrictions.
 
+## Login Page Visible Copy Boundary
+
+The live `unified-login.html` page must stay minimal for normal employees,
+owners, and administrators. The page should show only the Homelink logo, title,
+short unified-entry subtitle, employee-ID field, password/PIN field, login
+button, small clear-session action, and one short helper sentence.
+
+Do not show these internal QA notes on the visible login page:
+
+| Internal Note                                 | Where It Belongs                |
+| --------------------------------------------- | ------------------------------- |
+| Worker binding `DB = homelink`                | QA docs only, not user login UI |
+| Write-style QA requires separate approval     | QA docs only, not user login UI |
+| Production cutover remains `PRODUCTION_NO_GO` | QA docs only, not user login UI |
+| Role routing details and server-role matrix   | QA docs only, not user login UI |
+
 ## Live Route Verification
 
 `INTERNAL_QA_005B_UNIFIED_LOGIN_LIVE_SMOKE_RESULT.md` confirms the live unified

@@ -144,6 +144,10 @@ input:focus{
   gap:12px;
   margin-top:10px;
 }
+.login-actions{
+  display:grid;
+  grid-template-columns:1fr;
+}
 button{
   min-height:54px;
   border:1px solid rgba(255,255,255,.82);
@@ -176,11 +180,20 @@ button{
   background:rgba(255,255,255,.62);
   border:1px solid rgba(255,255,255,.82);
 }
+.login-actions .ghost{
+  justify-self:start;
+  min-height:42px;
+  min-width:0;
+  padding:10px 16px;
+  border-radius:999px;
+  font-size:14px;
+  font-weight:780;
+}
 button:disabled{
   opacity:.64;
   cursor:not-allowed;
 }
-.hint,.status,.boundary,.signed-in{
+.hint,.status,.signed-in{
   font-size:14px;
   color:#566174;
   line-height:1.75;
@@ -189,9 +202,18 @@ button:disabled{
   border-radius:18px;
   padding:16px 18px;
 }
-.status{
-  min-height:56px;
+.hint{
   margin-top:16px;
+}
+.status{
+  margin-top:12px;
+  padding:12px 14px;
+}
+.status[hidden]{
+  display:none;
+}
+.status.is-visible{
+  display:block;
 }
 .status.error{
   color:var(--danger);
@@ -214,12 +236,6 @@ button:disabled{
 .signed-in[hidden]{display:none}
 .signed-in strong{font-size:17px}
 .signed-in p{margin:0;color:var(--muted);line-height:1.5}
-.boundary{
-  margin-top:16px;
-  color:#6b4a00;
-  background:#fff9df;
-  border-color:#d9c483;
-}
 @media(max-width:720px){
   body{
     background:
@@ -231,8 +247,8 @@ button:disabled{
   .badge{width:42px;height:42px;font-size:14px}
   .login-title{font-size:24px}
   input{border-radius:15px}
-  .login-actions{display:grid}
   .btn,.primary,.ghost{width:100%}
+  .login-actions .ghost{width:auto}
 }
 </style>
 </head>
@@ -241,36 +257,33 @@ button:disabled{
   <section class="login-card employee-login-match" aria-label="Login form">
     <div class="login-brand">
       <div class="badge"><div>HOME<small>LINK.</small></div></div>
-      <div class="login-title">Homelink 登录<small>UNIFIED SIGN IN</small></div>
+      <div class="login-title">Homelink 登录<small>员工 / 老板 / 管理员统一入口</small></div>
     </div>
     <form id="loginForm">
       <div class="field">
-        <label for="accountId">员工编号 / 管理账号 <span class="label-en">EMPLOYEE ID / OWNER</span></label>
-        <input id="accountId" name="accountId" autocomplete="username" placeholder="员工填写编号；老板可留空">
+        <label for="accountId">员工编号（老板可留空）</label>
+        <input id="accountId" name="accountId" autocomplete="username" placeholder="员工编号；老板可留空">
       </div>
       <div class="field">
-        <label for="secret">密码 / PIN <span class="label-en">PASSWORD / PIN</span></label>
+        <label for="secret">密码 / PIN</label>
         <input id="secret" name="secret" type="password" autocomplete="current-password" required>
       </div>
       <div class="login-actions">
-        <button class="btn primary" id="loginButton" type="submit">登录<span class="label-en">SIGN IN</span></button>
-        <button class="btn ghost" id="logoutButton" type="button">清除会话</button>
+        <button class="btn primary" id="loginButton" type="submit">登录</button>
+        <button class="btn ghost" id="logoutButton" type="button">清除登录状态</button>
       </div>
     </form>
     <div class="signed-in" id="signedInPanel" hidden>
       <strong id="signedInTitle">已登录</strong>
-      <p id="signedInText">检测到有效 server session。</p>
+      <p id="signedInText">可以继续进入系统，或退出后切换账号。</p>
       <div class="actions">
-        <button class="btn primary" id="continueButton" type="button">继续</button>
-        <button class="btn ghost" id="clearSessionButton" type="button">清除会话 / 退出</button>
+        <button class="btn primary" id="continueButton" type="button">继续进入系统</button>
+        <button class="btn ghost" id="clearSessionButton" type="button">退出登录</button>
       </div>
     </div>
-    <div class="status" id="status" role="status">正在检查登录状态...</div>
+    <div class="status" id="status" role="status" hidden></div>
     <div class="hint">
-      员工输入编号和 PIN；老板/管理员按授权方式登录。登录后由后端角色自动跳转。
-    </div>
-    <div class="boundary">
-      当前 production cutover 仍为 PRODUCTION_NO_GO。完整写入测试需要单独批准。
+      员工请输入编号和 PIN；老板可留空编号。
     </div>
   </section>
 </main>
@@ -302,8 +315,10 @@ function apiUrl(path) {
 }
 
 function setStatus(message, tone) {
-  statusEl.textContent = message;
-  statusEl.className = "status" + (tone ? " " + tone : "");
+  const nextMessage = String(message || "").trim();
+  statusEl.textContent = nextMessage;
+  statusEl.hidden = !nextMessage;
+  statusEl.className = "status" + (nextMessage ? " is-visible" : "") + (tone ? " " + tone : "");
 }
 
 function shouldAutoRedirectExistingSession() {
@@ -340,10 +355,10 @@ async function fetchMe() {
 function routeFromServerClaim(me, options = {}) {
   const destination = destinationForRole(me?.role);
   if (!destination) {
-    setStatus("登录成功，但该角色未启用统一跳转。", "error");
+    setStatus("登录成功，但当前账号暂不能进入系统。", "error");
     return;
   }
-  setStatus("已登录为 " + me.role + "，正在跳转...");
+  setStatus("已登录，正在进入系统...");
   const nav = options.replace ? location.replace.bind(location) : location.assign.bind(location);
   nav(destination);
 }
@@ -358,17 +373,16 @@ function showLoginForm(message, tone) {
 function showSignedInPanel(me) {
   const destination = destinationForRole(me?.role);
   if (!destination) {
-    showLoginForm("当前已登录角色未启用统一跳转。", "error");
+    showLoginForm("当前账号暂不能进入系统。", "error");
     return;
   }
   currentSessionDestination = destination;
   form.style.display = "none";
   signedInPanel.hidden = false;
-  const role = String(me.role || "user");
-  signedInTitle.textContent = "已登录：" + role;
-  signedInText.textContent = "点击继续进入对应工作台，或清除会话后切换账号。";
-  continueButton.textContent = destination === OWNER_DESTINATION ? "继续进入老板工作台" : "继续进入员工业务页";
-  setStatus("会话有效。除非 URL 包含 ?auto=1，否则不会自动跳转。");
+  signedInTitle.textContent = "已登录";
+  signedInText.textContent = "可以继续进入系统，或退出后切换账号。";
+  continueButton.textContent = "继续进入系统";
+  setStatus("");
 }
 
 async function checkExistingSession() {
@@ -379,7 +393,7 @@ async function checkExistingSession() {
       else showSignedInPanel(me);
       return;
     }
-    showLoginForm("会话已过期或尚未登录，请登录。");
+    showLoginForm("");
   } catch (error) {
     showLoginForm("暂时无法检查当前会话，仍可继续登录。", "warn");
   }
@@ -418,7 +432,7 @@ async function signIn(event) {
     secret.value = "";
     routeFromServerClaim(me, { replace: true });
   } catch (error) {
-    setStatus("登录失败，请检查账号和密码后重试。", "error");
+    setStatus("登录失败，请检查编号或密码。", "error");
   } finally {
     loginButton.disabled = false;
   }
@@ -433,7 +447,7 @@ async function clearSession() {
   sessionStorage.removeItem("homelink:cloud_token");
   accountId.value = "";
   secret.value = "";
-  showLoginForm("会话已清除，请重新登录。");
+  showLoginForm("已退出，请重新登录。");
   logoutButton.disabled = false;
 }
 

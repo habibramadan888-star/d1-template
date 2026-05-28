@@ -22,7 +22,10 @@ test("unified login uses employee-login-equivalent logo and typography", async (
   const html = await readFile("deploy-worker/public/unified-login.html", "utf8");
 
   assert.match(html, /class="badge"><div>HOME<small>LINK\.<\/small><\/div><\/div>/);
-  assert.match(html, /class="login-title">Homelink 登录<small>UNIFIED SIGN IN<\/small>/);
+  assert.match(
+    html,
+    /class="login-title">Homelink 登录<small>员工 \/ 老板 \/ 管理员统一入口<\/small>/
+  );
   assert.match(html, /\.login-title\{\s*color:#111827;\s*font-size:26px;\s*font-weight:820;/);
   assert.match(html, /\.login-title small\{/);
   assert.match(html, /letter-spacing:\.12em/);
@@ -44,7 +47,7 @@ test("unified login uses employee-login-equivalent button and helper card", asyn
   assert.match(html, /class="btn primary" id="loginButton"/);
   assert.match(html, /background:linear-gradient\(180deg,#20bf6b 0%,#078d42 100%\)/);
   assert.match(html, /border-radius:17px/);
-  assert.match(html, /<span class="label-en">SIGN IN<\/span>/);
+  assert.match(html, /<button class="btn primary" id="loginButton" type="submit">登录<\/button>/);
   assert.match(html, /class="hint"/);
   assert.match(html, /border:1px dashed #d7e3dd/);
 });
