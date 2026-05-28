@@ -178,3 +178,19 @@ If remembered account leaks a password, stop testing and record a P0 security
 bug. If history remains blank for 15-20 seconds, record a P1 UX/performance
 bug. Full write testing still requires separate approval. Production cutover
 remains `PRODUCTION_NO_GO`.
+
+## Auth Routing Stabilization Rules
+
+| Rule                          | Expected Result                                                                                                                                       |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Single login entry            | Only `unified-login.html` is user-facing login. `employee-v3.html` and `index.html` are business destinations.                                        |
+| Unauthenticated owner page    | Opening `index.html` without a valid owner/manager/admin session must redirect to `unified-login.html`; the old owner password panel must not appear. |
+| Unauthenticated employee page | Opening `employee-v3.html` without a valid employee/staff session must redirect to `unified-login.html`; the old PIN panel must not appear.           |
+| Lock / logout                 | Any lock icon or logout action must clear session state and route to `unified-login.html`, never an old login panel.                                  |
+| Employee identity             | Employee header should show the real display name, username, or employee id. It must not show `staff` as the person name.                             |
+| Owner network entry           | WiFi/network control should be visible through the owner navigation or documented as manual-required if unavailable.                                  |
+| Owner history                 | History must show loading feedback quickly. More than 5 seconds with no visible feedback is a P1 UX/performance bug.                                  |
+
+Do not run successful live credential login, employee entry, handover, void,
+settings, or any other write-style QA unless a separate write approval is
+granted. Production cutover remains `PRODUCTION_NO_GO`.

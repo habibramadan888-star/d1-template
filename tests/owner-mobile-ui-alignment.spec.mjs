@@ -14,7 +14,7 @@ test("owner mobile layout keeps employee-style cards, nav, forms, and table cont
   assert.match(owner, /\.owner-ui-unified \.form-row\{grid-template-columns:1fr\}/);
   assert.match(
     owner,
-    /\.owner-ui-unified \.nav\{display:grid;grid-template-columns:repeat\(4,minmax\(0,1fr\)\)/
+    /\.owner-ui-unified \.nav\{display:grid;grid-template-columns:repeat\(5,minmax\(0,1fr\)\)/
   );
   assert.match(owner, /\.owner-ui-unified \.nav-btn\{min-width:0!important;width:100%/);
   assert.match(owner, /\.owner-ui-unified \.owner-admin-tool\{display:none\}/);
@@ -28,7 +28,7 @@ test("owner alternate entry keeps the same mobile alignment layer", async () => 
   assert.match(ownerAlt, /\.owner-ui-unified \.card\{border-radius:26px\}/);
   assert.match(
     ownerAlt,
-    /\.owner-ui-unified \.nav\{display:grid;grid-template-columns:repeat\(4,minmax\(0,1fr\)\)/
+    /\.owner-ui-unified \.nav\{display:grid;grid-template-columns:repeat\(5,minmax\(0,1fr\)\)/
   );
   assert.match(ownerAlt, /\.owner-ui-unified \.nav-btn\{min-width:0!important;width:100%/);
   assert.match(

@@ -61,7 +61,7 @@ test("employee-v3.html detects valid employee session if supported", async () =>
   assert.match(html, /fetchCurrentAuthUser/);
   assert.match(html, /\/api\/me/);
   assert.match(html, /isEmployeeAuthRole\(me\.role\)/);
-  assert.match(html, /applyEmployeeUser\(\{userid:me\.userid/);
+  assert.match(html, /applyEmployeeUser\(\{\s*userid:me\.userid/);
 });
 
 test("employee cannot enter owner dashboard", () => {
@@ -86,14 +86,16 @@ test("owner cannot accidentally submit employee-only workflow", () => {
   assert.equal(decision.destination, OWNER_DESTINATION);
 });
 
-test("invalid or expired session shows login", () => {
+test("invalid or expired session redirects to unified login", () => {
   const owner = resolveOwnerSessionHandoff({ meStatus: 401 });
   const employee = resolveEmployeeSessionHandoff({ meStatus: 401 });
 
-  assert.equal(owner.action, "SHOW_LOGIN");
-  assert.equal(owner.showSecondLogin, true);
-  assert.equal(employee.action, "SHOW_PIN_LOGIN");
-  assert.equal(employee.showSecondLogin, true);
+  assert.equal(owner.action, "REDIRECT");
+  assert.equal(owner.destination, "/unified-login.html");
+  assert.equal(owner.showSecondLogin, false);
+  assert.equal(employee.action, "REDIRECT");
+  assert.equal(employee.destination, "/unified-login.html");
+  assert.equal(employee.showSecondLogin, false);
 });
 
 test("/api/me remains authority", () => {

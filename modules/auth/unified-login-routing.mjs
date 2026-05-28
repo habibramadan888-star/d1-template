@@ -99,13 +99,6 @@ export function resolveOwnerBootstrapUx({ meStatus, meClaim, mePending = false }
   }
 
   const handoff = resolveOwnerSessionHandoff({ meStatus, meClaim });
-  if (handoff.action === "SHOW_LOGIN") {
-    return {
-      ...handoff,
-      showLegacyLogin: true
-    };
-  }
-
   return {
     ...handoff,
     showLegacyLogin: false
@@ -151,8 +144,9 @@ export function resolveOwnerSessionHandoff({ meStatus, meClaim } = {}) {
   if (meStatus === 401 || meStatus === 403 || !meClaim) {
     return {
       page: "owner",
-      action: "SHOW_LOGIN",
-      showSecondLogin: true,
+      action: "REDIRECT",
+      destination: UNIFIED_LOGIN_PATH,
+      showSecondLogin: false,
       authority: "/api/me"
     };
   }
@@ -181,7 +175,7 @@ export function resolveOwnerSessionHandoff({ meStatus, meClaim } = {}) {
   return {
     page: "owner",
     action: "DENY",
-    showSecondLogin: true,
+    showSecondLogin: false,
     authority: "/api/me"
   };
 }
@@ -190,8 +184,9 @@ export function resolveEmployeeSessionHandoff({ meStatus, meClaim } = {}) {
   if (meStatus === 401 || meStatus === 403 || !meClaim) {
     return {
       page: "employee",
-      action: "SHOW_PIN_LOGIN",
-      showSecondLogin: true,
+      action: "REDIRECT",
+      destination: UNIFIED_LOGIN_PATH,
+      showSecondLogin: false,
       authority: "/api/me"
     };
   }
@@ -219,7 +214,7 @@ export function resolveEmployeeSessionHandoff({ meStatus, meClaim } = {}) {
   return {
     page: "employee",
     action: "DENY",
-    showSecondLogin: true,
+    showSecondLogin: false,
     authority: "/api/me"
   };
 }

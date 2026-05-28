@@ -7,6 +7,42 @@ Production deploy: unified-login static route/session handoff deploys executed
 under explicit approval; no commercial cutover.
 Production database mutation: not executed
 
+## AUTH-ROUTING-STABILIZATION-001 Single Login Routing and Owner History
+
+Date: 2026-05-29, Asia/Dubai
+
+Scope: single-entry auth routing, logout routing, employee identity display,
+owner network entry visibility, and owner history first-load feedback. No
+production migration, production D1 write, D1 export/import/execute, employee
+entry write, handover submit, void/delete, settings change, dashboard
+calculation change, financial formula change, or commercial launch GO was
+approved.
+
+Completed locally:
+
+- Suppressed legacy owner and employee login panels as user-facing fallbacks.
+- Standardized unauthenticated `index.html` and `employee-v3.html` behavior to
+  redirect to `unified-login.html`.
+- Standardized lock/logout behavior to clear legacy auth state and route to
+  `unified-login.html`.
+- Updated employee identity display to prefer display name, username, or
+  employee id instead of showing role `staff`.
+- Restored the owner `网络` entry in the primary navigation while keeping
+  manager-gated backend access.
+- Added owner history skeleton, recent-record first load, timeout/retry
+  handling, and read-only history APIs that avoid runtime schema mutation.
+- Added targeted regression tests for auth routing, logout routing, employee
+  identity, owner network entry, history loading, and legacy-login flash.
+
+Safety:
+
+- Production D1 write: no.
+- Migration: no.
+- D1 export/import/execute: no.
+- Dashboard calculation change: no.
+- Financial formula change: no.
+- Production cutover: `PRODUCTION_NO_GO`.
+
 ## OWNER-UX-STABILIZATION-001 Login Persistence and Owner Mobile UX
 
 Date: 2026-05-28, Asia/Dubai
@@ -5165,6 +5201,31 @@ Result:
 P0-006 status:
 
 - `Partial - tenant scope staging route/query wiring gate ready`.
+
+## AUTH-ROUTING-STABILIZATION-001 Deploy and Read-Only Smoke
+
+Date: 2026-05-29, Asia/Dubai
+
+Scope: auth/session routing stabilization, unified logout routing, employee
+identity display, owner network entry restoration, and owner history
+first-load feedback. No production D1 migration, production D1 write,
+D1 export/import/execute, employee entry write, handover submit, void/delete,
+settings change, dashboard calculation change, financial formula change,
+commercial launch GO, or production cutover was executed.
+
+Result:
+
+- Deployed `homelink-finance` Worker static/auth routing assets with
+  `npx wrangler deploy --config wrangler.toml --env="" --keep-vars`.
+- Uploaded `/unified-login.html`, `/index-51-main.js`, `/index-51.html`, and
+  `/employee-v3.html`.
+- Current live Worker version: `89946037-bb3f-4abc-aa18-5afdff16c52d`.
+- Read-only live smoke passed for unified login HTML, employee page routing
+  asset, owner JS unified logout/history/network wiring, `/api/me` unauth 401,
+  and wrong-login 401.
+- Real credential login was not executed to avoid live session writes under the
+  no-D1-write task restriction.
+- Production cutover remains `PRODUCTION_NO_GO`.
 
 ## COMMERCIAL-LAUNCH-REVIEW-020 Production Preflight Execution Plan
 

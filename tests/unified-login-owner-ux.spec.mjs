@@ -27,11 +27,12 @@ test("valid owner /api/me enters dashboard", () => {
   assert.equal(decision.showLegacyLogin, false);
 });
 
-test("/api/me 401 shows login form only after check", () => {
+test("/api/me 401 redirects to unified login only after check", () => {
   const decision = resolveOwnerBootstrapUx({ meStatus: 401 });
 
-  assert.equal(decision.action, "SHOW_LOGIN");
-  assert.equal(decision.showLegacyLogin, true);
+  assert.equal(decision.action, "REDIRECT");
+  assert.equal(decision.destination, "/unified-login.html");
+  assert.equal(decision.showLegacyLogin, false);
 });
 
 test("employee session does not enter owner dashboard", () => {

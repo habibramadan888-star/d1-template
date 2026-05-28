@@ -27,10 +27,12 @@ const CUSTOMER_KEY='apt:customers';
 const CC_GRACE=3;
 const DEFAULT_PRICES=[600,650,700,750];
 const HISTORY_PAGE_SIZE=20;
+const HISTORY_FETCH_TIMEOUT_MS=8000;
 
 /* ── CLOUD AUTH ── */
 /* window.authToken 已移除：Token 存于 httpOnly Cookie，JS 不可读取 */
 const CLOUD_API_ORIGIN='https://homelink-finance.habibramadan888.workers.dev';
+const UNIFIED_LOGIN_DESTINATION='./unified-login.html';
 function apiUrl(url){
   if(/^https?:\/\//i.test(url))return url;
   const sameWorker=location.protocol!=='file:'&&location.host==='homelink-finance.habibramadan888.workers.dev';
@@ -43,12 +45,45 @@ async function apiFetch(url, opts = {}) {
   const target=apiUrl(url);
   return fetch(target,{...opts,headers,credentials:'include'});
 }
+async function apiFetchWithTimeout(url, opts = {}, timeoutMs = HISTORY_FETCH_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await apiFetch(url, { ...opts, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
 function normalizeAuthRole(r){return String(r||'').trim().toLowerCase();}
 function isOwnerAppRole(r){return ['manager','owner','admin'].includes(normalizeAuthRole(r));}
 function isEmployeeAppRole(r){return ['staff','employee'].includes(normalizeAuthRole(r));}
 function toOwnerSpaRole(r){return isOwnerAppRole(r)?'manager':normalizeAuthRole(r);}
 function isOwnerShellRole(){return role==='manager';}
 function defaultViewForRole(){return isOwnerShellRole()?'overview':'entry';}
+function clearLegacyAuthStorage(){
+  [
+    'homelink:cloud_token',
+    'homelink:role',
+    'homelink:user',
+    'owner:role',
+    'owner:user',
+    'empv3:user',
+    'empv3:operator',
+    'empv3:lastEmployeeId',
+    'hl:wifi_accounts',
+    'hl:wifi_sessions',
+    'hl:wifi_blacklist',
+    'hl:wifi_config'
+  ].forEach(k=>{
+    LS.del(k);
+    try{localStorage.removeItem(k)}catch{}
+    try{sessionStorage.removeItem(k)}catch{}
+  });
+}
+function redirectToUnifiedLogin(reason=''){
+  const target=UNIFIED_LOGIN_DESTINATION+(reason?`?reason=${encodeURIComponent(reason)}`:'');
+  location.replace(target);
+}
 async function fetchCurrentAuthUser(){
   const r=await apiFetch('/api/me',{method:'GET'});
   if(r.status===401||r.status===403)return null;
@@ -79,18 +114,14 @@ function showOwnerAuthChecking(){
   setOwnerAuthMessage('Checking session','正在验证登录状态');
 }
 function showOwnerLoginFallback(message='请输入员工代码'){
-  const els=ownerAuthElements();
-  if(els.overlay)els.overlay.style.display='flex';
-  if(els.loading)els.loading.hidden=true;
-  if(els.loginPanel)els.loginPanel.style.display='block';
-  setOwnerAuthMessage(message,'ENTER EMPLOYEE CODE');
-  if(els.empCode)els.empCode.focus();
+  console.info('[AuthRouting] Legacy owner login fallback suppressed:', message);
+  redirectToUnifiedLogin('owner_session_required');
 }
 function showOwnerAuthError(message='Could not verify session. Please try again.'){
   const els=ownerAuthElements();
   if(els.overlay)els.overlay.style.display='flex';
   if(els.loading)els.loading.hidden=true;
-  if(els.loginPanel)els.loginPanel.style.display='block';
+  if(els.loginPanel)els.loginPanel.style.display='none';
   if(els.codeErr){els.codeErr.textContent=message;els.codeErr.style.display='block';}
   setOwnerAuthMessage('Session check failed','请重试登录');
 }
@@ -108,11 +139,13 @@ function showOwnerAppShell(appRole){
     document.getElementById('navHistory')?.classList.remove('locked');
     document.getElementById('navAnalysis')?.classList.remove('locked');
     document.getElementById('navClients')?.classList.remove('locked');
+    document.getElementById('navWifi')?.classList.remove('locked');
   }else{
     document.getElementById('navOverview')?.classList.add('locked');
     document.getElementById('navHistory')?.classList.add('locked');
     document.getElementById('navAnalysis')?.classList.add('locked');
     document.getElementById('navClients')?.classList.add('locked');
+    document.getElementById('navWifi')?.classList.add('locked');
   }
   const db=document.getElementById('btnDashboard');
   if(db)db.style.display=isManager?'':'none';
@@ -121,7 +154,7 @@ async function resumeUnifiedOwnerSession(){
   showOwnerAuthChecking();
   try{
     const me=await fetchCurrentAuthUser();
-    if(!me){showOwnerLoginFallback();return false;}
+    if(!me){redirectToUnifiedLogin('owner_session_required');return false;}
     if(isOwnerAppRole(me.role)){
       await enterAs(toOwnerSpaRole(me.role));
       return true;
@@ -131,7 +164,7 @@ async function resumeUnifiedOwnerSession(){
       return true;
     }
     console.warn('[UnifiedLogin] unsupported role for owner app');
-    showOwnerLoginFallback('This account cannot access the owner dashboard.');
+    redirectToUnifiedLogin('owner_role_denied');
     return false;
   }catch(e){
     console.warn('[UnifiedLogin] owner session handoff failed:',e);
@@ -142,10 +175,8 @@ async function resumeUnifiedOwnerSession(){
 function showAuthExpired(){
   toast('登录已过期，请重新进入系统','err');
   role=null;
-  showOwnerLoginFallback('Session expired. Please sign in again.');
-  document.getElementById('topbar').style.display='none';
-  document.getElementById('mainApp').style.display='none';
-  document.getElementById('footerEl').style.display='none';
+  clearLegacyAuthStorage();
+  redirectToUnifiedLogin('session_expired');
 }
 
 /* ── HELPERS ── */
@@ -291,21 +322,18 @@ async function logout(){
     console.warn('[Logout] 服务端清除 Cookie 失败（网络问题），继续本地登出:',e);
   }
   /* 2. 清除认证/网络敏感缓存；业务历史不在登出时删除 */
-  ['homelink:cloud_token','hl:wifi_accounts','hl:wifi_sessions','hl:wifi_blacklist','hl:wifi_config'].forEach(k=>LS.del(k));
+  clearLegacyAuthStorage();
   /* 3. 重置内存状态和界面 */
   role=null;
   _wmAccountsCache=null;
   const ec=document.getElementById('empCode');if(ec)ec.value='';
   const ce=document.getElementById('codeErr');if(ce)ce.style.display='none';
   const db=document.getElementById('btnDashboard');if(db)db.style.display='none';
-  showOwnerLoginFallback();
-  document.getElementById('topbar').style.display='none';
-  document.getElementById('mainApp').style.display='none';
-  document.getElementById('footerEl').style.display='none';
   var m=document.getElementById('modalOverlay');if(m)m.classList.remove('open');
   var ov=document.getElementById('cp-overlay');if(ov)ov.style.display='none';
   _cpReady=false;
   if(typeof state!=='undefined') state._linkedArrearId=null;
+  redirectToUnifiedLogin('signed_out');
 }
 
 /* 老板密码二次验证弹窗 */
@@ -1508,7 +1536,7 @@ async function renderHistory(){
     if(s._cloud&&(!s.entries||!s.entries.length)){
       wrap.innerHTML='<div style="text-align:center;padding:40px;color:var(--text3)">加载中...</div>';
       try{
-        const r=await apiFetch(`/api/session_detail?id=${encodeURIComponent(s.id)}`);
+        const r=await apiFetchWithTimeout(`/api/session_detail?id=${encodeURIComponent(s.id)}`);
         if(r.status===401){showAuthExpired();wrap.innerHTML='<div class="card" style="padding:24px;text-align:center;color:var(--red)">登录已过期，请重新登录后查看历史</div>';return;}
         if(r.status===403){wrap.innerHTML='<div class="card" style="padding:24px;text-align:center;color:var(--red)">老板账户才能查看历史详情</div>';return;}
         if(!r.ok){wrap.innerHTML=`<div class="card" style="padding:24px;text-align:center;color:var(--red)">历史详情加载失败：${r.status}</div>`;return;}
@@ -1545,12 +1573,19 @@ async function renderHistory(){
   </div>`;
   let cloud=[];
   try{
-    const r=await apiFetch(`/api/history?limit=${encodeURIComponent(limit)}`);
+    const r=await apiFetchWithTimeout(`/api/history?limit=${encodeURIComponent(limit)}`);
     if(r.status===401){showAuthExpired();wrap.innerHTML='<div class="card" style="padding:24px;text-align:center;color:var(--red)">登录已过期，请重新登录后查看历史</div>';return;}
     if(r.ok)cloud=await r.json();
     else{wrap.innerHTML=`<div class="card" style="padding:24px;text-align:center;color:var(--red)">历史记录加载失败：${r.status}</div>`;return;}
   }catch(e){
-    wrap.innerHTML=`<div class="card" style="padding:24px;text-align:center;color:var(--red)">历史记录加载失败：${esc(e.message||'网络错误')}</div>`;
+    const timedOut=e?.name==='AbortError';
+    wrap.innerHTML=`<div class="card owner-history-timeout" style="padding:24px;text-align:center;color:var(--red)">
+      <div style="font-weight:800;margin-bottom:8px">${timedOut?'历史记录加载超时':'历史记录加载失败'}</div>
+      <div style="color:var(--text2);font-size:13px;line-height:1.6;margin-bottom:14px">${timedOut?'最近 20 条历史超过 8 秒仍未返回，请重试或稍后刷新。':'网络异常，请重试。'}</div>
+      <button class="btn btn-primary" id="btnHistoryRetry" type="button">重试加载</button>
+    </div>`;
+    const retry=document.getElementById('btnHistoryRetry');
+    if(retry)retry.onclick=()=>renderHistory();
     return;
   }
   const cloudIds=new Set(cloud.map(s=>s.id));
@@ -3486,10 +3521,11 @@ function renderOwnerOverview(){
     </div>
     <div class="card hl-card owner-overview-section" style="margin-top:16px">
       <div class="card-head"><div><div class="card-title">快速进入</div><div class="card-sub">QUICK ACTIONS</div></div></div>
-      <div class="card-body" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px">
+      <div class="card-body" style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px">
         <button class="btn btn-ghost" type="button" onclick="switchView('history')">历史</button>
         <button class="btn btn-ghost" type="button" onclick="switchView('clients')">客户</button>
         <button class="btn btn-ghost" type="button" onclick="switchView('analysis')">分析</button>
+        <button class="btn btn-ghost" type="button" onclick="switchView('wifi')">网络</button>
       </div>
     </div>`;
 }

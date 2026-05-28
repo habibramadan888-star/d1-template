@@ -111,6 +111,22 @@ commercial launch.
 | History performance | First paint shows skeleton quickly; initial history request loads recent records first with a load-more path.                                        |
 | Mobile density      | Page title, nav, cards, and lists are compact enough for mobile business review without reverting to old UI.                                         |
 
+## Auth Routing Stabilization Checks
+
+| Check                | Expected Result                                                                                                           |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Single-entry routing | All unauthenticated role destinations route to `unified-login.html`; no legacy owner or employee login panel flashes.     |
+| Role destination     | Server-confirmed employee/staff sessions route to `employee-v3.html`; owner/manager/admin sessions route to `index.html`. |
+| Lock/logout routing  | Lock and logout clear session state and route to `unified-login.html`, not to old login UI.                               |
+| Employee identity    | Employee UI displays display name, username, or employee id; `staff` is treated as a role, not a display name.            |
+| Network control      | Owner WiFi/network entry is present in the owner navigation or recorded as manual-required.                               |
+| History performance  | Owner history shows skeleton/loading quickly and loads recent records first instead of blocking on full history.          |
+
+If any auth route flashes an old login panel, routes through the wrong role
+destination, or shows `staff` as the visible employee name, record a P1 bug and
+pause role-flow QA until retested. Production cutover remains
+`PRODUCTION_NO_GO`.
+
 ## Owner Real Screenshot Regression Stop Items
 
 | Regression                                           | Required Handling                                                                                       |

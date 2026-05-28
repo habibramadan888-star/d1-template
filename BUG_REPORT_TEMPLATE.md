@@ -62,3 +62,13 @@ Use these expected results when reporting unified-login bugs:
 | Owner overview gives no business decision value | P1/P2              | Overview should show today's receipts, outstanding amount, pending items, handover/alerts, recent flow, and quick links. |
 | Owner history has 15-20 second blank load       | P1                 | History should show loading skeleton quickly and load recent rows first.                                                 |
 | Owner mobile typography/cards are too large     | P1/P2              | Mobile owner pages should increase useful information density while remaining readable.                                  |
+
+## Auth Routing Stabilization Bug Notes
+
+| Scenario                                                     | Suggested Severity | Expected Result                                                                                                         |
+| ------------------------------------------------------------ | ------------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| Any old login panel appears after opening a role destination | P1                 | Unauthenticated `index.html` and `employee-v3.html` should redirect to `unified-login.html` without legacy login flash. |
+| Lock/logout opens an old login page                          | P1                 | Lock/logout should clear session state and route to `unified-login.html`.                                               |
+| Employee header displays `staff` as the person name          | P1                 | UI should show display name, username, or employee id; `staff` is only a role.                                          |
+| Owner history shows no feedback for more than 5 seconds      | P1                 | History should show skeleton/loading quickly and load recent records first.                                             |
+| Owner network/WiFi entry is missing                          | P2/P1              | Entry should be visible or documented as manual-required; severity depends on operational impact.                       |

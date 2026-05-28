@@ -77,7 +77,8 @@ test("unified-login still supports explicit clear session action", async () => {
   assert.match(html, /id="logoutButton"/);
   assert.match(html, /async function clearSession\(\)/);
   assert.match(html, /\/auth\/logout/);
-  assert.match(html, /localStorage\.removeItem\("homelink:cloud_token"\)/);
+  assert.match(html, /"homelink:cloud_token"/);
+  assert.match(html, /localStorage\.removeItem\(key\)/);
 });
 
 test("production cutover remains PRODUCTION_NO_GO", () => {

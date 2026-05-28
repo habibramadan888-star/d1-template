@@ -1708,7 +1708,7 @@ label .label-en{
 </style>
 </head>
 <body class="hl-page employee-ui">
-<div class="login-overlay" id="loginOverlay">
+<div class="login-overlay hidden" id="loginOverlay" aria-hidden="true">
   <div class="login-card">
     <div class="login-brand">
       <div class="badge"><div>HOME<small>LINK.</small></div></div>
@@ -1724,7 +1724,7 @@ label .label-en{
 <div class="top">
   <div class="brand">
     <div class="logo"><div class="badge"><div>HOME<small>LINK.</small></div></div><div class="word"><span class="g">HOME</span><span>LINK</span><i>.</i><em>流水管理</em></div></div>
-    <div class="actions"><div class="operator">员工编号 <input id="operatorId" placeholder="A01"></div><span class="pill">员工</span><span class="pill main">🔐 v3录入</span></div>
+    <div class="actions"><div class="operator">当前员工 <input id="operatorId" placeholder="A01"></div><span class="pill">员工</span><span class="pill main">已登录<span class="label-en">SIGNED IN</span></span></div>
   </div>
   <div class="tabs">
     <button class="tab active" data-view="entry">录入<span class="en">ENTRY</span></button>
@@ -1923,11 +1923,35 @@ async function apiFetch(path,opts={}){return fetch(apiUrl(path),{credentials:'in
 function normalizeAuthRole(r){return String(r||'').trim().toLowerCase()}
 function isEmployeeAuthRole(r){return ['staff','employee'].includes(normalizeAuthRole(r))}
 function isOwnerAuthRole(r){return ['manager','owner','admin'].includes(normalizeAuthRole(r))}
+const UNIFIED_LOGIN_DESTINATION='./unified-login.html';
 async function fetchCurrentAuthUser(){
   const r=await apiFetch('/api/me',{method:'GET'});
   if(r.status===401||r.status===403)return null;
   if(!r.ok)throw new Error('me_failed_'+r.status);
   return r.json();
+}
+function clearEmployeeLegacyAuthState(){
+  ['empv3:user','empv3:operator','homelink:cloud_token','homelink:role','homelink:user','owner:role','owner:user'].forEach(k=>{
+    try{localStorage.removeItem(k)}catch{}
+    try{sessionStorage.removeItem(k)}catch{}
+  });
+}
+function redirectToUnifiedLogin(reason=''){
+  clearEmployeeLegacyAuthState();
+  const target=UNIFIED_LOGIN_DESTINATION+(reason?`?reason=${encodeURIComponent(reason)}`:'');
+  location.replace(target);
+}
+function employeeDisplayName(user){
+  return [
+    user?.display_name,
+    user?.displayName,
+    user?.employee_name,
+    user?.name,
+    user?.username,
+    user?.userid,
+    user?.employee_id,
+    user?.role
+  ].map(v=>String(v||'').trim()).find(Boolean)||'EMP';
 }
 function toast(msg,duration=2600){const el=$('toast');el.textContent=msg;el.style.display='block';clearTimeout(window.__toast);window.__toast=setTimeout(()=>el.style.display='none',duration)}
 function showStatus(msg,type='ok'){
@@ -1939,7 +1963,7 @@ function showStatus(msg,type='ok'){
 window.addEventListener('error',e=>{console.error(e.error||e.message);toast('页面脚本错误：'+(e.message||'unknown'),6000);showStatus('页面脚本错误：'+(e.message||'unknown'),'bad')});
 window.addEventListener('unhandledrejection',e=>{const msg=e.reason?.message||String(e.reason||'unknown');console.error(e.reason);toast('操作失败：'+msg,6000);showStatus('操作失败：'+msg,'bad')});
 function operatorId(){return state.user?.userid||$('operatorId').value.trim()||localStorage.getItem('empv3:operator')||'EMP'}
-function operatorName(){return state.user?.employee_name||state.user?.userid||operatorId()}
+function operatorName(){return employeeDisplayName(state.user)||operatorId()}
 function setOperator(v){try{localStorage.setItem('empv3:operator',v||'EMP')}catch{}}
 function saveDrafts(){
   if(!state.user?.userid)return false;
@@ -1983,10 +2007,13 @@ function applyEmployeeUser(user){
   if(user){
     state.drafts=readDrafts(user.userid);
     state.sessionId=readSessionId(user.userid);
-    $('operatorId').value=user.userid||'';
+    const display=employeeDisplayName(user);
+    $('operatorId').value=display;
+    $('operatorId').title=user.userid?`employee_id: ${user.userid}`:'';
     $('operatorId').readOnly=true;
-    document.querySelector('.pill.main').innerHTML=`${esc(user.employee_name||user.userid)}<span class="label-en">SIGNED IN</span>`;
+    document.querySelector('.pill.main').innerHTML=`${esc(display)}<span class="label-en">SIGNED IN</span>`;
     $('loginOverlay').classList.add('hidden');
+    $('loginOverlay').setAttribute('aria-hidden','true');
     try{localStorage.setItem('empv3:lastEmployeeId',user.userid||'')}catch{}
     loadRentConfig();
     loadTasks(false);
@@ -1996,11 +2023,13 @@ function applyEmployeeUser(user){
     state.rentConfig={};
     state.rentConfigLoaded=false;
     $('operatorId').value='';
+    $('operatorId').title='';
     $('operatorId').readOnly=false;
-    document.querySelector('.pill.main').innerHTML='🔐 v3录入';
+    document.querySelector('.pill.main').innerHTML='未登录<span class="label-en">SIGNED OUT</span>';
     try{localStorage.removeItem('empv3:user')}catch{}
     try{localStorage.removeItem('empv3:operator')}catch{}
-    $('loginOverlay').classList.remove('hidden');
+    $('loginOverlay').classList.add('hidden');
+    $('loginOverlay').setAttribute('aria-hidden','true');
   }
   refreshSessionViews();
 }
@@ -2012,8 +2041,7 @@ async function checkEmployeeSessionLegacyDisabled(){
     localStorage.removeItem('empv3:user');
   }catch{}
   applyEmployeeUser(null);
-  // 员工端按追责设计：刷新页面必须重新输入 PIN，不复用旧会话自动进入。
-  await apiFetch('/auth/logout',{method:'POST'}).catch(()=>{});
+  redirectToUnifiedLogin('employee_legacy_login_disabled');
 }
 async function employeeLogin(){
   const btn=$('btnEmployeeLogin');
@@ -3201,13 +3229,19 @@ async function checkEmployeeSession(){
     if(last)$('loginEmployeeId').value=last;
     localStorage.removeItem('empv3:user');
   }catch{}
-  applyEmployeeUser(null);
   $('loginOverlay').classList.add('hidden');
+  $('loginOverlay').setAttribute('aria-hidden','true');
   try{
     const me=await fetchCurrentAuthUser();
-    if(!me){$('loginOverlay').classList.remove('hidden');return}
+    if(!me){redirectToUnifiedLogin('employee_session_required');return}
     if(isEmployeeAuthRole(me.role)){
-      applyEmployeeUser({userid:me.userid,employee_name:me.employee_name||me.userid,role:me.role});
+      applyEmployeeUser({
+        userid:me.userid,
+        employee_name:me.employee_name||me.name||me.username||me.userid,
+        display_name:me.display_name||me.displayName||me.employee_name||me.name||me.username,
+        username:me.username,
+        role:me.role
+      });
       $('loginPin').value='';
       return;
     }
@@ -3215,11 +3249,10 @@ async function checkEmployeeSession(){
       location.replace('./index.html');
       return;
     }
-    $('loginHint').innerHTML='<span class="bad">This account role is not allowed on the employee entry page.</span>';
-    $('loginOverlay').classList.remove('hidden');
+    redirectToUnifiedLogin('employee_role_denied');
   }catch(e){
     console.warn('[UnifiedLogin] employee session handoff failed:',e);
-    $('loginOverlay').classList.remove('hidden');
+    redirectToUnifiedLogin('employee_session_check_failed');
   }
 }
 applyBilingualUI();

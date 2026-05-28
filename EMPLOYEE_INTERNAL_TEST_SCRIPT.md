@@ -42,6 +42,20 @@ production customer data in evidence.
 
 ## Visual Comparison Checks
 
+## Auth Routing Stabilization Retest
+
+| Test ID | Scenario                         | Steps                                                       | Expected Result                                                                                                        | Evidence Needed                        | Pass/Fail | Notes |
+| ------- | -------------------------------- | ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | -------------------------------------- | --------- | ----- |
+| EMP-017 | Employee unauthenticated routing | In a clean browser state, open `employee-v3.html`.          | Page routes to `unified-login.html`; the old PIN panel does not appear or flash.                                       | Short clip or timed screenshots.       |           |       |
+| EMP-018 | Employee identity display        | Sign in through unified login as an employee/staff account. | Header shows display name, username, or employee id such as `abdul`; it does not show role `staff` as the person name. | Header screenshot with secrets masked. |           |       |
+
+Additional stop conditions:
+
+| Condition                                                       | Required Response                                     |
+| --------------------------------------------------------------- | ----------------------------------------------------- |
+| Employee page shows old PIN login after unified routing         | Stop employee auth QA and open a P1 auth-routing bug. |
+| Employee visible identity is `staff` instead of account name/id | Open a P1 identity-display bug.                       |
+
 | Check                       | Expected Result                                                      | Notes                                                 |
 | --------------------------- | -------------------------------------------------------------------- | ----------------------------------------------------- |
 | Employee design baseline    | Employee page remains visually modern and unchanged in product feel. | Use as reference for owner UI comparison.             |

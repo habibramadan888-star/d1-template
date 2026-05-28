@@ -54,6 +54,23 @@ production customer data in evidence.
 
 ## Real Screenshot Retest
 
+## Auth Routing Stabilization Retest
+
+| Test ID | Scenario                      | Steps                                                               | Expected Result                                                                                           | Evidence Needed                      | Pass/Fail | Notes |
+| ------- | ----------------------------- | ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | ------------------------------------ | --------- | ----- |
+| OWN-028 | Owner unauthenticated routing | In a clean browser state, open `index.html`.                        | Page routes to `unified-login.html`; old owner password panel does not appear or flash.                   | Short clip or timed screenshots.     |           |       |
+| OWN-029 | Owner lock routing            | From an authenticated owner session, click the lock/logout control. | Session clears and the browser lands on `unified-login.html`; it does not show the old login panel.       | Screenshot after logout; no secrets. |           |       |
+| OWN-030 | Owner history first feedback  | Tap `历史` on mobile.                                               | Skeleton/loading appears quickly and recent records load first; no 30 second blank wait.                  | Timed screenshots or short clip.     |           |       |
+| OWN-031 | Owner network entry           | Open owner navigation.                                              | `网络` / WiFi control entry is visible or documented as manual-required; access remains permission-gated. | Navigation screenshot.               |           |       |
+
+Additional stop conditions:
+
+| Condition                                                 | Required Response                                                |
+| --------------------------------------------------------- | ---------------------------------------------------------------- |
+| Owner lock routes to an old login panel                   | Stop owner auth QA and open a P1 auth-routing bug.               |
+| Owner history has no visible feedback after 5 seconds     | Open a P1 UX/performance bug.                                    |
+| Owner network/WiFi entry is missing without documentation | Open a P2/P1 owner workflow bug depending on operational impact. |
+
 ## Owner UX Stabilization Retest
 
 | Test ID | Scenario                      | Steps                                          | Expected Result                                                                                                                                                | Evidence Needed                  | Pass/Fail | Notes |

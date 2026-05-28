@@ -2974,7 +2974,7 @@ async function handleRequest(request, env, ctx) {
       return json({ success: true, changed });
     }
     if (path === "/api/history") {
-      await empEnsureSchema(env);
+      if(!await empTableExists(env,"sessions"))return json([]);
       const includeVoided = url.searchParams.get("include_voided") === "1";
       const rawLimit = Number(url.searchParams.get("limit") || 0);
       const rawOffset = Number(url.searchParams.get("offset") || 0);
@@ -2993,7 +2993,6 @@ async function handleRequest(request, env, ctx) {
       return json(results);
     }
     if (path === "/api/session_detail" && method === "GET") {
-      await empEnsureSchema(env);
       const sid = cleanId(url.searchParams.get("id"));
       if (!sid) return json({ error: "bad_request" }, 400);
       if(!await empTableExists(env,"transactions"))return json([]);

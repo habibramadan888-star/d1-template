@@ -453,8 +453,23 @@ async function clearSession() {
   try {
     await requestJson("/auth/logout", { method: "POST" });
   } catch {}
-  localStorage.removeItem("homelink:cloud_token");
-  sessionStorage.removeItem("homelink:cloud_token");
+  [
+    "homelink:cloud_token",
+    "homelink:role",
+    "homelink:user",
+    "owner:role",
+    "owner:user",
+    "empv3:user",
+    "empv3:operator",
+    "empv3:lastEmployeeId",
+    "hl:wifi_accounts",
+    "hl:wifi_sessions",
+    "hl:wifi_blacklist",
+    "hl:wifi_config"
+  ].forEach((key) => {
+    localStorage.removeItem(key);
+    sessionStorage.removeItem(key);
+  });
   if (rememberAccount.checked) accountId.value = localStorage.getItem(REMEMBER_ACCOUNT_KEY) || accountId.value;
   else {
     localStorage.removeItem(REMEMBER_ACCOUNT_KEY);

@@ -7,7 +7,7 @@ test("owner mobile typography and spacing are compact enough for business use", 
 
   assert.match(
     html,
-    /\.owner-ui-unified \.nav-btn\{min-width:0!important;width:100%;height:58px;font-size:17px/
+    /\.owner-ui-unified \.nav-btn\{min-width:0!important;width:100%;height:58px;font-size:15px/
   );
   assert.match(html, /\.owner-ui-unified \.page-title\{font-size:28px\}/);
   assert.match(

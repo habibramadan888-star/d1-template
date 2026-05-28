@@ -30,8 +30,9 @@ test("clear session does not leak password", async () => {
   const html = await readFile(htmlPath, "utf8");
 
   assert.match(html, /async function clearSession\(\)/);
-  assert.match(html, /localStorage\.removeItem\("homelink:cloud_token"\)/);
-  assert.match(html, /sessionStorage\.removeItem\("homelink:cloud_token"\)/);
+  assert.match(html, /"homelink:cloud_token"/);
+  assert.match(html, /localStorage\.removeItem\(key\)/);
+  assert.match(html, /sessionStorage\.removeItem\(key\)/);
   assert.match(html, /secret\.value = ""/);
   assert.doesNotMatch(html, /localStorage\.setItem\([^)]*(password|pin|secret)/i);
 });

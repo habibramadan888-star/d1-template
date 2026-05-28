@@ -4,6 +4,25 @@ Generated: 2026-05-23, Asia/Dubai
 
 This file records the safety verification commands rerun during project status reconciliation. Commands were run without modifying business logic, production configuration, or production database data.
 
+## AUTH-ROUTING-STABILIZATION-001 Verification Addendum
+
+Date: 2026-05-29, Asia/Dubai
+
+| Verification            | Result | Evidence                                                                                                                        | Commercial Meaning                                                                           |
+| ----------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| Legacy login audit      | READY  | `AUTH_ROUTING_LEGACY_LOGIN_AUDIT.md`                                                                                            | Old owner/employee login paths and route loops are explicitly mapped.                        |
+| Single login routing    | READY  | `AUTH_ROUTING_SINGLE_LOGIN_ENTRY_FIX.md`; `tests/auth-single-entry-routing.spec.mjs`                                            | Role destinations no longer serve user-facing login entries when unauthenticated.            |
+| Logout routing          | READY  | `AUTH_LOGOUT_LOCK_ICON_FIX_RESULT.md`; `tests/logout-lock-icon-routing.spec.mjs`                                                | Lock/logout routes to unified login and clears legacy state.                                 |
+| Employee identity       | READY  | `EMPLOYEE_IDENTITY_DISPLAY_FIX_RESULT.md`; `tests/employee-identity-display.spec.mjs`                                           | Employee visible name no longer uses role `staff` as the person label.                       |
+| Owner network entry     | READY  | `OWNER_NETWORK_CONTROL_ENTRY_REVIEW.md`; `tests/owner-network-control-entry.spec.mjs`                                           | Owner network/WiFi entry is visible while backend access remains permission-gated.           |
+| Owner history loading   | READY  | `OWNER_HISTORY_30S_LOAD_DIAGNOSIS.md`; `OWNER_HISTORY_LOAD_TIME_FIX_RESULT.md`; `tests/owner-history-load-performance.spec.mjs` | History shows skeleton/retry and recent-row first loading instead of a 30 second blank wait. |
+| Legacy flash regression | READY  | `LEGACY_LOGIN_FLASH_AND_REDIRECT_LOOP_FIX.md`; `tests/legacy-login-flash-regression.spec.mjs`                                   | Old login UI should not flash during auth bootstrap.                                         |
+
+Production cutover remains `PRODUCTION_NO_GO`. No production migration, D1
+write, D1 export/import/execute, employee entry write, handover submit,
+void/delete, settings change, dashboard calculation change, financial formula
+change, business write flow change, or commercial launch GO occurred.
+
 ## OWNER-UX-STABILIZATION-001 Verification Addendum
 
 Date: 2026-05-28, Asia/Dubai
@@ -1538,6 +1557,32 @@ No production deploy, production migration, production D1 write, production URL
 call, remote staging flag write, staging D1 write, dashboard live switch, live
 financial formula change, legacy `CORPID` removal, or secret exposure occurred.
 P0-006 remains Partial and production remains NO-GO.
+
+## AUTH-ROUTING-STABILIZATION-001 Verification Addendum
+
+Date: 2026-05-29, Asia/Dubai
+
+| Check                                  | Run? | Result                           | Evidence                                          | Notes                                                              |
+| -------------------------------------- | ---- | -------------------------------- | ------------------------------------------------- | ------------------------------------------------------------------ |
+| `npm run format:check`                 | yes  | PASS                             | CLI output                                        | Formatting passed.                                                 |
+| `npm run check`                        | yes  | PASS                             | CLI output                                        | 533 tests passed; Worker build was dry-run only.                   |
+| `npm run security:secrets`             | yes  | PASS                             | CLI output                                        | Secret hygiene passed.                                             |
+| `npm run gate:commercial-launch`       | yes  | `PRODUCTION_NO_GO`               | CLI output                                        | Production cutover remains blocked.                                |
+| Auth single-entry tests                | yes  | PASS                             | `tests/auth-single-entry-routing.spec.mjs`        | Unauthenticated business pages redirect to unified login.          |
+| Logout routing tests                   | yes  | PASS                             | `tests/logout-lock-icon-routing.spec.mjs`         | Lock/logout routes to unified login and clears legacy auth caches. |
+| Employee identity tests                | yes  | PASS                             | `tests/employee-identity-display.spec.mjs`        | Employee display prefers name/user id over role `staff`.           |
+| Owner network entry tests              | yes  | PASS                             | `tests/owner-network-control-entry.spec.mjs`      | Network control entry is present in owner shell.                   |
+| Owner history performance tests        | yes  | PASS                             | `tests/owner-history-load-performance.spec.mjs`   | History shows skeleton and limits first load.                      |
+| Legacy login flash tests               | yes  | PASS                             | `tests/legacy-login-flash-regression.spec.mjs`    | Old owner/employee login UI does not flash before auth.            |
+| Unified login/session/auth guard tests | yes  | PASS                             | CLI output                                        | Existing unified login gates remain passing.                       |
+| `npm run qa:employee-entry-staging`    | yes  | `MANUAL_REQUIRED / DRY_RUN_ONLY` | CLI output                                        | No write confirmation flags supplied.                              |
+| Deploy                                 | yes  | PASS                             | `AUTH_ROUTING_STABILIZATION_DEPLOY_RESULT.md`     | Static/auth routing assets deployed to `homelink-finance`.         |
+| Live read-only smoke                   | yes  | PASS                             | `AUTH_ROUTING_STABILIZATION_LIVE_SMOKE_RESULT.md` | No real credential login and no business write performed.          |
+
+No production D1 write, production migration, D1 export/import/execute,
+employee entry write, handover submit, void/delete, settings change, dashboard
+calculation change, financial formula change, secret exposure, commercial
+launch GO, or production cutover occurred.
 
 ## P0-006M Verification Addendum
 
