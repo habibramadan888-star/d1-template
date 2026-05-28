@@ -104,6 +104,22 @@ P1 UX bug. If owner shows a second login flash, record it as a P1 UX bug. If
 mobile layout is broken or cramped, record it as P1/P2 depending on whether the
 main flow is blocked.
 
+## Owner Mobile Navigation Expectation
+
+After UI-UNIFICATION-003, owner mobile QA must confirm:
+
+| Area                 | Expected Result                                                                                            |
+| -------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Primary navigation   | The owner primary nav does not show `录入` as a main tab.                                                  |
+| Control panel button | The control panel button uses stable SVG/text and must not display garbled icon text.                      |
+| Right-side controls  | Role badge, control panel, and logout icon remain inside the mobile viewport.                              |
+| Client credit page   | Search, filter, refresh button, legend, and cards use the same design-system feel as employee cards/forms. |
+| Write boundary       | Complete write testing still needs separate approval; this is visual/read-only QA guidance only.           |
+
+If the owner topbar is clipped, garbled, or visually older than the employee
+page, record it as a P1 UX bug. If only a deep secondary panel is less polished
+but the main flow remains usable, record it as P2 unless it blocks testing.
+
 ## Stop Immediately If
 
 | Condition                                                                 | Action                                                  |

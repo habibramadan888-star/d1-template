@@ -924,9 +924,14 @@ body::before{
 .owner-ui-unified .container{width:min(var(--container-max),calc(100vw - 40px));padding:34px 0 92px}
 .owner-ui-unified .brand-icon{width:48px;height:48px;border-radius:14px;box-shadow:var(--shadow-sm)}
 .owner-ui-unified .brand-name{font-size:24px;font-weight:850;letter-spacing:-.035em}
+.owner-ui-unified .brand{min-width:0}
+.owner-ui-unified .topbar-right{min-width:0;flex-shrink:1}
+.owner-ui-unified .owner-dashboard-btn{gap:8px}
+.owner-ui-unified .owner-dashboard-btn .btn-label{display:inline-block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .owner-ui-unified .nav{gap:10px;padding:6px;border-radius:22px;background:rgba(255,255,255,.64);border:1px solid rgba(255,255,255,.72)}
 .owner-ui-unified .nav-btn{min-height:58px;border-radius:18px;font-size:18px;font-weight:760}
 .owner-ui-unified .nav-btn.active{background:linear-gradient(180deg,#20bf6b 0%,var(--color-primary-hover) 100%);box-shadow:0 18px 40px rgba(9,166,79,.24),inset 0 1px 0 rgba(255,255,255,.25)}
+.owner-ui-unified .owner-admin-tool{flex:0 0 auto;min-height:58px;border-radius:18px;border:1px solid rgba(255,255,255,.72);padding:0 16px;background:rgba(255,255,255,.58);color:var(--color-text-secondary);font-weight:var(--font-weight-bold);box-shadow:var(--shadow-sm);cursor:pointer}
 .owner-ui-unified .card,
 .owner-ui-unified .hist-card,
 .owner-ui-unified .hist-month,
@@ -1012,11 +1017,36 @@ body::before{
 .owner-ui-unified .lock-card{max-width:420px;border-radius:34px;padding:34px}
 .owner-ui-unified .table-wrap{border-radius:var(--radius-lg)}
 .owner-ui-unified .tx-table thead th{background:rgba(255,255,255,.72);font-size:var(--font-size-xs);color:var(--color-text-muted)}
+.owner-ui-unified .cc-summary{display:grid!important;grid-template-columns:repeat(auto-fit,minmax(128px,1fr));gap:10px;margin-bottom:14px!important}
+.owner-ui-unified .cc-toolbar{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(132px,180px) auto;gap:10px;margin-bottom:12px!important;padding:12px;border-radius:var(--radius-lg);background:rgba(255,255,255,.56);border:1px solid rgba(255,255,255,.72)}
+.owner-ui-unified .cc-search-wrap{position:relative;min-width:0}
+.owner-ui-unified .cc-search-icon{position:absolute;left:14px;top:50%;transform:translateY(-50%);width:15px;height:15px;color:var(--color-text-muted);pointer-events:none}
+.owner-ui-unified .cc-search-input{padding-left:42px!important}
+.owner-ui-unified .cc-filter-select{width:100%}
+.owner-ui-unified .cc-refresh-btn{white-space:nowrap}
+.owner-ui-unified .cc-legend{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center;padding:10px 12px;border-radius:var(--radius-md);background:rgba(255,255,255,.5);border:1px solid rgba(255,255,255,.68)}
+.owner-ui-unified .cc-legend-title{font-size:var(--font-size-xs);font-weight:var(--font-weight-bold);color:var(--color-text-muted)}
+.owner-ui-unified .cc-legend-item{display:inline-flex;align-items:center;gap:5px;padding:5px 8px;border-radius:999px;background:rgba(255,255,255,.7);border:1px solid rgba(203,213,225,.46);font-size:var(--font-size-xs);color:var(--color-text-secondary);font-weight:var(--font-weight-semibold)}
+.owner-ui-unified #ccCards{display:grid;gap:12px}
+.owner-ui-unified .cc-card{margin-bottom:0;border-radius:var(--radius-lg)!important}
+.owner-ui-unified .cc-card-head{padding:18px}
+.owner-ui-unified .cc-badge{border-radius:999px;padding:3px 8px;font-size:var(--font-size-xs);font-weight:var(--font-weight-bold)}
 @media(max-width:720px){
-  .owner-ui-unified .topbar-row1{padding:14px 16px 8px}
+  .owner-ui-unified .topbar{overflow:hidden}
+  .owner-ui-unified .topbar-row1{display:grid;grid-template-columns:minmax(0,1fr) auto;padding:14px 14px 8px;gap:10px}
   .owner-ui-unified .topbar-row2{padding:6px 16px 14px}
+  .owner-ui-unified .brand-icon{width:42px;height:42px;border-radius:13px}
+  .owner-ui-unified .brand-name{font-size:22px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .owner-ui-unified .topbar-right{justify-content:flex-end;gap:6px;max-width:100%;overflow:hidden}
+  .owner-ui-unified .role-badge{max-width:58px;overflow:hidden;text-overflow:ellipsis}
+  .owner-ui-unified .owner-dashboard-btn{max-width:118px;min-height:44px!important;padding:9px 10px!important;font-size:12px!important;border-radius:14px!important}
+  .owner-ui-unified .topbar-right .btn-ghost{min-width:44px;min-height:44px!important;padding:9px!important;border-radius:14px!important}
   .owner-ui-unified .container{width:100%;padding:18px 14px 72px}
-  .owner-ui-unified .nav-btn{min-width:108px;height:58px;font-size:18px}
+  .owner-ui-unified .topbar-row2{overflow:hidden}
+  .owner-ui-unified .nav{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));width:100%;min-width:0;gap:6px;padding:5px;border-radius:20px;overflow:hidden}
+  .owner-ui-unified .nav-btn{min-width:0!important;width:100%;height:58px;font-size:16px;padding:7px 4px;line-height:1.05}
+  .owner-ui-unified .nav-btn .ico{width:16px;height:16px}
+  .owner-ui-unified .owner-admin-tool{display:none}
   .owner-ui-unified .card{border-radius:26px}
   .owner-ui-unified .card-head,.owner-ui-unified .card-body{padding:18px}
   .owner-ui-unified .kpi-strip{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
@@ -1026,6 +1056,10 @@ body::before{
   .owner-ui-unified .form-row{grid-template-columns:1fr}
   .owner-ui-unified .inp,.owner-ui-unified .sel,.owner-ui-unified .ta{font-size:16px}
   .owner-ui-unified .tx-table{min-width:620px}
+  .owner-ui-unified .cc-toolbar{grid-template-columns:1fr;padding:12px;gap:9px}
+  .owner-ui-unified .cc-summary{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .owner-ui-unified .cc-legend{gap:6px}
+  .owner-ui-unified .cc-legend-item{font-size:10px}
 }
 </style>
 </head>
@@ -1041,6 +1075,7 @@ body::before{
 <symbol id="i-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></symbol>
 <symbol id="i-download" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></symbol>
 <symbol id="i-upload" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></symbol>
+<symbol id="i-refresh" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 1-15.5 6.3L3 16"/><path d="M3 21v-5h5"/><path d="M3 12a9 9 0 0 1 15.5-6.3L21 8"/><path d="M21 3v5h-5"/></symbol>
 <symbol id="i-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></symbol>
 <symbol id="i-paste" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></symbol>
 <symbol id="i-cal" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></symbol>
@@ -1101,19 +1136,19 @@ body::before{
     </div>
     <div class="topbar-right">
       <span class="role-badge" id="roleBadge"></span>
-      <button class="btn btn-primary" id="btnDashboard" style="padding:6px 12px;font-size:12px;display:none" onclick="openPanel()">🔐 控制面板</button>
+      <button class="btn btn-primary owner-dashboard-btn" id="btnDashboard" style="display:none" onclick="openPanel()" aria-label="打开控制面板"><svg class="ico"><use href="#i-chart"/></svg><span class="btn-label">控制台</span></button>
       <button class="btn btn-ghost" style="padding:6px 10px;font-size:12px" onclick="logout()" title="退出登录"><svg class="ico"><use href="#i-lock"/></svg></button>
     </div>
   </div>
   <!-- Row 2: Nav tabs full width -->
   <div class="topbar-row2">
     <nav class="nav" id="navTabs">
-      <button class="nav-btn active" data-view="entry"><svg class="ico"><use href="#i-edit"/></svg>录入<span class="en-sub">ENTRY</span></button>
+      <button class="nav-btn active" data-view="analysis" id="navAnalysis"><svg class="ico"><use href="#i-chart"/></svg>总览<span class="en-sub">OVERVIEW</span></button>
       <button class="nav-btn" data-view="history" id="navHistory"><svg class="ico"><use href="#i-history"/></svg>历史<span class="en-sub">HISTORY</span></button>
-      <button class="nav-btn" data-view="analysis" id="navAnalysis"><svg class="ico"><use href="#i-chart"/></svg>分析<span class="en-sub">ANALYSIS</span></button>
       <button class="nav-btn locked" data-view="clients" id="navClients"><svg class="ico"><use href="#i-users"/></svg>客户<span class="en-sub">CLIENTS</span></button>
-      <button class="nav-btn locked" data-view="wifi" id="navWifi"><svg class="ico"><use href="#i-spark"/></svg>WiFi<span class="en-sub">NETWORK</span></button>
+      <button class="nav-btn locked" data-view="wifi" id="navWifi"><svg class="ico"><use href="#i-spark"/></svg>网络<span class="en-sub">TOOLS</span></button>
     </nav>
+    <button class="owner-admin-tool" id="ownerEntryTool" type="button" title="管理工具：老板代录入入口">管理工具</button>
   </div>
 </header>
 
@@ -1121,7 +1156,7 @@ body::before{
 
 <main class="container hl-shell" id="mainApp" style="display:none">
   <!-- ENTRY -->
-  <section id="view-entry" class="view">
+  <section id="view-entry" class="view hidden">
     <div class="kpi-strip" id="summaryGrid"></div>
     <!-- 欠款提醒面板 -->
     <div id="arrearsPanel"></div>
@@ -1246,7 +1281,7 @@ body::before{
   </section>
 
   <!-- ANALYSIS -->
-  <section id="view-analysis" class="view hidden">
+  <section id="view-analysis" class="view">
     <div class="page-title">阶段性分析<span class="en-sub" style="font-size:12px;letter-spacing:0.08em;margin-top:3px">PERIOD ANALYSIS</span></div>
     <div class="page-sub">导入 TXT 锚点文档 · 选择时间段 · 生成报告</div>
 
@@ -1325,14 +1360,14 @@ body::before{
     <div id="billingWidget2" style="margin-bottom:14px"></div>
     <div id="clientContinuityPanel" style="margin-bottom:14px"></div>
     <!-- 汇总 -->
-    <div id="ccSummary" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px"></div>
+    <div id="ccSummary" class="cc-summary"></div>
     <!-- 筛选 + 添加 -->
-    <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
-      <div style="position:relative;flex:1;min-width:160px">
-        <svg style="position:absolute;left:9px;top:50%;transform:translateY(-50%);width:13px;height:13px;color:var(--text3)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input id="ccSearch" placeholder="搜索姓名/房间号" style="width:100%;padding:8px 10px 8px 28px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);font-size:13px;font-family:inherit;box-sizing:border-box" oninput="ccRender()">
+    <div class="cc-toolbar">
+      <div class="cc-search-wrap">
+        <svg class="cc-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input id="ccSearch" class="inp hl-input cc-search-input" placeholder="搜索姓名/房间号" oninput="ccRender()">
       </div>
-      <select id="ccFilter" style="padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);font-size:12px;font-family:inherit" onchange="ccRender()">
+      <select id="ccFilter" class="sel hl-select cc-filter-select" onchange="ccRender()">
         <option value="all">全部客户</option>
         <option value="excellent">🌟 优质</option>
         <option value="good">✅ 良好</option>
@@ -1341,16 +1376,16 @@ body::before{
         <option value="bad">🚨 高风险</option>
         <option value="new">🆕 新客户</option>
       </select>
-      <button class="btn btn-ghost" style="padding:8px 14px;font-size:12px;white-space:nowrap" onclick="ccRender(true)">🔄 刷新</button>
+      <button class="btn btn-ghost hl-button hl-button-secondary cc-refresh-btn" onclick="ccRender(true)"><svg class="ico"><use href="#i-refresh"/></svg>刷新</button>
     </div>
     <!-- 图例 -->
-    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;align-items:center">
-      <span style="font-size:10px;color:var(--text3)">图例：</span>
-      <div style="display:flex;align-items:center;gap:3px"><div class="cc-dot" style="background:#c8d0d8"></div><span style="font-size:10px;color:var(--text3)">准时/容忍内</span></div>
-      <div style="display:flex;align-items:center;gap:3px"><div class="cc-dot" style="background:#c8b800"></div><span style="font-size:10px;color:var(--text3)">逾期≤7天</span></div>
-      <div style="display:flex;align-items:center;gap:3px"><div class="cc-dot" style="background:#e06c00"></div><span style="font-size:10px;color:var(--text3)">逾期8-14天</span></div>
-      <div style="display:flex;align-items:center;gap:3px"><div class="cc-dot" style="background:#d93025"></div><span style="font-size:10px;color:var(--text3)">逾期&gt;14天</span></div>
-      <div style="display:flex;align-items:center;gap:3px"><div class="cc-dot" style="background:#1a8a4a"></div><span style="font-size:10px;color:var(--text3)">提前支付</span></div>
+    <div class="cc-legend">
+      <span class="cc-legend-title">图例</span>
+      <div class="cc-legend-item"><div class="cc-dot" style="background:#c8d0d8"></div><span>准时/容忍内</span></div>
+      <div class="cc-legend-item"><div class="cc-dot" style="background:#c8b800"></div><span>逾期≤7天</span></div>
+      <div class="cc-legend-item"><div class="cc-dot" style="background:#e06c00"></div><span>逾期8-14天</span></div>
+      <div class="cc-legend-item"><div class="cc-dot" style="background:#d93025"></div><span>逾期&gt;14天</span></div>
+      <div class="cc-legend-item"><div class="cc-dot" style="background:#1a8a4a"></div><span>提前支付</span></div>
     </div>
     <!-- 客户卡片 -->
     <div id="ccCards"></div>

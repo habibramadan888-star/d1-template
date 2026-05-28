@@ -7,6 +7,41 @@ Production deploy: unified-login static route/session handoff deploys executed
 under explicit approval; no commercial cutover.
 Production database mutation: not executed
 
+## UI-UNIFICATION-003 Owner Mobile UI Pass 2
+
+Date: 2026-05-28, Asia/Dubai
+
+Scope: screenshot-driven owner mobile UI/navigation/client-credit alignment. No
+production migration, production D1 write, D1 export/import/execute, employee
+entry write, handover submit, void/delete, settings change, dashboard
+calculation change, financial formula change, commercial launch GO, or
+production cutover was approved by this task.
+
+Completed:
+
+- Replaced the owner topbar `🔐 控制面板` emoji with stable SVG/text `控制台`.
+- Constrained owner mobile topbar/brand/right controls to prevent viewport
+  overflow.
+- Removed owner primary nav `录入 / ENTRY`; owner primary nav now starts at
+  `总览 / OVERVIEW`.
+- Demoted legacy owner proxy-entry access to a desktop-only `管理工具` secondary
+  control without changing write logic.
+- Updated the owner client credit page search, filter, refresh, legend, and card
+  spacing to use shared UI tokens/classes.
+- Added owner mobile nav, navigation IA, and client credit UI tests.
+
+Result:
+
+- Owner topbar garbled icon risk: fixed in static assets.
+- Owner right-side mobile overflow risk: fixed at CSS contract level.
+- Owner main nav `录入`: removed.
+- Employee entry flow: unchanged.
+- Production D1 write: no.
+- Production migration: no.
+- Dashboard calculation change: no.
+- Financial formula change: no.
+- Production cutover: `PRODUCTION_NO_GO`.
+
 ## UI-UNIFICATION-NIGHT-001 Owner / Employee Design System
 
 Date: 2026-05-28, Asia/Dubai

@@ -100,14 +100,14 @@ function showOwnerAppShell(appRole){
   const badge=document.getElementById('roleBadge');
   const isManager=appRole==='manager';
   if(isManager){
-    badge.textContent='鑰佹澘';
+    badge.textContent='老板';
     badge.className='role-badge manager';
     document.getElementById('navHistory')?.classList.remove('locked');
     document.getElementById('navAnalysis')?.classList.remove('locked');
     document.getElementById('navClients')?.classList.remove('locked');
     document.getElementById('navWifi')?.classList.remove('locked');
   }else{
-    badge.textContent='鍛樺伐';
+    badge.textContent='员工';
     badge.className='role-badge staff';
     document.getElementById('navHistory')?.classList.add('locked');
     document.getElementById('navAnalysis')?.classList.add('locked');
@@ -266,16 +266,16 @@ async function submitCode(){
     }
     const db=document.getElementById('btnDashboard');
     if(db) db.style.display=isMgr?'':'none';
-    try{renderEntryView();}catch(e2){console.error('[Login] renderEntryView:', e2);}
+    try{switchView(isMgr?'analysis':'entry');}catch(e2){console.error('[Login] initial switchView:', e2);}
   }
 }
 async function enterAs(r){
   role=toOwnerSpaRole(r);
   showOwnerAppShell(role);
-  try{renderEntryView();}catch(e){console.error('[OwnerBootstrap] initial shell render failed:',e);}
+  try{switchView(role==='manager'?'analysis':'entry');}catch(e){console.error('[OwnerBootstrap] initial shell render failed:',e);}
   try{
     await loadAll();
-    renderEntryView();
+    switchView(role==='manager'?'analysis':'entry');
   }catch(e){
     console.error('[OwnerBootstrap] data load failed:', e);
     toast('Some dashboard data failed to load. Refresh and try again.','err');
@@ -589,7 +589,7 @@ function totals(entries){
 
 /* ── STATE ── */
 const state={
-  view:'entry',session:{id:newId(),date:fmtDT(new Date()),entries:[]},saved:[],
+  view:'analysis',session:{id:newId(),date:fmtDT(new Date()),entries:[]},saved:[],
   activeCat:'cash',formTag:'Old',formPayType:null,
   analysisSessions:[],
   dateMode:'all',month:(()=>{const d=new Date();return `${d.getFullYear()}-${pad(d.getMonth()+1)}`;})(),
@@ -4592,6 +4592,8 @@ function bindEvents(){
   }
   const dashboardBtn=document.getElementById('btnDashboard');
   if(dashboardBtn)dashboardBtn.addEventListener('click',e=>{e.preventDefault();openPanel();});
+  const ownerEntryTool=document.getElementById('ownerEntryTool');
+  if(ownerEntryTool)ownerEntryTool.addEventListener('click',e=>{e.preventDefault();switchView('entry');});
   document.querySelector('.topbar-right .btn-ghost')?.addEventListener('click',e=>{e.preventDefault();logout();});
   document.getElementById('navTabs').addEventListener('click',e=>{const b=e.target.closest('.nav-btn');if(b)switchView(b.dataset.view);});
   document.getElementById('catTabs').addEventListener('click',e=>{const b=e.target.closest('.cat-tab');if(b){state.activeCat=b.dataset.cat;state.formPayType=null;state.formTag='Old';document.querySelectorAll('#entryForm .tag-btn').forEach(x=>x.classList.toggle('active',x.dataset.tag==='Old'));renderCatTabs();}});

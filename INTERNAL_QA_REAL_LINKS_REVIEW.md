@@ -128,3 +128,21 @@ The owner/boss destination remains:
 Do not treat these links as approval for production D1 writes, production
 migration, production deploy, dashboard authority switch, public beta, or
 commercial launch.
+
+## UI-UNIFICATION-003 Link QA Notes
+
+The owner destination remains:
+
+`https://homelink-finance.habibramadan888.workers.dev/index.html`
+
+Expected owner mobile behavior after the next static UI deploy:
+
+| Area          | Expected Result                                                                      |
+| ------------- | ------------------------------------------------------------------------------------ |
+| Primary nav   | No main `录入` tab; owner sees owner-oriented navigation.                            |
+| Control panel | Control panel button uses SVG/text and does not show emoji fallback or garbled text. |
+| Mobile width  | Right-side topbar controls stay inside the viewport.                                 |
+| Client credit | Search/filter/refresh/card surfaces use shared design-system styling.                |
+
+The current link is still bound to `DB = homelink`; do not run write QA without
+separate explicit approval.
