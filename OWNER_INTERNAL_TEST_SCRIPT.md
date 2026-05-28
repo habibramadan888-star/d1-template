@@ -54,6 +54,15 @@ production customer data in evidence.
 
 ## Real Screenshot Retest
 
+## Owner UX Stabilization Retest
+
+| Test ID | Scenario                      | Steps                                          | Expected Result                                                                                                                                                | Evidence Needed                  | Pass/Fail | Notes |
+| ------- | ----------------------------- | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- | --------- | ----- |
+| OWN-024 | Owner topbar simplified       | Open owner mobile view and inspect the topbar. | No visible `老板` badge; role permissions still work through server session.                                                                                   | Mobile topbar screenshot.        |           |       |
+| OWN-025 | Owner overview business value | Open owner 总览 on mobile.                     | Overview shows today's received amount, outstanding amount, pending work signal, recent handover/alerts, recent flow, and quick links where data is available. | Mobile overview screenshot.      |           |       |
+| OWN-026 | Owner history performance     | Tap 历史 on mobile.                            | Skeleton or loading feedback appears quickly, then recent history rows load first; no 15-20 second blank screen.                                               | Short clip or timed screenshots. |           |       |
+| OWN-027 | Owner mobile density          | Review 总览, 历史, 分析, 客户 on mobile.       | Typography/card/nav spacing is compact enough to show useful content without losing readability.                                                               | Mobile screenshots.              |           |       |
+
 | Test ID | Scenario                     | Steps                                                   | Expected Result                                                                                     | Evidence Needed             | Pass/Fail | Notes |
 | ------- | ---------------------------- | ------------------------------------------------------- | --------------------------------------------------------------------------------------------------- | --------------------------- | --------- | ----- |
 | OWN-023 | Owner entry block regression | Open owner homepage/default view on mobile after login. | Owner homepage does not show `添加记录 ADD ENTRY`, `现金收款`, or `银行转账` primary entry buttons. | Mobile homepage screenshot. |           |       |

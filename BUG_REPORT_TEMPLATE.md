@@ -52,3 +52,13 @@ Use these expected results when reporting unified-login bugs:
 | Browser back to unified-login while signed in | Page shows signed-in panel with Continue and Clear session choices; no automatic loop.      |
 | Employee login after unified-login route      | Employee destination should not ask for a second PIN if `/api/me` confirms employee/staff.  |
 | Any successful live login smoke               | Requires separate approval because it can write production D1 `active_sessions`.            |
+
+## Owner UX Stabilization Bug Notes
+
+| Scenario                                        | Suggested Severity | Expected Result                                                                                                          |
+| ----------------------------------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------ |
+| Login remembers password / PIN                  | P0                 | App may remember only username / account. Password storage by app code is forbidden.                                     |
+| Owner topbar still shows `老板` badge           | P2                 | Badge should be removed; server session remains the authority.                                                           |
+| Owner overview gives no business decision value | P1/P2              | Overview should show today's receipts, outstanding amount, pending items, handover/alerts, recent flow, and quick links. |
+| Owner history has 15-20 second blank load       | P1                 | History should show loading skeleton quickly and load recent rows first.                                                 |
+| Owner mobile typography/cards are too large     | P1/P2              | Mobile owner pages should increase useful information density while remaining readable.                                  |

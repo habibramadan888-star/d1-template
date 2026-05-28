@@ -26,6 +26,7 @@ const ARREARS_KEY='apt:arrears';
 const CUSTOMER_KEY='apt:customers';
 const CC_GRACE=3;
 const DEFAULT_PRICES=[600,650,700,750];
+const HISTORY_PAGE_SIZE=20;
 
 /* ── CLOUD AUTH ── */
 /* window.authToken 已移除：Token 存于 httpOnly Cookie，JS 不可读取 */
@@ -100,17 +101,14 @@ function showOwnerAppShell(appRole){
   document.getElementById('mainApp').style.display='block';
   document.getElementById('footerEl').style.display='block';
   const badge=document.getElementById('roleBadge');
+  if(badge){badge.textContent='';badge.hidden=true;badge.setAttribute('aria-hidden','true');}
   const isManager=appRole==='manager';
   if(isManager){
-    badge.textContent='老板';
-    badge.className='role-badge manager';
     document.getElementById('navOverview')?.classList.remove('locked');
     document.getElementById('navHistory')?.classList.remove('locked');
     document.getElementById('navAnalysis')?.classList.remove('locked');
     document.getElementById('navClients')?.classList.remove('locked');
   }else{
-    badge.textContent='员工';
-    badge.className='role-badge staff';
     document.getElementById('navOverview')?.classList.add('locked');
     document.getElementById('navHistory')?.classList.add('locked');
     document.getElementById('navAnalysis')?.classList.add('locked');
@@ -258,8 +256,7 @@ async function submitCode(){
     document.getElementById('footerEl').style.display='block';
     const badge=document.getElementById('roleBadge');
     const isMgr=isOwnerShellRole();
-    badge.textContent=isMgr?'老板':'员工';
-    badge.className='role-badge '+(isMgr?'manager':'staff');
+    if(badge){badge.textContent='';badge.hidden=true;badge.setAttribute('aria-hidden','true');}
     if(isMgr){
       document.getElementById('navOverview')?.classList.remove('locked');
       document.getElementById('navHistory')?.classList.remove('locked');
@@ -595,7 +592,7 @@ const state={
   activeCat:'cash',formTag:'Old',formPayType:null,
   analysisSessions:[],
   dateMode:'all',month:(()=>{const d=new Date();return `${d.getFullYear()}-${pad(d.getMonth()+1)}`;})(),
-  from:'',to:'',txCatFilter:'all',txSearch:'',historyViewing:null,
+  from:'',to:'',txCatFilter:'all',txSearch:'',historyViewing:null,historyLimit:HISTORY_PAGE_SIZE,
   arrears:[], // [{id,room,roomTo?,totalRent,paid,remain,dueDate,sessionId,cleared}]
   presetPrices:DEFAULT_PRICES,
   customers:[],
@@ -1538,11 +1535,17 @@ async function renderHistory(){
     return;
   }
 
-  // 会话列表：云端 + 本地合并
-  wrap.innerHTML='<div style="text-align:center;padding:40px;color:var(--text3)">正在加载...</div>';
+  // 会话列表：云端 + 本地合并。先显示骨架，避免历史页 15-20 秒空白。
+  const limit=state.historyLimit||HISTORY_PAGE_SIZE;
+  wrap.innerHTML=`<div class="owner-history-skeleton history-skeleton card" style="padding:18px">
+    <div class="hist-toolbar"><span>正在加载最近 ${limit} 条历史...</span><span class="hist-order">LOADING</span></div>
+    <div class="hist-grid">
+      ${Array.from({length:Math.min(6,limit)}).map(()=>'<div class="hist-card skeleton-card" style="min-height:118px;background:linear-gradient(90deg,rgba(255,255,255,.58),rgba(226,239,233,.72),rgba(255,255,255,.58));background-size:220% 100%;animation:pulse 1.2s ease-in-out infinite"></div>').join('')}
+    </div>
+  </div>`;
   let cloud=[];
   try{
-    const r=await apiFetch('/api/history');
+    const r=await apiFetch(`/api/history?limit=${encodeURIComponent(limit)}`);
     if(r.status===401){showAuthExpired();wrap.innerHTML='<div class="card" style="padding:24px;text-align:center;color:var(--red)">登录已过期，请重新登录后查看历史</div>';return;}
     if(r.ok)cloud=await r.json();
     else{wrap.innerHTML=`<div class="card" style="padding:24px;text-align:center;color:var(--red)">历史记录加载失败：${r.status}</div>`;return;}
@@ -1555,7 +1558,8 @@ async function renderHistory(){
   const all=[
     ...cloud.map(s=>({id:s.id,date:s.date,anchorId:s.anchor_id,entries:[],entriesCount:s.entries_count,_cloud:true,createdBy:s.created_by||''})),
     ...localOnly
-  ].sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+  ].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  const hasMoreCloud=cloud.length>=limit;
 
   const monthKey=s=>{
     const d=(s.date||'').slice(0,10);
@@ -1572,10 +1576,10 @@ async function renderHistory(){
   const groups=[...monthMap.entries()].sort(([a],[b])=>{
     if(a==='unknown')return 1;
     if(b==='unknown')return -1;
-    return a.localeCompare(b);
+     return b.localeCompare(a);
   });
 
-  document.getElementById('historyCount').textContent=`流水档案 · 共 ${all.length} 条 · ${groups.length} 个月 · 旧 → 新`;
+  document.getElementById('historyCount').textContent=`流水档案 · 已加载最近 ${all.length} 条 · ${groups.length} 个月 · 新 → 旧`;
   if(!all.length){wrap.innerHTML=`<div class="empty-state card" style="padding:44px"><div class="empty-ico">📄</div><div class="empty-title">还没有保存过会话</div><div class="empty-text">录入记录后点击"导出交接"即可保存</div></div>`;return;}
 
   const cardHtml=s=>{
@@ -1598,7 +1602,7 @@ async function renderHistory(){
       </div>
     </div>`;
   };
-  wrap.innerHTML=`<div class="hist-toolbar"><span>按月份归类，日期从旧到新</span><span class="hist-order">ORDER · ASC</span></div>`+
+  wrap.innerHTML=`<div class="hist-toolbar"><span>按月份归类，优先显示最近记录</span><span class="hist-order">RECENT · FIRST</span></div>`+
     groups.map(([key,items],idx)=>{
       const totalEntries=items.reduce((sum,s)=>sum+(s.entries?s.entries.length:(s.entriesCount||0)),0);
       const from=(items[0]?.date||'').slice(0,10)||'--';
@@ -1618,7 +1622,8 @@ async function renderHistory(){
           <div class="hist-grid">${items.map(cardHtml).join('')}</div>
         </div>
       </section>`;
-    }).join('');
+    }).join('')+
+    (hasMoreCloud?`<button class="btn btn-primary btn-block" id="btnHistoryLoadMore" type="button" style="margin-top:14px">加载更多历史</button>`:'');
 
   wrap.querySelectorAll('[data-month-toggle]').forEach(btn=>{
     btn.addEventListener('click',()=>{
@@ -1651,6 +1656,8 @@ async function renderHistory(){
       }else if(a.dataset.act==='view'){state.historyViewing=s;renderHistory();}
     });
   });
+  const more=document.getElementById('btnHistoryLoadMore');
+  if(more)more.onclick=()=>{state.historyLimit=(state.historyLimit||HISTORY_PAGE_SIZE)+HISTORY_PAGE_SIZE;renderHistory();};
 }
 
 /* ── ANALYSIS ── */
@@ -3415,10 +3422,14 @@ function renderOwnerOverview(){
   const wrap=document.getElementById('ownerOverviewContent');
   if(!wrap)return;
   const sessions=state.analysisSessions&&state.analysisSessions.length?state.analysisSessions:state.saved;
-  const entries=sessions.flatMap(s=>Array.isArray(s.entries)?s.entries:[]);
-  const t=totals(entries);
+  const today=(fmtDT(new Date())||'').slice(0,10);
+  const entries=sessions.flatMap(s=>Array.isArray(s.entries)?s.entries.map(e=>({...e,_sessionDate:s.date,_sessionId:s.id,_anchorId:s.anchorId})):[]);
+  const todayEntries=sessions.filter(s=>(s.date||'').slice(0,10)===today).flatMap(s=>Array.isArray(s.entries)?s.entries:[]);
+  const todayTotals=totals(todayEntries);
   const openArrears=(state.arrears||[]).filter(a=>!a.cleared);
+  const overdue=openArrears.filter(a=>a.dueDate&&a.dueDate<today);
   const latest=sessions.slice().sort((a,b)=>(b.date||'').localeCompare(a.date||'')).slice(0,3);
+  const recentEntries=entries.slice().reverse().slice(0,4);
   const kpi=(label,en,value,color='var(--color-primary)',note='')=>`
     <div class="owner-overview-card hl-card">
       <strong>${esc(label)}</strong>
@@ -3426,10 +3437,10 @@ function renderOwnerOverview(){
       <b style="color:${color}">${esc(value)}</b>
       ${note?`<span>${esc(note)}</span>`:''}
     </div>`;
-  const arrearsHtml=openArrears.length?openArrears.slice(0,4).map(a=>`
+  const arrearsHtml=openArrears.length?openArrears.slice(0,5).map(a=>`
     <div class="detail-row owner-mobile-row">
       <div class="room">${esc(a.room||'—')}</div>
-      <div class="note">${esc(a.note||a.type||'待收尾款')}</div>
+      <div class="note">${esc(a.note||a.type||'待收尾款')}${a.dueDate?` · ${esc(a.dueDate)}`:''}</div>
       <div class="amount" style="color:var(--color-warning)">${fmtMoney(a.remain||0)}</div>
     </div>`).join(''):`<div class="empty-state hl-empty-state"><div class="empty-title">暂无待收尾款</div><div class="empty-text">加载通通锁和流水后会在这里显示需要关注的项目。</div></div>`;
   const latestHtml=latest.length?latest.map(s=>`
@@ -3438,20 +3449,48 @@ function renderOwnerOverview(){
       <div class="note">${esc(s.anchorId||s.id||'会话')}</div>
       <div class="amount">${Array.isArray(s.entries)?s.entries.length:0} 笔</div>
     </div>`).join(''):`<div class="empty-state hl-empty-state"><div class="empty-title">暂无历史会话</div><div class="empty-text">导入或刷新数据后会在这里显示最近会话。</div></div>`;
+  const alertHtml=[
+    {label:'短付/待收',value:openArrears.length?`${openArrears.length} 项`:'暂无',tone:openArrears.length?'var(--color-warning)':'var(--color-primary)'},
+    {label:'逾期',value:overdue.length?`${overdue.length} 项`:'暂无',tone:overdue.length?'var(--color-danger)':'var(--color-primary)'},
+    {label:'待审核',value:'待接入',tone:'var(--color-text-muted)'},
+    {label:'作废记录',value:'待接入',tone:'var(--color-text-muted)'}
+  ].map(a=>`<div class="detail-row owner-mobile-row"><div class="room">${esc(a.label)}</div><div class="note">BUSINESS ALERT</div><div class="amount" style="color:${a.tone}">${esc(a.value)}</div></div>`).join('');
+  const recentEntryHtml=recentEntries.length?recentEntries.map(e=>`
+    <div class="detail-row owner-mobile-row">
+      <div class="room">${esc(e.room||'—')}</div>
+      <div class="note">${esc(CATS[e.cat]?.label||e.cat||'流水')} · ${esc((e._sessionDate||'').slice(0,10)||'未归档')}</div>
+      <div class="amount">${fmtMoney(e.amount||0)}</div>
+    </div>`).join(''):`<div class="empty-state hl-empty-state"><div class="empty-title">暂无最近流水</div><div class="empty-text">刷新历史或导入流水后显示最近记录。</div></div>`;
   wrap.innerHTML=`
     <div class="owner-overview-grid">
-      ${kpi('会话数量','SESSIONS',String(sessions.length),'#142033','当前可用于分析的会话')}
-      ${kpi('流水记录','LEDGER ROWS',String(entries.length),'#142033','当前会话内记录数')}
-      ${kpi('总收入','GROSS IN',fmtMoney(t.total),'var(--color-primary)','现金收入 + 银行转账')}
-      ${kpi('现金结余','CASH BALANCE',fmtMoney(t.cashBal),'#1a73e8','现金 - 退款 - 支出')}
+      ${kpi('今日实收','TODAY RECEIVED',fmtMoney(todayTotals.total),'var(--color-primary)',todayEntries.length?`${todayEntries.length} 笔今日流水`:'暂无今日流水')}
+      ${kpi('待收尾款','OUTSTANDING',fmtMoney(openArrears.reduce((sum,a)=>sum+(Number(a.remain)||0),0)),'var(--color-warning)',`${openArrears.length} 项待跟进`)}
+      ${kpi('今日待处理','ACTION ITEMS',String(openArrears.length+overdue.length),'#142033','短付、逾期、待跟进')}
+      ${kpi('最近交接','LATEST HANDOVER',latest[0]?(latest[0].date||'').slice(0,10):'暂无','#1a73e8',latest[0]?`${latest[0].entries?.length||latest[0].entriesCount||0} 笔记录`:'等待员工提交或导入')}
     </div>
-    <div class="card hl-card" style="margin-top:24px">
+    <div class="card hl-card owner-overview-section" style="margin-top:16px">
+      <div class="card-head"><div><div class="card-title">异常提醒</div><div class="card-sub">BUSINESS ALERTS</div></div></div>
+      <div class="card-body"><div class="detail-list">${alertHtml}</div></div>
+    </div>
+    <div class="card hl-card owner-overview-section" style="margin-top:16px">
       <div class="card-head"><div><div class="card-title">待收尾款</div><div class="card-sub">OUTSTANDING FOLLOW-UP</div></div></div>
       <div class="card-body"><div class="detail-list">${arrearsHtml}</div></div>
     </div>
-    <div class="card hl-card" style="margin-top:24px">
+    <div class="card hl-card owner-overview-section" style="margin-top:16px">
       <div class="card-head"><div><div class="card-title">最近会话</div><div class="card-sub">RECENT SESSIONS</div></div></div>
       <div class="card-body"><div class="detail-list">${latestHtml}</div></div>
+    </div>
+    <div class="card hl-card owner-overview-section" style="margin-top:16px">
+      <div class="card-head"><div><div class="card-title">最近流水摘要</div><div class="card-sub">RECENT LEDGER</div></div></div>
+      <div class="card-body"><div class="detail-list">${recentEntryHtml}</div></div>
+    </div>
+    <div class="card hl-card owner-overview-section" style="margin-top:16px">
+      <div class="card-head"><div><div class="card-title">快速进入</div><div class="card-sub">QUICK ACTIONS</div></div></div>
+      <div class="card-body" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px">
+        <button class="btn btn-ghost" type="button" onclick="switchView('history')">历史</button>
+        <button class="btn btn-ghost" type="button" onclick="switchView('clients')">客户</button>
+        <button class="btn btn-ghost" type="button" onclick="switchView('analysis')">分析</button>
+      </div>
     </div>`;
 }
 
@@ -3561,7 +3600,7 @@ async function updateHistCount(){
   if(listEl) listEl.innerHTML='<div style="text-align:center;padding:20px;color:var(--text3);font-size:13px">加载中...</div>';
   let cloud=[];
   try{
-    const r=await apiFetch('/api/history');
+    const r=await apiFetch(`/api/history?limit=${HISTORY_PAGE_SIZE}`);
     if(r.status===401){showAuthExpired();if(listEl)listEl.innerHTML='<div style="text-align:center;padding:20px;color:var(--red);font-size:13px">登录已过期</div>';return;}
     if(r.status===403){if(listEl)listEl.innerHTML='<div style="text-align:center;padding:20px;color:var(--red);font-size:13px">老板账户才能导入历史</div>';toast('老板账户才能导入历史','err');return;}
     if(!r.ok){if(listEl)listEl.innerHTML=`<div style="text-align:center;padding:20px;color:var(--red);font-size:13px">历史加载失败：${r.status}</div>`;return;}

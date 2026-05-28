@@ -99,6 +99,18 @@ commercial launch.
 | Public beta                 | Internal QA is not public beta.                                                                                             |
 | Commercial launch GO        | Launch gate remains `PRODUCTION_NO_GO`.                                                                                     |
 
+## Owner UX Stabilization Checks
+
+| Check               | Expected Result                                                                                                                                      |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Remember account    | Login page may remember username / employee ID / owner account only. Password remains empty on reload.                                               |
+| Password storage    | If the app stores password / PIN in localStorage or sessionStorage, stop and open a P0 security bug.                                                 |
+| Clear session       | Clears active session/token state and password field. Remembered account is preserved only when `记住账号` remains checked.                          |
+| Owner topbar        | The visible `老板` badge should not appear; permissions still come from the server session.                                                          |
+| Overview value      | Owner can see today's received amount, outstanding amount, pending item signal, latest handover status, alert summary, recent flow, and quick links. |
+| History performance | First paint shows skeleton quickly; initial history request loads recent records first with a load-more path.                                        |
+| Mobile density      | Page title, nav, cards, and lists are compact enough for mobile business review without reverting to old UI.                                         |
+
 ## Owner Real Screenshot Regression Stop Items
 
 | Regression                                           | Required Handling                                                                                       |

@@ -159,3 +159,22 @@ After OWNER-UI-REAL-SCREENSHOT-FIX-001, owner mobile QA must use real phone scre
 | Direct `现金收款` / `银行转账` owner homepage buttons | Not visible on owner homepage.                             |
 
 If any item remains visible in a live phone screenshot, mark visual QA as failed. Full write testing still requires separate approval because the live Worker is bound to `DB = homelink`. Production cutover remains `PRODUCTION_NO_GO`.
+
+## Owner UX Stabilization Expectation
+
+After OWNER-UX-STABILIZATION-001, QA should verify these owner/login behavior
+changes without running business writes:
+
+| Area             | Expected Result                                                                                                                                                |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Remember account | Unified login can remember the username / employee ID / owner account only.                                                                                    |
+| Password storage | Password / PIN must never be stored by the app in localStorage or sessionStorage.                                                                              |
+| Owner topbar     | The visible `老板` badge is removed from the owner topbar; server role still controls permissions.                                                             |
+| Owner overview   | The overview should help the owner judge today's business state: receipts, outstanding amount, pending items, recent handover, alerts, and quick entry points. |
+| History loading  | History should show a skeleton quickly and load recent records first instead of leaving a 15-20 second blank state.                                            |
+| Mobile density   | Owner mobile pages should show more useful content per screen while staying readable and aligned with employee styling.                                        |
+
+If remembered account leaks a password, stop testing and record a P0 security
+bug. If history remains blank for 15-20 seconds, record a P1 UX/performance
+bug. Full write testing still requires separate approval. Production cutover
+remains `PRODUCTION_NO_GO`.

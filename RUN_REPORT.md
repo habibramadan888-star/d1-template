@@ -7,6 +7,42 @@ Production deploy: unified-login static route/session handoff deploys executed
 under explicit approval; no commercial cutover.
 Production database mutation: not executed
 
+## OWNER-UX-STABILIZATION-001 Login Persistence and Owner Mobile UX
+
+Date: 2026-05-28, Asia/Dubai
+
+Scope: unified-login remembered account, owner topbar simplification, owner
+overview business-value redesign, history first-load performance, and owner
+mobile density. No production migration, D1 write, D1 export/import/execute,
+employee entry write, handover submit, void/delete, settings change, dashboard
+calculation change, financial formula change, or commercial launch GO was
+approved.
+
+Completed locally:
+
+- Added `记住账号` to `unified-login.html`.
+- Saved only username / employee ID / owner account to `homelink:remember_account`.
+- Confirmed the app does not store password / PIN.
+- Removed the visible owner `老板` badge from the owner topbar while preserving server role authority.
+- Reworked owner overview into today's business state: receipts, outstanding amount, pending signal, recent handover, alerts, recent flow, and quick links.
+- Added history skeleton, recent-first initial load, `limit=20`, and load-more behavior.
+- Tightened owner mobile typography, card padding, nav height, and list density.
+- Added targeted regression tests for remember account, topbar, overview value, history performance, and mobile density.
+- Deployed the static owner/login UX assets to `homelink-finance` after dry-run and drift checks.
+- Completed live read-only smoke without login or business writes.
+
+Safety:
+
+- Production D1 write: no.
+- Migration: no.
+- D1 export/import/execute: no.
+- Password stored by app: no.
+- Dashboard calculation change: no.
+- Financial formula change: no.
+- Production cutover: `PRODUCTION_NO_GO`.
+- Deploy executed: yes, static UI/read-only history support only.
+- Live smoke: PASS for login availability, remembered-account source, hidden owner badge source, history skeleton/limit source, employee availability, and unauthenticated `/api/me` 401.
+
 ## UNIFIED-LOGIN-CLEANUP-001 Minimal Visible Login UI
 
 Date: 2026-05-28, Asia/Dubai

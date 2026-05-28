@@ -115,6 +115,30 @@ body:before{
   border:0;
 }
 .field{margin-bottom:16px}
+.remember-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  margin:-2px 0 14px;
+  color:#4d5968;
+  font-size:13px;
+  font-weight:680;
+}
+.remember-row label{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  cursor:pointer;
+  user-select:none;
+}
+.remember-row input{
+  width:18px;
+  min-height:18px;
+  height:18px;
+  accent-color:var(--green);
+  box-shadow:none;
+}
 .field label{
   display:block;
   margin:0 0 8px;
@@ -244,6 +268,7 @@ button:disabled{
   .badge{width:42px;height:42px;font-size:14px}
   .login-title{font-size:24px}
   input{border-radius:15px}
+  .remember-row{font-size:12px;margin-bottom:12px}
   .btn,.primary,.ghost{width:100%}
   .login-actions .ghost{width:auto}
 }
@@ -265,6 +290,12 @@ button:disabled{
         <label class="sr-only" for="secret">密码</label>
         <input id="secret" name="secret" type="password" autocomplete="current-password" placeholder="密码" required>
       </div>
+      <div class="remember-row">
+        <label for="rememberAccount">
+          <input id="rememberAccount" name="rememberAccount" type="checkbox">
+          <span>记住账号</span>
+        </label>
+      </div>
       <div class="login-actions">
         <button class="btn primary" id="loginButton" type="submit">登录</button>
         <button class="btn ghost" id="logoutButton" type="button">清除会话</button>
@@ -285,8 +316,10 @@ const statusEl = document.getElementById("status");
 const form = document.getElementById("loginForm");
 const accountId = document.getElementById("accountId");
 const secret = document.getElementById("secret");
+const rememberAccount = document.getElementById("rememberAccount");
 const loginButton = document.getElementById("loginButton");
 const logoutButton = document.getElementById("logoutButton");
+const REMEMBER_ACCOUNT_KEY = "homelink:remember_account";
 
 function apiUrl(path) {
   if (/^https?:\/\//i.test(path)) return path;
@@ -310,6 +343,19 @@ function destinationForRole(role) {
   if (EMPLOYEE_ROLES.has(normalized)) return EMPLOYEE_DESTINATION;
   if (OWNER_ROLES.has(normalized)) return OWNER_DESTINATION;
   return null;
+}
+
+function loadRememberedAccount() {
+  const remembered = localStorage.getItem(REMEMBER_ACCOUNT_KEY) || "";
+  if (remembered) {
+    accountId.value = remembered;
+    rememberAccount.checked = true;
+  }
+}
+
+function persistRememberedAccount(account) {
+  if (rememberAccount.checked && account) localStorage.setItem(REMEMBER_ACCOUNT_KEY, account);
+  else localStorage.removeItem(REMEMBER_ACCOUNT_KEY);
 }
 
 async function requestJson(path, options = {}) {
@@ -392,6 +438,7 @@ async function signIn(event) {
     // Do not trust the login response role. /api/me is the routing authority.
     const me = await fetchMe();
     if (!me) throw new Error("session_expired");
+    persistRememberedAccount(id);
     secret.value = "";
     routeFromServerClaim(me, { replace: true });
   } catch (error) {
@@ -408,14 +455,22 @@ async function clearSession() {
   } catch {}
   localStorage.removeItem("homelink:cloud_token");
   sessionStorage.removeItem("homelink:cloud_token");
-  accountId.value = "";
+  if (rememberAccount.checked) accountId.value = localStorage.getItem(REMEMBER_ACCOUNT_KEY) || accountId.value;
+  else {
+    localStorage.removeItem(REMEMBER_ACCOUNT_KEY);
+    accountId.value = "";
+  }
   secret.value = "";
   showLoginForm("");
   logoutButton.disabled = false;
 }
 
 form.addEventListener("submit", signIn);
+rememberAccount.addEventListener("change", () => {
+  if (!rememberAccount.checked) localStorage.removeItem(REMEMBER_ACCOUNT_KEY);
+});
 logoutButton.addEventListener("click", clearSession);
+loadRememberedAccount();
 checkExistingSession();
 </script>
 </body>

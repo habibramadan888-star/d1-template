@@ -28,6 +28,7 @@ test("owner right side controls remain inside mobile viewport by CSS contract", 
     owner,
     /\.owner-ui-unified \.brand-name\{font-size:20px;min-width:0;overflow:hidden/
   );
-  assert.match(owner, /\.owner-ui-unified \.role-badge\{max-width:54px;overflow:hidden/);
+  assert.match(owner, /\.owner-ui-unified \.role-badge\{display:none!important\}/);
+  assert.match(owner, /<span class="role-badge" id="roleBadge" hidden aria-hidden="true"><\/span>/);
   assert.match(owner, /\.owner-ui-unified \.topbar-right \.btn-ghost\{min-width:40px/);
 });

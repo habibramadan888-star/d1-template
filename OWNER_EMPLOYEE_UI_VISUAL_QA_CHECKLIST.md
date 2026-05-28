@@ -53,9 +53,14 @@ Production status: `PRODUCTION_NO_GO`. This checklist is for internal visual QA 
 | Unified login first screen shows only login content                              |           |       |
 | Unified login has no helper paragraph or status card                             |           |       |
 | Unified login visible elements are only logo/title/username/password/login/clear |           |       |
+| Unified login may remember account only, never password/PIN                      |           |       |
 | Only `unified-login.html` is treated as login entry                              |           |       |
 | Back-button experience is clear                                                  |           |       |
 | First load has visible feedback                                                  |           |       |
+| Owner topbar has no meaningless `老板` badge                                     |           |       |
+| Owner overview gives business value, not only empty counters                     |           |       |
+| Owner history shows fast skeleton/recent rows, not 15-20 second blank            |           |       |
+| Owner mobile density is compact and readable                                     |           |       |
 | No write test performed                                                          |           |       |
 | Production remains `PRODUCTION_NO_GO`                                            |           |       |
 

@@ -11,15 +11,15 @@ test("owner cards, overview cards, and page titles follow employee card system",
   assert.match(owner, /box-shadow:var\(--shadow-card\)/);
   assert.match(owner, /\.owner-ui-unified \.owner-overview-grid/);
   assert.match(owner, /\.owner-ui-unified \.owner-overview-card/);
-  assert.match(owner, /\.owner-ui-unified \.page-title\{\n  font-size:50px/);
-  assert.match(owner, /\.owner-ui-unified \.card-title\{\n  font-size:26px/);
+  assert.match(owner, /\.owner-ui-unified \.page-title\{\n  font-size:34px/);
+  assert.match(owner, /\.owner-ui-unified \.card-title\{\n  font-size:20px/);
 });
 
 test("owner analysis import tool is card-like instead of old backend form", async () => {
   const owner = await readFile("deploy-worker/public/index.html", "utf8");
 
   assert.match(owner, /\.owner-ui-unified \.import-actions\{\n  display:grid/);
-  assert.match(owner, /\.owner-ui-unified \.import-tab\{\n  min-height:92px/);
+  assert.match(owner, /\.owner-ui-unified \.import-tab\{\n  min-height:72px/);
   assert.match(owner, /\.owner-ui-unified \.import-body textarea,\n\.owner-ui-unified \.ta\{/);
   assert.match(owner, /border-radius:24px/);
 });

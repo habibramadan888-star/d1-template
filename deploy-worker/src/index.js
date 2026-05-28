@@ -2976,10 +2976,19 @@ async function handleRequest(request, env, ctx) {
     if (path === "/api/history") {
       await empEnsureSchema(env);
       const includeVoided = url.searchParams.get("include_voided") === "1";
+      const rawLimit = Number(url.searchParams.get("limit") || 0);
+      const rawOffset = Number(url.searchParams.get("offset") || 0);
+      const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(Math.floor(rawLimit), 100) : 0;
+      const offset = Number.isFinite(rawOffset) && rawOffset > 0 ? Math.floor(rawOffset) : 0;
+      const baseSql = includeVoided
+        ? "SELECT * FROM sessions WHERE corpid=? ORDER BY created_at DESC"
+        : "SELECT * FROM sessions WHERE corpid=? AND COALESCE(voided_at,'')='' AND COALESCE(handover_status,'')<>'VOID' ORDER BY created_at DESC";
+      if (limit) {
+        const { results } = await env.DB.prepare(`${baseSql} LIMIT ? OFFSET ?`).bind(user.corpid, limit, offset).all();
+        return json(results);
+      }
       const { results } = await env.DB.prepare(
-        includeVoided
-          ? "SELECT * FROM sessions WHERE corpid=? ORDER BY created_at DESC"
-          : "SELECT * FROM sessions WHERE corpid=? AND COALESCE(voided_at,'')='' AND COALESCE(handover_status,'')<>'VOID' ORDER BY created_at DESC"
+        baseSql
       ).bind(user.corpid).all();
       return json(results);
     }

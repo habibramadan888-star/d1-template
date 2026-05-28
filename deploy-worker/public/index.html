@@ -51,6 +51,7 @@ html,body{background:var(--bg);color:var(--text);font-family:'Inter',system-ui,s
 .hidden{display:none!important}
 .view{animation:up 0.2s ease}
 @keyframes up{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pulse{0%{background-position:180% 0}100%{background-position:-180% 0}}
 /* CARDS */
 .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r2)}
 .card-head{padding:16px 18px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
@@ -1099,7 +1100,7 @@ body::before{
   flex-shrink:1;
 }
 .owner-ui-unified .role-badge{
-  display:inline-flex;
+  display:none!important;
   align-items:center;
   min-height:42px;
   padding:11px 18px;
@@ -1137,16 +1138,16 @@ body::before{
 .owner-ui-unified .nav-btn{
   min-width:0!important;
   width:100%;
-  min-height:86px;
+  min-height:64px;
   border-radius:0;
   border:0;
   border-right:1px solid var(--line);
   background:rgba(255,255,255,.94);
   color:#243044;
-  font-size:25px;
+  font-size:19px;
   font-weight:950;
   letter-spacing:.05em;
-  gap:10px;
+  gap:7px;
   flex-direction:row;
 }
 .owner-ui-unified .nav-btn:first-child{border-radius:27px 0 0 27px}
@@ -1155,7 +1156,7 @@ body::before{
 .owner-ui-unified .nav-btn .en-sub{
   margin-top:0;
   color:inherit;
-  font-size:13px;
+  font-size:10px;
   font-weight:700;
   letter-spacing:.08em;
   opacity:.78;
@@ -1168,27 +1169,27 @@ body::before{
 }
 .owner-ui-unified .container{
   width:min(980px,100%);
-  padding:52px 28px 110px;
+  padding:34px 24px 96px;
 }
 .owner-ui-unified .page-title{
-  font-size:50px;
+  font-size:34px;
   font-weight:950;
   line-height:1.08;
   letter-spacing:-.04em;
-  margin:0 0 12px;
+  margin:0 0 8px;
 }
 .owner-ui-unified .page-title .en-sub{
   display:block;
-  margin-top:14px!important;
+  margin-top:8px!important;
   color:#697386;
-  font-size:23px!important;
+  font-size:14px!important;
   font-weight:700;
   letter-spacing:.10em!important;
 }
 .owner-ui-unified .page-sub{
-  margin-bottom:30px!important;
+  margin-bottom:20px!important;
   color:#586273;
-  font-size:22px;
+  font-size:16px;
   font-weight:850;
   line-height:1.45;
 }
@@ -1208,28 +1209,28 @@ body::before{
 }
 .owner-ui-unified .card-head,
 .owner-ui-unified .hist-month-head{
-  padding:22px 26px;
+  padding:16px 20px;
 }
-.owner-ui-unified .card-body{padding:26px}
+.owner-ui-unified .card-body{padding:18px 20px}
 .owner-ui-unified .card-title{
-  font-size:26px;
+  font-size:20px;
   font-weight:950;
   line-height:1.15;
 }
 .owner-ui-unified .card-sub{
   margin-top:6px;
   color:#697386;
-  font-size:13px;
+  font-size:11px;
   font-weight:700;
   letter-spacing:.08em;
 }
 .owner-ui-unified .owner-overview-grid{
   display:grid;
   grid-template-columns:repeat(2,minmax(0,1fr));
-  gap:16px;
+  gap:12px;
 }
 .owner-ui-unified .owner-overview-card{
-  padding:22px;
+  padding:16px;
 }
 .owner-ui-unified .owner-overview-card strong{
   display:block;
@@ -1247,9 +1248,9 @@ body::before{
 }
 .owner-ui-unified .owner-overview-card b{
   display:block;
-  margin-top:20px;
+  margin-top:10px;
   color:var(--color-primary);
-  font-size:36px;
+  font-size:24px;
   font-weight:950;
   line-height:1;
 }
@@ -1264,13 +1265,13 @@ body::before{
   border-bottom:0;
 }
 .owner-ui-unified .import-tab{
-  min-height:92px;
+  min-height:72px;
   border:1.5px solid rgba(148,163,184,.28)!important;
   border-radius:22px;
   background:rgba(255,255,255,.66);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.9);
   color:#263246;
-  font-size:18px;
+  font-size:15px;
   font-weight:780;
 }
 .owner-ui-unified .import-tab.active{
@@ -1279,7 +1280,7 @@ body::before{
   border-color:rgba(9,166,79,.32)!important;
 }
 .owner-ui-unified .import-tab .itab-lbl{
-  font-size:18px;
+  font-size:15px;
   font-weight:850;
 }
 .owner-ui-unified .import-body{
@@ -1287,16 +1288,16 @@ body::before{
 }
 .owner-ui-unified .import-body textarea,
 .owner-ui-unified .ta{
-  min-height:150px;
+  min-height:118px;
   border-radius:24px;
-  font-size:18px;
+  font-size:15px;
   line-height:1.65;
 }
 .owner-ui-unified .detail-row,
 .owner-ui-unified .entry-row,
 .owner-ui-unified .cc-pay-row{
-  border-radius:18px;
-  padding:14px 16px;
+  border-radius:16px;
+  padding:10px 12px;
   background:rgba(255,255,255,.72);
 }
 .owner-ui-unified .empty-state{
@@ -1310,27 +1311,27 @@ body::before{
   .owner-ui-unified .brand-name{font-size:20px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .owner-ui-unified .brand-business{font-size:.68em}
   .owner-ui-unified .topbar-right{justify-content:flex-end;gap:5px;max-width:100%;overflow:hidden}
-  .owner-ui-unified .role-badge{max-width:54px;overflow:hidden;text-overflow:ellipsis;padding:6px 10px;font-size:12px;min-height:34px}
+  .owner-ui-unified .role-badge{display:none!important}
   .owner-ui-unified .owner-dashboard-btn{max-width:96px;min-height:38px!important;padding:7px 9px!important;font-size:12px!important;border-radius:14px!important}
   .owner-ui-unified .owner-dashboard-btn .ico{width:15px;height:15px;flex-basis:15px}
   .owner-ui-unified .topbar-right .btn-ghost{min-width:40px;min-height:40px!important;padding:8px!important;border-radius:14px!important}
-  .owner-ui-unified .container{width:100%;padding:34px 28px 92px}
+  .owner-ui-unified .container{width:100%;padding:24px 18px 86px}
   .owner-ui-unified .topbar-row2{overflow:hidden}
   .owner-ui-unified .nav{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));width:100%;min-width:0;gap:0;padding:0;border-radius:24px;overflow:hidden}
-  .owner-ui-unified .nav-btn{min-width:0!important;width:100%;height:74px;font-size:21px;padding:8px 4px;line-height:1.05;flex-direction:column;gap:5px}
+  .owner-ui-unified .nav-btn{min-width:0!important;width:100%;height:58px;font-size:17px;padding:6px 4px;line-height:1.05;flex-direction:column;gap:3px}
   .owner-ui-unified .nav-btn .ico{display:none}
-  .owner-ui-unified .nav-btn .en-sub{font-size:10px}
+  .owner-ui-unified .nav-btn .en-sub{font-size:8px}
   .owner-ui-unified .owner-admin-tool{display:none}
   .owner-ui-unified .card{border-radius:26px}
-  .owner-ui-unified .card-head,.owner-ui-unified .card-body{padding:18px}
-  .owner-ui-unified .page-title{font-size:38px}
-  .owner-ui-unified .page-title .en-sub{font-size:16px!important;margin-top:8px!important}
-  .owner-ui-unified .page-sub{font-size:17px;margin-bottom:22px!important}
-  .owner-ui-unified .owner-overview-grid{grid-template-columns:1fr}
+  .owner-ui-unified .card-head,.owner-ui-unified .card-body{padding:14px}
+  .owner-ui-unified .page-title{font-size:28px}
+  .owner-ui-unified .page-title .en-sub{font-size:11px!important;margin-top:5px!important}
+  .owner-ui-unified .page-sub{font-size:13px;margin-bottom:16px!important}
+  .owner-ui-unified .owner-overview-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
   .owner-ui-unified .kpi-strip{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
-  .owner-ui-unified .kpi{min-height:100px;padding:16px;border-radius:20px}
-  .owner-ui-unified .kpi-lbl{font-size:13px}
-  .owner-ui-unified .kpi-val{font-size:21px}
+  .owner-ui-unified .kpi{min-height:82px;padding:12px;border-radius:18px}
+  .owner-ui-unified .kpi-lbl{font-size:11px}
+  .owner-ui-unified .kpi-val{font-size:18px}
   .owner-ui-unified .form-row{grid-template-columns:1fr}
   .owner-ui-unified .inp,.owner-ui-unified .sel,.owner-ui-unified .ta{font-size:16px}
   .owner-ui-unified .import-actions{grid-template-columns:1fr;gap:10px;padding:14px}
@@ -1415,7 +1416,7 @@ body::before{
       <div class="brand-name"><span style="color:#1a9e3f">HOME</span><span style="color:#1a1d23">LINK</span><span style="color:#c8b800">.</span><span class="brand-business">流水管理</span></div>
     </div>
     <div class="topbar-right">
-      <span class="role-badge" id="roleBadge"></span>
+      <span class="role-badge" id="roleBadge" hidden aria-hidden="true"></span>
       <button class="btn btn-primary owner-dashboard-btn" id="btnDashboard" style="display:none" onclick="openPanel()" aria-label="打开控制台"><svg class="ico"><use href="#i-chart"/></svg><span class="btn-label">控制台</span></button>
       <button class="btn btn-ghost" style="padding:6px 10px;font-size:12px" onclick="logout()" title="退出登录"><svg class="ico"><use href="#i-lock"/></svg></button>
     </div>
