@@ -11,6 +11,8 @@ test("readonly admin is accepted for owner read routing", async () => {
   assert.match(worker, /admin_readonly/);
   assert.match(worker, /readonly_admin/);
   assert.match(worker, /canReadOwnerData\(user\)/);
+  assert.match(worker, /salt: String\(u\.salt \|\| u\.passwordSalt \|\| ""\)\.trim\(\)/);
+  assert.match(worker, /verifyPassword\(password, account\.hash, account\.salt \|\| salt\)/);
   assert.match(routing, /READONLY_ADMIN_ROLES/);
   assert.match(
     routing,

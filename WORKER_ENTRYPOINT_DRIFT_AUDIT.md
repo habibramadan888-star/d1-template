@@ -6,7 +6,7 @@ Scope: P1-006 controlled embedded Worker drift review. This script is read-only 
 
 - Source Worker: `deploy-worker\src\index.js`
 - Embedded Worker artifact: `deploy-worker\src\index.embedded.js`
-- Source SHA-256: `6f3026ed92b9009e0b067a60cc299ceaa5ff9925dabd21bb9f1a728b4009eb63`
+- Source SHA-256: `483e088dbb9d8b1bbaf3a45720163c4daddda9fe50182de523cd3cd84c0441e3`
 - Embedded SHA-256: `f53b3d8f6dce5821ed5b1dc3356218908a1f413488e21d18ccbf73a5f5518664`
 - Source API/auth route literals found: 24
 - Embedded API/auth route literals found: 24

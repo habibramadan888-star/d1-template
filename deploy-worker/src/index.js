@@ -526,12 +526,13 @@ function parseUserAccounts(env) {
   try {
     const parsed = JSON.parse(raw);
     const arr = Array.isArray(parsed) ? parsed : Object.entries(parsed).map(([userid, value]) => ({ userid, ...value || {} }));
-    return arr.map((u) => ({
-      userid: String(u.userid || u.id || "").trim(),
-      name: String(u.name || u.employee_name || u.displayName || u.userid || u.id || "").trim(),
-      role: String(u.role || "staff").trim(),
-      hash: String(u.hash || u.passwordHash || "").trim()
-    })).filter((u) => u.userid && isAllowedAuthRole(u.role) && u.hash);
+      return arr.map((u) => ({
+        userid: String(u.userid || u.id || "").trim(),
+        name: String(u.name || u.employee_name || u.displayName || u.userid || u.id || "").trim(),
+        role: String(u.role || "staff").trim(),
+        hash: String(u.hash || u.passwordHash || "").trim(),
+        salt: String(u.salt || u.passwordSalt || "").trim()
+      })).filter((u) => u.userid && isAllowedAuthRole(u.role) && u.hash);
   } catch {
     return [];
   }
@@ -540,7 +541,7 @@ __name(parseUserAccounts, "parseUserAccounts");
 async function resolveRole(password, env) {
   const salt = env.PW_SALT;
   for (const account of parseUserAccounts(env)) {
-    if (await verifyPassword(password, account.hash, salt)) {
+    if (await verifyPassword(password, account.hash, account.salt || salt)) {
       return { role: account.role, userid: account.userid, employee_name: account.name || account.userid };
     }
   }
