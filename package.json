@@ -158,6 +158,7 @@
     "test:arrears-modal-compact": "node --test tests/arrears-modal-compact-mobile.spec.mjs",
     "test:unified-login-password-manager": "node --test tests/unified-login-password-manager.spec.mjs",
     "test:readonly-admin-role": "node --test tests/readonly-admin-role.spec.mjs",
+    "test:readonly-admin-unified-login": "node --test tests/readonly-admin-unified-login.spec.mjs",
     "qa:employee-entry-staging": "node scripts/qa-employee-entry-real-staging.mjs",
     "staging:generate-passwords": "node scripts/generate-staging-test-passwords.mjs",
     "staging:set-secrets": "node scripts/set-staging-secrets-from-local.mjs",

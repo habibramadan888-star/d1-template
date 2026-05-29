@@ -312,6 +312,7 @@ const EMPLOYEE_DESTINATION = "./employee-v3.html";
 const OWNER_DESTINATION = "./index.html";
 const EMPLOYEE_ROLES = new Set(["employee", "staff"]);
 const OWNER_ROLES = new Set(["owner", "manager", "admin", "admin_readonly", "readonly_admin"]);
+const OWNER_ACCOUNT_IDS = new Set(["owner", "manager", "admin", "admin_readonly", "readonly_admin"]);
 const OWNER_PASSWORD_MANAGER_USERNAME = "homelink-owner";
 
 const statusEl = document.getElementById("status");
@@ -346,6 +347,11 @@ function destinationForRole(role) {
   if (EMPLOYEE_ROLES.has(normalized)) return EMPLOYEE_DESTINATION;
   if (OWNER_ROLES.has(normalized)) return OWNER_DESTINATION;
   return null;
+}
+
+function shouldUseOwnerLogin(account) {
+  const normalized = String(account || "").trim().toLowerCase();
+  return !normalized || OWNER_ACCOUNT_IDS.has(normalized);
 }
 
 function loadRememberedAccount() {
@@ -426,15 +432,15 @@ async function signIn(event) {
   setStatus("正在登录...");
   try {
     let authResult;
-    if (id) {
-      authResult = await requestJson("/auth/employee-login", {
-        method: "POST",
-        body: JSON.stringify({ employee_id: id, pin: password })
-      });
-    } else {
+    if (shouldUseOwnerLogin(id)) {
       authResult = await requestJson("/auth/login", {
         method: "POST",
         body: JSON.stringify({ password })
+      });
+    } else {
+      authResult = await requestJson("/auth/employee-login", {
+        method: "POST",
+        body: JSON.stringify({ employee_id: id, pin: password })
       });
     }
     if (!authResult.response.ok) {
