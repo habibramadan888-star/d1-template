@@ -16,10 +16,10 @@ test("owner header matches employee header structure and avoids backend topbar d
 
   assert.match(
     owner,
-    /\.owner-ui-unified \.topbar-row1,\n\.owner-ui-unified \.topbar-row2\{\n  width:min\(980px,100%\)/
+    /\.owner-ui-unified \.topbar-row1,\r?\n\.owner-ui-unified \.topbar-row2\{\r?\n  width:min\(980px,100%\)/
   );
-  assert.match(owner, /\.owner-ui-unified \.brand-icon\{\n  width:70px;\n  height:70px/);
-  assert.match(owner, /\.owner-ui-unified \.brand-name\{\n  display:flex/);
+  assert.match(owner, /\.owner-ui-unified \.brand-icon\{\r?\n  width:70px;\r?\n  height:70px/);
+  assert.match(owner, /\.owner-ui-unified \.brand-name\{\r?\n  display:flex/);
 });
 
 test("owner mobile header has the same compact employee shell behavior", async () => {

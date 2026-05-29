@@ -14,11 +14,11 @@ test("owner nav uses employee-style pill tabs and owner information architecture
   assert.doesNotMatch(nav, />\s*录入\s*</);
   assert.doesNotMatch(nav, /网络<span class="en-sub">TOOLS<\/span>/);
 
-  assert.match(owner, /\.owner-ui-unified \.nav\{\n  display:grid/);
-  assert.match(owner, /\.owner-ui-unified \.nav-btn\{\n  min-width:0!important/);
+  assert.match(owner, /\.owner-ui-unified \.nav\{\r?\n  display:grid/);
+  assert.match(owner, /\.owner-ui-unified \.nav-btn\{\r?\n  min-width:0!important/);
   assert.match(
     owner,
-    /\.owner-ui-unified \.nav-btn\.active\{\n  background:linear-gradient\(180deg,#10ad5a,#078d42\)/
+    /\.owner-ui-unified \.nav-btn\.active\{\r?\n  background:linear-gradient\(180deg,#10ad5a,#078d42\)/
   );
 });
 
