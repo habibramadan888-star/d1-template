@@ -17,7 +17,8 @@ test("employee display name prefers identity fields and never role staff", async
 test("employee header label no longer says employee id plus staff", async () => {
   const html = await readFile("deploy-worker/public/employee-v3.html", "utf8");
 
-  assert.match(html, /employee-identity-label/);
-  assert.match(html, /当前员工/);
+  assert.doesNotMatch(html, /<span class="employee-identity-label">当前员工<\/span>/);
+  assert.match(html, /aria-label="员工姓名"/);
   assert.doesNotMatch(html, /员工编号 <input id="operatorId"/);
+  assert.match(html, /\.operator input\{[^}]*text-align:center/);
 });

@@ -119,7 +119,69 @@ function cp_modalAmount(card){
   const raw=card?.amount??card?.rent??card?.remain??card?.arrears??card?.totalRent??'';
   const num=Number(raw);
   if(Number.isFinite(num)&&raw!=='')return `AED ${num.toFixed(2)}`;
-  return '未接入';
+  return '金额未接入';
+}
+function cp_overdueDayNumber(card){
+  const end=Number(card?.endDate||0);
+  if(!end)return 0;
+  return Math.max(0,Math.floor((Date.now()-end)/86400000));
+}
+function cp_overdueText(card){
+  const days=cp_overdueDayNumber(card);
+  return days>0?`${days} 天`:'未逾期';
+}
+function cp_generatedAt(){
+  const d=new Date();
+  const pad=n=>String(n).padStart(2,'0');
+  return `${d.getFullYear()}/${pad(d.getMonth()+1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+function cp_reportSuggestion(card,info){
+  const days=cp_overdueDayNumber(card);
+  if(days>=15)return '重点催收';
+  if(days>0)return '提醒续费';
+  if(info?.type==='today')return '今日跟进';
+  if(info?.type==='soon')return '提前提醒';
+  return '核对状态';
+}
+function cp_buildArrearsReport(title,list,scopeLabel='当前筛选'){
+  const aging={d1_7:0,d8_14:0,d15plus:0};
+  let longest=0;
+  list.forEach(({card})=>{
+    const days=cp_overdueDayNumber(card);
+    longest=Math.max(longest,days);
+    if(days>=15)aging.d15plus++;
+    else if(days>=8)aging.d8_14++;
+    else if(days>=1)aging.d1_7++;
+  });
+  const lines=[
+    `青旅｜${title}`,
+    `生成时间：${cp_generatedAt()}`,
+    `统计范围：${scopeLabel}`,
+    `总计：${list.length} 人`,
+    `最久逾期：${longest} 天`,
+    `需优先跟进：逾期超过 14 天共 ${aging.d15plus} 人`,
+    '',
+    '一、逾期汇总',
+    `- 逾期 1-7 天：${aging.d1_7} 人`,
+    `- 逾期 8-14 天：${aging.d8_14} 人`,
+    `- 逾期 15 天以上：${aging.d15plus} 人`,
+    '',
+    '二、明细'
+  ];
+  list.forEach(({room,card,info},idx)=>{
+    lines.push(`${idx+1}. 房间/床位：${room||'-'}`);
+    lines.push(`   租客/卡片：${card.cardName||'未命名卡片'}`);
+    lines.push(`   截止日期：${cp_fmtEndDate(card.endDate)}`);
+    lines.push(`   逾期天数：${cp_overdueText(card)}`);
+    lines.push(`   金额：${cp_modalAmount(card)}`);
+    lines.push(`   状态：${cp_modalStatusLabel(info)}`);
+    lines.push(`   建议动作：${cp_reportSuggestion(card,info)}`);
+  });
+  lines.push('');
+  lines.push('三、备注');
+  lines.push('- 本清单仅用于内部跟进。');
+  lines.push('- 金额字段如显示“金额未接入”，需以财务流水为准。');
+  return lines.join('\n');
 }
 
 function cp_openModal(type){
@@ -140,22 +202,26 @@ function cp_openModal(type){
     tbody.innerHTML=cfg.list.map(({room,card,info})=>{
       const endStr=cp_fmtEndDate(card.endDate);
       const status=cp_modalStatusLabel(info);
-      const overdue=cp_modalOverdueDays(card);
+      const overdue=cp_overdueText(card);
       const amount=cp_modalAmount(card);
-      return `<article class="arrears-detail-card">
-        <div class="arrears-detail-top">
-          <div>
-            <div class="arrears-detail-room">${esc(room||'-')}</div>
-            <div class="arrears-detail-tenant">${esc(card.cardName||'未命名卡片')}</div>
+      return `<article class="arrears-compact-row">
+        <div class="arrears-compact-main">
+          <div class="arrears-compact-id">
+            <strong>${esc(room||'-')}</strong>
+            <span>${esc(card.cardName||'未命名卡片')}</span>
           </div>
           <span class="status-lbl ${cfg.cls}">${esc(status)}</span>
         </div>
-        <div class="arrears-detail-grid">
-          <div class="arrears-detail-field"><span>截止日期</span><b>${esc(endStr)}</b></div>
-          <div class="arrears-detail-field"><span>逾期天数</span><b>${esc(overdue)}</b></div>
-          <div class="arrears-detail-field"><span>金额</span><b>${esc(amount)}</b></div>
-          <div class="arrears-detail-field"><span>卡片 / 租客</span><b>${esc(card.cardName||'-')}</b></div>
+        <div class="arrears-compact-meta">
+          <span>截止 ${esc(endStr)}</span>
+          <span>${esc(overdue)}</span>
+          <span>${esc(amount)}</span>
         </div>
+        <details class="arrears-compact-detail">
+          <summary>详情</summary>
+          <div>建议动作：${esc(cp_reportSuggestion(card,info))}</div>
+          <div>卡片 / 租客：${esc(card.cardName||'-')}</div>
+        </details>
       </article>`;
     }).join('');
   }
@@ -168,40 +234,12 @@ function cp_closeModal(e){
   document.getElementById('modalOverlay').classList.remove('open');
 }
 
-/* 公共函数：按房间分组生成导出文本，格式与主导出完全一致 */
 function cp_buildModalText(){
   const listMap={overdue:overdueList,today:todayList,soon:soonList};
-  const nameMap={overdue:'已过期清单',today:'今日到期清单',soon:'3天内到期清单'};
+  const nameMap={overdue:'逾期欠款清单',today:'今日到期清单',soon:'3天内到期清单'};
   const list=listMap[currentModalType]||[];
   if(list.length===0)return null;
-
-  const date=new Date().toLocaleDateString('zh-CN');
-  const title=nameMap[currentModalType]||'明细';
-  const lines=[`=== 青旅 ${title}  ${date} ===`,''];
-
-  /* 按房间分组（保持原始顺序）*/
-  const byRoom=new Map();
-  list.forEach(({room,card,info})=>{
-    if(!byRoom.has(room))byRoom.set(room,[]);
-    byRoom.get(room).push({card,info});
-  });
-
-  byRoom.forEach((items,room)=>{
-    lines.push(cp_buildRoomBox(room));
-    items.forEach(({card,info})=>{
-      const endStr=cp_fmtEndDate(card.endDate);
-      lines.push('  #'+card.cardName);
-      lines.push('    '+endStr+'  '+info.label);
-      lines.push('  update:');
-      lines.push('');
-    });
-    lines.push('- - - - - - - - - - - - - -');
-    lines.push('');
-  });
-
-  lines.push('---');
-  lines.push(`共${list.length}条  🔥=超2天`);
-  return lines.join('\n');
+  return cp_buildArrearsReport(nameMap[currentModalType]||'欠款明细',list,nameMap[currentModalType]||'当前明细');
 }
 
 function cp_copyModal(){
@@ -438,27 +476,10 @@ function cp_toggleStaff(){
 }
 
 
-function cp_buildRoomBox(room){
-  const bld = (room||'').split('-')[0];
-  const title = bld + ' 号公寓   ' + room;
-  const inner = 26; // 内宽（ASCII字符数）
-  const padTotal = Math.max(0, inner - title.length);
-  const padL = Math.floor(padTotal/2);
-  const padR = padTotal - padL;
-  return [
-    '╔' + '═'.repeat(inner+2) + '╗',
-    '║ ' + ' '.repeat(padL) + title + ' '.repeat(padR) + ' ║',
-    '╚' + '═'.repeat(inner+2) + '╝',
-    ''
-  ].join('\n');
-}
-
 function cp_exportTxt(){
-  const date=new Date().toLocaleDateString('zh-CN');
   const fn={all:'全部',overdue:'已过期',today:'今天到期',soon:'3天内到期',active:'正常',vacant:'空置',staff:'员工'};
-  const lines=[`=== 青旅 ${fn[currentFilter]}清单  ${date} ===`,''];
   const q=(document.getElementById('searchInput')?.value||'').toLowerCase().trim();
-  let total=0;
+  const exportList=[];
   const parseKey=name=>{const p=(name||'').split('-');return[parseInt(p[0])||0,parseInt(p[1])||0];};
   const sortedRooms=Object.entries(roomsData).sort(([a],[b])=>{
     const[bA,rA]=parseKey(a),[bB,rB]=parseKey(b);return bA!==bB?bA-bB:rA-rB;
@@ -473,24 +494,16 @@ function cp_exportTxt(){
     if(!filtered.length)continue;
     const ord={overdue:0,today:1,soon:2,active:3,vacant:4,staff:5};
     filtered.sort((a,b)=>(ord[cp_getStatus(a).type]??4)-(ord[cp_getStatus(b).type]??4));
-    lines.push(cp_buildRoomBox(room));
     filtered.forEach(c=>{
       const info=cp_getStatus(c);
-      const endStr=cp_fmtEndDate(c.endDate);
-      lines.push('  #'+c.cardName);
-      lines.push('    '+endStr+'  '+info.label);
-      lines.push('  update:');
-      lines.push('');
-      total++;
+      exportList.push({room,card:c,info});
     });
-    lines.push('- - - - - - - - - - - - - -');
-    lines.push('');
   }
-  if(!total){alert('没有可导出的数据');return;}
-  lines.push('---');lines.push(`共${total}条  🔥=超2天`);
-  const blob=new Blob([lines.join('\n')],{type:'text/plain;charset=utf-8'});
+  if(!exportList.length){alert('没有可导出的数据');return;}
+  const text=cp_buildArrearsReport(`${fn[currentFilter]}清单`,exportList,fn[currentFilter]||'当前筛选');
+  const blob=new Blob([text],{type:'text/plain;charset=utf-8'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);
-  a.download=`租金_${fn[currentFilter]}_${date}.txt`;
+  a.download=`青旅_${fn[currentFilter]}清单_${cp_generatedAt().replace(/[/: ]/g,'')}.txt`;
   document.body.appendChild(a);a.click();
   setTimeout(()=>{URL.revokeObjectURL(a.href);try{document.body.removeChild(a);}catch{}},200);
 }

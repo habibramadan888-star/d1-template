@@ -85,3 +85,12 @@ Use these expected results when reporting unified-login bugs:
 | Owner control panel mobile layout breaks                     | P1/P2    |
 | Arrears detail modal is unreadable on mobile                 | P1/P2    |
 | Employee top tab labels are inconsistent or truncated        | P2       |
+
+## INTERNAL-QA-BLOCKERS-003 Severity Guidance
+
+- Visible employee `Script error.` during initial render: P1.
+- Employee name shown as `staff` or with wrong label: P1.
+- Arrears export unreadable, contains ASCII box art, or empty `update:` fields: P1/P2 depending on launch impact.
+- Arrears modal shows only one record per mobile screen: P2, P1 if it blocks collection follow-up.
+- App stores plaintext password/PIN in frontend storage: P0 security bug.
+- Readonly admin can perform any business write: P0 authorization bug.

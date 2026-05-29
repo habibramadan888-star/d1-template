@@ -4,7 +4,8 @@ export const OWNER_DESTINATION = "/index.html";
 export const PRODUCTION_CUTOVER_STATUS = "PRODUCTION_NO_GO";
 
 const EMPLOYEE_ROLES = new Set(["employee", "staff"]);
-const OWNER_ROLES = new Set(["owner", "manager", "admin"]);
+const READONLY_ADMIN_ROLES = new Set(["admin_readonly", "readonly_admin"]);
+const OWNER_ROLES = new Set(["owner", "manager", "admin", ...READONLY_ADMIN_ROLES]);
 
 export function normalizeUnifiedLoginRole(role) {
   return String(role || "")
@@ -132,8 +133,14 @@ export function canAccessOwnerProtectedResources(authClaim) {
 export function canSubmitEmployeeWorkflow(authClaim, options = {}) {
   const role = normalizeUnifiedLoginRole(authClaim?.role);
   if (EMPLOYEE_ROLES.has(role)) return true;
+  if (READONLY_ADMIN_ROLES.has(role)) return false;
   if (OWNER_ROLES.has(role)) return options.explicitEmployeeWorkflowGrant === true;
   return false;
+}
+
+export function canWriteOwnerData(authClaim) {
+  const role = normalizeUnifiedLoginRole(authClaim?.role);
+  return OWNER_ROLES.has(role) && !READONLY_ADMIN_ROLES.has(role);
 }
 
 export function getCommercialLaunchStatusForUnifiedLogin() {
@@ -153,10 +160,11 @@ export function resolveOwnerSessionHandoff({ meStatus, meClaim } = {}) {
 
   const decision = getUnifiedLoginDestination(meClaim);
   if (decision.roleGroup === "owner") {
+    const role = normalizeUnifiedLoginRole(meClaim?.role);
     return {
       page: "owner",
       action: "ENTER_OWNER_APP",
-      roleForApp: "manager",
+      roleForApp: READONLY_ADMIN_ROLES.has(role) ? "readonly_admin" : "manager",
       showSecondLogin: false,
       authority: "/api/me"
     };

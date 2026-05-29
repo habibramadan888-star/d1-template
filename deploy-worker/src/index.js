@@ -6,6 +6,35 @@ import { createEmployeeEntryLiveWriteAdapterDraft } from "../../modules/worker/e
 // src/lib/jwt.js
 var ALGO = { name: "HMAC", hash: "SHA-256" };
 var DEFAULT_TTL_SECONDS = 8 * 60 * 60;
+var READONLY_ADMIN_ROLES = /* @__PURE__ */ new Set(["admin_readonly", "readonly_admin"]);
+function normalizeRoleValue(role) {
+  return String(role || "").trim().toLowerCase();
+}
+__name(normalizeRoleValue, "normalizeRoleValue");
+function isReadonlyAdminRoleValue(role) {
+  return READONLY_ADMIN_ROLES.has(normalizeRoleValue(role));
+}
+__name(isReadonlyAdminRoleValue, "isReadonlyAdminRoleValue");
+function isManagerRoleValue(role) {
+  return normalizeRoleValue(role) === "manager";
+}
+__name(isManagerRoleValue, "isManagerRoleValue");
+function isStaffRoleValue(role) {
+  return ["staff", "employee"].includes(normalizeRoleValue(role));
+}
+__name(isStaffRoleValue, "isStaffRoleValue");
+function isAllowedAuthRole(role) {
+  return isManagerRoleValue(role) || isStaffRoleValue(role) || isReadonlyAdminRoleValue(role);
+}
+__name(isAllowedAuthRole, "isAllowedAuthRole");
+function canReadOwnerData(user) {
+  return isManagerRoleValue(user?.role) || isReadonlyAdminRoleValue(user?.role);
+}
+__name(canReadOwnerData, "canReadOwnerData");
+function canWriteOwnerData(user) {
+  return isManagerRoleValue(user?.role);
+}
+__name(canWriteOwnerData, "canWriteOwnerData");
 function bytesToB64url(bytes) {
   let binary = "";
   const chunk = 8192;
@@ -88,7 +117,7 @@ async function verifyJWT(token, secret, options = {}) {
   if (!payload.exp || payload.exp < Math.floor(Date.now() / 1e3)) {
     throw new Error("token_expired");
   }
-  if (!["manager", "staff"].includes(payload.role) || !payload.corpid) {
+  if (!isAllowedAuthRole(payload.role) || !payload.corpid) {
     throw new Error("malformed_token");
   }
   return payload;
@@ -502,7 +531,7 @@ function parseUserAccounts(env) {
       name: String(u.name || u.employee_name || u.displayName || u.userid || u.id || "").trim(),
       role: String(u.role || "staff").trim(),
       hash: String(u.hash || u.passwordHash || "").trim()
-    })).filter((u) => u.userid && ["manager", "staff"].includes(u.role) && u.hash);
+    })).filter((u) => u.userid && isAllowedAuthRole(u.role) && u.hash);
   } catch {
     return [];
   }
@@ -723,7 +752,7 @@ var VALID_TAGS = /* @__PURE__ */ new Set(["Old", "New", "Transfer"]);
 var VALID_PAY_TYPES = /* @__PURE__ */ new Set(["", "full", "partial"]);
 var VALID_ARREAR_TYPES = /* @__PURE__ */ new Set(["rent", "deposit"]);
 function requireManager(user) {
-  return user.role === "manager";
+  return canWriteOwnerData(user);
 }
 __name(requireManager, "requireManager");
 async function audit(env, user, action, target = "", detail = {}) {
@@ -1920,6 +1949,7 @@ async function handleArrearTaskUpdate(request,env,user){
 __name(handleArrearTaskUpdate,"handleArrearTaskUpdate");
 async function handleEmployeeApi(request,env,user){
   const path=new URL(request.url).pathname;
+  if(isReadonlyAdminRoleValue(user?.role)&&request.method!=="GET")return forbidden();
   if(path==="/api/employee/migrate"&&request.method==="POST"){
     if(!requireManager(user))return forbidden();
     return handleEmployeeMigrate(request,env,user);
@@ -2543,10 +2573,12 @@ async function handleRequest(request, env, ctx) {
         employee_name: displayName,
         corpid: user.corpid,
         role: user.role,
-        isManager: user.role === "manager"
+        isManager: isManagerRoleValue(user.role),
+        isReadonlyAdmin: isReadonlyAdminRoleValue(user.role),
+        canWrite: canWriteOwnerData(user)
       });
     }
-    if (user.role !== "manager" && !allowStaffApi(path, method)) {
+    if (!canReadOwnerData(user) && !allowStaffApi(path, method)) {
       return forbidden();
     }
     if (path === "/api/security/revoke_sessions" && method === "POST") {
@@ -2571,20 +2603,21 @@ async function handleRequest(request, env, ctx) {
       return json({ success: true });
     }
     if (path === "/api/lock/cards" && method === "GET") {
-      if (!requireManager(user)) return forbidden();
+      if (!canReadOwnerData(user)) return forbidden();
       try {
         const result = await loadLockCards(env);
         if (result.error) return json({ error: result.error }, result.status || 500);
-        await audit(env, user, "lock.cards.load", "", { locksCount: result.locksCount });
+        if (canWriteOwnerData(user)) await audit(env, user, "lock.cards.load", "", { locksCount: result.locksCount });
         return json(result);
       } catch (e) {
         return json({ error: e?.message || "ttlock_failed" }, 502);
       }
     }
     if (path === "/api/wifi/accounts" && method === "GET") {
-      if (!requireManager(user)) return forbidden();
-      await env.DB.prepare(
-        `CREATE TABLE IF NOT EXISTS app_settings (
+      if (!canReadOwnerData(user)) return forbidden();
+      if (canWriteOwnerData(user)) {
+        await env.DB.prepare(
+          `CREATE TABLE IF NOT EXISTS app_settings (
             corpid TEXT NOT NULL,
             key TEXT NOT NULL,
             value TEXT DEFAULT '{}',
@@ -2592,17 +2625,24 @@ async function handleRequest(request, env, ctx) {
             updated_at DATETIME DEFAULT (datetime('now')),
             PRIMARY KEY (corpid, key)
           )`
-      ).run();
-      const row = await env.DB.prepare(
-        "SELECT value, updated_by, updated_at FROM app_settings WHERE corpid=? AND key=? LIMIT 1"
-      ).bind(user.corpid, "wifi_accounts").first();
+        ).run();
+      }
+      let row = null;
+      try {
+        row = await env.DB.prepare(
+          "SELECT value, updated_by, updated_at FROM app_settings WHERE corpid=? AND key=? LIMIT 1"
+        ).bind(user.corpid, "wifi_accounts").first();
+      } catch {
+        if (isReadonlyAdminRoleValue(user.role)) return json({ accounts: {}, updatedBy: "", updatedAt: "", readonly: true });
+        throw new Error("wifi_accounts_table_missing");
+      }
       let accounts = {};
       try {
         accounts = row?.value ? JSON.parse(row.value) : {};
       } catch {
         accounts = {};
       }
-      if (hasPlainWifiPasswords(accounts)) {
+      if (hasPlainWifiPasswords(accounts) && canWriteOwnerData(user)) {
         const encrypted = await encryptWifiAccounts(accounts, env);
         await env.DB.prepare(
           `INSERT INTO app_settings (corpid, key, value, updated_by, updated_at)
@@ -2616,7 +2656,7 @@ async function handleRequest(request, env, ctx) {
         accounts = encrypted;
       }
       accounts = await decryptWifiAccounts(accounts, env);
-      return json({ accounts, updatedBy: row?.updated_by || "", updatedAt: row?.updated_at || "" });
+      return json({ accounts, updatedBy: row?.updated_by || "", updatedAt: row?.updated_at || "", readonly: isReadonlyAdminRoleValue(user.role) });
     }
     if (path === "/api/wifi/accounts" && method === "POST") {
       if (!requireManager(user)) return forbidden();
@@ -2665,8 +2705,9 @@ async function handleRequest(request, env, ctx) {
       return handleBossArrears(request, env, user);
     }
     if (path === "/api/customers" && method === "GET") {
-      await env.DB.prepare(
-        `CREATE TABLE IF NOT EXISTS app_settings (
+      if (canWriteOwnerData(user)) {
+        await env.DB.prepare(
+          `CREATE TABLE IF NOT EXISTS app_settings (
             corpid TEXT NOT NULL,
             key TEXT NOT NULL,
             value TEXT DEFAULT '{}',
@@ -2674,10 +2715,17 @@ async function handleRequest(request, env, ctx) {
             updated_at DATETIME DEFAULT (datetime('now')),
             PRIMARY KEY (corpid, key)
           )`
-      ).run();
-      const row = await env.DB.prepare(
-        "SELECT value, updated_by, updated_at FROM app_settings WHERE corpid=? AND key=? LIMIT 1"
-      ).bind(user.corpid, "client_credit").first();
+        ).run();
+      }
+      let row = null;
+      try {
+        row = await env.DB.prepare(
+          "SELECT value, updated_by, updated_at FROM app_settings WHERE corpid=? AND key=? LIMIT 1"
+        ).bind(user.corpid, "client_credit").first();
+      } catch {
+        if (isReadonlyAdminRoleValue(user.role)) return json({ customers: [], updatedBy: "", updatedAt: "", readonly: true });
+        throw new Error("client_credit_table_missing");
+      }
       let customers = [];
       try {
         customers = row?.value ? JSON.parse(row.value) : [];
@@ -2692,6 +2740,7 @@ async function handleRequest(request, env, ctx) {
       });
     }
     if (path === "/api/customers" && method === "POST") {
+      if (!requireManager(user)) return forbidden();
       let body;
       try {
         body = await request.json();
@@ -2723,8 +2772,9 @@ async function handleRequest(request, env, ctx) {
       return json({ success: true, count: customers.length });
     }
     if (path === "/api/rent_config" && method === "GET") {
-      await env.DB.prepare(
-        `CREATE TABLE IF NOT EXISTS app_settings (
+      if (canWriteOwnerData(user)) {
+        await env.DB.prepare(
+          `CREATE TABLE IF NOT EXISTS app_settings (
             corpid TEXT NOT NULL,
             key TEXT NOT NULL,
             value TEXT DEFAULT '{}',
@@ -2732,10 +2782,17 @@ async function handleRequest(request, env, ctx) {
             updated_at DATETIME DEFAULT (datetime('now')),
             PRIMARY KEY (corpid, key)
           )`
-      ).run();
-      const row = await env.DB.prepare(
-        "SELECT value, updated_by, updated_at FROM app_settings WHERE corpid=? AND key=? LIMIT 1"
-      ).bind(user.corpid, "rent_ref_room").first();
+        ).run();
+      }
+      let row = null;
+      try {
+        row = await env.DB.prepare(
+          "SELECT value, updated_by, updated_at FROM app_settings WHERE corpid=? AND key=? LIMIT 1"
+        ).bind(user.corpid, "rent_ref_room").first();
+      } catch {
+        if (isReadonlyAdminRoleValue(user.role)) return json({ config: {}, updatedBy: "", updatedAt: "", readonly: true });
+        throw new Error("rent_config_table_missing");
+      }
       let config = {};
       try {
         config = row?.value ? JSON.parse(row.value) : {};

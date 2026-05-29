@@ -69,3 +69,11 @@ Additional stop conditions:
 | EMP-AUTH-001 | Unauthenticated employee page | Open `employee-v3.html` without session | Redirects unified login; old PIN login does not appear                              | Screenshot / URL |           | Read-only             |
 | EMP-AUTH-002 | Employee identity             | Login as a test employee                | Header shows actual account / employee id, not `staff`                              | Screenshot       |           | Do not submit entries |
 | EMP-AUTH-003 | Top navigation                | View `录入 / 跟进 / 导出` tabs          | All three buttons show Chinese above English consistently; English is not truncated | Screenshot       |           | No write              |
+
+## INTERNAL-QA-BLOCKERS-003 Employee Checks
+
+| Test ID            | Scenario                | Steps                              | Expected Result                                                                | Evidence Needed            | Pass/Fail | Notes           |
+| ------------------ | ----------------------- | ---------------------------------- | ------------------------------------------------------------------------------ | -------------------------- | --------- | --------------- |
+| EMP-BLOCKER-003-01 | Employee display name   | Login as Abdul/Zhang/Li test user  | Header shows only the real name, centered; no `当前员工`, no `staff` role text | Mobile screenshot          |           |                 |
+| EMP-BLOCKER-003-02 | Script error regression | Open employee page after login     | No visible `Script error.` toast during initial render                         | Screenshot or console note |           | No write action |
+| EMP-BLOCKER-003-03 | Top nav consistency     | Check 录入 / 跟进 / 导出 on mobile | Chinese over English, consistent sizes, no truncated `EXPO...`                 | Mobile screenshot          |           |                 |

@@ -55,10 +55,12 @@ async function apiFetchWithTimeout(url, opts = {}, timeoutMs = HISTORY_FETCH_TIM
   }
 }
 function normalizeAuthRole(r){return String(r||'').trim().toLowerCase();}
-function isOwnerAppRole(r){return ['manager','owner','admin'].includes(normalizeAuthRole(r));}
+function isReadonlyAdminRole(r){return ['admin_readonly','readonly_admin'].includes(normalizeAuthRole(r));}
+function isOwnerAppRole(r){return ['manager','owner','admin','admin_readonly','readonly_admin'].includes(normalizeAuthRole(r));}
 function isEmployeeAppRole(r){return ['staff','employee'].includes(normalizeAuthRole(r));}
-function toOwnerSpaRole(r){return isOwnerAppRole(r)?'manager':normalizeAuthRole(r);}
-function isOwnerShellRole(){return role==='manager';}
+function toOwnerSpaRole(r){return isReadonlyAdminRole(r)?'readonly_admin':isOwnerAppRole(r)?'manager':normalizeAuthRole(r);}
+function isOwnerShellRole(){return role==='manager'||role==='readonly_admin';}
+function isOwnerWriteRole(){return role==='manager';}
 function defaultViewForRole(){return isOwnerShellRole()?'overview':'entry';}
 function clearLegacyAuthStorage(){
   [
@@ -128,13 +130,14 @@ function showOwnerAuthError(message='Could not verify session. Please try again.
 function showOwnerAppShell(appRole){
   const overlay=document.getElementById('lockOverlay');
   if(overlay)overlay.style.display='none';
+  document.body.classList.toggle('readonly-admin',appRole==='readonly_admin');
   document.getElementById('topbar').style.display='block';
   document.getElementById('mainApp').style.display='block';
   document.getElementById('footerEl').style.display='block';
   const badge=document.getElementById('roleBadge');
   if(badge){badge.textContent='';badge.hidden=true;badge.setAttribute('aria-hidden','true');}
-  const isManager=appRole==='manager';
-  if(isManager){
+  const canReadOwner=appRole==='manager'||appRole==='readonly_admin';
+  if(canReadOwner){
     document.getElementById('navOverview')?.classList.remove('locked');
     document.getElementById('navHistory')?.classList.remove('locked');
     document.getElementById('navAnalysis')?.classList.remove('locked');
@@ -148,7 +151,37 @@ function showOwnerAppShell(appRole){
     document.getElementById('navWifi')?.classList.add('locked');
   }
   const db=document.getElementById('btnDashboard');
-  if(db)db.style.display=isManager?'':'none';
+  if(db)db.style.display=canReadOwner?'':'none';
+  applyReadonlyAdminUi();
+}
+function denyReadonlyAdminWrite(){
+  if(role!=='readonly_admin')return false;
+  toast('只读管理员不能修改数据','err');
+  return true;
+}
+function applyReadonlyAdminUi(){
+  const readonly=role==='readonly_admin';
+  document.body.classList.toggle('readonly-admin',readonly);
+  if(!readonly)return;
+  [
+    '#ownerEntryTool',
+    '#btnSave',
+    '#btnClear',
+    '#btnDelete',
+    '#btnParse',
+    '#catTabs',
+    '#entryForm',
+    '#wifiSave',
+    '#wifiClear',
+    '#btnConfigSave',
+    '#btnRentConfigSave'
+  ].forEach(sel=>{
+    document.querySelectorAll(sel).forEach(el=>{
+      el.setAttribute('aria-disabled','true');
+      if(el.matches('button,input,select,textarea'))el.disabled=true;
+      else el.classList.add('readonly-disabled');
+    });
+  });
 }
 async function resumeUnifiedOwnerSession(){
   showOwnerAuthChecking();
@@ -607,10 +640,10 @@ function rmAnalysis(anchorId){state.analysisSessions=state.analysisSessions.filt
 async function loadAll(){
   try{const cur=LS.get('current-session');if(cur){const p=JSON.parse(cur);if(p&&Array.isArray(p.entries))state.session=p;}}catch{}
   try{const keys=LS.keys('session:');const arr=[];for(const k of keys){try{const r=LS.get(k);if(r)arr.push(JSON.parse(r));}catch{}}arr.sort((a,b)=>(b.date||'').localeCompare(a.date||''));state.saved=arr;}catch{}
-  state.analysisSessions=role==='manager'?loadAnalysis():[];
+  state.analysisSessions=isOwnerShellRole()?loadAnalysis():[];
   // Load customers from authenticated cloud storage first; keep sessionStorage only as a short-lived fallback.
   state.customers=[];
-  if(role==='manager'){
+  if(isOwnerShellRole()){
     try{
       const cr=await apiFetch('/api/customers');
       if(!cr.ok)throw new Error('api');
@@ -626,7 +659,7 @@ async function loadAll(){
   // Load arrears
   // 欠款：从云端 API 加载（优先），失败则降级 localStorage
   state.arrears=[];
-  if(role==='manager'){
+  if(isOwnerShellRole()){
     try{
       const _ar=await apiFetch('/api/arrears');
       if(!_ar.ok) throw new Error('api');
@@ -638,7 +671,7 @@ async function loadAll(){
   }else{
     LS.del(ARREARS_KEY);
   }
-  if(role==='manager')await rc_loadRoomCfgFromCloud();
+  if(isOwnerShellRole())await rc_loadRoomCfgFromCloud();
 }
 
 /* ── RENDER ENTRY ── */
@@ -741,7 +774,7 @@ function renderCatTabs(){
   const fNote=document.getElementById('fNote');
   if(fNote) fNote.placeholder='可留空';
   const sb=document.getElementById('btnSettings');
-  if(sb) sb.style.display=role==='manager'?'flex':'none';
+  if(sb) sb.style.display=isOwnerWriteRole()?'flex':'none';
   // 新租客：标签明确为"租金"，与押金区分
   const fDueInc=document.getElementById('fDue');
   const fPaidInc=document.getElementById('fPaid');
@@ -885,7 +918,7 @@ function buildInstallSection(){
 /* onDepositInput removed - deposit uses fDepDue/fDepPaid */
 /* 老板视角：从云端静默刷新欠款列表 */
 async function refreshArrearsFromCloud(){
-  if(role!=='manager') return;
+  if(!isOwnerShellRole()) return;
   try{
     const r=await apiFetch('/api/arrears');
     if(!r.ok) return;
@@ -903,7 +936,7 @@ async function refreshArrearsFromCloud(){
 function renderArrearsPanel(){
   const panel=document.getElementById('arrearsPanel');
   if(!panel) return;
-  const visible=role==='manager'?state.arrears:state.arrears.filter(a=>a.sessionId===state.session.id);
+  const visible=isOwnerShellRole()?state.arrears:state.arrears.filter(a=>a.sessionId===state.session.id);
   const active=visible.filter(a=>!a.cleared);
   if(!active.length){panel.innerHTML='';return;}
   const today=fmtD(new Date());
@@ -941,7 +974,7 @@ ${overdue?('⚠ 已逾期 '+esc(a.dueDate)):daysLeft===0?'今天到期':daysLeft
             ? `<button class="arrear-clr" style="background:#1a73e8;color:#fff;font-size:10px;padding:4px 8px;border-radius:6px;border:none;cursor:pointer;white-space:nowrap" onclick="enterDepositForArrear(${jsArg(a.id)})">💰 录入押金</button>`
             : `<button class="arrear-clr" style="background:#1a8a4a;color:#fff;font-size:10px;padding:4px 8px;border-radius:6px;border:none;cursor:pointer;white-space:nowrap" onclick="enterPaymentForArrear(${jsArg(a.id)})">💰 录入收款</button>`
           }
-          ${role==='manager'?`<button style="background:transparent;color:#999;font-size:9px;padding:2px 4px;border:1px solid #ddd;border-radius:4px;cursor:pointer;white-space:nowrap" onclick="dismissArrear(${jsArg(a.id)})">作废</button>`:''}
+          ${isOwnerWriteRole()?`<button style="background:transparent;color:#999;font-size:9px;padding:2px 4px;border:1px solid #ddd;border-radius:4px;cursor:pointer;white-space:nowrap" onclick="dismissArrear(${jsArg(a.id)})">作废</button>`:''}
         </div>
       </div>`;
     }).join('')}
@@ -949,6 +982,7 @@ ${overdue?('⚠ 已逾期 '+esc(a.dueDate)):daysLeft===0?'今天到期':daysLeft
 }
 /* ── 录入收款/押金 → 不直接核销，引导员工录入流水 ── */
 function enterPaymentForArrear(id){
+  if(denyReadonlyAdminWrite())return;
   const ar=state.arrears.find(a=>a.id===id);
   if(!ar) return;
   // 切换到现金收款（默认）
@@ -979,6 +1013,7 @@ function enterPaymentForArrear(id){
 }
 
 function enterDepositForArrear(id){
+  if(denyReadonlyAdminWrite())return;
   const ar=state.arrears.find(a=>a.id===id);
   if(!ar) return;
   // 补收押金：不是新入住，不需要重填入住日期
@@ -1032,6 +1067,7 @@ function enterDepositForArrear(id){
 
 /* 作废：仅用于特殊情况（需二次确认），不录入任何收款 */
 async function dismissArrear(id){
+  if(denyReadonlyAdminWrite())return;
   if(!confirm('作废此提醒？\n注意：此操作不会录入任何收款记录，\n仅适用于录入错误等特殊情况。')) return;
   try{await apiFetch('/api/clear_arrear',{method:'POST',body:JSON.stringify({id})});}catch{}
   const ar=state.arrears.find(a=>a.id===id);
@@ -1418,6 +1454,7 @@ function delEntry(id){
   toast('已删除记录及关联欠款提醒');
 }
 async function exportSession(){
+  if(denyReadonlyAdminWrite())return;
   if(!state.session.entries.length){toast('当前没有任何记录','err');return;}
   const final={...state.session,date:fmtDT(new Date())};
   if(!final.anchorId)final.anchorId=mkAnchor(final.id,final.date.slice(0,10));
@@ -1571,7 +1608,7 @@ async function renderHistory(){
       `:`<div class="hist-stat" style="justify-content:center;color:var(--text3);font-size:11px">${cnt}笔 · 点击查看详情</div>`}
       <div class="hist-actions">
         <button class="btn btn-ghost" data-act="view"><svg class="ico"><use href="#i-eye"/></svg>查看</button>
-        ${role==='manager'?`<button class="btn btn-danger" data-act="del"><svg class="ico"><use href="#i-trash"/></svg></button>`:''}
+        ${isOwnerWriteRole()?`<button class="btn btn-danger" data-act="del"><svg class="ico"><use href="#i-trash"/></svg></button>`:''}
       </div>
     </div>`;
   };
@@ -1615,6 +1652,7 @@ async function renderHistory(){
       const id=card.dataset.id;
       const s=all.find(x=>x.id===id);if(!s)return;
       if(a.dataset.act==='del'){
+        if(denyReadonlyAdminWrite())return;
         const ok=await confirmManagerPassword('删除流水记录将同时从云端移除');
         if(!ok) return;
         toast('删除中...');
@@ -1749,6 +1787,7 @@ function rc_queueRoomCfgCloudSave(cfg,opts={}){
   _rcCloudSaveTimer=setTimeout(()=>rc_pushRoomCfgToCloud(cfg,opts),350);
 }
 async function rc_pushRoomCfgToCloud(cfg,opts={}){
+  if(denyReadonlyAdminWrite())return;
   const clean=rc_cleanRoomCfg(cfg);
   const jsonText=JSON.stringify(clean);
   if(jsonText===_rcLastCloudCfgJson)return;
@@ -2818,6 +2857,7 @@ async function wmLoadAccounts(force=false){
   return _wmAccountsCache;
 }
 async function wmSaveAccounts(m){
+  if(denyReadonlyAdminWrite())throw new Error('readonly_admin_denied');
   _wmAccountsCache=m;
   LS.del('hl:wifi_accounts');
   const r=await apiFetch('/api/wifi/accounts',{method:'POST',body:JSON.stringify({accounts:m})});
@@ -3495,6 +3535,7 @@ function isDuplicate(s){
 }
 
 async function syncImportedSessionsToCloud(sessions){
+  if(denyReadonlyAdminWrite())return{ok:0,fail:sessions?.length||0,errors:['readonly_admin_denied']};
   if(!sessions||!sessions.length)return{ok:0,fail:0,errors:[]};
   let ok=0,fail=0;const errors=[];
   for(const s of sessions){
@@ -4076,7 +4117,7 @@ const CC_GRADES={
   new:      {label:'新客户',  color:'#9ba3b0',bg:'rgba(155,163,176,0.1)',border:'rgba(155,163,176,0.2)'},
 };
 function ccSave(){
-  if(role!=='manager')return;
+  if(!isOwnerWriteRole()||denyReadonlyAdminWrite())return;
   const payload=JSON.stringify(state.customers);
   LS.set(CUSTOMER_KEY,payload);
   apiFetch('/api/customers',{method:'POST',body:JSON.stringify({customers:state.customers})})

@@ -89,3 +89,15 @@ If a real phone screenshot still shows any item below, UI acceptance fails and t
 | Owner arrears detail modal is readable                         |           |       |
 | Owner history has quick skeleton/loading feedback              |           |       |
 | Network/WiFi entry is visible or documented as manual-required |           |       |
+
+## INTERNAL-QA-BLOCKERS-003 Visual And Safety Checks
+
+| Check                                                                                       | Pass/Fail | Notes |
+| ------------------------------------------------------------------------------------------- | --------- | ----- |
+| Employee header shows only real name, centered                                              |           |       |
+| Employee header does not show `当前员工` or `staff`                                         |           |       |
+| Employee page does not show `Script error.` toast                                           |           |       |
+| Arrears modal compact list shows 3-5 rows on phone                                          |           |       |
+| Arrears export is summary-first and accounting-readable                                     |           |       |
+| Unified login can use browser password manager without app-owned plaintext password storage |           |       |
+| Readonly admin cannot see or trigger write actions                                          |           |       |

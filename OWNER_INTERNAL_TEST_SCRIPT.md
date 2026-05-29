@@ -93,3 +93,12 @@ Additional stop conditions:
 | OWNER-AUTH-003 | Arrears detail modal | Open overdue / due detail    | Modal shows readable cards and usable close/copy/export controls                 | Screenshot          |           | No write                       |
 | OWNER-AUTH-004 | History feedback     | Open history                 | Skeleton appears quickly; recent 20 records load first or retry feedback appears | Screenshot / timing |           | No delete                      |
 | OWNER-AUTH-005 | Network entry        | Find network/WiFi entry      | `网络 / NETWORK` entry is visible for authorized owner session                   | Screenshot          |           | Do not change network settings |
+
+## INTERNAL-QA-BLOCKERS-003 Owner Checks
+
+| Test ID              | Scenario                   | Steps                                           | Expected Result                                                               | Evidence Needed             | Pass/Fail | Notes                  |
+| -------------------- | -------------------------- | ----------------------------------------------- | ----------------------------------------------------------------------------- | --------------------------- | --------- | ---------------------- |
+| OWNER-BLOCKER-003-01 | Arrears export format      | Open control panel, filter overdue, export text | Export is summary-first, readable, no ASCII box art, no empty `update:` field | Export text screenshot/copy |           |                        |
+| OWNER-BLOCKER-003-02 | Arrears compact modal      | Open overdue detail modal on mobile             | Multiple compact rows are visible and readable                                | Mobile screenshot           |           |                        |
+| OWNER-BLOCKER-003-03 | Readonly admin write guard | Login as readonly admin test fixture            | Dashboard/history/clients visible; write buttons hidden or disabled           | Screenshot plus test result |           | No business write test |
+| OWNER-BLOCKER-003-04 | Password manager support   | Login owner via unified login                   | Browser can offer password save; app does not store plaintext password        | Browser prompt/manual note  |           | Do not print password  |

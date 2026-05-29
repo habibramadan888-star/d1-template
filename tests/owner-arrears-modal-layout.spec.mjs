@@ -8,9 +8,9 @@ test("arrears detail modal uses mobile cards instead of a narrow table", async (
 
   assert.match(html, /<div class="modal-list" id="modalBody"><\/div>/);
   assert.doesNotMatch(html, /<tbody id="modalBody"><\/tbody>/);
-  assert.match(cp, /arrears-detail-card/);
-  assert.match(cp, /arrears-detail-grid/);
-  assert.match(cp, /cp_modalOverdueDays/);
+  assert.match(cp, /arrears-compact-row/);
+  assert.match(cp, /arrears-compact-meta/);
+  assert.match(cp, /cp_overdueText/);
   assert.match(cp, /cp_modalAmount/);
 });
 

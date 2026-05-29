@@ -282,6 +282,7 @@ button:disabled{
       <div class="login-title">Homelink 登录</div>
     </div>
     <form id="loginForm">
+      <input class="sr-only" id="browserUsername" name="username" autocomplete="username" value="homelink-owner" aria-hidden="true" tabindex="-1">
       <div class="field">
         <label class="sr-only" for="accountId">用户名</label>
         <input id="accountId" name="accountId" autocomplete="username" placeholder="用户名">
@@ -310,11 +311,13 @@ const API_ORIGIN = "https://homelink-finance.habibramadan888.workers.dev";
 const EMPLOYEE_DESTINATION = "./employee-v3.html";
 const OWNER_DESTINATION = "./index.html";
 const EMPLOYEE_ROLES = new Set(["employee", "staff"]);
-const OWNER_ROLES = new Set(["owner", "manager", "admin"]);
+const OWNER_ROLES = new Set(["owner", "manager", "admin", "admin_readonly", "readonly_admin"]);
+const OWNER_PASSWORD_MANAGER_USERNAME = "homelink-owner";
 
 const statusEl = document.getElementById("status");
 const form = document.getElementById("loginForm");
 const accountId = document.getElementById("accountId");
+const browserUsername = document.getElementById("browserUsername");
 const secret = document.getElementById("secret");
 const rememberAccount = document.getElementById("rememberAccount");
 const loginButton = document.getElementById("loginButton");
@@ -351,11 +354,13 @@ function loadRememberedAccount() {
     accountId.value = remembered;
     rememberAccount.checked = true;
   }
+  browserUsername.value = remembered || OWNER_PASSWORD_MANAGER_USERNAME;
 }
 
 function persistRememberedAccount(account) {
   if (rememberAccount.checked && account) localStorage.setItem(REMEMBER_ACCOUNT_KEY, account);
   else localStorage.removeItem(REMEMBER_ACCOUNT_KEY);
+  browserUsername.value = account || OWNER_PASSWORD_MANAGER_USERNAME;
 }
 
 async function requestJson(path, options = {}) {
@@ -412,6 +417,7 @@ async function signIn(event) {
   event.preventDefault();
   const id = accountId.value.trim();
   const password = secret.value.trim();
+  browserUsername.value = id || OWNER_PASSWORD_MANAGER_USERNAME;
   if (!password) {
     setStatus("请输入密码或 PIN。", "error");
     return;
@@ -475,6 +481,7 @@ async function clearSession() {
     localStorage.removeItem(REMEMBER_ACCOUNT_KEY);
     accountId.value = "";
   }
+  browserUsername.value = accountId.value.trim() || OWNER_PASSWORD_MANAGER_USERNAME;
   secret.value = "";
   showLoginForm("");
   logoutButton.disabled = false;

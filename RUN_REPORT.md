@@ -5859,3 +5859,16 @@ Validation and deploy:
 - `npm run audit:worker-drift`: PASS, 0 critical mismatches.
 - Live deploy: PASS, `homelink-finance` version `438859f7-a6a9-4482-bd48-b05e5f5b8656`.
 - Live read-only smoke: PASS for unified login, old employee static route redirect stub, employee identity/top nav assets, owner modal/control assets, `/api/me` 401, and wrong-login 401.
+
+## INTERNAL-QA-BLOCKERS-003
+
+- Fixed employee identity display to show only the resolved real user name, centered in the header box.
+- Added sanitized employee runtime error handling so anonymous `Script error.` is not surfaced as a user-facing app failure.
+- Reworked arrears export into summary-first accounting text and compacted the arrears detail modal for mobile.
+- Added browser password manager support with a stable owner username identifier; the app does not store plaintext password/PIN.
+- Added readonly admin role handling with backend write denial and frontend write UI disabling.
+- Validation passed: `npm run check`, `npm run security:secrets`, `npm run gate:commercial-launch`, required targeted tests, and `npm run qa:employee-entry-staging`.
+- `npm run qa:employee-entry-staging` remained `MANUAL_REQUIRED / DRY_RUN_ONLY`.
+- Deployed only UI/auth/role-guard fixes to live `homelink-finance` Worker version `90370060-b148-4498-92d7-8995026a6eb9`.
+- Live read-only smoke passed for public page availability, unauthenticated `/api/me` 401, visible employee-label cleanup, unified-login autocomplete attributes, and absence of production/DB/QA warnings.
+- Production remains `PRODUCTION_NO_GO`; no D1 write, migration, D1 export/import/execute, or business write QA was performed.

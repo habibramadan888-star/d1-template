@@ -148,3 +148,13 @@ pause role-flow QA until retested. Production cutover remains
 - Confirm WiFi/network entry is present or explicitly marked manual-required.
 - Do not perform employee entry write, handover submit, void/delete, settings changes, D1 write, or migration.
 - Production cutover remains `PRODUCTION_NO_GO`.
+
+## INTERNAL-QA-BLOCKERS-003 Acceptance Addendum
+
+- Employee identity: display real user name only; `staff` is a role and must never be shown as a person name.
+- Script errors: any visible `Script error.` toast during employee initial render is a P1 blocker.
+- Arrears export: exported text must start with summary, include generated time/count/aging buckets, and use `金额未接入` when amount authority is not connected.
+- Arrears modal: mobile layout must use compact rows, not oversized cards that show only one customer per screen.
+- Login password manager: browser autocomplete is allowed; app-owned plaintext password/PIN storage is forbidden.
+- Readonly admin: can view owner dashboard/history/clients/analysis; all write actions must be disabled in UI and rejected by backend.
+- Production remains `PRODUCTION_NO_GO`; no internal QA result is production approval.

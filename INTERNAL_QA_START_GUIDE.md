@@ -205,3 +205,13 @@ granted. Production cutover remains `PRODUCTION_NO_GO`.
 - Control panel or arrears detail modal broken on mobile is a P1/P2 QA bug.
 - Full write-style QA still requires separate approval.
 - Production cutover remains `PRODUCTION_NO_GO`.
+
+## INTERNAL-QA-BLOCKERS-003 Update
+
+- 员工端右上角只能显示真实员工名称或账号，不得显示 `staff`、`员工编号 staff` 或 `当前员工 staff`。
+- 员工端出现 `Script error.` 视为 P1 bug；页面不得把匿名浏览器脚本错误直接展示给用户。
+- 欠款导出必须使用 summary-first 新格式，不得出现 ASCII 框线、空 `update:` 字段或难读调试文本。
+- 欠款明细弹层在手机端必须紧凑可读，一屏应能看到多条记录。
+- 登录页允许浏览器密码管理器保存密码，但系统不得把 password/PIN 明文保存到 `localStorage` 或 `sessionStorage`。
+- 只读管理员可以查看老板端数据，但不能录入、交接、作废、删除、修改 settings 或执行任何业务写入。
+- 完整写入测试仍需单独人工批准；Production cutover remains `PRODUCTION_NO_GO`.

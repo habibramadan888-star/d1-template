@@ -23,7 +23,7 @@ button,input,select,textarea{font:inherit}
 .brand{max-width:980px;margin:0 auto;padding:22px 28px;display:flex;justify-content:space-between;gap:16px;align-items:center}
 .logo{display:flex;align-items:center;gap:16px}.badge{width:70px;height:70px;border-radius:17px;background:linear-gradient(145deg,#0bb25b,#078d42);color:#fff;display:grid;place-items:center;font-weight:950;line-height:1.05;box-shadow:inset 0 -10px 20px rgba(0,0,0,.08)}.badge small{display:block;color:#f1d800;font-size:12px}.word{font-size:32px;font-weight:950;letter-spacing:-.04em}.word .g{color:var(--green)}.word .dot,.word i{color:#d5c100}.word i{font-style:normal}.word em{display:inline-block;margin-left:10px;color:#142033;font-size:.72em;font-style:normal;font-weight:760;letter-spacing:-.04em}
 .actions{display:flex;align-items:center;gap:12px}.pill{border:1.5px solid rgba(9,166,79,.24);color:var(--green2);background:#fff;border-radius:999px;padding:11px 18px;font-weight:950}.pill.main{background:linear-gradient(180deg,#10ad5a,#078d42);color:#fff;border:0}
-.operator{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px;font-weight:900}.operator input{width:92px;border:1px solid var(--line);border-radius:12px;padding:8px 10px}
+.operator{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px;font-weight:900}.operator input{width:92px;border:1px solid var(--line);border-radius:12px;padding:8px 10px;text-align:center}.employee-identity-label{display:none!important}
 .tabs{max-width:980px;margin:0 auto;padding:0 28px 20px;display:flex;overflow-x:auto;scrollbar-width:none}.tabs::-webkit-scrollbar{display:none}
 .tab{min-width:190px;height:86px;border:1px solid var(--line);border-right:0;background:rgba(255,255,255,.94);cursor:pointer;color:#243044;font-size:25px;font-weight:950;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;letter-spacing:.05em;text-align:center}
 .tab:first-child{border-radius:27px 0 0 27px}.tab:last-child{border-right:1px solid var(--line);border-radius:0 27px 27px 0}.tab.active{background:linear-gradient(180deg,#10ad5a,#078d42);color:#fff;border-color:rgba(9,166,79,.7);box-shadow:0 12px 26px rgba(9,166,79,.24)}.en{font-family:Consolas,"JetBrains Mono",monospace;font-size:13px;font-weight:700;letter-spacing:.08em;opacity:.78}
@@ -194,7 +194,7 @@ input:focus,select:focus,textarea:focus{
 .word .g{color:#0a9f4b}
 .actions .pill:not(.main){display:none}
 .operator{background:rgba(255,255,255,.50);border:1px solid rgba(255,255,255,.74);border-radius:16px;padding:6px 8px}
-.operator input{height:34px;background:rgba(255,255,255,.58)}
+.operator input{height:34px;background:rgba(255,255,255,.58);text-align:center}
 .tabs{padding:8px 24px 18px}
 .tab{height:64px;min-width:160px;font-size:22px;border-radius:22px!important;border:1px solid rgba(255,255,255,.72);margin-right:10px}
 .tab .en{font-size:10px}
@@ -1727,7 +1727,7 @@ label .label-en{
 <div class="top">
   <div class="brand">
     <div class="logo"><div class="badge"><div>HOME<small>LINK.</small></div></div><div class="word"><span class="g">HOME</span><span>LINK</span><i>.</i><em>流水管理</em></div></div>
-    <div class="actions"><div class="operator"><span class="employee-identity-label">当前员工</span><input id="operatorId" placeholder="未登录" readonly></div><span class="pill">员工</span><span class="pill main">已登录<span class="label-en">SIGNED IN</span></span></div>
+    <div class="actions"><div class="operator"><input id="operatorId" placeholder="未登录" readonly aria-label="员工姓名"></div><span class="pill">员工</span><span class="pill main">已登录<span class="label-en">SIGNED IN</span></span></div>
   </div>
   <div class="tabs">
     <button class="tab active" data-view="entry"><span class="tab-cn">录入</span><span class="en">ENTRY</span></button>
@@ -1963,8 +1963,29 @@ function showStatus(msg,type='ok'){
   const exp=$('exportStatus');
   if(exp)exp.innerHTML=`<div class="${type==='bad'?'bad':type==='warn'?'warn':''}">${esc(msg)}</div>`;
 }
-window.addEventListener('error',e=>{console.error(e.error||e.message);toast('页面脚本错误：'+(e.message||'unknown'),6000);showStatus('页面脚本错误：'+(e.message||'unknown'),'bad')});
-window.addEventListener('unhandledrejection',e=>{const msg=e.reason?.message||String(e.reason||'unknown');console.error(e.reason);toast('操作失败：'+msg,6000);showStatus('操作失败：'+msg,'bad')});
+function employeeRuntimeErrorInfo(e){
+  const message=String(e?.message||e?.reason?.message||e?.reason||'unknown');
+  const filename=String(e?.filename||'');
+  const line=Number(e?.lineno||0);
+  const column=Number(e?.colno||0);
+  return {message,filename,line,column,isAnonymousScriptError:message==='Script error.'&&!filename&&!line&&!column};
+}
+window.addEventListener('error',e=>{
+  const info=employeeRuntimeErrorInfo(e);
+  console.error('[EmployeeRuntime]',info,e.error||e.message);
+  if(info.isAnonymousScriptError){
+    console.warn('[EmployeeRuntime] Anonymous browser/extension script error suppressed from user UI.');
+    return;
+  }
+  toast('页面脚本错误，请刷新重试',6000);
+  showStatus('页面脚本错误，请刷新重试','bad');
+});
+window.addEventListener('unhandledrejection',e=>{
+  const info=employeeRuntimeErrorInfo(e);
+  console.error('[EmployeeRuntimePromise]',info,e.reason);
+  toast('操作失败，请重试',6000);
+  showStatus('操作失败，请重试','bad');
+});
 function operatorId(){return state.user?.userid||$('operatorId').value.trim()||localStorage.getItem('empv3:operator')||'EMP'}
 function operatorName(){return employeeDisplayName(state.user)||operatorId()}
 function setOperator(v){try{localStorage.setItem('empv3:operator',v||'EMP')}catch{}}
