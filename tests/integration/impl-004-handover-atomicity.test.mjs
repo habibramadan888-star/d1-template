@@ -1,29 +1,38 @@
+import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-describe("IMPL-004 Handover Atomicity integration plan", () => {
-  it(
-    "commits one normal handover atomically",
-    { skip: "requires staging handover write harness" },
-    () => {}
-  );
+import {
+  calculateHandoverTotals,
+  validateHandoverBody
+} from "../../deploy-worker/src/handlers/handover.js";
 
-  it(
-    "returns cached result for duplicate idempotency key",
-    { skip: "requires staging idempotency table" },
-    () => {}
-  );
+describe("IMPL-004: Handover Atomicity", () => {
+  it("calculates backend cash and bank totals from entry rows", () => {
+    assert.deepEqual(
+      calculateHandoverTotals([
+        { id: "e1", method: "CASH", amount: 100 },
+        { id: "e2", method: "BANK", amount: 250 },
+        { id: "e3", method: "BANK_TRANSFER", amount: 50 }
+      ]),
+      { totalCash: 100, totalBank: 300 }
+    );
+  });
 
-  it(
-    "rolls back on injected mid-transaction failure",
-    { skip: "requires failure injection harness" },
-    () => {}
-  );
+  it("validates entries and reported totals as integer minor units", () => {
+    const entries = validateHandoverBody({
+      totalCash: 100,
+      totalBank: 250,
+      entries: [{ id: "e1", method: "CASH", amount: 100 }]
+    });
 
-  it("allows safe retry after rollback", { skip: "requires failure injection harness" }, () => {});
-
-  it(
-    "rejects frontend/backend total mismatch",
-    { skip: "requires staging handover fixtures" },
-    () => {}
-  );
+    assert.equal(entries.length, 1);
+    assert.throws(() => validateHandoverBody({ totalCash: 1.5, totalBank: 0, entries: [] }));
+    assert.throws(() =>
+      validateHandoverBody({
+        totalCash: 100,
+        totalBank: 0,
+        entries: [{ method: "CASH", amount: 100 }]
+      })
+    );
+  });
 });

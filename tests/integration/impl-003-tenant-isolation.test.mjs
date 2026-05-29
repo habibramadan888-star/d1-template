@@ -1,39 +1,57 @@
+import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-describe("IMPL-003 Tenant and Property Isolation integration plan", () => {
-  it(
-    "filters employee reads by assigned property",
-    { skip: "requires staging scoped accounts" },
-    () => {}
-  );
+import {
+  appendScopeFilter,
+  buildScopeFilter,
+  normalizeAllowedProperties
+} from "../../deploy-worker/src/db/query-filters.js";
 
-  it(
-    "denies employee access to another property",
-    { skip: "requires staging scoped accounts" },
-    () => {}
-  );
+describe("IMPL-003: Tenant/Property Isolation", () => {
+  it("scopes employees by tenant and assigned property IDs", () => {
+    const filter = buildScopeFilter({
+      role: "employee",
+      tenant_id: "tenant-a",
+      allowed_properties: ["101", "102"]
+    });
 
-  it(
-    "allows owner reads inside own tenant",
-    { skip: "requires staging tenant fixtures" },
-    () => {}
-  );
+    assert.equal(filter.clause, "tenant_id = ? AND property_id IN (?, ?)");
+    assert.deepEqual(filter.params, ["tenant-a", "101", "102"]);
+  });
 
-  it(
-    "denies owner reads from another tenant",
-    { skip: "requires staging tenant fixtures" },
-    () => {}
-  );
+  it("scopes owners by tenant without property restriction", () => {
+    const filter = buildScopeFilter({ role: "owner", tenant_id: "tenant-a" });
 
-  it(
-    "ignores frontend-supplied tenant_id tampering",
-    { skip: "requires staging auth claim harness" },
-    () => {}
-  );
+    assert.equal(filter.clause, "tenant_id = ?");
+    assert.deepEqual(filter.params, ["tenant-a"]);
+  });
 
-  it(
-    "returns 403 for unauthorized scoped writes",
-    { skip: "requires staging write harness" },
-    () => {}
-  );
+  it("denies employees with no allowed properties", () => {
+    const filter = buildScopeFilter({ role: "employee", tenant_id: "tenant-a" });
+
+    assert.equal(filter.clause, "1 = 0");
+    assert.equal(filter.reason, "no_allowed_properties");
+  });
+
+  it("appends scoped WHERE before ORDER BY while preserving parameter order", () => {
+    const query = appendScopeFilter("SELECT * FROM entries ORDER BY created_at DESC", {
+      role: "employee",
+      tenant_id: "tenant-a",
+      allowed_properties: "101, 102"
+    });
+
+    assert.match(query.sql, /WHERE \(tenant_id = \? AND property_id IN \(\?, \?\)\) ORDER BY/);
+    assert.deepEqual(query.params, ["tenant-a", "101", "102"]);
+  });
+
+  it("normalizes property lists from strings and arrays", () => {
+    assert.deepEqual(normalizeAllowedProperties({ allowed_properties: "101, 102" }), [
+      "101",
+      "102"
+    ]);
+    assert.deepEqual(normalizeAllowedProperties({ allowed_properties: [101, "102"] }), [
+      "101",
+      "102"
+    ]);
+  });
 });

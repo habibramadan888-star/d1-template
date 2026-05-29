@@ -1,23 +1,32 @@
+import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-describe("IMPL-005 Runtime DDL Cleanup integration plan", () => {
-  it(
-    "starts Worker when schema is already migrated",
-    { skip: "requires staging schema verification" },
-    () => {}
-  );
+import { verifySchema } from "../../deploy-worker/src/db/schema-verify.js";
 
-  it(
-    "fails clearly when a required table is missing",
-    { skip: "requires disposable database" },
-    () => {}
-  );
+describe("IMPL-005: Runtime DDL Cleanup", () => {
+  it("passes when all required tables are present", async () => {
+    const db = {
+      async query(sql, params) {
+        return [{ name: params[0] }];
+      }
+    };
 
-  it("keeps migrations idempotent", { skip: "requires disposable database" }, () => {});
+    assert.deepEqual(await verifySchema(db, ["entries", "payments"]), {
+      ok: true,
+      verifiedTables: ["entries", "payments"]
+    });
+  });
 
-  it(
-    "keeps production Worker source free of runtime DDL",
-    { skip: "covered by static audit gate when implemented" },
-    () => {}
-  );
+  it("fails clearly when required tables are missing", async () => {
+    const db = {
+      async query(sql, params) {
+        return params[0] === "entries" ? [{ name: "entries" }] : [];
+      }
+    };
+
+    await assert.rejects(
+      () => verifySchema(db, ["entries", "payments"]),
+      /Missing required tables/
+    );
+  });
 });
