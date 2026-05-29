@@ -43,7 +43,7 @@ test("unknown role is denied", () => {
 test("unauthenticated access redirects to login", () => {
   assert.equal(shouldRedirectUnauthenticatedToUnifiedLogin({ meStatus: 401 }), true);
   assert.equal(shouldRedirectUnauthenticatedToUnifiedLogin({ hasAuthClaim: false }), true);
-  assert.equal(UNIFIED_LOGIN_PATH, "/unified-login.html");
+  assert.equal(UNIFIED_LOGIN_PATH, "/");
 });
 
 test("invalid login shows clear error", () => {
@@ -95,14 +95,15 @@ test("production status remains no-go", async () => {
   assert.match(readiness, /PRODUCTION_NO_GO/);
 });
 
-test("unified login asset uses /api/me as authority and preserves destinations", async () => {
-  const html = await readFile("deploy-worker/public/unified-login.html", "utf8");
+test("root portal asset uses /api/me as authority and preserves canonical destinations", async () => {
+  const html = await readFile("deploy-worker/public/portal.html", "utf8");
 
   assert.match(html, /\/api\/me/);
   assert.match(html, /\/auth\/login/);
   assert.match(html, /\/auth\/employee-login/);
-  assert.match(html, /employee-v3\.html/);
-  assert.match(html, /index\.html/);
+  assert.match(html, /"\/employee"/);
+  assert.match(html, /"\/owner"/);
+  assert.match(html, /"\/admin"/);
   assert.doesNotMatch(html, /tenant_id\s*=/i);
   assert.doesNotMatch(html, /property_id\s*=/i);
 });

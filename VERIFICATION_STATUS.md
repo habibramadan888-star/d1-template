@@ -1,5 +1,20 @@
 # Verification Status
 
+## AUTH-ROUTING-ARCHITECTURE-001 Verification Addendum
+
+Date: 2026-05-29, Asia/Dubai
+
+| Verification          | Result | Evidence                                                                     | Commercial Meaning                                           |
+| --------------------- | ------ | ---------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| Root three-door entry | READY  | `THREE_PORTAL_ENTRY_DESIGN.md`; `tests/three-portal-entry.spec.mjs`          | Formal user entry is `/`, not legacy `.html` pages.          |
+| Route normalization   | READY  | `ROUTE_NORMALIZATION_RESULT.md`; `tests/route-normalization.spec.mjs`        | Legacy paths redirect to root or canonical business routes.  |
+| Legacy login hidden   | READY  | `LEGACY_LOGIN_UI_REMOVAL_RESULT.md`; `tests/legacy-login-hidden.spec.mjs`    | Old employee/owner login UI is not part of normal user flow. |
+| Logout to root        | READY  | `LOGOUT_LOCK_TO_ROOT_ENTRY_RESULT.md`; `tests/logout-to-root-entry.spec.mjs` | Lock/logout returns to `/` and clears old auth state.        |
+| Role guards           | READY  | `ROLE_GUARD_CLOSURE_RESULT.md`; `tests/role-guard-closure.spec.mjs`          | Server role, not frontend door selection, controls access.   |
+| Readonly admin        | READY  | `READONLY_ADMIN_PORTAL_RESULT.md`; `tests/readonly-admin-portal.spec.mjs`    | Admin door routes readonly admin to read-only path.          |
+
+Production cutover remains `PRODUCTION_NO_GO`. No production migration, D1 write, D1 export/import/execute, employee entry write, handover submit, void/delete, settings change, dashboard calculation change, financial formula change, or commercial launch GO occurred.
+
 Generated: 2026-05-23, Asia/Dubai
 
 This file records the safety verification commands rerun during project status reconciliation. Commands were run without modifying business logic, production configuration, or production database data.

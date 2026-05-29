@@ -91,10 +91,10 @@ test("invalid or expired session redirects to unified login", () => {
   const employee = resolveEmployeeSessionHandoff({ meStatus: 401 });
 
   assert.equal(owner.action, "REDIRECT");
-  assert.equal(owner.destination, "/unified-login.html");
+  assert.equal(owner.destination, "/");
   assert.equal(owner.showSecondLogin, false);
   assert.equal(employee.action, "REDIRECT");
-  assert.equal(employee.destination, "/unified-login.html");
+  assert.equal(employee.destination, "/");
   assert.equal(employee.showSecondLogin, false);
 });
 

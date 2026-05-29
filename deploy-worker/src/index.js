@@ -2509,6 +2509,68 @@ async function handleEmployeeEntryAdapterStagingDraft(request,env){
 __name(handleEmployeeEntryAdapterStagingDraft,"handleEmployeeEntryAdapterStagingDraft");
 // EMPLOYEE_API_PATCH_END
 
+function redirectToRootEntry(request, portal = "") {
+  const target = new URL("/", request.url);
+  if (portal) target.searchParams.set("portal", portal);
+  return Response.redirect(target, 302);
+}
+__name(redirectToRootEntry, "redirectToRootEntry");
+function redirectToPath(request, pathname) {
+  const target = new URL(request.url);
+  target.pathname = pathname;
+  target.search = "";
+  return Response.redirect(target, 302);
+}
+__name(redirectToPath, "redirectToPath");
+async function readRouteClaim(request, env) {
+  const token = getBearerToken(request) || getCookie(request);
+  if (!token) return null;
+  try {
+    return await verifyJWT(token, env.JWT_SECRET);
+  } catch {
+    return null;
+  }
+}
+__name(readRouteClaim, "readRouteClaim");
+async function fetchStaticAsset(request, env, pathname) {
+  if (!env.ASSETS) return null;
+  const assetUrl = new URL(request.url);
+  assetUrl.pathname = pathname;
+  assetUrl.search = "";
+  return env.ASSETS.fetch(new Request(assetUrl.toString(), {
+    method: "GET",
+    headers: {
+      Accept: request.headers.get("Accept") || "text/html"
+    }
+  }));
+}
+__name(fetchStaticAsset, "fetchStaticAsset");
+async function handleAppEntryRoute(request, env, path, method) {
+  if (method !== "GET") return null;
+  if (path === "/" || path === "/home") return fetchStaticAsset(request, env, "/portal");
+  if (path === "/login" || path === "/unified-login.html") return redirectToRootEntry(request);
+  if (path === "/employee-login" || path === "/staff-login" || path === "/employee.html") return redirectToRootEntry(request, "employee");
+  if (path === "/owner-login") return redirectToRootEntry(request, "owner");
+  if (path === "/admin-login") return redirectToRootEntry(request, "admin");
+  if (path === "/employee-v3.html" || path === "/employee-v2.html") return redirectToPath(request, "/employee");
+  if (path === "/index.html" || path === "/index-51.html") return redirectToPath(request, "/owner");
+  if (path !== "/employee" && path !== "/owner" && path !== "/admin") return null;
+
+  const claim = await readRouteClaim(request, env);
+  if (!claim) return redirectToRootEntry(request);
+  if (isStaffRoleValue(claim.role)) {
+    return path === "/employee" ? fetchStaticAsset(request, env, "/employee-v3") : redirectToPath(request, "/employee");
+  }
+  if (isReadonlyAdminRoleValue(claim.role)) {
+    return path === "/admin" ? fetchStaticAsset(request, env, "/index-51") : redirectToPath(request, "/admin");
+  }
+  if (canReadOwnerData(claim)) {
+    return path === "/owner" ? fetchStaticAsset(request, env, "/index-51") : redirectToPath(request, "/owner");
+  }
+  return redirectToRootEntry(request);
+}
+__name(handleAppEntryRoute, "handleAppEntryRoute");
+
 async function handleRequest(request, env, ctx) {
   const url = new URL(request.url);
   const path = url.pathname;
@@ -2522,16 +2584,8 @@ async function handleRequest(request, env, ctx) {
       headers: { "Cache-Control": "public, max-age=86400" }
     });
   }
-  if (method === "GET" && [
-    "/employee.html",
-    "/employee",
-    "/login",
-    "/staff-login",
-    "/employee-login",
-    "/owner-login"
-  ].includes(path)) {
-    return Response.redirect(new URL("/unified-login.html", request.url), 302);
-  }
+  const appEntryResponse = await handleAppEntryRoute(request, env, path, method);
+  if (appEntryResponse) return appEntryResponse;
   const originError = enforceTrustedOrigin(request, env);
   if (originError) return originError;
   if (path === "/auth/login" && method === "POST") {

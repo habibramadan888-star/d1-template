@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import {
+  ADMIN_DESTINATION,
   EMPLOYEE_DESTINATION,
   OWNER_DESTINATION,
   PRODUCTION_CUTOVER_STATUS,
@@ -11,56 +12,45 @@ import {
   resolveUnifiedPostLoginRoute
 } from "../modules/auth/unified-login-routing.mjs";
 
-test("only unified-login.html is the primary login entry", async () => {
-  const model = await readFile("UNIFIED_LOGIN_SINGLE_ENTRY_MODEL.md", "utf8");
-  const guide = await readFile("INTERNAL_QA_START_GUIDE.md", "utf8");
+test("root is the only formal login entry", async () => {
+  const portal = await readFile("deploy-worker/public/portal.html", "utf8");
 
-  assert.equal(UNIFIED_LOGIN_PATH, "/unified-login.html");
-  assert.match(model, /one primary login entry/i);
-  assert.match(model, /no separate owner login page/i);
-  assert.match(model, /no separate employee login page/i);
-  assert.match(guide, /single unified login/i);
+  assert.equal(UNIFIED_LOGIN_PATH, "/");
+  assert.match(portal, /data-portal="employee"/);
+  assert.match(portal, /data-portal="owner"/);
+  assert.match(portal, /data-portal="admin"/);
+  assert.doesNotMatch(portal, /PRODUCTION_NO_GO|DB = homelink|server role/i);
 });
 
-test("employee-v3.html is an employee business destination, not primary login entry", async () => {
-  const model = await readFile("UNIFIED_LOGIN_SINGLE_ENTRY_MODEL.md", "utf8");
-  const employeeScript = await readFile("EMPLOYEE_INTERNAL_TEST_SCRIPT.md", "utf8");
-
-  assert.equal(EMPLOYEE_DESTINATION, "/employee-v3.html");
-  assert.match(model, /Employee business page/);
-  assert.match(
-    model,
-    /Employee business page[\s\S]+Destination after `\/api\/me` confirms `employee` or `staff`/
-  );
-  assert.match(employeeScript, /Do not treat `employee-v3\.html` as the primary login entry/);
+test("employee and owner legacy html paths are business aliases, not login entries", () => {
+  assert.equal(EMPLOYEE_DESTINATION, "/employee");
+  assert.equal(OWNER_DESTINATION, "/owner");
+  assert.equal(ADMIN_DESTINATION, "/admin");
 });
 
-test("index.html is an owner business destination, not primary login entry", async () => {
-  const model = await readFile("UNIFIED_LOGIN_SINGLE_ENTRY_MODEL.md", "utf8");
-  const ownerScript = await readFile("OWNER_INTERNAL_TEST_SCRIPT.md", "utf8");
-
-  assert.equal(OWNER_DESTINATION, "/index.html");
-  assert.match(model, /Owner business page/);
-  assert.match(
-    model,
-    /Owner business page[\s\S]+Destination after `\/api\/me` confirms `owner`, `manager`, or `admin`/
-  );
-  assert.match(ownerScript, /Do not treat `index\.html` as a separate owner login page/);
-});
-
-test("employee role routes to employee business page", () => {
+test("employee role routes to employee business path", () => {
   const decision = resolveUnifiedPostLoginRoute({ meClaim: { role: "staff" } });
 
   assert.equal(decision.authority, "/api/me");
   assert.equal(decision.destination, EMPLOYEE_DESTINATION);
 });
 
-test("owner manager admin roles route to owner business page", () => {
+test("owner manager roles route to owner business path", () => {
   for (const role of ["owner", "manager", "admin"]) {
     const decision = resolveUnifiedPostLoginRoute({ meClaim: { role } });
 
     assert.equal(decision.authority, "/api/me");
     assert.equal(decision.destination, OWNER_DESTINATION);
+  }
+});
+
+test("readonly admin routes to admin read-only path", () => {
+  for (const role of ["readonly_admin", "admin_readonly"]) {
+    const decision = resolveUnifiedPostLoginRoute({ meClaim: { role } });
+
+    assert.equal(decision.authority, "/api/me");
+    assert.equal(decision.roleGroup, "admin");
+    assert.equal(decision.destination, ADMIN_DESTINATION);
   }
 });
 
@@ -74,15 +64,6 @@ test("frontend role tamper remains ignored", () => {
   assert.equal(decision.authority, "/api/me");
   assert.equal(decision.destination, EMPLOYEE_DESTINATION);
   assert.equal(decision.ignoredFrontendRole, "manager");
-});
-
-test("no second login page is introduced", async () => {
-  const html = await readFile("deploy-worker/public/unified-login.html", "utf8");
-
-  assert.match(html, /<main class="login-overlay unified-login-shell"/);
-  assert.match(html, /Homelink 登录/);
-  assert.doesNotMatch(html, /owner-login\.html|employee-login\.html|boss-login\.html/i);
-  assert.doesNotMatch(html, /One login for every internal role/);
 });
 
 test("production cutover remains PRODUCTION_NO_GO", () => {

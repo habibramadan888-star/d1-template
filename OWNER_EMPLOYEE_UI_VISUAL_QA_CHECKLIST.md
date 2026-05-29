@@ -1,5 +1,9 @@
 # Owner Employee UI Visual QA Checklist
 
+## AUTH-ROUTING-ARCHITECTURE-001 Entry Checks
+
+Use the root URL only: `https://homelink-finance.habibramadan888.workers.dev/`. Confirm the three doors are visible, old login pages are not visible, employee routes to `/employee`, owner routes to `/owner`, readonly admin routes to `/admin` or read-only owner mode, and lock/logout returns to `/`. Production cutover remains `PRODUCTION_NO_GO`.
+
 Production status: `PRODUCTION_NO_GO`. This checklist is for internal visual QA only and does not approve business writes or production cutover.
 
 ## Required Screenshots

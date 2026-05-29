@@ -2,23 +2,21 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-test("old user-visible login routes redirect to unified-login", async () => {
+test("old user-visible login routes redirect to root portal", async () => {
   const worker = await readFile("deploy-worker/src/index.js", "utf8");
 
   for (const route of [
     "/employee.html",
-    "/employee",
     "/login",
     "/staff-login",
     "/employee-login",
-    "/owner-login"
+    "/owner-login",
+    "/admin-login",
+    "/unified-login.html"
   ]) {
     assert.match(worker, new RegExp(route.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
-  assert.match(
-    worker,
-    /Response\.redirect\(new URL\("\/unified-login\.html", request\.url\), 302\)/
-  );
+  assert.match(worker, /function redirectToRootEntry\(request, portal = ""\)/);
 });
 
 test("employee-v3 old PIN login overlay is not user-visible", async () => {
@@ -32,10 +30,9 @@ test("employee-v3 old PIN login overlay is not user-visible", async () => {
 test("legacy employee.html static asset redirects without showing PIN login", async () => {
   const html = await readFile("deploy-worker/public/employee.html", "utf8");
 
-  assert.match(html, /\/unified-login\.html/);
-  assert.match(html, /location\.replace\("\/unified-login\.html"\)/);
+  assert.match(html, /\/\?portal=employee/);
+  assert.match(html, /location\.replace\("\/\?portal=employee"\)/);
   assert.doesNotMatch(html, /ENTER EMPLOYEE CODE/);
-  assert.doesNotMatch(html, /请输入员工代码/);
   assert.doesNotMatch(html, /\/api\/employee\/entry/);
 });
 

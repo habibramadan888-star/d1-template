@@ -1,5 +1,9 @@
 # Bug Report Template
 
+## AUTH-ROUTING-ARCHITECTURE-001 Auth Routing Severity Notes
+
+Treat these as P0/P1 auth-routing bugs: old employee PIN login visible, old owner login visible, lock/logout not returning to `/`, stale role causing wrong business page, readonly admin seeing write controls as enabled, or employee name showing role `staff`. Production cutover remains `PRODUCTION_NO_GO`.
+
 Use this template for internal staging QA bugs. Do not include passwords,
 tokens, cookies, or unmasked sensitive screenshots.
 

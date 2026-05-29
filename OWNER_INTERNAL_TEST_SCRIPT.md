@@ -1,5 +1,9 @@
 # Owner Internal Test Script
 
+## AUTH-ROUTING-ARCHITECTURE-001 Entry Update
+
+Owner testers must start at `https://homelink-finance.habibramadan888.workers.dev/`, choose the owner door, then authenticate. Do not start from `/index.html`; it is a compatibility alias to `/owner`. Lock/logout must return to `/`. Old owner login UI must not appear. Production cutover remains `PRODUCTION_NO_GO`.
+
 Date: 2026-05-27, Asia/Dubai
 
 Scope: owner manual QA planning through unified login. Local asset review found

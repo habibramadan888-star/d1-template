@@ -1,5 +1,15 @@
 # Run Report
 
+## AUTH-ROUTING-ARCHITECTURE-001 Three Portal Entry
+
+Date: 2026-05-29, Asia/Dubai
+
+Scope: normalized app entry architecture to one root homepage with three doors: employee, owner, and administrator. Legacy user-facing login paths are aliases only. Business pages are `/employee`, `/owner`, and `/admin` and must be reached after server role verification. No production D1 write, migration, D1 export/import/execute, employee entry write, handover, void/delete, settings change, dashboard calculation change, financial formula change, or commercial launch GO occurred.
+
+Artifacts: `AUTH_ROUTING_ARCHITECTURE_AUDIT.md`, `THREE_PORTAL_ENTRY_DESIGN.md`, `THREE_PORTAL_LOGIN_IMPLEMENTATION_RESULT.md`, `ROUTE_NORMALIZATION_RESULT.md`, `LEGACY_LOGIN_UI_REMOVAL_RESULT.md`, `LOGOUT_LOCK_TO_ROOT_ENTRY_RESULT.md`, `ROLE_GUARD_CLOSURE_RESULT.md`, `READONLY_ADMIN_PORTAL_RESULT.md`, and `EMPLOYEE_IDENTITY_DISPLAY_PORTAL_RESULT.md`.
+
+Production cutover remains `PRODUCTION_NO_GO`.
+
 Date: 2026-05-23  
 Mode: NIGHT SHIFT local validation  
 Scope: governance, engineering baseline, local startup checks  

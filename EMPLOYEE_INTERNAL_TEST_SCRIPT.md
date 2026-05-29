@@ -1,5 +1,9 @@
 # Employee Internal Test Script
 
+## AUTH-ROUTING-ARCHITECTURE-001 Entry Update
+
+Employee testers must start at `https://homelink-finance.habibramadan888.workers.dev/`, choose the employee door, then authenticate. Do not start from `/employee-v3.html`; it is a compatibility alias to `/employee`. Old PIN login UI must not appear. Production cutover remains `PRODUCTION_NO_GO`.
+
 Date: 2026-05-27, Asia/Dubai
 
 Scope: employee manual QA planning through the single unified login. Start from

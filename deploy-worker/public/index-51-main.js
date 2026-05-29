@@ -32,7 +32,7 @@ const HISTORY_FETCH_TIMEOUT_MS=4500;
 /* ── CLOUD AUTH ── */
 /* window.authToken 已移除：Token 存于 httpOnly Cookie，JS 不可读取 */
 const CLOUD_API_ORIGIN='https://homelink-finance.habibramadan888.workers.dev';
-const UNIFIED_LOGIN_DESTINATION='./unified-login.html';
+const UNIFIED_LOGIN_DESTINATION='/';
 function apiUrl(url){
   if(/^https?:\/\//i.test(url))return url;
   const sameWorker=location.protocol!=='file:'&&location.host==='homelink-finance.habibramadan888.workers.dev';
@@ -193,7 +193,7 @@ async function resumeUnifiedOwnerSession(){
       return true;
     }
     if(isEmployeeAppRole(me.role)){
-      location.replace('./employee-v3.html');
+      location.replace('/employee');
       return true;
     }
     console.warn('[UnifiedLogin] unsupported role for owner app');

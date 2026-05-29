@@ -1,11 +1,12 @@
-export const UNIFIED_LOGIN_PATH = "/unified-login.html";
-export const EMPLOYEE_DESTINATION = "/employee-v3.html";
-export const OWNER_DESTINATION = "/index.html";
+export const UNIFIED_LOGIN_PATH = "/";
+export const EMPLOYEE_DESTINATION = "/employee";
+export const OWNER_DESTINATION = "/owner";
+export const ADMIN_DESTINATION = "/admin";
 export const PRODUCTION_CUTOVER_STATUS = "PRODUCTION_NO_GO";
 
 const EMPLOYEE_ROLES = new Set(["employee", "staff"]);
 const READONLY_ADMIN_ROLES = new Set(["admin_readonly", "readonly_admin"]);
-const OWNER_ROLES = new Set(["owner", "manager", "admin", ...READONLY_ADMIN_ROLES]);
+const OWNER_ROLES = new Set(["owner", "manager", "admin"]);
 
 export function normalizeUnifiedLoginRole(role) {
   return String(role || "")
@@ -22,6 +23,15 @@ export function getUnifiedLoginDestination(authClaim) {
       role,
       roleGroup: "employee",
       destination: EMPLOYEE_DESTINATION
+    };
+  }
+
+  if (READONLY_ADMIN_ROLES.has(role)) {
+    return {
+      ok: true,
+      role,
+      roleGroup: "admin",
+      destination: ADMIN_DESTINATION
     };
   }
 
@@ -127,7 +137,8 @@ export function getUnifiedLoginErrorMessage(errorCodeOrStatus) {
 }
 
 export function canAccessOwnerProtectedResources(authClaim) {
-  return OWNER_ROLES.has(normalizeUnifiedLoginRole(authClaim?.role));
+  const role = normalizeUnifiedLoginRole(authClaim?.role);
+  return OWNER_ROLES.has(role) || READONLY_ADMIN_ROLES.has(role);
 }
 
 export function canSubmitEmployeeWorkflow(authClaim, options = {}) {
@@ -159,7 +170,7 @@ export function resolveOwnerSessionHandoff({ meStatus, meClaim } = {}) {
   }
 
   const decision = getUnifiedLoginDestination(meClaim);
-  if (decision.roleGroup === "owner") {
+  if (decision.roleGroup === "owner" || decision.roleGroup === "admin") {
     const role = normalizeUnifiedLoginRole(meClaim?.role);
     return {
       page: "owner",
@@ -209,7 +220,7 @@ export function resolveEmployeeSessionHandoff({ meStatus, meClaim } = {}) {
     };
   }
 
-  if (decision.roleGroup === "owner") {
+  if (decision.roleGroup === "owner" || decision.roleGroup === "admin") {
     return {
       page: "employee",
       action: "REDIRECT",

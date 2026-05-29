@@ -58,7 +58,7 @@ test("unified-login keeps employee role routing through server authority", () =>
   });
 
   assert.equal(decision.authority, "/api/me");
-  assert.equal(decision.destination, "/employee-v3.html");
+  assert.equal(decision.destination, "/employee");
   assert.equal(decision.ignoredFrontendRole, "owner");
 });
 

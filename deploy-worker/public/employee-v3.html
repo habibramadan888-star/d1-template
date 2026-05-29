@@ -1926,7 +1926,7 @@ async function apiFetch(path,opts={}){return fetch(apiUrl(path),{credentials:'in
 function normalizeAuthRole(r){return String(r||'').trim().toLowerCase()}
 function isEmployeeAuthRole(r){return ['staff','employee'].includes(normalizeAuthRole(r))}
 function isOwnerAuthRole(r){return ['manager','owner','admin'].includes(normalizeAuthRole(r))}
-const UNIFIED_LOGIN_DESTINATION='./unified-login.html';
+const UNIFIED_LOGIN_DESTINATION='/';
 async function fetchCurrentAuthUser(){
   const r=await apiFetch('/api/me',{method:'GET'});
   if(r.status===401||r.status===403)return null;
@@ -3272,7 +3272,7 @@ async function checkEmployeeSession(){
       return;
     }
     if(isOwnerAuthRole(me.role)){
-      location.replace('./index.html');
+      location.replace('/owner');
       return;
     }
     redirectToUnifiedLogin('employee_role_denied');

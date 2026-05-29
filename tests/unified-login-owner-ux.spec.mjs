@@ -31,7 +31,7 @@ test("/api/me 401 redirects to unified login only after check", () => {
   const decision = resolveOwnerBootstrapUx({ meStatus: 401 });
 
   assert.equal(decision.action, "REDIRECT");
-  assert.equal(decision.destination, "/unified-login.html");
+  assert.equal(decision.destination, "/");
   assert.equal(decision.showLegacyLogin, false);
 });
 
@@ -53,7 +53,7 @@ test("unified-login with existing owner session stays minimal unless auto redire
 
   assert.equal(decision.action, "SHOW_MINIMAL_LOGIN");
   assert.equal(decision.autoRedirect, false);
-  assert.equal(decision.destination, "/index.html");
+  assert.equal(decision.destination, "/owner");
 });
 
 test("unified-login supports explicit auto redirect only", () => {

@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Homelink</title>
+<style>
+:root{
+  --green:#05a857;
+  --green-2:#18c46b;
+  --ink:#111827;
+  --muted:#64748b;
+  --line:rgba(148,163,184,.24);
+  --card:rgba(255,255,255,.78);
+  --shadow:0 26px 80px rgba(15,23,42,.14);
+  font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;
+  min-height:100vh;
+  color:var(--ink);
+  background:
+    radial-gradient(circle at 78% 12%,rgba(21,196,107,.2),transparent 34%),
+    radial-gradient(circle at 15% 84%,rgba(21,196,107,.18),transparent 30%),
+    linear-gradient(135deg,#f8fffb 0%,#eef8f4 52%,#eaf4f0 100%);
+  display:grid;
+  place-items:center;
+  padding:22px;
+}
+.shell{
+  width:min(430px,100%);
+  border:1px solid rgba(255,255,255,.72);
+  border-radius:30px;
+  background:var(--card);
+  box-shadow:var(--shadow);
+  backdrop-filter:blur(20px) saturate(160%);
+  padding:28px;
+}
+.brand{display:flex;align-items:center;gap:14px;margin-bottom:24px}
+.logo{
+  width:58px;height:58px;border-radius:18px;
+  display:grid;place-items:center;
+  background:linear-gradient(180deg,var(--green-2),var(--green));
+  color:white;font-weight:900;line-height:.82;letter-spacing:-.04em;
+  box-shadow:0 16px 32px rgba(5,168,87,.28);
+}
+.logo small{display:block;font-size:10px;letter-spacing:.08em}
+h1{font-size:34px;line-height:1;margin:0;font-weight:900;letter-spacing:-.04em}
+.sub{margin:6px 0 0;color:var(--muted);font-size:12px;font-weight:800;letter-spacing:.22em;text-transform:uppercase}
+.prompt{font-size:18px;font-weight:850;margin:0 0 16px}
+.doors{display:grid;gap:12px}
+.door{
+  width:100%;
+  border:1px solid var(--line);
+  border-radius:22px;
+  background:rgba(255,255,255,.72);
+  padding:18px 20px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  color:var(--ink);
+  font:inherit;
+  cursor:pointer;
+  box-shadow:0 14px 30px rgba(15,23,42,.06);
+}
+.door strong{display:block;font-size:22px;letter-spacing:-.03em}
+.door span{display:block;margin-top:2px;color:var(--muted);font-size:11px;font-weight:850;letter-spacing:.18em;text-transform:uppercase}
+.door.active{background:linear-gradient(180deg,var(--green-2),var(--green));color:#fff;border-color:transparent}
+.door.active span{color:rgba(255,255,255,.76)}
+.form{display:none;margin-top:18px}
+.form.active{display:block}
+.field{margin-bottom:14px}
+label{display:block;margin:0 0 8px;font-size:13px;font-weight:850;color:#334155}
+input{
+  width:100%;
+  min-height:56px;
+  border:1.5px solid rgba(148,163,184,.34);
+  border-radius:18px;
+  padding:0 17px;
+  background:rgba(255,255,255,.78);
+  font-size:17px;
+  color:var(--ink);
+  outline:none;
+}
+input:focus{border-color:rgba(5,168,87,.76);box-shadow:0 0 0 5px rgba(5,168,87,.12)}
+.actions{display:grid;gap:10px;margin-top:18px}
+.primary,.ghost{
+  border:0;
+  border-radius:19px;
+  min-height:58px;
+  font:inherit;
+  font-weight:900;
+  cursor:pointer;
+}
+.primary{background:linear-gradient(180deg,var(--green-2),var(--green));color:white;box-shadow:0 16px 32px rgba(5,168,87,.28)}
+.ghost{background:rgba(255,255,255,.58);color:#334155;border:1px solid var(--line);min-height:48px}
+.status{min-height:20px;margin-top:12px;color:var(--muted);font-size:13px;font-weight:750;text-align:center}
+.status.error{color:#dc2626}
+.hidden{display:none!important}
+@media(max-width:420px){
+  body{padding:18px}
+  .shell{padding:24px;border-radius:28px}
+  h1{font-size:30px}
+  .logo{width:52px;height:52px}
+  .door{padding:16px 18px}
+  .door strong{font-size:20px}
+}
+</style>
+</head>
+<body>
+<main class="shell" aria-label="Homelink entry">
+  <section class="brand">
+    <div class="logo">HOME<small>LINK.</small></div>
+    <div>
+      <h1>Homelink</h1>
+      <p class="sub">Finance Ledger</p>
+    </div>
+  </section>
+  <p class="prompt">请选择入口</p>
+  <section class="doors" aria-label="Portal choices">
+    <button class="door" type="button" data-portal="employee"><span><strong>员工</strong>Employee</span></button>
+    <button class="door" type="button" data-portal="owner"><span><strong>老板</strong>Owner</span></button>
+    <button class="door" type="button" data-portal="admin"><span><strong>管理员</strong>Admin</span></button>
+  </section>
+  <form class="form" id="loginForm">
+    <input class="hidden" id="browserUsername" name="username" autocomplete="username" value="homelink-owner">
+    <div class="field" id="accountField">
+      <label id="accountLabel" for="accountInput">用户名</label>
+      <input id="accountInput" name="accountInput" autocomplete="username" placeholder="用户名">
+    </div>
+    <div class="field">
+      <label id="passwordLabel" for="passwordInput">密码</label>
+      <input id="passwordInput" name="password" type="password" autocomplete="current-password" placeholder="密码" required>
+    </div>
+    <div class="actions">
+      <button class="primary" id="loginButton" type="submit">登录</button>
+      <button class="ghost" id="logoutButton" type="button">退出当前会话</button>
+    </div>
+    <div class="status" id="status" role="status" aria-live="polite"></div>
+  </form>
+</main>
+<script>
+const EMPLOYEE_ROLES=new Set(["employee","staff"]);
+const OWNER_ROLES=new Set(["owner","manager","admin"]);
+const ADMIN_ROLES=new Set(["readonly_admin","admin_readonly"]);
+const portalButtons=[...document.querySelectorAll("[data-portal]")];
+const form=document.getElementById("loginForm");
+const accountField=document.getElementById("accountField");
+const accountInput=document.getElementById("accountInput");
+const browserUsername=document.getElementById("browserUsername");
+const accountLabel=document.getElementById("accountLabel");
+const passwordLabel=document.getElementById("passwordLabel");
+const passwordInput=document.getElementById("passwordInput");
+const loginButton=document.getElementById("loginButton");
+const logoutButton=document.getElementById("logoutButton");
+const statusEl=document.getElementById("status");
+let selectedPortal=null;
+
+function setStatus(message,tone=""){
+  statusEl.textContent=message||"";
+  statusEl.className="status"+(tone?` ${tone}`:"");
+}
+function destinationForRole(role){
+  const r=String(role||"").trim().toLowerCase();
+  if(EMPLOYEE_ROLES.has(r))return"/employee";
+  if(ADMIN_ROLES.has(r))return"/admin";
+  if(OWNER_ROLES.has(r))return"/owner";
+  return null;
+}
+async function requestJson(path,options={}){
+  const headers={"Content-Type":"application/json",...(options.headers||{})};
+  const token=localStorage.getItem("homelink:cloud_token");
+  if(token&&!headers.Authorization)headers.Authorization="Bearer "+token;
+  const response=await fetch(path,{credentials:"include",...options,headers});
+  const body=await response.json().catch(()=>null);
+  return{response,body};
+}
+async function fetchMe(){
+  const{response,body}=await requestJson("/api/me",{method:"GET"});
+  if(response.status===401||response.status===403)return null;
+  if(!response.ok)throw new Error("me_failed");
+  return body;
+}
+function routeFromMe(me){
+  const target=destinationForRole(me?.role);
+  if(!target){setStatus("此账号暂不能进入系统","error");return}
+  location.replace(target);
+}
+function selectPortal(portal){
+  selectedPortal=portal;
+  portalButtons.forEach(btn=>btn.classList.toggle("active",btn.dataset.portal===portal));
+  form.classList.add("active");
+  setStatus("");
+  accountInput.value="";
+  passwordInput.value="";
+  if(portal==="employee"){
+    accountField.classList.remove("hidden");
+    accountLabel.textContent="员工账号";
+    accountInput.placeholder="员工账号";
+    passwordLabel.textContent="密码 / PIN";
+    browserUsername.value="";
+    accountInput.required=true;
+  }else if(portal==="admin"){
+    accountField.classList.remove("hidden");
+    accountLabel.textContent="管理员账号";
+    accountInput.placeholder="管理员账号";
+    accountInput.value="admin";
+    passwordLabel.textContent="密码";
+    browserUsername.value="admin";
+    accountInput.required=true;
+  }else{
+    accountField.classList.add("hidden");
+    accountInput.required=false;
+    passwordLabel.textContent="密码";
+    browserUsername.value="homelink-owner";
+  }
+  setTimeout(()=>portal==="owner"?passwordInput.focus():accountInput.focus(),30);
+}
+async function signIn(event){
+  event.preventDefault();
+  if(!selectedPortal){setStatus("请选择入口","error");return}
+  const account=accountInput.value.trim();
+  const password=passwordInput.value.trim();
+  if((selectedPortal==="employee"||selectedPortal==="admin")&&!account){setStatus("请输入账号","error");return}
+  if(!password){setStatus("请输入密码","error");return}
+  loginButton.disabled=true;
+  setStatus("正在登录...");
+  try{
+    const auth=selectedPortal==="employee"
+      ? await requestJson("/auth/employee-login",{method:"POST",body:JSON.stringify({employee_id:account,pin:password})})
+      : await requestJson("/auth/login",{method:"POST",body:JSON.stringify({username:account||browserUsername.value,password})});
+    if(!auth.response.ok)throw new Error("login_failed");
+    const me=await fetchMe();
+    if(!me)throw new Error("session_missing");
+    passwordInput.value="";
+    routeFromMe(me);
+  }catch{
+    setStatus("用户名或密码错误","error");
+  }finally{
+    loginButton.disabled=false;
+  }
+}
+async function logout(){
+  logoutButton.disabled=true;
+  try{await requestJson("/auth/logout",{method:"POST"})}catch{}
+  ["homelink:cloud_token","homelink:role","owner:role","empv3:user","empv3:operator"].forEach(key=>{
+    localStorage.removeItem(key);
+    sessionStorage.removeItem(key);
+  });
+  passwordInput.value="";
+  setStatus("已退出");
+  logoutButton.disabled=false;
+}
+portalButtons.forEach(btn=>btn.addEventListener("click",()=>selectPortal(btn.dataset.portal)));
+form.addEventListener("submit",signIn);
+logoutButton.addEventListener("click",logout);
+const initialPortal=new URLSearchParams(location.search).get("portal");
+if(["employee","owner","admin"].includes(initialPortal))selectPortal(initialPortal);
+</script>
+</body>
+</html>

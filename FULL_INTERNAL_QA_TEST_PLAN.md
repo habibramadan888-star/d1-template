@@ -1,5 +1,13 @@
 # Full Internal QA Test Plan
 
+## AUTH-ROUTING-ARCHITECTURE-001 Entry Update
+
+All testers start from the root URL only:
+
+`https://homelink-finance.habibramadan888.workers.dev/`
+
+The page presents three doors: employee, owner, and administrator. `/unified-login.html`, `/employee-v3.html`, and `/index.html` remain compatibility paths, not formal user instructions. If any old PIN login or old owner login appears, record it as a P0/P1 auth-routing bug. Full write testing still requires separate approval. Production cutover remains `PRODUCTION_NO_GO`.
+
 Date: 2026-05-28, Asia/Dubai
 
 Scope: internal QA planning with one unified login page. Testers must start

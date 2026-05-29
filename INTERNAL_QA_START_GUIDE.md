@@ -1,5 +1,13 @@
 # Internal QA Start Guide
 
+## AUTH-ROUTING-ARCHITECTURE-001 Entry Update
+
+Formal entry for all internal QA is now:
+
+`https://homelink-finance.habibramadan888.workers.dev/`
+
+The root page shows three doors: employee, owner, and administrator. Do not ask testers to memorize `/unified-login.html`, `/employee-v3.html`, or `/index.html`; those are compatibility paths only. Old login pages should not appear. Lock/logout must return to `/`. Full write testing still requires separate approval. Production cutover remains `PRODUCTION_NO_GO`.
+
 Date: 2026-05-28, Asia/Dubai
 
 Scope: unified login guide for internal QA. This file does not approve
