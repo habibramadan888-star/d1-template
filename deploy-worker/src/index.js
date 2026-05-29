@@ -2547,13 +2547,14 @@ async function fetchStaticAsset(request, env, pathname) {
 __name(fetchStaticAsset, "fetchStaticAsset");
 async function handleAppEntryRoute(request, env, path, method) {
   if (method !== "GET") return null;
+  // Compatibility-only paths are intercepted before static assets so legacy login UI cannot render.
   if (path === "/" || path === "/home") return fetchStaticAsset(request, env, "/portal");
   if (path === "/login" || path === "/unified-login.html") return redirectToRootEntry(request);
   if (path === "/employee-login" || path === "/staff-login" || path === "/employee.html") return redirectToRootEntry(request, "employee");
   if (path === "/owner-login") return redirectToRootEntry(request, "owner");
   if (path === "/admin-login") return redirectToRootEntry(request, "admin");
   if (path === "/employee-v3.html" || path === "/employee-v2.html") return redirectToPath(request, "/employee");
-  if (path === "/index.html" || path === "/index-51.html") return redirectToPath(request, "/owner");
+  if (path === "/index.html" || path === "/index-51.html" || path === "/owner.html") return redirectToPath(request, "/owner");
   if (path !== "/employee" && path !== "/owner" && path !== "/admin") return null;
 
   const claim = await readRouteClaim(request, env);

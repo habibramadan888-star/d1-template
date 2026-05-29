@@ -243,6 +243,19 @@ const routeCatalog = {
     risk: "P3",
     notes: "Redirects to canonical `/owner`; no business write occurs."
   },
+  "ANY /owner.html": {
+    purpose: "legacy owner business asset alias",
+    login: "Yes",
+    roles: "owner",
+    tenantScope: "session `corpid`",
+    reads: "session",
+    writes: "none",
+    financial: "No",
+    delete: "No",
+    audit: "No",
+    risk: "P3",
+    notes: "Redirects to canonical `/owner`; no business write occurs."
+  },
   "ANY /employee": {
     purpose: "employee business page",
     login: "Yes",

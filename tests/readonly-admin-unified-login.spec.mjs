@@ -48,7 +48,7 @@ test("readonly_admin cannot write owner data", async () => {
   assert.equal(canWriteOwnerData({ role: "readonly_admin" }), false);
   assert.match(
     worker,
-    /if \(path === "\/api\/customers" && method === "POST"\) \{\n      if \(!requireManager\(user\)\) return forbidden\(\);/
+    /if \(path === "\/api\/customers" && method === "POST"\) \{\s*if \(!requireManager\(user\)\) return forbidden\(\);/
   );
   assert.match(ownerJs, /function denyReadonlyAdminWrite\(\)/);
   assert.match(ownerJs, /readonly-admin/);

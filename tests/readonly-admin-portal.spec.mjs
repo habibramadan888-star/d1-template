@@ -19,7 +19,7 @@ test("readonly admin remains backend read-only", async () => {
   assert.match(worker, /canWrite: canWriteOwnerData\(user\)/);
   assert.match(
     worker,
-    /if \(path === "\/api\/customers" && method === "POST"\) \{\n      if \(!requireManager\(user\)\) return forbidden\(\);/
+    /if \(path === "\/api\/customers" && method === "POST"\) \{\s*if \(!requireManager\(user\)\) return forbidden\(\);/
   );
   assert.match(owner, /function denyReadonlyAdminWrite\(\)/);
 });

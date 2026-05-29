@@ -26,9 +26,8 @@ test("history page uses limited first load and load more instead of full blockin
 test("worker history API supports read-only limit and offset", async () => {
   const worker = await readFile("deploy-worker/src/index.js", "utf8");
   const route =
-    worker.match(
-      /if \(path === "\/api\/history"\) \{[\s\S]*?return json\(results\);\n    \}/
-    )?.[0] || "";
+    worker.match(/if \(path === "\/api\/history"\) \{[\s\S]*?return json\(results\);\s*\}/)?.[0] ||
+    "";
 
   assert.match(route, /url\.searchParams\.get\("limit"\)/);
   assert.match(route, /LIMIT \? OFFSET \?/);

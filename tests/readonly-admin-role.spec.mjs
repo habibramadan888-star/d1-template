@@ -30,16 +30,16 @@ test("readonly admin write requests are denied by backend and frontend guards", 
   assert.match(worker, /function canWriteOwnerData\(user\)/);
   assert.match(
     worker,
-    /function requireManager\(user\) \{\n  return canWriteOwnerData\(user\);\n\}/
+    /function requireManager\(user\) \{\s*return canWriteOwnerData\(user\);\s*\}/
   );
   assert.match(
     worker,
     /if\(isReadonlyAdminRoleValue\(user\?\.role\)&&request\.method!=="GET"\)return forbidden\(\);/
   );
-  assert.match(worker, /if \(canWriteOwnerData\(user\)\) \{\n        await env\.DB\.prepare/);
+  assert.match(worker, /if \(canWriteOwnerData\(user\)\) \{\s*await env\.DB\.prepare/);
   assert.match(
     worker,
-    /if \(path === "\/api\/customers" && method === "POST"\) \{\n      if \(!requireManager\(user\)\) return forbidden\(\);/
+    /if \(path === "\/api\/customers" && method === "POST"\) \{\s*if \(!requireManager\(user\)\) return forbidden\(\);/
   );
   assert.match(worker, /hasPlainWifiPasswords\(accounts\) && canWriteOwnerData\(user\)/);
   assert.match(ownerJs, /function denyReadonlyAdminWrite\(\)/);

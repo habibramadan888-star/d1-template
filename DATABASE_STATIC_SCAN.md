@@ -67,13 +67,13 @@ This is a static scan artifact. It does not replace `DATABASE_AUDIT.md`, which c
 | P1       | `deploy-worker/src/index.js:1175`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS entry_events`    |
 | P1       | `deploy-worker/src/index.js:1188`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS deposit_ledger`  |
 | P1       | `deploy-worker/src/index.js:1406`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS app_settings`    |
-| P1       | `deploy-worker/src/index.js:2642`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS active_sessions` |
-| P1       | `deploy-worker/src/index.js:2675`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS app_settings`    |
-| P1       | `deploy-worker/src/index.js:2739`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS app_settings`    |
-| P1       | `deploy-worker/src/index.js:2765`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS app_settings`    |
-| P1       | `deploy-worker/src/index.js:2809`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS app_settings`    |
-| P1       | `deploy-worker/src/index.js:2832`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS app_settings`    |
-| P1       | `deploy-worker/src/index.js:2862`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS app_settings`    |
+| P1       | `deploy-worker/src/index.js:2643`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS active_sessions` |
+| P1       | `deploy-worker/src/index.js:2676`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS app_settings`    |
+| P1       | `deploy-worker/src/index.js:2740`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS app_settings`    |
+| P1       | `deploy-worker/src/index.js:2766`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS app_settings`    |
+| P1       | `deploy-worker/src/index.js:2810`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS app_settings`    |
+| P1       | `deploy-worker/src/index.js:2833`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS app_settings`    |
+| P1       | `deploy-worker/src/index.js:2863`                     | Runtime CREATE TABLE appears in Worker source | `CREATE TABLE IF NOT EXISTS app_settings`    |
 | P0       | `deploy-worker/src/index.js:1099`                     | Decimal/money precision risk keyword          | `REAL`                                       |
 | P0       | `deploy-worker/src/index.js:1100`                     | Decimal/money precision risk keyword          | `REAL`                                       |
 | P0       | `deploy-worker/src/index.js:1102`                     | Decimal/money precision risk keyword          | `REAL`                                       |
