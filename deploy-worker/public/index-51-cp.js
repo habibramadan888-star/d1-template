@@ -130,57 +130,77 @@ function cp_overdueText(card){
   const days=cp_overdueDayNumber(card);
   return days>0?`${days} 天`:'未逾期';
 }
+function cp_dueTitleDate(){
+  const d=new Date();
+  return `${d.getMonth()+1}/${d.getDate()}`;
+}
 function cp_generatedAt(){
   const d=new Date();
   const pad=n=>String(n).padStart(2,'0');
   return `${d.getFullYear()}/${pad(d.getMonth()+1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
-function cp_reportSuggestion(card,info){
+function cp_exportRoomKey(room){
+  return String(room||'').match(/\d+|\D+/g)?.map(p=>/^\d+$/.test(p)?Number(p):p.toLowerCase())||[''];
+}
+function cp_compareNatural(a,b){
+  const ak=cp_exportRoomKey(a),bk=cp_exportRoomKey(b);
+  for(let i=0;i<Math.max(ak.length,bk.length);i++){
+    if(ak[i]===undefined)return -1;
+    if(bk[i]===undefined)return 1;
+    if(ak[i]===bk[i])continue;
+    if(typeof ak[i]==='number'&&typeof bk[i]==='number')return ak[i]-bk[i];
+    return String(ak[i]).localeCompare(String(bk[i]),undefined,{numeric:true});
+  }
+  return 0;
+}
+function cp_cardExportParts(card){
+  const raw=String(card?.cardName||'').replace(/[()（）【】]/g,' ').trim();
+  const tokens=raw.split(/\s+/).filter(Boolean);
+  const amountIdx=tokens.findIndex(t=>/^D\d+(?:\.\d+)?$/i.test(t));
+  const customer=tokens.find((t,idx)=>idx!==amountIdx&&/^\d+[A-Za-z0-9-]*$/.test(t))||raw||'-';
+  const amount=amountIdx>=0?tokens[amountIdx].toUpperCase():(() => {
+    const rawAmount=card?.amount??card?.rent??card?.remain??card?.arrears??card?.totalRent;
+    const n=Number(rawAmount);
+    return Number.isFinite(n)?`D${Math.round(n)}`:'D0';
+  })();
+  const dateToken=amountIdx>=0?tokens.slice(amountIdx+1).find(t=>/^[0-9pP]+$/.test(t)):tokens.find(t=>/^\d{4}(?:[pP]\d+)*$/.test(t));
+  const dateCode=dateToken||cp_exportDateCode(card?.endDate);
+  return{customer,amount,dateCode};
+}
+function cp_exportDateCode(ts){
+  const n=Number(ts||0);
+  if(!Number.isFinite(n)||n<=0)return '-';
+  const d=new Date(n);
+  if(Number.isNaN(d.getTime()))return '-';
+  return `${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
+}
+function cp_exportDueStatus(card,info){
   const days=cp_overdueDayNumber(card);
-  if(days>=15)return '重点催收';
-  if(days>0)return '提醒续费';
-  if(info?.type==='today')return '今日跟进';
-  if(info?.type==='soon')return '提前提醒';
-  return '核对状态';
+  if(info?.type==='today'||days<=0)return 'Due';
+  if(days===1)return '1d';
+  return `${days}d🔥`;
 }
 function cp_buildArrearsReport(title,list,scopeLabel='当前筛选'){
-  const aging={d1_7:0,d8_14:0,d15plus:0};
-  let longest=0;
-  list.forEach(({card})=>{
-    const days=cp_overdueDayNumber(card);
-    longest=Math.max(longest,days);
-    if(days>=15)aging.d15plus++;
-    else if(days>=8)aging.d8_14++;
-    else if(days>=1)aging.d1_7++;
+  const rows=list.map(item=>({
+    ...item,
+    days:cp_overdueDayNumber(item.card),
+    parts:cp_cardExportParts(item.card)
+  })).sort((a,b)=>{
+    const roomDiff=cp_compareNatural(a.room,b.room);
+    if(roomDiff)return roomDiff;
+    if(b.days!==a.days)return b.days-a.days;
+    return cp_compareNatural(a.parts.customer,b.parts.customer);
   });
-  const lines=[
-    `青旅｜${title}`,
-    `生成时间：${cp_generatedAt()}`,
-    `统计范围：${scopeLabel}`,
-    `总计：${list.length} 人`,
-    `最久逾期：${longest} 天`,
-    `需优先跟进：逾期超过 14 天共 ${aging.d15plus} 人`,
-    '',
-    '一、逾期汇总',
-    `- 逾期 1-7 天：${aging.d1_7} 人`,
-    `- 逾期 8-14 天：${aging.d8_14} 人`,
-    `- 逾期 15 天以上：${aging.d15plus} 人`,
-    '',
-    '二、明细'
-  ];
-  list.forEach(({room,card,info},idx)=>{
-    lines.push(`${idx+1}. 房间/床位：${room||'-'}`);
-    lines.push(`   租客/卡片：${card.cardName||'未命名卡片'}`);
-    lines.push(`   截止日期：${cp_fmtEndDate(card.endDate)}`);
-    lines.push(`   逾期天数：${cp_overdueText(card)}`);
-    lines.push(`   金额：${cp_modalAmount(card)}`);
-    lines.push(`   状态：${cp_modalStatusLabel(info)}`);
-    lines.push(`   建议动作：${cp_reportSuggestion(card,info)}`);
+  const lines=[`Due ${cp_dueTitleDate()} | ${rows.length} overdue`,'---'];
+  let lastRoom=null;
+  rows.forEach(({room,card,info,parts})=>{
+    const roomLabel=room||'-';
+    if(roomLabel!==lastRoom){
+      lines.push('',`【${roomLabel}】`);
+      lastRoom=roomLabel;
+    }
+    lines.push(`${parts.customer}  ${cp_exportDueStatus(card,info)}  ${parts.amount}  ${parts.dateCode}`);
   });
-  lines.push('');
-  lines.push('三、备注');
-  lines.push('- 本清单仅用于内部跟进。');
-  lines.push('- 金额字段如显示“金额未接入”，需以财务流水为准。');
   return lines.join('\n');
 }
 

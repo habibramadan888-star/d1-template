@@ -1,38 +1,29 @@
 # Arrears Export Format Redesign
 
-The arrears export now uses a summary-first accounting format:
+Final user-confirmed WhatsApp export format:
 
 ```text
-青旅｜逾期欠款清单
-生成时间：YYYY/MM/DD HH:mm
-统计范围：已过期
-总计：N 人
-最久逾期：N 天
-需优先跟进：逾期超过 14 天共 N 人
+Due 5/29 | 11 overdue
+---
 
-一、逾期汇总
-- 逾期 1-7 天：N 人
-- 逾期 8-14 天：N 人
-- 逾期 15 天以上：N 人
+【1-102】
+134  4d🔥  D200  0525
 
-二、明细
-1. 房间/床位：...
-   租客/卡片：...
-   截止日期：...
-   逾期天数：...
-   金额：金额未接入
-   状态：...
-   建议动作：...
-
-三、备注
-- 本清单仅用于内部跟进。
-- 金额字段如显示“金额未接入”，需以财务流水为准。
+【2-219】
+219  21d🔥  D200  0808
+4014  21d🔥  D200  0808
 ```
 
 Design decisions:
 
-- Removed ASCII box art and separator walls.
-- Removed empty `update:` fields.
-- Preserved the existing overdue classification logic.
-- Explicitly marks unknown amount as `金额未接入`.
-- Keeps output copy-friendly for WhatsApp, WeChat, and accounting review.
+- Default export is grouped by bed/room, not apartment or aging severity.
+- Group header format is `【bed】`.
+- Each tenant/card record is one short line.
+- Line format is `customer-id  due-status  amount-code  date-code`.
+- Customer id is first for WhatsApp search.
+- `Due` means due today.
+- `1d` has no fire marker.
+- `Xd🔥` is used only when `overdueDays > 1`.
+- Removed old categories such as `重点`, `核对`, and general follow-up labels.
+- Removed Chinese field labels, remarks, `update`, and missing-amount prose.
+- Calculation logic was not changed; this is export presentation only.
