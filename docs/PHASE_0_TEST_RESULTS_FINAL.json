@@ -1,0 +1,501 @@
+{
+  "startedAt": "2026-05-30T06:52:18.056Z",
+  "finishedAt": "2026-05-30T06:52:20.441Z",
+  "baseUrl": "http://127.0.0.1:8801",
+  "totalTests": 30,
+  "passed": 3,
+  "failed": 27,
+  "passRate": 0.1,
+  "avgLatencyMs": 25,
+  "decision": "NO-GO",
+  "categoryStats": {
+    "Auth": {
+      "total": 4,
+      "passed": 3,
+      "failed": 1
+    },
+    "Employee": {
+      "total": 8,
+      "passed": 0,
+      "failed": 8
+    },
+    "Owner": {
+      "total": 6,
+      "passed": 0,
+      "failed": 6
+    },
+    "Admin": {
+      "total": 6,
+      "passed": 0,
+      "failed": 6
+    },
+    "Isolation": {
+      "total": 3,
+      "passed": 0,
+      "failed": 3
+    },
+    "Health": {
+      "total": 3,
+      "passed": 0,
+      "failed": 3
+    }
+  },
+  "failureSummary": {
+    "ADMIN_AUTH_MISSING": 1,
+    "PERMISSION_DENIED": 9,
+    "ROUTE_NOT_WIRED": 17
+  },
+  "results": [
+    {
+      "id": 1,
+      "category": "Auth",
+      "name": "Employee Login",
+      "method": "POST",
+      "path": "/auth/employee-login",
+      "expected": [
+        200
+      ],
+      "actualStatus": 200,
+      "latencyMs": 121,
+      "passed": true,
+      "failureDetail": "",
+      "note": ""
+    },
+    {
+      "id": 2,
+      "category": "Auth",
+      "name": "Owner Login",
+      "method": "POST",
+      "path": "/auth/login",
+      "expected": [
+        200
+      ],
+      "actualStatus": 200,
+      "latencyMs": 82,
+      "passed": true,
+      "failureDetail": "",
+      "note": ""
+    },
+    {
+      "id": 3,
+      "category": "Auth",
+      "name": "Admin Login",
+      "method": "POST",
+      "path": "/auth/login",
+      "expected": [
+        200
+      ],
+      "actualStatus": 200,
+      "latencyMs": 87,
+      "passed": false,
+      "failureDetail": "readonly admin credential unavailable; got role manager",
+      "note": ""
+    },
+    {
+      "id": 4,
+      "category": "Auth",
+      "name": "Auth Route Closure",
+      "method": "GET",
+      "path": "/owner.html",
+      "expected": [
+        301,
+        302
+      ],
+      "actualStatus": 302,
+      "latencyMs": 10,
+      "passed": true,
+      "failureDetail": "",
+      "note": "http://127.0.0.1:8801/owner"
+    },
+    {
+      "id": 5,
+      "category": "Employee",
+      "name": "Property List",
+      "method": "GET",
+      "path": "/api/properties",
+      "expected": [
+        200
+      ],
+      "actualStatus": 403,
+      "latencyMs": 20,
+      "passed": false,
+      "failureDetail": "expected 200, got 403: {\"error\":\"forbidden\"}",
+      "note": ""
+    },
+    {
+      "id": 6,
+      "category": "Employee",
+      "name": "Entries List",
+      "method": "GET",
+      "path": "/api/entries",
+      "expected": [
+        200
+      ],
+      "actualStatus": 403,
+      "latencyMs": 18,
+      "passed": false,
+      "failureDetail": "expected 200, got 403: {\"error\":\"forbidden\"}",
+      "note": ""
+    },
+    {
+      "id": 7,
+      "category": "Employee",
+      "name": "Payments",
+      "method": "GET",
+      "path": "/api/payments",
+      "expected": [
+        200
+      ],
+      "actualStatus": 403,
+      "latencyMs": 21,
+      "passed": false,
+      "failureDetail": "expected 200, got 403: {\"error\":\"forbidden\"}",
+      "note": ""
+    },
+    {
+      "id": 8,
+      "category": "Employee",
+      "name": "Customers",
+      "method": "GET",
+      "path": "/api/customers",
+      "expected": [
+        200
+      ],
+      "actualStatus": 403,
+      "latencyMs": 20,
+      "passed": false,
+      "failureDetail": "expected 200, got 403: {\"error\":\"forbidden\"}",
+      "note": ""
+    },
+    {
+      "id": 9,
+      "category": "Employee",
+      "name": "Dashboard",
+      "method": "GET",
+      "path": "/api/dashboard",
+      "expected": [
+        200
+      ],
+      "actualStatus": 403,
+      "latencyMs": 20,
+      "passed": false,
+      "failureDetail": "expected 200, got 403: {\"error\":\"forbidden\"}",
+      "note": ""
+    },
+    {
+      "id": 10,
+      "category": "Employee",
+      "name": "Dashboard Totals",
+      "method": "GET",
+      "path": "/api/dashboard/totals",
+      "expected": [
+        200
+      ],
+      "actualStatus": 403,
+      "latencyMs": 18,
+      "passed": false,
+      "failureDetail": "expected 200, got 403: {\"error\":\"forbidden\"}",
+      "note": ""
+    },
+    {
+      "id": 11,
+      "category": "Employee",
+      "name": "Receivables",
+      "method": "GET",
+      "path": "/api/receivables",
+      "expected": [
+        200
+      ],
+      "actualStatus": 403,
+      "latencyMs": 18,
+      "passed": false,
+      "failureDetail": "expected 200, got 403: {\"error\":\"forbidden\"}",
+      "note": ""
+    },
+    {
+      "id": 12,
+      "category": "Employee",
+      "name": "Arrears",
+      "method": "GET",
+      "path": "/api/arrears",
+      "expected": [
+        200
+      ],
+      "actualStatus": 403,
+      "latencyMs": 19,
+      "passed": false,
+      "failureDetail": "expected 200, got 403: {\"error\":\"forbidden\"}",
+      "note": ""
+    },
+    {
+      "id": 13,
+      "category": "Owner",
+      "name": "Owner Dashboard",
+      "method": "GET",
+      "path": "/api/owner/dashboard",
+      "expected": [
+        200
+      ],
+      "actualStatus": 404,
+      "latencyMs": 15,
+      "passed": false,
+      "failureDetail": "expected 200, got 404: {\"error\":\"not_found\"}",
+      "note": ""
+    },
+    {
+      "id": 14,
+      "category": "Owner",
+      "name": "Owner Properties",
+      "method": "GET",
+      "path": "/api/owner/properties",
+      "expected": [
+        200
+      ],
+      "actualStatus": 404,
+      "latencyMs": 14,
+      "passed": false,
+      "failureDetail": "expected 200, got 404: {\"error\":\"not_found\"}",
+      "note": ""
+    },
+    {
+      "id": 15,
+      "category": "Owner",
+      "name": "Owner Totals",
+      "method": "GET",
+      "path": "/api/owner/totals",
+      "expected": [
+        200
+      ],
+      "actualStatus": 404,
+      "latencyMs": 19,
+      "passed": false,
+      "failureDetail": "expected 200, got 404: {\"error\":\"not_found\"}",
+      "note": ""
+    },
+    {
+      "id": 16,
+      "category": "Owner",
+      "name": "Owner History",
+      "method": "GET",
+      "path": "/api/owner/history",
+      "expected": [
+        200
+      ],
+      "actualStatus": 404,
+      "latencyMs": 18,
+      "passed": false,
+      "failureDetail": "expected 200, got 404: {\"error\":\"not_found\"}",
+      "note": ""
+    },
+    {
+      "id": 17,
+      "category": "Owner",
+      "name": "Owner Arrears",
+      "method": "GET",
+      "path": "/api/owner/arrears",
+      "expected": [
+        200
+      ],
+      "actualStatus": 404,
+      "latencyMs": 20,
+      "passed": false,
+      "failureDetail": "expected 200, got 404: {\"error\":\"not_found\"}",
+      "note": ""
+    },
+    {
+      "id": 18,
+      "category": "Owner",
+      "name": "Owner Reports",
+      "method": "GET",
+      "path": "/api/owner/reports",
+      "expected": [
+        200
+      ],
+      "actualStatus": 404,
+      "latencyMs": 16,
+      "passed": false,
+      "failureDetail": "expected 200, got 404: {\"error\":\"not_found\"}",
+      "note": ""
+    },
+    {
+      "id": 19,
+      "category": "Admin",
+      "name": "Admin Dashboard",
+      "method": "GET",
+      "path": "/api/admin/dashboard",
+      "expected": [
+        200
+      ],
+      "actualStatus": 404,
+      "latencyMs": 16,
+      "passed": false,
+      "failureDetail": "expected 200, got 404: {\"error\":\"not_found\"}",
+      "note": ""
+    },
+    {
+      "id": 20,
+      "category": "Admin",
+      "name": "Admin Entries (RO)",
+      "method": "GET",
+      "path": "/api/admin/entries",
+      "expected": [
+        200
+      ],
+      "actualStatus": 404,
+      "latencyMs": 17,
+      "passed": false,
+      "failureDetail": "expected 200, got 404: {\"error\":\"not_found\"}",
+      "note": ""
+    },
+    {
+      "id": 21,
+      "category": "Admin",
+      "name": "Admin Totals",
+      "method": "GET",
+      "path": "/api/admin/totals",
+      "expected": [
+        200
+      ],
+      "actualStatus": 404,
+      "latencyMs": 17,
+      "passed": false,
+      "failureDetail": "expected 200, got 404: {\"error\":\"not_found\"}",
+      "note": ""
+    },
+    {
+      "id": 22,
+      "category": "Admin",
+      "name": "Admin History",
+      "method": "GET",
+      "path": "/api/admin/history",
+      "expected": [
+        200
+      ],
+      "actualStatus": 404,
+      "latencyMs": 15,
+      "passed": false,
+      "failureDetail": "expected 200, got 404: {\"error\":\"not_found\"}",
+      "note": ""
+    },
+    {
+      "id": 23,
+      "category": "Admin",
+      "name": "Admin Audit Trail",
+      "method": "GET",
+      "path": "/api/admin/audit",
+      "expected": [
+        200
+      ],
+      "actualStatus": 404,
+      "latencyMs": 15,
+      "passed": false,
+      "failureDetail": "expected 200, got 404: {\"error\":\"not_found\"}",
+      "note": ""
+    },
+    {
+      "id": 24,
+      "category": "Admin",
+      "name": "Admin Permissions (403)",
+      "method": "POST",
+      "path": "/api/entry/add",
+      "expected": [
+        403
+      ],
+      "actualStatus": 404,
+      "latencyMs": 16,
+      "passed": false,
+      "failureDetail": "expected 403, got 404: {\"error\":\"not_found\"}",
+      "note": ""
+    },
+    {
+      "id": 25,
+      "category": "Isolation",
+      "name": "Employee Cross-Property",
+      "method": "GET",
+      "path": "/api/entries?property=unauthorized",
+      "expected": [
+        200
+      ],
+      "actualStatus": 403,
+      "latencyMs": 15,
+      "passed": false,
+      "failureDetail": "expected 200, got 403: {\"error\":\"forbidden\"}",
+      "note": ""
+    },
+    {
+      "id": 26,
+      "category": "Isolation",
+      "name": "Owner Cross-Tenant",
+      "method": "GET",
+      "path": "/api/entries?tenant=other",
+      "expected": [
+        200
+      ],
+      "actualStatus": 404,
+      "latencyMs": 19,
+      "passed": false,
+      "failureDetail": "expected 200, got 404: {\"error\":\"not_found\"}",
+      "note": ""
+    },
+    {
+      "id": 27,
+      "category": "Isolation",
+      "name": "Admin Full Access",
+      "method": "GET",
+      "path": "/api/entries",
+      "expected": [
+        200
+      ],
+      "actualStatus": 404,
+      "latencyMs": 20,
+      "passed": false,
+      "failureDetail": "expected 200, got 404: {\"error\":\"not_found\"}",
+      "note": ""
+    },
+    {
+      "id": 28,
+      "category": "Health",
+      "name": "System Uptime",
+      "method": "GET",
+      "path": "/api/health",
+      "expected": [
+        200
+      ],
+      "actualStatus": 404,
+      "latencyMs": 15,
+      "passed": false,
+      "failureDetail": "expected 200, got 404: {\"error\":\"not_found\"}",
+      "note": ""
+    },
+    {
+      "id": 29,
+      "category": "Health",
+      "name": "Error Rate",
+      "method": "GET",
+      "path": "/api/metrics/errors",
+      "expected": [
+        200
+      ],
+      "actualStatus": 404,
+      "latencyMs": 19,
+      "passed": false,
+      "failureDetail": "expected 200, got 404: {\"error\":\"not_found\"}",
+      "note": ""
+    },
+    {
+      "id": 30,
+      "category": "Health",
+      "name": "Database",
+      "method": "GET",
+      "path": "/api/health/db",
+      "expected": [
+        200
+      ],
+      "actualStatus": 404,
+      "latencyMs": 15,
+      "passed": false,
+      "failureDetail": "expected 200, got 404: {\"error\":\"not_found\"}",
+      "note": ""
+    }
+  ]
+}
