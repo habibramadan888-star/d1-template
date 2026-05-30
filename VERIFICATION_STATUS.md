@@ -1670,3 +1670,17 @@ No production D1 write, migration, D1 export/import/execute, employee entry
 write, handover submit, void/delete, settings change, dashboard calculation
 change, financial formula change, plaintext password storage, commercial launch
 GO, or production cutover occurred.
+
+## ARREARS-FOLLOWUP-FINAL-001 Verification Status
+
+| Item                      | Status  | Evidence                                                                                                                                                         |
+| ------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Final module spec         | CREATED | `ARREARS_FOLLOWUP_FINAL_MODULE_SPEC.md`                                                                                                                          |
+| Source model              | CREATED | `ARREARS_SOURCE_MODEL_FINAL.md`                                                                                                                                  |
+| Data model draft          | CREATED | `ARREARS_FOLLOWUP_DATA_MODEL_FINAL.md`                                                                                                                           |
+| State machine             | CREATED | `ARREARS_FOLLOWUP_STATE_MACHINE_FINAL.md`                                                                                                                        |
+| Permission matrix         | CREATED | `ARREARS_FOLLOWUP_PERMISSION_MATRIX_FINAL.md`                                                                                                                    |
+| API/audit/export/QA specs | CREATED | `ARREARS_FOLLOWUP_API_FINAL_SPEC.md`, `ARREARS_FOLLOWUP_AUDIT_TRAIL_FINAL_SPEC.md`, `ARREARS_WHATSAPP_EXPORT_FINAL_SPEC.md`, `ARREARS_FOLLOWUP_FINAL_QA_PLAN.md` |
+| Production cutover        | NO_GO   | No production migration/write/deploy in this task                                                                                                                |
+
+This is design verification only. No Partial P0 was marked Verified.

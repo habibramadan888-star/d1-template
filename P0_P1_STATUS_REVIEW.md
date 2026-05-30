@@ -1952,3 +1952,10 @@ P0 status remains unchanged:
 No production deploy, production migration, production D1 write,
 production-copy D1 write, D1 export/import/execute, dashboard switch,
 financial formula change, or cutover occurred in INTERNAL-QA-001.
+
+## ARREARS-FOLLOWUP-FINAL-001 P0/P1 Status
+
+- Arrears follow-up final lifecycle/risk/accounting model was documented.
+- No implementation status was upgraded from Partial to Verified.
+- No production deploy, production migration, staging D1 write, production D1 write, production-copy D1 write, dashboard calculation change, or financial formula change occurred.
+- `PRODUCTION_NO_GO` remains unchanged.

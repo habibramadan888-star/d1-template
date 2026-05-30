@@ -1371,6 +1371,18 @@ Still blocked for production:
 - Production receivables migration, backup, rollback, backfill, and deploy
   approval.
 
+## Added Backlog: Arrears Follow-up Implementation
+
+Final design documents are now available, but implementation remains blocked until approval:
+
+- Schema approval and migration plan for `arrears_followup_tasks`.
+- Local API/UI implementation and tests.
+- Staging QA approval and target confirmation.
+- Accounting signoff for amount authority and payment matching semantics.
+- Production preflight packet before any production migration or deploy.
+
+Commercial launch remains blocked: `PRODUCTION_NO_GO`.
+
 ## Commercial Launch Review 020 Backlog Addendum
 
 Date: 2026-05-27, Asia/Dubai

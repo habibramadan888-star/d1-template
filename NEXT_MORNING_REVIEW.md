@@ -68,6 +68,21 @@ Alternative next prompt:
 
 Production cutover remains `NO-GO`.
 
+## Next Morning Review Addendum: Arrears Follow-up
+
+Review the final arrears follow-up design package before implementation:
+
+- `ARREARS_FOLLOWUP_FINAL_MODULE_SPEC.md`
+- `ARREARS_SOURCE_MODEL_FINAL.md`
+- `ARREARS_FOLLOWUP_DATA_MODEL_FINAL.md`
+- `ARREARS_FOLLOWUP_STATE_MACHINE_FINAL.md`
+- `ARREARS_FOLLOWUP_PERMISSION_MATRIX_FINAL.md`
+- `ARREARS_FOLLOWUP_FINAL_QA_PLAN.md`
+
+Recommended next action: use `NEXT_PROMPT_ARREARS_SCHEMA_APPROVAL_REQUIRED.md` only if schema review is approved. Do not run migration or D1 writes without explicit approval.
+
+Production cutover remains `NO-GO`.
+
 ## Commercial Launch Review 015A Ramadan Receivables Accounting Decisions Addendum
 
 Date: 2026-05-27, Asia/Dubai
