@@ -105,3 +105,14 @@ If a real phone screenshot still shows any item below, UI acceptance fails and t
 | Arrears export is summary-first and accounting-readable                                     |           |       |
 | Unified login can use browser password manager without app-owned plaintext password storage |           |       |
 | Readonly admin cannot see or trigger write actions                                          |           |       |
+
+# OWNER-PAGE-REGRESSION-LOCK-001 Visual Checklist Addendum
+
+Date: 2026-05-30, Asia/Dubai
+
+- Owner overview screenshot must not show `QUICK ACTIONS` / `快速进入`.
+- Owner overview screenshot must not show duplicate quick buttons for history, customer, analysis, or network.
+- Owner navigation screenshot must show the internal `欠款管理` entry.
+- Root portal screenshot must show only employee, owner, admin doors.
+- Arrears screenshot must show the complete information pool: `欠款管理`, `ARREARS FOLLOW-UP`, `待下发`, `跟进中`, `承诺逾期`, `待核对`, `下发员工`, `WhatsApp 导出`, task status, responsible staff, promised repayment date, and notes.
+- Any reappearance of `QUICK ACTIONS` or disappearance of the arrears entry is a regression bug.

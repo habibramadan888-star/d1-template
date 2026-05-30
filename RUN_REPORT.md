@@ -5889,6 +5889,7 @@ Validation and deploy:
 - Generated approval-required next prompts for schema, local implementation, staging QA, and production preflight.
 - Production cutover remains `PRODUCTION_NO_GO`.
 - No D1 write, no migration, no production deploy, no staging deploy, no production-copy write, no dashboard calculation change, and no financial formula change were executed.
+
 ## THREE-PORTAL-FIX-001 Main Portal Entry Card Fix
 
 - Main `/` portal model corrected to one entry surface with three doors: 员工, 老板, 管理员.
@@ -5897,3 +5898,23 @@ Validation and deploy:
 - Added `tests/three-portal-entry-cards.spec.mjs` and `npm run test:three-portal-entry-cards`.
 - No D1 write, migration, D1 export/import/execute, business write, dashboard calculation change, financial formula change, or commercial launch GO occurred.
 - Production cutover remains `PRODUCTION_NO_GO`.
+
+# OWNER-PAGE-REGRESSION-LOCK-001 Run Report Addendum
+
+Date: 2026-05-30, Asia/Dubai
+
+Scope locked:
+
+- Owner overview prohibits `QUICK ACTIONS` and `快速进入`.
+- Arrears management remains owner-internal, not a root login entry.
+- Arrears management entry must not disappear from owner navigation.
+- Arrears information pool must remain visible and complete.
+- Regression tests added for overview quick-actions removal, arrears entry presence, and arrears info-pool composition.
+
+Safety:
+
+- D1 write: no
+- Migration: no
+- Financial formula change: no
+- Dashboard calculation change: no
+- Production cutover: `PRODUCTION_NO_GO`

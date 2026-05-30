@@ -1,5 +1,17 @@
 # Verification Status
 
+## OWNER-PAGE-REGRESSION-LOCK-001 Verification Addendum
+
+Date: 2026-05-30, Asia/Dubai
+
+| Verification                      | Result | Evidence                                                                                  | Commercial Meaning                                                                                                                              |
+| --------------------------------- | ------ | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Overview QUICK ACTIONS prohibited | READY  | `OWNER_PAGE_COMPONENT_AUTHORITY_MAP.md`; `tests/owner-overview-no-quick-actions.spec.mjs` | Owner overview cannot regress to duplicate shortcut surface.                                                                                    |
+| Owner arrears entry locked        | READY  | `tests/owner-arrears-entry-present.spec.mjs`                                              | Arrears management remains an owner-internal module, not a fourth login entry.                                                                  |
+| Arrears info pool locked          | READY  | `tests/owner-arrears-info-pool.spec.mjs`                                                  | Arrears follow-up must show status KPIs, directive action, WhatsApp export, task status, responsible staff, promised repayment date, and notes. |
+
+If `QUICK ACTIONS` appears again or the owner arrears entry disappears, classify it as a regression bug. Production cutover remains `PRODUCTION_NO_GO`.
+
 ## AUTH-ROUTING-ARCHITECTURE-001 Verification Addendum
 
 Date: 2026-05-29, Asia/Dubai
@@ -1684,16 +1696,17 @@ GO, or production cutover occurred.
 | Production cutover        | NO_GO   | No production migration/write/deploy in this task                                                                                                                |
 
 This is design verification only. No Partial P0 was marked Verified.
+
 ## THREE-PORTAL-FIX-001 Verification Status
 
-| Check | Status | Evidence |
-|---|---|---|
-| Main portal has only employee/owner/admin | pass | `deploy-worker/public/portal.html`; `npm run test:three-portal-entry-cards` |
-| Arrears no longer appears as a main login identity | pass | `tests/three-portal-entry-cards.spec.mjs` |
-| Owner arrears module remains available after login | pass | `deploy-worker/public/index-51.html`; `deploy-worker/public/index-51-main.js` |
-| Employee arrears follow-up remains internal to employee app | pass | employee workflow unchanged |
-| Readonly admin remains read-only | pass | `denyReadonlyAdminWrite()` and backend readonly role checks |
-| D1 write/migration/export/import/execute | not run | prohibited by task |
-| Commercial launch gate | `PRODUCTION_NO_GO` | `npm run gate:commercial-launch` |
+| Check                                                       | Status             | Evidence                                                                      |
+| ----------------------------------------------------------- | ------------------ | ----------------------------------------------------------------------------- |
+| Main portal has only employee/owner/admin                   | pass               | `deploy-worker/public/portal.html`; `npm run test:three-portal-entry-cards`   |
+| Arrears no longer appears as a main login identity          | pass               | `tests/three-portal-entry-cards.spec.mjs`                                     |
+| Owner arrears module remains available after login          | pass               | `deploy-worker/public/index-51.html`; `deploy-worker/public/index-51-main.js` |
+| Employee arrears follow-up remains internal to employee app | pass               | employee workflow unchanged                                                   |
+| Readonly admin remains read-only                            | pass               | `denyReadonlyAdminWrite()` and backend readonly role checks                   |
+| D1 write/migration/export/import/execute                    | not run            | prohibited by task                                                            |
+| Commercial launch gate                                      | `PRODUCTION_NO_GO` | `npm run gate:commercial-launch`                                              |
 
 Production cutover remains `PRODUCTION_NO_GO`.

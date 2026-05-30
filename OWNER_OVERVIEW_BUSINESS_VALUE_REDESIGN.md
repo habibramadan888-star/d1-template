@@ -12,7 +12,6 @@ The owner overview now prioritizes a quick business readout instead of empty ope
 - How much remains outstanding?
 - Are there items needing attention?
 - What was the latest handover state?
-- Where should the owner go next?
 
 ## Modules
 
@@ -26,7 +25,7 @@ The owner overview now prioritizes a quick business readout instead of empty ope
 | 待收尾款列表       | kept                | Gives direct follow-up context without changing calculations.                                                                                  |
 | 最近会话           | kept but downgraded | Useful operational context, not the primary decision item.                                                                                     |
 | 最近流水摘要       | added               | Shows latest session / transaction context when available.                                                                                     |
-| 快速进入           | added               | Routes owner to history, clients, and analytics.                                                                                               |
+| 快速进入           | removed             | Removed from the bottom of the overview because it duplicated primary navigation and had no distinct business function.                        |
 | Raw total counters | downgraded          | No longer the main overview value because they do not answer immediate owner decisions.                                                        |
 
 ## Boundaries

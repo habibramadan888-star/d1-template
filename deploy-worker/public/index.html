@@ -281,6 +281,7 @@ footer{text-align:center;padding:20px;color:var(--text3);font-size:9px;font-fami
 .arrears-head{padding:11px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(224,108,0,0.15)}
 .arrears-title{font-size:13px;font-weight:700;color:#b35a00;display:flex;align-items:center;gap:6px}
 .arrear-row{display:flex;align-items:center;gap:8px;padding:9px 14px;border-bottom:1px solid rgba(224,108,0,0.1);font-size:12px}
+.arrear-row.overdue-row{background:rgba(217,48,37,0.06);border-left:4px solid #d93025}
 .arrear-row:last-child{border:none}
 .arrear-room{font-family:JetBrains Mono,monospace;font-weight:700;min-width:46px;color:var(--text)}
 .arrear-due{font-family:JetBrains Mono,monospace;font-size:10px;color:#e06c00;white-space:nowrap}
@@ -1465,6 +1466,7 @@ body::before{
   <div class="topbar-row2">
     <nav class="nav" id="navTabs">
       <button class="nav-btn active" data-view="overview" id="navOverview"><svg class="ico"><use href="#i-chart"/></svg>总览<span class="en-sub">OVERVIEW</span></button>
+      <button class="nav-btn" data-view="arrears" id="navArrears"><svg class="ico"><use href="#i-doc"/></svg>欠款管理<span class="en-sub">ARREARS</span></button>
       <button class="nav-btn" data-view="history" id="navHistory"><svg class="ico"><use href="#i-history"/></svg>历史<span class="en-sub">HISTORY</span></button>
       <button class="nav-btn locked" data-view="analysis" id="navAnalysis"><svg class="ico"><use href="#i-trend"/></svg>分析<span class="en-sub">ANALYTICS</span></button>
       <button class="nav-btn locked" data-view="clients" id="navClients"><svg class="ico"><use href="#i-users"/></svg>客户<span class="en-sub">CLIENTS</span></button>
@@ -1480,8 +1482,6 @@ body::before{
   <!-- ENTRY -->
   <section id="view-entry" class="view hidden owner-entry-disabled" aria-hidden="true">
     <div class="kpi-strip" id="summaryGrid"></div>
-    <!-- 欠款提醒面板 -->
-    <div id="arrearsPanel"></div>
     <div class="main-grid">
       <div class="card">
         <div class="card-head">
@@ -1600,6 +1600,13 @@ body::before{
     <div class="page-title">总览<span class="en-sub" style="font-size:12px;letter-spacing:0.08em;margin-top:3px">OVERVIEW</span></div>
     <div class="page-sub">今日重点 · 收款状态 · 待处理提醒</div>
     <div id="ownerOverviewContent"></div>
+  </section>
+
+  <!-- ARREARS FOLLOW-UP -->
+  <section id="view-arrears" class="view hidden">
+    <div class="page-title">欠款管理<span class="en-sub" style="font-size:12px;letter-spacing:0.08em;margin-top:3px">ARREARS FOLLOW-UP</span></div>
+    <div class="page-sub">指令下发 · 员工承诺 · 逾期跟进</div>
+    <div id="arrearsPanel"></div>
   </section>
 
   <!-- HISTORY -->

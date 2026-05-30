@@ -166,6 +166,7 @@ pause role-flow QA until retested. Production cutover remains
 - Login password manager: browser autocomplete is allowed; app-owned plaintext password/PIN storage is forbidden.
 - Readonly admin: can view owner dashboard/history/clients/analysis; all write actions must be disabled in UI and rejected by backend.
 - Production remains `PRODUCTION_NO_GO`; no internal QA result is production approval.
+
 ## THREE-PORTAL-FIX-001 Entry Model Regression
 
 QA must verify the formal `/` entry surface has only three role doors:
@@ -181,3 +182,16 @@ QA must verify the formal `/` entry surface has only three role doors:
 - Readonly admin: owner/admin arrears view remains read-only.
 
 Run `npm run test:three-portal-entry-cards` before visual acceptance. Production cutover remains `PRODUCTION_NO_GO`.
+
+# OWNER-PAGE-REGRESSION-LOCK-001 Addendum
+
+Date: 2026-05-30, Asia/Dubai
+
+Owner QA must include these non-negotiable UI composition checks:
+
+- Overview page prohibits `QUICK ACTIONS` / `快速进入`.
+- Overview page must not duplicate history/customer/analysis/network shortcut buttons.
+- Arrears management is an owner-internal module and must not appear as a fourth login door.
+- Owner internal navigation must keep the `欠款管理` entry visible.
+- The arrears information pool must show `欠款管理`, `ARREARS FOLLOW-UP`, status KPIs, `下发员工`, `WhatsApp 导出`, `筛选状态`, task status, responsible staff, promised repayment date, and notes.
+- If `QUICK ACTIONS` appears or arrears entry disappears, classify it as a regression bug.

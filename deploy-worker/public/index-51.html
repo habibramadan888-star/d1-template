@@ -281,11 +281,38 @@ footer{text-align:center;padding:20px;color:var(--text3);font-size:9px;font-fami
 .arrears-head{padding:11px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(224,108,0,0.15)}
 .arrears-title{font-size:13px;font-weight:700;color:#b35a00;display:flex;align-items:center;gap:6px}
 .arrear-row{display:flex;align-items:center;gap:8px;padding:9px 14px;border-bottom:1px solid rgba(224,108,0,0.1);font-size:12px}
+.arrear-row.overdue-row{background:rgba(217,48,37,0.06);border-left:4px solid #d93025}
 .arrear-row:last-child{border:none}
 .arrear-room{font-family:JetBrains Mono,monospace;font-weight:700;min-width:46px;color:var(--text)}
 .arrear-due{font-family:JetBrains Mono,monospace;font-size:10px;color:#e06c00;white-space:nowrap}
 .arrear-remain{font-family:JetBrains Mono,monospace;font-weight:700;color:#d93025;margin-left:auto;margin-right:8px}
 .arrear-clr{background:rgba(26,138,74,0.12);border:none;border-radius:5px;color:#1a8a4a;font-size:11px;font-weight:600;padding:3px 8px;cursor:pointer;white-space:nowrap}
+.arrears-kpi-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:10px 0 12px}
+.arrears-kpi-card{background:#fff;border:1px solid rgba(224,108,0,.16);border-radius:14px;padding:10px;box-shadow:0 8px 20px rgba(120,60,0,.05)}
+.arrears-kpi-card strong{display:block;font-size:19px;line-height:1;color:#b45309}
+.arrears-kpi-card span{display:block;margin-top:5px;font-size:11px;color:#6b7280;font-weight:700}
+.arrears-filter-row{display:flex;gap:7px;overflow-x:auto;padding:2px 0 10px;scrollbar-width:none}
+.arrears-filter-row::-webkit-scrollbar{display:none}
+.arrears-filter-btn{border:1px solid rgba(180,83,9,.18);background:#fff;color:#92400e;border-radius:999px;padding:7px 11px;font-size:12px;font-weight:800;white-space:nowrap;cursor:pointer}
+.arrears-filter-btn.active{background:#b45309;color:#fff;border-color:#b45309}
+.arrears-directive-box{background:#fffbeb;border:1px solid rgba(180,83,9,.22);border-radius:16px;padding:12px;margin:0 0 12px}
+.arrears-directive-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.arrears-directive-grid label{font-size:11px;color:#92400e;font-weight:800}
+.arrears-directive-grid input,.arrears-directive-grid select,.arrears-directive-grid textarea{width:100%;margin-top:5px;border:1px solid rgba(180,83,9,.24);border-radius:10px;padding:8px;background:#fff;font-family:inherit;font-size:12px}
+.arrear-task-card{background:#fff;border:1px solid rgba(148,163,184,.22);border-radius:18px;padding:13px;margin:10px 0;box-shadow:0 10px 26px rgba(15,23,42,.06)}
+.arrear-task-card.overdue-row{background:linear-gradient(180deg,#fff,#fff7f7);border-color:rgba(217,48,37,.28);border-left:5px solid #d93025}
+.arrear-task-line{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:8px;font-size:12px;color:#475569;line-height:1.35}
+.arrear-task-line:first-child{margin-top:0}
+.arrear-task-main{font-size:15px;font-weight:900;color:#111827;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.arrear-task-amount{font-family:JetBrains Mono,monospace;font-size:15px;font-weight:900;color:#b45309;white-space:nowrap}
+.arrear-task-meta{font-size:12px;color:#64748b;font-weight:700}
+.arrear-task-status{display:inline-flex;align-items:center;border-radius:999px;padding:3px 8px;font-size:11px;font-weight:900}
+.arrear-task-note{margin-top:9px;padding:9px 10px;border-radius:12px;background:#f8fafc;color:#475569;font-size:12px;line-height:1.45}
+.arrear-task-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:11px}
+.arrear-task-actions button{border:0;border-radius:10px;padding:7px 10px;font-size:12px;font-weight:850;cursor:pointer}
+.arrear-task-actions .primary{background:#0f9f54;color:#fff}
+.arrear-task-actions .secondary{background:#eef2f7;color:#334155}
+.arrear-task-select{width:18px;height:18px;accent-color:#0f9f54;flex:0 0 auto}
 
 
 /* BILINGUAL TEXT */
@@ -1465,6 +1492,7 @@ body::before{
   <div class="topbar-row2">
     <nav class="nav" id="navTabs">
       <button class="nav-btn active" data-view="overview" id="navOverview"><svg class="ico"><use href="#i-chart"/></svg>总览<span class="en-sub">OVERVIEW</span></button>
+      <button class="nav-btn" data-view="arrears" id="navArrears"><svg class="ico"><use href="#i-doc"/></svg>欠款管理<span class="en-sub">ARREARS</span></button>
       <button class="nav-btn" data-view="history" id="navHistory"><svg class="ico"><use href="#i-history"/></svg>历史<span class="en-sub">HISTORY</span></button>
       <button class="nav-btn locked" data-view="analysis" id="navAnalysis"><svg class="ico"><use href="#i-trend"/></svg>分析<span class="en-sub">ANALYTICS</span></button>
       <button class="nav-btn locked" data-view="clients" id="navClients"><svg class="ico"><use href="#i-users"/></svg>客户<span class="en-sub">CLIENTS</span></button>
@@ -1480,8 +1508,6 @@ body::before{
   <!-- ENTRY -->
   <section id="view-entry" class="view hidden owner-entry-disabled" aria-hidden="true">
     <div class="kpi-strip" id="summaryGrid"></div>
-    <!-- 欠款提醒面板 -->
-    <div id="arrearsPanel"></div>
     <div class="main-grid">
       <div class="card">
         <div class="card-head">
@@ -1600,6 +1626,13 @@ body::before{
     <div class="page-title">总览<span class="en-sub" style="font-size:12px;letter-spacing:0.08em;margin-top:3px">OVERVIEW</span></div>
     <div class="page-sub">今日重点 · 收款状态 · 待处理提醒</div>
     <div id="ownerOverviewContent"></div>
+  </section>
+
+  <!-- ARREARS FOLLOW-UP -->
+  <section id="view-arrears" class="view hidden">
+    <div class="page-title">欠款管理<span class="en-sub" style="font-size:12px;letter-spacing:0.08em;margin-top:3px">ARREARS FOLLOW-UP</span></div>
+    <div class="page-sub">指令下发 · 员工承诺 · 逾期跟进</div>
+    <div id="arrearsPanel"></div>
   </section>
 
   <!-- HISTORY -->

@@ -12,15 +12,12 @@ test("overview page contains business-relevant owner sections", async () => {
     "今日待处理",
     "最近交接",
     "异常提醒",
-    "最近流水摘要",
-    "快速进入"
+    "最近流水摘要"
   ]) {
     assert.match(overview, new RegExp(text));
   }
   assert.match(overview, /待接入/);
-  assert.match(overview, /switchView\('history'\)/);
-  assert.match(overview, /switchView\('clients'\)/);
-  assert.match(overview, /switchView\('analysis'\)/);
+  assert.doesNotMatch(overview, /快速进入|QUICK ACTIONS/);
 });
 
 test("overview redesign does not change dashboard formulas", async () => {

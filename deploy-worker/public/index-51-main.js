@@ -66,7 +66,11 @@ function isEmployeeAppRole(r){return ['staff','employee'].includes(normalizeAuth
 function toOwnerSpaRole(r){return isReadonlyAdminRole(r)?'readonly_admin':isOwnerAppRole(r)?'manager':normalizeAuthRole(r);}
 function isOwnerShellRole(){return role==='manager'||role==='readonly_admin';}
 function isOwnerWriteRole(){return role==='manager';}
-function defaultViewForRole(){return isOwnerShellRole()?'overview':'entry';}
+function requestedOwnerView(){
+  const raw=(new URLSearchParams(location.search).get('view')||location.hash.replace(/^#\/?/,'')).trim();
+  return ['overview','arrears','history','analysis','clients','wifi'].includes(raw)?raw:'overview';
+}
+function defaultViewForRole(){return isOwnerShellRole()?requestedOwnerView():'entry';}
 function clearLegacyAuthStorage(){
   [
     'homelink:cloud_token',
@@ -91,7 +95,7 @@ function redirectToUnifiedLogin(reason=''){
   const target=UNIFIED_LOGIN_DESTINATION+(reason?`?reason=${encodeURIComponent(reason)}`:'');
   location.replace(target);
 }
-function unwrapStandardResponse(body){return body&&body.code===0&&body.data?body.data:body}
+function unwrapStandardResponse(body){return body&&body.code===0&&Object.prototype.hasOwnProperty.call(body,'data')?body.data:body}
 async function fetchCurrentAuthUser(){
   const r=await apiFetch('/api/me',{method:'GET'});
   if(r.status===401||r.status===403)return null;
@@ -145,12 +149,14 @@ function showOwnerAppShell(appRole){
   const canReadOwner=appRole==='manager'||appRole==='readonly_admin';
   if(canReadOwner){
     document.getElementById('navOverview')?.classList.remove('locked');
+    document.getElementById('navArrears')?.classList.remove('locked');
     document.getElementById('navHistory')?.classList.remove('locked');
     document.getElementById('navAnalysis')?.classList.remove('locked');
     document.getElementById('navClients')?.classList.remove('locked');
     document.getElementById('navWifi')?.classList.remove('locked');
   }else{
     document.getElementById('navOverview')?.classList.add('locked');
+    document.getElementById('navArrears')?.classList.add('locked');
     document.getElementById('navHistory')?.classList.add('locked');
     document.getElementById('navAnalysis')?.classList.add('locked');
     document.getElementById('navClients')?.classList.add('locked');
@@ -279,10 +285,11 @@ async function submitCode(){
 async function enterAs(r){
   role=toOwnerSpaRole(r);
   showOwnerAppShell(role);
-  try{switchView(defaultViewForRole());}catch(e){console.error('[OwnerBootstrap] initial shell render failed:',e);}
+  const initialView=defaultViewForRole();
+  try{switchView(initialView);}catch(e){console.error('[OwnerBootstrap] initial shell render failed:',e);}
   try{
     await loadAll();
-    switchView(defaultViewForRole());
+    switchView(state.view||initialView);
   }catch(e){
     console.error('[OwnerBootstrap] data load failed:', e);
     toast('Some dashboard data failed to load. Refresh and try again.','err');
@@ -670,7 +677,7 @@ async function loadAll(){
     try{
       const _ar=await apiFetch('/api/arrears');
       if(!_ar.ok) throw new Error('api');
-      const _rows=await _ar.json();
+      const _rows=rowsFromApiPayload(await _ar.json(),['arrears','tasks']);
       state.arrears=_rows.map(normalizeArrearFromCloud);
     }catch{try{const ar=LS.get(ARREARS_KEY);if(ar)state.arrears=JSON.parse(ar)||[];}catch{}}
   }else{
@@ -947,8 +954,27 @@ function normalizeArrearFromCloud(a){
     directiveStatus:a.effective_directive_status||a.directive_status||'none',
     rawDirectiveStatus:a.directive_status||'none',
     staffPromisedAt:a.staff_promised_at||'',
-    isOverdue:!!a.is_overdue
+    isOverdue:!!a.is_overdue,
+    closeStatus:a.close_status||a.closeStatus||''
   };
+}
+function rowsFromApiPayload(payload,keys=[]){
+  if(Array.isArray(payload))return payload;
+  if(payload&&Array.isArray(payload.data))return payload.data;
+  for(const key of keys){
+    if(payload&&Array.isArray(payload[key]))return payload[key];
+    if(payload&&payload.data&&Array.isArray(payload.data[key]))return payload.data[key];
+  }
+  return [];
+}
+function isArrearTaskOpen(a){
+  if(!a||a.cleared)return false;
+  const closedValues=new Set(['closed','cleared','paid','settled','void','voided','written_off','cancelled','canceled','已结清','结清','关闭','作废']);
+  const closeStatus=String(a.closeStatus||a.close_status||'').trim().toLowerCase();
+  const followupStatus=String(a.followupStatus||a.followup_status||'').trim().toLowerCase();
+  if(closedValues.has(closeStatus)||closedValues.has(followupStatus))return false;
+  const remain=Number(a.remain);
+  return a.remain==null||Number.isNaN(remain)||remain>0;
 }
 function arrearDirectiveStatus(a){
   const raw=String(a?.directiveStatus||'none');
@@ -967,11 +993,46 @@ function setArrearDirectiveFilter(value){
   state.arrearFilter=value||'all';
   renderArrearsPanel();
 }
+function updateArrearDirectiveButtonState(){
+  const btn=document.getElementById('arrearDirectiveBtn');
+  if(!btn)return;
+  const selected=document.querySelectorAll('[data-arrear-select]:checked').length;
+  btn.disabled=selected===0;
+  btn.style.opacity=selected? '1':'0.55';
+  btn.style.cursor=selected? 'pointer':'not-allowed';
+  btn.textContent=selected?`要求员工更新（${selected}） / Send directive`:'要求员工更新 / Send directive';
+}
+function exportArrearsWhatsApp(){
+  const active=(state.arrears||[]).filter(isArrearTaskOpen);
+  const lines=[
+    '欠款管理 ARREARS FOLLOW-UP',
+    `未结清任务：${active.length}`,
+    ...active.slice(0,30).map((a,i)=>{
+      const status=arrearDirectiveStatus(a);
+      const amount=a.remain==null?'待定':`${fmtMoney(a.remain)} AED`;
+      return `${i+1}. ${a.room||'-'} | ${amount} | ${status} | 承诺:${a.promiseDate||'-'} | 备注:${a.staffNote||a.ownerNote||'-'}`;
+    })
+  ];
+  const text=lines.join('\n');
+  try{
+    navigator.clipboard?.writeText(text);
+    toast('WhatsApp 文本已复制');
+  }catch{
+    toast('WhatsApp 文本已生成，请手动复制','err');
+  }
+  const url='https://wa.me/?text='+encodeURIComponent(text);
+  try{window.open(url,'_blank','noopener,noreferrer');}catch{}
+}
 async function sendArrearDirectives(){
   if(!isOwnerWriteRole())return;
   const ids=[...document.querySelectorAll('[data-arrear-select]:checked')].map(x=>x.value).filter(Boolean);
   if(!ids.length){toast('Select arrears first','err');return;}
-  const dueDate=document.getElementById('arrearDirectiveDue')?.value||'';
+  const dueInput=document.getElementById('arrearDirectiveDue');
+  let dueDate=dueInput?.value||'';
+  if(!dueDate){
+    dueDate=prompt('请输入要求员工完成更新的日期（YYYY-MM-DD）',fmtD(new Date(Date.now()+86400000)))||'';
+    if(dueInput)dueInput.value=dueDate;
+  }
   if(!dueDate){toast('Select requested date','err');return;}
   try{
     const r=await apiFetch('/api/arrear_tasks/directive',{method:'POST',body:JSON.stringify({task_ids:ids,due_date:dueDate})});
@@ -983,69 +1044,125 @@ async function sendArrearDirectives(){
     toast('Directive failed: '+(e.message||e),'err');
   }
 }
-/* 老板视角：从云端静默刷新欠款列表 */
-async function refreshArrearsFromCloud(){
-  if(!isOwnerShellRole()) return;
+function showArrearsLoading(){
+  const panel=document.getElementById('arrearsPanel');
+  if(!panel)return;
+  panel.innerHTML=`<div class="arrears-panel">
+    <div class="arrears-head"><div class="arrears-title">欠款管理<span class="en-sub" style="font-size:8px;letter-spacing:0.06em">ARREARS FOLLOW-UP</span></div></div>
+    <div style="padding:22px;color:var(--text2);font-size:13px;text-align:center">
+      <div style="font-weight:700;margin-bottom:4px">加载中...</div>
+      <div style="font-size:11px;color:var(--text3)">正在读取所有未结清欠款任务</div>
+    </div>
+  </div>`;
+}
+function showArrearsLoadError(error){
+  const panel=document.getElementById('arrearsPanel');
+  if(!panel)return;
+  panel.innerHTML=`<div class="arrears-panel">
+    <div class="arrears-head"><div class="arrears-title">欠款管理<span class="en-sub" style="font-size:8px;letter-spacing:0.06em">ARREARS FOLLOW-UP</span></div></div>
+    <div style="padding:18px;color:#b91c1c;font-size:13px;text-align:center">
+      欠款数据加载失败，请刷新重试。
+      <div style="font-size:10px;color:#991b1b;margin-top:4px">${esc(error?.message||String(error||''))}</div>
+    </div>
+  </div>`;
+}
+async function loadArrearsForOwner({showLoading=false}={}){
+  if(!isOwnerShellRole())return false;
+  if(showLoading)showArrearsLoading();
   try{
     const r=await apiFetch('/api/arrears');
-    if(!r.ok) return;
-    const rows=await r.json();
+    const payload=await r.json().catch(()=>[]);
+    if(!r.ok)throw new Error(payload?.message||('HTTP '+r.status));
+    const rows=rowsFromApiPayload(payload,['arrears','tasks']);
     state.arrears=rows.map(normalizeArrearFromCloud);
-    saveArrears();        // 同步到本地 localStorage
-    renderArrearsPanel(); // 静默更新面板
-  }catch(e){console.warn('refreshArrearsFromCloud:',e);}
+    saveArrears();
+    renderArrearsPanel();
+    return true;
+  }catch(e){
+    console.warn('loadArrearsForOwner:',e);
+    try{
+      const cached=LS.get(ARREARS_KEY);
+      if(cached){
+        state.arrears=JSON.parse(cached)||[];
+        renderArrearsPanel();
+        if(showLoading)toast('欠款接口暂不可用，已显示本地缓存。','err');
+        return false;
+      }
+    }catch{}
+    if(showLoading)showArrearsLoadError(e);
+    return false;
+  }
+}
+/* 老板视角：从云端静默刷新欠款列表 */
+async function refreshArrearsFromCloud(){
+  return loadArrearsForOwner({showLoading:false});
 }
 
 function renderArrearsPanel(){
   const panel=document.getElementById('arrearsPanel');
   if(!panel) return;
   const visible=isOwnerShellRole()?state.arrears:state.arrears.filter(a=>a.sessionId===state.session.id);
-  const active=visible.filter(a=>!a.cleared);
-  if(!active.length){panel.innerHTML='';return;}
+  const active=visible.filter(isArrearTaskOpen);
+  if(!active.length){
+    panel.innerHTML=isOwnerShellRole()
+      ? `<div class="arrears-panel"><div class="arrears-head"><div class="arrears-title">欠款管理<span class="en-sub" style="font-size:8px;letter-spacing:0.06em">ARREARS FOLLOW-UP</span></div></div><div style="padding:18px;color:var(--text3);font-size:13px;text-align:center">暂无待跟进欠款任务。员工录入短付或老板创建欠款任务后，将在这里显示复选框和“要求员工更新”按钮。</div></div>`
+      : '';
+    return;
+  }
   const today=fmtD(new Date());
   const pendingCount=active.filter(a=>arrearDirectiveStatus(a)==='pending').length;
+  const promisedCount=active.filter(a=>arrearDirectiveStatus(a)==='promised').length;
   const overdueDirectiveCount=active.filter(a=>arrearDirectiveStatus(a)==='overdue').length;
+  const reviewCount=active.filter(a=>arrearDirectiveStatus(a)==='none').length;
   const filtered=active
     .filter(a=>state.arrearFilter==='all'||arrearDirectiveStatus(a)===state.arrearFilter)
     .sort((a,b)=>(a.dueDate||'9999').localeCompare(b.dueDate||'9999'));
-  panel.innerHTML=`<div class="arrears-panel">
+  const totalAmount=(()=>{const known=active.filter(a=>a.remain!=null);const unk=active.filter(a=>a.remain==null);const tot=Math.round(known.reduce((s,a)=>s+(a.remain||0),0)*100)/100;return '共 '+fmtMoney(tot)+' AED'+(unk.length?' + '+unk.length+'笔待定':'');})();
+  panel.innerHTML=`<div class="arrears-panel" data-owner-arrears-info-pool="true">
     <div class="arrears-head">
       <div class="arrears-title">
-        ⚠ 待收尾款<span class="en-sub" style="font-size:8px;letter-spacing:0.06em">OUTSTANDING</span>
+        欠款管理<span class="en-sub" style="font-size:8px;letter-spacing:0.06em">ARREARS FOLLOW-UP</span>
         <span style="background:#d93025;color:#fff;font-size:11px;padding:2px 8px;border-radius:10px;font-weight:700;margin-left:4px">${active.length} 笔</span>
       </div>
-      <span style="font-size:11px;color:#b35a00;font-family:JetBrains Mono,monospace">${(()=>{const known=active.filter(a=>a.remain!=null);const unk=active.filter(a=>a.remain==null);const tot=Math.round(known.reduce((s,a)=>s+(a.remain||0),0)*100)/100;return '共 '+fmtMoney(tot)+' AED'+(unk.length?' + '+unk.length+'笔待定':'');})()}</span>
+      <span style="font-size:11px;color:#b35a00;font-family:JetBrains Mono,monospace">${totalAmount}</span>
     </div>
-    <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:8px 0">
-      <div style="background:#fef3c7;color:#92400e;border-radius:10px;padding:8px;font-size:12px;font-weight:700">Pending directives: ${pendingCount}</div>
-      <div style="background:#fee2e2;color:#991b1b;border-radius:10px;padding:8px;font-size:12px;font-weight:700">Overdue promised: ${overdueDirectiveCount}</div>
+    <div class="arrears-kpi-grid" data-owner-arrears-kpis="true">
+      <div class="arrears-kpi-card"><strong>${pendingCount}</strong><span>待下发</span></div>
+      <div class="arrears-kpi-card"><strong>${promisedCount}</strong><span>跟进中</span></div>
+      <div class="arrears-kpi-card"><strong>${overdueDirectiveCount}</strong><span>承诺逾期</span></div>
+      <div class="arrears-kpi-card"><strong>${reviewCount}</strong><span>待核对</span></div>
     </div>
-    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0">
-      ${isOwnerWriteRole()?`<label style="font-size:11px;color:var(--text2)">Requested date <input id="arrearDirectiveDue" type="date" min="${today}" style="margin-left:4px;padding:5px 7px;border:1px solid #ddd;border-radius:7px"></label>
-      <button style="background:#b45309;color:#fff;font-size:11px;padding:6px 10px;border-radius:8px;border:none;cursor:pointer" onclick="sendArrearDirectives()">要求员工更新 / Send directive</button>`:''}
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0" data-owner-arrears-actions="true">
+      ${isOwnerWriteRole()?`<label style="font-size:11px;color:var(--text2)">下发员工日期 <input id="arrearDirectiveDue" type="date" min="${today}" style="margin-left:4px;padding:5px 7px;border:1px solid #ddd;border-radius:7px"></label>
+      <button id="arrearDirectiveBtn" disabled style="background:#b45309;color:#fff;font-size:11px;padding:6px 10px;border-radius:8px;border:none;cursor:not-allowed;opacity:.55" onclick="sendArrearDirectives()">要求员工更新 / 下发员工</button>`:''}
+      <button type="button" style="background:#075e54;color:#fff;font-size:11px;padding:6px 10px;border-radius:8px;border:none;cursor:pointer" onclick="exportArrearsWhatsApp()">WhatsApp 导出</button>
+      <label style="font-size:11px;color:var(--text2)">筛选状态</label>
       <select onchange="setArrearDirectiveFilter(this.value)" style="padding:5px 7px;border:1px solid #ddd;border-radius:7px">
         ${['all','pending','promised','overdue','none'].map(v=>`<option value="${v}" ${state.arrearFilter===v?'selected':''}>${v}</option>`).join('')}
       </select>
     </div>
+    <div style="font-size:11px;color:var(--text3);font-weight:800;margin:10px 0 6px">欠款任务列表 / 信息池</div>
     ${filtered.map(a=>{
       const overdue=a.dueDate&&a.dueDate<today;
       const daysLeft=a.dueDate?Math.ceil((new Date(a.dueDate)-new Date(today))/(1000*60*60*24)):null;
       const urgency=overdue?'#d93025':daysLeft!==null&&daysLeft<=3?'#e06c00':'#b35a00';
       const directive=arrearDirectiveStatus(a);
       const [statusLabel,statusColor,statusBg]=arrearStatusMeta(directive);
-      return `<div class="arrear-row">
+      return `<div class="arrear-row ${overdue?'overdue-row':''}" data-owner-arrear-task-card="true">
         ${isOwnerWriteRole()?`<input type="checkbox" data-arrear-select value="${esc(a.taskId||a.id)}" style="margin-right:4px">`:''}
-        <span class="arrear-room">#${esc(a.room)}</span>
+        <span class="arrear-room">房间/床位 #${esc(a.room)}</span>
         <div style="flex:1;min-width:0">
-          <div style="font-size:12px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(a.note||'分期尾款')}</div>
+          <div style="font-size:12px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">客户编号 ${esc(a.tenantCardId||a.tenantName||a.taskId||a.id||'-')} · 套餐/卡片 ${esc(a.type||'rent')} · ${esc(a.note||'分期尾款')}</div>
           <div style="font-size:10px;color:${urgency};font-family:JetBrains Mono,monospace;margin-top:1px">
-${overdue?('⚠ 已逾期 '+esc(a.dueDate)):daysLeft===0?'今天到期':daysLeft===1?'明天到期':daysLeft!==null?(daysLeft+'天后到期 '+esc(a.dueDate)):'无截止日 · 尽快安排'}
+逾期天数 ${overdue?Math.abs(daysLeft||0):0} · ${overdue?('⚠ 已逾期 '+esc(a.dueDate)):daysLeft===0?'今天到期':daysLeft===1?'明天到期':daysLeft!==null?(daysLeft+'天后到期 '+esc(a.dueDate)):'无截止日 · 尽快安排'}
           </div>
           <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:5px;font-size:10px">
-            <span style="color:${statusColor};background:${statusBg};border-radius:999px;padding:2px 7px;font-weight:700">directive: ${esc(statusLabel)}</span>
-            ${a.bossRequestedDueDate?`<span style="color:#92400e;background:#fffbeb;border-radius:999px;padding:2px 7px">boss due: ${esc(a.bossRequestedDueDate)}</span>`:''}
-            ${a.promiseDate?`<span style="color:#065f46;background:#ecfdf5;border-radius:999px;padding:2px 7px">promise: ${esc(a.promiseDate)}</span>`:''}
-            ${a.staffNote?`<span style="color:#374151;background:#f3f4f6;border-radius:999px;padding:2px 7px">staff: ${esc(a.staffNote)}</span>`:''}
+            <span style="color:${statusColor};background:${statusBg};border-radius:999px;padding:2px 7px;font-weight:700">任务状态 ${esc(statusLabel)}</span>
+            <span style="color:#1f2937;background:#f9fafb;border-radius:999px;padding:2px 7px">负责人 ${esc(a.bossRequestedBy||a.ownerNote||'待分配')}</span>
+            ${a.bossRequestedDueDate?`<span style="color:#92400e;background:#fffbeb;border-radius:999px;padding:2px 7px">老板要求 ${esc(a.bossRequestedDueDate)}</span>`:''}
+            ${a.promiseDate?`<span style="color:#065f46;background:#ecfdf5;border-radius:999px;padding:2px 7px">承诺还款日期 ${esc(a.promiseDate)}</span>`:''}
+            ${a.staffNote?`<span style="color:#374151;background:#f3f4f6;border-radius:999px;padding:2px 7px">最近备注 ${esc(a.staffNote)}</span>`:''}
+            <span style="color:#4338ca;background:#eef2ff;border-radius:999px;padding:2px 7px" data-owner-review-action="true">老板审核动作 待核对</span>
           </div>
           ${directive==='overdue'?`<div style="margin-top:4px;color:#b91c1c;font-size:10px;font-weight:700">Overdue: promised ${esc(a.promiseDate||'-')} but remaining balance is still open.</div>`:''}
         </div>
@@ -1057,16 +1174,10 @@ ${overdue?('⚠ 已逾期 '+esc(a.dueDate)):daysLeft===0?'今天到期':daysLeft
           const clr = a.type==='deposit' ? '#1a73e8' : urgency;
           return '<span class="arrear-remain" style="color:'+clr+';font-weight:700">'+amtStr+'</span>';
         })()}
-        <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">
-          ${a.type==='deposit'
-            ? `<button class="arrear-clr" style="background:#1a73e8;color:#fff;font-size:10px;padding:4px 8px;border-radius:6px;border:none;cursor:pointer;white-space:nowrap" onclick="enterDepositForArrear(${jsArg(a.id)})">💰 录入押金</button>`
-            : `<button class="arrear-clr" style="background:#1a8a4a;color:#fff;font-size:10px;padding:4px 8px;border-radius:6px;border:none;cursor:pointer;white-space:nowrap" onclick="enterPaymentForArrear(${jsArg(a.id)})">💰 录入收款</button>`
-          }
-          ${isOwnerWriteRole()?`<button style="background:transparent;color:#999;font-size:9px;padding:2px 4px;border:1px solid #ddd;border-radius:4px;cursor:pointer;white-space:nowrap" onclick="dismissArrear(${jsArg(a.id)})">作废</button>`:''}
-        </div>
       </div>`;
     }).join('')}
   </div>`;
+  updateArrearDirectiveButtonState();
 }
 /* ── 录入收款/押金 → 不直接核销，引导员工录入流水 ── */
 function enterPaymentForArrear(id){
@@ -3554,7 +3665,7 @@ function renderOwnerOverview(){
     {label:'短付/待收',value:openArrears.length?`${openArrears.length} 项`:'暂无',tone:openArrears.length?'var(--color-warning)':'var(--color-primary)'},
     {label:'逾期',value:overdue.length?`${overdue.length} 项`:'暂无',tone:overdue.length?'var(--color-danger)':'var(--color-primary)'},
     {label:'待审核',value:'待接入',tone:'var(--color-text-muted)'},
-    {label:'作废记录',value:'待接入',tone:'var(--color-text-muted)'}
+    {label:'异常记录',value:'待接入',tone:'var(--color-text-muted)'}
   ].map(a=>`<div class="detail-row owner-mobile-row"><div class="room">${esc(a.label)}</div><div class="note">BUSINESS ALERT</div><div class="amount" style="color:${a.tone}">${esc(a.value)}</div></div>`).join('');
   const recentEntryHtml=recentEntries.length?recentEntries.map(e=>`
     <div class="detail-row owner-mobile-row">
@@ -3584,15 +3695,6 @@ function renderOwnerOverview(){
     <div class="card hl-card owner-overview-section" style="margin-top:16px">
       <div class="card-head"><div><div class="card-title">最近流水摘要</div><div class="card-sub">RECENT LEDGER</div></div></div>
       <div class="card-body"><div class="detail-list">${recentEntryHtml}</div></div>
-    </div>
-    <div class="card hl-card owner-overview-section" style="margin-top:16px">
-      <div class="card-head"><div><div class="card-title">快速进入</div><div class="card-sub">QUICK ACTIONS</div></div></div>
-      <div class="card-body" style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px">
-        <button class="btn btn-ghost" type="button" onclick="switchView('history')">历史</button>
-        <button class="btn btn-ghost" type="button" onclick="switchView('clients')">客户</button>
-        <button class="btn btn-ghost" type="button" onclick="switchView('analysis')">分析</button>
-        <button class="btn btn-ghost" type="button" onclick="switchView('wifi')">网络</button>
-      </div>
     </div>`;
 }
 
@@ -4763,11 +4865,12 @@ function switchView(v){
     toast('老板端录入入口已移至员工端，请使用员工业务页提交流水。','info');
     v='overview';
   }
-  if(role==='staff'&&(v==='overview'||v==='history'||v==='analysis'||v==='clients'||v==='wifi')){toast('员工账户无此权限','err');return;}
+  if(role==='staff'&&(v==='overview'||v==='arrears'||v==='history'||v==='analysis'||v==='clients'||v==='wifi')){toast('员工账户无此权限','err');return;}
   state.view=v;
   document.querySelectorAll('#navTabs .nav-btn').forEach(b=>b.classList.toggle('active',b.dataset.view===v));
-  ['entry','overview','history','analysis','clients','wifi'].forEach(n=>{document.getElementById('view-'+n)?.classList.toggle('hidden',n!==v);});
+  ['entry','overview','arrears','history','analysis','clients','wifi'].forEach(n=>{document.getElementById('view-'+n)?.classList.toggle('hidden',n!==v);});
   if(v==='entry'){renderEntryView();refreshArrearsFromCloud();}
+  if(v==='arrears'){loadArrearsForOwner({showLoading:true});}
   if(v==='overview'){renderOwnerOverview();updateHistCount();}
   if(v==='history')renderHistory();
   if(v==='analysis'){const bw=document.getElementById('billingWidget');if(bw)bw.innerHTML='';renderFilterControls();renderAnalysis();updateHistCount();}
@@ -4840,6 +4943,9 @@ function bindEvents(){
   // Live update installment remain on amount or standard price change
   document.addEventListener('input',e=>{
     if(e.target.id==='fAmount'||e.target.id==='fInstStandard') updateInstallRemain();
+  });
+  document.addEventListener('change',e=>{
+    if(e.target?.matches?.('[data-arrear-select]')) updateArrearDirectiveButtonState();
   });
   document.getElementById('fRoom').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();addEntry();}});
   document.getElementById('btnAdd').onclick=addEntry;

@@ -1,5 +1,23 @@
 # Owner Internal Test Script
 
+## OWNER-PAGE-REGRESSION-LOCK-001 Addendum
+
+Date: 2026-05-30, Asia/Dubai
+
+- Owner overview must not render `QUICK ACTIONS` or `快速进入`.
+- Arrears management is an owner-internal module, not a login entry.
+- The three-door root portal must remain employee / owner / admin only.
+- Owner internal navigation must keep a visible `欠款管理` entry.
+- The arrears information pool must remain visible and include status KPIs, directive action, WhatsApp export, task status, owner/staff follow-up fields, promised repayment date, and recent notes.
+- If `QUICK ACTIONS` reappears or the owner arrears entry disappears, treat it as a regression bug.
+
+Regression evidence:
+
+- `OWNER_PAGE_COMPONENT_AUTHORITY_MAP.md`
+- `tests/owner-overview-no-quick-actions.spec.mjs`
+- `tests/owner-arrears-entry-present.spec.mjs`
+- `tests/owner-arrears-info-pool.spec.mjs`
+
 ## AUTH-ROUTING-ARCHITECTURE-001 Entry Update
 
 Owner testers must start at `https://homelink-finance.habibramadan888.workers.dev/`, choose the owner door, then authenticate. Do not start from `/index.html`; it is a compatibility alias to `/owner`. Lock/logout must return to `/`. Old owner login UI must not appear. Production cutover remains `PRODUCTION_NO_GO`.
@@ -106,6 +124,7 @@ Additional stop conditions:
 | OWNER-BLOCKER-003-02 | Arrears compact modal      | Open overdue detail modal on mobile             | Multiple compact rows are visible and readable                                | Mobile screenshot           |           |                        |
 | OWNER-BLOCKER-003-03 | Readonly admin write guard | Login as readonly admin test fixture            | Dashboard/history/clients visible; write buttons hidden or disabled           | Screenshot plus test result |           | No business write test |
 | OWNER-BLOCKER-003-04 | Password manager support   | Login owner via unified login                   | Browser can offer password save; app does not store plaintext password        | Browser prompt/manual note  |           | Do not print password  |
+
 ## THREE-PORTAL-FIX-001 Owner Entry Notes
 
 Use `/` only to choose the owner role. The main portal must not display 欠款管理 as a separate identity.
