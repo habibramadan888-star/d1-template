@@ -102,3 +102,17 @@ Use these expected results when reporting unified-login bugs:
 - Arrears modal shows only one record per mobile screen: P2, P1 if it blocks collection follow-up.
 - App stores plaintext password/PIN in frontend storage: P0 security bug.
 - Readonly admin can perform any business write: P0 authorization bug.
+
+## Owner Arrears Final UX Regression Rules
+
+Treat these as P1 blockers:
+
+- Owner arrears page stays blank or unusable for around 20 seconds.
+- Owner arrears page shows a third source beyond system existing arrears and TTLock expired unpaid.
+- TTLock expired unpaid card shows `金额待核对` instead of a rent-mapped amount.
+- Missing bed rent configuration appears as a normal owner arrears card.
+- Owner arrears card does not match the history page card visual system.
+- Owner arrears card shows raw/debug labels such as `directive`, `promise`, `staff`, `source_type`, `followup_status`, `none`, `undefined`, or `null`.
+- Top navigation still says `欠款管理` or wraps to a second line on mobile.
+
+Production remains `PRODUCTION_NO_GO`.

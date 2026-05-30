@@ -19,13 +19,14 @@ function extractFunction(source, name) {
   throw new Error(`Could not extract ${name}`);
 }
 
-test("owner internal navigation contains arrears management entry", async () => {
+test("owner internal navigation contains the shortened arrears entry", async () => {
   const html = await readFile("deploy-worker/public/index-51.html", "utf8");
   const js = await readFile("deploy-worker/public/index-51-main.js", "utf8");
 
   assert.match(html, /data-view="arrears"/);
   assert.match(html, /id="navArrears"/);
-  assert.match(html, /欠款管理/);
+  assert.match(html, />欠款<span class="en-sub">ARREARS<\/span>/);
+  assert.doesNotMatch(html, /欠款管理<span class="en-sub">ARREARS<\/span>/);
   assert.match(js, /if\(v==='arrears'\)\{loadArrearsForOwner\(\{showLoading:true\}\);\}/);
 });
 
@@ -34,7 +35,7 @@ test("main three-door portal does not expose arrears as login identity", async (
   const visible = visiblePortal(portal);
 
   assert.equal([...visible.matchAll(/data-portal="/g)].length, 3);
-  assert.doesNotMatch(visible, /欠款管理/);
+  assert.doesNotMatch(visible, /欠款管理|欠款/);
   assert.doesNotMatch(visible, /ARREARS FOLLOW-UP/i);
   assert.doesNotMatch(visible, /data-portal="arrears"/);
 });

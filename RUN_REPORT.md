@@ -5942,3 +5942,13 @@ Safety:
 - Financial formula change: no
 - Dashboard calculation change: no
 - Production cutover: `PRODUCTION_NO_GO`
+
+## OWNER-ARREARS-FINAL-UX-LOGIC-001
+
+- Owner arrears source model is now restricted to two allowed sources: system existing arrears records and TTLock expired unpaid cards.
+- TTLock expired unpaid cards must use bed rent mapping for amount. Beds without rent configuration are excluded from the default owner arrears list and treated as configuration QA.
+- Owner cards show only employee promised amount, promised payment date, and note by default.
+- Owner arrears cards now reuse the history page visual system (`hist-card`, `hist-stat`, `hist-anchor`) and must not regress to table/row/debug layouts.
+- Top navigation label changed from `欠款管理` to `欠款`; primary mobile order is `总览 / 欠款 / 历史 / 客户 / 网络`.
+- A 20-second arrears blank load is a P1 blocker. Raw debug fields (`directive`, `promise`, `staff`, `source_type`, `followup_status`, `none`, `undefined`, `null`) are regression blockers.
+- Production remains `PRODUCTION_NO_GO`; no D1 write, migration, D1 export/import/execute, employee entry write, handover, void/delete, dashboard calculation change, or financial formula change was performed.

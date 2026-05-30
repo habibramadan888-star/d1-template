@@ -45,7 +45,7 @@ test("main portal does not expose arrears management as a fourth login identity"
   const html = await portalHtml();
   const visible = visiblePortal(html);
 
-  assert.doesNotMatch(visible, /欠款管理/);
+  assert.doesNotMatch(visible, /欠款管理|欠款/);
   assert.doesNotMatch(visible, /新版指令功能/);
   assert.doesNotMatch(visible, /ARREARS FOLLOW-UP/i);
   assert.doesNotMatch(visible, /Arrears follow-up/i);
@@ -62,7 +62,7 @@ test("owner arrears module remains available inside the owner app", async () => 
 
   assert.match(portal, /if\(OWNER_ROLES\.has\(r\)\)return"\/owner"/);
   assert.match(ownerHtml, /data-view="arrears"/);
-  assert.match(ownerHtml, /欠款管理/);
+  assert.match(ownerHtml, />欠款<span class="en-sub">ARREARS<\/span>/);
   assert.match(ownerJs, /function renderArrearsPanel\(\)/);
   assert.match(ownerJs, /\/api\/arrears/);
   assert.match(worker, /path === "\/api\/arrears"/);

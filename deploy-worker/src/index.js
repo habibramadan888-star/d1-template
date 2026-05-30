@@ -1884,9 +1884,20 @@ function empTaskToBossArrear(t){
   };
 }
 __name(empTaskToBossArrear,"empTaskToBossArrear");
-async function empListMergedArrearTasks(env,user){
+function bossArrearsListLimit(request){
+  try{
+    const raw=Number(new URL(request.url).searchParams.get("limit")||20);
+    if(!Number.isFinite(raw))return 20;
+    return Math.min(Math.max(Math.floor(raw),1),100);
+  }catch{
+    return 20;
+  }
+}
+__name(bossArrearsListLimit,"bossArrearsListLimit");
+async function empListMergedArrearTasks(env,user,opts={}){
   await empEnsureSchema(env);
-  const taskRows=await env.DB.prepare("SELECT * FROM arrear_tasks WHERE corpid=? ORDER BY COALESCE(updated_at,created_at) DESC").bind(user.corpid).all();
+  const limit=Math.min(Math.max(Number(opts.limit||100),1),500);
+  const taskRows=await env.DB.prepare("SELECT * FROM arrear_tasks WHERE corpid=? ORDER BY COALESCE(updated_at,created_at) DESC LIMIT ?").bind(user.corpid,limit).all();
   const tasks=(taskRows.results||[]).filter(t=>empCloseStatusIsOpen(t.close_status)&&empTaskRemaining(t)>0);
   const seenIds=new Set(tasks.map(t=>cleanText(t.task_id,100)).filter(Boolean));
   const seenKeys=new Set(tasks.map(t=>[
@@ -1895,7 +1906,7 @@ async function empListMergedArrearTasks(env,user){
     empTaskRemaining(t).toFixed(2)
   ].join("|")));
   if(await empTableExists(env,"arrears")){
-    const legacy=await env.DB.prepare("SELECT * FROM arrears WHERE corpid=? AND cleared=0 AND COALESCE(voided_at,'')='' ORDER BY created_at DESC").bind(user.corpid).all();
+    const legacy=await env.DB.prepare("SELECT * FROM arrears WHERE corpid=? AND cleared=0 AND COALESCE(voided_at,'')='' ORDER BY created_at DESC LIMIT ?").bind(user.corpid,limit).all();
     for(const row of legacy.results||[]){
       const mapped=empLegacyArrearToTask(row);
       const mappedId=cleanText(mapped.task_id,100);
@@ -1917,15 +1928,15 @@ async function empListMergedArrearTasks(env,user){
 }
 __name(empListMergedArrearTasks,"empListMergedArrearTasks");
 async function handleBossArrears(request,env,user){
-  const tasks=await empListMergedArrearTasks(env,user);
+  const tasks=await empListMergedArrearTasks(env,user,{limit:bossArrearsListLimit(request)});
   return success(tasks.map(empTaskToBossArrear).filter(a=>a.remain>0));
 }
 __name(handleBossArrears,"handleBossArrears");
 async function handleBossArrearsFollowupTasks(request,env,user){
-  const tasks=await empListMergedArrearTasks(env,user);
+  const tasks=await empListMergedArrearTasks(env,user,{limit:bossArrearsListLimit(request)});
   return success({
     tasks:tasks.map(empTaskToBossArrear).filter(a=>a.remain>0),
-    source_authority:["historical_arrears"]
+    source_authority:["existing_arrears_record","ttlock_expired_unpaid"]
   });
 }
 __name(handleBossArrearsFollowupTasks,"handleBossArrearsFollowupTasks");

@@ -15,21 +15,21 @@ function extractFunction(source, name) {
   throw new Error(`Could not extract ${name}`);
 }
 
-test("owner arrears tasks render through a dedicated mobile card component", async () => {
+test("owner arrears tasks render through history-style mobile cards", async () => {
   const js = await readFile("deploy-worker/public/index-51-main.js", "utf8");
   const render = extractFunction(js, "renderArrearsPanel");
   const card = extractFunction(js, "renderOwnerArrearsTaskCard");
 
   assert.match(render, /renderOwnerArrearsTaskCard\(a,today\)/);
   assert.doesNotMatch(render, /class="arrear-row arrear-task-card/);
-  assert.match(card, /<article class="owner-arrears-task-card/);
+  assert.match(card, /class="hist-card owner-arrears-task-card/);
   assert.match(card, /owner-arrears-identity/);
-  assert.match(card, /owner-arrears-due-line/);
-  assert.match(card, /owner-arrears-followup-grid/);
+  assert.match(card, /hist-anchor owner-arrears-due-line/);
+  assert.match(card, /hist-stat/);
   assert.match(card, /owner-arrears-card-actions/);
 });
 
-test("mobile card includes the core readable business blocks", async () => {
+test("mobile card includes the owner-readable business blocks only", async () => {
   const js = await readFile("deploy-worker/public/index-51-main.js", "utf8");
   const card = extractFunction(js, "renderOwnerArrearsTaskCard");
 
@@ -37,14 +37,21 @@ test("mobile card includes the core readable business blocks", async () => {
     "arrearCustomerLabel",
     "arrearBedLabel",
     "arrearAmountLabel",
+    "arrearSourceLabel",
     "arrearDueLine",
-    "来源",
-    "状态",
-    "负责人",
-    "承诺还款",
-    "备注"
+    "arrearPromiseAmountLabel",
+    "arrearPromiseDateLabel",
+    "arrearFollowupNoteLabel",
+    "承诺金额",
+    "承诺日期",
+    "备注",
+    "状态"
   ]) {
     assert.match(card, new RegExp(required));
+  }
+
+  for (const forbidden of ["directive:", "promise:", "staff:", "source_type", "金额待核对"]) {
+    assert.doesNotMatch(card, new RegExp(forbidden, "i"));
   }
 });
 
@@ -53,7 +60,7 @@ test("owner arrears mobile CSS uses one-column cards, not table rows", async () 
 
   assert.match(html, /\.owner-arrears-list\{display:grid;grid-template-columns:1fr/);
   assert.match(html, /\.owner-arrears-task-card\{width:100%;box-sizing:border-box;display:block/);
-  assert.match(html, /\.owner-arrears-followup-grid\{display:grid;grid-template-columns:1fr/);
-  assert.match(html, /@media \(max-width:720px\)/);
   assert.match(html, /\.owner-arrears-task-card \*\{writing-mode:horizontal-tb\}/);
+  assert.match(html, /@media \(max-width:720px\)/);
+  assert.doesNotMatch(html, /table-layout|display:table|writing-mode:\s*vertical/i);
 });

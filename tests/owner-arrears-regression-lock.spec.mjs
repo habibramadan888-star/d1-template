@@ -26,18 +26,19 @@ function extractFunction(source, name) {
   throw new Error(`Could not extract ${name}`);
 }
 
-test("owner arrears loader builds a unified follow-up pool from all required sources", async () => {
+test("owner arrears loader avoids duplicate fetches and keeps TTLock aggregation off first paint", async () => {
   const js = await readFile("deploy-worker/public/index-51-main.js", "utf8");
   const load = extractFunction(js, "loadArrearsForOwner");
 
+  assert.match(load, /if\(state\.arrearsLoading\)return/);
+  assert.match(load, /showArrearsLoading\(\)/);
   assert.match(load, /loadHistoricalArrearsForOwner/);
-  assert.match(load, /buildArrearsFollowupPool/);
-  assert.match(load, /currentDueUnpaidForArrearsPool/);
-  assert.match(load, /ttlockExpiredCardsForArrearsPool/);
+  assert.match(load, /setTimeout\(async\(\)=>/);
   assert.match(load, /ensureOwnerLockCardsForArrearsPool/);
+  assert.doesNotMatch(load, /currentDueUnpaidForArrearsPool/);
 });
 
-test("owner arrears cards expose business source labels and unknown TTLock amount review state", async () => {
+test("owner arrears cards expose only final business labels and no unknown amount state", async () => {
   const js = await readFile("deploy-worker/public/index-51-main.js", "utf8");
   const render = extractFunction(js, "renderArrearsPanel");
   const card = extractFunction(js, "renderOwnerArrearsTaskCard");
@@ -53,19 +54,18 @@ test("owner arrears cards expose business source labels and unknown TTLock amoun
 
   for (const required of [
     "data-owner-arrear-task-card",
-    "owner-arrears-task-card",
+    "hist-card owner-arrears-task-card",
     "arrearAmountLabel",
-    "来源",
-    "状态",
-    "负责人",
-    "承诺还款",
-    "备注"
+    "承诺金额",
+    "承诺日期",
+    "备注",
+    "状态"
   ]) {
     assert.match(card, new RegExp(required));
   }
-  assert.match(amountLabel, /金额待核对/);
-  assert.match(js, /ttlock_expired_card/);
-  assert.match(js, /通通锁过期/);
+  assert.doesNotMatch(amountLabel, /金额待核对/);
+  assert.match(js, /ttlock_expired_unpaid/);
+  assert.match(js, /通通锁到期未付/);
 });
 
 test("owner arrears main list does not reintroduce debug labels or direct write shortcuts", async () => {
@@ -81,9 +81,11 @@ test("owner arrears main list does not reintroduce debug labels or direct write 
       "Overdue: promised",
       "录入收款</button>",
       "录入押金</button>",
-      "作废</button>"
+      "作废</button>",
+      "source_type",
+      "followup_status"
     ]) {
-      assert.doesNotMatch(source, new RegExp(forbidden));
+      assert.doesNotMatch(source, new RegExp(forbidden, "i"));
     }
   }
 });

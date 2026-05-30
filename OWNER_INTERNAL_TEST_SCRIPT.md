@@ -167,3 +167,15 @@ Use `/` only to choose the owner role. The main portal must not display 欠款�
 After owner login, verify 欠款管理 is available inside the owner workspace navigation/module area. The owner can manage/review arrears from that workspace only; do not treat arrears as a standalone login entry.
 
 Production cutover remains `PRODUCTION_NO_GO`.
+
+## Owner Arrears Final UX Test Addendum
+
+1. Open owner `欠款` from the primary nav. The label must be `欠款`, not `欠款管理`.
+2. Confirm the page shows a skeleton/loading shell immediately and never stays blank for 20 seconds.
+3. Confirm default arrears cards only include two sources: `系统已有欠款` and `通通锁到期未付`.
+4. Confirm TTLock expired unpaid cards display a concrete AED amount from bed rent mapping. Cards must not show `金额待核对`.
+5. Confirm each card matches the history page card style and shows customer/bed/amount, due status, source, status, promised amount, promised date, and note.
+6. Confirm no raw/debug labels appear: `directive`, `promise`, `staff`, `source_type`, `followup_status`, `none`, `undefined`, `null`.
+7. Confirm readonly admin can view details only and cannot see write buttons.
+
+Stop the test if any old row/table layout, third source, debug field, or 20-second blank load appears. Production remains `PRODUCTION_NO_GO`.

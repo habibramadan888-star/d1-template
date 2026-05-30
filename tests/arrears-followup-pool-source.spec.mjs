@@ -5,47 +5,59 @@ import test from "node:test";
 import { buildArrearsFollowupPool } from "../modules/finance/arrears-followup-pool.mjs";
 import { arrearsFollowupPoolFixture } from "./fixtures/arrears-followup-pool.fixture.mjs";
 
-test("arrears follow-up pool includes historical, current-due, and TTLock expired-card sources", () => {
+test("arrears follow-up pool only includes existing arrears and TTLock expired unpaid", () => {
   const pool = buildArrearsFollowupPool(arrearsFollowupPoolFixture, { today: "2026-05-30" });
   const sourceTypes = new Set(pool.map((row) => row.sourceType));
 
-  assert.equal(pool.length, 3);
-  assert.ok(sourceTypes.has("historical_arrears"));
-  assert.ok(sourceTypes.has("current_due_unpaid"));
-  assert.ok(sourceTypes.has("ttlock_expired_card"));
+  assert.equal(pool.length, 2);
+  assert.deepEqual([...sourceTypes].sort(), ["existing_arrears_record", "ttlock_expired_unpaid"]);
+  assert.equal(sourceTypes.has("current_due_unpaid"), false);
+  assert.equal(sourceTypes.has("unsupported_arrears_source"), false);
 });
 
-test("TTLock expired-card tasks remain in pool even when amount authority is unknown", () => {
+test("TTLock expired unpaid rows use bed rent amount and missing-rent rows stay out of default pool", () => {
   const pool = buildArrearsFollowupPool(arrearsFollowupPoolFixture, { today: "2026-05-30" });
-  const ttlock = pool.find((row) => row.sourceType === "ttlock_expired_card");
+  const ttlock = pool.find((row) => row.sourceType === "ttlock_expired_unpaid");
 
   assert.ok(ttlock);
-  assert.equal(ttlock.remain, null);
-  assert.equal(ttlock.amountAuthorityStatus, "unknown");
-  assert.match(ttlock.note, /金额待核对/);
+  assert.equal(ttlock.remain, 630);
+  assert.equal(ttlock.amountAuthorityStatus, "bed_rent_mapping");
+  assert.equal(
+    pool.some((row) => row.room === "702 / 5"),
+    false
+  );
 });
 
-test("closed historical arrears are excluded but unpaid current-due rows are retained", () => {
-  const pool = buildArrearsFollowupPool(arrearsFollowupPoolFixture, { today: "2026-05-30" });
+test("closed existing arrears are excluded and random customer rows are ignored", () => {
+  const pool = buildArrearsFollowupPool(
+    {
+      ...arrearsFollowupPoolFixture,
+      existingArrearsRecords: [
+        ...arrearsFollowupPoolFixture.existingArrearsRecords,
+        ...arrearsFollowupPoolFixture.unknownSourceRows
+      ]
+    },
+    { today: "2026-05-30" }
+  );
 
   assert.equal(
     pool.some((row) => row.taskId === "hist-closed"),
     false
   );
   assert.equal(
-    pool.some((row) => row.sourceType === "current_due_unpaid" && row.remain === 700),
-    true
+    pool.some((row) => row.id === "unknown-001"),
+    false
   );
 });
 
-test("owner frontend uses the same source names and visibly calls buildArrearsFollowupPool", async () => {
+test("owner frontend uses the same two-source names and visibly calls buildArrearsFollowupPool", async () => {
   const js = await readFile("deploy-worker/public/index-51-main.js", "utf8");
 
   assert.match(js, /function buildArrearsFollowupPool/);
-  assert.match(js, /historicalArrears/);
-  assert.match(js, /currentDueUnpaid/);
-  assert.match(js, /ttlockExpiredCards/);
-  assert.match(js, /ttlock_expired_card/);
+  assert.match(js, /existingArrearsRecords/);
+  assert.match(js, /ttlockExpiredCardsForArrearsPool/);
+  assert.match(js, /ttlock_expired_unpaid/);
+  assert.doesNotMatch(js, /currentDueUnpaidForArrearsPool/);
 });
 
 test("commercial launch gate remains PRODUCTION_NO_GO", async () => {

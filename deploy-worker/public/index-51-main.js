@@ -27,6 +27,7 @@ const CUSTOMER_KEY='apt:customers';
 const CC_GRACE=3;
 const DEFAULT_PRICES=[600,650,700,750];
 const HISTORY_PAGE_SIZE=20;
+const ARREARS_PAGE_SIZE=20;
 const HISTORY_FETCH_TIMEOUT_MS=4500;
 
 /* ── CLOUD AUTH ── */
@@ -607,6 +608,7 @@ const state={
   from:'',to:'',txCatFilter:'all',txSearch:'',historyViewing:null,historyLimit:HISTORY_PAGE_SIZE,
   arrears:[], // [{id,room,roomTo?,totalRent,paid,remain,dueDate,sessionId,cleared}]
   arrearFilter:'all',
+  arrearsLimit:ARREARS_PAGE_SIZE,arrearsLoading:false,
   presetPrices:DEFAULT_PRICES,
   customers:[],
   anaOpen:{session:false,finance:false,people:false,continuity:false,tx:false},
@@ -670,14 +672,10 @@ async function loadAll(){
   }
   // Load preset prices
   try{const pp=LS.get(PRICES_KEY);if(pp){const parsed=JSON.parse(pp);if(Array.isArray(parsed)&&parsed.length)state.presetPrices=parsed;}}catch{}
-  // Load arrears
-  // 欠款：从云端 API 加载（优先），失败则降级 localStorage
+  // Load cached arrears shell only; owner arrears fetch happens when the page opens.
   state.arrears=[];
   if(isOwnerShellRole()){
-    try{
-      const _rows=await loadHistoricalArrearsForOwner();
-      state.arrears=buildArrearsFollowupPool({historicalArrears:_rows,currentDueUnpaid:[],ttlockExpiredCards:[]});
-    }catch{try{const ar=LS.get(ARREARS_KEY);if(ar)state.arrears=JSON.parse(ar)||[];}catch{}}
+    try{const ar=LS.get(ARREARS_KEY);if(ar)state.arrears=JSON.parse(ar)||[];}catch{}
   }else{
     LS.del(ARREARS_KEY);
   }
@@ -952,11 +950,14 @@ function normalizeArrearFromCloud(a){
     tenantName:a.tenant_name||'',
     tenantCardId:a.tenant_card_id||'',
     followupStatus:a.followup_status||'',
-    promiseDate:a.promise_date||'',
+    promiseDate:a.promise_date||a.promised_payment_date||'',
     promiseAmount:a.promise_amount||0,
+    promisedAmountFils:a.promised_amount_fils||0,
+    promisedPaymentDate:a.promised_payment_date||'',
     actualReceived:a.actual_received||0,
     ownerNote:a.owner_note||'',
     staffNote:a.staff_note||'',
+    followupNote:a.followup_note||'',
     bossRequestedAt:a.boss_requested_at||'',
     bossRequestedBy:a.boss_requested_by||'',
     bossRequestedDueDate:a.boss_requested_due_date||'',
@@ -977,11 +978,14 @@ function rowsFromApiPayload(payload,keys=[]){
   return [];
 }
 function normalizeArrearsSourceType(source){
-  const raw=String(source||'historical_arrears').trim().toLowerCase();
-  if(raw==='arrears'||raw==='arrear_tasks')return 'historical_arrears';
-  if(raw==='current_due'||raw==='current_due_unpaid')return 'current_due_unpaid';
-  if(raw==='ttlock'||raw==='ttlock_expired')return 'ttlock_expired_card';
-  return raw||'historical_arrears';
+  const raw=String(source||'existing_arrears_record').trim().toLowerCase();
+  if(['arrears','arrear','arrear_tasks','historical_arrears','existing_arrears','legacy_arrears','existing_arrears_record'].includes(raw))return 'existing_arrears_record';
+  if(['ttlock','ttlock_expired','ttlock_expired_card','ttlock_expired_unpaid'].includes(raw))return 'ttlock_expired_unpaid';
+  return 'unsupported_arrears_source';
+}
+function isAllowedArrearsSource(row){
+  const source=normalizeArrearsSourceType(row?.sourceType||row?.source_type||row?.source);
+  return source==='existing_arrears_record'||source==='ttlock_expired_unpaid';
 }
 function arrearsPoolDedupeKey(row){
   const sourceType=normalizeArrearsSourceType(row.sourceType||row.source_type||row.source);
@@ -989,51 +993,58 @@ function arrearsPoolDedupeKey(row){
   if(sourceRef)return `${sourceType}|${sourceRef}`;
   return [sourceType,row.room||row.roomBed||'',row.dueDate||row.due_date||'',row.remain??'unknown'].join('|');
 }
-function buildArrearsFollowupPool({historicalArrears=[],currentDueUnpaid=[],ttlockExpiredCards=[]}={}){
+function bedRentAmountForArrears(row){
+  try{
+    const cfg=typeof rc_getRoomCfg==='function'?rc_getRoomCfg():{};
+    const keys=[
+      row?.roomBed,row?.room_bed,row?.bed,row?.room,row?.lockRoom,row?.lock_room,
+      String(row?.roomBed||row?.room_bed||row?.room||'').replace(/\s*\/\s*/g,' / '),
+      String(row?.roomBed||row?.room_bed||row?.room||'').split('/').pop()?.trim()
+    ].map(v=>String(v||'').trim()).filter(Boolean);
+    for(const key of keys){
+      const amount=Number(cfg[key]);
+      if(Number.isFinite(amount)&&amount>0)return amount;
+    }
+  }catch(e){
+    console.warn('bedRentAmountForArrears:',e);
+  }
+  return null;
+}
+function buildArrearsFollowupPool({existingArrearsRecords=[],historicalArrears=[],ttlockExpiredUnpaid=[],ttlockExpiredCards=[]}={}){
+  const existingRows=[...existingArrearsRecords,...historicalArrears];
   const normalizeHistorical=row=>normalizeArrearFromCloud({
     ...row,
-    source_type:normalizeArrearsSourceType(row.source_type||row.sourceType||row.source||'historical_arrears'),
+    source_type:'existing_arrears_record',
     source_ref:row.source_ref||row.sourceRef||row.task_id||row.id
   });
-  const normalizeCurrent=row=>normalizeArrearFromCloud({
-    id:row.id||`current-due-${row.room||row.bed||''}-${row.dueDate||row.endDate||''}`,
-    task_id:row.task_id||row.taskId||`current-due-${row.room||row.bed||''}-${row.dueDate||row.endDate||''}`,
-    source_type:'current_due_unpaid',
-    source_ref:row.source_ref||row.sourceRef||`${row.room||row.bed||''}|${row.dueDate||row.endDate||''}`,
-    room:row.room||row.bed,
-    room_bed:row.roomBed||row.room||row.bed,
-    customer_code:row.customerCode||row.name||'',
-    card_code:row.cardCode||row.name||'',
-    package_code:row.packageCode||'rent',
-    note:row.note||'本期到期未结清',
-    remain:row.remaining??row.remain??row.amount,
-    due_date:row.dueDate||row.endDate,
-    followup_status:row.followupStatus||'待跟进',
-    accounting_status:'open'
-  });
-  const normalizeTtlock=row=>normalizeArrearFromCloud({
+  const normalizeTtlock=row=>{
+    const rentAmount=bedRentAmountForArrears(row);
+    if(!(Number.isFinite(rentAmount)&&rentAmount>0)){
+      return null;
+    }
+    return normalizeArrearFromCloud({
     id:row.id||`ttlock-expired-${row.room||row.bed||''}-${row.dueDate||row.endDate||'unknown'}`,
     task_id:row.task_id||row.taskId||`ttlock-expired-${row.room||row.bed||''}-${row.dueDate||row.endDate||'unknown'}`,
-    source_type:'ttlock_expired_card',
+    source_type:'ttlock_expired_unpaid',
     source_ref:row.source_ref||row.sourceRef||`${row.room||row.bed||''}|${row.dueDate||row.endDate||''}|${row.cardName||''}`,
     room:row.room||row.bed||row.lockRoom,
     room_bed:row.roomBed||row.room||row.bed||row.lockRoom,
     customer_code:row.customerCode||row.cardName||row.tenantName||'',
     card_code:row.cardCode||row.cardName||'',
     package_code:row.packageCode||'ttlock_card',
-    note:row.note||'通通锁卡片已过期，金额待核对',
-    remain:row.remain??null,
+    note:row.note||'通通锁卡片已到期，按床位租金生成待跟进欠款',
+    remain:rentAmount,
     due_date:row.dueDate||row.endDate,
-    followup_status:row.followupStatus||'待核对',
-    amount_authority_status:'unknown',
-    accounting_status:'needs_amount_review'
+    followup_status:row.followupStatus||'待下发',
+    amount_authority_status:'bed_rent_config',
+    accounting_status:'open'
   });
+  };
   const seen=new Set();
   return [
-    ...historicalArrears.map(normalizeHistorical),
-    ...currentDueUnpaid.map(normalizeCurrent),
-    ...ttlockExpiredCards.map(normalizeTtlock)
-  ].filter(isArrearTaskOpen).filter(row=>{
+    ...existingRows.map(normalizeHistorical),
+    ...[...ttlockExpiredUnpaid,...ttlockExpiredCards].map(normalizeTtlock).filter(Boolean)
+  ].filter(isAllowedArrearsSource).filter(isArrearTaskOpen).filter(row=>Number(row.remain)>0).filter(row=>{
     const key=arrearsPoolDedupeKey(row);
     if(seen.has(key))return false;
     seen.add(key);
@@ -1042,7 +1053,7 @@ function buildArrearsFollowupPool({historicalArrears=[],currentDueUnpaid=[],ttlo
     const ad=a.dueDate||'9999-12-31';
     const bd=b.dueDate||'9999-12-31';
     if(ad!==bd)return ad.localeCompare(bd);
-    const order={ttlock_expired_card:0,historical_arrears:1,current_due_unpaid:2};
+    const order={ttlock_expired_unpaid:0,existing_arrears_record:1};
     return (order[a.sourceType]??9)-(order[b.sourceType]??9);
   });
 }
@@ -1053,12 +1064,12 @@ function isArrearTaskOpen(a){
   const followupStatus=String(a.followupStatus||a.followup_status||'').trim().toLowerCase();
   if(closedValues.has(closeStatus)||closedValues.has(followupStatus))return false;
   const remain=Number(a.remain);
-  return a.remain==null||Number.isNaN(remain)||remain>0;
+  return Number.isFinite(remain)&&remain>0;
 }
 async function loadHistoricalArrearsForOwner(){
-  const primary=await apiFetch('/api/arrears/followup/tasks');
+  const primary=await apiFetchWithTimeout(`/api/arrears/followup/tasks?limit=${ARREARS_PAGE_SIZE}`);
   if(primary.ok)return rowsFromApiPayload(await primary.json(),['arrears','tasks']);
-  const fallback=await apiFetch('/api/arrears');
+  const fallback=await apiFetchWithTimeout(`/api/arrears?limit=${ARREARS_PAGE_SIZE}`);
   if(!fallback.ok){
     const payload=await fallback.json().catch(()=>({}));
     throw new Error(payload?.message||('HTTP '+fallback.status));
@@ -1081,35 +1092,21 @@ async function ensureOwnerLockCardsForArrearsPool(){
   }
   return false;
 }
-function currentDueUnpaidForArrearsPool(){
-  try{
-    const period=getBillingPeriod();
-    const renewal=calcPeriodRenewals(period);
-    return (renewal?.items||[]).filter(item=>!item.isPaid&&Number(item.remaining||0)>0).map(item=>({
-      room:item.room,
-      name:item.name,
-      remaining:item.remaining,
-      dueDate:item.endDate instanceof Date?fmtD(item.endDate):String(item.endDate||'').slice(0,10),
-      note:item.isPartial?'本期到期部分未结清':'本期到期未结清',
-      sourceRef:`${item.room}|${item.endDate instanceof Date?item.endDate.getTime():item.endDate}|${item.remaining}`
-    }));
-  }catch(e){
-    console.warn('currentDueUnpaidForArrearsPool:',e);
-    return [];
-  }
-}
 function ttlockExpiredCardsForArrearsPool(){
   try{
     if(typeof rc_currentOccupiedCards!=='function')return [];
-    return rc_currentOccupiedCards().filter(card=>Number(card.end||0)>0&&Number(card.end||0)<Date.now()).map(card=>({
-      room:card.bed||card.lockRoom,
-      bed:card.bed,
-      lockRoom:card.lockRoom,
-      cardName:card.cardName,
-      dueDate:card.endDate instanceof Date?fmtD(card.endDate):String(card.endDate||'').slice(0,10),
-      sourceRef:`${card.bed||card.lockRoom}|${card.end||0}|${card.cardName||''}`,
-      note:'通通锁卡片已过期，金额待核对'
-    }));
+    return rc_currentOccupiedCards()
+      .filter(card=>Number(card.end||0)>0&&Number(card.end||0)<Date.now())
+      .map(card=>({
+        room:card.bed||card.lockRoom,
+        bed:card.bed,
+        lockRoom:card.lockRoom,
+        cardName:card.cardName,
+        dueDate:card.endDate instanceof Date?fmtD(card.endDate):String(card.endDate||'').slice(0,10),
+        sourceRef:`${card.bed||card.lockRoom}|${card.end||0}|${card.cardName||''}`,
+        note:'通通锁卡片已到期，按床位租金生成待跟进欠款'
+      }))
+      .filter(card=>Number(bedRentAmountForArrears(card))>0);
   }catch(e){
     console.warn('ttlockExpiredCardsForArrearsPool:',e);
     return [];
@@ -1117,10 +1114,9 @@ function ttlockExpiredCardsForArrearsPool(){
 }
 function arrearSourceLabel(a){
   return {
-    historical_arrears:'历史欠款',
-    current_due_unpaid:'到期未收',
-    ttlock_expired_card:'通通锁过期'
-  }[normalizeArrearsSourceType(a?.sourceType)]||'欠款来源待核对';
+    existing_arrears_record:'系统已有欠款',
+    ttlock_expired_unpaid:'通通锁到期未付'
+  }[normalizeArrearsSourceType(a?.sourceType)]||'不显示';
 }
 function arrearDirectiveStatus(a){
   const raw=String(a?.directiveStatus||'none');
@@ -1173,7 +1169,7 @@ function arrearBedLabel(a){
   return cleanArrearText(a?.roomBed||a?.room||a?.bed||a?.lockRoom,'床位待核对');
 }
 function arrearAmountLabel(a){
-  return a?.remain==null?'金额待核对':`${fmtMoney(a.remain)} AED`;
+  return `${fmtMoney(Number(a?.remain||0))} AED`;
 }
 function arrearDueLine(a,today){
   const due=cleanArrearText(a?.dueDate||a?.due_date,'截止待核对');
@@ -1191,7 +1187,8 @@ function arrearBusinessState(a){
   if(follow==='待核对'||String(a?.accountingStatus||a?.accounting_status||'')==='needs_review')return '待核对';
   if(directive==='overdue')return '承诺逾期';
   if(directive==='promised'||follow==='承诺付款')return '承诺付款';
-  if(directive==='pending'||follow==='已联系')return '跟进中';
+  if(follow==='已联系')return '已跟进';
+  if(directive==='pending')return '已下发';
   return '待下发';
 }
 function renderArrearCardActions(a){
@@ -1202,43 +1199,47 @@ function renderArrearCardActions(a){
   const stateLabel=arrearBusinessState(a);
   const selectAction=`onclick="selectArrearForDirective(${taskArg})"`;
   const noticeAction=`onclick="showArrearTaskActionHint(${taskArg})"`;
-  if(stateLabel==='跟进中')return `${detail}<button type="button" class="primary" data-arrear-write-action="nudge" ${selectAction}>催促</button>`;
+  if(stateLabel==='已下发'||stateLabel==='已跟进')return `${detail}<button type="button" class="primary" data-arrear-write-action="nudge" ${selectAction}>催促</button>`;
   if(stateLabel==='承诺付款')return `<button type="button" class="primary" data-arrear-write-action="review" ${noticeAction}>待核对</button><button type="button" class="secondary" data-arrear-write-action="continue" ${selectAction}>继续跟进</button>`;
   if(stateLabel==='已反馈付款')return `<button type="button" class="primary" data-arrear-write-action="mark-review" ${noticeAction}>标记待核对</button>${detail}`;
   if(stateLabel==='待核对')return `<button type="button" class="primary" data-arrear-write-action="close" ${noticeAction}>确认关闭</button><button type="button" class="secondary" data-arrear-write-action="continue" ${selectAction}>继续跟进</button>`;
   return `<button type="button" class="primary" data-arrear-write-action="assign" ${selectAction}>下发员工</button>${detail}`;
+}
+function arrearPromiseAmountLabel(a){
+  const fils=Number(a?.promisedAmountFils||a?.promised_amount_fils||0);
+  const amount=fils>0?fils/100:Number(a?.promiseAmount||a?.promise_amount||0);
+  return Number.isFinite(amount)&&amount>0?`${fmtMoney(amount)} AED`:'未填写';
+}
+function arrearPromiseDateLabel(a){
+  return cleanArrearText(a?.promisedPaymentDate||a?.promised_payment_date||a?.promiseDate||a?.promise_date,'未填写');
+}
+function arrearFollowupNoteLabel(a){
+  return cleanArrearText(a?.followupNote||a?.followup_note||a?.staffNote||a?.staff_note,'暂无');
 }
 function renderOwnerArrearsTaskCard(a,today){
   const directive=arrearDirectiveStatus(a);
   const [statusLabel,statusColor,statusBg]=arrearStatusMeta(directive);
   const overdue=a?.dueDate&&a.dueDate<today;
   const taskId=esc(a?.taskId||a?.id||'');
-  const note=cleanArrearText(a?.staffNote||a?.ownerNote||a?.note,'无');
-  const ownerDue=cleanArrearText(a?.bossRequestedDueDate,'未设置');
-  const promiseDate=cleanArrearText(a?.promiseDate,'未填写');
-  const assignee=cleanArrearText(a?.bossRequestedBy||a?.employeeName||a?.userid,'待分配');
   const customer=esc(arrearCustomerLabel(a));
   const bed=esc(arrearBedLabel(a));
   const amount=esc(arrearAmountLabel(a));
   const source=esc(arrearSourceLabel(a));
   const dueLine=esc(arrearDueLine(a,today));
   const businessStatus=esc(arrearBusinessState(a)||statusLabel);
-  const followup=esc(arrearFollowupStatusLabel(a));
-  return `<article class="owner-arrears-task-card ${overdue?'is-overdue':''}" data-owner-arrear-task-card="true" data-arrear-pool-kind="${esc(normalizeArrearsSourceType(a?.sourceType))}">
+  const promiseAmount=esc(arrearPromiseAmountLabel(a));
+  const promiseDate=esc(arrearPromiseDateLabel(a));
+  const note=esc(arrearFollowupNoteLabel(a));
+  return `<article class="hist-card owner-arrears-task-card ${overdue?'is-overdue':''}" data-owner-arrear-task-card="true" data-arrear-pool-kind="${esc(normalizeArrearsSourceType(a?.sourceType))}">
     <div class="owner-arrears-card-top">
       ${isOwnerWriteRole()?`<input class="arrear-task-select" type="checkbox" data-arrear-select value="${taskId}" aria-label="选择欠款任务 ${customer}">`:''}
       <div class="owner-arrears-identity"><strong>${customer}</strong><span>｜${bed}</span><b>｜${amount}</b></div>
     </div>
-    <div class="owner-arrears-due-line">${dueLine}</div>
-    <dl class="owner-arrears-followup-grid">
-      <div><dt>来源</dt><dd>${source}</dd></div>
-      <div><dt>状态</dt><dd><span class="owner-arrears-status-pill" style="color:${statusColor};background:${statusBg}">${businessStatus}</span></dd></div>
-      <div><dt>负责人</dt><dd>${esc(assignee)}</dd></div>
-      <div><dt>承诺还款</dt><dd>${esc(promiseDate)}</dd></div>
-      <div><dt>老板要求日期</dt><dd>${esc(ownerDue)}</dd></div>
-      <div><dt>跟进结果</dt><dd>${followup}</dd></div>
-    </dl>
-    <div class="owner-arrears-note">备注：${esc(note)}</div>
+    <div class="hist-anchor owner-arrears-due-line">${source}｜${dueLine}</div>
+    <div class="hist-stat"><span>承诺金额</span><span class="mono">${promiseAmount}</span></div>
+    <div class="hist-stat"><span>承诺日期</span><span class="mono">${promiseDate}</span></div>
+    <div class="hist-stat"><span>备注</span><span>${note}</span></div>
+    <div class="hist-stat"><span>状态</span><span class="owner-arrears-status-pill" style="color:${statusColor};background:${statusBg}">${businessStatus}</span></div>
     <div class="owner-arrears-card-actions">${renderArrearCardActions(a)}</div>
   </article>`;
 }
@@ -1257,17 +1258,15 @@ function updateArrearDirectiveButtonState(){
   btn.disabled=selected===0;
   btn.style.opacity=selected? '1':'0.55';
   btn.style.cursor=selected? 'pointer':'not-allowed';
-  btn.textContent=selected?`要求员工更新（${selected}） / Send directive`:'要求员工更新 / Send directive';
+  btn.textContent=selected?`下发员工（${selected}）`:'下发员工';
 }
 function exportArrearsWhatsApp(){
   const active=(state.arrears||[]).filter(isArrearTaskOpen);
   const lines=[
-    '欠款管理 ARREARS FOLLOW-UP',
+    '欠款 ARREARS',
     `未结清任务：${active.length}`,
     ...active.slice(0,30).map((a,i)=>{
-      const status=arrearDirectiveStatus(a);
-      const amount=a.remain==null?'金额待核对':`${fmtMoney(a.remain)} AED`;
-      return `${i+1}. ${a.room||'-'} | ${arrearSourceLabel(a)} | ${amount} | ${status} | 承诺:${a.promiseDate||'-'} | 备注:${a.staffNote||a.ownerNote||'-'}`;
+      return `${i+1}. ${a.room||'-'} | ${arrearSourceLabel(a)} | ${arrearAmountLabel(a)} | ${arrearBusinessState(a)} | 承诺金额:${arrearPromiseAmountLabel(a)} | 承诺日期:${arrearPromiseDateLabel(a)} | 备注:${arrearFollowupNoteLabel(a)}`;
     })
   ];
   const text=lines.join('\n');
@@ -1318,8 +1317,9 @@ function showArrearTaskDetails(id){
     `${arrearCustomerLabel(task)}｜${arrearBedLabel(task)}｜${arrearAmountLabel(task)}`,
     `来源：${arrearSourceLabel(task)}`,
     `状态：${arrearBusinessState(task)}`,
-    `承诺还款：${cleanArrearText(task.promiseDate,'未填写')}`,
-    `备注：${cleanArrearText(task.staffNote||task.ownerNote||task.note,'无')}`
+    `承诺金额：${arrearPromiseAmountLabel(task)}`,
+    `承诺日期：${arrearPromiseDateLabel(task)}`,
+    `备注：${arrearFollowupNoteLabel(task)}`
   ].join('\n');
   alert(msg);
 }
@@ -1331,11 +1331,10 @@ function showArrearTaskActionHint(id){
 function showArrearsLoading(){
   const panel=document.getElementById('arrearsPanel');
   if(!panel)return;
-  panel.innerHTML=`<div class="arrears-panel">
-    <div class="arrears-head"><div class="arrears-title">欠款管理<span class="en-sub" style="font-size:8px;letter-spacing:0.06em">ARREARS FOLLOW-UP</span></div></div>
-    <div style="padding:22px;color:var(--text2);font-size:13px;text-align:center">
-      <div style="font-weight:700;margin-bottom:4px">加载中...</div>
-      <div style="font-size:11px;color:var(--text3)">正在读取所有未结清欠款任务</div>
+  panel.innerHTML=`<div class="arrears-panel owner-arrears-shell" data-owner-arrears-shell="true">
+    <div class="hist-toolbar"><span>欠款跟进 · 最近 ${ARREARS_PAGE_SIZE} 条</span><span class="hist-order">LOADING</span></div>
+    <div class="hist-grid owner-arrears-skeleton" data-owner-arrears-skeleton="true">
+      ${Array.from({length:4}).map(()=>'<div class="hist-card skeleton-card" style="min-height:132px;background:linear-gradient(90deg,rgba(255,255,255,.58),rgba(226,239,233,.72),rgba(255,255,255,.58));background-size:220% 100%;animation:pulse 1.2s ease-in-out infinite"></div>').join('')}
     </div>
   </div>`;
 }
@@ -1343,7 +1342,7 @@ function showArrearsLoadError(error){
   const panel=document.getElementById('arrearsPanel');
   if(!panel)return;
   panel.innerHTML=`<div class="arrears-panel">
-    <div class="arrears-head"><div class="arrears-title">欠款管理<span class="en-sub" style="font-size:8px;letter-spacing:0.06em">ARREARS FOLLOW-UP</span></div></div>
+    <div class="hist-toolbar"><span>欠款跟进</span><span class="hist-order">ERROR</span></div>
     <div style="padding:18px;color:#b91c1c;font-size:13px;text-align:center">
       欠款数据加载失败，请刷新重试。
       <div style="font-size:10px;color:#991b1b;margin-top:4px">${esc(error?.message||String(error||''))}</div>
@@ -1352,17 +1351,35 @@ function showArrearsLoadError(error){
 }
 async function loadArrearsForOwner({showLoading=false}={}){
   if(!isOwnerShellRole())return false;
+  if(state.arrearsLoading)return false;
+  state.arrearsLoading=true;
   if(showLoading)showArrearsLoading();
   try{
-    if(showLoading)await ensureOwnerLockCardsForArrearsPool();
     const rows=await loadHistoricalArrearsForOwner();
     state.arrears=buildArrearsFollowupPool({
-      historicalArrears:rows,
-      currentDueUnpaid:currentDueUnpaidForArrearsPool(),
-      ttlockExpiredCards:ttlockExpiredCardsForArrearsPool()
+      existingArrearsRecords:rows,
+      ttlockExpiredUnpaid:[]
     });
     saveArrears();
     renderArrearsPanel();
+    if(showLoading){
+      setTimeout(async()=>{
+        try{
+          await ensureOwnerLockCardsForArrearsPool();
+          const ttlockRows=ttlockExpiredCardsForArrearsPool();
+          if(ttlockRows.length){
+            state.arrears=buildArrearsFollowupPool({
+              existingArrearsRecords:state.arrears.filter(a=>normalizeArrearsSourceType(a.sourceType)==='existing_arrears_record'),
+              ttlockExpiredUnpaid:ttlockRows
+            });
+            saveArrears();
+            renderArrearsPanel();
+          }
+        }catch(e){
+          console.warn('hydrate ttlock arrears:',e);
+        }
+      },0);
+    }
     return true;
   }catch(e){
     console.warn('loadArrearsForOwner:',e);
@@ -1377,6 +1394,8 @@ async function loadArrearsForOwner({showLoading=false}={}){
     }catch{}
     if(showLoading)showArrearsLoadError(e);
     return false;
+  }finally{
+    state.arrearsLoading=false;
   }
 }
 /* 老板视角：从云端静默刷新欠款列表 */
@@ -1388,10 +1407,10 @@ function renderArrearsPanel(){
   const panel=document.getElementById('arrearsPanel');
   if(!panel) return;
   const visible=isOwnerShellRole()?state.arrears:state.arrears.filter(a=>a.sessionId===state.session.id);
-  const active=visible.filter(isArrearTaskOpen);
+  const active=visible.filter(isAllowedArrearsSource).filter(isArrearTaskOpen);
   if(!active.length){
     panel.innerHTML=isOwnerShellRole()
-      ? `<div class="arrears-panel"><div class="arrears-head"><div class="arrears-title">欠款管理<span class="en-sub" style="font-size:8px;letter-spacing:0.06em">ARREARS FOLLOW-UP</span></div></div><div style="padding:18px;color:var(--text3);font-size:13px;text-align:center">暂无待跟进欠款任务。员工录入短付或老板创建欠款任务后，将在这里显示复选框和“要求员工更新”按钮。</div></div>`
+      ? `<div class="empty-state card" style="padding:44px"><div class="empty-ico">📌</div><div class="empty-title">暂无未结清欠款</div><div class="empty-text">这里只显示系统已有欠款记录，以及通通锁到期未付且已配置床位租金的卡片。</div></div>`
       : '';
     return;
   }
@@ -1403,42 +1422,44 @@ function renderArrearsPanel(){
   const filtered=active
     .filter(a=>state.arrearFilter==='all'||arrearDirectiveStatus(a)===state.arrearFilter)
     .sort((a,b)=>(a.dueDate||'9999').localeCompare(b.dueDate||'9999'));
-  const totalAmount=(()=>{const known=active.filter(a=>a.remain!=null);const unk=active.filter(a=>a.remain==null);const tot=Math.round(known.reduce((s,a)=>s+(a.remain||0),0)*100)/100;return '共 '+fmtMoney(tot)+' AED'+(unk.length?' + '+unk.length+'笔金额待核对':'');})();
-  panel.innerHTML=`<div class="arrears-panel" data-owner-arrears-info-pool="true">
-    <div class="arrears-head">
-      <div class="arrears-title">
-        欠款管理<span class="en-sub" style="font-size:8px;letter-spacing:0.06em">ARREARS FOLLOW-UP</span>
-        <span style="background:#d93025;color:#fff;font-size:11px;padding:2px 8px;border-radius:10px;font-weight:700;margin-left:4px">${active.length} 笔</span>
-      </div>
-      <span style="font-size:11px;color:#b35a00;font-family:JetBrains Mono,monospace">${totalAmount}</span>
+  const visibleLimit=state.arrearsLimit||ARREARS_PAGE_SIZE;
+  const pageRows=filtered.slice(0,visibleLimit);
+  const hasMore=filtered.length>visibleLimit;
+  const totalAmount=Math.round(active.reduce((s,a)=>s+Number(a.remain||0),0)*100)/100;
+  panel.innerHTML=`<div class="arrears-panel card" data-owner-arrears-info-pool="true">
+    <div class="hist-toolbar owner-arrears-toolbar">
+      <span>未结清 ${active.length} 笔 · ${fmtMoney(totalAmount)} AED · 显示 ${pageRows.length}/${filtered.length}</span>
+      <span class="hist-order">RECENT · FIRST</span>
     </div>
-    <div class="arrears-kpi-grid" data-owner-arrears-kpis="true">
-      <div class="arrears-kpi-card"><strong>${pendingCount}</strong><span>待跟进</span></div>
-      <div class="arrears-kpi-card"><strong>${promisedCount}</strong><span>已承诺</span></div>
-      <div class="arrears-kpi-card"><strong>${overdueDirectiveCount}</strong><span>逾期</span></div>
-      <div class="arrears-kpi-card"><strong>${reviewCount}</strong><span>待核对</span></div>
+    <div class="owner-arrears-summary" data-owner-arrears-kpis="true">
+      <span>已下发 ${pendingCount}</span>
+      <span>承诺 ${promisedCount}</span>
+      <span>逾期 ${overdueDirectiveCount}</span>
+      <span>待核对 ${reviewCount}</span>
     </div>
-    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0" data-owner-arrears-actions="true">
-      ${isOwnerWriteRole()?`<label style="font-size:11px;color:var(--text2)">下发员工日期 <input id="arrearDirectiveDue" type="date" min="${today}" style="margin-left:4px;padding:5px 7px;border:1px solid #ddd;border-radius:7px"></label>
-      <button id="arrearDirectiveBtn" disabled style="background:#b45309;color:#fff;font-size:11px;padding:6px 10px;border-radius:8px;border:none;cursor:not-allowed;opacity:.55" onclick="sendArrearDirectives()">要求员工更新 / 下发员工</button>`:''}
-      <button type="button" style="background:#075e54;color:#fff;font-size:11px;padding:6px 10px;border-radius:8px;border:none;cursor:pointer" onclick="exportArrearsWhatsApp()">WhatsApp 导出</button>
-      <label style="font-size:11px;color:var(--text2)">筛选状态</label>
-      <select onchange="setArrearDirectiveFilter(this.value)" style="padding:5px 7px;border:1px solid #ddd;border-radius:7px">
+    <div class="owner-arrears-controls" data-owner-arrears-actions="true">
+      ${isOwnerWriteRole()?`<label class="owner-arrears-date">下发日期 <input id="arrearDirectiveDue" type="date" min="${today}"></label>
+      <button class="btn btn-primary" id="arrearDirectiveBtn" disabled onclick="sendArrearDirectives()">下发员工</button>`:''}
+      <button type="button" class="btn btn-ghost" onclick="exportArrearsWhatsApp()">WhatsApp 导出</button>
+      <label class="owner-arrears-filter-label">状态</label>
+      <select class="sel owner-arrears-filter" onchange="setArrearDirectiveFilter(this.value)">
         ${[
           ['all','全部'],
-          ['pending','待员工跟进'],
-          ['promised','已承诺'],
-          ['overdue','逾期'],
+          ['pending','已下发'],
+          ['promised','承诺付款'],
+          ['overdue','承诺逾期'],
           ['not_requested','待下发']
         ].map(([v,label])=>`<option value="${v}" ${(v==='not_requested'?state.arrearFilter==='none':state.arrearFilter===v)?'selected':''}>${label}</option>`).join('')}
       </select>
     </div>
-    <div style="font-size:11px;color:var(--text3);font-weight:800;margin:10px 0 6px">欠款任务列表 / 信息池</div>
-    <div class="owner-arrears-list" data-owner-arrears-card-list="true">
-      ${filtered.map(a=>renderOwnerArrearsTaskCard(a,today)).join('')}
+    <div class="hist-grid owner-arrears-list" data-owner-arrears-card-list="true">
+      ${pageRows.map(a=>renderOwnerArrearsTaskCard(a,today)).join('')}
     </div>
+    ${hasMore?`<button class="btn btn-primary btn-block" id="btnArrearsLoadMore" type="button" style="margin-top:14px">加载更多欠款</button>`:''}
   </div>`;
   updateArrearDirectiveButtonState();
+  const more=document.getElementById('btnArrearsLoadMore');
+  if(more)more.onclick=()=>{state.arrearsLimit=(state.arrearsLimit||ARREARS_PAGE_SIZE)+ARREARS_PAGE_SIZE;renderArrearsPanel();};
 }
 /* ── 录入收款/押金 → 不直接核销，引导员工录入流水 ── */
 function enterPaymentForArrear(id){

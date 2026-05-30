@@ -140,3 +140,19 @@ Date: 2026-05-30, Asia/Dubai
 - Root portal screenshot must show only employee, owner, admin doors.
 - Arrears screenshot must show the complete information pool: `欠款管理`, `ARREARS FOLLOW-UP`, `待下发`, `跟进中`, `承诺逾期`, `待核对`, `下发员工`, `WhatsApp 导出`, task status, responsible staff, promised repayment date, and notes.
 - Any reappearance of `QUICK ACTIONS` or disappearance of the arrears entry is a regression bug.
+
+## Owner Arrears Final Mobile UX Checklist
+
+| Check                                   | Required | Result | Notes                                                                                              |
+| --------------------------------------- | -------: | ------ | -------------------------------------------------------------------------------------------------- |
+| Top nav label is `欠款`                 |      Yes |        | Must not show `欠款管理`.                                                                          |
+| Top nav stays one line                  |      Yes |        | Order: 总览 / 欠款 / 历史 / 客户 / 网络.                                                           |
+| Page shell/skeleton appears immediately |      Yes |        | No 20-second blank state.                                                                          |
+| Only two sources appear                 |      Yes |        | 系统已有欠款, 通通锁到期未付.                                                                      |
+| TTLock amount is rent-mapped            |      Yes |        | No `金额待核对` in default cards.                                                                  |
+| Card matches history visual system      |      Yes |        | Same card radius, spacing, typography, and stat rows.                                              |
+| Owner sees promised amount/date/note    |      Yes |        | Default employee feedback fields only.                                                             |
+| No debug fields                         |      Yes |        | No `directive`, `promise`, `staff`, `source_type`, `followup_status`, `none`, `undefined`, `null`. |
+| readonly_admin is read-only             |      Yes |        | Details only, no write buttons.                                                                    |
+
+Production remains `PRODUCTION_NO_GO`.

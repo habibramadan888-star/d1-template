@@ -277,16 +277,40 @@ footer{text-align:center;padding:20px;color:var(--text3);font-size:9px;font-fami
 .paytype-section{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:10px}
 .paytype-label{font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.07em;font-family:JetBrains Mono,monospace;margin-bottom:7px;font-weight:600}
 /* ARREARS */
-.arrears-panel{background:#fff8f0;border:1px solid rgba(224,108,0,0.3);border-radius:var(--r2);margin-bottom:14px;overflow:hidden}
-.arrears-head{padding:11px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(224,108,0,0.15)}
-.arrears-title{font-size:13px;font-weight:700;color:#b35a00;display:flex;align-items:center;gap:6px}
-.arrear-row{display:flex;align-items:center;gap:8px;padding:9px 14px;border-bottom:1px solid rgba(224,108,0,0.1);font-size:12px}
-.arrear-row.overdue-row{background:rgba(217,48,37,0.06);border-left:4px solid #d93025}
-.arrear-row:last-child{border:none}
-.arrear-room{font-family:JetBrains Mono,monospace;font-weight:700;min-width:46px;color:var(--text)}
-.arrear-due{font-family:JetBrains Mono,monospace;font-size:10px;color:#e06c00;white-space:nowrap}
-.arrear-remain{font-family:JetBrains Mono,monospace;font-weight:700;color:#d93025;margin-left:auto;margin-right:8px}
-.arrear-clr{background:rgba(26,138,74,0.12);border:none;border-radius:5px;color:#1a8a4a;font-size:11px;font-weight:600;padding:3px 8px;cursor:pointer;white-space:nowrap}
+.arrears-panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);margin-bottom:14px;overflow:hidden;padding:12px}
+.arrears-head{padding:11px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border)}
+.arrears-title{font-size:13px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:6px}
+.owner-arrears-toolbar{margin-bottom:12px}
+.owner-arrears-summary{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.owner-arrears-summary span{padding:5px 9px;border:1px solid var(--border);border-radius:999px;background:var(--surface);color:var(--text3);font-size:11px;font-weight:800}
+.owner-arrears-controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.owner-arrears-date{font-size:11px;color:var(--text2);display:flex;align-items:center;gap:6px}
+.owner-arrears-date input{padding:7px 9px;border:1px solid var(--border);border-radius:10px;background:var(--surface);font-family:inherit}
+.owner-arrears-filter-label{font-size:11px;color:var(--text2);font-weight:800}
+.owner-arrears-filter{max-width:132px}
+.owner-arrears-list{display:grid;grid-template-columns:1fr;gap:10px;padding:0;overflow-x:hidden}
+.owner-arrears-task-card{width:100%;box-sizing:border-box;display:block;background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);padding:16px;margin:0;box-shadow:none;writing-mode:horizontal-tb;overflow:hidden}
+.owner-arrears-task-card.is-overdue{background:linear-gradient(180deg,var(--surface),#fff7f7);border-color:rgba(217,48,37,.26);border-left:4px solid #d93025}
+.owner-arrears-card-top{display:flex;align-items:flex-start;gap:10px;min-width:0}
+.owner-arrears-identity{display:flex;align-items:baseline;flex-wrap:wrap;gap:0 4px;min-width:0;font-size:16px;line-height:1.35;color:#111827;word-break:normal;overflow-wrap:anywhere}
+.owner-arrears-identity strong{font-weight:900;color:#111827}
+.owner-arrears-identity span{font-weight:800;color:#334155}
+.owner-arrears-identity b{font-weight:950;color:#b45309}
+.owner-arrears-due-line{margin-top:4px;margin-bottom:10px;color:var(--text3);font-size:10px;font-weight:750;line-height:1.45;word-break:break-word}
+.owner-arrears-status-pill{display:inline-flex;border-radius:999px;padding:3px 8px;font-size:12px;font-weight:900}
+.owner-arrears-card-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px}
+.owner-arrears-card-actions button{border:0;border-radius:11px;padding:8px 12px;min-width:76px;font-size:12px;font-weight:900;cursor:pointer;white-space:nowrap}
+.owner-arrears-card-actions .primary{background:#0f9f54;color:#fff}
+.owner-arrears-card-actions .secondary{background:#eef2f7;color:#334155}
+@media(max-width:720px){
+  .arrears-panel{overflow-x:hidden}
+  .arrears-head{align-items:flex-start;gap:8px;flex-wrap:wrap}
+  .owner-arrears-list{grid-template-columns:1fr;gap:10px;padding:0 10px 12px}
+  .owner-arrears-task-card{padding:13px;border-radius:17px;min-height:0}
+  .owner-arrears-identity{font-size:15px;line-height:1.4}
+  .owner-arrears-card-actions button{flex:0 0 auto}
+  .owner-arrears-task-card *{writing-mode:horizontal-tb}
+}
 
 
 /* BILINGUAL TEXT */
@@ -1466,9 +1490,8 @@ body::before{
   <div class="topbar-row2">
     <nav class="nav" id="navTabs">
       <button class="nav-btn active" data-view="overview" id="navOverview"><svg class="ico"><use href="#i-chart"/></svg>总览<span class="en-sub">OVERVIEW</span></button>
-      <button class="nav-btn" data-view="arrears" id="navArrears"><svg class="ico"><use href="#i-doc"/></svg>欠款管理<span class="en-sub">ARREARS</span></button>
+      <button class="nav-btn" data-view="arrears" id="navArrears"><svg class="ico"><use href="#i-doc"/></svg>欠款<span class="en-sub">ARREARS</span></button>
       <button class="nav-btn" data-view="history" id="navHistory"><svg class="ico"><use href="#i-history"/></svg>历史<span class="en-sub">HISTORY</span></button>
-      <button class="nav-btn locked" data-view="analysis" id="navAnalysis"><svg class="ico"><use href="#i-trend"/></svg>分析<span class="en-sub">ANALYTICS</span></button>
       <button class="nav-btn locked" data-view="clients" id="navClients"><svg class="ico"><use href="#i-users"/></svg>客户<span class="en-sub">CLIENTS</span></button>
       <button class="nav-btn locked" data-view="wifi" id="navWifi"><svg class="ico"><use href="#i-spark"/></svg>网络<span class="en-sub">NETWORK</span></button>
     </nav>
@@ -1602,10 +1625,10 @@ body::before{
     <div id="ownerOverviewContent"></div>
   </section>
 
-  <!-- ARREARS FOLLOW-UP -->
+  <!-- ARREARS -->
   <section id="view-arrears" class="view hidden">
-    <div class="page-title">欠款管理<span class="en-sub" style="font-size:12px;letter-spacing:0.08em;margin-top:3px">ARREARS FOLLOW-UP</span></div>
-    <div class="page-sub">指令下发 · 员工承诺 · 逾期跟进</div>
+    <div class="page-title">欠款<span class="en-sub" style="font-size:12px;letter-spacing:0.08em;margin-top:3px">ARREARS</span></div>
+    <div class="page-sub">系统已有欠款 · 通通锁到期未付 · 员工承诺金额/日期/备注</div>
     <div id="arrearsPanel"></div>
   </section>
 

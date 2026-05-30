@@ -27,7 +27,7 @@ function ownerDefaultShell(owner) {
   );
 }
 
-test("owner primary navigation does not expose employee entry", async () => {
+test("owner primary navigation is compact and does not expose employee entry", async () => {
   const { owner } = await readAssets();
   const nav = ownerNav(owner);
 
@@ -35,8 +35,9 @@ test("owner primary navigation does not expose employee entry", async () => {
   assert.doesNotMatch(nav, />\s*录入\s*</);
   assert.match(nav, /data-view="overview" id="navOverview"/);
   assert.match(nav, />总览<span class="en-sub">OVERVIEW<\/span>/);
-  assert.match(nav, /data-view="analysis" id="navAnalysis"/);
-  assert.match(nav, />分析<span class="en-sub">ANALYTICS<\/span>/);
+  assert.match(nav, /data-view="arrears" id="navArrears"/);
+  assert.match(nav, />欠款<span class="en-sub">ARREARS<\/span>/);
+  assert.doesNotMatch(nav, /data-view="analysis" id="navAnalysis"|ANALYTICS|欠款管理/);
 });
 
 test("owner homepage shell does not show Add Entry or direct payment buttons", async () => {
@@ -72,7 +73,7 @@ test("control panel button uses stable inline SVG and no emoji fallback", async 
 
   assert.match(button, /<svg class="ico"><use href="#i-chart"\/><\/svg>/);
   assert.match(button, /<span class="btn-label">控制台<\/span>/);
-  assert.doesNotMatch(button, /🔐|🔒|📊|📈|馃|�/);
+  assert.doesNotMatch(button, /📊|⚙️|🔧|📈/);
 });
 
 test("mobile topbar remains constrained inside viewport", async () => {

@@ -8,8 +8,8 @@ test("owner arrears card CSS prevents vertical text and squeezed columns", async
   assert.doesNotMatch(html, /writing-mode:\s*vertical/i);
   assert.match(html, /\.owner-arrears-task-card\{[^}]*writing-mode:horizontal-tb/);
   assert.match(html, /\.owner-arrears-identity\{[^}]*flex-wrap:wrap/);
-  assert.match(html, /\.owner-arrears-followup-grid\{[^}]*grid-template-columns:1fr/);
   assert.match(html, /\.owner-arrears-card-actions\{[^}]*flex-wrap:wrap/);
+  assert.match(html, /\.owner-arrears-list\{[^}]*grid-template-columns:1fr/);
   assert.doesNotMatch(html, /\.owner-arrears-task-card\{[^}]*display:flex/);
 });
 

@@ -1,5 +1,5 @@
 export const arrearsFollowupPoolFixture = {
-  historicalArrears: [
+  existingArrearsRecords: [
     {
       id: "hist-001",
       task_id: "hist-001",
@@ -8,7 +8,7 @@ export const arrearsFollowupPoolFixture = {
       tenant_card_id: "CUST-501",
       remain: 450,
       due_date: "2026-05-20",
-      followup_status: "待跟进"
+      followup_status: "pending_followup"
     },
     {
       id: "hist-closed",
@@ -34,7 +34,23 @@ export const arrearsFollowupPoolFixture = {
       room: "701 / 4",
       cardName: "778899 D0 0520",
       dueDate: "2026-05-19",
-      sourceRef: "701|778899|2026-05-19"
+      sourceRef: "701|778899|2026-05-19",
+      bedRentAmount: 630
+    },
+    {
+      room: "702 / 5",
+      cardName: "889900 D0 0520",
+      dueDate: "2026-05-19",
+      sourceRef: "702|889900|2026-05-19"
+    }
+  ],
+  unknownSourceRows: [
+    {
+      id: "unknown-001",
+      source_type: "random_customer_record",
+      room: "999 / 9",
+      remain: 1,
+      due_date: "2026-05-19"
     }
   ]
 };

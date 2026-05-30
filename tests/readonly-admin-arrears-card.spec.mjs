@@ -25,12 +25,16 @@ test("readonly_admin arrears cards only expose details action", async () => {
   assert.match(actions, />下发员工<\/button>/);
   assert.match(actions, />确认关闭<\/button>/);
   assert.match(card, /isOwnerWriteRole\(\)\?/);
+  assert.match(card, /data-arrear-select/);
 });
 
 test("backend write guard stays enforced for readonly_admin role", async () => {
   const js = await readFile("deploy-worker/public/index-51-main.js", "utf8");
+  const worker = await readFile("deploy-worker/src/index.js", "utf8");
 
   assert.match(js, /function denyReadonlyAdminWrite/);
   assert.match(js, /function isOwnerWriteRole/);
   assert.match(js, /readonly_admin/);
+  assert.match(worker, /READONLY_ADMIN_ROLES/);
+  assert.match(worker, /canWriteOwnerData\(user\)/);
 });

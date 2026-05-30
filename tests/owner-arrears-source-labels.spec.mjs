@@ -26,21 +26,23 @@ function extractFunction(source, name) {
   throw new Error(`Could not extract ${name}`);
 }
 
-test("all arrears sources are included in the owner pool", async () => {
+test("owner arrears loader builds the pool from existing arrears first and TTLock after first paint", async () => {
   const js = await readFile("deploy-worker/public/index-51-main.js", "utf8");
   const load = extractFunction(js, "loadArrearsForOwner");
 
-  assert.match(load, /historicalArrears:rows/);
-  assert.match(load, /currentDueUnpaid:currentDueUnpaidForArrearsPool\(\)/);
-  assert.match(load, /ttlockExpiredCards:ttlockExpiredCardsForArrearsPool\(\)/);
+  assert.match(load, /existingArrearsRecords:rows/);
+  assert.match(load, /buildArrearsFollowupPool/);
+  assert.match(load, /ttlockExpiredUnpaid:ttlockRows/);
+  assert.match(load, /setTimeout\(async\(\)=>/);
+  assert.doesNotMatch(load, /currentDueUnpaid/);
 });
 
-test("source types map to business labels, including TTLock expired cards", async () => {
+test("source types map to the two approved business labels", async () => {
   const js = await readFile("deploy-worker/public/index-51-main.js", "utf8");
   const labels = extractFunction(js, "arrearSourceLabel");
 
-  assert.match(labels, /historical_arrears:'历史欠款'/);
-  assert.match(labels, /current_due_unpaid:'到期未收'/);
-  assert.match(labels, /ttlock_expired_card:'通通锁过期'/);
+  assert.match(labels, /existing_arrears_record:'系统已有欠款'/);
+  assert.match(labels, /ttlock_expired_unpaid:'通通锁到期未付'/);
+  assert.doesNotMatch(labels, /current_due_unpaid|到期未收|historical_arrears:'/);
   assert.match(js, /function ttlockExpiredCardsForArrearsPool/);
 });

@@ -1736,3 +1736,16 @@ This is design verification only. No Partial P0 was marked Verified.
 | Commercial launch gate                                      | `PRODUCTION_NO_GO` | `npm run gate:commercial-launch`                                              |
 
 Production cutover remains `PRODUCTION_NO_GO`.
+
+## OWNER-ARREARS-FINAL-UX-LOGIC-001 Verification Notes
+
+| Area                     | Status | Notes                                                                                                 |
+| ------------------------ | ------ | ----------------------------------------------------------------------------------------------------- |
+| Allowed arrears sources  | READY  | Only system existing arrears and TTLock expired unpaid are allowed in the owner arrears default list. |
+| TTLock amount authority  | READY  | TTLock expired unpaid uses bed rent mapping; missing rent is configuration QA, not a default card.    |
+| Owner card information   | READY  | Default card shows promised amount, promised date, and note only.                                     |
+| History visual alignment | READY  | Arrears cards reuse `hist-card`, `hist-stat`, and `hist-anchor` styling.                              |
+| Top nav                  | READY  | `欠款管理` shortened to `欠款`; primary nav has five tabs.                                            |
+| Blockers                 | ACTIVE | 20s blank loading and raw debug field display are regression blockers.                                |
+
+Production cutover remains `PRODUCTION_NO_GO`.

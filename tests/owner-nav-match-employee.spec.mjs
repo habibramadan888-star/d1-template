@@ -2,20 +2,21 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-test("owner nav uses employee-style pill tabs and owner information architecture", async () => {
-  const owner = await readFile("deploy-worker/public/index.html", "utf8");
+test("owner nav uses employee-style pill tabs and final owner information architecture", async () => {
+  const owner = await readFile("deploy-worker/public/index-51.html", "utf8");
   const nav = owner.match(/<nav class="nav" id="navTabs">[\s\S]*?<\/nav>/)?.[0] || "";
 
   assert.match(nav, /data-view="overview" id="navOverview"/);
   assert.match(nav, /data-view="arrears" id="navArrears"/);
   assert.doesNotMatch(nav, /id="navArrears"[^>]*locked/);
   assert.match(nav, />总览<span class="en-sub">OVERVIEW<\/span>/);
-  assert.match(nav, />欠款管理<span class="en-sub">ARREARS<\/span>/);
+  assert.match(nav, />欠款<span class="en-sub">ARREARS<\/span>/);
   assert.match(nav, />历史<span class="en-sub">HISTORY<\/span>/);
-  assert.match(nav, />分析<span class="en-sub">ANALYTICS<\/span>/);
   assert.match(nav, />客户<span class="en-sub">CLIENTS<\/span>/);
+  assert.match(nav, />网络<span class="en-sub">NETWORK<\/span>/);
   assert.doesNotMatch(nav, />\s*录入\s*</);
-  assert.doesNotMatch(nav, /网络<span class="en-sub">TOOLS<\/span>/);
+  assert.doesNotMatch(nav, />分析<span class="en-sub">ANALYTICS<\/span>/);
+  assert.doesNotMatch(nav, /欠款管理/);
 
   assert.match(owner, /\.owner-ui-unified \.nav\{\r?\n  display:grid/);
   assert.match(owner, /\.owner-ui-unified \.nav-btn\{\r?\n  min-width:0!important/);

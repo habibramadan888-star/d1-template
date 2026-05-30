@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-test("owner primary nav no longer exposes employee-style entry as a main tab", async () => {
-  const owner = await readFile("deploy-worker/public/index.html", "utf8");
+test("owner primary nav uses the final compact mobile information architecture", async () => {
+  const owner = await readFile("deploy-worker/public/index-51.html", "utf8");
   const nav = owner.match(/<nav class="nav" id="navTabs">[\s\S]*?<\/nav>/)?.[0] || "";
 
   assert.doesNotMatch(nav, /data-view="entry"/);
@@ -12,15 +12,16 @@ test("owner primary nav no longer exposes employee-style entry as a main tab", a
   assert.match(nav, /data-view="arrears" id="navArrears"/);
   assert.doesNotMatch(nav, /id="navArrears"[^>]*locked/);
   assert.match(nav, />总览<span class="en-sub">OVERVIEW<\/span>/);
-  assert.match(nav, />欠款管理<span class="en-sub">ARREARS<\/span>/);
+  assert.match(nav, />欠款<span class="en-sub">ARREARS<\/span>/);
   assert.match(nav, /data-view="history"/);
-  assert.match(nav, /data-view="analysis" id="navAnalysis"/);
-  assert.match(nav, />分析<span class="en-sub">ANALYTICS<\/span>/);
   assert.match(nav, /data-view="clients"/);
+  assert.match(nav, /data-view="wifi"/);
+  assert.doesNotMatch(nav, /data-view="analysis"|ANALYTICS|欠款管理/);
+  assert.equal([...nav.matchAll(/class="nav-btn/g)].length, 5);
 });
 
 test("legacy owner proxy entry remains hidden, not primary navigation", async () => {
-  const owner = await readFile("deploy-worker/public/index.html", "utf8");
+  const owner = await readFile("deploy-worker/public/index-51.html", "utf8");
   const nav = owner.match(/<nav class="nav" id="navTabs">[\s\S]*?<\/nav>/)?.[0] || "";
 
   assert.match(owner, /id="ownerEntryTool"/);
@@ -50,13 +51,15 @@ test("dashboard and financial formula markers remain unchanged", async () => {
 
 test("owner arrears view keeps selected tab during bootstrap and shows loading state", async () => {
   const ownerJs = await readFile("deploy-worker/public/index-51-main.js", "utf8");
-  const ownerHtml = await readFile("deploy-worker/public/index.html", "utf8");
+  const ownerHtml = await readFile("deploy-worker/public/index-51.html", "utf8");
 
   assert.match(ownerJs, /const initialView=defaultViewForRole\(\)/);
   assert.match(ownerJs, /switchView\(state\.view\|\|initialView\)/);
   assert.match(ownerJs, /if\(v==='arrears'\)\{loadArrearsForOwner\(\{showLoading:true\}\);\}/);
   assert.match(ownerJs, /function showArrearsLoading\(\)/);
-  assert.match(ownerJs, /const active=visible\.filter\(isArrearTaskOpen\)/);
-  assert.match(ownerJs, /overdue-row/);
-  assert.match(ownerHtml, /\.arrear-row\.overdue-row/);
+  assert.match(
+    ownerJs,
+    /const active=visible\.filter\(isAllowedArrearsSource\)\.filter\(isArrearTaskOpen\)/
+  );
+  assert.match(ownerHtml, /\.owner-arrears-task-card\.is-overdue/);
 });

@@ -208,3 +208,17 @@ Owner QA must include these non-negotiable UI composition checks:
 - Owner internal navigation must keep the `欠款管理` entry visible.
 - The arrears information pool must show `欠款管理`, `ARREARS FOLLOW-UP`, status KPIs, `下发员工`, `WhatsApp 导出`, `筛选状态`, task status, responsible staff, promised repayment date, and notes.
 - If `QUICK ACTIONS` appears or arrears entry disappears, classify it as a regression bug.
+
+## Owner Arrears Final UX QA Addendum
+
+Owner arrears QA must validate the final source and visual contract:
+
+- Allowed sources are exactly two: system existing arrears records and TTLock expired unpaid.
+- TTLock expired unpaid must use bed rent mapping for amount; beds without rent config are configuration QA and do not enter the default list.
+- Owner default card content is limited to employee promised amount, promised date, and note, alongside identity/source/status/due context.
+- Arrears visual style must match the history page card system. Old outstanding rows/tables, vertical text, or debug output are regressions.
+- Top navigation must show `欠款`; `欠款管理` is too long for mobile primary nav.
+- A 20-second blank/load stall is a P1 blocker.
+- Raw debug fields are regression blockers.
+
+Production cutover remains `PRODUCTION_NO_GO`.

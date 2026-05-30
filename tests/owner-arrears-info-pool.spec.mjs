@@ -15,22 +15,18 @@ function extractFunction(source, name) {
   throw new Error(`Could not extract ${name}`);
 }
 
-test("owner arrears page renders complete follow-up information pool", async () => {
+test("owner arrears page renders the final follow-up information pool", async () => {
   const js = await readFile("deploy-worker/public/index-51-main.js", "utf8");
   const render = extractFunction(js, "renderArrearsPanel");
   const card = extractFunction(js, "renderOwnerArrearsTaskCard");
   const dueLine = extractFunction(js, "arrearDueLine");
 
   for (const required of [
-    "欠款管理",
-    "ARREARS FOLLOW-UP",
-    "待跟进",
-    "已承诺",
-    "待核对",
-    "欠款任务列表",
+    "未结清",
+    "显示",
+    "未结清",
     "下发员工",
-    "WhatsApp 导出",
-    "筛选状态",
+    "状态</label>",
     "data-owner-arrears-info-pool",
     "data-owner-arrears-card-list"
   ]) {
@@ -43,11 +39,10 @@ test("owner arrears page renders complete follow-up information pool", async () 
     "arrearBedLabel",
     "arrearAmountLabel",
     "arrearDueLine",
-    "来源",
-    "状态",
-    "负责人",
-    "承诺还款",
+    "承诺金额",
+    "承诺日期",
     "备注",
+    "状态",
     "data-owner-arrear-task-card"
   ]) {
     assert.match(card, new RegExp(required));
@@ -67,7 +62,8 @@ test("owner arrears main list does not render raw debug labels or direct write s
       "staff:",
       "录入收款</button>",
       "录入押金</button>",
-      "作废</button>"
+      "作废</button>",
+      "金额待核对"
     ]) {
       assert.doesNotMatch(source, new RegExp(forbidden));
     }
