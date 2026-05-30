@@ -1841,6 +1841,21 @@ function empTaskToBossArrear(t){
     id:cleanId(t?.task_id)||empId("arrear-view"),
     task_id:cleanText(t?.task_id||"",100),
     source:cleanText(t?.source||"arrear_tasks",40),
+    source_type:cleanText(t?.source_type||(/arrears/i.test(t?.source||"")?"historical_arrears":"historical_arrears"),40),
+    source_ref:cleanText(t?.source_ref||t?.task_id||"",120),
+    dedupe_key:cleanText(t?.source_ref||t?.task_id||"",120)||[
+      cleanText(t?.source||"arrear_tasks",40),
+      cleanText(t?.bed||"",160),
+      dueDate,
+      remain.toFixed(2)
+    ].join("|"),
+    room_bed:cleanText(t?.bed||"",160),
+    customer_code:cleanText(t?.tenant_card_id||t?.tenant_name||"",120),
+    card_code:cleanText(t?.tenant_card_id||"",80),
+    package_code:type,
+    amount_authority_status:"known",
+    accounting_status:"open",
+    overdue_days:dueDate?Math.max(0,empDaysBetween(dueDate,empTodayDubai())):0,
     room:cleanText(t?.bed||"",160),
     note:reason||"\u6b20\u6b3e",
     remain,
@@ -1906,6 +1921,14 @@ async function handleBossArrears(request,env,user){
   return success(tasks.map(empTaskToBossArrear).filter(a=>a.remain>0));
 }
 __name(handleBossArrears,"handleBossArrears");
+async function handleBossArrearsFollowupTasks(request,env,user){
+  const tasks=await empListMergedArrearTasks(env,user);
+  return success({
+    tasks:tasks.map(empTaskToBossArrear).filter(a=>a.remain>0),
+    source_authority:["historical_arrears"]
+  });
+}
+__name(handleBossArrearsFollowupTasks,"handleBossArrearsFollowupTasks");
 async function empCloseArrearEverywhere(env,user,id,now){
   await empEnsureSchema(env);
   let changed=false;
@@ -2996,7 +3019,8 @@ async function handleRequest(request, env, ctx) {
       try {
         const result = await loadLockCards(env);
         if (result.error) return errorResponse(result.error, result.status || 500, result.error);
-        if (canWriteOwnerData(user)) await audit(env, user, "lock.cards.load", "", { locksCount: result.locksCount });
+        const purpose = new URL(request.url).searchParams.get("purpose") || "";
+        if (canWriteOwnerData(user) && purpose !== "arrears_pool") await audit(env, user, "lock.cards.load", "", { locksCount: result.locksCount });
         return success(result);
       } catch (e) {
         return errorResponse("ttlock_failed", 502, e?.message || "ttlock_failed");
@@ -3089,6 +3113,9 @@ async function handleRequest(request, env, ctx) {
       ).bind(user.corpid, "wifi_accounts", JSON.stringify(clean), user.userid).run();
       await audit(env, user, "wifi.accounts.save", "wifi_accounts", { count: Object.keys(clean).length });
       return success({ success: true, count: Object.keys(clean).length });
+    }
+    if (path === "/api/arrears/followup/tasks" && method === "GET") {
+      return handleBossArrearsFollowupTasks(request, env, user);
     }
     if (path === "/api/arrears" && method === "GET") {
       return handleBossArrears(request, env, user);

@@ -1,5 +1,17 @@
 # Verification Status
 
+## ARREARS-ROOT-CAUSE-LOCK-001 Verification Addendum
+
+Date: 2026-05-30, Asia/Dubai
+
+| Verification             | Result | Evidence                                                                                       | Commercial Meaning                                                                            |
+| ------------------------ | ------ | ---------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Arrears source authority | READY  | `ARREARS_POOL_SOURCE_OF_TRUTH.md`; `tests/arrears-followup-pool-source.spec.mjs`               | Owner arrears pool must include historical, current due unpaid, and TTLock expired-card rows. |
+| Owner arrears UI lock    | READY  | `tests/owner-arrears-regression-lock.spec.mjs`; `tests/owner-arrears-no-debug-fields.spec.mjs` | No debug labels or direct write shortcuts in the owner arrears main list.                     |
+| Owner nav no-wrap lock   | READY  | `tests/owner-nav-no-wrap-regression.spec.mjs`                                                  | `NETWORK` remains visible in primary nav without wrapping.                                    |
+
+Production remains `PRODUCTION_NO_GO`.
+
 ## OWNER-PAGE-REGRESSION-LOCK-001 Verification Addendum
 
 Date: 2026-05-30, Asia/Dubai

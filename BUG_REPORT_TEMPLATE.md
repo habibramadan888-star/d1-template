@@ -1,5 +1,9 @@
 # Bug Report Template
 
+## ARREARS-ROOT-CAUSE-LOCK-001 Severity Notes
+
+Treat these as P0/P1 arrears regressions: owner arrears pool missing TTLock expired cards, current due unpaid rows hidden, unknown-amount TTLock rows hidden instead of showing `金额待核对`, owner arrears main list showing raw debug labels, owner arrears main list showing direct write shortcuts, or `网络` wrapping to a second nav row.
+
 ## AUTH-ROUTING-ARCHITECTURE-001 Auth Routing Severity Notes
 
 Treat these as P0/P1 auth-routing bugs: old employee PIN login visible, old owner login visible, lock/logout not returning to `/`, stale role causing wrong business page, readonly admin seeing write controls as enabled, or employee name showing role `staff`. Production cutover remains `PRODUCTION_NO_GO`.

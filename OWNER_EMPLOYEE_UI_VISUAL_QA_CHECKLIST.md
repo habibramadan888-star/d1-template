@@ -1,5 +1,14 @@
 # Owner Employee UI Visual QA Checklist
 
+## ARREARS-ROOT-CAUSE-LOCK-001 Visual Checks
+
+| Screenshot                  | Required | Pass/Fail | Notes                                                                           |
+| --------------------------- | -------- | --------- | ------------------------------------------------------------------------------- |
+| Owner arrears source labels | Yes      |           | Confirm `历史欠款`, `本期到期未结清`, or `通通锁过期` appears where applicable. |
+| Unknown TTLock amount       | Yes      |           | Confirm text is `金额待核对`.                                                   |
+| Owner nav mobile            | Yes      |           | Confirm `网络` does not wrap to a second row.                                   |
+| Owner arrears debug fields  | Yes      |           | Confirm no `directive:`, `promise:`, or `staff:` labels are visible.            |
+
 ## AUTH-ROUTING-ARCHITECTURE-001 Entry Checks
 
 Use the root URL only: `https://homelink-finance.habibramadan888.workers.dev/`. Confirm the three doors are visible, old login pages are not visible, employee routes to `/employee`, owner routes to `/owner`, readonly admin routes to `/admin` or read-only owner mode, and lock/logout returns to `/`. Production cutover remains `PRODUCTION_NO_GO`.

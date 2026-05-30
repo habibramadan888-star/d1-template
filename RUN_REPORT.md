@@ -1,5 +1,15 @@
 # Run Report
 
+## ARREARS-ROOT-CAUSE-LOCK-001
+
+Date: 2026-05-30, Asia/Dubai
+
+Scope: locked the owner arrears follow-up pool to merge historical arrears, current due unpaid, and TTLock expired-card sources. Unknown-amount TTLock expired cards remain visible as `金额待核对`. Owner overview quick actions remain removed, owner arrears remains an internal owner module, and owner primary navigation is capped to prevent the network tab from wrapping.
+
+No production migration, production D1 write, D1 export/import/execute, employee entry write, handover submit, void/delete, real arrears status write, dashboard calculation change, financial formula change, or commercial launch GO occurred.
+
+Production remains `PRODUCTION_NO_GO`.
+
 ## AUTH-ROUTING-ARCHITECTURE-001 Three Portal Entry
 
 Date: 2026-05-29, Asia/Dubai

@@ -1,5 +1,18 @@
 # Full Internal QA Test Plan
 
+## ARREARS-ROOT-CAUSE-LOCK-001 QA Addendum
+
+Owner arrears QA must validate source completeness, not just visual rendering:
+
+- `historical_arrears` rows are present.
+- `current_due_unpaid` rows are present.
+- `ttlock_expired_card` rows are present.
+- Unknown amount TTLock rows display `金额待核对`.
+- Owner overview still has no quick-entry section.
+- Owner nav does not wrap the network entry to a second row.
+
+No production cutover is approved. Production remains `PRODUCTION_NO_GO`.
+
 ## AUTH-ROUTING-ARCHITECTURE-001 Entry Update
 
 All testers start from the root URL only:

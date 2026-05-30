@@ -1,5 +1,19 @@
 # Owner Internal Test Script
 
+## ARREARS-ROOT-CAUSE-LOCK-001 Addendum
+
+Date: 2026-05-30, Asia/Dubai
+
+- Open owner `欠款管理`.
+- Confirm task pool includes rows from historical arrears, current due unpaid, and TTLock expired cards.
+- Confirm expired TTLock rows with no verified amount display `金额待核对`, not zero and not hidden.
+- Confirm each row is a task card with source type, customer code, room/bed, overdue days, package/card, status, responsible metadata, promised repayment date, and recent note.
+- Confirm main list has no raw `directive:`, `promise:`, or `staff:` labels.
+- Confirm main list has no direct `录入收款`, `录入押金`, or `作废` shortcuts.
+- Confirm owner primary nav shows no second-row `网络` wrap.
+
+Production remains `PRODUCTION_NO_GO`.
+
 ## OWNER-PAGE-REGRESSION-LOCK-001 Addendum
 
 Date: 2026-05-30, Asia/Dubai
