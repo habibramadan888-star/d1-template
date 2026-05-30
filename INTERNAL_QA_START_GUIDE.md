@@ -223,3 +223,14 @@ granted. Production cutover remains `PRODUCTION_NO_GO`.
 - 登录页允许浏览器密码管理器保存密码，但系统不得把 password/PIN 明文保存到 `localStorage` 或 `sessionStorage`。
 - 只读管理员可以查看老板端数据，但不能录入、交接、作废、删除、修改 settings 或执行任何业务写入。
 - 完整写入测试仍需单独人工批准；Production cutover remains `PRODUCTION_NO_GO`.
+## THREE-PORTAL-FIX-001 Entry Model Update
+
+Formal entry `/` has exactly three doors:
+
+- 员工
+- 老板
+- 管理员
+
+欠款管理 is not a login identity. It is a post-login business module: owners manage/review arrears inside the owner workspace, employees handle assigned follow-up tasks inside the employee workspace, and readonly admins can view arrears in read-only mode.
+
+Production cutover remains `PRODUCTION_NO_GO`.

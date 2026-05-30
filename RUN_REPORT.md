@@ -5889,3 +5889,11 @@ Validation and deploy:
 - Generated approval-required next prompts for schema, local implementation, staging QA, and production preflight.
 - Production cutover remains `PRODUCTION_NO_GO`.
 - No D1 write, no migration, no production deploy, no staging deploy, no production-copy write, no dashboard calculation change, and no financial formula change were executed.
+## THREE-PORTAL-FIX-001 Main Portal Entry Card Fix
+
+- Main `/` portal model corrected to one entry surface with three doors: 员工, 老板, 管理员.
+- Removed the mistaken 欠款管理（新版指令功能） card from `deploy-worker/public/portal.html`.
+- Arrears management remains a post-login business module in the owner workspace; employee arrears follow-up remains in the employee workspace; readonly admin remains read-only.
+- Added `tests/three-portal-entry-cards.spec.mjs` and `npm run test:three-portal-entry-cards`.
+- No D1 write, migration, D1 export/import/execute, business write, dashboard calculation change, financial formula change, or commercial launch GO occurred.
+- Production cutover remains `PRODUCTION_NO_GO`.

@@ -106,3 +106,10 @@ Additional stop conditions:
 | OWNER-BLOCKER-003-02 | Arrears compact modal      | Open overdue detail modal on mobile             | Multiple compact rows are visible and readable                                | Mobile screenshot           |           |                        |
 | OWNER-BLOCKER-003-03 | Readonly admin write guard | Login as readonly admin test fixture            | Dashboard/history/clients visible; write buttons hidden or disabled           | Screenshot plus test result |           | No business write test |
 | OWNER-BLOCKER-003-04 | Password manager support   | Login owner via unified login                   | Browser can offer password save; app does not store plaintext password        | Browser prompt/manual note  |           | Do not print password  |
+## THREE-PORTAL-FIX-001 Owner Entry Notes
+
+Use `/` only to choose the owner role. The main portal must not display 欠款管理 as a separate identity.
+
+After owner login, verify 欠款管理 is available inside the owner workspace navigation/module area. The owner can manage/review arrears from that workspace only; do not treat arrears as a standalone login entry.
+
+Production cutover remains `PRODUCTION_NO_GO`.

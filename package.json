@@ -166,6 +166,7 @@
     "test:readonly-admin-unified-login": "node --test tests/readonly-admin-unified-login.spec.mjs",
     "test:auth-route-closure": "node --test tests/auth-route-closure.spec.mjs",
     "test:three-portal": "node --test tests/three-portal-entry.spec.mjs",
+    "test:three-portal-entry-cards": "node --test tests/three-portal-entry-cards.spec.mjs",
     "test:route-normalization": "node --test tests/route-normalization.spec.mjs",
     "test:legacy-login-hidden": "node --test tests/legacy-login-hidden.spec.mjs",
     "test:logout-to-root": "node --test tests/logout-to-root-entry.spec.mjs",

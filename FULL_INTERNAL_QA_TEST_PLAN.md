@@ -166,3 +166,18 @@ pause role-flow QA until retested. Production cutover remains
 - Login password manager: browser autocomplete is allowed; app-owned plaintext password/PIN storage is forbidden.
 - Readonly admin: can view owner dashboard/history/clients/analysis; all write actions must be disabled in UI and rejected by backend.
 - Production remains `PRODUCTION_NO_GO`; no internal QA result is production approval.
+## THREE-PORTAL-FIX-001 Entry Model Regression
+
+QA must verify the formal `/` entry surface has only three role doors:
+
+- 员工
+- 老板
+- 管理员
+
+欠款管理 is not an entry identity and must not appear as a fourth card on the main portal. Validate arrears only after login:
+
+- Owner: arrears management in owner workspace.
+- Employee: assigned arrears follow-up tasks in employee workspace.
+- Readonly admin: owner/admin arrears view remains read-only.
+
+Run `npm run test:three-portal-entry-cards` before visual acceptance. Production cutover remains `PRODUCTION_NO_GO`.
