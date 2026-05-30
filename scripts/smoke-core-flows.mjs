@@ -32,6 +32,10 @@ function cookieHeader(response) {
   return values.map((value) => value.split(";")[0]).join("; ");
 }
 
+function unwrapStandardResponse(payload) {
+  return payload && payload.code === 0 && payload.data ? payload.data : payload;
+}
+
 async function request(path, options = {}) {
   return fetch(`${baseUrl}${path}`, {
     ...options,
@@ -85,7 +89,7 @@ async function loginEmployee(employeeId, pin) {
 async function checkOwnerRead(name, path, cookie, shape) {
   const response = await request(path, { headers: { Cookie: cookie } });
   await expectStatus(name, response, 200);
-  const json = await expectJson(name, response);
+  const json = unwrapStandardResponse(await expectJson(name, response));
   if (shape === "array" && !Array.isArray(json)) {
     throw new Error(`${name} expected JSON array`);
   }

@@ -378,15 +378,19 @@ async function requestJson(path, options = {}) {
     ...options,
     headers
   });
-  const body = await response.json().catch(() => null);
+  const body = unwrapStandardResponse(await response.json().catch(() => null));
   return { response, body };
+}
+
+function unwrapStandardResponse(body) {
+  return body && body.code === 0 && body.data ? body.data : body;
 }
 
 async function fetchMe() {
   const { response, body } = await requestJson("/api/me", { method: "GET" });
   if (response.status === 401 || response.status === 403) return null;
   if (!response.ok) throw new Error(body?.error || "me_failed");
-  return body;
+  return unwrapStandardResponse(body);
 }
 
 function routeFromServerClaim(me, options = {}) {

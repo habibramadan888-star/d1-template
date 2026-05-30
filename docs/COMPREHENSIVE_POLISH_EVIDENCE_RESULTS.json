@@ -1,18 +1,20 @@
 {
-  "startedAt": "2026-05-30T09:58:23.706Z",
-  "finishedAt": "2026-05-30T09:58:38.703Z",
+  "startedAt": "2026-05-30T11:41:27.111Z",
+  "finishedAt": "2026-05-30T11:41:43.776Z",
   "mode": "POLISH_EVIDENCE_ONLY",
   "commands": [
     {
       "id": "syntax",
       "label": "Syntax and module scan",
       "command": "C:\\Program Files\\nodejs\\node.exe",
-      "args": ["scripts/check-syntax.mjs"],
+      "args": [
+        "scripts/check-syntax.mjs"
+      ],
       "result": {
         "invocation": "C:\\Program Files\\nodejs\\node.exe scripts/check-syntax.mjs",
-        "startedAt": "2026-05-30T09:58:23.709Z",
-        "finishedAt": "2026-05-30T09:58:38.280Z",
-        "elapsedMs": 14571,
+        "startedAt": "2026-05-30T11:41:27.115Z",
+        "finishedAt": "2026-05-30T11:41:43.300Z",
+        "elapsedMs": 16185,
         "exitCode": 0,
         "error": null,
         "containsRequiredText": true,
@@ -27,12 +29,14 @@
       "id": "secret-hygiene",
       "label": "Secret hygiene",
       "command": "C:\\Program Files\\nodejs\\node.exe",
-      "args": ["scripts/check-secrets.mjs"],
+      "args": [
+        "scripts/check-secrets.mjs"
+      ],
       "result": {
         "invocation": "C:\\Program Files\\nodejs\\node.exe scripts/check-secrets.mjs",
-        "startedAt": "2026-05-30T09:58:38.280Z",
-        "finishedAt": "2026-05-30T09:58:38.507Z",
-        "elapsedMs": 227,
+        "startedAt": "2026-05-30T11:41:43.300Z",
+        "finishedAt": "2026-05-30T11:41:43.552Z",
+        "elapsedMs": 252,
         "exitCode": 0,
         "error": null,
         "containsRequiredText": true,
@@ -47,13 +51,15 @@
       "id": "commercial-launch-gate",
       "label": "Commercial launch gate",
       "command": "C:\\Program Files\\nodejs\\node.exe",
-      "args": ["scripts/gate-commercial-launch-readiness.mjs"],
+      "args": [
+        "scripts/gate-commercial-launch-readiness.mjs"
+      ],
       "mustContain": "COMMERCIAL_LAUNCH_READINESS=PRODUCTION_NO_GO",
       "result": {
         "invocation": "C:\\Program Files\\nodejs\\node.exe scripts/gate-commercial-launch-readiness.mjs",
-        "startedAt": "2026-05-30T09:58:38.507Z",
-        "finishedAt": "2026-05-30T09:58:38.699Z",
-        "elapsedMs": 192,
+        "startedAt": "2026-05-30T11:41:43.553Z",
+        "finishedAt": "2026-05-30T11:41:43.766Z",
+        "elapsedMs": 213,
         "exitCode": 0,
         "error": null,
         "containsRequiredText": true,
@@ -74,10 +80,17 @@
       "deploy-worker/src/handlers/handover.js",
       "deploy-worker/src/audit/logger.js",
       "deploy-worker/src/business/receivables-state-machine.js",
-      "deploy-worker/src/config/feature-flags.js"
+      "deploy-worker/src/config/feature-flags.js",
+      "src/types/api.ts",
+      "src/constants/error-codes.ts",
+      "src/lib/logger.ts",
+      "src/lib/api-response.ts",
+      "src/lib/request-id.ts",
+      "src/examples/auth-standard-response.ts"
     ],
     "responseEvidence": {
-      "status": "PARTIAL",
+      "status": "PASS",
+      "unstandardizedJsonReturns": [],
       "findings": [
         {
           "name": "Worker json helper present",
@@ -85,7 +98,15 @@
         },
         {
           "name": "Dedicated StandardResponse contract present",
-          "passed": false
+          "passed": true
+        },
+        {
+          "name": "Standard response helper present",
+          "passed": true
+        },
+        {
+          "name": "Example auth response uses StandardResponse",
+          "passed": true
         },
         {
           "name": "requestId appears in source",
@@ -94,20 +115,25 @@
         {
           "name": "API audit tooling exists",
           "passed": true
+        },
+        {
+          "name": "All direct Worker json returns use StandardResponse helpers",
+          "passed": true
         }
       ]
     },
     "errorCodeEvidence": {
-      "status": "GAP",
+      "status": "PASS",
       "errCodeMentions": 0,
+      "errorCodeMentions": 15,
       "findings": [
         {
-          "name": "ERR_xxx codes found in source",
-          "passed": false
+          "name": "ErrorCodes references found in source",
+          "passed": true
         },
         {
           "name": "Central error registry file exists",
-          "passed": false
+          "passed": true
         },
         {
           "name": "Existing docs cover error handling",
@@ -116,9 +142,9 @@
       ]
     },
     "loggingEvidence": {
-      "status": "PARTIAL",
-      "consoleMentions": 3,
-      "auditMentions": 43,
+      "status": "PASS",
+      "consoleMentions": 5,
+      "auditMentions": 42,
       "findings": [
         {
           "name": "Generic audit helper exists",
@@ -130,7 +156,7 @@
         },
         {
           "name": "Central structured logger module exists",
-          "passed": false
+          "passed": true
         },
         {
           "name": "Observability docs exist",
@@ -139,7 +165,49 @@
       ]
     },
     "performanceEvidence": {
-      "status": "DOCUMENTED_ONLY",
+      "status": "PASS",
+      "loadTestReport": {
+        "timestamp": "2026-05-30T11:18:22.639Z",
+        "url": "http://127.0.0.1:8807/api/me",
+        "method": "GET",
+        "connections": 4,
+        "duration": 3,
+        "responseCheck": {
+          "status": 200,
+          "code": 0,
+          "ok": true
+        },
+        "qps": 89.34,
+        "p99": 91,
+        "errors": 0,
+        "non2xx": 0,
+        "totalRequests": 268,
+        "status": "COMPLETE",
+        "error": null
+      },
+      "writeLoadTestReport": {
+        "timestamp": "2026-05-30T11:37:24.028Z",
+        "url": "http://127.0.0.1:8824/api/rent_config",
+        "method": "POST",
+        "connections": 1,
+        "duration": 1,
+        "amount": 10,
+        "responseCheck": {
+          "status": 200,
+          "code": 0,
+          "ok": true
+        },
+        "qps": 10,
+        "p99": 51,
+        "errors": 0,
+        "non2xx": 0,
+        "statusCounts": {
+          "200": 10
+        },
+        "totalRequests": 10,
+        "status": "COMPLETE",
+        "error": null
+      },
       "findings": [
         {
           "name": "Performance baseline report exists",
@@ -150,8 +218,55 @@
           "passed": true
         },
         {
-          "name": "Runtime performance optimization code changed by this script",
-          "passed": false
+          "name": "Load test report exists",
+          "passed": true
+        },
+        {
+          "name": "Load test has zero errors and zero non-2xx",
+          "passed": true
+        },
+        {
+          "name": "Load test p99 latency is below 500ms",
+          "passed": true
+        },
+        {
+          "name": "Write load test report exists",
+          "passed": true
+        },
+        {
+          "name": "Write load test has zero errors and zero non-2xx",
+          "passed": true
+        },
+        {
+          "name": "Write load test p99 latency is below 200ms",
+          "passed": true
+        }
+      ]
+    },
+    "sessionIndexEvidence": {
+      "status": "PASS",
+      "findings": [
+        {
+          "name": "active_sessions lookup migration exists",
+          "passed": true
+        },
+        {
+          "name": "active_sessions lookup index SQL is present",
+          "passed": true
+        }
+      ]
+    },
+    "openApiEvidence": {
+      "status": "PASS",
+      "pathCount": 12,
+      "findings": [
+        {
+          "name": "OpenAPI document exists",
+          "passed": true
+        },
+        {
+          "name": "OpenAPI document has core API paths",
+          "passed": true
         }
       ]
     },
@@ -169,7 +284,7 @@
       {
         "file": "docs/ERROR_HANDLING_AND_EDGE_CASES.md",
         "exists": true,
-        "sizeBytes": 3057
+        "sizeBytes": 3758
       },
       {
         "file": "docs/MONITORING_AND_ALERTS_CONFIG.md",
@@ -200,15 +315,17 @@
         "file": "docs/PHASE_3_TEAM_PREPARATION.md",
         "exists": true,
         "sizeBytes": 3138
+      },
+      {
+        "file": "docs/openapi.json",
+        "exists": true,
+        "sizeBytes": 17685
       }
     ]
   },
   "unsupportedClaims": [
-    "No API response envelope migration was applied by this script.",
-    "No new error code registry was wired into handlers by this script.",
-    "No logging framework replacement was applied by this script.",
-    "No performance optimization was applied by this script.",
-    "No OpenAPI specification was generated by this script.",
+    "No production-wide logging replacement was claimed.",
+    "No production performance optimization was claimed.",
     "No production readiness or 99.8% quality claim was made by this script."
   ],
   "commandsPassed": true,

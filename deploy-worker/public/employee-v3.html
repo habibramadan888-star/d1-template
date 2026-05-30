@@ -1922,16 +1922,22 @@ function readSessionId(userid){
 }
 const state={lockCards:[],current:null,depositBalance:null,rentConfig:{},rentConfigLoaded:false,drafts:[],tasks:[],followupItems:[],sessionId:'',user:null};
 function apiUrl(path){return location.protocol!=='file:'&&location.host.includes('workers.dev')?path:API_ORIGIN+path}
-async function apiFetch(path,opts={}){return fetch(apiUrl(path),{credentials:'include',...opts,headers:{'Content-Type':'application/json',...(opts.headers||{})}})}
+async function apiFetch(path,opts={}){return wrapStandardJsonResponse(await fetch(apiUrl(path),{credentials:'include',...opts,headers:{'Content-Type':'application/json',...(opts.headers||{})}}))}
+function wrapStandardJsonResponse(response){
+  const originalJson=response.json.bind(response);
+  try{response.json=async()=>unwrapStandardResponse(await originalJson());}catch{}
+  return response;
+}
 function normalizeAuthRole(r){return String(r||'').trim().toLowerCase()}
 function isEmployeeAuthRole(r){return ['staff','employee'].includes(normalizeAuthRole(r))}
 function isOwnerAuthRole(r){return ['manager','owner','admin'].includes(normalizeAuthRole(r))}
 const UNIFIED_LOGIN_DESTINATION='/';
+function unwrapStandardResponse(body){return body&&body.code===0&&body.data?body.data:body}
 async function fetchCurrentAuthUser(){
   const r=await apiFetch('/api/me',{method:'GET'});
   if(r.status===401||r.status===403)return null;
   if(!r.ok)throw new Error('me_failed_'+r.status);
-  return r.json();
+  return unwrapStandardResponse(await r.json());
 }
 function clearEmployeeLegacyAuthState(){
   ['empv3:user','empv3:operator','homelink:cloud_token','homelink:role','homelink:user','owner:role','owner:user'].forEach(k=>{
@@ -3039,7 +3045,7 @@ async function commitSessionAndExport(){
       const r=await apiFetch('/api/employee/entry',{method:'POST',body:JSON.stringify({entry:e,session:sessionForEntry})});
       const raw=await r.text();
       let data=null;
-      try{data=raw?JSON.parse(raw):null}catch{}
+      try{data=raw?unwrapStandardResponse(JSON.parse(raw)):null}catch{}
       if(!r.ok||data?.success===false)throw new Error(data?.error||data?.message||raw||('HTTP '+r.status));
       e.sync_status='SYNCED';
       e.cloud_entry_id=data?.entry_id||e.cloud_entry_id||'';

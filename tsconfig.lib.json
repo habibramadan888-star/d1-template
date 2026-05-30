@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.api.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "module": "ES2022",
+    "moduleResolution": "Bundler",
+    "outDir": "dist/lib",
+    "rootDir": "src",
+    "declaration": false,
+    "sourceMap": false,
+    "rewriteRelativeImportExtensions": true
+  },
+  "include": ["src/**/*.ts"]
+}

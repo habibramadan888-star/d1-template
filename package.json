@@ -4,12 +4,14 @@
   "private": true,
   "description": "Commercial governance and validation tooling for the Homelink finance system.",
   "scripts": {
-    "build": "npm run build:worker:assets && npm run build:worker:embedded",
+    "build": "npm run build:lib && npm run build:worker:assets && npm run build:worker:embedded",
     "build:worker:assets": "cd deploy-worker && wrangler deploy --config wrangler.toml --dry-run --outdir ../.wrangler-dryrun/assets",
     "build:worker:embedded": "cd deploy-worker && wrangler deploy --config wrangler.embedded.toml --dry-run --outdir ../.wrangler-dryrun/embedded",
     "lint": "eslint deploy-worker/src/index.js deploy-worker/scripts/**/*.js index-51-main.js",
     "format:check": "prettier --check \"*.md\" \"tools/**/*.cjs\" \"scripts/**/*.mjs\" \"tests/**/*.mjs\" \"modules/**/*.mjs\"",
     "typecheck": "node scripts/check-syntax.mjs",
+    "typecheck:api": "tsc --noEmit -p tsconfig.api.json",
+    "build:lib": "tsc --project tsconfig.lib.json && node scripts/write-dist-lib-package.cjs",
     "governance:check": "node tools/check-governance.cjs",
     "security:secrets": "node scripts/check-secrets.mjs",
     "audit:api": "node scripts/audit-api.mjs",
@@ -24,6 +26,9 @@
     "audit:audit-logs": "node scripts/audit-audit-log-coverage.mjs",
     "audit:rollback-readiness": "node scripts/audit-rollback-readiness.mjs",
     "gate:commercial-launch": "node scripts/gate-commercial-launch-readiness.mjs",
+    "loadtest": "node scripts/load-test.js",
+    "loadtest:write": "node scripts/load-test-write.js",
+    "openapi": "node scripts/generate-openapi.js",
     "verify:embedded-worker": "node scripts/verify-embedded-worker-freshness.mjs",
     "build:embedded:dry-run": "node scripts/generate-embedded-worker-dry-run.mjs",
     "build:embedded:write": "node scripts/write-embedded-worker-controlled.mjs",
@@ -190,12 +195,25 @@
     "check": "npm run governance:check && npm run security:secrets && npm run format:check && npm run lint && npm run typecheck && npm run audit:api:check && npm run audit:db:check && npm run test && npm run build"
   },
   "devDependencies": {
+    "@asteasolutions/zod-to-openapi": "^8.5.0",
     "@eslint/js": "^9.0.0",
+    "@types/node": "^25.9.1",
+    "autocannon": "^2.0.1",
     "eslint": "^9.0.0",
     "prettier": "^3.0.0",
-    "wrangler": "^4.0.0"
+    "typescript": "^6.0.3",
+    "wrangler": "^4.0.0",
+    "zod-to-openapi": "^0.2.1"
   },
   "engines": {
     "node": ">=20"
+  },
+  "dependencies": {
+    "pino": "^10.3.1",
+    "pino-http": "^11.0.0",
+    "pino-pretty": "^13.1.3"
+  },
+  "overrides": {
+    "hyperid": "^4.0.0"
   }
 }

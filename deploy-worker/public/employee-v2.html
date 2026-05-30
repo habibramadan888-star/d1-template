@@ -147,7 +147,13 @@ const uid=p=>p+'-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const state={lockCards:[],drafts:JSON.parse(localStorage.getItem('emp:drafts')||'[]'),tasks:[],currentBed:null};
 function apiUrl(path){return location.protocol!=='file:'&&location.host.includes('workers.dev')?path:API_ORIGIN+path}
-async function apiFetch(path,opts={}){return fetch(apiUrl(path),{credentials:'include',...opts,headers:{'Content-Type':'application/json',...(opts.headers||{})}})}
+function unwrapStandardResponse(body){return body&&body.code===0&&body.data?body.data:body}
+function wrapStandardJsonResponse(response){
+  const originalJson=response.json.bind(response);
+  try{response.json=async()=>unwrapStandardResponse(await originalJson());}catch{}
+  return response;
+}
+async function apiFetch(path,opts={}){return wrapStandardJsonResponse(await fetch(apiUrl(path),{credentials:'include',...opts,headers:{'Content-Type':'application/json',...(opts.headers||{})}}))}
 function toast(msg){const el=$('toast');el.textContent=msg;el.style.display='block';clearTimeout(window.__t);window.__t=setTimeout(()=>el.style.display='none',2600)}
 function saveDrafts(){localStorage.setItem('emp:drafts',JSON.stringify(state.drafts))}
 function operatorId(){return $('operatorId').value.trim()||localStorage.getItem('emp:operator')||'EMP'}

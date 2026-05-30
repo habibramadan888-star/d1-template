@@ -3,6 +3,10 @@ var __name = (target, value) => __defProp(target, "name", { value, configurable:
 
 import { createEmployeeEntryLiveWriteAdapterDraft } from "../../modules/worker/employee-entry-live-write-adapter.mjs";
 import { createDashboardTotalsPayload } from "./handlers/dashboard-totals.js";
+import { ErrorCodes } from "../../dist/lib/constants/error-codes.js";
+import { fail, ok } from "../../dist/lib/lib/api-response.js";
+import { logger } from "../../dist/lib/lib/logger.js";
+import { requestIdMiddleware } from "../../dist/lib/lib/request-id.js";
 
 // src/lib/jwt.js
 var ALGO = { name: "HMAC", hash: "SHA-256" };
@@ -425,6 +429,54 @@ var CORS_HEADERS = {
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Authorization"
 };
+function createRequestContext(request) {
+  const headers = {};
+  for (const [key, value] of request.headers.entries()) {
+    headers[key.toLowerCase()] = value;
+  }
+  const requestLike = { headers };
+  const responseHeaders = new Headers();
+  requestIdMiddleware(
+    requestLike,
+    {
+      setHeader(name, value) {
+        responseHeaders.set(name, value);
+      }
+    },
+    () => {}
+  );
+  const requestLogger =
+    typeof logger.child === "function" ? logger.child({ requestId: requestLike.id }) : logger;
+  return {
+    requestId: requestLike.id,
+    logger: requestLogger,
+    responseHeaders
+  };
+}
+__name(createRequestContext, "createRequestContext");
+function attachRequestContext(request, context) {
+  try {
+    Object.defineProperty(request, "logger", {
+      value: context.logger,
+      configurable: true
+    });
+  } catch {
+    // Cloudflare Request objects may be non-extensible in some runtimes.
+  }
+}
+__name(attachRequestContext, "attachRequestContext");
+function applyRequestIdHeader(response, context) {
+  response.headers.set("x-request-id", context.requestId);
+  return response;
+}
+__name(applyRequestIdHeader, "applyRequestIdHeader");
+function authFailureResponse(auth) {
+  const status = auth.status || 401;
+  const code = status === 403 ? ErrorCodes.FORBIDDEN : ErrorCodes.UNAUTHORIZED;
+  const message = status === 403 ? "Forbidden" : auth.error || "unauthenticated";
+  return json(fail(code, message), status);
+}
+__name(authFailureResponse, "authFailureResponse");
 function json(data, status = 200, extraHeaders = {}) {
   return new Response(JSON.stringify(data), {
     status,
@@ -432,20 +484,37 @@ function json(data, status = 200, extraHeaders = {}) {
   });
 }
 __name(json, "json");
+function errorCodeForStatus(status = 500) {
+  if (status === 400) return ErrorCodes.BAD_REQUEST;
+  if (status === 401) return ErrorCodes.UNAUTHORIZED;
+  if (status === 403) return ErrorCodes.FORBIDDEN;
+  if (status === 404) return ErrorCodes.NOT_FOUND;
+  if (status >= 400 && status < 500) return ErrorCodes.BAD_REQUEST;
+  return ErrorCodes.INTERNAL_SERVER;
+}
+__name(errorCodeForStatus, "errorCodeForStatus");
+function success(data, status = 200, extraHeaders = {}) {
+  return json(ok(data), status, extraHeaders);
+}
+__name(success, "success");
+function errorResponse(message = "Internal server error", status = 500, error, extra = {}) {
+  return json({ ...fail(errorCodeForStatus(status), message, error), ...extra }, status);
+}
+__name(errorResponse, "errorResponse");
 function unauthorized(message = "unauthenticated") {
-  return json({ error: message }, 401);
+  return json(fail(ErrorCodes.UNAUTHORIZED, message), 401);
 }
 __name(unauthorized, "unauthorized");
 function forbidden(message = "forbidden") {
-  return json({ error: message }, 403);
+  return json(fail(ErrorCodes.FORBIDDEN, message), 403);
 }
 __name(forbidden, "forbidden");
 function badRequest(message = "bad_request") {
-  return json({ error: message }, 400);
+  return json(fail(ErrorCodes.BAD_REQUEST, message), 400);
 }
 __name(badRequest, "badRequest");
 function tooManyRequests(message = "too_many_attempts") {
-  return json({ error: message }, 429);
+  return json(fail(ErrorCodes.BAD_REQUEST, message), 429);
 }
 __name(tooManyRequests, "tooManyRequests");
 
@@ -784,7 +853,7 @@ async function audit(env, user, action, target = "", detail = {}) {
       JSON.stringify(detail || {})
     ).run();
   } catch (e) {
-    console.warn("[audit]", action, e?.message || e);
+    logger.warn({ action, err: e }, "Audit log failed");
   }
 }
 __name(audit, "audit");
@@ -1429,21 +1498,21 @@ async function handleEmployeeDeposit(request,env,user){
   const cid=cleanText(url.searchParams.get("cid"),80);
   if(!cid)return badRequest("cid_required");
   const balance=await empDepositBalance(env,user.corpid,cid);
-  return json({success:true,tenant_card_id:cid,balance});
+  return success({success:true,tenant_card_id:cid,balance});
 }
 __name(handleEmployeeDeposit,"handleEmployeeDeposit");
 async function handleEmployeeMigrate(request,env,user){
   if(!requireManager(user))return forbidden();
   await empEnsureSchema(env);
   await audit(env,user,"employee.schema.migrate","employee").catch(()=>{});
-  return json({success:true,migrated:true});
+  return success({success:true,migrated:true});
 }
 __name(handleEmployeeMigrate,"handleEmployeeMigrate");
 async function handleEmployeeLockCards(request,env,user){
   const result=await loadLockCards(env);
-  if(result.error)return json({error:result.error},result.status||500);
+  if(result.error)return errorResponse(result.error,result.status||500,result.error);
   await audit(env,user,"employee.lock.cards.load","",{locksCount:result.locksCount}).catch(()=>{});
-  return json(result);
+  return success(result);
 }
 __name(handleEmployeeLockCards,"handleEmployeeLockCards");
 async function handleEmployeeEntry(request,env,user){
@@ -1460,7 +1529,7 @@ async function handleEmployeeEntry(request,env,user){
     const adapterRefId=cleanId(entry.id)||liveRouteAdapterDraft.clientEntryId||empId("eea");
     await eeaRecordLiveRoutePrevalidation(env,user,adapterRefId,liveRouteAdapterDraft,liveRouteGate);
     if(liveRouteAdapterDraft.status==="SKIPPED_VOIDED"){
-      return json({
+      return success({
         success:true,
         skipped:true,
         reason:"voided_row_excluded",
@@ -1488,7 +1557,7 @@ async function handleEmployeeEntry(request,env,user){
     if(existingTx.type==="AP"&&existingTx.linked_task_id){
       arrearTask=await empReconcileArrearTask(env,user,existingTx.linked_task_id,authOperatorId,now);
     }
-    return json({
+    return success({
       success:true,
       entry_id:entryId,
       session_id:existingTx.session_id||sessionId,
@@ -1703,7 +1772,7 @@ async function handleEmployeeEntry(request,env,user){
   };
   await empEvent(env,user,{ref_id:entryId,ref_type:"transaction",event_type:"create",field_name:"*",new_value:JSON.stringify(finalEntryForAudit),operator_id:authOperatorId,ts:now});
   await audit(env,user,"employee.entry.create",entryId,{room,amount}).catch(()=>{});
-  return json({
+  return success({
     success:true,
     entry_id:entryId,
     session_id:sessionId,
@@ -1801,7 +1870,7 @@ async function empListMergedArrearTasks(env,user){
 __name(empListMergedArrearTasks,"empListMergedArrearTasks");
 async function handleBossArrears(request,env,user){
   const tasks=await empListMergedArrearTasks(env,user);
-  return json(tasks.map(empTaskToBossArrear).filter(a=>a.remain>0));
+  return success(tasks.map(empTaskToBossArrear).filter(a=>a.remain>0));
 }
 __name(handleBossArrears,"handleBossArrears");
 async function empCloseArrearEverywhere(env,user,id,now){
@@ -1832,7 +1901,7 @@ async function empCloseArrearEverywhere(env,user,id,now){
 __name(empCloseArrearEverywhere,"empCloseArrearEverywhere");
 async function handleArrearTasks(request,env,user){
   const tasks=await empListMergedArrearTasks(env,user);
-  return json({success:true,tasks});
+  return success({success:true,tasks});
 }
 __name(handleArrearTasks,"handleArrearTasks");
 async function handleArrearTaskUpdate(request,env,user){
@@ -1894,7 +1963,7 @@ async function handleArrearTaskUpdate(request,env,user){
     },EMP_TASK_COLUMNS);
     await empEvent(env,user,{ref_id:taskId,ref_type:"arrear_task",event_type:"create",field_name:"*",new_value:JSON.stringify(insertedTask),operator_id:actor,ts:now});
     await audit(env,user,"employee.arrear_task.create",taskId,{status:insertedTask.followup_status}).catch(()=>{});
-    return json({success:true,created:true});
+    return success({success:true,created:true});
   }
   const updateValues={};
   if(isManager){
@@ -1946,7 +2015,7 @@ async function handleArrearTaskUpdate(request,env,user){
     }
   }
   await audit(env,user,"employee.arrear_task.update",taskId,{status:patch.followup_status||""}).catch(()=>{});
-  return json({success:true});
+  return success({success:true});
 }
 __name(handleArrearTaskUpdate,"handleArrearTaskUpdate");
 async function handleEmployeeApi(request,env,user){
@@ -2010,48 +2079,48 @@ __name(phase0Limit,"phase0Limit");
 async function phase0Properties(env,user,url){
   if(await phase0TableExists(env,"properties")){
     const rows=await phase0All(env,"SELECT * FROM properties WHERE tenant_id=? LIMIT ?",[user.corpid,phase0Limit(url)]);
-    return json({properties:rows});
+    return success({properties:rows});
   }
-  return json({properties:[]});
+  return success({properties:[]});
 }
 __name(phase0Properties,"phase0Properties");
 async function phase0Entries(env,user,url){
   const limit=phase0Limit(url);
   if(await phase0TableExists(env,"entries")){
     const rows=await phase0All(env,"SELECT * FROM entries WHERE tenant_id=? LIMIT ?",[user.corpid,limit]);
-    return json({entries:rows});
+    return success({entries:rows});
   }
   if(await phase0TableExists(env,"transactions")){
     const rows=await phase0All(env,"SELECT * FROM transactions WHERE corpid=? AND COALESCE(voided_at,'')='' LIMIT ?",[user.corpid,limit]);
-    return json({entries:rows});
+    return success({entries:rows});
   }
-  return json({entries:[]});
+  return success({entries:[]});
 }
 __name(phase0Entries,"phase0Entries");
 async function phase0Payments(env,user,url){
   const limit=phase0Limit(url);
   if(await phase0TableExists(env,"payments")){
     const rows=await phase0All(env,"SELECT * FROM payments WHERE tenant_id=? LIMIT ?",[user.corpid,limit]);
-    return json({payments:rows});
+    return success({payments:rows});
   }
   if(await phase0TableExists(env,"transactions")){
     const rows=await phase0All(env,"SELECT id, cat, amount, pay_type, created_at FROM transactions WHERE corpid=? AND COALESCE(voided_at,'')='' LIMIT ?",[user.corpid,limit]);
-    return json({payments:rows});
+    return success({payments:rows});
   }
-  return json({payments:[]});
+  return success({payments:[]});
 }
 __name(phase0Payments,"phase0Payments");
 async function phase0Receivables(env,user,url){
   const limit=phase0Limit(url);
   if(await phase0TableExists(env,"receivables")){
     const rows=await phase0All(env,"SELECT * FROM receivables WHERE tenant_id=? LIMIT ?",[user.corpid,limit]);
-    return json({receivables:rows});
+    return success({receivables:rows});
   }
   if(await phase0TableExists(env,"arrear_tasks")){
     const rows=await phase0All(env,"SELECT * FROM arrear_tasks WHERE corpid=? LIMIT ?",[user.corpid,limit]);
-    return json({receivables:rows});
+    return success({receivables:rows});
   }
-  return json({receivables:[]});
+  return success({receivables:[]});
 }
 __name(phase0Receivables,"phase0Receivables");
 async function phase0DashboardTotals(env,user){
@@ -2075,16 +2144,16 @@ async function phase0DashboardTotals(env,user){
     receivablesRow={totalOutstanding:Math.round(Number(row?.totalOutstanding||0)*100),totalOverdue:Math.round(Number(row?.totalOutstanding||0)*100)};
     rowsChecked.receivables=Number((await phase0First(env,"SELECT COUNT(*) AS count FROM arrear_tasks WHERE corpid=?",[user.corpid]))?.count||0);
   }
-  return json(createDashboardTotalsPayload({paymentRows,receivablesRow,rowsChecked,user,computationId:crypto.randomUUID(),startedAt:Date.now()}));
+  return success(createDashboardTotalsPayload({paymentRows,receivablesRow,rowsChecked,user,computationId:crypto.randomUUID(),startedAt:Date.now()}));
 }
 __name(phase0DashboardTotals,"phase0DashboardTotals");
 async function phase0Audit(env,user,url){
   const limit=phase0Limit(url);
   if(await phase0TableExists(env,"audit_logs")){
     const rows=await phase0All(env,"SELECT * FROM audit_logs WHERE corpid=? OR corpid IS NULL ORDER BY created_at DESC LIMIT ?",[user.corpid,limit]);
-    return json({audit:rows,readonly:isReadonlyAdminRoleValue(user.role)});
+    return success({audit:rows,readonly:isReadonlyAdminRoleValue(user.role)});
   }
-  return json({audit:[],readonly:isReadonlyAdminRoleValue(user.role)});
+  return success({audit:[],readonly:isReadonlyAdminRoleValue(user.role)});
 }
 __name(phase0Audit,"phase0Audit");
 async function handlePhase0ReadOnlyApi(request,env,user){
@@ -2092,9 +2161,9 @@ async function handlePhase0ReadOnlyApi(request,env,user){
   const url=new URL(request.url);
   const path=url.pathname;
   const method=request.method;
-  if(path==="/api/health"&&method==="GET")return json({status:"healthy",environment:env.APP_ENV||"",phase0RouteWiring:true});
-  if(path==="/api/health/db"&&method==="GET")return json({status:env.DB?"connected":"missing",database:"D1"});
-  if(path==="/api/metrics/errors"&&method==="GET")return json({errorRate:0,window:"local_phase0",readonly:true});
+  if(path==="/api/health"&&method==="GET")return success({status:"healthy",environment:env.APP_ENV||"",phase0RouteWiring:true});
+  if(path==="/api/health/db"&&method==="GET")return success({status:env.DB?"connected":"missing",database:"D1"});
+  if(path==="/api/metrics/errors"&&method==="GET")return success({errorRate:0,window:"local_phase0",readonly:true});
   if(path==="/api/entry/add"&&method==="POST"&&isReadonlyAdminRoleValue(user.role))return forbidden();
   if(method!=="GET")return null;
   if(path==="/api/properties")return phase0Properties(env,user,url);
@@ -2102,27 +2171,27 @@ async function handlePhase0ReadOnlyApi(request,env,user){
   if(path==="/api/payments")return phase0Payments(env,user,url);
   if(path==="/api/customers"){
     if(canReadOwnerData(user))return null;
-    return json({customers:[],updatedBy:"",updatedAt:"",phase0RouteWiring:true});
+    return success({customers:[],updatedBy:"",updatedAt:"",phase0RouteWiring:true});
   }
-  if(path==="/api/dashboard")return json({status:"ok",phase0RouteWiring:true});
+  if(path==="/api/dashboard")return success({status:"ok",phase0RouteWiring:true});
   if(path==="/api/dashboard/totals")return phase0DashboardTotals(env,user);
   if(path==="/api/receivables")return phase0Receivables(env,user,url);
-  if(path==="/api/arrears"&&!canReadOwnerData(user))return json([]);
-  if(path==="/api/history"&&!canReadOwnerData(user))return json([]);
+  if(path==="/api/arrears"&&!canReadOwnerData(user))return success([]);
+  if(path==="/api/history"&&!canReadOwnerData(user))return success([]);
   if(path.startsWith("/api/owner/")){
     if(!canReadOwnerData(user))return forbidden();
     if(path==="/api/owner/properties")return phase0Properties(env,user,url);
     if(path==="/api/owner/totals")return phase0DashboardTotals(env,user);
     if(path==="/api/owner/history")return phase0Entries(env,user,url);
     if(path==="/api/owner/arrears")return phase0Receivables(env,user,url);
-    return json({status:"ok",scope:"owner",path});
+    return success({status:"ok",scope:"owner",path});
   }
   if(path.startsWith("/api/admin/")){
     if(!isReadonlyAdminRoleValue(user.role))return forbidden();
     if(path==="/api/admin/audit")return phase0Audit(env,user,url);
     if(path==="/api/admin/totals")return phase0DashboardTotals(env,user);
     if(path==="/api/admin/history"||path==="/api/admin/entries")return phase0Entries(env,user,url);
-    return json({status:"ok",scope:"admin",path,readonly:true});
+    return success({status:"ok",scope:"admin",path,readonly:true});
   }
   return null;
 }
@@ -2146,7 +2215,7 @@ function hscIssue(code,message,extra={}){
 }
 __name(hscIssue,"hscIssue");
 function hscError(code,message,status,extra={}){
-  return json({success:false,code,error:code,message,...extra},status);
+  return json({...fail(errorCodeForStatus(status),message,code),success:false,domainCode:code,...extra},status);
 }
 __name(hscError,"hscError");
 function hscEnvGate(env){
@@ -2457,10 +2526,10 @@ async function handleHandoverStagingCommit(request,env){
   const fingerprint=await hscFingerprint(body);
   const existingKey=await env.DB.prepare("SELECT * FROM handover_idempotency_keys WHERE company_id=? AND property_id=? AND idempotency_key=? LIMIT 1")
     .bind(user.corpid||"",propertyId,idempotencyKey).first().catch(()=>null);
-  if(existingKey){
+    if(existingKey){
     if(existingKey.request_fingerprint===fingerprint){
       const commit=await env.DB.prepare("SELECT * FROM handover_commits WHERE commit_id=? LIMIT 1").bind(existingKey.commit_id||"").first().catch(()=>null);
-      return json({success:true,status:"IDEMPOTENT_REPLAY",commit_id:existingKey.commit_id,idempotency_status:"IDEMPOTENT_REPLAY",backend_totals:commit?{cashHandoverFils:commit.backend_cash_handover_fils,bankTransferTotalFils:commit.backend_bank_transfer_fils,grossReceivedFils:commit.backend_gross_received_fils,sessionTotalFils:commit.backend_session_total_fils}:null});
+      return success({success:true,status:"IDEMPOTENT_REPLAY",commit_id:existingKey.commit_id,idempotency_status:"IDEMPOTENT_REPLAY",backend_totals:commit?{cashHandoverFils:commit.backend_cash_handover_fils,bankTransferTotalFils:commit.backend_bank_transfer_fils,grossReceivedFils:commit.backend_gross_received_fils,sessionTotalFils:commit.backend_session_total_fils}:null});
     }
     return hscError("IDEMPOTENCY_CONFLICT","Same idempotency key was used with a different payload.",409);
   }
@@ -2539,7 +2608,7 @@ async function handleHandoverStagingCommit(request,env){
   });
   await env.DB.batch(statements);
   await audit(env,user,"handover.staging.accepted",commitId,{property_id:propertyId,session_id:sessionId,accepted_rows:classified.acceptedRows.length}).catch(()=>{});
-  return json({success:true,status:"ACCEPTED",commit_id:commitId,idempotency_status:"NEW",accepted_rows:classified.acceptedRows.length,rejected_rows:classified.rejectedRows,backend_totals:backend,frontend_total_comparison:comparison,audit_events:["handover_commit_attempt","handover_commit_accepted"]},201);
+  return success({success:true,status:"ACCEPTED",commit_id:commitId,idempotency_status:"NEW",accepted_rows:classified.acceptedRows.length,rejected_rows:classified.rejectedRows,backend_totals:backend,frontend_total_comparison:comparison,audit_events:["handover_commit_attempt","handover_commit_accepted"]},201);
 }
 __name(handleHandoverStagingCommit,"handleHandoverStagingCommit");
 const EEA_ALLOWED_APP_ENVS = HSC_ALLOWED_APP_ENVS;
@@ -2661,8 +2730,9 @@ async function handleEmployeeEntryAdapterStagingDraft(request,env){
       productionDeploy:false
     }
   };
-  if(draft.status==="SKIPPED_VOIDED")return json(response,200);
-  return json(response,draft.ok?200:422);
+  if(draft.status==="SKIPPED_VOIDED")return success(response,200);
+  if(draft.ok)return success(response,200);
+  return errorResponse("Employee entry adapter draft rejected.",422,"EMPLOYEE_ENTRY_ADAPTER_REJECTED",{adapter_draft:response});
 }
 __name(handleEmployeeEntryAdapterStagingDraft,"handleEmployeeEntryAdapterStagingDraft");
 // EMPLOYEE_API_PATCH_END
@@ -2770,16 +2840,14 @@ async function handleRequest(request, env, ctx) {
   if (path.startsWith("/api/")) {
     const auth = await requireAuth(request, env);
     if (auth.error) {
-      if (auth.status === 401) return unauthorized();
-      if (auth.status === 403) return forbidden();
-      return unauthorized();
+      return authFailureResponse(auth);
     }
     const user = auth.payload;
     const employeeApiResponse = await handleEmployeeApi(request, env, user);
     if (employeeApiResponse) return employeeApiResponse;
     if (path === "/api/me") {
       const displayName = user.employee_name && user.employee_name !== user.role ? user.employee_name : user.userid;
-      return json({
+      const data = {
         userid: user.userid,
         username: user.userid,
         employee_id: user.userid,
@@ -2790,7 +2858,8 @@ async function handleRequest(request, env, ctx) {
         isManager: isManagerRoleValue(user.role),
         isReadonlyAdmin: isReadonlyAdminRoleValue(user.role),
         canWrite: canWriteOwnerData(user)
-      });
+      };
+      return json(ok(data));
     }
     const phase0ReadOnlyResponse = await handlePhase0ReadOnlyApi(request, env, user);
     if (phase0ReadOnlyResponse) return phase0ReadOnlyResponse;
@@ -2816,17 +2885,17 @@ async function handleRequest(request, env, ctx) {
         "UPDATE active_sessions SET revoked=1 WHERE corpid=? AND sid<>?"
       ).bind(user.corpid, user.sid || "").run();
       await audit(env, user, "security.sessions.revoke_all", "active_sessions");
-      return json({ success: true });
+      return success({ success: true });
     }
     if (path === "/api/lock/cards" && method === "GET") {
       if (!canReadOwnerData(user)) return forbidden();
       try {
         const result = await loadLockCards(env);
-        if (result.error) return json({ error: result.error }, result.status || 500);
+        if (result.error) return errorResponse(result.error, result.status || 500, result.error);
         if (canWriteOwnerData(user)) await audit(env, user, "lock.cards.load", "", { locksCount: result.locksCount });
-        return json(result);
+        return success(result);
       } catch (e) {
-        return json({ error: e?.message || "ttlock_failed" }, 502);
+        return errorResponse("ttlock_failed", 502, e?.message || "ttlock_failed");
       }
     }
     if (path === "/api/wifi/accounts" && method === "GET") {
@@ -2849,7 +2918,7 @@ async function handleRequest(request, env, ctx) {
           "SELECT value, updated_by, updated_at FROM app_settings WHERE corpid=? AND key=? LIMIT 1"
         ).bind(user.corpid, "wifi_accounts").first();
       } catch {
-        if (isReadonlyAdminRoleValue(user.role)) return json({ accounts: {}, updatedBy: "", updatedAt: "", readonly: true });
+        if (isReadonlyAdminRoleValue(user.role)) return success({ accounts: {}, updatedBy: "", updatedAt: "", readonly: true });
         throw new Error("wifi_accounts_table_missing");
       }
       let accounts = {};
@@ -2872,13 +2941,13 @@ async function handleRequest(request, env, ctx) {
         accounts = encrypted;
       }
       accounts = await decryptWifiAccounts(accounts, env);
-      return json({ accounts, updatedBy: row?.updated_by || "", updatedAt: row?.updated_at || "", readonly: isReadonlyAdminRoleValue(user.role) });
+      return success({ accounts, updatedBy: row?.updated_by || "", updatedAt: row?.updated_at || "", readonly: isReadonlyAdminRoleValue(user.role) });
     }
     if (path === "/api/wifi/accounts" && method === "POST") {
       if (!requireManager(user)) return forbidden();
       const body = await request.json();
       const raw = body?.accounts;
-      if (!raw || typeof raw !== "object" || Array.isArray(raw)) return json({ error: "bad_request" }, 400);
+      if (!raw || typeof raw !== "object" || Array.isArray(raw)) return badRequest("bad_request");
       const clean = {};
       for (const [bed, account] of Object.entries(raw)) {
         const key = cleanText(bed, 40);
@@ -2915,7 +2984,7 @@ async function handleRequest(request, env, ctx) {
              updated_at=datetime("now")`
       ).bind(user.corpid, "wifi_accounts", JSON.stringify(clean), user.userid).run();
       await audit(env, user, "wifi.accounts.save", "wifi_accounts", { count: Object.keys(clean).length });
-      return json({ success: true, count: Object.keys(clean).length });
+      return success({ success: true, count: Object.keys(clean).length });
     }
     if (path === "/api/arrears" && method === "GET") {
       return handleBossArrears(request, env, user);
@@ -2939,7 +3008,7 @@ async function handleRequest(request, env, ctx) {
           "SELECT value, updated_by, updated_at FROM app_settings WHERE corpid=? AND key=? LIMIT 1"
         ).bind(user.corpid, "client_credit").first();
       } catch {
-        if (isReadonlyAdminRoleValue(user.role)) return json({ customers: [], updatedBy: "", updatedAt: "", readonly: true });
+        if (isReadonlyAdminRoleValue(user.role)) return success({ customers: [], updatedBy: "", updatedAt: "", readonly: true });
         throw new Error("client_credit_table_missing");
       }
       let customers = [];
@@ -2949,7 +3018,7 @@ async function handleRequest(request, env, ctx) {
         customers = [];
       }
       if (!Array.isArray(customers)) customers = [];
-      return json({
+      return success({
         customers: customers.map(sanitizeCustomer).filter(Boolean),
         updatedBy: row?.updated_by || "",
         updatedAt: row?.updated_at || ""
@@ -2985,7 +3054,7 @@ async function handleRequest(request, env, ctx) {
              updated_at=datetime("now")`
       ).bind(user.corpid, "client_credit", JSON.stringify(customers), user.userid).run();
       await audit(env, user, "customers.save", "client_credit", { count: customers.length });
-      return json({ success: true, count: customers.length });
+      return success({ success: true, count: customers.length });
     }
     if (path === "/api/rent_config" && method === "GET") {
       if (canWriteOwnerData(user)) {
@@ -3006,7 +3075,7 @@ async function handleRequest(request, env, ctx) {
           "SELECT value, updated_by, updated_at FROM app_settings WHERE corpid=? AND key=? LIMIT 1"
         ).bind(user.corpid, "rent_ref_room").first();
       } catch {
-        if (isReadonlyAdminRoleValue(user.role)) return json({ config: {}, updatedBy: "", updatedAt: "", readonly: true });
+        if (isReadonlyAdminRoleValue(user.role)) return success({ config: {}, updatedBy: "", updatedAt: "", readonly: true });
         throw new Error("rent_config_table_missing");
       }
       let config = {};
@@ -3015,7 +3084,7 @@ async function handleRequest(request, env, ctx) {
       } catch {
         config = {};
       }
-      return json({ config, updatedBy: row?.updated_by || "", updatedAt: row?.updated_at || "" });
+      return success({ config, updatedBy: row?.updated_by || "", updatedAt: row?.updated_at || "" });
     }
     if (path === "/api/rent_config" && method === "POST") {
       if (!requireManager(user)) return forbidden();
@@ -3031,7 +3100,7 @@ async function handleRequest(request, env, ctx) {
       ).run();
       const body = await request.json();
       const raw = body?.config;
-      if (!raw || typeof raw !== "object" || Array.isArray(raw)) return json({ error: "bad_request" }, 400);
+      if (!raw || typeof raw !== "object" || Array.isArray(raw)) return badRequest("bad_request");
       const clean = {};
       for (const [room, value] of Object.entries(raw)) {
         const key = String(room || "").trim();
@@ -3049,7 +3118,7 @@ async function handleRequest(request, env, ctx) {
              updated_at=datetime("now")`
       ).bind(user.corpid, "rent_ref_room", JSON.stringify(clean), user.userid).run();
       await audit(env, user, "rent_config.update", "rent_ref_room", { count: Object.keys(clean).length });
-      return json({ success: true, count: Object.keys(clean).length });
+      return success({ success: true, count: Object.keys(clean).length });
     }
     if (path === "/api/save_session" && method === "POST") {
       if (!requireManager(user)) return forbidden();
@@ -3150,7 +3219,7 @@ async function handleRequest(request, env, ctx) {
         }
       }
       await env.DB.batch(batch);
-      return json({ success: true, sessionId });
+      return success({ success: true, sessionId });
     }
     if (path === "/api/delete_session" && method === "POST") {
       if (!requireManager(user)) return forbidden();
@@ -3163,18 +3232,18 @@ async function handleRequest(request, env, ctx) {
       }
       const { id: rawId } = body || {};
       const id = cleanId(rawId);
-      if (!id) return json({ error: "bad_request" }, 400);
+      if (!id) return badRequest("bad_request");
       const voidReason = cleanText(body?.void_reason || body?.reason || "manager_void_session", 240);
       const voidSource = cleanText(body?.void_source || "api.delete_session", 80);
       const requestId = cleanText(body?.request_id || body?.idempotency_key || crypto.randomUUID(), 100);
       const existing = await env.DB.prepare(
         "SELECT id, voided_at FROM sessions WHERE id=? AND corpid=? LIMIT 1"
       ).bind(id, user.corpid).first();
-      if (!existing) return json({ error: "not_found" }, 404);
+      if (!existing) return errorResponse("not_found", 404, "not_found");
       const now=empNow();
       if (existing.voided_at) {
         await audit(env, user, "session.void.already_voided", id, { request_id: requestId });
-        return json({ success: true, sessionId: id, voided: true, already_voided: true });
+        return success({ success: true, sessionId: id, voided: true, already_voided: true });
       }
       const batch = [
         env.DB.prepare(`UPDATE sessions
@@ -3249,19 +3318,19 @@ async function handleRequest(request, env, ctx) {
         ts:now
       });
       await audit(env, user, "session.void", id, { request_id: requestId, reason: voidReason, source: voidSource });
-      return json({ success: true, sessionId: id, voided: true, voided_at: now });
+      return success({ success: true, sessionId: id, voided: true, voided_at: now });
     }
     if (path === "/api/clear_arrear" && method === "POST") {
       if (!requireManager(user)) return forbidden();
       const { id: rawId } = await request.json();
       const id = cleanId(rawId);
-      if (!id) return json({ error: "bad_request" }, 400);
+      if (!id) return badRequest("bad_request");
       const changed=await empCloseArrearEverywhere(env,user,id,empNow());
       await audit(env, user, "arrear.clear", id, { changed });
-      return json({ success: true, changed });
+      return success({ success: true, changed });
     }
     if (path === "/api/history") {
-      if(!await empTableExists(env,"sessions"))return json([]);
+      if(!await empTableExists(env,"sessions"))return success([]);
       const includeVoided = url.searchParams.get("include_voided") === "1";
       const rawLimit = Number(url.searchParams.get("limit") || 0);
       const rawOffset = Number(url.searchParams.get("offset") || 0);
@@ -3272,26 +3341,26 @@ async function handleRequest(request, env, ctx) {
         : "SELECT * FROM sessions WHERE corpid=? AND COALESCE(voided_at,'')='' AND COALESCE(handover_status,'')<>'VOID' ORDER BY created_at DESC";
       if (limit) {
         const { results } = await env.DB.prepare(`${baseSql} LIMIT ? OFFSET ?`).bind(user.corpid, limit, offset).all();
-        return json(results);
+        return success(results);
       }
       const { results } = await env.DB.prepare(
         baseSql
       ).bind(user.corpid).all();
-      return json(results);
+      return success(results);
     }
     if (path === "/api/session_detail" && method === "GET") {
       const sid = cleanId(url.searchParams.get("id"));
-      if (!sid) return json({ error: "bad_request" }, 400);
-      if(!await empTableExists(env,"transactions"))return json([]);
+      if (!sid) return badRequest("bad_request");
+      if(!await empTableExists(env,"transactions"))return success([]);
       const includeVoided = url.searchParams.get("include_voided") === "1";
       const { results } = await env.DB.prepare(
         includeVoided
           ? "SELECT * FROM transactions WHERE session_id=? AND corpid=? ORDER BY created_at ASC"
           : "SELECT * FROM transactions WHERE session_id=? AND corpid=? AND COALESCE(voided_at,'')='' AND COALESCE(status,'ACTIVE')<>'VOID' ORDER BY created_at ASC"
       ).bind(sid, user.corpid).all();
-      return json(results);
+      return success(results);
     }
-    return json({ error: "not_found" }, 404);
+    return errorResponse("not_found", 404, "not_found");
   }
   if (env.ASSETS) {
     return env.ASSETS.fetch(request);
@@ -3304,8 +3373,27 @@ async function handleRequest(request, env, ctx) {
 __name(handleRequest, "handleRequest");
 var index_default = {
   async fetch(request, env, ctx) {
-    const response = await handleRequest(request, env, ctx);
-    return await withSecurityHeaders(response, request, env);
+    const requestContext = createRequestContext(request);
+    attachRequestContext(request, requestContext);
+    try {
+      requestContext.logger.info(
+        { method: request.method, pathname: new URL(request.url).pathname },
+        "Worker request started"
+      );
+      const response = await handleRequest(request, env, ctx, requestContext);
+      const securedResponse = await withSecurityHeaders(response, request, env);
+      applyRequestIdHeader(securedResponse, requestContext);
+      requestContext.logger.info({ status: securedResponse.status }, "Worker request completed");
+      return securedResponse;
+    } catch (err) {
+      requestContext.logger.error({ err }, "Unhandled exception");
+      const errorResponse = json(
+        fail(ErrorCodes.INTERNAL_SERVER, "Internal server error"),
+        500,
+        { "x-request-id": requestContext.requestId }
+      );
+      return await withSecurityHeaders(errorResponse, request, env);
+    }
   }
 };
 export {

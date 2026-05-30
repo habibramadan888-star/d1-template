@@ -31,6 +31,10 @@ function cookieHeader(response) {
   return values.map((value) => value.split(";")[0]).join("; ");
 }
 
+function unwrapStandardResponse(payload) {
+  return payload && payload.code === 0 && payload.data ? payload.data : payload;
+}
+
 async function request(path, options = {}) {
   return fetch(`${baseUrl}${path}`, {
     ...options,
@@ -66,7 +70,7 @@ if (!cookie) throw new Error("employee login did not return a session cookie");
 
 const me = await request("/api/me", { headers: { Cookie: cookie } });
 await expectStatus("employee /api/me", me, 200);
-const payload = await me.json();
+const payload = unwrapStandardResponse(await me.json());
 if (payload.role !== "staff") throw new Error(`employee role expected staff, got ${payload.role}`);
 console.log("PASS employee role staff");
 

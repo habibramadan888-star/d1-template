@@ -1,0 +1,19 @@
+{
+  "timestamp": "2026-05-30T11:18:22.639Z",
+  "url": "http://127.0.0.1:8807/api/me",
+  "method": "GET",
+  "connections": 4,
+  "duration": 3,
+  "responseCheck": {
+    "status": 200,
+    "code": 0,
+    "ok": true
+  },
+  "qps": 89.34,
+  "p99": 91,
+  "errors": 0,
+  "non2xx": 0,
+  "totalRequests": 268,
+  "status": "COMPLETE",
+  "error": null
+}

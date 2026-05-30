@@ -43,7 +43,12 @@ async function apiFetch(url, opts = {}) {
   const token=LS.get('homelink:cloud_token');
   if(token&&!headers.Authorization)headers.Authorization=`Bearer ${token}`;
   const target=apiUrl(url);
-  return fetch(target,{...opts,headers,credentials:'include'});
+  return wrapStandardJsonResponse(await fetch(target,{...opts,headers,credentials:'include'}));
+}
+function wrapStandardJsonResponse(response){
+  const originalJson=response.json.bind(response);
+  try{response.json=async()=>unwrapStandardResponse(await originalJson());}catch{}
+  return response;
 }
 async function apiFetchWithTimeout(url, opts = {}, timeoutMs = HISTORY_FETCH_TIMEOUT_MS) {
   const controller = new AbortController();
@@ -86,11 +91,12 @@ function redirectToUnifiedLogin(reason=''){
   const target=UNIFIED_LOGIN_DESTINATION+(reason?`?reason=${encodeURIComponent(reason)}`:'');
   location.replace(target);
 }
+function unwrapStandardResponse(body){return body&&body.code===0&&body.data?body.data:body}
 async function fetchCurrentAuthUser(){
   const r=await apiFetch('/api/me',{method:'GET'});
   if(r.status===401||r.status===403)return null;
   if(!r.ok)throw new Error('me_failed_'+r.status);
-  return r.json();
+  return unwrapStandardResponse(await r.json());
 }
 function ownerAuthElements(){
   return {

@@ -32,6 +32,10 @@ function cookieHeader(response) {
   return values.map((value) => value.split(";")[0]).join("; ");
 }
 
+function unwrapStandardResponse(payload) {
+  return payload && payload.code === 0 && payload.data ? payload.data : payload;
+}
+
 async function request(path, options = {}) {
   return fetch(`${baseUrl}${path}`, {
     ...options,
@@ -106,7 +110,7 @@ async function main() {
   const ownerCookie = await loginOwner(managerPassword);
   const ownerMe = await request("/api/me", { headers: { Cookie: ownerCookie } });
   await expectStatus("owner /api/me", ownerMe, 200);
-  const ownerPayload = await ownerMe.json();
+  const ownerPayload = unwrapStandardResponse(await ownerMe.json());
   if (ownerPayload.role !== "manager") {
     throw new Error(`owner /api/me role expected manager, got ${ownerPayload.role}`);
   }
@@ -120,7 +124,7 @@ async function main() {
   const employeeCookie = await loginEmployee(employeeId, employeePin);
   const employeeMe = await request("/api/me", { headers: { Cookie: employeeCookie } });
   await expectStatus("employee /api/me", employeeMe, 200);
-  const employeePayload = await employeeMe.json();
+  const employeePayload = unwrapStandardResponse(await employeeMe.json());
   if (employeePayload.role !== "staff") {
     throw new Error(`employee /api/me role expected staff, got ${employeePayload.role}`);
   }
