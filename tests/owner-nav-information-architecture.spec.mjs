@@ -14,10 +14,11 @@ test("owner primary nav uses the final compact mobile information architecture",
   assert.match(nav, />总览<span class="en-sub">OVERVIEW<\/span>/);
   assert.match(nav, />欠款<span class="en-sub">ARREARS<\/span>/);
   assert.match(nav, /data-view="history"/);
+  assert.match(nav, /data-view="analysis" id="navAnalysis"/);
   assert.match(nav, /data-view="clients"/);
   assert.match(nav, /data-view="wifi"/);
-  assert.doesNotMatch(nav, /data-view="analysis"|ANALYTICS|欠款管理/);
-  assert.equal([...nav.matchAll(/class="nav-btn/g)].length, 5);
+  assert.doesNotMatch(nav, /ANALYTICS|欠款管理/);
+  assert.equal([...nav.matchAll(/class="nav-btn/g)].length, 6);
 });
 
 test("legacy owner proxy entry remains hidden, not primary navigation", async () => {

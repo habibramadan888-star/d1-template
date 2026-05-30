@@ -179,3 +179,11 @@ Production cutover remains `PRODUCTION_NO_GO`.
 7. Confirm readonly admin can view details only and cannot see write buttons.
 
 Stop the test if any old row/table layout, third source, debug field, or 20-second blank load appears. Production remains `PRODUCTION_NO_GO`.
+
+## Owner Regression Audit Test Addendum
+
+1. Confirm owner navigation exposes all six modules: 总览 / 欠款 / 历史 / 分析 / 客户 / 网络.
+2. Confirm `分析` is visible or horizontally reachable and opens the analysis view.
+3. Confirm the arrears page does not display `signal is aborted without reason`; slow requests should keep skeleton/cache.
+4. Run `npm run test:owner-regression-smoke` before accepting any owner shell change.
+5. Production cutover remains `PRODUCTION_NO_GO`.

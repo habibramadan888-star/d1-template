@@ -156,3 +156,15 @@ Date: 2026-05-30, Asia/Dubai
 | readonly_admin is read-only             |      Yes |        | Details only, no write buttons.                                                                    |
 
 Production remains `PRODUCTION_NO_GO`.
+
+## Owner Regression Audit Visual Checklist
+
+| Check                             | Required | Result | Notes                                     |
+| --------------------------------- | -------: | ------ | ----------------------------------------- |
+| `分析` tab visible/reachable      |      Yes |        | Regression blocker if missing.            |
+| Owner nav has all modules         |      Yes |        | 总览 / 欠款 / 历史 / 分析 / 客户 / 网络.  |
+| Nav does not wrap                 |      Yes |        | Horizontal scroll is allowed.             |
+| Arrears does not show abort error |      Yes |        | `signal is aborted without reason` is P1. |
+| Full owner smoke run              |      Yes |        | `npm run test:owner-regression-smoke`.    |
+
+Production remains `PRODUCTION_NO_GO`.

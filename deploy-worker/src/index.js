@@ -1841,7 +1841,7 @@ function empTaskToBossArrear(t){
     id:cleanId(t?.task_id)||empId("arrear-view"),
     task_id:cleanText(t?.task_id||"",100),
     source:cleanText(t?.source||"arrear_tasks",40),
-    source_type:cleanText(t?.source_type||(/arrears/i.test(t?.source||"")?"historical_arrears":"historical_arrears"),40),
+    source_type:/ttlock/i.test(String(t?.source_type||t?.source||""))?"ttlock_expired_unpaid":"existing_arrears_record",
     source_ref:cleanText(t?.source_ref||t?.task_id||"",120),
     dedupe_key:cleanText(t?.source_ref||t?.task_id||"",120)||[
       cleanText(t?.source||"arrear_tasks",40),
@@ -1869,6 +1869,9 @@ function empTaskToBossArrear(t){
     followup_status:cleanText(t?.followup_status||"",40),
     promise_date:cleanDate(t?.promise_date||""),
     promise_amount:cleanMoney(t?.promise_amount||0),
+    promised_amount_fils:Math.round(cleanMoney(t?.promise_amount||0)*100),
+    promised_payment_date:cleanDate(t?.promise_date||""),
+    followup_note:cleanText(t?.staff_note||"",500),
     actual_received:cleanMoney(t?.actual_received||0),
     owner_note:cleanText(t?.owner_note||"",500),
     staff_note:cleanText(t?.staff_note||"",500),

@@ -116,3 +116,14 @@ Treat these as P1 blockers:
 - Top navigation still says `欠款管理` or wraps to a second line on mobile.
 
 Production remains `PRODUCTION_NO_GO`.
+
+## Owner Module Regression Rules
+
+Treat these as blockers:
+
+- Missing `分析` entry: regression blocker.
+- Owner arrears shows `signal is aborted without reason`: P1 blocker.
+- Any owner module is unreachable after login: regression blocker.
+- Owner shell changes deployed without `npm run test:owner-regression-smoke`: QA process blocker.
+
+Production remains `PRODUCTION_NO_GO`.

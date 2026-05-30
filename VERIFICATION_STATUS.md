@@ -244,6 +244,16 @@ Date: 2026-05-28, Asia/Dubai
 
 Production cutover remains `PRODUCTION_NO_GO`.
 
+## OWNER-REGRESSION-AUDIT-FIX-001 Verification Notes
+
+| Area                   | Status   | Notes                                                              |
+| ---------------------- | -------- | ------------------------------------------------------------------ |
+| Analysis nav           | REQUIRED | Missing `分析` is a regression blocker.                            |
+| Arrears abort handling | REQUIRED | `signal is aborted without reason` is a P1 blocker.                |
+| Full owner smoke       | REQUIRED | Run `npm run test:owner-regression-smoke` for owner shell changes. |
+| Module coverage        | REQUIRED | 总览, 欠款, 历史, 分析, 客户, 网络 must be reachable.              |
+| Production cutover     | NO_GO    | Must remain `PRODUCTION_NO_GO`.                                    |
+
 ## INTERNAL-QA-001 Verification Addendum
 
 Date: 2026-05-27, Asia/Dubai

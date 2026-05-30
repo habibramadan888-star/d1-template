@@ -222,3 +222,16 @@ Owner arrears QA must validate the final source and visual contract:
 - Raw debug fields are regression blockers.
 
 Production cutover remains `PRODUCTION_NO_GO`.
+
+## Owner Regression Audit QA Addendum
+
+Owner QA must treat these as blockers:
+
+- Missing `分析` entry.
+- Owner arrears `signal is aborted without reason`.
+- Any owner module unreachable after login.
+- Owner shell changes without `npm run test:owner-regression-smoke`.
+
+Required module smoke: 总览, 欠款, 历史, 分析, 客户, 网络.
+
+Production cutover remains `PRODUCTION_NO_GO`.

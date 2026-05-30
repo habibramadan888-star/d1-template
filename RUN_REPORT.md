@@ -5952,3 +5952,11 @@ Safety:
 - Top navigation label changed from `欠款管理` to `欠款`; primary mobile order is `总览 / 欠款 / 历史 / 客户 / 网络`.
 - A 20-second arrears blank load is a P1 blocker. Raw debug fields (`directive`, `promise`, `staff`, `source_type`, `followup_status`, `none`, `undefined`, `null`) are regression blockers.
 - Production remains `PRODUCTION_NO_GO`; no D1 write, migration, D1 export/import/execute, employee entry write, handover, void/delete, dashboard calculation change, or financial formula change was performed.
+
+## OWNER-REGRESSION-AUDIT-FIX-001
+
+- Missing `分析` in the owner navigation is a regression blocker.
+- Owner arrears `signal is aborted without reason` is a P1 blocker.
+- Owner navigation must keep all modules reachable: 总览 / 欠款 / 历史 / 分析 / 客户 / 网络.
+- Any owner shell change must run `npm run test:owner-regression-smoke`.
+- Production cutover remains `PRODUCTION_NO_GO`.

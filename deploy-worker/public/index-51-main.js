@@ -53,12 +53,16 @@ function wrapStandardJsonResponse(response){
 }
 async function apiFetchWithTimeout(url, opts = {}, timeoutMs = HISTORY_FETCH_TIMEOUT_MS) {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const timer = setTimeout(() => controller.abort(new DOMException('Request timed out', 'TimeoutError')), timeoutMs);
   try {
     return await apiFetch(url, { ...opts, signal: controller.signal });
   } finally {
     clearTimeout(timer);
   }
+}
+function isAbortLikeError(err){
+  const msg=String(err?.message||err||'').toLowerCase();
+  return err?.name==='AbortError'||err?.name==='TimeoutError'||msg.includes('abort')||msg.includes('aborted');
 }
 function normalizeAuthRole(r){return String(r||'').trim().toLowerCase();}
 function isReadonlyAdminRole(r){return ['admin_readonly','readonly_admin'].includes(normalizeAuthRole(r));}
@@ -608,7 +612,7 @@ const state={
   from:'',to:'',txCatFilter:'all',txSearch:'',historyViewing:null,historyLimit:HISTORY_PAGE_SIZE,
   arrears:[], // [{id,room,roomTo?,totalRent,paid,remain,dueDate,sessionId,cleared}]
   arrearFilter:'all',
-  arrearsLimit:ARREARS_PAGE_SIZE,arrearsLoading:false,
+arrearsLimit:ARREARS_PAGE_SIZE,arrearsLoading:false,arrearsLoadSeq:0,
   presetPrices:DEFAULT_PRICES,
   customers:[],
   anaOpen:{session:false,finance:false,people:false,continuity:false,tx:false},
@@ -1067,9 +1071,16 @@ function isArrearTaskOpen(a){
   return Number.isFinite(remain)&&remain>0;
 }
 async function loadHistoricalArrearsForOwner(){
-  const primary=await apiFetchWithTimeout(`/api/arrears/followup/tasks?limit=${ARREARS_PAGE_SIZE}`);
-  if(primary.ok)return rowsFromApiPayload(await primary.json(),['arrears','tasks']);
-  const fallback=await apiFetchWithTimeout(`/api/arrears?limit=${ARREARS_PAGE_SIZE}`);
+  let primary=null;
+  let primaryError=null;
+  try{
+    primary=await apiFetchWithTimeout(`/api/arrears/followup/tasks?limit=${ARREARS_PAGE_SIZE}`,{},12000);
+  }catch(e){
+    primaryError=e;
+  }
+  if(primary?.ok)return rowsFromApiPayload(await primary.json(),['arrears','tasks']);
+  if(primaryError&&!isAbortLikeError(primaryError))throw primaryError;
+  const fallback=await apiFetchWithTimeout(`/api/arrears?limit=${ARREARS_PAGE_SIZE}`,{},12000);
   if(!fallback.ok){
     const payload=await fallback.json().catch(()=>({}));
     throw new Error(payload?.message||('HTTP '+fallback.status));
@@ -1352,10 +1363,13 @@ function showArrearsLoadError(error){
 async function loadArrearsForOwner({showLoading=false}={}){
   if(!isOwnerShellRole())return false;
   if(state.arrearsLoading)return false;
+  const loadSeq=(state.arrearsLoadSeq||0)+1;
+  state.arrearsLoadSeq=loadSeq;
   state.arrearsLoading=true;
   if(showLoading)showArrearsLoading();
   try{
     const rows=await loadHistoricalArrearsForOwner();
+    if(loadSeq!==state.arrearsLoadSeq)return false;
     state.arrears=buildArrearsFollowupPool({
       existingArrearsRecords:rows,
       ttlockExpiredUnpaid:[]
@@ -1365,7 +1379,9 @@ async function loadArrearsForOwner({showLoading=false}={}){
     if(showLoading){
       setTimeout(async()=>{
         try{
+          if(loadSeq!==state.arrearsLoadSeq)return;
           await ensureOwnerLockCardsForArrearsPool();
+          if(loadSeq!==state.arrearsLoadSeq)return;
           const ttlockRows=ttlockExpiredCardsForArrearsPool();
           if(ttlockRows.length){
             state.arrears=buildArrearsFollowupPool({
@@ -1392,10 +1408,14 @@ async function loadArrearsForOwner({showLoading=false}={}){
         return false;
       }
     }catch{}
+    if(isAbortLikeError(e)){
+      if(showLoading)showArrearsLoading();
+      return false;
+    }
     if(showLoading)showArrearsLoadError(e);
     return false;
   }finally{
-    state.arrearsLoading=false;
+    if(loadSeq===state.arrearsLoadSeq)state.arrearsLoading=false;
   }
 }
 /* 老板视角：从云端静默刷新欠款列表 */

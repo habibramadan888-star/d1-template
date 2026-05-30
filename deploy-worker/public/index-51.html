@@ -1446,6 +1446,13 @@ body::before{
   .owner-ui-unified .cc-legend{gap:6px}
   .owner-ui-unified .cc-legend-item{font-size:10px}
 }
+/* OWNER REGRESSION LOCK: keep all owner modules reachable without wrapping. */
+.owner-ui-unified .topbar-row2{overflow-x:auto;scrollbar-width:none}
+.owner-ui-unified .topbar-row2::-webkit-scrollbar{display:none}
+.owner-ui-unified .nav{display:flex!important;flex-wrap:nowrap!important;width:max-content!important;min-width:100%!important;overflow-x:auto!important;gap:4px!important;padding:4px!important;border-radius:22px!important}
+.owner-ui-unified #navClients{display:flex!important}
+.owner-ui-unified .nav-btn{flex:0 0 66px!important;width:66px!important;min-width:66px!important;height:54px!important;min-height:54px!important;padding:6px 4px!important;border-radius:16px!important;border-right:0!important;font-size:15px!important;line-height:1.05!important;white-space:nowrap!important}
+.owner-ui-unified .nav-btn .en-sub{font-size:8px!important}
 </style>
 </head>
 <body class="hl-page owner-ui-unified">
@@ -1531,6 +1538,7 @@ body::before{
       <button class="nav-btn active" data-view="overview" id="navOverview"><svg class="ico"><use href="#i-chart"/></svg>总览<span class="en-sub">OVERVIEW</span></button>
       <button class="nav-btn" data-view="arrears" id="navArrears"><svg class="ico"><use href="#i-doc"/></svg>欠款<span class="en-sub">ARREARS</span></button>
       <button class="nav-btn" data-view="history" id="navHistory"><svg class="ico"><use href="#i-history"/></svg>历史<span class="en-sub">HISTORY</span></button>
+      <button class="nav-btn" data-view="analysis" id="navAnalysis"><svg class="ico"><use href="#i-chart"/></svg>分析<span class="en-sub">ANALYSIS</span></button>
       <button class="nav-btn locked" data-view="clients" id="navClients"><svg class="ico"><use href="#i-users"/></svg>客户<span class="en-sub">CLIENTS</span></button>
       <button class="nav-btn locked" data-view="wifi" id="navWifi"><svg class="ico"><use href="#i-spark"/></svg>网络<span class="en-sub">NETWORK</span></button>
     </nav>
