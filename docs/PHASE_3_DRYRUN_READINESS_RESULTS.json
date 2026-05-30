@@ -1,0 +1,151 @@
+{
+  "startedAt": "2026-05-30T08:19:11.992Z",
+  "finishedAt": "2026-05-30T08:20:00.001Z",
+  "decision": "READY_FOR_PHASE3_PLANNING",
+  "phaseEvidence": [
+    {
+      "phase": "Phase 0",
+      "file": "docs/PHASE_0_TEST_RESULTS_FINAL.json",
+      "expected": {
+        "decision": "GO",
+        "passField": "passed",
+        "totalField": "totalTests"
+      },
+      "passed": true,
+      "decision": "GO",
+      "pass": 30,
+      "total": 30,
+      "generatedAt": "2026-05-30T07:09:52.655Z",
+      "reason": "phase evidence complete"
+    },
+    {
+      "phase": "Phase 1",
+      "file": "docs/PHASE_1_COMPLETE_RESULTS.json",
+      "expected": {
+        "decision": "GO",
+        "passField": "pass",
+        "totalField": "tests"
+      },
+      "passed": true,
+      "decision": "GO",
+      "pass": 242,
+      "total": 242,
+      "generatedAt": "2026-05-30T07:26:26.125Z",
+      "reason": "phase evidence complete"
+    },
+    {
+      "phase": "Phase 2A",
+      "file": "docs/PHASE_2A_FEATURE_FLAG_RESULTS.json",
+      "expected": {
+        "decision": "GO",
+        "passField": "pass",
+        "totalField": "tests"
+      },
+      "passed": true,
+      "decision": "GO",
+      "pass": 248,
+      "total": 248,
+      "generatedAt": "2026-05-30T07:58:24.566Z",
+      "reason": "phase evidence complete"
+    }
+  ],
+  "phaseEvidencePassed": 3,
+  "validationWindows": [
+    {
+      "id": "production-locks",
+      "title": "Production locks and source safety",
+      "purpose": "Confirm production-only behavior remains locked, route/auth entry points are closed, and feature flags do not enable production paths.",
+      "files": [
+        "tests/source-risk.spec.mjs",
+        "tests/feature-flag-production-lock-matrix.spec.mjs",
+        "tests/auth-single-entry-routing.spec.mjs"
+      ],
+      "startedAt": "2026-05-30T08:19:12.000Z",
+      "finishedAt": "2026-05-30T08:19:12.480Z",
+      "elapsedMs": 480,
+      "command": "C:\\Program Files\\nodejs\\node.exe --test --test-concurrency=1 --test-reporter=tap tests/source-risk.spec.mjs tests/feature-flag-production-lock-matrix.spec.mjs tests/auth-single-entry-routing.spec.mjs",
+      "exitCode": 0,
+      "error": null,
+      "outputTail": "TAP version 13\n# Subtest: unauthenticated employee-v3 redirects to root portal instead of showing old PIN UI\nok 1 - unauthenticated employee-v3 redirects to root portal instead of showing old PIN UI\n  ---\n  duration_ms: 6.2018\n  type: 'test'\n  ...\n# Subtest: unauthenticated owner index redirects to root portal instead of old owner login\nok 2 - unauthenticated owner index redirects to root portal instead of old owner login\n  ---\n  duration_ms: 1.824\n  type: 'test'\n  ...\n# Subtest: authenticated roles route to the correct business destination\nok 3 - authenticated roles route to the correct business destination\n  ---\n  duration_ms: 4.9317\n  type: 'test'\n  ...\n# Subtest: production cutover remains PRODUCTION_NO_GO\nok 4 - production cutover remains PRODUCTION_NO_GO\n  ---\n  duration_ms: 1.2094\n  type: 'test'\n  ...\n# Subtest: handover staging critical flags and production locks are present in source and embedded workers\nok 5 - handover staging critical flags and production locks are present in source and embedded workers\n  ---\n  duration_ms: 6.6545\n  type: 'test'\n  ...\n# Subtest: employee entry adapter live-route rehearsal remains source-gated and non-production\nok 6 - employee entry adapter live-route rehearsal remains source-gated and non-production\n  ---\n  duration_ms: 1.4039\n  type: 'test'\n  ...\n# Subtest: current embedded employee-entry adapter drift remains explicit manual deploy gate evidence\nok 7 - current embedded employee-entry adapter drift remains explicit manual deploy gate evidence\n  ---\n  duration_ms: 3.8749\n  type: 'test'\n  ...\n# Subtest: npm scripts keep Cloudflare deploy commands in dry-run mode\nok 8 - npm scripts keep Cloudflare deploy commands in dry-run mode\n  ---\n  duration_ms: 7.477\n  type: 'test'\n  ...\n# Subtest: commercial CI workflow runs checks without deploy secrets\nok 9 - commercial CI workflow runs checks without deploy secrets\n  ---\n  duration_ms: 1.8413\n  type: 'test'\n  ...\n# Subtest: secret hygiene check blocks tracked local secret files\nok 10 - secret hygiene check blocks tracked local secret files\n  ---\n  duration_ms: 1.3665\n  type: 'test'\n  ...\n# Subtest: server-side auth gate remains present in Worker source\nok 11 - server-side auth gate remains present in Worker source\n  ---\n  duration_ms: 1.4756\n  type: 'test'\n  ...\n# Subtest: API inventory is generated and checked against Worker route metadata\nok 12 - API inventory is generated and checked against Worker route metadata\n  ---\n  duration_ms: 1.4626\n  type: 'test'\n  ...\n# Subtest: database static scan is generated separately from manual database audit\nok 13 - database static scan is generated separately from manual database audit\n  ---\n  duration_ms: 1.6326\n  type: 'test'\n  ...\n# Subtest: syntax check scans future module, script, test, and tool files automatically\nok 14 - syntax check scans future module, script, test, and tool files automatically\n  ---\n  duration_ms: 1.0332\n  type: 'test'\n  ...\n# Subtest: authenticated core smoke covers owner and employee permission boundaries\nok 15 - authenticated core smoke covers owner and employee permission boundaries\n  ---\n  duration_ms: 1.1705\n  type: 'test'\n  ...\n# Subtest: clean Worker bootstrap probe is explicit local-only and not a default gate\nok 16 - clean Worker bootstrap probe is explicit local-only and not a default gate\n  ---\n  duration_ms: 1.9859\n  type: 'test'\n  ...\n# Subtest: migration rehearsal script is local-only\nok 17 - migration rehearsal script is local-only\n  ---\n  duration_ms: 1.4444\n  type: 'test'\n  ...\n# Subtest: migration rehearsal script uses disposable local cleanup instead of SQL rollback\nok 18 - migration rehearsal script uses disposable local cleanup instead of SQL rollback\n  ---\n  duration_ms: 0.7322\n  type: 'test'\n  ...\n# Subtest: rent write plan rehearsal is local-only and not a default gate\nok 19 - rent write plan rehearsal is local-only and not a default gate\n  ---\n  duration_ms: 1.847\n  type: 'test'\n  ...\n# Subtest: legacy reconciliation dry-run is explicit local read-only\nok 20 - legacy reconciliation dry-run is explicit local read-only\n  ---\n  duration_ms: 1.3188\n  type: 'test'\n  ...\n# Subtest: known financial risks are still documented while code remains unchanged\nok 21 - known financial risks are still documented while code remains unchanged\n  ---\n  duration_ms: 1.4402\n  type: 'test'\n  ...\n1..21\n# tests 21\n# suites 0\n# pass 21\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 384.9345\n",
+      "tests": 21,
+      "pass": 21,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 384.9345,
+      "passed": true
+    },
+    {
+      "id": "feature-rollback-rehearsals",
+      "title": "Feature switch and rollback rehearsals",
+      "purpose": "Re-run representative backend totals, receivables, tenant-scope, and handover staging switch rehearsals before a production-copy dry-run.",
+      "files": [
+        "tests/backend-totals-staging-switch-rehearsal.spec.mjs",
+        "tests/receivables-staging-authority-switch-rehearsal.spec.mjs",
+        "tests/tenant-scope-staging-wiring-rehearsal.spec.mjs",
+        "tests/handover-staging-endpoint.spec.mjs"
+      ],
+      "startedAt": "2026-05-30T08:19:12.480Z",
+      "finishedAt": "2026-05-30T08:19:59.323Z",
+      "elapsedMs": 46843,
+      "command": "C:\\Program Files\\nodejs\\node.exe --test --test-concurrency=1 --test-reporter=tap tests/backend-totals-staging-switch-rehearsal.spec.mjs tests/receivables-staging-authority-switch-rehearsal.spec.mjs tests/tenant-scope-staging-wiring-rehearsal.spec.mjs tests/handover-staging-endpoint.spec.mjs",
+      "exitCode": 0,
+      "error": null,
+      "outputTail": "TAP version 13\n# Subtest: production plus flag true is disabled and legacy\nok 1 - production plus flag true is disabled and legacy\n  ---\n  duration_ms: 1.24\n  type: 'test'\n  ...\n# Subtest: staging plus flag false keeps legacy behavior\nok 2 - staging plus flag false keeps legacy behavior\n  ---\n  duration_ms: 0.3731\n  type: 'test'\n  ...\n# Subtest: staging plus flag true enables backend totals staging mode for approved candidates\nok 3 - staging plus flag true enables backend totals staging mode for approved candidates\n  ---\n  duration_ms: 0.7356\n  type: 'test'\n  ...\n# Subtest: approved candidate totals use backend authority candidate\nok 4 - approved candidate totals use backend authority candidate\n  ---\n  duration_ms: 0.1757\n  type: 'test'\n  ...\n# Subtest: blocked P0-008 totals stay shadow-only\nok 5 - blocked P0-008 totals stay shadow-only\n  ---\n  duration_ms: 0.2161\n  type: 'test'\n  ...\n# Subtest: P0-001 blocked totals stay shadow-only\nok 6 - P0-001 blocked totals stay shadow-only\n  ---\n  duration_ms: 0.2134\n  type: 'test'\n  ...\n# Subtest: P0-006 keeps all production switches disabled\nok 7 - P0-006 keeps all production switches disabled\n  ---\n  duration_ms: 0.169\n  type: 'test'\n  ...\n# Subtest: voided records are excluded from active totals\nok 8 - voided records are excluded from active totals\n  ---\n  duration_ms: 0.896\n  type: 'test'\n  ...\n# Subtest: active records totals are correct\nok 9 - active records totals are correct\n  ---\n  duration_ms: 0.3596\n  type: 'test'\n  ...\n# Subtest: frontend totals are not authority\nok 10 - frontend totals are not authority\n  ---\n  duration_ms: 0.7417\n  type: 'test'\n  ...\n# Subtest: rollback flag false restores legacy behavior\nok 11 - rollback flag false restores legacy behavior\n  ---\n  duration_ms: 1.1921\n  type: 'test'\n  ...\n# Subtest: dashboard and history do not show unapproved changes\nok 12 - dashboard and history do not show unapproved changes\n  ---\n  duration_ms: 0.4698\n  type: 'test'\n  ...\n# Subtest: pure rehearsal helper does not call production URL or write production D1\nok 13 - pure rehearsal helper does not call production URL or write production D1\n  ---\n  duration_ms: 0.3758\n  type: 'test'\n  ...\n# Subtest: production APP_ENV hides staging handover endpoint with 404\nok 14 - production APP_ENV hides staging handover endpoint with 404\n  ---\n  duration_ms: 1652.6047\n  type: 'test'\n  ...\n# Subtest: missing or disabled feature flag rejects before auth\nok 15 - missing or disabled feature flag rejects before auth\n  ---\n  duration_ms: 3148.4759\n  type: 'test'\n  ...\n# PASS local migration migrations\\\\local\\\\001_clean_legacy_bootstrap.sql\n# PASS local migration migrations\\\\local\\\\002_handover_atomic_staging.sql\n# PASS local dev seed app_settings for local-dev-company\n# Subtest: enabled staging handover endpoint enforces auth, roles, idempotency, totals, and staging writes\nok 16 - enabled staging handover endpoint enforces auth, roles, idempotency, totals, and staging writes\n  ---\n  duration_ms: 30905.3823\n  type: 'test'\n  ...\n# Subtest: matched candidate switches to receivables authority value during rehearsal\nok 17 - matched candidate switches to receivables authority value during rehearsal\n  ---\n  duration_ms: 7.5695\n  type: 'test'\n  ...\n# Subtest: only approved matched candidates switch\nok 18 - only approved matched candidates switch\n  ---\n  duration_ms: 1.3551\n  type: 'test'\n  ...\n# Subtest: adjustment expected differences remain shadow-only\nok 19 - adjustment expected differences remain shadow-only\n  ---\n  duration_ms: 0.7489\n  type: 'test'\n  ...\n# Subtest: dashboard live result remains unchanged\nok 20 - dashboard live result remains unchanged\n  ---\n  duration_ms: 0.6763\n  type: 'test'\n  ...\n# Subtest: rollback restores legacy for all rows\nok 21 - rollback restores legacy for all rows\n  ---\n  duration_ms: 0.6482\n  type: 'test'\n  ...\n# Subtest: summary passes when switch candidates and rollback are clean\nok 22 - summary passes when switch candidates and rollback are clean\n  ---\n  duration_ms: 0.6236\n  type: 'test'\n  ...\n# Subtest: summary blocks rollback failures\nok 23 - summary blocks rollback failures\n  ---\n  duration_ms: 0.1241\n  type: 'test'\n  ...\n# Subtest: rehearsal blocks when approval flags are missing\nok 24 - rehearsal blocks when approval flags are missing\n  ---\n  duration_ms: 4.8683\n  type: 'test'\n  ...\n# Subtest: approved rehearsal runs route and query scenarios\nok 25 - approved rehearsal runs route and query scenarios\n  ---\n  duration_ms: 3.498\n  type: 'test'\n  ...\n# Subtest: rehearsal proves off to on to rollback false flag behavior\nok 26 - rehearsal proves off to on to rollback false flag behavior\n  ---\n  duration_ms: 1.2247\n  type: 'test'\n  ...\n# Subtest: production remains disabled even if rehearsal flags are true\nok 27 - production remains disabled even if rehearsal flags are true\n  ---\n  duration_ms: 1.3226\n  type: 'test'\n  ...\n# Subtest: route rehearsal keeps expected allow and deny decisions\nok 28 - route rehearsal keeps expected allow and deny decisions\n  ---\n  duration_ms: 1.2204\n  type: 'test'\n  ...\n# Subtest: dashboard history rehearsal removes cross-tenant rows without dashboard mutation\nok 29 - dashboard history rehearsal removes cross-tenant rows without dashboard mutation\n  ---\n  duration_ms: 1.175\n  type: 'test'\n  ...\n# Subtest: rehearsal script source does not call production or D1\nok 30 - rehearsal script source does not call production or D1\n  ---\n  duration_ms: 0.6641\n  type: 'test'\n  ...\n1..30\n# tests 30\n# suites 0\n# pass 30\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 46765.8739\n",
+      "tests": 30,
+      "pass": 30,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 46765.8739,
+      "passed": true
+    },
+    {
+      "id": "audit-isolation-atomicity",
+      "title": "Audit, isolation, and atomicity evidence",
+      "purpose": "Confirm tenant audit visibility, tenant access matrix decisions, and handover atomic request behavior remain valid.",
+      "files": [
+        "tests/tenant-scope-audit-entry-events.spec.mjs",
+        "tests/tenant-scope-access-matrix.spec.mjs",
+        "tests/handover-atomic-rehearsal.spec.mjs"
+      ],
+      "startedAt": "2026-05-30T08:19:59.323Z",
+      "finishedAt": "2026-05-30T08:19:59.772Z",
+      "elapsedMs": 449,
+      "command": "C:\\Program Files\\nodejs\\node.exe --test --test-concurrency=1 --test-reporter=tap tests/tenant-scope-audit-entry-events.spec.mjs tests/tenant-scope-access-matrix.spec.mjs tests/handover-atomic-rehearsal.spec.mjs",
+      "exitCode": 0,
+      "error": null,
+      "outputTail": "TAP version 13\n# Subtest: handover atomic fixtures cover required scenarios\nok 1 - handover atomic fixtures cover required scenarios\n  ---\n  duration_ms: 7.5541\n  type: 'test'\n  ...\n# Subtest: valid cash-only handover creates accepted commit draft\nok 2 - valid cash-only handover creates accepted commit draft\n  ---\n  duration_ms: 6.0957\n  type: 'test'\n  ...\n# Subtest: valid bank-only handover creates accepted commit draft\nok 3 - valid bank-only handover creates accepted commit draft\n  ---\n  duration_ms: 1.7533\n  type: 'test'\n  ...\n# Subtest: mixed cash and bank handover totals are recomputed backend-side\nok 4 - mixed cash and bank handover totals are recomputed backend-side\n  ---\n  duration_ms: 1.1434\n  type: 'test'\n  ...\n# Subtest: deposit and rent are separated in accepted rows\nok 5 - deposit and rent are separated in accepted rows\n  ---\n  duration_ms: 1.0113\n  type: 'test'\n  ...\n# Subtest: arrears payment is classified separately\nok 6 - arrears payment is classified separately\n  ---\n  duration_ms: 1.0657\n  type: 'test'\n  ...\n# Subtest: frontend total tamper produces structured discrepancy\nok 7 - frontend total tamper produces structured discrepancy\n  ---\n  duration_ms: 1.5546\n  type: 'test'\n  ...\n# Subtest: same idempotency key replay is idempotent\nok 8 - same idempotency key replay is idempotent\n  ---\n  duration_ms: 2.0904\n  type: 'test'\n  ...\n# Subtest: same rows with different idempotency key produces duplicate warning\nok 9 - same rows with different idempotency key produces duplicate warning\n  ---\n  duration_ms: 2.0057\n  type: 'test'\n  ...\n# Subtest: weak network retry does not create duplicate financial result\nok 10 - weak network retry does not create duplicate financial result\n  ---\n  duration_ms: 1.3331\n  type: 'test'\n  ...\n# Subtest: partial upload simulation is rejected before commit\nok 11 - partial upload simulation is rejected before commit\n  ---\n  duration_ms: 1.4164\n  type: 'test'\n  ...\n# Subtest: voided session row is rejected\nok 12 - voided session row is rejected\n  ---\n  duration_ms: 1.0843\n  type: 'test'\n  ...\n# Subtest: voided transaction row is rejected\nok 13 - voided transaction row is rejected\n  ---\n  duration_ms: 0.7677\n  type: 'test'\n  ...\n# Subtest: three-decimal money is rejected\nok 14 - three-decimal money is rejected\n  ---\n  duration_ms: 0.7709\n  type: 'test'\n  ...\n# Subtest: empty amount is rejected\nok 15 - empty amount is rejected\n  ---\n  duration_ms: 0.7359\n  type: 'test'\n  ...\n# Subtest: unauthorized employee scope is rejected\nok 16 - unauthorized employee scope is rejected\n  ---\n  duration_ms: 0.6191\n  type: 'test'\n  ...\n# Subtest: owner submitter is rejected for employee handover\nok 17 - owner submitter is rejected for employee handover\n  ---\n  duration_ms: 0.814\n  type: 'test'\n  ...\n# Subtest: large multi-row handover totals are correct\nok 18 - large multi-row handover totals are correct\n  ---\n  duration_ms: 1.1312\n  type: 'test'\n  ...\n# Subtest: legacy decimal warning is preserved\nok 19 - legacy decimal warning is preserved\n  ---\n  duration_ms: 1.1073\n  type: 'test'\n  ...\n# Subtest: audit event plan includes attempt and accepted/rejected outcome\nok 20 - audit event plan includes attempt and accepted/rejected outcome\n  ---\n  duration_ms: 2.8315\n  type: 'test'\n  ...\n# Subtest: entry event plan covers accepted and rejected rows\nok 21 - entry event plan covers accepted and rejected rows\n  ---\n  duration_ms: 1.2299\n  type: 'test'\n  ...\n# Subtest: helper functions expose validation, normalization, duplicate detection, and formatting\nok 22 - helper functions expose validation, normalization, duplicate detection, and formatting\n  ---\n  duration_ms: 1.9786\n  type: 'test'\n  ...\n# Subtest: handover module is non-invasive and does not require database writes\nok 23 - handover module is non-invasive and does not require database writes\n  ---\n  duration_ms: 0.9104\n  type: 'test'\n  ...\n# Subtest: integer fils math remains authoritative for handover totals\nok 24 - integer fils math remains authoritative for handover totals\n  ---\n  duration_ms: 0.9634\n  type: 'test'\n  ...\n# Subtest: unauthenticated denied\nok 25 - unauthenticated denied\n  ---\n  duration_ms: 3.3425\n  type: 'test'\n  ...\n# Subtest: invalid JWT denied\nok 26 - invalid JWT denied\n  ---\n  duration_ms: 0.7859\n  type: 'test'\n  ...\n# Subtest: employee own tenant allowed\nok 27 - employee own tenant allowed\n  ---\n  duration_ms: 0.9833\n  type: 'test'\n  ...\n# Subtest: employee other tenant denied\nok 28 - employee other tenant denied\n  ---\n  duration_ms: 0.2834\n  type: 'test'\n  ...\n# Subtest: employee own property allowed\nok 29 - employee own property allowed\n  ---\n  duration_ms: 0.2917\n  type: 'test'\n  ...\n# Subtest: employee other property denied\nok 30 - employee other property denied\n  ---\n  duration_ms: 0.2597\n  type: 'test'\n  ...\n# Subtest: owner own tenant allowed\nok 31 - owner own tenant allowed\n  ---\n  duration_ms: 0.2774\n  type: 'test'\n  ...\n# Subtest: owner other tenant denied\nok 32 - owner other tenant denied\n  ---\n  duration_ms: 0.3103\n  type: 'test'\n  ...\n# Subtest: manager and admin constrained by tenant and property\nok 33 - manager and admin constrained by tenant and property\n  ---\n  duration_ms: 0.9494\n  type: 'test'\n  ...\n# Subtest: frontend tenant_id tamper ignored\nok 34 - frontend tenant_id tamper ignored\n  ---\n  duration_ms: 0.4073\n  type: 'test'\n  ...\n# Subtest: legacy CORPID fallback warning preserved\nok 35 - legacy CORPID fallback warning preserved\n  ---\n  duration_ms: 0.21\n  type: 'test'\n  ...\n# Subtest: delete_session respects scope\nok 36 - delete_session respects scope\n  ---\n  duration_ms: 0.5647\n  type: 'test'\n  ...\n# Subtest: dashboard/history respects scope\nok 37 - dashboard/history respects scope\n  ---\n  duration_ms: 0.5209\n  type: 'test'\n  ...\n# Subtest: audit_logs and entry_events staging evidence covered\nok 38 - audit_logs and entry_events staging evidence covered\n  ---\n  duration_ms: 0.4617\n  type: 'test'\n  ...\n# Subtest: settings/app_settings scoped or marked blocked/manual_required\nok 39 - settings/app_settings scoped or marked blocked/manual_required\n  ---\n  duration_ms: 1.0471\n  type: 'test'\n  ...\n# Subtest: production env remains disabled/no-go for tenant authority switch\nok 40 - production env remains disabled/no-go for tenant authority switch\n  ---\n  duration_ms: 0.2011\n  type: 'test'\n  ...\n# Subtest: access matrix source does not call production or mutate D1\nok 41 - access matrix source does not call production or mutate D1\n  ---\n  duration_ms: 0.5669\n  type: 'test'\n  ...\n# Subtest: unauthenticated cannot access tenant audit rows\nok 42 - unauthenticated cannot access tenant audit rows\n  ---\n  duration_ms: 2.0109\n  type: 'test'\n  ...\n# Subtest: invalid JWT cannot access tenant audit rows\nok 43 - invalid JWT cannot access tenant audit rows\n  ---\n  duration_ms: 0.6225\n  type: 'test'\n  ...\n# Subtest: employee can access own tenant/property audit evidence if policy allows\nok 44 - employee can access own tenant/property audit evidence if policy allows\n  ---\n  duration_ms: 0.3131\n  type: 'test'\n  ...\n# Subtest: employee cannot access other tenant audit evidence\nok 45 - employee cannot access other tenant audit evidence\n  ---\n  duration_ms: 0.222\n  type: 'test'\n  ...\n# Subtest: employee cannot access other property audit evidence\nok 46 - employee cannot access other property audit evidence\n  ---\n  duration_ms: 0.2938\n  type: 'test'\n  ...\n# Subtest: owner can access own tenant audit evidence\nok 47 - owner can access own tenant audit evidence\n  ---\n  duration_ms: 0.2147\n  type: 'test'\n  ...\n# Subtest: owner cannot access other tenant audit evidence\nok 48 - owner cannot access other tenant audit evidence\n  ---\n  duration_ms: 1.3606\n  type: 'test'\n  ...\n# Subtest: manager/admin constrained by tenant/property\nok 49 - manager/admin constrained by tenant/property\n  ---\n  duration_ms: 0.7155\n  type: 'test'\n  ...\n# Subtest: frontend tenant_id tamper ignored\nok 50 - frontend tenant_id tamper ignored\n  ---\n  duration_ms: 0.4649\n  type: 'test'\n  ...\n# Subtest: legacy CORPID fallback warning preserved\nok 51 - legacy CORPID fallback warning preserved\n  ---\n  duration_ms: 0.3098\n  type: 'test'\n  ...\n# Subtest: audit_logs scope fields validated\nok 52 - audit_logs scope fields validated\n  ---\n  duration_ms: 0.4909\n  type: 'test'\n  ...\n# Subtest: entry_events scope fields validated\nok 53 - entry_events scope fields validated\n  ---\n  duration_ms: 0.3416\n  type: 'test'\n  ...\n# Subtest: missing scope fields become MANUAL_REQUIRED, not PASS\nok 54 - missing scope fields become MANUAL_REQUIRED, not PASS\n  ---\n  duration_ms: 0.3916\n  type: 'test'\n  ...\n# Subtest: production env remains NO-GO\nok 55 - production env remains NO-GO\n  ---\n  duration_ms: 0.1805\n  type: 'test'\n  ...\n# Subtest: current staging evidence closes scoped owner and void event rows\nok 56 - current staging evidence closes scoped owner and void event rows\n  ---\n  duration_ms: 0.1773\n  type: 'test'\n  ...\n# Subtest: access helper rejects missing tenant claims for direct access\nok 57 - access helper rejects missing tenant claims for direct access\n  ---\n  duration_ms: 0.2639\n  type: 'test'\n  ...\n# Subtest: rehearsal script only uses read-only SQL and staging D1\nok 58 - rehearsal script only uses read-only SQL and staging D1\n  ---\n  duration_ms: 0.9563\n  type: 'test'\n  ...\n1..58\n# tests 58\n# suites 0\n# pass 58\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 370.9074\n",
+      "tests": 58,
+      "pass": 58,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "durationMs": 370.9074,
+      "passed": true
+    }
+  ],
+  "gate": {
+    "id": "commercial-launch-gate",
+    "title": "Commercial launch gate remains locked",
+    "startedAt": "2026-05-30T08:19:59.773Z",
+    "finishedAt": "2026-05-30T08:19:59.999Z",
+    "elapsedMs": 228,
+    "exitCode": 0,
+    "command": "C:\\Program Files\\nodejs\\node.exe scripts/gate-commercial-launch-readiness.mjs",
+    "passed": true,
+    "productionNoGo": true,
+    "outputTail": "COMMERCIAL_LAUNCH_READINESS=PRODUCTION_NO_GO\nCOMMERCIAL_LAUNCH_AREAS=17\nCOMMERCIAL_LAUNCH_NO_GO=12\nCOMMERCIAL_LAUNCH_MANUAL_REQUIRED=1\nCOMMERCIAL_LAUNCH_BLOCKED=0\n"
+  },
+  "tests": 109,
+  "pass": 109,
+  "fail": 0,
+  "cancelled": 0,
+  "skipped": 0,
+  "todo": 0,
+  "validationWindowsPassed": 3,
+  "elapsedMs": 48008
+}
