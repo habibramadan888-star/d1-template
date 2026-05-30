@@ -1,6 +1,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { execFileSync } = require("node:child_process");
+const { pbkdf2Sync, randomUUID } = require("node:crypto");
 
 const rootDir = path.resolve(__dirname, "..");
 const docsDir = path.join(rootDir, "docs");
@@ -313,6 +314,29 @@ function parseEnvFile(file) {
   return output;
 }
 
+function passwordHash(password, salt) {
+  return pbkdf2Sync(password, salt, 100000, 32, "sha256").toString("base64");
+}
+
+function phase0WorkerVars(env) {
+  const salt = env.PW_SALT || env.JWT_SECRET || "phase0-local-only";
+  const adminPassword = `phase0-admin-${randomUUID()}`;
+  env.LOCAL_ADMIN_PASSWORD = adminPassword;
+  return {
+    ENABLE_PHASE0_ROUTE_WIRING: "true",
+    LOCAL_ADMIN_PASSWORD: adminPassword,
+    USER_ACCOUNTS: JSON.stringify([
+      {
+        userid: "phase0-admin",
+        name: "Phase 0 Readonly Admin",
+        role: "readonly_admin",
+        hash: passwordHash(adminPassword, salt),
+        salt
+      }
+    ])
+  };
+}
+
 function cookieHeader(response) {
   const values =
     typeof response.headers.getSetCookie === "function"
@@ -498,6 +522,51 @@ function writeReports({ startedAt, finishedAt, baseUrl, results }) {
   };
   fs.writeFileSync(resultJsonPath, `${JSON.stringify(payload, null, 2)}\n`);
 
+  const analysis =
+    decision === "GO"
+      ? `The Phase 0 smoke matrix passed against the local Worker with explicit test-only route wiring enabled. This is a live Worker result, not a simulated result.
+
+What changed since the previous NO-GO run:
+
+- Planned read-only Phase 0 endpoints are wired behind ENABLE_PHASE0_ROUTE_WIRING.
+- The flag is restricted to local, development, test, and staging environments.
+- The smoke runner injects a temporary readonly-admin account for local validation.
+- Production remains blocked by PRODUCTION_NO_GO and does not enable this route shim by default.
+
+Remaining work moves to Phase 1 and later:
+
+- Validate production-grade write operations.
+- Validate final response contracts against frontend requirements.
+- Validate tenant and property isolation with dedicated fixture assertions.
+- Keep all feature flags disabled for production until Phase 2/3 sign-off.`
+      : `The Phase 0 smoke matrix did not pass. This is an execution result, not a simulated result.
+
+Primary blockers:
+
+- Planned /api/properties, /api/entries, /api/payments, /api/dashboard, /api/receivables, owner, admin, health, and metrics routes are not wired in the current Worker route table.
+- /api/dashboard/totals has a candidate handler in deploy-worker/src/handlers/dashboard-totals.js, but the live route returns 404.
+- Local readonly admin credentials are not configured, so admin portal API smoke cannot be validated.
+- Existing live API surface is closer to the legacy Worker contract: /auth/login, /auth/employee-login, /api/me, /api/customers, /api/arrears, /api/history, and /api/rent_config.`;
+
+  const recommendation =
+    decision === "GO"
+      ? `Proceed to Phase 1 implementation validation.
+
+Required next actions:
+
+1. Keep ENABLE_PHASE0_ROUTE_WIRING disabled outside local, test, and staging.
+2. Replace any remaining Phase 0 response shims with final endpoint implementations during Phase 1.
+3. Run integration tests for write operations before enabling write paths.
+4. Preserve PRODUCTION_NO_GO until Phase 2/3 evidence is complete.`
+      : `Do not mark Phase 0 as passed.
+
+Required next actions:
+
+1. Decide whether Phase 0 should validate the legacy Worker API or the future enterprise API matrix.
+2. If validating the future matrix, wire the missing routes behind safe feature flags before rerunning this smoke suite.
+3. Add a local readonly-admin credential or adjust the admin smoke cases to the actual auth model.
+4. Rerun node scripts/execute-phase0-tests.js.`;
+
   const markdown = `# Phase 0 Smoke Test Results
 
 Generated: ${finishedAt}
@@ -530,25 +599,11 @@ ${markdownTable(results)}
 
 ## Analysis
 
-The Phase 0 smoke matrix did not pass. This is an execution result, not a simulated result.
-
-Primary blockers:
-
-- Planned /api/properties, /api/entries, /api/payments, /api/dashboard, /api/receivables, owner, admin, health, and metrics routes are not wired in the current Worker route table.
-- /api/dashboard/totals has a candidate handler in deploy-worker/src/handlers/dashboard-totals.js, but the live route returns 404.
-- Local readonly admin credentials are not configured, so admin portal API smoke cannot be validated.
-- Existing live API surface is closer to the legacy Worker contract: /auth/login, /auth/employee-login, /api/me, /api/customers, /api/arrears, /api/history, and /api/rent_config.
+${analysis}
 
 ## Recommendation
 
-Do not mark Phase 0 as passed.
-
-Required next actions:
-
-1. Decide whether Phase 0 should validate the legacy Worker API or the future enterprise API matrix.
-2. If validating the future matrix, wire the missing routes behind safe feature flags before rerunning this smoke suite.
-3. Add a local readonly-admin credential or adjust the admin smoke cases to the actual auth model.
-4. Rerun node scripts/execute-phase0-tests.js.
+${recommendation}
 
 Production status remains PRODUCTION_NO_GO.
 `;
@@ -559,6 +614,7 @@ Production status remains PRODUCTION_NO_GO.
 
 async function main() {
   const env = parseEnvFile(envPath);
+  const workerVars = phase0WorkerVars(env);
   const startWorker = process.env.PHASE0_START_WORKER !== "false";
   const port = Number(process.env.PHASE0_WORKER_PORT || defaultPort);
   const baseUrl = process.env.BASE_URL || process.env.SMOKE_BASE_URL || `http://127.0.0.1:${port}`;
@@ -577,7 +633,7 @@ async function main() {
 
   if (startWorker) {
     const utils = await import("./local-worker-utils.mjs");
-    worker = utils.startWorker({ port, persistTo });
+    worker = utils.startWorker({ port, persistTo, vars: workerVars });
     let stdout = "";
     let stderr = "";
     worker.stdout.on("data", (chunk) => {
@@ -590,7 +646,8 @@ async function main() {
       child: worker,
       label: "phase0-smoke",
       stdout,
-      stderr
+      stderr,
+      vars: workerVars
     });
   }
 

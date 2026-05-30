@@ -1,50 +1,46 @@
 {
-  "startedAt": "2026-05-30T06:52:18.056Z",
-  "finishedAt": "2026-05-30T06:52:20.441Z",
+  "startedAt": "2026-05-30T07:09:50.521Z",
+  "finishedAt": "2026-05-30T07:09:52.655Z",
   "baseUrl": "http://127.0.0.1:8801",
   "totalTests": 30,
-  "passed": 3,
-  "failed": 27,
-  "passRate": 0.1,
-  "avgLatencyMs": 25,
-  "decision": "NO-GO",
+  "passed": 30,
+  "failed": 0,
+  "passRate": 1,
+  "avgLatencyMs": 32,
+  "decision": "GO",
   "categoryStats": {
     "Auth": {
       "total": 4,
-      "passed": 3,
-      "failed": 1
+      "passed": 4,
+      "failed": 0
     },
     "Employee": {
       "total": 8,
-      "passed": 0,
-      "failed": 8
+      "passed": 8,
+      "failed": 0
     },
     "Owner": {
       "total": 6,
-      "passed": 0,
-      "failed": 6
+      "passed": 6,
+      "failed": 0
     },
     "Admin": {
       "total": 6,
-      "passed": 0,
-      "failed": 6
+      "passed": 6,
+      "failed": 0
     },
     "Isolation": {
       "total": 3,
-      "passed": 0,
-      "failed": 3
+      "passed": 3,
+      "failed": 0
     },
     "Health": {
       "total": 3,
-      "passed": 0,
-      "failed": 3
+      "passed": 3,
+      "failed": 0
     }
   },
-  "failureSummary": {
-    "ADMIN_AUTH_MISSING": 1,
-    "PERMISSION_DENIED": 9,
-    "ROUTE_NOT_WIRED": 17
-  },
+  "failureSummary": {},
   "results": [
     {
       "id": 1,
@@ -56,7 +52,7 @@
         200
       ],
       "actualStatus": 200,
-      "latencyMs": 121,
+      "latencyMs": 130,
       "passed": true,
       "failureDetail": "",
       "note": ""
@@ -71,7 +67,7 @@
         200
       ],
       "actualStatus": 200,
-      "latencyMs": 82,
+      "latencyMs": 154,
       "passed": true,
       "failureDetail": "",
       "note": ""
@@ -86,9 +82,9 @@
         200
       ],
       "actualStatus": 200,
-      "latencyMs": 87,
-      "passed": false,
-      "failureDetail": "readonly admin credential unavailable; got role manager",
+      "latencyMs": 91,
+      "passed": true,
+      "failureDetail": "",
       "note": ""
     },
     {
@@ -102,7 +98,7 @@
         302
       ],
       "actualStatus": 302,
-      "latencyMs": 10,
+      "latencyMs": 8,
       "passed": true,
       "failureDetail": "",
       "note": "http://127.0.0.1:8801/owner"
@@ -116,10 +112,10 @@
       "expected": [
         200
       ],
-      "actualStatus": 403,
-      "latencyMs": 20,
-      "passed": false,
-      "failureDetail": "expected 200, got 403: {\"error\":\"forbidden\"}",
+      "actualStatus": 200,
+      "latencyMs": 19,
+      "passed": true,
+      "failureDetail": "",
       "note": ""
     },
     {
@@ -131,10 +127,10 @@
       "expected": [
         200
       ],
-      "actualStatus": 403,
-      "latencyMs": 18,
-      "passed": false,
-      "failureDetail": "expected 200, got 403: {\"error\":\"forbidden\"}",
+      "actualStatus": 200,
+      "latencyMs": 23,
+      "passed": true,
+      "failureDetail": "",
       "note": ""
     },
     {
@@ -146,10 +142,10 @@
       "expected": [
         200
       ],
-      "actualStatus": 403,
-      "latencyMs": 21,
-      "passed": false,
-      "failureDetail": "expected 200, got 403: {\"error\":\"forbidden\"}",
+      "actualStatus": 200,
+      "latencyMs": 25,
+      "passed": true,
+      "failureDetail": "",
       "note": ""
     },
     {
@@ -161,10 +157,10 @@
       "expected": [
         200
       ],
-      "actualStatus": 403,
-      "latencyMs": 20,
-      "passed": false,
-      "failureDetail": "expected 200, got 403: {\"error\":\"forbidden\"}",
+      "actualStatus": 200,
+      "latencyMs": 17,
+      "passed": true,
+      "failureDetail": "",
       "note": ""
     },
     {
@@ -176,10 +172,10 @@
       "expected": [
         200
       ],
-      "actualStatus": 403,
-      "latencyMs": 20,
-      "passed": false,
-      "failureDetail": "expected 200, got 403: {\"error\":\"forbidden\"}",
+      "actualStatus": 200,
+      "latencyMs": 16,
+      "passed": true,
+      "failureDetail": "",
       "note": ""
     },
     {
@@ -191,10 +187,10 @@
       "expected": [
         200
       ],
-      "actualStatus": 403,
-      "latencyMs": 18,
-      "passed": false,
-      "failureDetail": "expected 200, got 403: {\"error\":\"forbidden\"}",
+      "actualStatus": 200,
+      "latencyMs": 42,
+      "passed": true,
+      "failureDetail": "",
       "note": ""
     },
     {
@@ -206,10 +202,10 @@
       "expected": [
         200
       ],
-      "actualStatus": 403,
-      "latencyMs": 18,
-      "passed": false,
-      "failureDetail": "expected 200, got 403: {\"error\":\"forbidden\"}",
+      "actualStatus": 200,
+      "latencyMs": 19,
+      "passed": true,
+      "failureDetail": "",
       "note": ""
     },
     {
@@ -221,10 +217,10 @@
       "expected": [
         200
       ],
-      "actualStatus": 403,
-      "latencyMs": 19,
-      "passed": false,
-      "failureDetail": "expected 200, got 403: {\"error\":\"forbidden\"}",
+      "actualStatus": 200,
+      "latencyMs": 12,
+      "passed": true,
+      "failureDetail": "",
       "note": ""
     },
     {
@@ -236,10 +232,10 @@
       "expected": [
         200
       ],
-      "actualStatus": 404,
-      "latencyMs": 15,
-      "passed": false,
-      "failureDetail": "expected 200, got 404: {\"error\":\"not_found\"}",
+      "actualStatus": 200,
+      "latencyMs": 12,
+      "passed": true,
+      "failureDetail": "",
       "note": ""
     },
     {
@@ -251,10 +247,10 @@
       "expected": [
         200
       ],
-      "actualStatus": 404,
+      "actualStatus": 200,
       "latencyMs": 14,
-      "passed": false,
-      "failureDetail": "expected 200, got 404: {\"error\":\"not_found\"}",
+      "passed": true,
+      "failureDetail": "",
       "note": ""
     },
     {
@@ -266,10 +262,10 @@
       "expected": [
         200
       ],
-      "actualStatus": 404,
-      "latencyMs": 19,
-      "passed": false,
-      "failureDetail": "expected 200, got 404: {\"error\":\"not_found\"}",
+      "actualStatus": 200,
+      "latencyMs": 36,
+      "passed": true,
+      "failureDetail": "",
       "note": ""
     },
     {
@@ -281,10 +277,10 @@
       "expected": [
         200
       ],
-      "actualStatus": 404,
-      "latencyMs": 18,
-      "passed": false,
-      "failureDetail": "expected 200, got 404: {\"error\":\"not_found\"}",
+      "actualStatus": 200,
+      "latencyMs": 22,
+      "passed": true,
+      "failureDetail": "",
       "note": ""
     },
     {
@@ -296,10 +292,10 @@
       "expected": [
         200
       ],
-      "actualStatus": 404,
-      "latencyMs": 20,
-      "passed": false,
-      "failureDetail": "expected 200, got 404: {\"error\":\"not_found\"}",
+      "actualStatus": 200,
+      "latencyMs": 24,
+      "passed": true,
+      "failureDetail": "",
       "note": ""
     },
     {
@@ -311,10 +307,10 @@
       "expected": [
         200
       ],
-      "actualStatus": 404,
+      "actualStatus": 200,
       "latencyMs": 16,
-      "passed": false,
-      "failureDetail": "expected 200, got 404: {\"error\":\"not_found\"}",
+      "passed": true,
+      "failureDetail": "",
       "note": ""
     },
     {
@@ -326,10 +322,10 @@
       "expected": [
         200
       ],
-      "actualStatus": 404,
+      "actualStatus": 200,
       "latencyMs": 16,
-      "passed": false,
-      "failureDetail": "expected 200, got 404: {\"error\":\"not_found\"}",
+      "passed": true,
+      "failureDetail": "",
       "note": ""
     },
     {
@@ -341,10 +337,10 @@
       "expected": [
         200
       ],
-      "actualStatus": 404,
-      "latencyMs": 17,
-      "passed": false,
-      "failureDetail": "expected 200, got 404: {\"error\":\"not_found\"}",
+      "actualStatus": 200,
+      "latencyMs": 28,
+      "passed": true,
+      "failureDetail": "",
       "note": ""
     },
     {
@@ -356,10 +352,10 @@
       "expected": [
         200
       ],
-      "actualStatus": 404,
-      "latencyMs": 17,
-      "passed": false,
-      "failureDetail": "expected 200, got 404: {\"error\":\"not_found\"}",
+      "actualStatus": 200,
+      "latencyMs": 45,
+      "passed": true,
+      "failureDetail": "",
       "note": ""
     },
     {
@@ -371,10 +367,10 @@
       "expected": [
         200
       ],
-      "actualStatus": 404,
-      "latencyMs": 15,
-      "passed": false,
-      "failureDetail": "expected 200, got 404: {\"error\":\"not_found\"}",
+      "actualStatus": 200,
+      "latencyMs": 25,
+      "passed": true,
+      "failureDetail": "",
       "note": ""
     },
     {
@@ -386,10 +382,10 @@
       "expected": [
         200
       ],
-      "actualStatus": 404,
-      "latencyMs": 15,
-      "passed": false,
-      "failureDetail": "expected 200, got 404: {\"error\":\"not_found\"}",
+      "actualStatus": 200,
+      "latencyMs": 29,
+      "passed": true,
+      "failureDetail": "",
       "note": ""
     },
     {
@@ -401,10 +397,10 @@
       "expected": [
         403
       ],
-      "actualStatus": 404,
-      "latencyMs": 16,
-      "passed": false,
-      "failureDetail": "expected 403, got 404: {\"error\":\"not_found\"}",
+      "actualStatus": 403,
+      "latencyMs": 15,
+      "passed": true,
+      "failureDetail": "",
       "note": ""
     },
     {
@@ -416,10 +412,10 @@
       "expected": [
         200
       ],
-      "actualStatus": 403,
-      "latencyMs": 15,
-      "passed": false,
-      "failureDetail": "expected 200, got 403: {\"error\":\"forbidden\"}",
+      "actualStatus": 200,
+      "latencyMs": 24,
+      "passed": true,
+      "failureDetail": "",
       "note": ""
     },
     {
@@ -431,10 +427,10 @@
       "expected": [
         200
       ],
-      "actualStatus": 404,
-      "latencyMs": 19,
-      "passed": false,
-      "failureDetail": "expected 200, got 404: {\"error\":\"not_found\"}",
+      "actualStatus": 200,
+      "latencyMs": 28,
+      "passed": true,
+      "failureDetail": "",
       "note": ""
     },
     {
@@ -446,10 +442,10 @@
       "expected": [
         200
       ],
-      "actualStatus": 404,
-      "latencyMs": 20,
-      "passed": false,
-      "failureDetail": "expected 200, got 404: {\"error\":\"not_found\"}",
+      "actualStatus": 200,
+      "latencyMs": 23,
+      "passed": true,
+      "failureDetail": "",
       "note": ""
     },
     {
@@ -461,10 +457,10 @@
       "expected": [
         200
       ],
-      "actualStatus": 404,
-      "latencyMs": 15,
-      "passed": false,
-      "failureDetail": "expected 200, got 404: {\"error\":\"not_found\"}",
+      "actualStatus": 200,
+      "latencyMs": 14,
+      "passed": true,
+      "failureDetail": "",
       "note": ""
     },
     {
@@ -476,10 +472,10 @@
       "expected": [
         200
       ],
-      "actualStatus": 404,
-      "latencyMs": 19,
-      "passed": false,
-      "failureDetail": "expected 200, got 404: {\"error\":\"not_found\"}",
+      "actualStatus": 200,
+      "latencyMs": 13,
+      "passed": true,
+      "failureDetail": "",
       "note": ""
     },
     {
@@ -491,10 +487,10 @@
       "expected": [
         200
       ],
-      "actualStatus": 404,
-      "latencyMs": 15,
-      "passed": false,
-      "failureDetail": "expected 200, got 404: {\"error\":\"not_found\"}",
+      "actualStatus": 200,
+      "latencyMs": 14,
+      "passed": true,
+      "failureDetail": "",
       "note": ""
     }
   ]

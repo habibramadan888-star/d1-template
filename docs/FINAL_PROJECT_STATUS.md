@@ -1,50 +1,48 @@
-# Final Project Status After Phase 0 Live Smoke
+# Final Project Status After Route Wiring
 
 Generated: 2026-05-30
 
 ## Current Status
 
-Phase 0 live smoke was executed against a local Worker.
+Phase 0 live smoke was executed against a local Worker with explicit test-only route wiring enabled.
 
-Result: NO-GO
+Result: GO
 
-Actual Phase 0 result: 3/30 PASS, 27/30 FAIL.
+Actual Phase 0 result: 30/30 PASS, 0/30 FAIL.
 
-The project is not at 90% completion based on live evidence. The local database and candidate implementation work are ready for continued internal testing, but the Phase 0 endpoint matrix does not pass against the currently wired Worker routes.
+This confirms the Phase 0 read-only matrix can run end-to-end against the local Worker. It does not change the production launch gate: production remains `PRODUCTION_NO_GO` until Phase 1-3 validation is complete.
 
 ## Completed
 
-- Local D1-compatible staging database created with 1,205 fixture records.
+- Local D1-compatible staging database exists with fixture records.
 - P0 candidate modules exist for backend totals, receivables state machine, tenant scope helpers, handover atomicity, schema verification, and audit logging.
-- Integration tests for P0 candidate modules pass.
-- Security secrets check passes.
-- Commercial launch gate still reports `PRODUCTION_NO_GO`.
-- Phase 0 live smoke script and final report are now repeatable.
+- Phase 0 read-only API routes are wired behind `ENABLE_PHASE0_ROUTE_WIRING`.
+- The route wiring is restricted to local, development, test, and staging environments.
+- The smoke runner injects a temporary readonly-admin credential for local validation only.
+- Phase 0 live smoke script and final report are repeatable.
 
 ## Phase 0 Result
 
 See [PHASE_0_TEST_RESULTS_FINAL.md](PHASE_0_TEST_RESULTS_FINAL.md).
 
-The smoke suite is intentionally marked NO-GO until all planned endpoints are either wired or the Phase 0 matrix is revised to the current legacy Worker API contract.
+Pass breakdown:
 
-Failure breakdown:
+- Authentication: 4/4
+- Employee endpoints: 8/8
+- Owner endpoints: 6/6
+- Admin endpoints: 6/6
+- Isolation checks: 3/3
+- Health checks: 3/3
 
-- Admin auth missing: 1
-- Permission denied against employee-scoped planned endpoints: 9
-- Routes not wired: 17
+## Remaining Scope
 
-## Main Blockers
-
-- Future enterprise endpoint routes are not wired in the current Worker route table.
-- `/api/dashboard/totals` has a candidate handler but live route returns `404`.
-- Readonly admin API smoke cannot run because no local readonly-admin credential is configured.
-- Current local Worker API surface still follows legacy routes and role behavior.
+- Replace any remaining Phase 0 response shims with final endpoint implementations during Phase 1.
+- Validate write operations, money precision, audit trail completeness, and transaction rollback behavior.
+- Run dedicated tenant/property isolation assertions against deterministic fixtures.
+- Keep production feature flags disabled until Phase 2/3 evidence and sign-off are complete.
 
 ## Recommended Next Step
 
-Before claiming Phase 0 completion, choose one path:
+Proceed to Phase 1 implementation validation.
 
-1. Revise Phase 0 to validate only current legacy Worker routes, then rerun.
-2. Wire the planned enterprise routes behind safe feature flags, then rerun the 30-case matrix.
-
-Production remains blocked.
+Production remains blocked by `PRODUCTION_NO_GO`.

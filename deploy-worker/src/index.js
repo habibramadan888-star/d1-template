@@ -2,6 +2,7 @@
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 
 import { createEmployeeEntryLiveWriteAdapterDraft } from "../../modules/worker/employee-entry-live-write-adapter.mjs";
+import { createDashboardTotalsPayload } from "./handlers/dashboard-totals.js";
 
 // src/lib/jwt.js
 var ALGO = { name: "HMAC", hash: "SHA-256" };
@@ -1969,6 +1970,163 @@ function allowStaffApi(path,method){
   return false;
 }
 __name(allowStaffApi,"allowStaffApi");
+function isPhase0RouteWiringEnabled(env){
+  const appEnv=String(env.APP_ENV||"").trim().toLowerCase();
+  const enabled=["1","true","yes","on"].includes(String(env.ENABLE_PHASE0_ROUTE_WIRING||"").trim().toLowerCase());
+  return enabled&&["development","dev","local","test","staging"].includes(appEnv);
+}
+__name(isPhase0RouteWiringEnabled,"isPhase0RouteWiringEnabled");
+async function phase0TableExists(env,table){
+  try{
+    const row=await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=? LIMIT 1").bind(table).first();
+    return !!row;
+  }catch{
+    return false;
+  }
+}
+__name(phase0TableExists,"phase0TableExists");
+async function phase0All(env,sql,params=[]){
+  try{
+    const {results}=await env.DB.prepare(sql).bind(...params).all();
+    return results||[];
+  }catch{
+    return [];
+  }
+}
+__name(phase0All,"phase0All");
+async function phase0First(env,sql,params=[]){
+  try{
+    return await env.DB.prepare(sql).bind(...params).first();
+  }catch{
+    return null;
+  }
+}
+__name(phase0First,"phase0First");
+function phase0Limit(url,defaultLimit=100){
+  const raw=Number(url.searchParams.get("limit")||defaultLimit);
+  return Number.isFinite(raw)&&raw>0?Math.min(Math.floor(raw),500):defaultLimit;
+}
+__name(phase0Limit,"phase0Limit");
+async function phase0Properties(env,user,url){
+  if(await phase0TableExists(env,"properties")){
+    const rows=await phase0All(env,"SELECT * FROM properties WHERE tenant_id=? LIMIT ?",[user.corpid,phase0Limit(url)]);
+    return json({properties:rows});
+  }
+  return json({properties:[]});
+}
+__name(phase0Properties,"phase0Properties");
+async function phase0Entries(env,user,url){
+  const limit=phase0Limit(url);
+  if(await phase0TableExists(env,"entries")){
+    const rows=await phase0All(env,"SELECT * FROM entries WHERE tenant_id=? LIMIT ?",[user.corpid,limit]);
+    return json({entries:rows});
+  }
+  if(await phase0TableExists(env,"transactions")){
+    const rows=await phase0All(env,"SELECT * FROM transactions WHERE corpid=? AND COALESCE(voided_at,'')='' LIMIT ?",[user.corpid,limit]);
+    return json({entries:rows});
+  }
+  return json({entries:[]});
+}
+__name(phase0Entries,"phase0Entries");
+async function phase0Payments(env,user,url){
+  const limit=phase0Limit(url);
+  if(await phase0TableExists(env,"payments")){
+    const rows=await phase0All(env,"SELECT * FROM payments WHERE tenant_id=? LIMIT ?",[user.corpid,limit]);
+    return json({payments:rows});
+  }
+  if(await phase0TableExists(env,"transactions")){
+    const rows=await phase0All(env,"SELECT id, cat, amount, pay_type, created_at FROM transactions WHERE corpid=? AND COALESCE(voided_at,'')='' LIMIT ?",[user.corpid,limit]);
+    return json({payments:rows});
+  }
+  return json({payments:[]});
+}
+__name(phase0Payments,"phase0Payments");
+async function phase0Receivables(env,user,url){
+  const limit=phase0Limit(url);
+  if(await phase0TableExists(env,"receivables")){
+    const rows=await phase0All(env,"SELECT * FROM receivables WHERE tenant_id=? LIMIT ?",[user.corpid,limit]);
+    return json({receivables:rows});
+  }
+  if(await phase0TableExists(env,"arrear_tasks")){
+    const rows=await phase0All(env,"SELECT * FROM arrear_tasks WHERE corpid=? LIMIT ?",[user.corpid,limit]);
+    return json({receivables:rows});
+  }
+  return json({receivables:[]});
+}
+__name(phase0Receivables,"phase0Receivables");
+async function phase0DashboardTotals(env,user){
+  const paymentRows=[];
+  let receivablesRow={totalOutstanding:0,totalOverdue:0};
+  let rowsChecked={payments:0,receivables:0};
+  if(await phase0TableExists(env,"payments")){
+    paymentRows.push(...await phase0All(env,"SELECT COALESCE(SUM(amount),0) AS total, method FROM payments WHERE tenant_id=? GROUP BY method",[user.corpid]));
+    rowsChecked.payments=Number((await phase0First(env,"SELECT COUNT(*) AS count FROM payments WHERE tenant_id=?",[user.corpid]))?.count||0);
+  }else if(await phase0TableExists(env,"transactions")){
+    const cash=await phase0First(env,"SELECT COALESCE(SUM(amount),0) AS total FROM transactions WHERE corpid=? AND cat='cash' AND COALESCE(voided_at,'')=''",[user.corpid]);
+    const bank=await phase0First(env,"SELECT COALESCE(SUM(amount),0) AS total FROM transactions WHERE corpid=? AND cat='bank' AND COALESCE(voided_at,'')=''",[user.corpid]);
+    paymentRows.push({method:"CASH",total:Math.round(Number(cash?.total||0)*100)},{method:"BANK",total:Math.round(Number(bank?.total||0)*100)});
+    rowsChecked.payments=Number((await phase0First(env,"SELECT COUNT(*) AS count FROM transactions WHERE corpid=?",[user.corpid]))?.count||0);
+  }
+  if(await phase0TableExists(env,"receivables")){
+    receivablesRow=await phase0First(env,"SELECT COALESCE(SUM(outstanding_amount),0) AS totalOutstanding, COALESCE(SUM(CASE WHEN due_date < date('now') AND outstanding_amount > 0 THEN outstanding_amount ELSE 0 END),0) AS totalOverdue FROM receivables WHERE tenant_id=?",[user.corpid])||receivablesRow;
+    rowsChecked.receivables=Number((await phase0First(env,"SELECT COUNT(*) AS count FROM receivables WHERE tenant_id=?",[user.corpid]))?.count||0);
+  }else if(await phase0TableExists(env,"arrear_tasks")){
+    const row=await phase0First(env,"SELECT COALESCE(SUM(arrear_amount-actual_received),0) AS totalOutstanding FROM arrear_tasks WHERE corpid=? AND COALESCE(close_status,'')=''",[user.corpid]);
+    receivablesRow={totalOutstanding:Math.round(Number(row?.totalOutstanding||0)*100),totalOverdue:Math.round(Number(row?.totalOutstanding||0)*100)};
+    rowsChecked.receivables=Number((await phase0First(env,"SELECT COUNT(*) AS count FROM arrear_tasks WHERE corpid=?",[user.corpid]))?.count||0);
+  }
+  return json(createDashboardTotalsPayload({paymentRows,receivablesRow,rowsChecked,user,computationId:crypto.randomUUID(),startedAt:Date.now()}));
+}
+__name(phase0DashboardTotals,"phase0DashboardTotals");
+async function phase0Audit(env,user,url){
+  const limit=phase0Limit(url);
+  if(await phase0TableExists(env,"audit_logs")){
+    const rows=await phase0All(env,"SELECT * FROM audit_logs WHERE corpid=? OR corpid IS NULL ORDER BY created_at DESC LIMIT ?",[user.corpid,limit]);
+    return json({audit:rows,readonly:isReadonlyAdminRoleValue(user.role)});
+  }
+  return json({audit:[],readonly:isReadonlyAdminRoleValue(user.role)});
+}
+__name(phase0Audit,"phase0Audit");
+async function handlePhase0ReadOnlyApi(request,env,user){
+  if(!isPhase0RouteWiringEnabled(env))return null;
+  const url=new URL(request.url);
+  const path=url.pathname;
+  const method=request.method;
+  if(path==="/api/health"&&method==="GET")return json({status:"healthy",environment:env.APP_ENV||"",phase0RouteWiring:true});
+  if(path==="/api/health/db"&&method==="GET")return json({status:env.DB?"connected":"missing",database:"D1"});
+  if(path==="/api/metrics/errors"&&method==="GET")return json({errorRate:0,window:"local_phase0",readonly:true});
+  if(path==="/api/entry/add"&&method==="POST"&&isReadonlyAdminRoleValue(user.role))return forbidden();
+  if(method!=="GET")return null;
+  if(path==="/api/properties")return phase0Properties(env,user,url);
+  if(path==="/api/entries")return phase0Entries(env,user,url);
+  if(path==="/api/payments")return phase0Payments(env,user,url);
+  if(path==="/api/customers"){
+    if(canReadOwnerData(user))return null;
+    return json({customers:[],updatedBy:"",updatedAt:"",phase0RouteWiring:true});
+  }
+  if(path==="/api/dashboard")return json({status:"ok",phase0RouteWiring:true});
+  if(path==="/api/dashboard/totals")return phase0DashboardTotals(env,user);
+  if(path==="/api/receivables")return phase0Receivables(env,user,url);
+  if(path==="/api/arrears"&&!canReadOwnerData(user))return json([]);
+  if(path==="/api/history"&&!canReadOwnerData(user))return json([]);
+  if(path.startsWith("/api/owner/")){
+    if(!canReadOwnerData(user))return forbidden();
+    if(path==="/api/owner/properties")return phase0Properties(env,user,url);
+    if(path==="/api/owner/totals")return phase0DashboardTotals(env,user);
+    if(path==="/api/owner/history")return phase0Entries(env,user,url);
+    if(path==="/api/owner/arrears")return phase0Receivables(env,user,url);
+    return json({status:"ok",scope:"owner",path});
+  }
+  if(path.startsWith("/api/admin/")){
+    if(!isReadonlyAdminRoleValue(user.role))return forbidden();
+    if(path==="/api/admin/audit")return phase0Audit(env,user,url);
+    if(path==="/api/admin/totals")return phase0DashboardTotals(env,user);
+    if(path==="/api/admin/history"||path==="/api/admin/entries")return phase0Entries(env,user,url);
+    return json({status:"ok",scope:"admin",path,readonly:true});
+  }
+  return null;
+}
+__name(handlePhase0ReadOnlyApi,"handlePhase0ReadOnlyApi");
 const HSC_ALLOWED_APP_ENVS = new Set(["development","dev","local","test","staging"]);
 const HSC_EMPLOYEE_ROLES = new Set(["staff","employee"]);
 const HSC_VOIDED_STATUSES = new Set(["VOID","VOIDED","DELETED","CANCELLED"]);
@@ -2634,6 +2792,8 @@ async function handleRequest(request, env, ctx) {
         canWrite: canWriteOwnerData(user)
       });
     }
+    const phase0ReadOnlyResponse = await handlePhase0ReadOnlyApi(request, env, user);
+    if (phase0ReadOnlyResponse) return phase0ReadOnlyResponse;
     if (!canReadOwnerData(user) && !allowStaffApi(path, method)) {
       return forbidden();
     }
