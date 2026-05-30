@@ -1,5 +1,26 @@
 # Owner Internal Test Script
 
+## OWNER-ARREARS-MOBILE-CARD-DEPLOY-001 Addendum
+
+Date: 2026-05-31, Asia/Dubai
+
+Use the production root URL only: `https://homelink-finance.habibramadan888.workers.dev/`. Choose the owner door and authenticate normally. Do not run write flows during visual acceptance.
+
+Required read-only visual checks:
+
+- Open owner arrears management on a mobile viewport.
+- Confirm each arrears task is a single-column card, not a table row or squeezed multi-column grid.
+- Confirm the first visible line shows customer number, bed/room, and amount or an amount-pending label.
+- Confirm overdue information, source label, follow-up status, responsible person, promised repayment date, and note are readable.
+- Confirm no raw/debug UI text appears: `directive`, `promise`, `staff`, `source_type`, `followup_status`, `none`, `undefined`, or `null`.
+- Confirm TTLock expired-card tasks remain visible when that source exists, even if amount is unknown.
+- Confirm readonly admin sees detail-only behavior and no write action buttons.
+- Confirm the root portal still has only employee, owner, and admin entries.
+
+Stop if the mobile screenshot still shows vertical text, debug fields, hidden TTLock expired-card rows, write buttons for readonly admin, or horizontal page scrolling.
+
+Production remains `PRODUCTION_NO_GO`.
+
 ## ARREARS-ROOT-CAUSE-LOCK-001 Addendum
 
 Date: 2026-05-30, Asia/Dubai

@@ -1,32 +1,53 @@
-# OWNER_ARREARS_MOBILE_CARD_DEPLOY_RESULT
+# Owner Arrears Mobile Card Deploy Result
+
+Date: 2026-05-31, Asia/Dubai
 
 ## Deploy Decision
 
-No production deployment was executed in this task.
+Production deployment was executed for the Homelink Finance Worker default environment after predeploy verification passed.
 
-## Reason
+## Command
 
-The code change is a static owner UI/card-layout fix, but the required validation and deployment-preflight commands must complete cleanly before deployment. The task explicitly forbids D1 writes, migrations, business writes, financial formula changes, dashboard calculation changes, and production cutover.
+```bash
+cd deploy-worker
+npx wrangler deploy --config wrangler.toml
+```
 
-## Dry-Run / Drift Checks
+## Wrangler Result
 
-| Check                            | Result                                                                                                  |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `npm run build:embedded:dry-run` | PASS                                                                                                    |
-| `npm run verify:embedded-worker` | PASS                                                                                                    |
-| `npm run audit:worker-drift`     | PASS with `WORKER_DRIFT_CRITICAL_MISMATCHES=0`; the existing route mismatch count remains informational |
-| `npm run check`                  | BLOCKED by the existing global Prettier baseline (`893` files), not by the new task files               |
+| Item                   | Result                                                 |
+| ---------------------- | ------------------------------------------------------ |
+| Worker                 | `homelink-finance`                                     |
+| URL                    | `https://homelink-finance.habibramadan888.workers.dev` |
+| Version ID             | `b695662a-9c47-477d-aa4c-a6a6fb1fdfac`                 |
+| Static assets read     | 10 files                                               |
+| Static assets uploaded | 2 files                                                |
 
-## D1 / Migration Status
+Uploaded assets:
 
-| Operation                | Executed |
-| ------------------------ | -------- |
-| D1 write                 | no       |
-| D1 migration             | no       |
-| D1 export/import/execute | no       |
-| employee entry write     | no       |
-| handover submit          | no       |
-| void/delete              | no       |
+| Asset               |
+| ------------------- |
+| `/index-51.html`    |
+| `/index-51-main.js` |
+
+Wrangler also reported the existing warning that multiple environments are defined in `wrangler.toml` and no explicit `--env` was provided. This deployment intentionally targeted the default production Worker, per task instruction.
+
+## Scope Confirmation
+
+This deployment published the owner arrears mobile card UI fix and related read-only static UI assets only.
+
+| Operation                    | Executed |
+| ---------------------------- | -------: |
+| D1 write                     |       no |
+| D1 migration                 |       no |
+| D1 export/import/execute     |       no |
+| employee entry write         |       no |
+| handover submit              |       no |
+| void/delete                  |       no |
+| settings change              |       no |
+| dashboard calculation change |       no |
+| financial formula change     |       no |
+| commercial launch GO         |       no |
 
 ## Production Cutover
 

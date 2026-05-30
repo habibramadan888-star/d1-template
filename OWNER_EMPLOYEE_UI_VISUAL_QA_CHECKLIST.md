@@ -1,5 +1,20 @@
 # Owner Employee UI Visual QA Checklist
 
+## OWNER-ARREARS-MOBILE-CARD-DEPLOY-001 Visual Checks
+
+Date: 2026-05-31, Asia/Dubai
+
+| Screenshot                     | Required | Pass/Fail | Notes                                                                                                         |
+| ------------------------------ | -------: | --------- | ------------------------------------------------------------------------------------------------------------- |
+| Owner arrears mobile card list |      Yes |           | One screen should show at least two cards' main content where data density allows.                            |
+| No vertical arrears text       |      Yes |           | Customer number, bed, amount, overdue days, source, and status must read horizontally/naturally.              |
+| No debug fields                |      Yes |           | No visible `directive`, `promise`, `staff`, `source_type`, `followup_status`, `none`, `undefined`, or `null`. |
+| TTLock expired-card source     |      Yes |           | Confirm TTLock expired cards are visible when present, even with amount pending.                              |
+| Readonly admin arrears card    |      Yes |           | Readonly admin sees `Details` only and no write buttons.                                                      |
+| Root portal integrity          |      Yes |           | Root portal remains employee / owner / admin only.                                                            |
+
+Production remains `PRODUCTION_NO_GO`. This visual QA does not approve business writes, D1 writes, migrations, or production cutover.
+
 ## ARREARS-ROOT-CAUSE-LOCK-001 Visual Checks
 
 | Screenshot                  | Required | Pass/Fail | Notes                                                                           |

@@ -1,5 +1,19 @@
 # Run Report
 
+## OWNER-ARREARS-MOBILE-CARD-DEPLOY-001
+
+Date: 2026-05-31, Asia/Dubai
+
+Scope: deployed the owner arrears mobile card layout fix to the default `homelink-finance` Worker after predeploy verification. The deploy uploaded `/index-51.html` and `/index-51-main.js` only. Worker version: `b695662a-9c47-477d-aa4c-a6a6fb1fdfac`.
+
+Predeploy evidence: `OWNER_ARREARS_DEPLOY_DIRTY_FILE_SAFETY_CHECK.md`, `OWNER_ARREARS_MOBILE_CARD_PREDEPLOY_VERIFY_RESULT.md`, `OWNER_ARREARS_MOBILE_CARD_DEPLOY_RESULT.md`, and `OWNER_ARREARS_MOBILE_CARD_LIVE_SMOKE_RESULT.md`.
+
+Public live smoke confirmed the updated owner arrears renderer is served in `/index-51-main.js`, TTLock expired-card labels are present, readonly-admin markers are present, and the root portal remains three-card only. Authenticated mobile screenshot acceptance remains required because production login would write an `active_sessions` row and was not performed.
+
+No production D1 write, migration, D1 export/import/execute, employee entry write, handover submit, void/delete, settings change, dashboard calculation change, financial formula change, or commercial launch GO occurred.
+
+Production remains `PRODUCTION_NO_GO`.
+
 ## ARREARS-ROOT-CAUSE-LOCK-001
 
 Date: 2026-05-30, Asia/Dubai

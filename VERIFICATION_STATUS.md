@@ -1,5 +1,19 @@
 # Verification Status
 
+## OWNER-ARREARS-MOBILE-CARD-DEPLOY-001 Verification Addendum
+
+Date: 2026-05-31, Asia/Dubai
+
+| Verification                 |  Result | Evidence                                                                                                                                                                                                                                       | Commercial Meaning                                                                                                                      |
+| ---------------------------- | ------: | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Dirty-file safety            |    PASS | `OWNER_ARREARS_DEPLOY_DIRTY_FILE_SAFETY_CHECK.md`                                                                                                                                                                                              | Existing dirty generated reports and no-content-diff `portal.html` did not block static UI deployment.                                  |
+| Mobile card regression tests |    PASS | `tests/owner-arrears-mobile-card-layout.spec.mjs`; `tests/owner-arrears-no-vertical-text.spec.mjs`; `tests/owner-arrears-no-debug-fields.spec.mjs`; `tests/owner-arrears-source-labels.spec.mjs`; `tests/readonly-admin-arrears-card.spec.mjs` | Owner arrears cards render as readable mobile cards, not squeezed rows.                                                                 |
+| Predeploy gates              |    PASS | `OWNER_ARREARS_MOBILE_CARD_PREDEPLOY_VERIFY_RESULT.md`                                                                                                                                                                                         | Security, commercial gate, embedded-worker dry run, freshness, drift audit, and employee-entry staging dry run passed.                  |
+| Production static deploy     |    PASS | `OWNER_ARREARS_MOBILE_CARD_DEPLOY_RESULT.md`                                                                                                                                                                                                   | Worker version `b695662a-9c47-477d-aa4c-a6a6fb1fdfac` published the owner arrears UI assets.                                            |
+| Public live smoke            | PARTIAL | `OWNER_ARREARS_MOBILE_CARD_LIVE_SMOKE_RESULT.md`                                                                                                                                                                                               | Public assets are updated; authenticated mobile screenshot acceptance is still required because login would write a production session. |
+
+Production remains `PRODUCTION_NO_GO`. No D1 write, migration, D1 export/import/execute, employee entry write, handover submit, void/delete, dashboard calculation change, financial formula change, or commercial launch GO occurred.
+
 ## ARREARS-ROOT-CAUSE-LOCK-001 Verification Addendum
 
 Date: 2026-05-30, Asia/Dubai
