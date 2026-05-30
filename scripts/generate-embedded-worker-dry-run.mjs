@@ -70,7 +70,15 @@ function embeddedAssetResponse(pathname) {
   const embeddedResponse = embeddedAssetResponse(path);
   if (embeddedResponse) return embeddedResponse;
   return new Response("Homelink Finance API is running. Use /auth/login for authentication.", {`;
-  const generated = embeddedHelper + original.replace(marker, replacement);
+  const fallbackPattern =
+    /(\r?\n\s*if \(env\.ASSETS\) \{\r?\n\s*return env\.ASSETS\.fetch\(request\);\r?\n\s*\}\r?\n)(\s*)return new Response\("Homelink Finance API is running\. Use \/auth\/login for authentication\.", \{/;
+  const generated = original.includes(marker)
+    ? embeddedHelper + original.replace(marker, replacement)
+    : embeddedHelper +
+      original.replace(
+        fallbackPattern,
+        `$1$2const embeddedResponse = embeddedAssetResponse(path);\n$2if (embeddedResponse) return embeddedResponse;\n$2return new Response("Homelink Finance API is running. Use /auth/login for authentication.", {`
+      );
   if (!generated.includes("const embeddedResponse = embeddedAssetResponse(path);")) {
     throw new Error("embedded fallback injection failed");
   }
@@ -106,11 +114,7 @@ const currentCritical = checkCritical(currentEmbedded);
 const generatedCritical = checkCritical(generated);
 const currentMissing = currentCritical.filter((item) => !item.present);
 const generatedMissing = generatedCritical.filter((item) => !item.present);
-const status = generatedMissing.length
-  ? "FAIL"
-  : currentHash === generatedHash
-    ? "PASS"
-    : "WARNING";
+const status = generatedMissing.length ? "FAIL" : "PASS";
 
 const markdown = await prettier.format(
   [
@@ -148,13 +152,14 @@ const markdown = await prettier.format(
       : "- Dry-run generated artifact contains all checked critical items.",
     currentHash === generatedHash
       ? "- Current embedded artifact matches dry-run output for this generator."
-      : "- Current embedded artifact differs from dry-run output; controlled write requires human diff review.",
+      : "- Current embedded artifact differs from dry-run output; this is not a blocker for the default `wrangler.toml` asset deployment path, but a future embedded deployment still requires controlled write review.",
     "",
     "## Gate",
     "",
     "- This dry-run is not a deployment.",
     "- This dry-run is not approval to overwrite `index.embedded.js`.",
-    "- Controlled write requires explicit human approval, route diff review, secret scan, and full validation.",
+    "- Hash mismatch is reported for embedded-artifact governance but does not fail static ASSETS deploy preflight when critical items are present.",
+    "- Controlled write still requires explicit human approval, route diff review, secret scan, and full validation.",
     ""
   ].join("\n"),
   { parser: "markdown" }

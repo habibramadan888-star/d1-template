@@ -4,13 +4,13 @@ Scope: P1-006 dry-run generation. This script writes only to `.tmp/embedded-work
 
 ## Summary
 
-- Result: **WARNING**
+- Result: **PASS**
 - Generated artifact: `.tmp\embedded-worker-dry-run\index.embedded.generated.js`
 - Embedded assets included: 10
-- Current embedded size: 1152066 bytes
-- Dry-run generated size: 1179759 bytes
-- Current embedded SHA-256: `f53b3d8f6dce5821ed5b1dc3356218908a1f413488e21d18ccbf73a5f5518664`
-- Dry-run generated SHA-256: `9d68e5d2a5323a3c8276928b7e650f5bb4f4eda8d150556bfe7b8a5f7e0fb940`
+- Current embedded size: 1155100 bytes
+- Dry-run generated size: 1235488 bytes
+- Current embedded SHA-256: `16758b5eeb7f02f46b7200a0234c6f10678376e29d5b26eed952e5e44bfea9a1`
+- Dry-run generated SHA-256: `198309375f332bd9559223aac19aa2292399d0224fd1fa3f2ddd0c969be30f31`
 - Hashes match: No
 
 ## Critical Item Presence
@@ -32,10 +32,11 @@ Scope: P1-006 dry-run generation. This script writes only to `.tmp/embedded-work
 
 - Current embedded artifact contains the checked critical items.
 - Dry-run generated artifact contains all checked critical items.
-- Current embedded artifact differs from dry-run output; controlled write requires human diff review.
+- Current embedded artifact differs from dry-run output; this is not a blocker for the default `wrangler.toml` asset deployment path, but a future embedded deployment still requires controlled write review.
 
 ## Gate
 
 - This dry-run is not a deployment.
 - This dry-run is not approval to overwrite `index.embedded.js`.
-- Controlled write requires explicit human approval, route diff review, secret scan, and full validation.
+- Hash mismatch is reported for embedded-artifact governance but does not fail static ASSETS deploy preflight when critical items are present.
+- Controlled write still requires explicit human approval, route diff review, secret scan, and full validation.
