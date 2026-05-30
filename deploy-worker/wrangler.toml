@@ -20,6 +20,10 @@ id = "c7c64d522d964baba2e72454e7262da9"
 APP_NAME = "Homelink Finance"
 APP_VERSION = "2.0.0"
 CORPID = "homelink"
+FF_BACKEND_TOTALS = "false"
+FF_RECEIVABLES_STATE = "false"
+FF_TENANT_ISOLATION = "false"
+FF_AUDIT_TRAIL = "false"
 
 [env.staging]
 name = "homelink-finance-staging"
@@ -32,6 +36,10 @@ APP_ENV = "staging"
 CORPID = "homelink-staging"
 ENABLE_EMPLOYEE_ENTRY_ADAPTER_LIVE_ROUTE = "false"
 ENABLE_HANDOVER_ATOMIC_STAGING = "false"
+FF_BACKEND_TOTALS = "false"
+FF_RECEIVABLES_STATE = "false"
+FF_TENANT_ISOLATION = "false"
+FF_AUDIT_TRAIL = "false"
 
 [[env.staging.d1_databases]]
 binding = "DB"

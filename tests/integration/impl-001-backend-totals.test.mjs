@@ -39,6 +39,8 @@ describe("IMPL-001: Backend Totals Authority", () => {
     assert.equal(payload.computation.rowsChecked.payments, 2);
     assert.equal(payload.audit.computationId, "comp-1");
     assert.equal(payload.data.totalCollected, 100);
+    assert.equal(payload.data.currency, "AED");
+    assert.equal(payload.data.precision, "fils");
   });
 
   it("counts rows with tenant parameterization and rejects unsupported table names", async () => {

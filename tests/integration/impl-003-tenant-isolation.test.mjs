@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
+  addPropertyFilter,
+  addTenantFilter,
   appendScopeFilter,
+  buildSecureQuery,
   buildScopeFilter,
   normalizeAllowedProperties
 } from "../../deploy-worker/src/db/query-filters.js";
@@ -53,5 +56,35 @@ describe("IMPL-003: Tenant/Property Isolation", () => {
       "101",
       "102"
     ]);
+  });
+
+  it("keeps compatibility wrappers parameterized", () => {
+    const tenantQuery = addTenantFilter("SELECT * FROM entries", {
+      role: "owner",
+      tenant_id: "tenant-a"
+    });
+    assert.equal(tenantQuery.sql, "SELECT * FROM entries WHERE (tenant_id = ?)");
+    assert.deepEqual(tenantQuery.params, ["tenant-a"]);
+
+    const propertyQuery = addPropertyFilter("SELECT * FROM entries WHERE active = 1", {
+      role: "employee",
+      allowed_properties: ["101"]
+    });
+    assert.equal(
+      propertyQuery.sql,
+      "SELECT * FROM entries WHERE active = 1 AND (property_id IN (?))"
+    );
+    assert.deepEqual(propertyQuery.params, ["101"]);
+
+    const secureQuery = buildSecureQuery("SELECT * FROM entries LIMIT 10", {
+      role: "employee",
+      tenant_id: "tenant-a",
+      allowed_properties: ["101"]
+    });
+    assert.equal(
+      secureQuery.sql,
+      "SELECT * FROM entries WHERE (tenant_id = ? AND property_id IN (?)) LIMIT 10"
+    );
+    assert.deepEqual(secureQuery.params, ["tenant-a", "101"]);
   });
 });

@@ -12,6 +12,12 @@ export const REQUIRED_TABLES = Object.freeze([
   "idempotency_keys"
 ]);
 
+export const RECOMMENDED_INDEXES = Object.freeze([
+  "idx_audit_logs_resource_id",
+  "idx_receivables_ledger_receivable_id",
+  "idx_idempotency_keys_expires_at"
+]);
+
 export async function verifySchema(db, requiredTables = REQUIRED_TABLES) {
   const missing = [];
 
@@ -24,6 +30,13 @@ export async function verifySchema(db, requiredTables = REQUIRED_TABLES) {
 
   if (missing.length > 0) {
     throw new Error(`FATAL: Missing required tables: ${missing.join(", ")}. Run migrations first.`);
+  }
+
+  for (const index of RECOMMENDED_INDEXES) {
+    const exists = await indexExists(db, index);
+    if (!exists) {
+      console.warn(`Recommended index missing: ${index}`);
+    }
   }
 
   return {
@@ -39,6 +52,18 @@ export async function tableExists(db, table) {
     db,
     "SELECT name FROM sqlite_master WHERE type='table' AND name = ? LIMIT 1",
     [table]
+  );
+
+  return Boolean(row);
+}
+
+export async function indexExists(db, index) {
+  validateIdentifier(index);
+
+  const row = await first(
+    db,
+    "SELECT name FROM sqlite_master WHERE type='index' AND name = ? LIMIT 1",
+    [index]
   );
 
   return Boolean(row);

@@ -3,6 +3,8 @@
 // prepare/bind/run API and a simple db.query test double.
 
 const SECRET_KEY_PATTERN = /password|secret|token|pin|authorization|cookie/i;
+const MAX_AUDIT_VALUE_LENGTH = 5000;
+const VALID_STATUSES = new Set(["PENDING", "SUCCESS", "FAILED"]);
 
 export async function recordAuditLog(db, context, options = {}) {
   const entry = normalizeAuditContext(context);
@@ -55,7 +57,7 @@ export function normalizeAuditContext(context = {}) {
     newValue: redactSensitiveValues(context.newValue ?? context.new_value ?? null),
     changedFields: context.changedFields || context.changed_fields || null,
     reason: context.reason || null,
-    status: context.status || "PENDING",
+    status: VALID_STATUSES.has(context.status) ? context.status : "PENDING",
     errorMessage: context.errorMessage || context.error_message || null,
     createdAt: context.createdAt || context.created_at || new Date().toISOString()
   };
@@ -87,7 +89,33 @@ function serializeAuditValue(value) {
     return null;
   }
 
-  return JSON.stringify(value);
+  const serialized = JSON.stringify(value);
+  if (serialized.length <= MAX_AUDIT_VALUE_LENGTH) {
+    return serialized;
+  }
+
+  return `${serialized.slice(0, MAX_AUDIT_VALUE_LENGTH)}...[truncated]`;
+}
+
+export async function queryAuditLogs(db, resourceId, limit = 100) {
+  if (!resourceId) {
+    throw new Error("resourceId is required");
+  }
+
+  const safeLimit = Math.min(Math.max(Number.parseInt(limit, 10) || 100, 1), 10_000);
+  const result = await all(
+    db,
+    `
+      SELECT *
+      FROM audit_logs
+      WHERE resource_id = ?
+      ORDER BY created_at DESC
+      LIMIT ?
+    `,
+    [resourceId, safeLimit]
+  );
+
+  return result;
 }
 
 async function execute(db, sql, params = []) {
@@ -104,6 +132,27 @@ async function execute(db, sql, params = []) {
 
   if (typeof db.query === "function") {
     return db.query(sql, params);
+  }
+
+  throw new Error("Unsupported database adapter");
+}
+
+async function all(db, sql, params = []) {
+  if (!db) {
+    throw new Error("Database binding is required");
+  }
+
+  if (typeof db.prepare === "function") {
+    const result = await db
+      .prepare(sql)
+      .bind(...params)
+      .all();
+    return result.results || [];
+  }
+
+  if (typeof db.query === "function") {
+    const result = await db.query(sql, params);
+    return Array.isArray(result) ? result : result?.results || [];
   }
 
   throw new Error("Unsupported database adapter");

@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 
 import {
   normalizeAuditContext,
+  queryAuditLogs,
   recordAuditLog,
   redactSensitiveValues
 } from "../../deploy-worker/src/audit/logger.js";
@@ -57,5 +58,20 @@ describe("IMPL-006: Audit Trail", () => {
     assert.equal(entry.operationType, "UPDATE");
     assert.equal(entry.resourceType, "payment");
     assert.equal(entry.userId, "user-1");
+  });
+
+  it("queries audit logs by resource id with bounded limit", async () => {
+    const calls = [];
+    const db = {
+      async query(sql, params) {
+        calls.push({ sql, params });
+        return [{ resource_id: "entry-1" }];
+      }
+    };
+
+    const logs = await queryAuditLogs(db, "entry-1", 50000);
+    assert.equal(logs.length, 1);
+    assert.match(calls[0].sql, /FROM audit_logs/);
+    assert.deepEqual(calls[0].params, ["entry-1", 10000]);
   });
 });

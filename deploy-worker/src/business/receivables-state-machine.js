@@ -1,5 +1,7 @@
 // IMPL-002: Receivables State Machine
 
+import { recordAuditLog } from "../audit/logger.js";
+
 export const STATES = Object.freeze({
   CREATED: "CREATED",
   PENDING: "PENDING",
@@ -47,6 +49,16 @@ export function assertValidTransition(from, to, context = {}) {
 }
 
 export async function transitionReceivable(db, receivableId, newState, context = {}, options = {}) {
+  if (!db) {
+    throw new Error("Database connection required");
+  }
+  if (!receivableId || typeof receivableId !== "string") {
+    throw new Error("Invalid receivableId");
+  }
+  if (!Object.values(STATES).includes(newState)) {
+    throw new Error(`Invalid receivable state: ${newState}`);
+  }
+
   const current =
     options.current ||
     (await first(db, "SELECT * FROM receivables WHERE id = ? LIMIT 1", [receivableId]));
@@ -66,6 +78,18 @@ export async function transitionReceivable(db, receivableId, newState, context =
   try {
     await applyReceivableState(db, current, newState);
     await insertLedgerEntry(db, current.id || receivableId, oldState, newState, context);
+    await recordAuditLog(db, {
+      operationType: "STATE_TRANSITION",
+      resourceType: "receivable",
+      resourceId: current.id || receivableId,
+      userId: context.userId || null,
+      userRole: context.userRole || null,
+      oldValue: { status: oldState },
+      newValue: { status: newState },
+      changedFields: ["status"],
+      reason: context.reason || null,
+      status: "SUCCESS"
+    });
 
     if (useTransaction) {
       await execute(db, "COMMIT");
@@ -81,7 +105,19 @@ export async function transitionReceivable(db, receivableId, newState, context =
 }
 
 export async function allocatePayment(db, customerId, tenantId, paymentAmount, context = {}) {
+  if (!db) {
+    throw new Error("Database connection required");
+  }
+  if (!customerId || typeof customerId !== "string") {
+    throw new Error("customerId is required");
+  }
+  if (!tenantId || typeof tenantId !== "string") {
+    throw new Error("tenantId is required");
+  }
   assertIntegerAmount(paymentAmount, "paymentAmount");
+  if (paymentAmount <= 0) {
+    throw new Error("paymentAmount must be greater than zero");
+  }
 
   const receivables = await all(
     db,
@@ -108,6 +144,7 @@ export async function allocatePayment(db, customerId, tenantId, paymentAmount, c
       }
 
       const outstanding = Number(receivable.outstanding_amount || 0);
+      assertIntegerAmount(outstanding, "receivable.outstanding_amount");
       const allocated = Math.min(remaining, outstanding);
       const newOutstanding = outstanding - allocated;
       const newState = newOutstanding > 0 ? STATES.PARTIAL : STATES.PAID;

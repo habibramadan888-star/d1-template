@@ -34,5 +34,12 @@ describe("IMPL-004: Handover Atomicity", () => {
         entries: [{ method: "CASH", amount: 100 }]
       })
     );
+    assert.throws(() =>
+      validateHandoverBody({
+        totalCash: 100,
+        totalBank: 0,
+        entries: [{ id: "e1", method: "CARD", amount: 100 }]
+      })
+    );
   });
 });

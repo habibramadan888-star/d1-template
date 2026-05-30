@@ -48,6 +48,40 @@ export function appendScopeFilter(query, user, options = {}) {
   return appendWhereClause(query, filter.clause, filter.params);
 }
 
+export function addTenantFilter(query, user, options = {}) {
+  const filter = buildScopeFilter(user, {
+    ...options,
+    includeProperty: false
+  });
+
+  return appendWhereClause(query, filter.clause, filter.params);
+}
+
+export function addPropertyFilter(query, user, options = {}) {
+  if (!user || !user.role) {
+    return appendWhereClause(query, "1 = 0", []);
+  }
+  if (ADMIN_ROLES.has(user.role) || OWNER_ROLES.has(user.role)) {
+    return { sql: String(query || "").trim(), params: [] };
+  }
+
+  const propertyColumn = options.propertyColumn || "property_id";
+  const properties = normalizeAllowedProperties(user);
+  if (properties.length === 0) {
+    return appendWhereClause(query, "1 = 0", []);
+  }
+
+  return appendWhereClause(
+    query,
+    `${propertyColumn} IN (${properties.map(() => "?").join(", ")})`,
+    properties
+  );
+}
+
+export function buildSecureQuery(query, user, options = {}) {
+  return appendScopeFilter(query, user, options);
+}
+
 export function appendWhereClause(query, clause, params = []) {
   const normalized = String(query || "").trim();
   if (!normalized) {

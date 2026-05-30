@@ -5,6 +5,8 @@
 import { recordAuditLog } from "../audit/logger.js";
 
 const COUNTABLE_TABLES = new Set(["payments", "receivables"]);
+const MAX_DURATION_MS = 5000;
+const MAX_ROWS_CHECKED = 10_000_000;
 
 export async function handleDashboardTotals(request, env, deps = {}) {
   const startedAt = Date.now();
@@ -15,6 +17,10 @@ export async function handleDashboardTotals(request, env, deps = {}) {
   let user;
 
   try {
+    if (request.method && request.method !== "GET") {
+      return json({ error: "Method not allowed" }, 405);
+    }
+
     if (!db) {
       throw new Error("D1 database binding is required");
     }
@@ -39,6 +45,7 @@ export async function handleDashboardTotals(request, env, deps = {}) {
         SELECT COALESCE(SUM(amount), 0) AS total, method
         FROM payments
         WHERE ${scopeWhere}
+          AND amount > 0
         GROUP BY method
       `,
       scopeParams
@@ -58,6 +65,7 @@ export async function handleDashboardTotals(request, env, deps = {}) {
           ), 0) AS totalOverdue
         FROM receivables
         WHERE ${scopeWhere}
+          AND outstanding_amount > 0
       `,
       scopeParams
     );
@@ -76,6 +84,12 @@ export async function handleDashboardTotals(request, env, deps = {}) {
       startedAt,
       now
     });
+
+    if (payload.computation.durationMs > MAX_DURATION_MS) {
+      throw new Error(
+        `Dashboard totals computation exceeded ${MAX_DURATION_MS}ms: ${payload.computation.durationMs}ms`
+      );
+    }
 
     await recordAuditLog(db, {
       operationType: "COMPUTATION",
@@ -121,7 +135,9 @@ export function createDashboardTotalsPayload({
       totalOutstanding: toInteger(
         receivablesRow.totalOutstanding ?? receivablesRow.total_outstanding
       ),
-      totalOverdue: toInteger(receivablesRow.totalOverdue ?? receivablesRow.overdue)
+      totalOverdue: toInteger(receivablesRow.totalOverdue ?? receivablesRow.overdue),
+      currency: "AED",
+      precision: "fils"
     },
     computation: {
       version: "1.0",
@@ -168,7 +184,7 @@ export async function countRows(db, table, tenantId, role) {
   const where = isAdminRole(role) ? "1 = 1" : "tenant_id = ?";
   const row = await first(db, `SELECT COUNT(*) AS count FROM ${table} WHERE ${where}`, params);
 
-  return toInteger(row?.count ?? row?.cnt);
+  return Math.min(toInteger(row?.count ?? row?.cnt), MAX_ROWS_CHECKED);
 }
 
 function getTenantId(user = {}) {

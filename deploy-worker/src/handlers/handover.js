@@ -4,13 +4,20 @@
 
 import { recordAuditLog } from "../audit/logger.js";
 
+const MAX_ENTRIES_PER_HANDOVER = 10_000;
+const MIN_IDEMPOTENCY_KEY_LENGTH = 8;
+
 export async function handleHandover(request, env, deps = {}) {
   const db = env?.DB;
   const authenticate = deps.authenticate || env?.getAuthUser;
   const idFactory = deps.generateId || (() => crypto.randomUUID());
   const idempotencyKey = request.headers.get("Idempotency-Key");
 
-  if (!idempotencyKey) {
+  if (request.method && request.method !== "POST") {
+    return json({ error: "Method not allowed" }, 405);
+  }
+
+  if (!idempotencyKey || idempotencyKey.length < MIN_IDEMPOTENCY_KEY_LENGTH) {
     return json({ error: "Idempotency-Key required" }, 400);
   }
 
@@ -70,7 +77,7 @@ export async function handleHandover(request, env, deps = {}) {
         ]
       );
 
-      await markEntriesHandedOver(db, handoverId, entries);
+      await markEntriesHandedOver(db, handoverId, entries, getTenantId(user));
 
       await recordAuditLog(db, {
         operationType: "HANDOVER",
@@ -124,6 +131,8 @@ export function calculateHandoverTotals(entries = []) {
         totals.totalCash += entry.amount;
       } else if (method === "BANK" || method === "BANK_TRANSFER") {
         totals.totalBank += entry.amount;
+      } else {
+        throw new Error(`Unsupported payment method: ${entry.method}`);
       }
 
       return totals;
@@ -136,10 +145,17 @@ export function validateHandoverBody(body) {
   if (!body || !Array.isArray(body.entries) || body.entries.length === 0) {
     throw new Error("entries array is required");
   }
+  if (body.entries.length > MAX_ENTRIES_PER_HANDOVER) {
+    throw new Error(`entries exceeds limit: ${MAX_ENTRIES_PER_HANDOVER}`);
+  }
 
   for (const entry of body.entries) {
     if (!entry.id) {
       throw new Error("entry.id is required");
+    }
+    const method = String(entry.method || "").toUpperCase();
+    if (!["CASH", "BANK", "BANK_TRANSFER"].includes(method)) {
+      throw new Error(`Unsupported payment method: ${entry.method}`);
     }
     assertIntegerAmount(entry.amount, "entry.amount");
   }
@@ -164,17 +180,23 @@ async function readIdempotency(db, key) {
   );
 }
 
-async function markEntriesHandedOver(db, handoverId, entries) {
+async function markEntriesHandedOver(db, handoverId, entries, tenantId) {
   const placeholders = entries.map(() => "?").join(", ");
+  const tenantClause = tenantId ? " AND tenant_id = ?" : "";
+  const tenantParams = tenantId ? [tenantId] : [];
   await execute(
     db,
     `
       UPDATE entries
       SET handover_id = ?, handover_status = 'HANDED_OVER'
-      WHERE id IN (${placeholders})
+      WHERE id IN (${placeholders})${tenantClause}
     `,
-    [handoverId, ...entries.map((entry) => entry.id)]
+    [handoverId, ...entries.map((entry) => entry.id), ...tenantParams]
   );
+}
+
+function getTenantId(user = {}) {
+  return user.tenant_id || user.tenantId || user.company_id || user.corpid || null;
 }
 
 function assertIntegerAmount(value, label) {
