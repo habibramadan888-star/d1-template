@@ -313,6 +313,39 @@ footer{text-align:center;padding:20px;color:var(--text3);font-size:9px;font-fami
 .arrear-task-actions .primary{background:#0f9f54;color:#fff}
 .arrear-task-actions .secondary{background:#eef2f7;color:#334155}
 .arrear-task-select{width:18px;height:18px;accent-color:#0f9f54;flex:0 0 auto}
+.owner-arrears-list{display:grid;grid-template-columns:1fr;gap:10px;padding:0 10px 12px;overflow-x:hidden}
+.owner-arrears-task-card{width:100%;box-sizing:border-box;display:block;background:#fff;border:1px solid rgba(148,163,184,.24);border-radius:18px;padding:14px;margin:0;box-shadow:0 10px 26px rgba(15,23,42,.06);writing-mode:horizontal-tb;overflow:hidden}
+.owner-arrears-task-card.is-overdue{background:linear-gradient(180deg,#fff,#fff7f7);border-color:rgba(217,48,37,.3);border-left:5px solid #d93025}
+.owner-arrears-card-top{display:flex;align-items:flex-start;gap:10px;min-width:0}
+.owner-arrears-identity{display:flex;align-items:baseline;flex-wrap:wrap;gap:0 4px;min-width:0;font-size:16px;line-height:1.35;color:#111827;word-break:normal;overflow-wrap:anywhere}
+.owner-arrears-identity strong{font-weight:900;color:#111827}
+.owner-arrears-identity span{font-weight:800;color:#334155}
+.owner-arrears-identity b{font-weight:950;color:#b45309}
+.owner-arrears-due-line{margin-top:8px;color:#b91c1c;font-size:12px;font-weight:850;line-height:1.45;word-break:break-word}
+.owner-arrears-followup-grid{display:grid;grid-template-columns:1fr;gap:7px;margin:11px 0 0}
+.owner-arrears-followup-grid div{min-width:0;border:1px solid rgba(226,232,240,.9);border-radius:12px;background:#f8fafc;padding:8px 9px}
+.owner-arrears-followup-grid dt{margin:0 0 3px;color:#64748b;font-size:11px;font-weight:850}
+.owner-arrears-followup-grid dd{margin:0;color:#111827;font-size:13px;font-weight:800;line-height:1.35;word-break:break-word}
+.owner-arrears-status-pill{display:inline-flex;border-radius:999px;padding:3px 8px;font-size:12px;font-weight:900}
+.owner-arrears-note{margin-top:10px;border-radius:12px;background:#fff7ed;color:#7c2d12;padding:9px 10px;font-size:12px;font-weight:750;line-height:1.45;word-break:break-word}
+.owner-arrears-card-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.owner-arrears-card-actions button{border:0;border-radius:11px;padding:8px 12px;min-width:76px;font-size:12px;font-weight:900;cursor:pointer;white-space:nowrap}
+.owner-arrears-card-actions .primary{background:#0f9f54;color:#fff}
+.owner-arrears-card-actions .secondary{background:#eef2f7;color:#334155}
+@media (min-width:760px){
+  .owner-arrears-list{padding:0 12px 14px}
+  .owner-arrears-followup-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width:720px){
+  .arrears-panel{overflow-x:hidden}
+  .arrears-head{align-items:flex-start;gap:8px;flex-wrap:wrap}
+  .arrears-kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr));padding:0 10px}
+  .owner-arrears-list{grid-template-columns:1fr;gap:10px;padding:0 10px 12px}
+  .owner-arrears-task-card{padding:13px;border-radius:17px;min-height:0}
+  .owner-arrears-identity{font-size:15px;line-height:1.4}
+  .owner-arrears-card-actions button{flex:0 0 auto}
+  .owner-arrears-task-card *{writing-mode:horizontal-tb}
+}
 
 
 /* BILINGUAL TEXT */

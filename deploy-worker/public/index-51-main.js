@@ -1118,9 +1118,9 @@ function ttlockExpiredCardsForArrearsPool(){
 function arrearSourceLabel(a){
   return {
     historical_arrears:'历史欠款',
-    current_due_unpaid:'本期到期未结清',
+    current_due_unpaid:'到期未收',
     ttlock_expired_card:'通通锁过期'
-  }[normalizeArrearsSourceType(a?.sourceType)]||'欠款来源';
+  }[normalizeArrearsSourceType(a?.sourceType)]||'欠款来源待核对';
 }
 function arrearDirectiveStatus(a){
   const raw=String(a?.directiveStatus||'none');
@@ -1129,14 +1129,125 @@ function arrearDirectiveStatus(a){
 }
 function arrearStatusMeta(status){
   return {
-    none:['none','#6b7280','#f3f4f6'],
-    pending:['pending','#b45309','#fef3c7'],
-    promised:['promised','#047857','#d1fae5'],
-    overdue:['overdue','#b91c1c','#fee2e2']
-  }[status]||['none','#6b7280','#f3f4f6'];
+    none:['待下发','#6b7280','#f3f4f6'],
+    pending:['待跟进','#b45309','#fef3c7'],
+    promised:['承诺付款','#047857','#d1fae5'],
+    overdue:['承诺逾期','#b91c1c','#fee2e2']
+  }[status]||['待下发','#6b7280','#f3f4f6'];
+}
+function arrearFollowupStatusLabel(a){
+  const raw=String(a?.followupStatus||a?.followup_status||'').trim();
+  const labels={
+    pending_followup:'待跟进',
+    contacted:'已联系',
+    promised:'承诺付款',
+    promise_overdue:'承诺逾期',
+    paid_reported:'已反馈付款',
+    needs_review:'待核对',
+    closed:'已关闭',
+    open:'待跟进',
+    待跟进:'待跟进',
+    已联系:'已联系',
+    承诺付款:'承诺付款',
+    承诺逾期:'承诺逾期',
+    已反馈付款:'已反馈付款',
+    待核对:'待核对',
+    已结清:'已关闭',
+    部分支付:'待跟进',
+    无法联系:'待跟进',
+    转老板处理:'待核对'
+  };
+  if(labels[raw])return labels[raw];
+  return arrearStatusMeta(arrearDirectiveStatus(a))[0];
+}
+function cleanArrearText(value,fallback){
+  const raw=String(value??'').trim();
+  if(!raw||/^(none|null|undefined)$/i.test(raw))return fallback;
+  return raw;
+}
+function arrearCustomerLabel(a){
+  const id=cleanArrearText(a?.customerCode||a?.tenantCardId||a?.tenantName||a?.taskId||a?.id,'待核对');
+  return id.startsWith('#')?id:'#'+id;
+}
+function arrearBedLabel(a){
+  return cleanArrearText(a?.roomBed||a?.room||a?.bed||a?.lockRoom,'床位待核对');
+}
+function arrearAmountLabel(a){
+  return a?.remain==null?'金额待核对':`${fmtMoney(a.remain)} AED`;
+}
+function arrearDueLine(a,today){
+  const due=cleanArrearText(a?.dueDate||a?.due_date,'截止待核对');
+  const code=cleanArrearText(a?.packageCode||a?.cardCode||a?.type,'D-');
+  if(!a?.dueDate)return `截止待核对｜${code}`;
+  const days=Math.ceil((new Date(a.dueDate)-new Date(today))/(1000*60*60*24));
+  if(days<0)return `逾期 ${Math.abs(days)} 天 🔥｜${code}｜截止 ${due}`;
+  if(days===0)return `今天到期｜${code}｜截止 ${due}`;
+  return `${days} 天后到期｜${code}｜截止 ${due}`;
+}
+function arrearBusinessState(a){
+  const directive=arrearDirectiveStatus(a);
+  const follow=arrearFollowupStatusLabel(a);
+  if(follow==='已反馈付款')return '已反馈付款';
+  if(follow==='待核对'||String(a?.accountingStatus||a?.accounting_status||'')==='needs_review')return '待核对';
+  if(directive==='overdue')return '承诺逾期';
+  if(directive==='promised'||follow==='承诺付款')return '承诺付款';
+  if(directive==='pending'||follow==='已联系')return '跟进中';
+  return '待下发';
+}
+function renderArrearCardActions(a){
+  const taskIdRaw=String(a?.taskId||a?.id||'');
+  const taskArg=jsArg(taskIdRaw);
+  const detail=`<button type="button" class="secondary" data-arrear-card-action="details" onclick="showArrearTaskDetails(${taskArg})">详情</button>`;
+  if(!isOwnerWriteRole())return detail;
+  const stateLabel=arrearBusinessState(a);
+  const selectAction=`onclick="selectArrearForDirective(${taskArg})"`;
+  const noticeAction=`onclick="showArrearTaskActionHint(${taskArg})"`;
+  if(stateLabel==='跟进中')return `${detail}<button type="button" class="primary" data-arrear-write-action="nudge" ${selectAction}>催促</button>`;
+  if(stateLabel==='承诺付款')return `<button type="button" class="primary" data-arrear-write-action="review" ${noticeAction}>待核对</button><button type="button" class="secondary" data-arrear-write-action="continue" ${selectAction}>继续跟进</button>`;
+  if(stateLabel==='已反馈付款')return `<button type="button" class="primary" data-arrear-write-action="mark-review" ${noticeAction}>标记待核对</button>${detail}`;
+  if(stateLabel==='待核对')return `<button type="button" class="primary" data-arrear-write-action="close" ${noticeAction}>确认关闭</button><button type="button" class="secondary" data-arrear-write-action="continue" ${selectAction}>继续跟进</button>`;
+  return `<button type="button" class="primary" data-arrear-write-action="assign" ${selectAction}>下发员工</button>${detail}`;
+}
+function renderOwnerArrearsTaskCard(a,today){
+  const directive=arrearDirectiveStatus(a);
+  const [statusLabel,statusColor,statusBg]=arrearStatusMeta(directive);
+  const overdue=a?.dueDate&&a.dueDate<today;
+  const taskId=esc(a?.taskId||a?.id||'');
+  const note=cleanArrearText(a?.staffNote||a?.ownerNote||a?.note,'无');
+  const ownerDue=cleanArrearText(a?.bossRequestedDueDate,'未设置');
+  const promiseDate=cleanArrearText(a?.promiseDate,'未填写');
+  const assignee=cleanArrearText(a?.bossRequestedBy||a?.employeeName||a?.userid,'待分配');
+  const customer=esc(arrearCustomerLabel(a));
+  const bed=esc(arrearBedLabel(a));
+  const amount=esc(arrearAmountLabel(a));
+  const source=esc(arrearSourceLabel(a));
+  const dueLine=esc(arrearDueLine(a,today));
+  const businessStatus=esc(arrearBusinessState(a)||statusLabel);
+  const followup=esc(arrearFollowupStatusLabel(a));
+  return `<article class="owner-arrears-task-card ${overdue?'is-overdue':''}" data-owner-arrear-task-card="true" data-arrear-pool-kind="${esc(normalizeArrearsSourceType(a?.sourceType))}">
+    <div class="owner-arrears-card-top">
+      ${isOwnerWriteRole()?`<input class="arrear-task-select" type="checkbox" data-arrear-select value="${taskId}" aria-label="选择欠款任务 ${customer}">`:''}
+      <div class="owner-arrears-identity"><strong>${customer}</strong><span>｜${bed}</span><b>｜${amount}</b></div>
+    </div>
+    <div class="owner-arrears-due-line">${dueLine}</div>
+    <dl class="owner-arrears-followup-grid">
+      <div><dt>来源</dt><dd>${source}</dd></div>
+      <div><dt>状态</dt><dd><span class="owner-arrears-status-pill" style="color:${statusColor};background:${statusBg}">${businessStatus}</span></dd></div>
+      <div><dt>负责人</dt><dd>${esc(assignee)}</dd></div>
+      <div><dt>承诺还款</dt><dd>${esc(promiseDate)}</dd></div>
+      <div><dt>老板要求日期</dt><dd>${esc(ownerDue)}</dd></div>
+      <div><dt>跟进结果</dt><dd>${followup}</dd></div>
+    </dl>
+    <div class="owner-arrears-note">备注：${esc(note)}</div>
+    <div class="owner-arrears-card-actions">${renderArrearCardActions(a)}</div>
+  </article>`;
+}
+function normalizeArrearFilter(value){
+  const raw=String(value||'all');
+  return raw==='not_requested'?'none':raw;
 }
 function setArrearDirectiveFilter(value){
-  state.arrearFilter=value||'all';
+  state.arrearFilter=normalizeArrearFilter(value);
   renderArrearsPanel();
 }
 function updateArrearDirectiveButtonState(){
@@ -1189,6 +1300,33 @@ async function sendArrearDirectives(){
   }catch(e){
     toast('Directive failed: '+(e.message||e),'err');
   }
+}
+function selectArrearForDirective(id){
+  if(!isOwnerWriteRole())return;
+  const target=String(id||'');
+  const box=[...document.querySelectorAll('[data-arrear-select]')].find(el=>el.value===target);
+  if(box){
+    box.checked=true;
+    updateArrearDirectiveButtonState();
+    document.getElementById('arrearDirectiveDue')?.focus();
+  }
+}
+function showArrearTaskDetails(id){
+  const task=state.arrears.find(a=>(a.taskId||a.id)===id);
+  if(!task){toast('未找到欠款任务','err');return;}
+  const msg=[
+    `${arrearCustomerLabel(task)}｜${arrearBedLabel(task)}｜${arrearAmountLabel(task)}`,
+    `来源：${arrearSourceLabel(task)}`,
+    `状态：${arrearBusinessState(task)}`,
+    `承诺还款：${cleanArrearText(task.promiseDate,'未填写')}`,
+    `备注：${cleanArrearText(task.staffNote||task.ownerNote||task.note,'无')}`
+  ].join('\n');
+  alert(msg);
+}
+function showArrearTaskActionHint(id){
+  const task=state.arrears.find(a=>(a.taskId||a.id)===id);
+  const label=task?`${arrearCustomerLabel(task)} ${arrearBedLabel(task)}`:'该欠款任务';
+  toast(`${label} 的关闭/核对仍需通过正式审核流程处理`);
 }
 function showArrearsLoading(){
   const panel=document.getElementById('arrearsPanel');
@@ -1261,7 +1399,7 @@ function renderArrearsPanel(){
   const pendingCount=active.filter(a=>arrearDirectiveStatus(a)==='pending').length;
   const promisedCount=active.filter(a=>arrearDirectiveStatus(a)==='promised').length;
   const overdueDirectiveCount=active.filter(a=>arrearDirectiveStatus(a)==='overdue').length;
-  const reviewCount=active.filter(a=>arrearDirectiveStatus(a)==='none').length;
+  const reviewCount=active.filter(a=>['待核对','已反馈付款'].includes(arrearBusinessState(a))).length;
   const filtered=active
     .filter(a=>state.arrearFilter==='all'||arrearDirectiveStatus(a)===state.arrearFilter)
     .sort((a,b)=>(a.dueDate||'9999').localeCompare(b.dueDate||'9999'));
@@ -1275,9 +1413,9 @@ function renderArrearsPanel(){
       <span style="font-size:11px;color:#b35a00;font-family:JetBrains Mono,monospace">${totalAmount}</span>
     </div>
     <div class="arrears-kpi-grid" data-owner-arrears-kpis="true">
-      <div class="arrears-kpi-card"><strong>${pendingCount}</strong><span>待下发</span></div>
-      <div class="arrears-kpi-card"><strong>${promisedCount}</strong><span>跟进中</span></div>
-      <div class="arrears-kpi-card"><strong>${overdueDirectiveCount}</strong><span>承诺逾期</span></div>
+      <div class="arrears-kpi-card"><strong>${pendingCount}</strong><span>待跟进</span></div>
+      <div class="arrears-kpi-card"><strong>${promisedCount}</strong><span>已承诺</span></div>
+      <div class="arrears-kpi-card"><strong>${overdueDirectiveCount}</strong><span>逾期</span></div>
       <div class="arrears-kpi-card"><strong>${reviewCount}</strong><span>待核对</span></div>
     </div>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0" data-owner-arrears-actions="true">
@@ -1286,45 +1424,19 @@ function renderArrearsPanel(){
       <button type="button" style="background:#075e54;color:#fff;font-size:11px;padding:6px 10px;border-radius:8px;border:none;cursor:pointer" onclick="exportArrearsWhatsApp()">WhatsApp 导出</button>
       <label style="font-size:11px;color:var(--text2)">筛选状态</label>
       <select onchange="setArrearDirectiveFilter(this.value)" style="padding:5px 7px;border:1px solid #ddd;border-radius:7px">
-        ${['all','pending','promised','overdue','none'].map(v=>`<option value="${v}" ${state.arrearFilter===v?'selected':''}>${v}</option>`).join('')}
+        ${[
+          ['all','全部'],
+          ['pending','待员工跟进'],
+          ['promised','已承诺'],
+          ['overdue','逾期'],
+          ['not_requested','待下发']
+        ].map(([v,label])=>`<option value="${v}" ${(v==='not_requested'?state.arrearFilter==='none':state.arrearFilter===v)?'selected':''}>${label}</option>`).join('')}
       </select>
     </div>
     <div style="font-size:11px;color:var(--text3);font-weight:800;margin:10px 0 6px">欠款任务列表 / 信息池</div>
-    ${filtered.map(a=>{
-      const overdue=a.dueDate&&a.dueDate<today;
-      const daysLeft=a.dueDate?Math.ceil((new Date(a.dueDate)-new Date(today))/(1000*60*60*24)):null;
-      const urgency=overdue?'#d93025':daysLeft!==null&&daysLeft<=3?'#e06c00':'#b35a00';
-      const directive=arrearDirectiveStatus(a);
-      const [statusLabel,statusColor,statusBg]=arrearStatusMeta(directive);
-      return `<div class="arrear-row arrear-task-card ${overdue?'overdue-row':''}" data-owner-arrear-task-card="true" data-arrear-source="${esc(a.sourceType||'historical_arrears')}">
-        ${isOwnerWriteRole()?`<input type="checkbox" data-arrear-select value="${esc(a.taskId||a.id)}" style="margin-right:4px">`:''}
-        <span class="arrear-room">房间/床位 #${esc(a.room)}</span>
-        <div style="flex:1;min-width:0">
-          <div style="font-size:12px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">客户编号 ${esc(a.customerCode||a.tenantCardId||a.tenantName||a.taskId||a.id||'-')} · 来源类型 ${esc(arrearSourceLabel(a))} · 套餐/卡片 ${esc(a.cardCode||a.packageCode||a.type||'rent')} · ${esc(a.note||'分期尾款')}</div>
-          <div style="font-size:10px;color:${urgency};font-family:JetBrains Mono,monospace;margin-top:1px">
-逾期天数 ${overdue?Math.abs(daysLeft||0):0} · ${overdue?('⚠ 已逾期 '+esc(a.dueDate)):daysLeft===0?'今天到期':daysLeft===1?'明天到期':daysLeft!==null?(daysLeft+'天后到期 '+esc(a.dueDate)):'无截止日 · 尽快安排'}
-          </div>
-          <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:5px;font-size:10px">
-            <span style="color:${statusColor};background:${statusBg};border-radius:999px;padding:2px 7px;font-weight:700">任务状态 ${esc(statusLabel)}</span>
-            <span style="color:#4338ca;background:#eef2ff;border-radius:999px;padding:2px 7px">来源类型 ${esc(arrearSourceLabel(a))}</span>
-            <span style="color:#1f2937;background:#f9fafb;border-radius:999px;padding:2px 7px">负责人 ${esc(a.bossRequestedBy||a.ownerNote||'待分配')}</span>
-            ${a.bossRequestedDueDate?`<span style="color:#92400e;background:#fffbeb;border-radius:999px;padding:2px 7px">老板要求 ${esc(a.bossRequestedDueDate)}</span>`:''}
-            ${a.promiseDate?`<span style="color:#065f46;background:#ecfdf5;border-radius:999px;padding:2px 7px">承诺还款日期 ${esc(a.promiseDate)}</span>`:''}
-            ${a.staffNote?`<span style="color:#374151;background:#f3f4f6;border-radius:999px;padding:2px 7px">最近备注 ${esc(a.staffNote)}</span>`:''}
-            <span style="color:#4338ca;background:#eef2ff;border-radius:999px;padding:2px 7px" data-owner-review-action="true">老板审核动作 待核对</span>
-          </div>
-          ${directive==='overdue'?`<div style="margin-top:4px;color:#b91c1c;font-size:10px;font-weight:700">Overdue: promised ${esc(a.promiseDate||'-')} but remaining balance is still open.</div>`:''}
-        </div>
-        ${(()=>{
-          // 押金类型：有金额就显示金额，remain=null才显示"待定"
-          const amtStr = a.remain==null ? '金额待核对'
-            : a.remain>0 ? fmtMoney(a.remain)+' AED'
-            : '—';
-          const clr = a.type==='deposit' ? '#1a73e8' : urgency;
-          return '<span class="arrear-remain" style="color:'+clr+';font-weight:700">'+amtStr+'</span>';
-        })()}
-      </div>`;
-    }).join('')}
+    <div class="owner-arrears-list" data-owner-arrears-card-list="true">
+      ${filtered.map(a=>renderOwnerArrearsTaskCard(a,today)).join('')}
+    </div>
   </div>`;
   updateArrearDirectiveButtonState();
 }

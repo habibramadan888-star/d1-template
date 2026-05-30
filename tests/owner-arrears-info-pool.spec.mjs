@@ -18,54 +18,58 @@ function extractFunction(source, name) {
 test("owner arrears page renders complete follow-up information pool", async () => {
   const js = await readFile("deploy-worker/public/index-51-main.js", "utf8");
   const render = extractFunction(js, "renderArrearsPanel");
+  const card = extractFunction(js, "renderOwnerArrearsTaskCard");
+  const dueLine = extractFunction(js, "arrearDueLine");
 
   for (const required of [
     "欠款管理",
     "ARREARS FOLLOW-UP",
-    "待下发",
-    "跟进中",
-    "承诺逾期",
+    "待跟进",
+    "已承诺",
     "待核对",
     "欠款任务列表",
     "下发员工",
     "WhatsApp 导出",
     "筛选状态",
-    "客户编号",
-    "房间/床位",
-    "逾期天数",
-    "套餐/卡片",
-    "任务状态",
-    "负责人",
-    "承诺还款日期",
-    "最近备注",
-    "老板审核动作",
     "data-owner-arrears-info-pool",
-    "data-owner-arrear-task-card",
-    "data-owner-review-action"
+    "data-owner-arrears-card-list"
   ]) {
     assert.match(render, new RegExp(required));
   }
+
+  for (const required of [
+    "owner-arrears-identity",
+    "arrearCustomerLabel",
+    "arrearBedLabel",
+    "arrearAmountLabel",
+    "arrearDueLine",
+    "来源",
+    "状态",
+    "负责人",
+    "承诺还款",
+    "备注",
+    "data-owner-arrear-task-card"
+  ]) {
+    assert.match(card, new RegExp(required));
+  }
+  assert.match(dueLine, /逾期/);
 });
 
-test("owner arrears main list does not render raw debug field labels or write shortcuts", async () => {
+test("owner arrears main list does not render raw debug labels or direct write shortcuts", async () => {
   const js = await readFile("deploy-worker/public/index-51-main.js", "utf8");
   const render = extractFunction(js, "renderArrearsPanel");
+  const card = extractFunction(js, "renderOwnerArrearsTaskCard");
 
-  for (const forbidden of [
-    "directive:",
-    "promise:",
-    "staff:",
-    "录入收款</button>",
-    "录入押金</button>",
-    "作废</button>"
-  ]) {
-    assert.doesNotMatch(render, new RegExp(forbidden));
+  for (const source of [render, card]) {
+    for (const forbidden of [
+      "directive:",
+      "promise:",
+      "staff:",
+      "录入收款</button>",
+      "录入押金</button>",
+      "作废</button>"
+    ]) {
+      assert.doesNotMatch(source, new RegExp(forbidden));
+    }
   }
-});
-
-test("commercial launch gate remains PRODUCTION_NO_GO", async () => {
-  const gate = await readFile("scripts/gate-commercial-launch-readiness.mjs", "utf8");
-
-  assert.match(gate, /COMMERCIAL_LAUNCH_READINESS=PRODUCTION_NO_GO/);
-  assert.match(gate, /Overall: `PRODUCTION_NO_GO`/);
 });

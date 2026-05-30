@@ -37,28 +37,33 @@ test("owner arrears loader builds a unified follow-up pool from all required sou
   assert.match(load, /ensureOwnerLockCardsForArrearsPool/);
 });
 
-test("owner arrears cards expose source type and unknown TTLock amount review state", async () => {
+test("owner arrears cards expose business source labels and unknown TTLock amount review state", async () => {
   const js = await readFile("deploy-worker/public/index-51-main.js", "utf8");
   const render = extractFunction(js, "renderArrearsPanel");
+  const card = extractFunction(js, "renderOwnerArrearsTaskCard");
+  const amountLabel = extractFunction(js, "arrearAmountLabel");
 
   for (const required of [
     "data-owner-arrears-info-pool",
-    "data-owner-arrear-task-card",
-    "arrear-task-card",
-    "来源类型",
-    "arrearSourceLabel",
-    "金额待核对",
-    "客户编号",
-    "房间/床位",
-    "逾期天数",
-    "套餐/卡片",
-    "任务状态",
-    "负责人",
-    "承诺还款日期",
-    "最近备注"
+    "data-owner-arrears-card-list",
+    "renderOwnerArrearsTaskCard"
   ]) {
     assert.match(render, new RegExp(required));
   }
+
+  for (const required of [
+    "data-owner-arrear-task-card",
+    "owner-arrears-task-card",
+    "arrearAmountLabel",
+    "来源",
+    "状态",
+    "负责人",
+    "承诺还款",
+    "备注"
+  ]) {
+    assert.match(card, new RegExp(required));
+  }
+  assert.match(amountLabel, /金额待核对/);
   assert.match(js, /ttlock_expired_card/);
   assert.match(js, /通通锁过期/);
 });
@@ -66,15 +71,19 @@ test("owner arrears cards expose source type and unknown TTLock amount review st
 test("owner arrears main list does not reintroduce debug labels or direct write shortcuts", async () => {
   const js = await readFile("deploy-worker/public/index-51-main.js", "utf8");
   const render = extractFunction(js, "renderArrearsPanel");
+  const card = extractFunction(js, "renderOwnerArrearsTaskCard");
 
-  for (const forbidden of [
-    "directive:",
-    "promise:",
-    "staff:",
-    "录入收款</button>",
-    "录入押金</button>",
-    "作废</button>"
-  ]) {
-    assert.doesNotMatch(render, new RegExp(forbidden));
+  for (const source of [render, card]) {
+    for (const forbidden of [
+      "directive:",
+      "promise:",
+      "staff:",
+      "Overdue: promised",
+      "录入收款</button>",
+      "录入押金</button>",
+      "作废</button>"
+    ]) {
+      assert.doesNotMatch(source, new RegExp(forbidden));
+    }
   }
 });
