@@ -8,7 +8,7 @@ test("owner lock/logout clears auth state and routes only to root portal", async
 
   assert.match(html, /onclick="logout\(\)"/);
   assert.match(js, /async function logout\(\)/);
-  assert.match(js, /\/auth\/logout/);
+  assert.match(js, /\/api\/logout/);
   assert.match(js, /clearLegacyAuthStorage\(\)/);
   assert.match(js, /redirectToUnifiedLogin\('signed_out'\)/);
   assert.match(js, /const UNIFIED_LOGIN_DESTINATION='\/'/);

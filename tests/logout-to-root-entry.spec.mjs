@@ -6,7 +6,7 @@ test("owner logout routes to root entry", async () => {
   const js = await readFile("deploy-worker/public/index-51-main.js", "utf8");
 
   assert.match(js, /async function logout\(\)/);
-  assert.match(js, /\/auth\/logout/);
+  assert.match(js, /\/api\/logout/);
   assert.match(js, /clearLegacyAuthStorage\(\)/);
   assert.match(js, /const UNIFIED_LOGIN_DESTINATION='\/'/);
   assert.match(js, /redirectToUnifiedLogin\('signed_out'\)/);
@@ -23,7 +23,7 @@ test("employee session failure routes to root entry", async () => {
 test("portal clear session removes legacy auth state", async () => {
   const portal = await readFile("deploy-worker/public/portal.html", "utf8");
 
-  assert.match(portal, /\/auth\/logout/);
+  assert.match(portal, /\/api\/logout/);
   for (const key of [
     "homelink:cloud_token",
     "homelink:role",

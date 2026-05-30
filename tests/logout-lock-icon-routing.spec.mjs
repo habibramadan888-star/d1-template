@@ -8,7 +8,7 @@ test("owner lock icon uses unified logout routing", async () => {
 
   assert.match(html, /onclick="logout\(\)"/);
   assert.match(js, /async function logout\(\)/);
-  assert.match(js, /\/auth\/logout/);
+  assert.match(js, /\/api\/logout/);
   assert.match(js, /clearLegacyAuthStorage\(\)/);
   assert.match(js, /redirectToUnifiedLogin\('signed_out'\)/);
   assert.doesNotMatch(js, /showOwnerLoginFallback\(\);\s*document\.getElementById\('topbar'\)/);

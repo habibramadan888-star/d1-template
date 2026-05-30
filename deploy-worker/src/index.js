@@ -577,17 +577,21 @@ async function createSession(request, env, user, ttlSeconds = 8 * 60 * 60) {
 }
 __name(createSession, "createSession");
 async function revokeSession(request, env) {
-  const token = getCookie(request);
-  if (!token) return;
+  const token = getBearerToken(request) || getCookie(request);
+  const result = { revoked: false, sid: "" };
+  if (!token) return result;
   try {
     const payload = await verifyJWT(token, env.JWT_SECRET, { skipSession: true });
-    if (!payload.sid || !env.DB) return;
+    result.sid = payload.sid || "";
+    if (!payload.sid || !env.DB) return result;
     await ensureSessionTable(env);
-    await env.DB.prepare(
-      "UPDATE active_sessions SET revoked=1 WHERE sid=? AND corpid=?"
-    ).bind(payload.sid, payload.corpid || "").run();
+    const update = await env.DB.prepare(
+      "UPDATE active_sessions SET revoked=1 WHERE sid=?"
+    ).bind(payload.sid).run();
+    result.revoked = Number(update?.meta?.changes ?? update?.changes ?? 0) > 0;
   } catch {
   }
+  return result;
 }
 __name(revokeSession, "revokeSession");
 function parseUserAccounts(env) {
@@ -745,16 +749,9 @@ async function handleConfirmManager(request, env) {
 }
 __name(handleConfirmManager, "handleConfirmManager");
 async function handleLogout(request, env) {
-  await revokeSession(request, env);
-  return new Response(JSON.stringify({ ok: true }), {
-    status: 200,
-    headers: {
-      "Content-Type": "application/json",
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type, Authorization",
-      "Set-Cookie": clearSessionCookie()
-    }
+  const revoked = await revokeSession(request, env);
+  return json(ok({ success: true, revoked: Boolean(revoked?.revoked) }), 200, {
+    "Set-Cookie": clearSessionCookie()
   });
 }
 __name(handleLogout, "handleLogout");
@@ -1114,7 +1111,9 @@ const EMP_TX_COLUMNS = [
 const EMP_TASK_COLUMNS = [
   "task_id","corpid","userid","entry_id","bed","tenant_name","arrear_amount","arrear_reason","created_at",
   "followup_status","promise_date","promise_amount","actual_received","close_status","close_reason","owner_note","staff_note","last_followup_at","updated_by","updated_at",
-  "tenant_card_id","original_entry_id","original_period_start","original_period_end","created_by","write_off_authorized","write_off_reason","write_off_at",
+  "tenant_card_id","original_entry_id","original_period_start","original_period_end","created_by",
+  "boss_requested_at","boss_requested_by","boss_requested_due_date","directive_status","staff_promised_at",
+  "write_off_authorized","write_off_reason","write_off_at",
   "voided_at","voided_by","void_reason","void_source"
 ];
 const EMP_SESSION_COLUMNS = [
@@ -1280,6 +1279,11 @@ async function empEnsureSchema(env){
   await empAddColumn(env,"arrear_tasks","owner_note","TEXT");
   await empAddColumn(env,"arrear_tasks","staff_note","TEXT");
   await empAddColumn(env,"arrear_tasks","last_followup_at","TEXT");
+  await empAddColumn(env,"arrear_tasks","boss_requested_at","TEXT");
+  await empAddColumn(env,"arrear_tasks","boss_requested_by","TEXT");
+  await empAddColumn(env,"arrear_tasks","boss_requested_due_date","TEXT");
+  await empAddColumn(env,"arrear_tasks","directive_status","TEXT DEFAULT 'none'");
+  await empAddColumn(env,"arrear_tasks","staff_promised_at","TEXT");
   await empAddColumn(env,"arrear_tasks","write_off_authorized","TEXT");
   await empAddColumn(env,"arrear_tasks","write_off_reason","TEXT");
   await empAddColumn(env,"arrear_tasks","write_off_at","TEXT");
@@ -1292,6 +1296,7 @@ async function empEnsureSchema(env){
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_transactions_operator ON transactions(corpid, operator_id)").run().catch(()=>{});
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_transactions_cid_period ON transactions(corpid, tenant_card_id, period_start, period_end)").run().catch(()=>{});
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_arrear_tasks_status ON arrear_tasks(corpid, followup_status, promise_date)").run();
+  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_arrear_tasks_directive ON arrear_tasks(corpid, directive_status, boss_requested_due_date, promise_date)").run().catch(()=>{});
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_arrear_tasks_cid_period ON arrear_tasks(corpid, tenant_card_id, original_period_start, original_period_end)").run().catch(()=>{});
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_entry_events_ref ON entry_events(corpid, ref_type, ref_id, ts)").run();
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_deposit_ledger_cid ON deposit_ledger(corpid, tenant_card_id, ts)").run();
@@ -1354,6 +1359,22 @@ function empDaysBetween(a,b){
   return Math.max(0,Math.round((bm-am)/86400000));
 }
 __name(empDaysBetween,"empDaysBetween");
+function empCleanIsoDate(value){
+  const d=cleanDate(value||"");
+  return /^\d{4}-\d{2}-\d{2}$/.test(d)?d:"";
+}
+__name(empCleanIsoDate,"empCleanIsoDate");
+function empDirectiveStatus(t){
+  const raw=cleanText(t?.directive_status||"none",20);
+  return ["none","pending","promised","overdue"].includes(raw)?raw:"none";
+}
+__name(empDirectiveStatus,"empDirectiveStatus");
+function empDirectiveIsOverdue(t){
+  const status=empDirectiveStatus(t);
+  const promise=empCleanIsoDate(t?.promise_date||"");
+  return (status==="promised"||status==="overdue")&&promise&&promise<empTodayDubai()&&empTaskRemaining(t)>0;
+}
+__name(empDirectiveIsOverdue,"empDirectiveIsOverdue");
 async function empInsertDynamic(env, table, values, allowed){
   const cols=await empTableColumns(env,table);
   const names=[];
@@ -1804,7 +1825,8 @@ function empLegacyArrearToTask(a){
     created_at:cleanText(a?.created_at||"",40),followup_status:"\u5f85\u8ddf\u8fdb",promise_date:cleanDate(a?.due_date||""),
     promise_amount:cleanMoney(a?.remain||0),actual_received:0,close_status:a?.cleared?"CLEARED":"",
     close_reason:"",owner_note:"",staff_note:"",last_followup_at:"",updated_by:"",updated_at:"",
-    tenant_card_id:"",original_entry_id:cleanText(a?.entry_id||"",80),original_period_start:"",original_period_end:cleanDate(a?.due_date||"")
+    tenant_card_id:"",original_entry_id:cleanText(a?.entry_id||"",80),original_period_start:"",original_period_end:cleanDate(a?.due_date||""),
+    boss_requested_at:"",boss_requested_by:"",boss_requested_due_date:"",directive_status:"none",staff_promised_at:""
   };
 }
 __name(empLegacyArrearToTask,"empLegacyArrearToTask");
@@ -1813,6 +1835,8 @@ function empTaskToBossArrear(t){
   const remain=empTaskRemaining(t);
   const dueDate=cleanDate(t?.promise_date||t?.original_period_end||String(t?.created_at||"").slice(0,10));
   const type=/deposit|\u62bc\u91d1/i.test(reason)?"deposit":"rent";
+  const directiveStatus=empDirectiveStatus(t);
+  const isOverdue=empDirectiveIsOverdue(t);
   return {
     id:cleanId(t?.task_id)||empId("arrear-view"),
     task_id:cleanText(t?.task_id||"",100),
@@ -1831,6 +1855,15 @@ function empTaskToBossArrear(t){
     promise_date:cleanDate(t?.promise_date||""),
     promise_amount:cleanMoney(t?.promise_amount||0),
     actual_received:cleanMoney(t?.actual_received||0),
+    owner_note:cleanText(t?.owner_note||"",500),
+    staff_note:cleanText(t?.staff_note||"",500),
+    boss_requested_at:cleanText(t?.boss_requested_at||"",40),
+    boss_requested_by:cleanText(t?.boss_requested_by||"",80),
+    boss_requested_due_date:empCleanIsoDate(t?.boss_requested_due_date||""),
+    directive_status:directiveStatus,
+    staff_promised_at:cleanText(t?.staff_promised_at||"",40),
+    is_overdue:isOverdue,
+    effective_directive_status:isOverdue?"overdue":directiveStatus,
     created_at:cleanText(t?.created_at||"",40),
     updated_at:cleanText(t?.updated_at||"",40)
   };
@@ -1904,6 +1937,65 @@ async function handleArrearTasks(request,env,user){
   return success({success:true,tasks});
 }
 __name(handleArrearTasks,"handleArrearTasks");
+async function handleArrearTaskDirective(request,env,user){
+  if(!requireManager(user))return forbidden();
+  await empEnsureSchema(env);
+  let body;
+  try{body=await request.json();}catch{return badRequest("invalid_json");}
+  const ids=Array.isArray(body?.task_ids)?body.task_ids.map(x=>cleanId(x)).filter(Boolean):[];
+  const uniqueIds=[...new Set(ids)].slice(0,100);
+  const dueDate=empCleanIsoDate(body?.due_date);
+  if(!uniqueIds.length)return badRequest("task_ids_required");
+  if(!dueDate)return badRequest("due_date_required");
+  if(dueDate<empTodayDubai())return badRequest("due_date_in_past");
+  const note=cleanText(body?.note||"",500);
+  const actor=cleanText(user.userid,80);
+  const now=empNow();
+  let updatedCount=0;
+  const notFound=[];
+  for(const taskId of uniqueIds){
+    let old=await env.DB.prepare("SELECT * FROM arrear_tasks WHERE task_id=? AND corpid=? LIMIT 1").bind(taskId,user.corpid).first();
+    if(!old&&await empTableExists(env,"arrears")){
+      const legacy=await env.DB.prepare("SELECT * FROM arrears WHERE id=? AND corpid=? LIMIT 1").bind(taskId,user.corpid).first().catch(()=>null);
+      if(legacy){
+        const mapped=empLegacyArrearToTask(legacy);
+        await empInsertDynamic(env,"arrear_tasks",{
+          ...mapped,
+          created_by:actor,
+          updated_by:actor,
+          updated_at:now
+        },EMP_TASK_COLUMNS);
+        old=mapped;
+      }
+    }
+    if(!old||!empCloseStatusIsOpen(old.close_status)){notFound.push(taskId);continue;}
+    const updates=[
+      "boss_requested_at=?",
+      "boss_requested_by=?",
+      "boss_requested_due_date=?",
+      "directive_status='pending'",
+      "updated_by=?",
+      "updated_at=?"
+    ];
+    const vals=[now,actor,dueDate,actor,now];
+    if(note){
+      updates.push("owner_note=?");
+      vals.push(note);
+    }
+    vals.push(taskId,user.corpid);
+    const result=await env.DB.prepare(`UPDATE arrear_tasks SET ${updates.join(",")} WHERE task_id=? AND corpid=?`).bind(...vals).run();
+    const changes=Number(result?.meta?.changes??result?.changes??0);
+    if(changes>0){
+      updatedCount+=changes;
+      await empEvent(env,user,{ref_id:taskId,ref_type:"arrear_task",event_type:"directive",field_name:"directive_status",old_value:old.directive_status||"none",new_value:"pending",operator_id:actor,ts:now});
+    }else{
+      notFound.push(taskId);
+    }
+  }
+  await audit(env,user,"arrear_task.directive",uniqueIds.join(","),{due_date:dueDate,updated_count:updatedCount,not_found:notFound.length}).catch(()=>{});
+  return success({success:true,updated_count:updatedCount,not_found:notFound});
+}
+__name(handleArrearTaskDirective,"handleArrearTaskDirective");
 async function handleArrearTaskUpdate(request,env,user){
   await empEnsureSchema(env);
   let body;
@@ -1956,7 +2048,9 @@ async function handleArrearTaskUpdate(request,env,user){
       close_reason:isManager?cleanText(patch.close_reason,120):"",owner_note:cleanText(patch.owner_note||"",500),
       staff_note:patchNote,last_followup_at:now,tenant_card_id:cleanText(patch.tenant_card_id||"",80),
       original_entry_id:cleanText(patch.original_entry_id||"",80),original_period_start:cleanDate(patch.original_period_start||""),
-      original_period_end:cleanDate(patch.original_period_end||""),created_by:actor,updated_by:actor,updated_at:now
+      original_period_end:cleanDate(patch.original_period_end||""),created_by:actor,
+      boss_requested_at:"",boss_requested_by:"",boss_requested_due_date:"",directive_status:"none",staff_promised_at:"",
+      updated_by:actor,updated_at:now
     };
     await empInsertDynamic(env,"arrear_tasks",{
       ...insertedTask
@@ -2003,6 +2097,12 @@ async function handleArrearTaskUpdate(request,env,user){
     if(Object.keys(updateValues).length)updateValues.last_followup_at=now;
   }
   if(!Object.keys(updateValues).length)return badRequest("no_update_fields");
+  const bossDue=empCleanIsoDate(old?.boss_requested_due_date||"");
+  const promisedAfterBossDue=!isManager&&bossDue&&patchPromise&&patchPromise>bossDue;
+  if(!isManager&&empDirectiveStatus(old)==="pending"){
+    updateValues.directive_status="promised";
+    updateValues.staff_promised_at=now;
+  }
   updateValues.updated_by=actor;
   updateValues.updated_at=now;
   const updates=[];const vals=[];
@@ -2014,8 +2114,11 @@ async function handleArrearTaskUpdate(request,env,user){
       await empEvent(env,user,{ref_id:taskId,ref_type:"arrear_task",event_type:"update",field_name:k,old_value:old?.[k],new_value:v,operator_id:actor,ts:now});
     }
   }
-  await audit(env,user,"employee.arrear_task.update",taskId,{status:patch.followup_status||""}).catch(()=>{});
-  return success({success:true});
+  if(promisedAfterBossDue){
+    await empEvent(env,user,{ref_id:taskId,ref_type:"arrear_task",event_type:"directive_warning",field_name:"promise_date",old_value:bossDue,new_value:patchPromise,operator_id:actor,ts:now});
+  }
+  await audit(env,user,"employee.arrear_task.update",taskId,{status:patch.followup_status||"",directive_status:updateValues.directive_status||old?.directive_status||"none",promise_after_requested_due:!!promisedAfterBossDue}).catch(()=>{});
+  return success({success:true,directive_status:updateValues.directive_status||empDirectiveStatus(old)});
 }
 __name(handleArrearTaskUpdate,"handleArrearTaskUpdate");
 async function handleEmployeeApi(request,env,user){
@@ -2029,6 +2132,7 @@ async function handleEmployeeApi(request,env,user){
   if(path==="/api/employee/deposit"&&request.method==="GET")return handleEmployeeDeposit(request,env,user);
   if(path==="/api/employee/entry"&&request.method==="POST")return handleEmployeeEntry(request,env,user);
   if(path==="/api/arrear_tasks"&&request.method==="GET")return handleArrearTasks(request,env,user);
+  if(path==="/api/arrear_tasks/directive"&&request.method==="POST")return handleArrearTaskDirective(request,env,user);
   if(path==="/api/arrear_tasks/update"&&request.method==="POST")return handleArrearTaskUpdate(request,env,user);
   return null;
 }
@@ -2828,7 +2932,7 @@ async function handleRequest(request, env, ctx) {
     if (auth.error) return unauthorized();
     return handleConfirmManager(request, env);
   }
-  if (path === "/auth/logout" && method === "POST") {
+  if ((path === "/auth/logout" || path === "/api/logout") && method === "POST") {
     return handleLogout(request, env);
   }
   if (path === "/api/staging/handover/commit" && method === "POST") {

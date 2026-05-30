@@ -246,7 +246,7 @@ async function signIn(event){
 }
 async function logout(){
   logoutButton.disabled=true;
-  try{await requestJson("/auth/logout",{method:"POST"})}catch{}
+  try{await requestJson("/api/logout",{method:"POST"})}catch{}
   ["homelink:cloud_token","homelink:role","owner:role","empv3:user","empv3:operator"].forEach(key=>{
     localStorage.removeItem(key);
     sessionStorage.removeItem(key);

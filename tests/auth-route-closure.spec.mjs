@@ -66,7 +66,7 @@ test("logout and clear session routes return only to root portal", async () => {
   const ownerJs = await readFile("deploy-worker/public/index-51-main.js", "utf8");
   const employee = await readFile("deploy-worker/public/employee-v3.html", "utf8");
 
-  assert.match(portal, /\/auth\/logout/);
+  assert.match(portal, /\/api\/logout/);
   assert.match(portal, /location\.replace\(target\)/);
   assert.match(ownerJs, /const UNIFIED_LOGIN_DESTINATION='\/'/);
   assert.match(ownerJs, /redirectToUnifiedLogin\('signed_out'\)/);

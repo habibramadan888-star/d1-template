@@ -1185,6 +1185,7 @@ label .label-en{
 .followup-card.overdue{border-left-color:#f59e0b}
 .followup-card.force{border-left-color:#dc2626}
 .followup-card.history{border-left-color:#2563eb}
+.followup-card.directive{border-left-color:#f59e0b;background:#fffbeb}
 .followup-top{
   display:grid;
   grid-template-columns:1fr auto;
@@ -1708,6 +1709,80 @@ label .label-en{
     font-size:13px!important;
   }
 }
+.employee-user{
+  position:relative;
+  display:flex;
+  align-items:center;
+}
+.employee-user-button{
+  border:0;
+  border-radius:999px;
+  padding:9px 16px;
+  min-height:38px;
+  color:#fff;
+  cursor:pointer;
+  font:inherit;
+  font-weight:950;
+  background:linear-gradient(180deg,#10ad5a,#078d42);
+  box-shadow:0 14px 30px rgba(9,166,79,.22),inset 0 1px 0 rgba(255,255,255,.24);
+}
+.employee-user-button .label-en{
+  display:block;
+  margin-top:1px;
+  font-size:9px;
+  letter-spacing:.13em;
+  opacity:.82;
+}
+.employee-user-menu{
+  position:absolute;
+  right:0;
+  top:calc(100% + 10px);
+  z-index:40;
+  min-width:190px;
+  padding:12px;
+  border:1px solid rgba(148,163,184,.30);
+  border-radius:18px;
+  background:rgba(255,255,255,.96);
+  box-shadow:0 24px 60px rgba(15,23,42,.18);
+}
+.employee-user-menu[hidden]{display:none!important}
+.employee-user-meta{
+  margin-bottom:10px;
+  color:var(--muted);
+  font-size:12px;
+  font-weight:800;
+}
+.employee-logout{
+  width:100%;
+  border:0;
+  border-radius:14px;
+  padding:10px 12px;
+  color:#fff;
+  cursor:pointer;
+  font:inherit;
+  font-weight:950;
+  background:linear-gradient(180deg,#ef4444,#b91c1c);
+}
+.employee-logout .label-en{
+  display:block;
+  margin-top:2px;
+  font-size:9px;
+  letter-spacing:.12em;
+  opacity:.82;
+}
+@media(max-width:720px){
+  .employee-user-button{
+    padding:8px 11px;
+    max-width:132px;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  .employee-user-menu{
+    right:-4px;
+    min-width:172px;
+  }
+}
 </style>
 </head>
 <body class="hl-page employee-ui">
@@ -1727,7 +1802,19 @@ label .label-en{
 <div class="top">
   <div class="brand">
     <div class="logo"><div class="badge"><div>HOME<small>LINK.</small></div></div><div class="word"><span class="g">HOME</span><span>LINK</span><i>.</i><em>流水管理</em></div></div>
-    <div class="actions"><div class="operator"><input id="operatorId" placeholder="未登录" readonly aria-label="员工姓名"></div><span class="pill">员工</span><span class="pill main">已登录<span class="label-en">SIGNED IN</span></span></div>
+    <div class="actions">
+      <div class="operator" hidden><input id="operatorId" placeholder="未登录" readonly aria-label="员工姓名"></div>
+      <span class="pill">员工</span>
+      <div class="employee-user" id="employeeUser">
+        <button class="employee-user-button" id="employeeUserButton" type="button" aria-haspopup="menu" aria-expanded="false">
+          <span id="employeeUserName">未登录</span><span class="label-en">ACCOUNT</span>
+        </button>
+        <div class="employee-user-menu" id="employeeUserMenu" hidden>
+          <div class="employee-user-meta" id="employeeUserMeta">未登录</div>
+          <button class="employee-logout" id="btnEmployeeLogout" type="button">退出登录<span class="label-en">LOGOUT</span></button>
+        </div>
+      </div>
+    </div>
   </div>
   <div class="tabs">
     <button class="tab active" data-view="entry"><span class="tab-cn">录入</span><span class="en">ENTRY</span></button>
@@ -1950,6 +2037,31 @@ function redirectToUnifiedLogin(reason=''){
   const target=UNIFIED_LOGIN_DESTINATION+(reason?`?reason=${encodeURIComponent(reason)}`:'');
   location.replace(target);
 }
+function setEmployeeMenuOpen(open){
+  const menu=$('employeeUserMenu');
+  const button=$('employeeUserButton');
+  if(!menu||!button)return;
+  menu.hidden=!open;
+  button.setAttribute('aria-expanded',open?'true':'false');
+}
+async function employeeLogout(){
+  const btn=$('btnEmployeeLogout');
+  const old=btn?.innerHTML;
+  if(btn){btn.disabled=true;btn.innerHTML='退出中<span class="label-en">SIGNING OUT</span>'}
+  try{
+    const token=localStorage.getItem('homelink:cloud_token')||'';
+    const headers=token?{Authorization:`Bearer ${token}`}:{};
+    await fetch(apiUrl('/api/logout'),{method:'POST',headers,credentials:'include'});
+  }catch(e){
+    console.warn('[EmployeeLogout] server logout failed; clearing local session',e);
+  }finally{
+    if(btn&&old){btn.disabled=false;btn.innerHTML=old}
+    setEmployeeMenuOpen(false);
+    clearEmployeeLegacyAuthState();
+    applyEmployeeUser(null);
+    redirectToUnifiedLogin('signed_out');
+  }
+}
 function employeeDisplayName(user){
   return [
     user?.display_name,
@@ -2041,7 +2153,10 @@ function applyEmployeeUser(user){
     $('operatorId').value=display;
     $('operatorId').title=user.userid?`employee_id: ${user.userid}`:'';
     $('operatorId').readOnly=true;
-    document.querySelector('.pill.main').innerHTML=`${esc(display)}<span class="label-en">SIGNED IN</span>`;
+    if($('employeeUserName'))$('employeeUserName').textContent=display;
+    if($('employeeUserMeta'))$('employeeUserMeta').textContent=user.userid?`employee_id: ${user.userid}`:'signed in';
+    if($('employeeUserButton'))$('employeeUserButton').disabled=false;
+    setEmployeeMenuOpen(false);
     $('loginOverlay').classList.add('hidden');
     $('loginOverlay').setAttribute('aria-hidden','true');
     try{localStorage.setItem('empv3:lastEmployeeId',user.userid||'')}catch{}
@@ -2055,7 +2170,9 @@ function applyEmployeeUser(user){
     $('operatorId').value='';
     $('operatorId').title='';
     $('operatorId').readOnly=false;
-    document.querySelector('.pill.main').innerHTML='未登录<span class="label-en">SIGNED OUT</span>';
+    if($('employeeUserName'))$('employeeUserName').textContent='未登录';
+    if($('employeeUserMeta'))$('employeeUserMeta').textContent='未登录';
+    setEmployeeMenuOpen(false);
     try{localStorage.removeItem('empv3:user')}catch{}
     try{localStorage.removeItem('empv3:operator')}catch{}
     $('loginOverlay').classList.add('hidden');
@@ -2739,6 +2856,9 @@ function historyFollowupItems(){
     }
     const promise=t.promise_date||'';
     const promiseOverdue=promise?daysBetween(promise,today()):0;
+    const directiveStatus=t.directive_status||'none';
+    const bossDue=t.boss_requested_due_date||'';
+    const bossPending=directiveStatus==='pending';
     const remark=card?cardRemarkText(card):String(t.tenant_name||'').trim();
     return {
       source:card?'history':'history_unmatched',
@@ -2759,7 +2879,13 @@ function historyFollowupItems(){
       followup_status:t.followup_status||'待跟进',
       promise_date:promise,
       staff_note:t.staff_note||'',
-      force:promiseOverdue>3,
+      owner_note:t.owner_note||'',
+      directive_status:directiveStatus,
+      boss_requested_due_date:bossDue,
+      boss_requested_at:t.boss_requested_at||'',
+      staff_promised_at:t.staff_promised_at||'',
+      boss_directive:bossPending,
+      force:bossPending||promiseOverdue>3,
       raw:t
     };
   }).filter(Boolean);
@@ -2768,7 +2894,7 @@ function currentFollowupItems(){
   const history=historyFollowupItems();
   const historyBeds=new Set(history.map(x=>String(x.bed||'')).filter(Boolean));
   const items=[...dueFromLockCards().filter(x=>!historyBeds.has(String(x.bed||''))),...history];
-  items.sort((a,b)=>(Number(b.force)-Number(a.force))||(b.overdue_days-a.overdue_days)||(b.amount-a.amount));
+  items.sort((a,b)=>(Number(b.boss_directive)-Number(a.boss_directive))||(Number(b.force)-Number(a.force))||(b.overdue_days-a.overdue_days)||(b.amount-a.amount));
   state.followupItems=items;
   return items;
 }
@@ -2781,9 +2907,11 @@ function followupTitle(item){
 function followupCard(item){
   const id=safeDomId(item.task_id);
   const force=item.force;
-  const cls=force?'force':(item.source==='history'||item.source==='history_unmatched'?'history':'overdue');
+  const cls=item.boss_directive?'directive':(force?'force':(item.source==='history'||item.source==='history_unmatched'?'history':'overdue'));
   const source=item.source==='ttlock'?'通通锁过期 TTLOCK':(item.source==='history_unmatched'?'历史欠款 / 未匹配当前通通锁':'历史欠款 HISTORY');
   const matchTag=item.lock_match==='UNMATCHED'?'<span class="followup-tag bad">未匹配当前通通锁 · UNMATCHED</span>':'';
+  const directiveTag=item.boss_directive?`<span class="followup-tag bad">BOSS REQUEST · due ${esc(item.boss_requested_due_date||'-')}</span>`:'';
+  const ownerNote=item.owner_note?`<br>老板备注 OWNER NOTE: ${esc(item.owner_note)}`:'';
   const rentNote=item.amount>0?`${fmtMoney(item.amount)} AED`:'未配置月租';
   const editableStatuses=['待跟进','已联系','承诺付款','无法联系','转老板处理'];
   const currentStatus=String(item.followup_status||'待跟进');
@@ -2799,6 +2927,7 @@ function followupCard(item){
           <span class="followup-tag">${esc(source)}</span>
           <span class="followup-tag ${item.overdue_days>0?'bad':''}">过期 ${esc(item.overdue_days)} 天 · OVERDUE ${esc(item.overdue_days)}D</span>
           ${matchTag}
+          ${directiveTag}
           ${force?'<span class="followup-tag bad">必须承诺 · REQUIRED</span>':''}
         </div>
       </div>
@@ -2807,7 +2936,7 @@ function followupCard(item){
     <div class="followup-note">
       备注锚点 REMARK: ${esc(item.lock_remark||item.tenant_name||'-')} · CID: ${esc(item.tenant_card_id||'-')} · 押金 DEPOSIT: ${esc(item.deposit?fmtMoney(item.deposit):'-')}<br>
       日期锚点 PERIOD: ${esc(item.period_start||'-')} → ${esc(item.period_end||'-')} · 到期 DUE: ${esc(item.due_date||'-')}<br>
-      原因 REASON: ${esc(item.reason||'-')}
+      原因 REASON: ${esc(item.reason||'-')}${ownerNote}
     </div>
     <div class="followup-actions">
       <select id="followStatus_${id}">
@@ -2908,7 +3037,7 @@ async function saveFollowup(taskId){
     if(!r.ok)throw new Error('HTTP '+r.status);
     await loadTasks(false);
     renderTasks();
-    toast('跟进锚点已保存',6000);
+    toast(item.boss_directive?'已回执老板':'跟进锚点已保存',6000);
   }catch(e){
     toast('保存失败：'+(e.message||e),6000);
   }finally{
@@ -3086,6 +3215,9 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')closePreviewModal()}
 $('btnEmployeeLogin').onclick=employeeLogin;
 $('loginPin').addEventListener('keydown',e=>{if(e.key==='Enter')employeeLogin()});
 $('loginEmployeeId').addEventListener('keydown',e=>{if(e.key==='Enter')$('loginPin').focus()});
+$('employeeUserButton').onclick=e=>{e.stopPropagation();setEmployeeMenuOpen($('employeeUserMenu')?.hidden!==false)};
+$('btnEmployeeLogout').onclick=employeeLogout;
+document.addEventListener('click',e=>{if(!e.target.closest?.('#employeeUser'))setEmployeeMenuOpen(false)});
 function applyBilingualUILegacy(){
   const label=(id,zh,en)=>{const el=$(id);const l=el?.closest('.field')?.querySelector('label');if(l)l.innerHTML=`${zh}<span class="label-en">${en}</span>`};
   document.querySelectorAll('.body>.context-note:not(#contextNotice):not(#apTaskInfo)').forEach(el=>el.remove());
