@@ -55,3 +55,12 @@
 8. readonly_admin POST `/api/arrear_tasks/update` returns 403.
 9. readonly_admin cannot access entry write UI.
 10. readonly_admin settings write returns 403 or readonly payload.
+
+## Owner Arrears Batch UI Lock
+
+- readonly_admin can view arrears cards.
+- readonly_admin can expand card details.
+- readonly_admin can use read-only WhatsApp export.
+- readonly_admin must not see select-all or send-employee controls.
+- readonly_admin card actions remain detail-only.
+- Production cutover remains `PRODUCTION_NO_GO`.

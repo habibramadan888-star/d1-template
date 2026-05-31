@@ -1295,6 +1295,165 @@ function showArrearTaskActionHint(id){
   const label=task?`${arrearCustomerLabel(task)} ${arrearBedLabel(task)}`:'该欠款任务';
   toast(`${label} 的关闭/核对仍需通过正式审核流程处理`);
 }
+/* Owner arrears P1 interaction lock: UI/read-only only, no directive writes. */
+function normalizeArrearFilter(value){
+  const raw=String(value||'all');
+  return ['all','ttlock_expired_unpaid','existing_arrears_record'].includes(raw)?raw:'all';
+}
+function naturalArrearRoomBedKey(a){
+  return String(arrearBedLabel(a)||'床位待确认').replace(/^#/,'').trim();
+}
+function ownerArrearsNaturalCompare(a,b){
+  const bed=naturalArrearRoomBedKey(a).localeCompare(naturalArrearRoomBedKey(b),undefined,{numeric:true,sensitivity:'base'});
+  if(bed!==0)return bed;
+  const overdueDelta=Number(b?.overdue_days||b?.overdueDays||0)-Number(a?.overdue_days||a?.overdueDays||0);
+  if(overdueDelta!==0)return overdueDelta;
+  return String(a?.customerCode||a?.tenantCardId||'').localeCompare(String(b?.customerCode||b?.tenantCardId||''),undefined,{numeric:true,sensitivity:'base'});
+}
+function ownerArrearsFilteredRows(rows=ownerArrearsActiveRows()){
+  const filter=normalizeArrearFilter(state.arrearFilter);
+  return rows
+    .filter(a=>filter==='all'||normalizeArrearsSourceType(a?.sourceType)===filter)
+    .slice()
+    .sort(ownerArrearsNaturalCompare);
+}
+function setArrearDirectiveFilter(value){
+  state.arrearFilter=normalizeArrearFilter(value);
+  state.arrearsLimit=ARREARS_PAGE_SIZE;
+  renderOwnerOverviewArrearsPanel();
+  renderArrearsPanel();
+}
+function ownerArrearsVisibleCheckboxes(){
+  return [...document.querySelectorAll('[data-arrear-select]')].filter(el=>!el.disabled&&el.offsetParent!==null);
+}
+function syncArrearSelectAllState(){
+  const boxes=ownerArrearsVisibleCheckboxes();
+  const checked=boxes.filter(el=>el.checked).length;
+  const all=document.getElementById('arrearSelectAll');
+  const count=document.getElementById('arrearSelectionCount');
+  if(all){
+    all.checked=boxes.length>0&&checked===boxes.length;
+    all.indeterminate=checked>0&&checked<boxes.length;
+  }
+  if(count)count.textContent=`已选择 ${checked} / ${boxes.length}`;
+  return {boxes,checked};
+}
+function updateArrearDirectiveButtonState(){
+  const btn=document.getElementById('arrearDirectiveBtn');
+  const {checked}=syncArrearSelectAllState();
+  if(!btn)return;
+  btn.disabled=checked===0;
+  btn.style.opacity=checked?'1':'0.55';
+  btn.style.cursor=checked?'pointer':'not-allowed';
+  btn.textContent=checked?`下发员工（${checked}）`:'下发员工';
+}
+function toggleArrearSelectAll(checked){
+  if(!isOwnerWriteRole())return;
+  ownerArrearsVisibleCheckboxes().forEach(el=>{el.checked=!!checked;});
+  updateArrearDirectiveButtonState();
+}
+function ownerArrearsSelectedRows(){
+  const selected=new Set([...document.querySelectorAll('[data-arrear-select]:checked')].map(x=>x.value));
+  return ownerArrearsFilteredRows().filter(a=>selected.has(String(a?.taskId||a?.id||'')));
+}
+function renderOwnerArrearsTaskCard(a,today){
+  const directive=arrearDirectiveStatus(a);
+  const [statusLabel,statusColor,statusBg]=arrearStatusMeta(directive);
+  const overdue=a?.dueDate&&a.dueDate<today;
+  const taskId=esc(a?.taskId||a?.id||'');
+  const bed=esc(arrearBedLabel(a));
+  const amount=esc(arrearAmountLabel(a));
+  const source=esc(arrearSourceLabel(a));
+  const dueLine=esc(arrearDueLine(a,today));
+  const businessStatus=esc(arrearBusinessState(a)||statusLabel);
+  const promiseDate=esc(arrearPromiseDateLabel(a));
+  const note=esc(arrearFollowupNoteLabel(a));
+  const owner=esc(cleanArrearText(a?.staffName||a?.staff_name||a?.userid||a?.userId,'待分配'));
+  return `<article class="hist-card owner-arrears-task-card ${overdue?'is-overdue':''}" data-owner-arrear-task-card="true" data-arrear-pool-kind="${esc(normalizeArrearsSourceType(a?.sourceType))}">
+    <div class="owner-arrears-card-top">
+      ${isOwnerWriteRole()?`<input class="arrear-task-select" type="checkbox" data-arrear-select value="${taskId}" aria-label="选择欠款任务 ${bed} ${amount}">`:''}
+      <div class="owner-arrears-identity" data-owner-arrears-business-title="true"><strong>${bed}</strong><b>｜${amount}</b></div>
+    </div>
+    <div class="hist-anchor owner-arrears-due-line">${source}｜${dueLine}</div>
+    <details class="owner-arrears-card-detail" data-owner-arrears-card-detail="true">
+      <summary>展开详情</summary>
+      <div class="hist-stat"><span>承诺日期</span><span class="mono">${promiseDate}</span></div>
+      <div class="hist-stat"><span>备注</span><span>${note}</span></div>
+      <div class="hist-stat"><span>状态</span><span class="owner-arrears-status-pill" style="color:${statusColor};background:${statusBg}">${businessStatus}</span></div>
+      <div class="hist-stat"><span>来源</span><span>${source}</span></div>
+      <div class="hist-stat"><span>负责人</span><span>${owner}</span></div>
+      <div class="owner-arrears-card-actions">${renderArrearCardActions(a)}</div>
+    </details>
+  </article>`;
+}
+function buildArrearsWhatsAppText(rows=ownerArrearsFilteredRows()){
+  const list=rows.slice(0,80);
+  const today=fmtD(new Date());
+  const dueLabel=list[0]?.dueDate?String(list[0].dueDate).slice(5).replace('-','/'):'--/--';
+  const overdueCount=list.filter(a=>a?.dueDate&&a.dueDate<today).length;
+  return [
+    `Due ${dueLabel} | ${overdueCount} overdue`,
+    '',
+    ...list.map((a,i)=>{
+      const bed=arrearBedLabel(a);
+      const code=cleanArrearText(a?.customerCode||a?.cardCode||a?.tenantCardId,'-').replace(/^#/,'');
+      const days=a?.dueDate?Math.max(0,Math.ceil((new Date(today)-new Date(a.dueDate))/(1000*60*60*24))):0;
+      const pkg=cleanArrearText(a?.packageCode||a?.type,'D100');
+      const due=cleanArrearText(a?.dueDate,'--');
+      return `${i+1}. ${bed}  ${days}d${days>0?'🔥':''}  ${pkg}  ${code}  ${due}`;
+    })
+  ].join('\n');
+}
+function showArrearsWhatsAppFallback(text,url){
+  const old=document.querySelector('.owner-arrears-export-fallback');
+  if(old)old.remove();
+  const box=document.createElement('div');
+  box.className='owner-arrears-export-fallback';
+  box.innerHTML=`<div class="cc-modal" style="display:flex"><div class="cc-modal-card" style="max-width:560px">
+    <div class="modal-head"><b>WhatsApp 导出文本</b><button type="button" class="secondary" data-arrears-export-close="true">关闭</button></div>
+    <textarea class="inp" style="min-height:220px;white-space:pre-wrap">${esc(text)}</textarea>
+    <a class="btn btn-primary btn-block" href="${esc(url)}" target="_blank" rel="noopener noreferrer">打开 WhatsApp</a>
+  </div></div>`;
+  document.body.appendChild(box);
+  box.querySelector('[data-arrears-export-close]')?.addEventListener('click',()=>box.remove());
+  hydrateInlineHandlers(box);
+}
+async function exportArrearsWhatsApp(){
+  const rows=ownerArrearsFilteredRows();
+  if(!rows.length){toast('当前筛选没有可导出的欠款','err');return;}
+  const text=buildArrearsWhatsAppText(rows);
+  const url='https://wa.me/?text='+encodeURIComponent(text);
+  let copied=false;
+  try{
+    if(navigator.clipboard?.writeText){
+      await navigator.clipboard.writeText(text);
+      copied=true;
+    }
+  }catch{}
+  if(copied)toast('WhatsApp 文本已复制');
+  else toast('无法复制，请手动复制','err');
+  let opened=null;
+  try{opened=window.open(url,'_blank','noopener,noreferrer');}catch{}
+  if(!opened)showArrearsWhatsAppFallback(text,url);
+}
+async function sendArrearDirectives(){
+  if(!isOwnerWriteRole())return;
+  const ids=[...document.querySelectorAll('[data-arrear-select]:checked')].map(x=>x.value).filter(Boolean);
+  if(!ids.length){toast('请先选择要下发的欠款','err');return;}
+  const rows=ownerArrearsSelectedRows();
+  const text=buildArrearsWhatsAppText(rows);
+  toast(`已生成下发员工清单（dry-run）：${ids.length} 条`);
+  showArrearsWhatsAppFallback(text,'https://wa.me/?text='+encodeURIComponent(text));
+}
+function selectArrearForDirective(id){
+  if(!isOwnerWriteRole())return;
+  const target=String(id||'');
+  const box=[...document.querySelectorAll('[data-arrear-select]')].find(el=>el.value===target);
+  if(box){
+    box.checked=true;
+    updateArrearDirectiveButtonState();
+  }
+}
 function clearArrearsLoadingTimers(){
   if(state.arrearsSlowTimer){
     clearTimeout(state.arrearsSlowTimer);
@@ -1588,6 +1747,124 @@ function renderArrearsPanel(){
   if(more)more.onclick=()=>{state.arrearsLimit=(state.arrearsLimit||ARREARS_PAGE_SIZE)+ARREARS_PAGE_SIZE;loadArrearsForOwner({showLoading:false,limit:state.arrearsLimit});};
 }
 /* ── 录入收款/押金 → 不直接核销，引导员工录入流水 ── */
+function renderOwnerArrearsControls(){
+  const sourceOptions=[
+    ['all','全部'],
+    ['ttlock_expired_unpaid','通通锁已过期'],
+    ['existing_arrears_record','系统已有欠款']
+  ];
+  return `<div class="owner-arrears-controls" data-owner-arrears-actions="true">
+    ${isOwnerWriteRole()?`<label class="owner-arrears-select-all"><input id="arrearSelectAll" type="checkbox" onchange="toggleArrearSelectAll(this.checked)"> 全选</label>
+    <span class="owner-arrears-selection-count" id="arrearSelectionCount">已选择 0 / 0</span>
+    <button class="btn btn-primary" id="arrearDirectiveBtn" disabled onclick="sendArrearDirectives()">下发员工</button>`:''}
+    <button type="button" class="btn btn-ghost" onclick="exportArrearsWhatsApp()">WhatsApp 导出</button>
+    <label class="owner-arrears-filter-label">来源</label>
+    <select class="sel owner-arrears-filter" onchange="setArrearDirectiveFilter(this.value)">
+      ${sourceOptions.map(([v,label])=>`<option value="${v}" ${normalizeArrearFilter(state.arrearFilter)===v?'selected':''}>${label}</option>`).join('')}
+    </select>
+  </div>`;
+}
+function renderOwnerOverviewArrearsPanel(){
+  const panel=document.getElementById('ownerOverviewArrearsPanel');
+  if(!panel)return;
+  const status=state.arrearsStatus||'idle';
+  if(status==='idle'||status==='loading'){
+    panel.innerHTML=`<div class="owner-overview-arrears-skeleton" data-owner-overview-arrears-skeleton="true">
+      <div class="hist-toolbar"><span>欠款跟进</span><span class="hist-order">${state.arrearsSlow?'仍在读取':'LOADING'}</span></div>
+      <div class="hist-grid owner-arrears-skeleton">
+        ${Array.from({length:2}).map(()=>'<div class="hist-card skeleton-card" style="min-height:116px;background:linear-gradient(90deg,rgba(255,255,255,.58),rgba(226,239,233,.72),rgba(255,255,255,.58));background-size:220% 100%;animation:pulse 1.2s ease-in-out infinite"></div>').join('')}
+      </div>
+      ${state.arrearsSlow?'<div class="empty-text" style="text-align:center;margin-top:8px">仍在读取，页面不会空白；请稍候或重试。</div>':''}
+    </div>`;
+    return;
+  }
+  if(status==='timeout'||status==='error'){
+    panel.innerHTML=`<div class="empty-state hl-empty-state" data-owner-overview-arrears-error="true">
+      <div class="empty-title">欠款数据读取失败</div>
+      <div class="empty-text">欠款模块失败不会影响总览其他模块。</div>
+      <button class="btn btn-primary" type="button" onclick="retryOwnerOverviewArrears()">重试</button>
+    </div>`;
+    return;
+  }
+  const rows=ownerArrearsFilteredRows();
+  if(!rows.length||status==='empty'){
+    panel.innerHTML=`<div class="empty-state hl-empty-state" data-owner-overview-arrears-empty="true">
+      <div class="empty-title">暂无未结清欠款</div>
+      <div class="empty-text">这里只显示系统已有欠款，以及通通锁到期未付且已匹配床位租金的任务。</div>
+      ${ownerArrearsSourceNotice()}
+      <button class="btn btn-ghost" type="button" onclick="retryOwnerOverviewArrears()">重新读取</button>
+    </div>`;
+    return;
+  }
+  const active=ownerArrearsActiveRows();
+  const summary=state.arrearsSummary||ownerArrearsSummary(active);
+  const pool=state.arrearsPoolResult||{};
+  const pagination=state.arrearsPagination||pool.pagination||{};
+  const totalCount=Number(summary.total_count??pagination.total_count??active.length);
+  const today=fmtD(new Date());
+  const sorted=state.arrearsExpanded?rows:rows.slice(0,ARREARS_OVERVIEW_PAGE_SIZE);
+  const limit=state.arrearsExpanded?Math.min(state.arrearsLimit||ARREARS_PAGE_SIZE,sorted.length):sorted.length;
+  const pageRows=sorted.slice(0,limit);
+  const displayText=state.arrearsExpanded
+    ? `已显示 ${pageRows.length} / 共 ${rows.length}`
+    : `预览 ${pageRows.length} / 共 ${rows.length}`;
+  const viewAllLabel=state.arrearsExpanded?'收起':`查看全部 ${rows.length}`;
+  panel.innerHTML=`<div class="owner-overview-arrears-content" data-owner-overview-arrears-loaded="true" data-owner-arrears-visible-count="${pageRows.length}" data-owner-arrears-total-count="${rows.length}">
+    <div class="owner-arrears-summary" data-owner-arrears-kpis="true">
+      <span>总额 ${fmtMoney(Number(summary.total_amount_fils||0)/100)} AED</span>
+      <span>需跟进 ${Number(summary.total_count||totalCount||0)}</span>
+      <span>系统欠款 ${Number(summary.existing_arrears_count||0)}</span>
+      <span>通通锁 ${Number(summary.ttlock_expired_unpaid_count||0)}</span>
+      <span data-owner-arrears-preview-count="true">${esc(displayText)}</span>
+    </div>
+    ${ownerArrearsSourceNotice()}
+    ${renderOwnerArrearsControls()}
+    <div class="hist-grid owner-arrears-list" data-owner-arrears-card-list="true">
+      ${pageRows.map(a=>renderOwnerArrearsTaskCard(a,today)).join('')}
+    </div>
+    <button type="button" class="btn btn-ghost btn-block" data-owner-arrears-view-all="true" style="margin-top:12px">${esc(viewAllLabel)}</button>
+    ${state.arrearsExpanded&&(rows.length>pageRows.length||state.arrearsPoolResult?.has_more)?`<button class="btn btn-primary btn-block" type="button" style="margin-top:14px" onclick="state.arrearsLimit=(state.arrearsLimit||ARREARS_PAGE_SIZE)+ARREARS_PAGE_SIZE;loadArrearsForOwner({showLoading:false,limit:state.arrearsLimit})">加载更多欠款</button>`:''}
+  </div>`;
+  updateArrearDirectiveButtonState();
+}
+function renderArrearsPanel(){
+  const panel=document.getElementById('arrearsPanel');
+  if(!panel) return;
+  const active=ownerArrearsActiveRows();
+  if(!active.length){
+    panel.innerHTML=isOwnerShellRole()
+      ? `<div class="empty-state card" style="padding:44px"><div class="empty-ico">📋</div><div class="empty-title">暂无未结清欠款</div><div class="empty-text">这里只显示系统已有欠款，以及通通锁到期未付且已配置床位租金的卡片。</div></div>`
+      : '';
+    return;
+  }
+  const today=fmtD(new Date());
+  const filtered=ownerArrearsFilteredRows(active);
+  const visibleLimit=state.arrearsLimit||ARREARS_PAGE_SIZE;
+  const pageRows=filtered.slice(0,visibleLimit);
+  const hasMore=filtered.length>visibleLimit||!!state.arrearsPoolResult?.has_more;
+  const summary=state.arrearsSummary||{};
+  const totalCount=Number(summary.total_count||state.arrearsPagination?.total_count||active.length);
+  const totalAmount=Number(summary.total_amount_fils||0)/100;
+  panel.innerHTML=`<div class="arrears-panel card" data-owner-arrears-info-pool="true">
+    <div class="hist-toolbar owner-arrears-toolbar">
+      <span>未结清 ${totalCount} 条｜${fmtMoney(totalAmount)} AED｜显示 ${pageRows.length}/${filtered.length}</span>
+      <span class="hist-order">ROOM/BED SORT</span>
+    </div>
+    <div class="owner-arrears-summary" data-owner-arrears-kpis="true">
+      <span>全部 ${active.length}</span>
+      <span>通通锁 ${active.filter(a=>normalizeArrearsSourceType(a?.sourceType)==='ttlock_expired_unpaid').length}</span>
+      <span>系统欠款 ${active.filter(a=>normalizeArrearsSourceType(a?.sourceType)==='existing_arrears_record').length}</span>
+    </div>
+    ${renderOwnerArrearsControls()}
+    <div class="hist-grid owner-arrears-list" data-owner-arrears-card-list="true">
+      ${pageRows.map(a=>renderOwnerArrearsTaskCard(a,today)).join('')}
+    </div>
+    ${hasMore?`<button class="btn btn-primary btn-block" id="btnArrearsLoadMore" type="button" style="margin-top:14px">加载更多欠款</button>`:''}
+  </div>`;
+  updateArrearDirectiveButtonState();
+  const more=document.getElementById('btnArrearsLoadMore');
+  if(more)more.onclick=()=>{state.arrearsLimit=(state.arrearsLimit||ARREARS_PAGE_SIZE)+ARREARS_PAGE_SIZE;loadArrearsForOwner({showLoading:false,limit:state.arrearsLimit});};
+}
 function enterPaymentForArrear(id){
   if(denyReadonlyAdminWrite())return;
   const ar=state.arrears.find(a=>a.id===id);
@@ -5381,7 +5658,10 @@ const INLINE_ACTIONS=new Set([
   'toggleAnaPanel','showRenewalDetails','toggleClientContinuity','anaToggle','ccDelPayment','ccShowAddPayment','ccToggle',
   'ccDelCustomer','ccSubmitCustomer','ccPreviewDays','ccSubmitPayment','closePanel','cp_toggleStaff','cp_loadAll','cp_exportTxt',
   'cp_openModal','cp_setFilter','cp_closeModal','cp_copyModal','cp_exportModal','cp_applyFilter','cp_toggleRoom'
-  ,'toggleHistSelection','clearHistSelection'
+  ,'toggleHistSelection','clearHistSelection',
+  'setArrearDirectiveFilter','toggleArrearSelectAll','sendArrearDirectives','exportArrearsWhatsApp',
+  'selectArrearForDirective','showArrearTaskDetails','showArrearTaskActionHint','retryOwnerOverviewArrears',
+  'loadArrearsForOwner'
 ]);
 function parseInlineArgs(src, el, event){
   const out=[];let cur='',q='',escNext=false;

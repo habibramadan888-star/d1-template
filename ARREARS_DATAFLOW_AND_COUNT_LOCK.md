@@ -93,3 +93,11 @@ Backend `/api/boss/arrears/followup-tasks` is the locked SOT for owner arrears d
 - Authenticated live count/list/view-all verification is `MANUAL_REQUIRED` because creating a new production session would write D1.
 - No D1 write or migration was executed.
 - Production remains `PRODUCTION_NO_GO`.
+
+## Source Filter / Sort Lock
+
+- Owner arrears filter exposes only `all`, `ttlock_expired_unpaid`, and `existing_arrears_record`.
+- Source counts and totals remain backend-authoritative.
+- Frontend room/bed sorting is display-only and must not mutate `state.arrears`, source counts, totals, or backend SOT payloads.
+- WhatsApp export uses the currently displayed Backend SOT rows after source filter and display sort.
+- No D1 write or migration is allowed for this UI layer.

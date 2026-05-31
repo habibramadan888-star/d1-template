@@ -1847,3 +1847,16 @@ Expected invariant:
 | Backend compatibility    | READY   | Legacy promised amount fields are accepted but not written by staff default update flow. |
 | Migration / D1 write     | NOT_RUN | Prohibited and not executed.                                                             |
 | Production cutover       | NO_GO   | `PRODUCTION_NO_GO` remains unchanged.                                                    |
+## Owner Arrears Batch Display / Export Verification
+
+- Scope: UI/read-only behavior, no deploy.
+- Safety: no D1 write, no migration, no D1 execute/export/import, no business write.
+- Required checks added:
+  - `test:owner-arrears-batch-select`
+  - `test:owner-arrears-send-directive-ui`
+  - `test:owner-arrears-collapsible-card`
+  - `test:owner-arrears-filter-simplified`
+  - `test:owner-arrears-room-bed-sort`
+  - `test:owner-arrears-whatsapp-export`
+  - `test:readonly-admin-arrears-batch-ui`
+- `gate:commercial-launch` must remain `PRODUCTION_NO_GO`.

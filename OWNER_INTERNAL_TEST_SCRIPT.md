@@ -230,3 +230,15 @@ Stop the test if any old row/table layout, third source, debug field, or 20-seco
 5. 欠款不允许出现在一级 Tab。
 6. 分析入口必须存在，网络入口必须可访问。
 7. Production cutover remains `PRODUCTION_NO_GO`.
+## Owner Arrears Batch Display / Export QA
+
+1. Open owner arrears page.
+2. Verify filters only show `全部`, `通通锁已过期`, `系统已有欠款`.
+3. Choose each filter and verify select-all only selects visible tasks in that filter.
+4. Verify selected count shows `已选择 N / M`.
+5. Verify "下发员工" without selection prompts the user to select arrears first.
+6. Verify "下发员工" with selection generates a dry-run execution list and does not submit a backend write.
+7. Verify default cards are compact and details expand per card.
+8. Verify WhatsApp export copies text or shows a manual fallback.
+9. Verify readonly_admin can view/export but cannot see select-all or send-employee write controls.
+10. Confirm no D1 write, migration, or production deploy was performed.

@@ -65,3 +65,10 @@ Create a dedicated compatibility task to remove or ignore `promise_amount` from 
 - Default employee UI must not display or submit promised amount fields.
 - No migration or D1 write was performed.
 - Production cutover remains `PRODUCTION_NO_GO`.
+
+## Owner Batch Directive UI Lock
+
+- Current owner-side "send employee" flow is dry-run/list-generation only unless a separate write approval is issued.
+- The owner UI no longer asks for a directive date before generating the employee execution list.
+- Employee write flows are not executed by owner arrears batch selection tests.
+- Production cutover remains `PRODUCTION_NO_GO`.

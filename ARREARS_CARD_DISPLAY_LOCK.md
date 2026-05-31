@@ -80,3 +80,12 @@ Current card no longer calls `arrearPromiseAmountLabel()` in the default card pa
 - Promised amount fields are legacy optional only and may not re-enter the default owner card.
 - No dashboard calculation, financial formula, D1 write, or migration was performed.
 - Production cutover remains `PRODUCTION_NO_GO`.
+
+## Batch Display / Export Lock
+
+- Owner arrears cards default to collapsed compact mode.
+- Default card shows only bed/room-bed, amount, source, and due/overdue line.
+- Promise date, note, status, source detail, owner/staff assignment, and actions belong inside the card disclosure.
+- Select-all is allowed only for owner write roles and applies only to the current source filter result.
+- WhatsApp export must remain available as the employee execution-list outlet and must provide a manual fallback.
+- Production cutover remains `PRODUCTION_NO_GO`.
