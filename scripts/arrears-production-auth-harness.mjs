@@ -84,6 +84,8 @@ async function requestJson(pathname, options = {}) {
     ...options,
     headers: {
       "Content-Type": "application/json",
+      "Origin": BASE_URL,
+      "User-Agent": "HomelinkArrearsAuthHarness/1.0",
       ...(options.headers || {})
     }
   });
@@ -118,6 +120,27 @@ async function loginOwner(values) {
   return {
     usable: me.response.status === 200,
     roleMatched: ["owner", "manager", "admin"].includes(role),
+    status: me.response.status
+  };
+}
+
+async function loginAdmin(values) {
+  const login = await requestJson("/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ password: values.ADMIN_PASSWORD })
+  });
+  const cookie = collectCookie(login.response);
+  if (login.response.status !== 200 || !cookie) {
+    return { usable: false, roleMatched: false, status: login.response.status };
+  }
+  const me = await requestJson("/api/me", {
+    method: "GET",
+    headers: { Cookie: cookie }
+  });
+  const role = roleFromMe(me.body);
+  return {
+    usable: me.response.status === 200,
+    roleMatched: ["admin", "readonly_admin", "admin_readonly"].includes(role),
     status: me.response.status
   };
 }
@@ -210,6 +233,7 @@ async function main() {
 
   const owner = await loginOwner(values);
   const employee = await loginEmployee(values);
+  const admin = await loginAdmin(values);
   console.log(
     JSON.stringify(
       {
@@ -220,6 +244,9 @@ async function main() {
         employee_auth_usable: employee.usable ? "yes" : "no",
         employee_role_matched: employee.roleMatched ? "yes" : "no",
         employee_status: employee.status,
+        admin_auth_usable: admin.usable ? "yes" : "no",
+        admin_role_matched: admin.roleMatched ? "yes" : "no",
+        admin_status: admin.status,
         cookie_value: "[REDACTED]",
         set_cookie_value: "[REDACTED]",
         password_printed: "no",
@@ -235,7 +262,7 @@ async function main() {
       2
     )
   );
-  return owner.usable && owner.roleMatched && employee.usable && employee.roleMatched ? 0 : 1;
+  return owner.usable && owner.roleMatched && employee.usable && employee.roleMatched && admin.usable && admin.roleMatched ? 0 : 1;
 }
 
 const exitCode = await main();
