@@ -6210,3 +6210,12 @@ Safety:
 - Owner arrears cards no longer show a primary clickable `下发员工` action for assigned or employee-followed-up tasks.
 - No production write, write gate opening, deploy, migration, batch dispatch, TTLock smoke, financial formula change, or dashboard calculation change was performed.
 - Production cutover remains `PRODUCTION_NO_GO`.
+
+## Arrears Follow-up Persisted State Live Audit - 2026-06-01
+
+- Read-only live audit concluded `LIVE_NOT_DEPLOYED`.
+- Live assets do not contain commit `223cbbb` markers: `serverOriginalPromisedDate`, `updateEmployeeDirectivePersistedState`, or owner `assigned-state` / `followed-up-state`.
+- The phone behavior is consistent with production still serving an older UI asset, not with a new production write issue.
+- Default action is no deploy; deployment requires separate approval and must be limited to UI state/button fixes only.
+- No production write, write gate opening, deploy, migration, batch dispatch, TTLock smoke, financial formula change, or dashboard calculation change was performed.
+- Production cutover remains `PRODUCTION_NO_GO`.

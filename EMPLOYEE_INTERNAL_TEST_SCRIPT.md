@@ -197,3 +197,11 @@ During employee QA, confirm:
 5. With write gate off, submit the dirty edit and confirm the warning says the current modification will not write to production.
 6. Confirm amount edit, close, void, handover, and promised amount remain unavailable.
 7. Production cutover remains `PRODUCTION_NO_GO`.
+
+## Live Persisted State Deployment Check - 2026-06-01
+
+1. Before repeating phone acceptance, confirm the live asset contains `serverOriginalPromisedDate` and `updateEmployeeDirectivePersistedState`.
+2. If those markers are missing, treat the issue as `LIVE_NOT_DEPLOYED`.
+3. Do not submit another employee follow-up to validate this UI state.
+4. Do not open write gate for UI acceptance.
+5. Production cutover remains `PRODUCTION_NO_GO`.

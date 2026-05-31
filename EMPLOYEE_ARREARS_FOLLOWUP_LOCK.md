@@ -76,6 +76,14 @@ Create a dedicated compatibility task to remove or ignore `promise_amount` from 
 - No production write, write gate opening, migration, batch dispatch, TTLock smoke, financial formula change, or dashboard calculation change is part of this UI lock.
 - Production cutover remains `PRODUCTION_NO_GO`.
 
+## Live Deploy Audit Lock - 2026-06-01
+
+- If the live phone still shows gate-off warning for unchanged saved feedback, first verify that the deployed asset contains the persisted-state markers.
+- `LIVE_NOT_DEPLOYED` must be treated as a deploy approval question, not as a reason to perform another production write.
+- Date comparison must be normalized and note comparison must be trimmed before deploying any further hardening.
+- All employee boss directive renderers must use the same saved/dirty state model.
+- Production cutover remains `PRODUCTION_NO_GO`.
+
 ## Owner Batch Directive UI Lock
 
 - Current owner-side "send employee" flow is dry-run/list-generation only unless a separate write approval is issued.

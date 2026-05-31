@@ -2029,3 +2029,15 @@ Deployment verification:
 | Production write / gate | NOT_RUN | No production write and no write gate opening in this UI fix. |
 | D1 migration / deploy | NOT_RUN | No migration, D1 execute/export/import, or deploy was performed. |
 | Production cutover | NO_GO | Remains `PRODUCTION_NO_GO`. |
+
+## Arrears Follow-up Persisted State Live Audit Verification - 2026-06-01
+
+| Area | Status | Notes |
+|---|---|---|
+| Live deploy audit | COMPLETE | Conclusion: `LIVE_NOT_DEPLOYED`. |
+| Live employee state markers | MISSING | Live asset does not expose the `223cbbb` persisted-state markers. |
+| Live owner button markers | MISSING | Live `index-51-main.js` lacks `assigned-state` / `followed-up-state`. |
+| Recommended action | APPROVAL_REQUIRED | Deploy UI-only fix if phone acceptance is required. |
+| Production write / gate | NOT_RUN | No production write and no write gate opening in this audit. |
+| D1 migration / deploy | NOT_RUN | No migration, D1 execute/export/import, or deploy was performed. |
+| Production cutover | NO_GO | Remains `PRODUCTION_NO_GO`. |

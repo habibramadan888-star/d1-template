@@ -411,3 +411,13 @@ Production cutover remains `PRODUCTION_NO_GO`.
 - Owner cards for assigned/followed-up tasks must not continue to show a primary clickable `下发员工` action.
 - This QA does not authorize production writes, migration, deploy, TTLock smoke, or batch dispatch.
 - Production cutover remains `PRODUCTION_NO_GO`.
+
+## Live Persisted State Audit QA - 2026-06-01
+
+- If phone acceptance still shows the old warning, first inspect live assets for the `223cbbb` UI markers.
+- Missing markers mean the fix is not deployed, not that another follow-up write is needed.
+- Date comparison must normalize equivalent dates such as `2026-06-10` and phone-displayed `2026/06/10`.
+- Note comparison must trim whitespace.
+- All employee boss directive renderers must use the same saved/dirty state model.
+- Owner followed-up tasks must not show clickable primary `下发员工`.
+- Production cutover remains `PRODUCTION_NO_GO`.

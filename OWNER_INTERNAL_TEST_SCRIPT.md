@@ -366,3 +366,11 @@ Production cutover remains `PRODUCTION_NO_GO`.
 5. Confirm readonly_admin still sees details only.
 6. Do not execute any owner directive write or batch dispatch.
 7. Production cutover remains `PRODUCTION_NO_GO`.
+
+## Live Owner Button Deployment Check - 2026-06-01
+
+1. Before repeating owner phone acceptance, confirm live `index-51-main.js` contains `assigned-state` and `followed-up-state`.
+2. If those markers are missing, treat the issue as `LIVE_NOT_DEPLOYED`.
+3. Do not create another owner directive to validate this UI state.
+4. Do not open write gate for UI acceptance.
+5. Production cutover remains `PRODUCTION_NO_GO`.
