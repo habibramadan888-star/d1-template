@@ -51,3 +51,11 @@ Owner default card does not show:
 1. Promised amount.
 2. Internal IDs.
 3. Raw source/status fields.
+## Arrears Directive Real Delivery Lock - 2026-05-31
+
+- Dry-run is not real employee directive delivery.
+- Real delivery requires persistent directive state in `arrear_tasks`.
+- Employee feedback is limited to promised payment date and follow-up note.
+- Employees must not edit arrears amount or close tasks.
+- Production writes require separate approval; live remains dry-run before approval.
+- Production cutover remains `PRODUCTION_NO_GO`.

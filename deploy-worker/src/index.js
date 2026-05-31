@@ -1366,15 +1366,35 @@ function empCleanIsoDate(value){
 __name(empCleanIsoDate,"empCleanIsoDate");
 function empDirectiveStatus(t){
   const raw=cleanText(t?.directive_status||"none",20);
-  return ["none","pending","promised","overdue"].includes(raw)?raw:"none";
+  return ["none","pending","assigned","viewed","promised","followed_up","needs_review","closed","cancelled","overdue"].includes(raw)?raw:"none";
 }
 __name(empDirectiveStatus,"empDirectiveStatus");
 function empDirectiveIsOverdue(t){
   const status=empDirectiveStatus(t);
   const promise=empCleanIsoDate(t?.promise_date||"");
-  return (status==="promised"||status==="overdue")&&promise&&promise<empTodayDubai()&&empTaskRemaining(t)>0;
+  return (status==="promised"||status==="followed_up"||status==="needs_review"||status==="overdue")&&promise&&promise<empTodayDubai()&&empTaskRemaining(t)>0;
 }
 __name(empDirectiveIsOverdue,"empDirectiveIsOverdue");
+function arrearsDirectiveWriteApproved(env){
+  return String(env?.ARREARS_DIRECTIVE_WRITE_APPROVED||"").toLowerCase()==="true" ||
+    String(env?.ARREARS_DIRECTIVE_WRITE_MODE||"").toLowerCase()==="approved";
+}
+__name(arrearsDirectiveWriteApproved,"arrearsDirectiveWriteApproved");
+function arrearsDirectiveApprovalRequired(operation="arrears_directive_write"){
+  return errorResponse("production_write_approval_required",409,void 0,{
+    approval_required:true,
+    operation,
+    dry_run_only:true
+  });
+}
+__name(arrearsDirectiveApprovalRequired,"arrearsDirectiveApprovalRequired");
+function normalizeDirectiveStatusForEmployee(status){
+  const raw=cleanText(status||"none",30);
+  if(raw==="pending")return "assigned";
+  if(raw==="promised")return "promised";
+  return ["assigned","viewed","followed_up","needs_review","closed","cancelled","overdue"].includes(raw)?raw:"none";
+}
+__name(normalizeDirectiveStatusForEmployee,"normalizeDirectiveStatusForEmployee");
 async function empInsertDynamic(env, table, values, allowed){
   const cols=await empTableColumns(env,table);
   const names=[];
@@ -1887,6 +1907,9 @@ function empTaskToBossArrear(t){
     actual_received:cleanMoney(t?.actual_received||0),
     owner_note:cleanText(t?.owner_note||"",500),
     staff_note:cleanText(t?.staff_note||"",500),
+    userid:cleanText(t?.userid||"",80),
+    assigned_employee_id:cleanText(t?.userid||"",80),
+    assigned_employee_name:cleanText(t?.userid||"",80),
     boss_requested_at:cleanText(t?.boss_requested_at||"",40),
     boss_requested_by:cleanText(t?.boss_requested_by||"",80),
     boss_requested_due_date:empCleanIsoDate(t?.boss_requested_due_date||""),
@@ -2361,6 +2384,135 @@ async function handleArrearTaskDirective(request,env,user){
   return success({success:true,updated_count:updatedCount,not_found:notFound});
 }
 __name(handleArrearTaskDirective,"handleArrearTaskDirective");
+function empTaskToEmployeeDirective(t){
+  const view=empTaskToBossArrear(t);
+  return {
+    id:view.task_id||view.id,
+    directive_id:view.task_id||view.id,
+    task_id:view.task_id||view.id,
+    room_bed:view.room_bed,
+    customer_code:view.customer_code,
+    amount_fils:view.amount_fils,
+    source_type:view.source_type,
+    due_date:view.due_date,
+    overdue_days:view.overdue_days,
+    directive_status:normalizeDirectiveStatusForEmployee(view.directive_status),
+    promised_payment_date:view.promised_payment_date,
+    followup_note:view.followup_note,
+    owner_note:view.owner_note,
+    assigned_employee_id:cleanText(t?.userid||"",80),
+    assigned_employee_name:cleanText(t?.userid||"",80),
+    staff_promised_at:view.staff_promised_at
+  };
+}
+__name(empTaskToEmployeeDirective,"empTaskToEmployeeDirective");
+async function handleBossArrearsDirectives(request,env,user){
+  if(!requireManager(user))return forbidden();
+  await empEnsureSchema(env);
+  let body;
+  try{body=await request.json();}catch{return badRequest("invalid_json");}
+  const ids=Array.isArray(body?.task_ids)?body.task_ids.map(x=>cleanId(x)).filter(Boolean):[];
+  const uniqueIds=[...new Set(ids)].slice(0,100);
+  const idempotencyKey=cleanText(body?.idempotency_key||request.headers.get("Idempotency-Key")||"",120);
+  if(!uniqueIds.length)return badRequest("task_ids_required");
+  if(!idempotencyKey)return badRequest("idempotency_key_required");
+  if(!arrearsDirectiveWriteApproved(env))return arrearsDirectiveApprovalRequired("boss_arrears_directives_create");
+  const assignedFallback=cleanText(body?.assigned_employee_id||"",80);
+  const note=cleanText(body?.note||"",500);
+  const actor=cleanText(user.userid,80);
+  const now=empNow();
+  let createdCount=0;
+  let skippedDuplicateCount=0;
+  const notFound=[];
+  const directives=[];
+  for(const taskId of uniqueIds){
+    const old=await env.DB.prepare("SELECT * FROM arrear_tasks WHERE task_id=? AND corpid=? LIMIT 1").bind(taskId,user.corpid).first();
+    if(!old||!empCloseStatusIsOpen(old.close_status)){notFound.push(taskId);continue;}
+    const current=empDirectiveStatus(old);
+    if(["assigned","pending","viewed","promised","followed_up","needs_review"].includes(current)){
+      skippedDuplicateCount+=1;
+      directives.push(empTaskToEmployeeDirective(old));
+      continue;
+    }
+    const assigned=assignedFallback||cleanText(old.userid||"",80)||actor;
+    const updates=[
+      "userid=?",
+      "boss_requested_at=?",
+      "boss_requested_by=?",
+      "directive_status='assigned'",
+      "updated_by=?",
+      "updated_at=?"
+    ];
+    const vals=[assigned,now,actor,actor,now];
+    if(note){updates.push("owner_note=?");vals.push(note);}
+    vals.push(taskId,user.corpid);
+    const result=await env.DB.prepare(`UPDATE arrear_tasks SET ${updates.join(",")} WHERE task_id=? AND corpid=?`).bind(...vals).run();
+    const changes=Number(result?.meta?.changes??result?.changes??0);
+    if(changes>0){
+      createdCount+=changes;
+      const updated={...old,userid:assigned,boss_requested_at:now,boss_requested_by:actor,directive_status:"assigned",owner_note:note||old.owner_note,updated_by:actor,updated_at:now};
+      directives.push(empTaskToEmployeeDirective(updated));
+      await empEvent(env,user,{ref_id:taskId,ref_type:"arrear_task",event_type:"directive_assigned",field_name:"directive_status",old_value:old.directive_status||"none",new_value:"assigned",operator_id:actor,ts:now});
+    }else{
+      notFound.push(taskId);
+    }
+  }
+  await audit(env,user,"boss.arrears.directives.create",uniqueIds.join(","),{
+    idempotency_key:idempotencyKey,
+    created_count:createdCount,
+    skipped_duplicate_count:skippedDuplicateCount,
+    not_found:notFound.length
+  }).catch(()=>{});
+  return success({ok:true,created_count:createdCount,skipped_duplicate_count:skippedDuplicateCount,not_found:notFound,directives});
+}
+__name(handleBossArrearsDirectives,"handleBossArrearsDirectives");
+async function handleEmployeeArrearsDirectives(request,env,user){
+  if(!isStaffRoleValue(user?.role))return forbidden();
+  await empEnsureSchema(env);
+  const rows=await env.DB.prepare(
+    `SELECT * FROM arrear_tasks
+      WHERE corpid=? AND userid=?
+        AND COALESCE(close_status,'') NOT IN ('PAID','CLEARED','CLOSED','VOID','WRITTEN_OFF','WAIVED','closed','paid','cleared')
+        AND COALESCE(directive_status,'none') IN ('assigned','pending','viewed','promised','followed_up','needs_review','overdue')
+      ORDER BY COALESCE(boss_requested_at,updated_at,created_at) DESC
+      LIMIT 100`
+  ).bind(user.corpid,user.userid).all();
+  const directives=(rows.results||[]).map(empTaskToEmployeeDirective);
+  return success({success:true,directives,tasks:directives});
+}
+__name(handleEmployeeArrearsDirectives,"handleEmployeeArrearsDirectives");
+async function handleEmployeeArrearsDirectiveFollowup(request,env,user,taskId){
+  if(!isStaffRoleValue(user?.role))return forbidden();
+  await empEnsureSchema(env);
+  let body;
+  try{body=await request.json();}catch{return badRequest("invalid_json");}
+  if(body?.promised_amount!==void 0||body?.promise_amount!==void 0||body?.promised_amount_fils!==void 0)return badRequest("promised_amount_not_allowed");
+  const idempotencyKey=cleanText(body?.idempotency_key||request.headers.get("Idempotency-Key")||"",120);
+  if(!idempotencyKey)return badRequest("idempotency_key_required");
+  const promisedDate=empCleanIsoDate(body?.promised_payment_date||"");
+  if(!promisedDate)return badRequest("promised_payment_date_required");
+  if(promisedDate<empTodayDubai())return badRequest("promise_date_in_past");
+  const note=cleanText(body?.followup_note||"",500);
+  if(!arrearsDirectiveWriteApproved(env))return arrearsDirectiveApprovalRequired("employee_arrears_directive_followup");
+  const task=await env.DB.prepare("SELECT * FROM arrear_tasks WHERE task_id=? AND corpid=? AND userid=? LIMIT 1").bind(taskId,user.corpid,user.userid).first();
+  if(!task)return errorResponse("not_found",404,"not_found");
+  const now=empNow();
+  await env.DB.prepare(
+    `UPDATE arrear_tasks
+       SET promise_date=?,
+           staff_note=?,
+           directive_status='followed_up',
+           staff_promised_at=?,
+           last_followup_at=?,
+           updated_by=?,
+           updated_at=?
+       WHERE task_id=? AND corpid=? AND userid=?`
+  ).bind(promisedDate,note,now,now,user.userid,now,taskId,user.corpid,user.userid).run();
+  await empEvent(env,user,{ref_id:taskId,ref_type:"arrear_task",event_type:"employee_followup",field_name:"promise_date",old_value:task.promise_date||"",new_value:promisedDate,operator_id:user.userid,ts:now});
+  await audit(env,user,"employee.arrears.directive.followup",taskId,{idempotency_key:idempotencyKey,has_note:!!note}).catch(()=>{});
+  return success({success:true,directive:empTaskToEmployeeDirective({...task,promise_date:promisedDate,staff_note:note,directive_status:"followed_up",staff_promised_at:now,updated_by:user.userid,updated_at:now})});
+}
+__name(handleEmployeeArrearsDirectiveFollowup,"handleEmployeeArrearsDirectiveFollowup");
 async function handleArrearTaskUpdate(request,env,user){
   await empEnsureSchema(env);
   let body;
@@ -2488,6 +2640,9 @@ __name(handleArrearTaskUpdate,"handleArrearTaskUpdate");
 async function handleEmployeeApi(request,env,user){
   const path=new URL(request.url).pathname;
   if(isReadonlyAdminRoleValue(user?.role)&&request.method!=="GET")return forbidden();
+  const employeeDirectiveFollowup=path.match(/^\/api\/employee\/arrears\/directives\/([^/]+)\/followup$/);
+  if(employeeDirectiveFollowup&&request.method==="POST")return handleEmployeeArrearsDirectiveFollowup(request,env,user,cleanId(employeeDirectiveFollowup[1]));
+  if(path==="/api/employee/arrears/directives"&&request.method==="GET")return handleEmployeeArrearsDirectives(request,env,user);
   if(path==="/api/employee/migrate"&&request.method==="POST"){
     if(!requireManager(user))return forbidden();
     return handleEmployeeMigrate(request,env,user);
@@ -3457,6 +3612,9 @@ async function handleRequest(request, env, ctx) {
     }
     if ((path === "/api/arrears/followup/tasks" || path === "/api/boss/arrears/followup-tasks") && method === "GET") {
       return handleBossArrearsFollowupTasks(request, env, user);
+    }
+    if (path === "/api/boss/arrears/directives" && method === "POST") {
+      return handleBossArrearsDirectives(request, env, user);
     }
     if (path === "/api/arrears" && method === "GET") {
       return handleBossArrears(request, env, user);

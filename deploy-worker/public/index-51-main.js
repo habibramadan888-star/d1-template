@@ -970,6 +970,9 @@ function normalizeArrearFromCloud(a){
     ownerNote:a.owner_note||'',
     staffNote:a.staff_note||'',
     followupNote:a.followup_note||'',
+    userid:a.userid||a.assigned_employee_id||'',
+    userId:a.userid||a.assigned_employee_id||'',
+    staffName:a.assigned_employee_name||a.staff_name||a.userid||a.assigned_employee_id||'',
     bossRequestedAt:a.boss_requested_at||'',
     bossRequestedBy:a.boss_requested_by||'',
     bossRequestedDueDate:a.boss_requested_due_date||'',
@@ -1091,14 +1094,20 @@ function arrearSourceLabel(a){
 }
 function arrearDirectiveStatus(a){
   const raw=String(a?.directiveStatus||'none');
-  if((raw==='promised'||raw==='overdue')&&a?.promiseDate&&a.promiseDate<fmtD(new Date())&&Number(a?.actualReceived||0)<Number(a?.remain||0)+Number(a?.actualReceived||0))return 'overdue';
-  return ['none','pending','promised','overdue'].includes(raw)?raw:'none';
+  if((raw==='promised'||raw==='followed_up'||raw==='needs_review'||raw==='overdue')&&a?.promiseDate&&a.promiseDate<fmtD(new Date())&&Number(a?.actualReceived||0)<Number(a?.remain||0)+Number(a?.actualReceived||0))return 'overdue';
+  if(raw==='pending')return 'assigned';
+  return ['none','assigned','viewed','promised','followed_up','needs_review','closed','cancelled','overdue'].includes(raw)?raw:'none';
 }
 function arrearStatusMeta(status){
   return {
     none:['待下发','#6b7280','#f3f4f6'],
-    pending:['待跟进','#b45309','#fef3c7'],
+    assigned:['已下发','#b45309','#fef3c7'],
+    viewed:['员工已查看','#0369a1','#e0f2fe'],
     promised:['承诺付款','#047857','#d1fae5'],
+    followed_up:['员工已反馈','#047857','#d1fae5'],
+    needs_review:['待核对','#7c3aed','#ede9fe'],
+    closed:['已关闭','#475569','#e2e8f0'],
+    cancelled:['已取消','#6b7280','#f3f4f6'],
     overdue:['承诺逾期','#b91c1c','#fee2e2']
   }[status]||['待下发','#6b7280','#f3f4f6'];
 }
@@ -1157,9 +1166,13 @@ function arrearBusinessState(a){
   if(follow==='已反馈付款')return '已反馈付款';
   if(follow==='待核对'||String(a?.accountingStatus||a?.accounting_status||'')==='needs_review')return '待核对';
   if(directive==='overdue')return '承诺逾期';
+  if(directive==='followed_up')return '员工已反馈';
+  if(directive==='viewed')return '员工已查看';
+  if(directive==='needs_review')return '待核对';
+  if(directive==='closed')return '已关闭';
   if(directive==='promised'||follow==='承诺付款')return '承诺付款';
   if(follow==='已联系')return '已跟进';
-  if(directive==='pending')return '已下发';
+  if(directive==='assigned')return '已下发';
   return '待下发';
 }
 function renderArrearCardActions(a){
@@ -1418,6 +1431,22 @@ function arrearsWhatsappDueHeader(rows){
   if(!m)return dates[0];
   return `${Number(m[2])}/${Number(m[3])}`;
 }
+function arrearsWhatsappTimestamp(date=new Date()){
+  try{
+    const parts=new Intl.DateTimeFormat('en-US',{
+      timeZone:'Asia/Dubai',
+      month:'numeric',
+      day:'numeric',
+      hour:'2-digit',
+      minute:'2-digit',
+      hour12:false
+    }).formatToParts(date);
+    const pick=t=>parts.find(p=>p.type===t)?.value;
+    return `${Number(pick('month'))}/${Number(pick('day'))} ${pick('hour')}:${pick('minute')}`;
+  }catch{
+    return arrearsWhatsappDueHeader([]);
+  }
+}
 function arrearsWhatsappOverdueStatus(a,today=fmtD(new Date())){
   const raw=String(a?.dueDate||a?.due_date||'').trim();
   if(!raw)return 'Due';
@@ -1454,7 +1483,7 @@ function buildArrearsWhatsAppText(rows=ownerArrearsExportRows()){
     if(!groups.has(bed))groups.set(bed,[]);
     groups.get(bed).push(a);
   });
-  const lines=[`Due ${arrearsWhatsappDueHeader(list)} | ${overdueCount} overdue`,'---'];
+  const lines=[`Due Follow-up | ${arrearsWhatsappTimestamp()} | ${overdueCount} overdue`,'============================'];
   [...groups.keys()].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true,sensitivity:'base'})).forEach((bed,idx)=>{
     if(idx>0)lines.push('');
     lines.push(`【${bed}】`);
@@ -1462,7 +1491,10 @@ function buildArrearsWhatsAppText(rows=ownerArrearsExportRows()){
       .slice()
       .sort((a,b)=>arrearsWhatsappCustomerCode(a).localeCompare(arrearsWhatsappCustomerCode(b),undefined,{numeric:true,sensitivity:'base'}))
       .forEach(a=>{
-        lines.push(`${arrearsWhatsappCustomerCode(a)}  ${arrearsWhatsappOverdueStatus(a,today)}  ${arrearsWhatsappPackageLabel(a)}  ${arrearsWhatsappDateCode(a)}`);
+        const code=arrearsWhatsappCustomerCode(a).padEnd(4,' ');
+        const overdue=arrearsWhatsappOverdueStatus(a,today).padEnd(5,' ');
+        const pkg=arrearsWhatsappPackageLabel(a).padEnd(5,' ');
+        lines.push(`${code} ${overdue} ${pkg} ${arrearsWhatsappDateCode(a)}`);
       });
   });
   return lines.join('\n');

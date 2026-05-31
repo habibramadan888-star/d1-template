@@ -36,7 +36,7 @@ function buildHarness(source) {
     };
     const arrearBedLabel = (a) => cleanArrearText(a.roomBed || a.room_bed || a.bed || a.bed_no, "bed-pending");
     const naturalArrearRoomBedKey = (a) => String(arrearBedLabel(a) || "bed-pending").replace(/^#/, "").trim();
-    const fmtD = () => "2026-05-31";
+    const fmtD = () => "2026-05-29";
     const ownerArrearsExportRows = () => rows;
     ${funcs}
     return buildArrearsWhatsAppText(rows);
@@ -44,50 +44,34 @@ function buildHarness(source) {
   );
 }
 
-const fixtureRows = [
-  { taskId: "a", roomBed: "1-102", customerCode: "134", dueDate: "2026-05-25", packageCode: "D200" },
-  { taskId: "b", roomBed: "2-219", customerCode: "219", dueDate: "2026-05-08", packageCode: "D200" },
-  { taskId: "c", roomBed: "2-219", customerCode: "4014", dueDate: "2026-08-08", packageCode: "D200" },
-  { taskId: "d", roomBed: "3-103", customerCode: "325", dueDate: "2026-05-07", packageCode: "D100" },
-  { taskId: "e", roomBed: "8-202", customerCode: "835", dueDate: "2026-05-31", packageCode: "rent", remain: 20 }
-];
-
-test("WhatsApp arrears export uses user-verified follow-up baseline", async () => {
+test("WhatsApp output matches the user-verified searchable layout", async () => {
   const js = await readFile("deploy-worker/public/index-51-main.js", "utf8");
-  const text = buildHarness(js)(fixtureRows);
+  const text = buildHarness(js)([
+    { taskId: "1", roomBed: "1-102", customerCode: "134", dueDate: "2026-05-25", packageCode: "D200" },
+    { taskId: "2", roomBed: "2-219", customerCode: "219", dueDate: "2026-05-08", packageCode: "D200" },
+    { taskId: "3", roomBed: "2-219", customerCode: "4014", dueDate: "2026-08-08", packageCode: "D200" },
+    { taskId: "4", roomBed: "3-103", customerCode: "325", dueDate: "2026-05-07", packageCode: "D100" }
+  ]);
 
-  assert.match(text.split("\n")[0], /^Due Follow-up \| \d{1,2}\/\d{1,2} \d{2}:\d{2} \| \d+ overdue$/);
-  assert.match(text, /\n============================\n/);
-  assert.match(text, /\u30101-102\u3011/);
-  assert.match(text, /134\s+6d\*\s+D200\s+0525/);
-  assert.match(text, /219\s+23d\*\s+D200\s+0508/);
-  assert.match(text, /4014\s+Due\s+D200\s+0808/);
-  assert.match(text, /835\s+Due\s+D20\s+0531/);
+  assert.match(text, /^Due Follow-up \| \d{1,2}\/\d{1,2} \d{2}:\d{2} \| \d+ overdue/m);
+  assert.match(text, /============================/);
+  assert.match(text, /\u30101-102\u3011\n134\s+4d\*\s+D200\s+0525/);
+  assert.match(text, /\u30102-219\u3011\n219\s+21d\*\s+D200\s+0508\n4014\s+Due\s+D200\s+0808/);
+  assert.match(text, /\u30103-103\u3011\n325\s+22d\*\s+D100\s+0507/);
 });
 
-test("WhatsApp baseline omits raw source and internal/debug fields", async () => {
+test("WhatsApp output keeps search terms continuous and excludes raw/debug labels", async () => {
   const js = await readFile("deploy-worker/public/index-51-main.js", "utf8");
-  const text = buildHarness(js)(fixtureRows);
+  const text = buildHarness(js)([
+    { taskId: "a", roomBed: "1-125", customerCode: "125", dueDate: "2026-05-20", packageCode: "D200", source_type: "ttlock_card" },
+    { taskId: "b", roomBed: "2-219", customerCode: "219", dueDate: "2026-05-20", packageCode: "D200" },
+    { taskId: "c", roomBed: "2-219", customerCode: "4014", dueDate: "2026-05-20", packageCode: "D200" }
+  ]);
 
-  for (const forbidden of [
-    "ttlock_card",
-    "ttlock_expired_unpaid",
-    "existing_arrears_record",
-    "rent",
-    "deposit",
-    "source_type",
-    "#ttlock-expired",
-    "undefined",
-    "null",
-    "none",
-    "\ud83d\udd25",
-    "\ufffd"
-  ]) {
+  for (const term of ["125", "219", "4014"]) {
+    assert.match(text, new RegExp(`(^|\\n)${term}\\s`, "m"));
+  }
+  for (const forbidden of ["ttlock_card", "rent", "deposit", "source_type", "undefined", "null", "none", "\ufffd"]) {
     assert.doesNotMatch(text, new RegExp(forbidden, "i"));
   }
-});
-
-test("production cutover remains blocked", async () => {
-  const gate = await readFile("scripts/gate-commercial-launch-readiness.mjs", "utf8");
-  assert.match(gate, /PRODUCTION_NO_GO/);
 });

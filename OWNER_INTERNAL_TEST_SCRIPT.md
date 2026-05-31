@@ -285,3 +285,13 @@ Run these checks on the live Worker version `73517bf9-df6e-47e1-a72f-9743264ee93
 10. Confirm searchable codes such as `125`, `219`, and `4014` appear as continuous strings when present in the data.
 
 Production cutover remains `PRODUCTION_NO_GO`.
+## Arrears Directive Real Delivery QA - 2026-05-31
+
+1. Confirm dry-run does not equal real directive delivery.
+2. Confirm real owner directive API returns approval-required unless explicit write approval is enabled.
+3. Confirm employee assigned directive read contract exists.
+4. Confirm employee follow-up accepts promised payment date and note only.
+5. Confirm owner can see employee promised date, note, status, and responsible employee in the arrears card details.
+6. Confirm WhatsApp export uses the user-verified searchable format.
+7. Confirm production write approval document exists before any live write.
+8. Confirm production cutover remains `PRODUCTION_NO_GO`.

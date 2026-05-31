@@ -1902,3 +1902,16 @@ Deployment verification:
 | Authenticated mobile click-through | MANUAL_REQUIRED | Not executed because creating a fresh production session writes `active_sessions`. |
 | D1 write / migration | NOT_RUN | No D1 execute/export/import/write or migration was run. |
 | Production cutover | NO_GO | `PRODUCTION_NO_GO` remains unchanged. |
+## Arrears Directive Real Delivery Closure Verification - 2026-05-31
+
+| Area | Status | Notes |
+|---|---|---|
+| Owner directive API | READY_APPROVAL_GATED | New route exists; default production behavior returns approval-required. |
+| Employee directive read | READY | New read route maps assigned directives from `arrear_tasks`. |
+| Employee follow-up write | READY_APPROVAL_GATED | Accepts promised date and note only; default write blocked pending approval. |
+| Owner feedback display | READY | Owner card details expose promised date, note, status, and responsible employee. |
+| WhatsApp format | READY | User-verified searchable baseline locked in code/tests. |
+| D1 write | NOT_RUN | No D1 write performed. |
+| Migration | NOT_RUN | No migration performed. |
+| Deploy | NOT_RUN | No deploy performed in this task. |
+| Production cutover | NO_GO | Remains `PRODUCTION_NO_GO`. |

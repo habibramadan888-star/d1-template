@@ -333,3 +333,13 @@ Production cutover remains `PRODUCTION_NO_GO`.
   - Migration = No.
   - Business write = No.
   - Production cutover = `PRODUCTION_NO_GO`.
+## Arrears Real Directive Delivery Closure QA - 2026-05-31
+
+- Dry-run must not be accepted as real employee delivery.
+- Real directive delivery requires persistent directive state.
+- Employee must read assigned directives.
+- Employee feedback must include promised payment date and note only.
+- Owner must see employee feedback.
+- WhatsApp export must use the user-verified searchable format.
+- Production write requires separate approval.
+- Production cutover remains `PRODUCTION_NO_GO`.

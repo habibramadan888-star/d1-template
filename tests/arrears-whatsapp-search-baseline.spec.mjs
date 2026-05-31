@@ -24,9 +24,10 @@ test("searchable identifiers are emitted as continuous ASCII substrings", async 
   for (const token of ["customerCode", "cardCode", "tenantCardId"]) {
     assert.match(customer, new RegExp(token));
   }
-  for (const token of ["【${bed}】", "arrearsWhatsappCustomerCode", "arrearsWhatsappDateCode"]) {
-    assert.match(builder, token.includes("$") ? /\u3010\$\{bed\}\u3011/ : new RegExp(token));
-  }
+  assert.match(builder, /\u3010\$\{bed\}\u3011/);
+  assert.match(builder, /arrearsWhatsappCustomerCode/);
+  assert.match(builder, /arrearsWhatsappDateCode/);
+  assert.match(builder, /padEnd\(4,' '\)/);
 });
 
 test("final baseline protects known searchable examples", async () => {
@@ -35,5 +36,7 @@ test("final baseline protects known searchable examples", async () => {
 
   assert.match(builder, /localeCompare\(b,undefined,\{numeric:true,sensitivity:'base'\}\)/);
   assert.doesNotMatch(builder, /split\(''\)|join\(' '\)/);
-  assert.match(builder, /lines\.push\(`\$\{arrearsWhatsappCustomerCode\(a\)\}\s\s/);
+  assert.match(builder, /Due Follow-up/);
+  assert.match(builder, /============================/);
+  assert.match(builder, /lines\.push\(`\$\{code\} \$\{overdue\} \$\{pkg\}/);
 });

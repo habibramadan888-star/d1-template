@@ -64,3 +64,10 @@
 - readonly_admin must not see select-all or send-employee controls.
 - readonly_admin card actions remain detail-only.
 - Production cutover remains `PRODUCTION_NO_GO`.
+## Readonly Admin Arrears Directive Lock - 2026-05-31
+
+- readonly_admin can read owner arrears and directive feedback.
+- readonly_admin cannot call owner directive write API.
+- readonly_admin cannot call employee follow-up write API.
+- readonly_admin must not see or execute real write controls.
+- Production cutover remains `PRODUCTION_NO_GO`.

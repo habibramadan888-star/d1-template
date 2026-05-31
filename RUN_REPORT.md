@@ -6083,3 +6083,13 @@ Safety:
 - Three portal card text alignment is deployed.
 - D1 write: No. Migration: No. Business write: No.
 - Production cutover remains `PRODUCTION_NO_GO`.
+## Arrears Directive Real Delivery Closure - 2026-05-31
+
+- Added approval-gated owner directive API contract: `/api/boss/arrears/directives`.
+- Added employee assigned directive read contract: `/api/employee/arrears/directives`.
+- Added employee follow-up contract: `/api/employee/arrears/directives/:id/followup`.
+- Reused existing `arrear_tasks`; no migration was executed.
+- Production writes remain blocked unless explicit approval env is enabled.
+- WhatsApp export format updated to the user-verified searchable `Due Follow-up | M/D HH:mm | N overdue` baseline.
+- No deploy, D1 write, D1 execute/export/import, or migration was performed.
+- Production cutover remains `PRODUCTION_NO_GO`.

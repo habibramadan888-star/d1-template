@@ -116,3 +116,11 @@ Backend `/api/boss/arrears/followup-tasks` is the locked SOT for owner arrears d
 - The dry-run list uses selected arrears rows; if no rows are selected, WhatsApp export uses the current filtered rows.
 - No D1 write, migration, or backend SOT rewrite is allowed in this acceptance bugfix.
 - Production cutover remains `PRODUCTION_NO_GO`.
+## Arrears Directive Dataflow Lock - 2026-05-31
+
+- Owner source of truth remains `/api/boss/arrears/followup-tasks`.
+- Real directive delivery path is `/api/boss/arrears/directives`, approval gated.
+- Employee assigned directive read path is `/api/employee/arrears/directives`.
+- Employee feedback path is `/api/employee/arrears/directives/:id/followup`.
+- Owner feedback display comes from `promise_date`, `staff_note`, `directive_status`, and assigned employee fields.
+- Production write approval is required before enabling real writes.

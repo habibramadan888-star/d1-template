@@ -100,3 +100,12 @@ During employee QA, confirm:
 - If status is `承诺付款`, promised repayment date is required.
 - Note is recommended for operational context.
 - Production cutover remains `PRODUCTION_NO_GO`.
+## Employee Arrears Directive QA - 2026-05-31
+
+1. Open employee follow-up page.
+2. Confirm assigned directive read contract is `/api/employee/arrears/directives`.
+3. Confirm task cards show room/bed, customer, amount, due date, status, promised payment date, and note.
+4. Confirm employee feedback form asks for promised payment date and note.
+5. Confirm no promised amount input is required or accepted.
+6. Confirm employee cannot close task.
+7. Confirm write path remains approval gated unless staging/production write approval is explicit.

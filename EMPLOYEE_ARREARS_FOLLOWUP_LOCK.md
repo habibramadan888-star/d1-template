@@ -78,3 +78,11 @@ Create a dedicated compatibility task to remove or ignore `promise_amount` from 
 - Real boss-to-employee directive delivery is not executed in this task and remains approval-required.
 - Owner-side “下发员工” generates a dry-run execution list only.
 - Production cutover remains `PRODUCTION_NO_GO`.
+## Employee Arrears Directive Follow-Up Lock - 2026-05-31
+
+- Employee must be able to read assigned directives.
+- Employee feedback contains promised payment date and note only.
+- Employee cannot submit promised amount.
+- Employee cannot modify arrears amount.
+- Employee cannot close directive/task.
+- Write path is approval gated for production.
