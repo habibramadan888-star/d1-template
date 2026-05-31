@@ -8,7 +8,7 @@ const BASE_URL = (process.env.ARREARS_AUTH_BASE_URL || DEFAULT_BASE_URL).replace
 function parseArgs(argv) {
   return {
     checkConfig: argv.includes("--check-config"),
-    authSmoke: argv.includes("--auth-smoke") || argv.includes("--run-auth-check")
+    authSmoke: argv.includes("--auth-smoke")
   };
 }
 
@@ -42,11 +42,13 @@ function summarizeConfig(values, exists) {
   const employeePasswordPresent = hasValue(values, "EMPLOYEE_PASSWORD") || hasValue(values, "EMPLOYEE_PIN");
   return {
     auth_file_exists: exists,
-    owner_login_id_present: hasValue(values, "OWNER_LOGIN_ID"),
+    owner_login_id_required: "no",
     owner_password_present: hasValue(values, "OWNER_PASSWORD"),
     employee_login_id_present: hasValue(values, "EMPLOYEE_LOGIN_ID"),
     employee_password_present: employeePasswordPresent,
     employee_name_present: hasValue(values, "EMPLOYEE_NAME"),
+    admin_login_id_present: hasValue(values, "ADMIN_LOGIN_ID"),
+    admin_password_present: hasValue(values, "ADMIN_PASSWORD"),
     password_printed: "no",
     token_printed: "no",
     cookie_printed: "no"
@@ -59,7 +61,9 @@ function assertConfig(values, exists) {
     summary.auth_file_exists &&
     summary.owner_password_present &&
     summary.employee_login_id_present &&
-    summary.employee_password_present;
+    summary.employee_password_present &&
+    summary.admin_login_id_present &&
+    summary.admin_password_present;
   return { ready, summary };
 }
 

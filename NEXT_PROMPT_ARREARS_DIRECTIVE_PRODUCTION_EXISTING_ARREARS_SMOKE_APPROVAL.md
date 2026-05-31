@@ -33,6 +33,21 @@ Copy this only if Ramadan explicitly approves a minimum production write smoke f
 - [ ] 确认 `.tmp/arrears-smoke-auth/production-auth.local.env` 只保存在本机且不提交 Git。
 - [ ] 允许 Codex 使用 masked auth harness，但禁止输出 password/token/cookie/Set-Cookie。
 
+本地认证文件结构必须是：
+
+- 老板：无登录名，只填写 `OWNER_PASSWORD`。
+- 员工：填写 `EMPLOYEE_LOGIN_ID`、`EMPLOYEE_PASSWORD`、`EMPLOYEE_NAME`。
+- 管理员：填写 `ADMIN_LOGIN_ID`、`ADMIN_PASSWORD`。
+
+禁止事项：
+
+- 不要把密码发到聊天。
+- 不要截图认证文件。
+- 不要写进 Markdown。
+- 不要提交 Git。
+- Codex 只能读取本机 ignored 文件，并且输出必须脱敏。
+- 如登录会创建 `active_sessions`，必须另行批准 auth session write。
+
 ## Production write approval
 
 1. 是否允许临时开启 production write gate：
@@ -92,4 +107,3 @@ Copy this only if Ramadan explicitly approves a minimum production write smoke f
 - 不提交 secret。
 - 不打印 password/token/cookie/Set-Cookie。
 ```
-
