@@ -198,6 +198,17 @@ During employee QA, confirm:
 6. Confirm amount edit, close, void, handover, and promised amount remain unavailable.
 7. Production cutover remains `PRODUCTION_NO_GO`.
 
+## Live Persisted State UI Fix Acceptance - 2026-06-01
+
+1. Confirm `/employee-v3` contains `serverOriginalPromisedDate`, `serverOriginalFollowupNote`, `updateEmployeeDirectivePersistedState`, and `employeeDirectiveIsDirty`.
+2. Log in as Abdul and open FOLLOW-UP.
+3. For an already saved feedback task, confirm unchanged server date/note shows saved/existing feedback.
+4. Click the saved state without editing and confirm no write-gate-off warning appears.
+5. Change promised date or note and confirm the card shows current changes unsubmitted.
+6. With write gate off, submit the dirty edit and confirm the warning says the current modification will not write to production.
+7. Confirm promised amount input, amount edit, close, void, handover, and accounting status changes remain unavailable.
+8. Production cutover remains `PRODUCTION_NO_GO`.
+
 ## Live Persisted State Deployment Check - 2026-06-01
 
 1. Before repeating phone acceptance, confirm the live asset contains `serverOriginalPromisedDate` and `updateEmployeeDirectivePersistedState`.

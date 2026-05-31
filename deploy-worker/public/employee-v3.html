@@ -2990,6 +2990,13 @@ function bindEmployeeDirectiveActions(){
   });
 }
 function directiveFollowupValue(value){return String(value||'').trim()}
+function normalizeDirectiveDate(value){
+  const raw=directiveFollowupValue(value);
+  if(!raw)return '';
+  const m=raw.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/);
+  if(!m)return raw;
+  return `${m[1]}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`;
+}
 function employeeDirectiveHasPersistedFeedback(d){
   if(!d)return false;
   const status=String(d.directive_status||'').trim();
@@ -3002,13 +3009,13 @@ function employeeDirectiveHasPersistedFeedback(d){
 function employeeDirectiveCurrentValues(taskId){
   const id=safeDomId(taskId);
   return {
-    promised:directiveFollowupValue($(`directivePromise_${id}`)?.value||''),
+    promised:normalizeDirectiveDate($(`directivePromise_${id}`)?.value||''),
     note:directiveFollowupValue($(`directiveNote_${id}`)?.value||'')
   };
 }
 function employeeDirectiveOriginalValues(d){
   return {
-    promised:directiveFollowupValue(d?.serverOriginalPromisedDate||d?.promised_payment_date||''),
+    promised:normalizeDirectiveDate(d?.serverOriginalPromisedDate||d?.promised_payment_date||''),
     note:directiveFollowupValue(d?.serverOriginalFollowupNote||d?.followup_note||'')
   };
 }

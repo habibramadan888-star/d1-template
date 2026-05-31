@@ -367,6 +367,17 @@ Production cutover remains `PRODUCTION_NO_GO`.
 6. Do not execute any owner directive write or batch dispatch.
 7. Production cutover remains `PRODUCTION_NO_GO`.
 
+## Live Owner Assigned / Followed-up Button Acceptance - 2026-06-01
+
+1. Confirm live `/index-51-main.js` contains `assigned-state` and `followed-up-state`.
+2. Log in as owner and open arrears.
+3. Locate an assigned task and confirm it shows read-only state such as `已下发`, not a clickable primary `下发员工` action.
+4. Locate a followed-up task and confirm it shows read-only state such as `员工已反馈`, not a clickable primary `下发员工` action.
+5. Confirm only waiting/not-dispatched tasks expose the primary send action for owner write roles.
+6. Confirm readonly_admin still sees details only.
+7. Do not create owner directives, employee follow-ups, batch dispatches, or TTLock smoke during this acceptance.
+8. Production cutover remains `PRODUCTION_NO_GO`.
+
 ## Live Owner Button Deployment Check - 2026-06-01
 
 1. Before repeating owner phone acceptance, confirm live `index-51-main.js` contains `assigned-state` and `followed-up-state`.

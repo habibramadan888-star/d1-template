@@ -412,6 +412,17 @@ Production cutover remains `PRODUCTION_NO_GO`.
 - This QA does not authorize production writes, migration, deploy, TTLock smoke, or batch dispatch.
 - Production cutover remains `PRODUCTION_NO_GO`.
 
+## Live Persisted State UI Deploy QA - 2026-06-01
+
+- Live asset markers are now required before phone acceptance:
+  - `/employee-v3` contains `serverOriginalPromisedDate`, `serverOriginalFollowupNote`, `updateEmployeeDirectivePersistedState`, and `employeeDirectiveIsDirty`.
+  - `/index-51-main.js` contains `assigned-state` and `followed-up-state`.
+- Saved feedback must not show write-gate-off warning when date/note are unchanged.
+- Only dirty unsaved date/note edits may show the gated warning while write gate is off.
+- Owner assigned/followed-up tasks must show read-only state buttons, not clickable primary `下发员工`.
+- No production business write, write gate opening, migration, owner directive write, employee follow-up write, batch dispatch, TTLock smoke, financial formula change, or dashboard calculation change is authorized by this QA.
+- Production cutover remains `PRODUCTION_NO_GO`.
+
 ## Live Persisted State Audit QA - 2026-06-01
 
 - If phone acceptance still shows the old warning, first inspect live assets for the `223cbbb` UI markers.

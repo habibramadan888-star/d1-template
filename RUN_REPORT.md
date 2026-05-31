@@ -6211,6 +6211,18 @@ Safety:
 - No production write, write gate opening, deploy, migration, batch dispatch, TTLock smoke, financial formula change, or dashboard calculation change was performed.
 - Production cutover remains `PRODUCTION_NO_GO`.
 
+## Arrears Follow-up Persisted State Live UI Deploy - 2026-06-01
+
+- Deployed approved UI-only fix to `homelink-finance`.
+- Worker version id: `dd0e3078-3637-4bca-aee7-e0bfba569488`.
+- Uploaded assets: `/employee-v3.html` and `/index-51-main.js`.
+- Live `/employee-v3` now contains `serverOriginalPromisedDate`, `serverOriginalFollowupNote`, `updateEmployeeDirectivePersistedState`, and `employeeDirectiveIsDirty`.
+- Live `/index-51-main.js` now contains owner `assigned-state` and `followed-up-state` markers.
+- Saved employee feedback should no longer trigger the write-gate-off warning; only new or dirty date/note edits should show the gated warning.
+- Owner assigned/followed-up tasks should no longer show a clickable primary `下发员工` action.
+- No production write, write gate opening, migration, owner directive write, employee follow-up write, batch dispatch, TTLock smoke, financial formula change, or dashboard calculation change was performed.
+- Production cutover remains `PRODUCTION_NO_GO`.
+
 ## Arrears Follow-up Persisted State Live Audit - 2026-06-01
 
 - Read-only live audit concluded `LIVE_NOT_DEPLOYED`.

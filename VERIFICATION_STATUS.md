@@ -2030,6 +2030,21 @@ Deployment verification:
 | D1 migration / deploy | NOT_RUN | No migration, D1 execute/export/import, or deploy was performed. |
 | Production cutover | NO_GO | Remains `PRODUCTION_NO_GO`. |
 
+## Arrears Follow-up Persisted State Live UI Deploy Verification - 2026-06-01
+
+| Area | Status | Notes |
+|---|---|---|
+| Predeploy verification | PASS | Required focused tests, security, gate, QA dry-run, embedded checks, and worker drift audit passed. |
+| Worker deploy | PASS | Version `dd0e3078-3637-4bca-aee7-e0bfba569488`. |
+| Uploaded assets | PASS | `/employee-v3.html`, `/index-51-main.js`. |
+| Live employee state markers | PASS | `/employee-v3` contains persisted-state markers. |
+| Live owner button markers | PASS | `/index-51-main.js` contains `assigned-state` / `followed-up-state`. |
+| Public smoke | PASS | `/`, `/employee-v3`, and `/index-51-main.js` returned 200. |
+| Authenticated Abdul/owner phone acceptance | MANUAL_REQUIRED | Not run in this deployment because no password/token/cookie material was used. |
+| Production write / gate | NOT_RUN | No production business write and no write gate opening. |
+| D1 migration / execute | NOT_RUN | No D1 execute/export/import/write or migration. |
+| Production cutover | NO_GO | Remains `PRODUCTION_NO_GO`. |
+
 ## Arrears Follow-up Persisted State Live Audit Verification - 2026-06-01
 
 | Area | Status | Notes |
