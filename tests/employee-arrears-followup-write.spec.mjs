@@ -38,3 +38,18 @@ test("employee follow-up cannot submit amount or close task and writes are appro
   assert.match(fn, /directive_status='followed_up'/);
   assert.match(fn, /employee\.arrears\.directive\.followup/);
 });
+
+test("employee follow-up uses durable idempotency storage", async () => {
+  const worker = await readFile("deploy-worker/src/index.js", "utf8");
+  const fn = extractFunction(worker, "handleEmployeeArrearsDirectiveFollowup");
+  const replayFn = extractFunction(worker, "arrearsDirectiveIdempotencyReplay");
+  const recordFn = extractFunction(worker, "arrearsDirectiveRecordIdempotency");
+
+  assert.match(fn, /employee_arrears_followup_update/);
+  assert.match(fn, /arrearsDirectiveRequestHash/);
+  assert.match(fn, /arrearsDirectiveIdempotencyReplay/);
+  assert.match(fn, /arrearsDirectiveRecordIdempotency/);
+  assert.match(replayFn, /request_hash/);
+  assert.match(replayFn, /actor_user_id/);
+  assert.match(recordFn, /response_hash/);
+});

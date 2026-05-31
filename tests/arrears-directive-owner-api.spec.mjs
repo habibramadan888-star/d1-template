@@ -35,3 +35,24 @@ test("owner directive API blocks writes unless explicitly approved", async () =>
   assert.match(fn, /duplicate/i);
   assert.match(fn, /boss\.arrears\.directives\.create/);
 });
+
+test("owner directive API uses durable idempotency storage", async () => {
+  const worker = await readFile("deploy-worker/src/index.js", "utf8");
+  const fn = extractFunction(worker, "handleBossArrearsDirectives");
+  const replayFn = extractFunction(worker, "arrearsDirectiveIdempotencyReplay");
+  const recordFn = extractFunction(worker, "arrearsDirectiveRecordIdempotency");
+  const migration = await readFile(
+    "migration-drafts/003_arrears_directive_idempotency_staging.sql",
+    "utf8"
+  );
+
+  assert.match(migration, /CREATE TABLE IF NOT EXISTS request_idempotency_keys/);
+  assert.match(migration, /idx_request_idempotency_scope_action_key/);
+  assert.match(fn, /boss_arrears_directive_create/);
+  assert.match(fn, /arrearsDirectiveRequestHash/);
+  assert.match(fn, /arrearsDirectiveIdempotencyReplay/);
+  assert.match(fn, /arrearsDirectiveRecordIdempotency/);
+  assert.match(replayFn, /idempotency_conflict/);
+  assert.match(replayFn, /X-Idempotency-Replayed/);
+  assert.match(recordFn, /INSERT INTO request_idempotency_keys/);
+});

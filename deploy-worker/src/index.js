@@ -2384,6 +2384,57 @@ async function handleArrearTaskDirective(request,env,user){
   return success({success:true,updated_count:updatedCount,not_found:notFound});
 }
 __name(handleArrearTaskDirective,"handleArrearTaskDirective");
+async function arrearsDirectiveRequestHash(payload){
+  return hscSha256(JSON.stringify(hscStableValue(payload)));
+}
+__name(arrearsDirectiveRequestHash,"arrearsDirectiveRequestHash");
+async function arrearsDirectiveIdempotencyReplay(env,options){
+  const row=await env.DB.prepare(
+    `SELECT * FROM request_idempotency_keys
+     WHERE scope=? AND action=? AND idempotency_key=?
+     LIMIT 1`
+  ).bind(options.scope,options.action,options.idempotencyKey).first();
+  if(!row)return null;
+  if(row.actor_user_id!==options.actorUserId||row.actor_role!==options.actorRole||row.request_hash!==options.requestHash){
+    return errorResponse("idempotency_conflict",409,"idempotency_conflict");
+  }
+  if(row.response_body){
+    try{
+      return json(JSON.parse(row.response_body),200,{"X-Idempotency-Replayed":"true"});
+    }catch{
+      return success({success:true,idempotency_status:"IDEMPOTENT_REPLAY"},200,{"X-Idempotency-Replayed":"true"});
+    }
+  }
+  return success({success:true,idempotency_status:"IDEMPOTENT_REPLAY"},200,{"X-Idempotency-Replayed":"true"});
+}
+__name(arrearsDirectiveIdempotencyReplay,"arrearsDirectiveIdempotencyReplay");
+async function arrearsDirectiveRecordIdempotency(env,options,responseBody){
+  const responseText=JSON.stringify(responseBody);
+  const responseHash=await hscSha256(responseText);
+  await env.DB.prepare(
+    `INSERT INTO request_idempotency_keys (
+      id, scope, idempotency_key, actor_user_id, actor_role, action,
+      request_hash, response_hash, response_body, resource_type, resource_id,
+      status, created_at, expires_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).bind(
+    empId("idem"),
+    options.scope,
+    options.idempotencyKey,
+    options.actorUserId,
+    options.actorRole,
+    options.action,
+    options.requestHash,
+    responseHash,
+    responseText,
+    options.resourceType||"",
+    options.resourceId||"",
+    options.status||"RECORDED",
+    empNow(),
+    options.expiresAt||""
+  ).run();
+}
+__name(arrearsDirectiveRecordIdempotency,"arrearsDirectiveRecordIdempotency");
 function empTaskToEmployeeDirective(t){
   const view=empTaskToBossArrear(t);
   return {
@@ -2420,6 +2471,23 @@ async function handleBossArrearsDirectives(request,env,user){
   const assignedFallback=cleanText(body?.assigned_employee_id||"",80);
   const note=cleanText(body?.note||"",500);
   const actor=cleanText(user.userid,80);
+  const action="boss_arrears_directive_create";
+  const requestHash=await arrearsDirectiveRequestHash({
+    corpid:user.corpid,
+    actor,
+    assigned_employee_id:assignedFallback,
+    note,
+    task_ids:uniqueIds
+  });
+  const replay=await arrearsDirectiveIdempotencyReplay(env,{
+    scope:user.corpid,
+    action,
+    idempotencyKey,
+    requestHash,
+    actorUserId:actor,
+    actorRole:user.role
+  });
+  if(replay)return replay;
   const now=empNow();
   let createdCount=0;
   let skippedDuplicateCount=0;
@@ -2457,13 +2525,25 @@ async function handleBossArrearsDirectives(request,env,user){
       notFound.push(taskId);
     }
   }
+  const responseBody=ok({ok:true,created_count:createdCount,skipped_duplicate_count:skippedDuplicateCount,not_found:notFound,directives,idempotency_status:"NEW"});
+  await arrearsDirectiveRecordIdempotency(env,{
+    scope:user.corpid,
+    action,
+    idempotencyKey,
+    requestHash,
+    actorUserId:actor,
+    actorRole:user.role,
+    resourceType:"arrear_task",
+    resourceId:uniqueIds.join(","),
+    status:"SUCCESS"
+  },responseBody);
   await audit(env,user,"boss.arrears.directives.create",uniqueIds.join(","),{
     idempotency_key:idempotencyKey,
     created_count:createdCount,
     skipped_duplicate_count:skippedDuplicateCount,
     not_found:notFound.length
   }).catch(()=>{});
-  return success({ok:true,created_count:createdCount,skipped_duplicate_count:skippedDuplicateCount,not_found:notFound,directives});
+  return json(responseBody);
 }
 __name(handleBossArrearsDirectives,"handleBossArrearsDirectives");
 async function handleEmployeeArrearsDirectives(request,env,user){
@@ -2494,6 +2574,23 @@ async function handleEmployeeArrearsDirectiveFollowup(request,env,user,taskId){
   if(promisedDate<empTodayDubai())return badRequest("promise_date_in_past");
   const note=cleanText(body?.followup_note||"",500);
   if(!arrearsDirectiveWriteApproved(env))return arrearsDirectiveApprovalRequired("employee_arrears_directive_followup");
+  const action="employee_arrears_followup_update";
+  const requestHash=await arrearsDirectiveRequestHash({
+    corpid:user.corpid,
+    actor:user.userid,
+    task_id:taskId,
+    promised_payment_date:promisedDate,
+    followup_note:note
+  });
+  const replay=await arrearsDirectiveIdempotencyReplay(env,{
+    scope:user.corpid,
+    action,
+    idempotencyKey,
+    requestHash,
+    actorUserId:user.userid,
+    actorRole:user.role
+  });
+  if(replay)return replay;
   const task=await env.DB.prepare("SELECT * FROM arrear_tasks WHERE task_id=? AND corpid=? AND userid=? LIMIT 1").bind(taskId,user.corpid,user.userid).first();
   if(!task)return errorResponse("not_found",404,"not_found");
   const now=empNow();
@@ -2509,8 +2606,20 @@ async function handleEmployeeArrearsDirectiveFollowup(request,env,user,taskId){
        WHERE task_id=? AND corpid=? AND userid=?`
   ).bind(promisedDate,note,now,now,user.userid,now,taskId,user.corpid,user.userid).run();
   await empEvent(env,user,{ref_id:taskId,ref_type:"arrear_task",event_type:"employee_followup",field_name:"promise_date",old_value:task.promise_date||"",new_value:promisedDate,operator_id:user.userid,ts:now});
+  const responseBody=ok({success:true,directive:empTaskToEmployeeDirective({...task,promise_date:promisedDate,staff_note:note,directive_status:"followed_up",staff_promised_at:now,updated_by:user.userid,updated_at:now}),idempotency_status:"NEW"});
+  await arrearsDirectiveRecordIdempotency(env,{
+    scope:user.corpid,
+    action,
+    idempotencyKey,
+    requestHash,
+    actorUserId:user.userid,
+    actorRole:user.role,
+    resourceType:"arrear_task",
+    resourceId:taskId,
+    status:"SUCCESS"
+  },responseBody);
   await audit(env,user,"employee.arrears.directive.followup",taskId,{idempotency_key:idempotencyKey,has_note:!!note}).catch(()=>{});
-  return success({success:true,directive:empTaskToEmployeeDirective({...task,promise_date:promisedDate,staff_note:note,directive_status:"followed_up",staff_promised_at:now,updated_by:user.userid,updated_at:now})});
+  return json(responseBody);
 }
 __name(handleEmployeeArrearsDirectiveFollowup,"handleEmployeeArrearsDirectiveFollowup");
 async function handleArrearTaskUpdate(request,env,user){
