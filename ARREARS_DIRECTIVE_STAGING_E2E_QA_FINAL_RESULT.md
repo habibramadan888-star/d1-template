@@ -1,21 +1,25 @@
 # Arrears Directive Staging E2E QA Final Result
 
-Result: `PASS_WITH_STAGING_SOURCE_LIMITATION`
+Result: `PASS`
+
+## Existing Arrears Record Result
+
+Existing arrears record staging E2E QA: `PASS` from commit `67e3640`.
+
+## TTLock Expired Unpaid Result
 
 | Step | Result |
 | --- | --- |
-| staging idempotency migration | pass |
-| owner creates directive | pass |
+| ttlock fixture created in staging | pass |
+| owner creates directive from ttlock task | pass |
 | duplicate owner request prevented | pass |
-| employee reads directive | pass |
-| employee submits date/note | pass |
+| employee reads ttlock directive | pass |
+| employee submits date/note for ttlock directive | pass |
 | duplicate employee request prevented | pass |
-| owner sees feedback | pass |
+| owner sees ttlock feedback | pass |
 | readonly_admin blocked | pass |
 | audit recorded | pass |
 | rollback plan valid | pass |
 | production D1 write | no |
 | production migration | no |
 | production cutover | PRODUCTION_NO_GO |
-
-Staging limitation: no persisted `ttlock_expired_unpaid` task row was available in `arrear_tasks`; source-specific ttlock coverage remains a separate staging data setup item.

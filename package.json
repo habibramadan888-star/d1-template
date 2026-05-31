@@ -207,6 +207,7 @@
     "test:owner-arrears-directive-feedback": "node --test tests/owner-arrears-directive-feedback-display.spec.mjs",
     "test:arrears-whatsapp-user-format": "node --test tests/arrears-whatsapp-user-verified-format.spec.mjs",
     "qa:arrears-directive-staging": "node scripts/qa-arrears-directive-staging.mjs",
+    "qa:arrears-directive-ttlock-staging": "node scripts/qa-arrears-directive-ttlock-staging.mjs",
     "test:arrears-whatsapp-live-button-baseline": "node --test tests/arrears-whatsapp-live-button-baseline.spec.mjs",
     "test:arrears-whatsapp-clipboard-share-match": "node --test tests/arrears-whatsapp-clipboard-share-match.spec.mjs",
     "test:three-portal-card-alignment": "node --test tests/three-portal-card-alignment.spec.mjs",
