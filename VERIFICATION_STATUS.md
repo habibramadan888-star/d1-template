@@ -2045,6 +2045,20 @@ Deployment verification:
 | D1 migration / execute | NOT_RUN | No D1 execute/export/import/write or migration. |
 | Production cutover | NO_GO | Remains `PRODUCTION_NO_GO`. |
 
+## Internal Full Acceptance Phase Verification - 2026-06-01
+
+| Area | Status | Notes |
+|---|---|---|
+| Internal full acceptance | STARTED | Checklists, role scripts, screenshot template, triage rules, and fix batch rules generated. |
+| existing_arrears production smoke | PASS | Minimal production smoke previously passed. |
+| Abdul single-task follow-up write | PASS | Approved one-task follow-up write previously passed. |
+| TTLock production smoke | NOT_TESTED | Not part of this phase without separate approval. |
+| Batch rollout | NOT_APPROVED | No batch dispatch authorized. |
+| Write gate | OFF | No production write gate opened in this task. |
+| Production write | NOT_RUN | No new production business write. |
+| Migration / D1 execute | NOT_RUN | No migration, D1 export/import/execute. |
+| Production cutover | NO_GO | Remains `PRODUCTION_NO_GO`. |
+
 ## Arrears Follow-up Persisted State Live Audit Verification - 2026-06-01
 
 | Area | Status | Notes |

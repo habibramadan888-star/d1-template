@@ -423,6 +423,25 @@ Production cutover remains `PRODUCTION_NO_GO`.
 - No production business write, write gate opening, migration, owner directive write, employee follow-up write, batch dispatch, TTLock smoke, financial formula change, or dashboard calculation change is authorized by this QA.
 - Production cutover remains `PRODUCTION_NO_GO`.
 
+## Internal Full Acceptance Phase - 2026-06-01
+
+- Internal full acceptance is now the active validation stage.
+- This stage is not production cutover and not public beta.
+- Use `INTERNAL_FULL_ACCEPTANCE_CHECKLIST.md` as the master checklist.
+- Use `INTERNAL_ACCEPTANCE_BUG_TRIAGE_RULES.md` to classify P0/P1/P2/P3 issues before fixing.
+- Use role scripts:
+  - `OWNER_INTERNAL_ACCEPTANCE_SCRIPT.md`
+  - `EMPLOYEE_INTERNAL_ACCEPTANCE_SCRIPT.md`
+  - `ADMIN_INTERNAL_ACCEPTANCE_SCRIPT.md`
+- Use `MOBILE_ACCEPTANCE_SCREENSHOT_TEMPLATE.md` for every uploaded phone screenshot.
+- Use `INTERNAL_ACCEPTANCE_FIX_BATCH_PLAN.md` to group fixes and avoid random mixed-module changes.
+- existing_arrears production minimal smoke has passed.
+- Abdul single-task follow-up write has passed.
+- TTLock production smoke is not tested.
+- Batch rollout is not approved.
+- Write gate remains off by default.
+- Production cutover remains `PRODUCTION_NO_GO`.
+
 ## Live Persisted State Audit QA - 2026-06-01
 
 - If phone acceptance still shows the old warning, first inspect live assets for the `223cbbb` UI markers.
