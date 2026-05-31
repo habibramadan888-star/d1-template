@@ -8,7 +8,7 @@ const BASE_URL = (process.env.ARREARS_AUTH_BASE_URL || DEFAULT_BASE_URL).replace
 function parseArgs(argv) {
   return {
     checkConfig: argv.includes("--check-config"),
-    runAuthCheck: argv.includes("--run-auth-check")
+    authSmoke: argv.includes("--auth-smoke") || argv.includes("--run-auth-check")
   };
 }
 
@@ -150,21 +150,57 @@ async function main() {
   const { ready, summary } = assertConfig(values, exists);
 
   if (args.checkConfig) {
-    console.log(JSON.stringify({ mode: "check-config", ready, ...summary }, null, 2));
+    console.log(
+      JSON.stringify(
+        {
+          mode: "check-config",
+          config_present: exists ? "yes" : "no",
+          ready,
+          ...summary
+        },
+        null,
+        2
+      )
+    );
     return 0;
   }
 
-  if (!args.runAuthCheck) {
+  if (!args.authSmoke) {
     safeLog("mode", "no-op");
-    safeLog("next", "run with --check-config or --run-auth-check");
+    safeLog("next", "run with --check-config or --auth-smoke");
     safeLog("password printed", "no");
     safeLog("token printed", "no");
     safeLog("cookie printed", "no");
     return 0;
   }
 
+  const approved = String(process.env.ARREARS_AUTH_HARNESS_APPROVED || "").toLowerCase() === "yes";
+  if (!approved) {
+    console.log(
+      JSON.stringify(
+        {
+          mode: "auth-smoke",
+          refused: true,
+          reason: "ARREARS_AUTH_HARNESS_APPROVED must be yes",
+          owner_auth_usable: "no",
+          employee_auth_usable: "no",
+          owner_role_matched: "no",
+          employee_role_matched: "no",
+          cookie_printed: "no",
+          token_printed: "no",
+          password_printed: "no",
+          business_write: "no",
+          production_cutover: "PRODUCTION_NO_GO"
+        },
+        null,
+        2
+      )
+    );
+    return 2;
+  }
+
   if (!ready) {
-    console.log(JSON.stringify({ mode: "run-auth-check", ready, ...summary }, null, 2));
+    console.log(JSON.stringify({ mode: "auth-smoke", ready, ...summary }, null, 2));
     return 2;
   }
 
@@ -173,7 +209,7 @@ async function main() {
   console.log(
     JSON.stringify(
       {
-        mode: "run-auth-check",
+        mode: "auth-smoke",
         owner_auth_usable: owner.usable ? "yes" : "no",
         owner_role_matched: owner.roleMatched ? "yes" : "no",
         owner_status: owner.status,
@@ -185,9 +221,11 @@ async function main() {
         password_printed: "no",
         token_printed: "no",
         cookie_printed: "no",
+        business_write: "no",
         business_write_executed: "no",
         owner_directive_create_called: "no",
-        employee_followup_called: "no"
+        employee_followup_called: "no",
+        production_cutover: "PRODUCTION_NO_GO"
       },
       null,
       2

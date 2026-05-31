@@ -9,7 +9,7 @@ Harness path: `scripts/arrears-production-auth-harness.mjs`
 | Mode | Behavior |
 |---|---|
 | `--check-config` | Checks whether the ignored local env file exists and required fields are present. Does not login. Does not write D1. Does not print secrets. |
-| `--run-auth-check` | Logs in owner and employee, keeps cookies in memory only, verifies `/api/me`, and prints only redacted auth status. This may create production `active_sessions` rows and therefore requires explicit approval before use. |
+| `--auth-smoke` | Refuses to run unless `ARREARS_AUTH_HARNESS_APPROVED=yes`; then logs in owner and employee, keeps cookies in memory only, verifies `/api/me`, and prints only redacted auth status. This may create production `active_sessions` rows and therefore requires explicit approval before use. |
 
 ## Output Contract
 
@@ -21,6 +21,8 @@ The harness output is limited to:
 - cookie printed: no
 - token printed: no
 - password printed: no
+- business write: no
+- production cutover: PRODUCTION_NO_GO
 
 ## Explicit Non-Calls
 
@@ -33,5 +35,8 @@ The harness output is limited to:
 
 ## Session Warning
 
-`--run-auth-check` uses real login endpoints. The Worker login implementation creates `active_sessions` rows. This mode must not be run until Ramadan explicitly approves production auth session writes.
+`--auth-smoke` uses real login endpoints. The Worker login implementation creates `active_sessions` rows. This mode must not be run until Ramadan explicitly approves production auth session writes and sets `ARREARS_AUTH_HARNESS_APPROVED=yes`.
 
+## Verification
+
+`node scripts/arrears-production-auth-harness.mjs --check-config` was run only in config-check mode. No login was attempted.
