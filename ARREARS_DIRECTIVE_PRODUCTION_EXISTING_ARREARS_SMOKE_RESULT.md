@@ -1,48 +1,48 @@
 # Arrears Directive Production Existing Arrears Smoke Result
 
-Timestamp: 2026-05-31T20:47:26+04:00
+Timestamp: 2026-05-31T17:43:31.672Z
 
-Overall result: `BLOCKED_AUTH_MATERIAL_MISSING`
-
-The production-linked write smoke was not executed. This is not a pass record.
+Overall: BLOCKED
 
 | Step | Result |
-|---|---|
-| final safety check | fail: auth material missing |
-| pre snapshot | pass: read-only snapshot captured |
-| write gate enabled | not executed |
-| owner directive create | not executed |
-| owner idempotency replay | not executed |
-| employee read | not executed |
-| employee followup | not executed |
-| employee idempotency replay | not executed |
-| owner feedback visible | not executed |
-| readonly_admin blocked | not executed |
-| write gate disabled | not required: gate was never enabled |
-| rollback/cleanup | not required: no write occurred |
-| post verify | not executed |
-| production cutover | `PRODUCTION_NO_GO` |
+| --- | --- |
+| final safety check | pass |
+| pre snapshot | pass |
+| write gate enabled | pass |
+| owner directive create | blocked: HTTP 404 |
+| owner idempotency replay | skipped |
+| employee read | skipped |
+| employee follow-up | skipped |
+| employee idempotency replay | skipped |
+| owner feedback visible | skipped |
+| readonly_admin blocked | skipped |
+| write gate disabled | pass |
+| rollback/cleanup | pass |
+| post verify | pass |
+| production cutover | PRODUCTION_NO_GO |
 
-## Scope Confirmation
+## Root Cause
 
-| Item | Status |
-|---|---|
-| production write gate opened | No |
-| production D1 write count | 0 |
-| production migration | No |
-| production deploy | No |
-| ttlock smoke | No |
-| batch write | No |
-| target task touched | No |
-| secrets printed | No |
+The live Worker returned HTTP 404 for the approved owner directive endpoint:
 
-## Required Next Action
+`POST /api/boss/arrears/directives`
 
-Ramadan must provide a safe authenticated execution path before this smoke can run:
+That means the currently deployed production Worker does not expose the approved Backend SOT write endpoint needed for this smoke. The smoke was stopped after the owner create attempt. Employee read/follow-up, idempotency replay, owner feedback, and readonly write-path verification were not executed.
 
-1. Set non-printing local runtime variables for owner and employee login, or
-2. Provide an already-authenticated secure execution harness that does not print cookies/tokens, or
-3. Run the authenticated API smoke manually and provide redacted evidence.
+## Scope Actually Reached
 
-After authentication material is available, rerun the final safety check, then enable the write gate only for the shortest possible window and disable it immediately after the smoke.
+- Task selected: task-mpgzu9kp-f150e26f
+- Write gate was temporarily enabled and then disabled.
+- The owner directive API call returned 404 and created no directive.
+- No employee follow-up was executed.
+- No idempotency rows were created for smoke keys.
+- No audit/event rows were created for directive/follow-up.
+- Selected task fields were verified/restored to pre-smoke values.
+- No ttlock smoke.
+- No batch write.
+- No financial formula change.
+- No dashboard calculation change.
 
+
+Password/token/cookie printed: no.
+Production cutover: PRODUCTION_NO_GO.

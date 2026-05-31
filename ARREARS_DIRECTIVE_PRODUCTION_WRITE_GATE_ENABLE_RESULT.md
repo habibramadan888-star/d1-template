@@ -1,15 +1,14 @@
 # Arrears Directive Production Write Gate Enable Result
 
-Result: `NOT_EXECUTED`
+Timestamp: 2026-05-31T17:43:31.672Z
 
-The production write gate was not enabled.
+| Check | Result |
+| --- | --- |
+| write gate enabled | pass |
+| operator | Ramadan Habib |
+| maximum open duration | 15 minutes |
+| scope | attempt selected task directive only |
 
-Reason: final safety check stopped with `BLOCKED_AUTH_MATERIAL_MISSING`.
 
-| Item | Status |
-|---|---|
-| gate before execution | off |
-| gate enable attempted | no |
-| gate after execution | off |
-| production D1 write | no |
-
+Password/token/cookie printed: no.
+Production cutover: PRODUCTION_NO_GO.

@@ -1,12 +1,13 @@
 # Arrears Directive Production Idempotency Replay Result
 
-Result: `NOT_EXECUTED`
+Timestamp: 2026-05-31T17:43:31.672Z
 
-The owner idempotency replay request was not sent.
+| Check | Result |
+| --- | --- |
+| owner idempotency replay | skipped |
+| reason | owner directive create returned 404 before idempotency row creation |
+| idempotency rows for owner key | 0 |
 
-| Check | Status |
-|---|---|
-| duplicate directive prevention | not executed |
-| owner idempotency key row | absent before smoke |
-| production D1 write | no |
 
+Password/token/cookie printed: no.
+Production cutover: PRODUCTION_NO_GO.

@@ -1,14 +1,13 @@
 # Arrears Directive Production Employee Read Result
 
-Result: `NOT_EXECUTED`
+Timestamp: 2026-05-31T17:43:31.672Z
 
-The employee directive read request was not sent.
+| Check | Result |
+| --- | --- |
+| employee read | skipped |
+| reason | owner directive was not created |
+| business write | none |
 
-Reason: authenticated employee runtime material for `abdul` is unavailable locally.
 
-| Check | Status |
-|---|---|
-| employee can read assigned directive | not executed |
-| other employee cannot read directive | not executed |
-| production D1 write | no |
-
+Password/token/cookie printed: no.
+Production cutover: PRODUCTION_NO_GO.

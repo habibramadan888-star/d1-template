@@ -1,13 +1,14 @@
 # Arrears Directive Production Write Gate Disable Result
 
-Result: `NOT_REQUIRED`
+Timestamp: 2026-05-31T17:43:31.672Z
 
-The write gate was never enabled, so no disable operation was required.
+| Check | Result |
+| --- | --- |
+| write gate disabled | pass |
+| ARREARS_DIRECTIVE_WRITE_APPROVED present after run | no |
+| ARREARS_DIRECTIVE_WRITE_MODE present after run | no |
+| closed by finally/manual verification | yes |
 
-| Gate Secret | Present After Stop |
-|---|---|
-| `ARREARS_DIRECTIVE_WRITE_APPROVED` | no |
-| `ARREARS_DIRECTIVE_WRITE_MODE` | no |
 
-Production D1 write: No.
-
+Password/token/cookie printed: no.
+Production cutover: PRODUCTION_NO_GO.

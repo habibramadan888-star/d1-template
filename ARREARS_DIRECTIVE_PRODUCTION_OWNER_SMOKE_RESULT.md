@@ -1,14 +1,16 @@
 # Arrears Directive Production Owner Smoke Result
 
-Result: `NOT_EXECUTED`
+Timestamp: 2026-05-31T17:43:31.672Z
 
-The owner directive create request was not sent.
+| Check | Result |
+| --- | --- |
+| endpoint | /api/boss/arrears/directives |
+| HTTP status | 404 |
+| created_count | 0 |
+| result | blocked |
+| root cause | live Worker does not expose approved owner directive endpoint |
+| amount/accounting mutation | none |
 
-Reason: production write gate was not enabled because authenticated owner runtime material is unavailable.
 
-| Expected Scope | Status |
-|---|---|
-| task_id `task-mpgzu9kp-f150e26f` only | not executed |
-| owner idempotency key | unused |
-| production D1 write | no |
-
+Password/token/cookie printed: no.
+Production cutover: PRODUCTION_NO_GO.

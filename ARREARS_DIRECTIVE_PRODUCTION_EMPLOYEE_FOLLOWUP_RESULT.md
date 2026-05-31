@@ -1,14 +1,14 @@
 # Arrears Directive Production Employee Follow-Up Result
 
-Result: `NOT_EXECUTED`
+Timestamp: 2026-05-31T17:43:31.672Z
 
-The employee follow-up write request was not sent.
+| Check | Result |
+| --- | --- |
+| employee follow-up | skipped |
+| reason | owner directive was not created |
+| promised_payment_date write | none |
+| followup_note write | none |
 
-| Prepared Field | Value |
-|---|---|
-| task_id | `task-mpgzu9kp-f150e26f` |
-| promised_payment_date | `2026-06-01` |
-| employee idempotency key | `qa-prod-arrears-employee-20260531T203913-task-mpgzu9kp-f150e26f` |
 
-Production D1 write: No.
-
+Password/token/cookie printed: no.
+Production cutover: PRODUCTION_NO_GO.

@@ -1,16 +1,17 @@
 # Arrears Directive Production Rollback Or Cleanup Result
 
-Result: `NOT_REQUIRED`
+Timestamp: 2026-05-31T17:43:31.672Z
 
-No owner directive, employee follow-up, idempotency row, or audit row was created by this run.
+| Check | Result |
+| --- | --- |
+| rollback/cleanup needed for directive | no directive created |
+| selected task restore executed | yes, selected task fields restored to pre-smoke snapshot |
+| directive_status | none |
+| actual_received | 0 |
+| amount unchanged | 50 AED |
+| idempotency rows retained | 0 |
+| audit rows retained | 0 |
 
-| Item | Cleanup Required |
-|---|---|
-| directive row | no |
-| employee follow-up | no |
-| idempotency rows | no |
-| audit rows | no |
-| selected task amount | unchanged in pre-smoke snapshot |
 
-Production D1 write: No.
-
+Password/token/cookie printed: no.
+Production cutover: PRODUCTION_NO_GO.

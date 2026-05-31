@@ -1,12 +1,13 @@
 # Arrears Directive Production Employee Idempotency Replay Result
 
-Result: `NOT_EXECUTED`
+Timestamp: 2026-05-31T17:43:31.672Z
 
-The employee idempotency replay request was not sent.
+| Check | Result |
+| --- | --- |
+| employee idempotency replay | skipped |
+| reason | employee follow-up was not executed |
+| idempotency rows for employee key | 0 |
 
-| Check | Status |
-|---|---|
-| duplicate follow-up prevention | not executed |
-| employee idempotency key row | absent before smoke |
-| production D1 write | no |
 
+Password/token/cookie printed: no.
+Production cutover: PRODUCTION_NO_GO.

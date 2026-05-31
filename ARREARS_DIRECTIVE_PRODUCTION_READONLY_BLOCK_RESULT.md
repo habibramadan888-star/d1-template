@@ -1,10 +1,13 @@
 # Arrears Directive Production Readonly Block Result
 
-Result: `NOT_EXECUTED`
+Timestamp: 2026-05-31T17:43:31.672Z
 
-The readonly-admin write-block API request was not sent.
+| Check | Result |
+| --- | --- |
+| readonly_admin write attempt | skipped |
+| reason | approved endpoint missing in live Worker; no further write-path calls made |
+| readonly contract | unchanged |
 
-Reason: production write gate was not enabled and authenticated readonly-admin runtime material was not available locally.
 
-Production D1 write: No.
-
+Password/token/cookie printed: no.
+Production cutover: PRODUCTION_NO_GO.

@@ -1,17 +1,20 @@
 # Arrears Directive Production Post-Smoke Verify
 
-Result: `NOT_EXECUTED`
-
-Because the smoke was blocked before write-gate enablement, post-smoke verification is equivalent to the pre-smoke read-only safety state.
+Timestamp: 2026-05-31T17:43:31.672Z
 
 | Check | Result |
-|---|---|
-| selected task amount unchanged | pre-smoke verified `50 AED` |
-| no extra directives created | pre-smoke verified no active directive |
-| idempotency rows expected | none expected because smoke not executed |
-| audit rows expected | none expected because smoke not executed |
-| write gate off | yes |
-| production cutover | `PRODUCTION_NO_GO` |
-| dashboard calculation changed | no evidence of change |
-| financial formula changed | no evidence of change |
+| --- | --- |
+| selected task amount unchanged = 50 AED | pass |
+| selected task actual_received unchanged = 0 | pass |
+| selected task directive_status restored = none | pass |
+| boss_requested_at/by/due_date remain null | pass |
+| staff_promised_at remains null | pass |
+| idempotency rows for smoke keys | 0 |
+| audit rows for task | 0 |
+| directive/follow-up entry event rows | 0 |
+| write gate off | pass |
+| production cutover | PRODUCTION_NO_GO |
 
+
+Password/token/cookie printed: no.
+Production cutover: PRODUCTION_NO_GO.
