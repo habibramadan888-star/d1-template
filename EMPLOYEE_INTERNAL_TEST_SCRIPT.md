@@ -118,3 +118,12 @@ During employee QA, confirm:
 4. If a directive exists, card must show bed, amount, source, due/overdue, status, owner note, promised date input, and follow-up note input.
 5. Employee feedback must not include amount edit, promised amount input, close, or void.
 6. If production write gate is off, submit attempt must explain that feedback was not written to production.
+
+## Live Employee Inbox Acceptance After Deploy - 2026-05-31
+
+1. Log in as an employee.
+2. Open FOLLOW-UP.
+3. Confirm `老板下发任务` section appears.
+4. If there are no real directives, confirm it displays `暂无老板下发任务`.
+5. Confirm `系统提醒` remains visible separately.
+6. Do not perform employee follow-up write unless separately approved.

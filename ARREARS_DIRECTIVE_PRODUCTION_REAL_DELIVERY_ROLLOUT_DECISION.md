@@ -25,3 +25,14 @@ The owner UI generated a dispatch/WhatsApp list, but real production delivery re
 - Batch dispatch: not approved.
 - TTLock production smoke: not approved.
 - Production cutover: `PRODUCTION_NO_GO`.
+
+## UI Deploy Note - 2026-05-31
+
+The employee inbox UI and owner dry-run copy were deployed in Worker version `6d7b8a02-ddb1-4cb8-a67d-21ace1871c10`.
+
+This deploy does not change the rollout decision:
+
+- Production write gate remains off.
+- Dry-run still does not create employee-side directives.
+- Real production delivery still requires separate approval.
+- Production cutover remains `PRODUCTION_NO_GO`.

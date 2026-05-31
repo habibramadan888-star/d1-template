@@ -6123,3 +6123,14 @@ Safety:
 - Production write approval errors are shown honestly as not written to production.
 - No deploy, D1 write, D1 execute/export/import, migration, TTLock smoke, or batch dispatch was performed.
 - Production cutover remains `PRODUCTION_NO_GO`.
+
+## Arrears Employee Inbox UI Deploy - 2026-05-31
+
+- Deployed approved UI/read-only scope to `homelink-finance`.
+- Worker version id: `6d7b8a02-ddb1-4cb8-a67d-21ace1871c10`.
+- Uploaded assets: `/employee-v3.html` and `/index-51-main.js`.
+- Owner dry-run copy is live and no longer implies employee-side receipt while write gate is off.
+- Employee boss directive inbox UI and read wiring were included in uploaded `employee-v3.html`.
+- Public employee page fetch redirects to login/portal, so authenticated phone acceptance is required for employee inbox visual confirmation.
+- No production write gate, D1 write, D1 execute/export/import, migration, business write, TTLock smoke, or batch dispatch was performed.
+- Production cutover remains `PRODUCTION_NO_GO`.

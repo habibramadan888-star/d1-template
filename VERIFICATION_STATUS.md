@@ -1942,3 +1942,17 @@ Deployment verification:
 | Write gate | OFF | No write gate opened. |
 | D1 write / migration | NOT_RUN | No D1 write, migration, export, import, or execute. |
 | Production cutover | NO_GO | Remains `PRODUCTION_NO_GO`. |
+
+## Arrears Employee Inbox UI Deploy Verification - 2026-05-31
+
+| Area | Status | Notes |
+|---|---|---|
+| Predeploy verification | PASS | Focused tests, security, gate, QA dry-run, embedded checks, and worker drift audit passed. |
+| Worker deploy | PASS | Version `6d7b8a02-ddb1-4cb8-a67d-21ace1871c10`. |
+| Uploaded assets | PASS | `/employee-v3.html`, `/index-51-main.js`. |
+| Public root smoke | PASS | `/` 200 and three portal remains employee/owner/admin only. |
+| Owner dry-run copy live | PASS | Live owner JS includes dry-run / not-written copy. |
+| Employee inbox visual smoke | MANUAL_REQUIRED | Employee page is auth-protected and redirects without login. |
+| Write gate | OFF | No write gate opened. |
+| D1 write / migration | NOT_RUN | No D1 execute/export/import/write or migration. |
+| Production cutover | NO_GO | Remains `PRODUCTION_NO_GO`. |

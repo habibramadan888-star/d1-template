@@ -357,3 +357,11 @@ Production cutover remains `PRODUCTION_NO_GO`.
   - `npm run test:employee-arrears-directive-inbox-ui`
   - `npm run test:employee-arrears-directive-read-ui`
   - `npm run test:employee-arrears-followup-ui-gate`
+
+## Arrears Employee Inbox UI Live Deploy QA - 2026-05-31
+
+- Owner dry-run copy is deployed and must remain distinct from real delivery.
+- Employee boss directive inbox UI is deployed but requires authenticated phone acceptance because employee routes redirect without login.
+- Write gate off means no real employee directive is created by owner dry-run.
+- Real production delivery still requires rollout approval.
+- Production cutover remains `PRODUCTION_NO_GO`.

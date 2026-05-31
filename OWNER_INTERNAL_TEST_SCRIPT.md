@@ -304,3 +304,12 @@ Production cutover remains `PRODUCTION_NO_GO`.
 4. Expected while production write gate is off: dry-run/WhatsApp list is generated and UI explicitly says it was not written to employee side.
 5. Do not expect employee inbox delivery unless a separate production write approval opens the gate.
 6. Verify `readonly_admin` cannot see dispatch write controls.
+
+## Live Owner Dry-run Copy Acceptance After Deploy - 2026-05-31
+
+1. Log in as owner.
+2. Open arrears.
+3. Select at least one task and click `下发员工`.
+4. Expected: UI states real dispatch is not enabled and a dry-run/manual list was generated.
+5. It must not say that employee side already received the task.
+6. No production write should be performed.
