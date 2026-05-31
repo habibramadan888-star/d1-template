@@ -2017,3 +2017,15 @@ Deployment verification:
 | Batch / TTLock / owner directive | NOT_RUN | No batch dispatch, TTLock smoke, or new owner directive create was executed. |
 | D1 migration / deploy | NOT_RUN | No migration, D1 export/import/execute, or deploy was performed. |
 | Production cutover | NO_GO | Remains `PRODUCTION_NO_GO`. |
+
+## Arrears Follow-up Persisted State UI Verification - 2026-06-01
+
+| Area | Status | Notes |
+|---|---|---|
+| Persisted employee feedback | FIXED | Existing server feedback is recognized as saved. |
+| Dirty date/note edits | FIXED | Current inputs are compared against server originals. |
+| Gate-off copy | FIXED | Gate warning appears only for unsaved changes or new feedback attempts. |
+| Owner assigned/followed-up button state | FIXED | Primary `下发员工` is not rendered as a clickable action for assigned/followed-up tasks. |
+| Production write / gate | NOT_RUN | No production write and no write gate opening in this UI fix. |
+| D1 migration / deploy | NOT_RUN | No migration, D1 execute/export/import, or deploy was performed. |
+| Production cutover | NO_GO | Remains `PRODUCTION_NO_GO`. |

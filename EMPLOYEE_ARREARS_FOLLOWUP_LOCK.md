@@ -66,6 +66,16 @@ Create a dedicated compatibility task to remove or ignore `promise_amount` from 
 - No migration or D1 write was performed.
 - Production cutover remains `PRODUCTION_NO_GO`.
 
+## Persisted Feedback State Lock - 2026-06-01
+
+- Saved employee feedback and currently unsaved edits must be distinct states.
+- Write gate off must not negate feedback that is already saved and visible to owner.
+- Gate-off warning is only for new or modified feedback that is not yet persisted.
+- Unchanged persisted feedback should show saved/owner-visible copy and must not show a production-write-disabled error.
+- Owner-side assigned or followed-up tasks must not keep a primary clickable `下发员工` action.
+- No production write, write gate opening, migration, batch dispatch, TTLock smoke, financial formula change, or dashboard calculation change is part of this UI lock.
+- Production cutover remains `PRODUCTION_NO_GO`.
+
 ## Owner Batch Directive UI Lock
 
 - Current owner-side "send employee" flow is dry-run/list-generation only unless a separate write approval is issued.

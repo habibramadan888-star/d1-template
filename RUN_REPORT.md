@@ -6201,3 +6201,12 @@ Safety:
 - Write gate was opened only for the approved single-task window and is now closed.
 - No owner directive create, batch dispatch, TTLock smoke, migration, deploy, employee entry write, financial formula change, or dashboard calculation change was performed.
 - Production cutover remains `PRODUCTION_NO_GO`.
+
+## Arrears Follow-up Persisted State UI Fix - 2026-06-01
+
+- Fixed employee-side persisted feedback recognition for boss directive follow-up cards.
+- Employee UI now distinguishes saved feedback from unsaved date/note edits.
+- Write gate off no longer implies already-saved feedback failed; gate warning is reserved for new/dirty submissions.
+- Owner arrears cards no longer show a primary clickable `下发员工` action for assigned or employee-followed-up tasks.
+- No production write, write gate opening, deploy, migration, batch dispatch, TTLock smoke, financial formula change, or dashboard calculation change was performed.
+- Production cutover remains `PRODUCTION_NO_GO`.

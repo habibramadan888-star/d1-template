@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 function extractAsyncFunction(source, name) {
-  const start = source.indexOf(`async function ${name}(`);
+  const start = source.lastIndexOf(`async function ${name}(`);
   assert.notEqual(start, -1, `${name} must exist`);
   const open = source.indexOf("{", source.indexOf(")", start));
   let depth = 0;

@@ -402,3 +402,12 @@ Production cutover remains `PRODUCTION_NO_GO`.
 - Verify write gate is closed after the acceptance write.
 - Verify no batch dispatch, TTLock smoke, owner directive create, migration, deploy, financial formula change, or dashboard calculation change occurred.
 - Production cutover remains `PRODUCTION_NO_GO`.
+
+## Persisted Follow-up State Regression QA - 2026-06-01
+
+- Saved feedback and unsaved edits must be separate states.
+- Write gate off must not imply previously saved feedback failed.
+- Only unsaved changes should show gated-warning copy.
+- Owner cards for assigned/followed-up tasks must not continue to show a primary clickable `下发员工` action.
+- This QA does not authorize production writes, migration, deploy, TTLock smoke, or batch dispatch.
+- Production cutover remains `PRODUCTION_NO_GO`.

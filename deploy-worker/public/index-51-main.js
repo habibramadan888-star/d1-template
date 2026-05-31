@@ -1180,9 +1180,13 @@ function renderArrearCardActions(a){
   const taskArg=jsArg(taskIdRaw);
   const detail=`<button type="button" class="secondary" data-arrear-card-action="details" onclick="showArrearTaskDetails(${taskArg})">详情</button>`;
   if(!isOwnerWriteRole())return detail;
+  const directive=arrearDirectiveStatus(a);
   const stateLabel=arrearBusinessState(a);
   const selectAction=`onclick="selectArrearForDirective(${taskArg})"`;
   const noticeAction=`onclick="showArrearTaskActionHint(${taskArg})"`;
+  if(['assigned','viewed'].includes(directive))return `${detail}<button type="button" class="secondary" data-arrear-write-action="assigned-state" disabled aria-disabled="true">已下发</button>`;
+  if(directive==='followed_up')return `${detail}<button type="button" class="secondary" data-arrear-write-action="followed-up-state" disabled aria-disabled="true">员工已反馈</button>`;
+  if(directive==='closed'||directive==='cancelled')return detail;
   if(stateLabel==='已下发'||stateLabel==='已跟进')return `${detail}<button type="button" class="primary" data-arrear-write-action="nudge" ${selectAction}>催促</button>`;
   if(stateLabel==='承诺付款')return `<button type="button" class="primary" data-arrear-write-action="review" ${noticeAction}>待核对</button><button type="button" class="secondary" data-arrear-write-action="continue" ${selectAction}>继续跟进</button>`;
   if(stateLabel==='已反馈付款')return `<button type="button" class="primary" data-arrear-write-action="mark-review" ${noticeAction}>标记待核对</button>${detail}`;

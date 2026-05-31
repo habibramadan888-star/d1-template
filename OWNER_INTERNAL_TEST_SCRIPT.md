@@ -356,3 +356,13 @@ Production cutover remains `PRODUCTION_NO_GO`.
 6. Confirm amount remains `50 AED`, `actual_received` remains `0`, and accounting status remains unchanged.
 7. Confirm no batch dispatch, TTLock smoke, close, void, or handover action is part of this acceptance.
 8. Production cutover remains `PRODUCTION_NO_GO`.
+
+## Assigned / Followed-up Button State Acceptance - 2026-06-01
+
+1. Open owner arrears.
+2. Locate an assigned task and confirm it does not show a clickable primary `下发员工` action.
+3. Locate a followed-up task and confirm it shows an already-feedback/saved state instead of a clickable primary `下发员工` action.
+4. Confirm only waiting/not-dispatched tasks expose the primary send action for owner write roles.
+5. Confirm readonly_admin still sees details only.
+6. Do not execute any owner directive write or batch dispatch.
+7. Production cutover remains `PRODUCTION_NO_GO`.

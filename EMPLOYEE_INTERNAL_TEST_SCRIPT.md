@@ -187,3 +187,13 @@ During employee QA, confirm:
 5. Confirm the task amount remains `50 AED` and `actual_received` remains `0`.
 6. Confirm any further production follow-up write requires a separate approval because the write gate is closed.
 7. Production cutover remains `PRODUCTION_NO_GO`.
+
+## Persisted Follow-up State Acceptance - 2026-06-01
+
+1. Reload the employee FOLLOW-UP page after a saved feedback exists.
+2. Confirm unchanged saved promised date and note show as saved/existing feedback.
+3. Click the saved button/state without editing and confirm no production-write-disabled error appears.
+4. Change promised date or note and confirm the card shows current changes unsubmitted.
+5. With write gate off, submit the dirty edit and confirm the warning says the current modification will not write to production.
+6. Confirm amount edit, close, void, handover, and promised amount remain unavailable.
+7. Production cutover remains `PRODUCTION_NO_GO`.

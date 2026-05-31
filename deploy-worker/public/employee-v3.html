@@ -2874,6 +2874,8 @@ function employeeDirectiveSourceLabel(source){
 }
 function normalizeEmployeeDirective(d){
   const amount=Number(d?.amount_fils??d?.amountFils??0)/100;
+  const promisedPaymentDate=String(d?.promised_payment_date||d?.promise_date||'');
+  const followupNote=String(d?.followup_note||d?.staff_note||'');
   return {
     directive_id:String(d?.directive_id||d?.task_id||d?.id||''),
     task_id:String(d?.task_id||d?.directive_id||d?.id||''),
@@ -2884,8 +2886,10 @@ function normalizeEmployeeDirective(d){
     due_date:String(d?.due_date||d?.dueDate||''),
     overdue_days:Number(d?.overdue_days||d?.overdueDays||0),
     directive_status:String(d?.directive_status||d?.directiveStatus||'assigned'),
-    promised_payment_date:String(d?.promised_payment_date||d?.promise_date||''),
-    followup_note:String(d?.followup_note||d?.staff_note||''),
+    promised_payment_date:promisedPaymentDate,
+    followup_note:followupNote,
+    serverOriginalPromisedDate:promisedPaymentDate.trim(),
+    serverOriginalFollowupNote:followupNote.trim(),
     owner_note:String(d?.owner_note||'')
   };
 }
@@ -2984,6 +2988,75 @@ function bindEmployeeDirectiveActions(){
       }
     };
   });
+}
+function directiveFollowupValue(value){return String(value||'').trim()}
+function employeeDirectiveHasPersistedFeedback(d){
+  if(!d)return false;
+  const status=String(d.directive_status||'').trim();
+  return Boolean(
+    directiveFollowupValue(d.serverOriginalPromisedDate||d.promised_payment_date)||
+    directiveFollowupValue(d.serverOriginalFollowupNote||d.followup_note)||
+    ['followed_up','promised','needs_review'].includes(status)
+  );
+}
+function employeeDirectiveCurrentValues(taskId){
+  const id=safeDomId(taskId);
+  return {
+    promised:directiveFollowupValue($(`directivePromise_${id}`)?.value||''),
+    note:directiveFollowupValue($(`directiveNote_${id}`)?.value||'')
+  };
+}
+function employeeDirectiveOriginalValues(d){
+  return {
+    promised:directiveFollowupValue(d?.serverOriginalPromisedDate||d?.promised_payment_date||''),
+    note:directiveFollowupValue(d?.serverOriginalFollowupNote||d?.followup_note||'')
+  };
+}
+function employeeDirectiveIsDirty(d){
+  if(!d)return false;
+  const current=employeeDirectiveCurrentValues(d.task_id);
+  const original=employeeDirectiveOriginalValues(d);
+  return current.promised!==original.promised||current.note!==original.note;
+}
+function updateEmployeeDirectivePersistedState(taskId){
+  const item=(state.employeeDirectives||[]).find(x=>x.task_id===taskId);
+  if(!item)return;
+  const id=safeDomId(taskId);
+  const tag=$(`directiveStatus_${id}`);
+  const btn=document.querySelector(`[data-save-directive-follow="${CSS.escape(taskId)}"]`);
+  const hasPersisted=employeeDirectiveHasPersistedFeedback(item);
+  const dirty=employeeDirectiveIsDirty(item);
+  if(tag){
+    tag.classList.toggle('bad',dirty);
+    tag.dataset.directiveDirty=dirty?'true':'false';
+    tag.textContent=dirty?'当前修改未提交':(hasPersisted?'已有反馈':employeeDirectiveStatusLabel(item.directive_status));
+  }
+  if(btn){
+    btn.dataset.directiveDirty=dirty?'true':'false';
+    btn.dataset.directivePersisted=hasPersisted?'true':'false';
+    if(hasPersisted&&!dirty){
+      btn.textContent='已保存';
+      btn.disabled=true;
+      btn.classList.add('disabled');
+      btn.setAttribute('aria-disabled','true');
+    }else{
+      btn.textContent=hasPersisted?'提交修改':'提交反馈';
+      btn.disabled=false;
+      btn.classList.remove('disabled');
+      btn.removeAttribute('aria-disabled');
+    }
+  }
+}
+function bindEmployeeDirectiveActions(){
+  document.querySelectorAll('[data-save-directive-follow]').forEach(btn=>btn.onclick=()=>saveEmployeeDirectiveFollowup(btn.dataset.saveDirectiveFollow));
+  document.querySelectorAll('[data-directive-edit]').forEach(input=>{
+    input.oninput=()=>{
+      const card=input.closest('[data-directive-task-id]');
+      const taskId=card?.dataset?.directiveTaskId||'';
+      if(taskId)updateEmployeeDirectivePersistedState(taskId);
+    };
+  });
+  (state.employeeDirectives||[]).forEach(d=>updateEmployeeDirectivePersistedState(d.task_id));
 }
 function safeDomId(v){return String(v||'').replace(/[^a-zA-Z0-9_-]/g,'_')}
 function openArrearTasks(){
@@ -3236,6 +3309,13 @@ async function saveEmployeeDirectiveFollowup(taskId){
   const id=safeDomId(taskId);
   const promised=$(`directivePromise_${id}`)?.value||'';
   const note=$(`directiveNote_${id}`)?.value.trim()||'';
+  const hasPersisted=employeeDirectiveHasPersistedFeedback(item);
+  const dirty=employeeDirectiveIsDirty(item);
+  if(hasPersisted&&!dirty){
+    updateEmployeeDirectivePersistedState(taskId);
+    toast('反馈已保存，老板端可见。',6000);
+    return;
+  }
   if(!promised){toast('请填写承诺付款日期',6000);return}
   if(!note){toast('请填写跟进备注，说明客户答复或原因',6000);return}
   const btn=document.querySelector(`[data-save-directive-follow="${CSS.escape(taskId)}"]`);
@@ -3253,6 +3333,8 @@ async function saveEmployeeDirectiveFollowup(taskId){
     });
     const data=await r.json().catch(()=>({}));
     if(r.status===409||data?.error==='production_write_approval_required'||data?.message==='production_write_approval_required'){
+      toast(hasPersisted?'真实反馈写入未启用；当前修改不会写入生产。请先用 WhatsApp/线下回执。':'真实反馈写入未启用；当前不会写入生产。请先用 WhatsApp/线下回执。',8000);
+      return;
       toast('真实反馈写入未启用；当前不会写入生产。请先用 WhatsApp/线下回执。',8000);
       return;
     }
@@ -3263,6 +3345,54 @@ async function saveEmployeeDirectiveFollowup(taskId){
     toast('提交失败：'+(e.message||e),6000);
   }finally{
     if(btn){btn.disabled=false;btn.textContent='提交反馈';}
+  }
+}
+async function saveEmployeeDirectiveFollowup(taskId){
+  if(!state.user){applyEmployeeUser(null);toast('请先登录员工账号',6000);return}
+  const item=(state.employeeDirectives||[]).find(x=>x.task_id===taskId);
+  if(!item)return;
+  const id=safeDomId(taskId);
+  const promised=$(`directivePromise_${id}`)?.value||'';
+  const note=$(`directiveNote_${id}`)?.value.trim()||'';
+  const hasPersisted=employeeDirectiveHasPersistedFeedback(item);
+  const dirty=employeeDirectiveIsDirty(item);
+  if(hasPersisted&&!dirty){
+    updateEmployeeDirectivePersistedState(taskId);
+    toast('反馈已保存，老板端可见。',6000);
+    return;
+  }
+  if(!promised){toast('请填写承诺付款日期',6000);return}
+  if(!note){toast('请填写跟进备注，说明客户答复或原因',6000);return}
+  const btn=document.querySelector(`[data-save-directive-follow="${CSS.escape(taskId)}"]`);
+  if(btn){btn.disabled=true;btn.textContent='提交中';}
+  try{
+    const idempotency=`emp-directive-${Date.now()}-${taskId}`.replace(/[^a-zA-Z0-9_-]/g,'-').slice(0,120);
+    const r=await apiFetch(`/api/employee/arrears/directives/${encodeURIComponent(taskId)}/followup`,{
+      method:'POST',
+      headers:{'Idempotency-Key':idempotency},
+      body:JSON.stringify({
+        promised_payment_date:promised,
+        followup_note:note,
+        idempotency_key:idempotency
+      })
+    });
+    const data=await r.json().catch(()=>({}));
+    if(r.status===409||data?.error==='production_write_approval_required'||data?.message==='production_write_approval_required'){
+      toast(hasPersisted?'真实反馈写入未启用；当前修改不会写入生产。请先用 WhatsApp/线下回执。':'真实反馈写入未启用；当前不会写入生产。请先用 WhatsApp/线下回执。',8000);
+      return;
+    }
+    if(!r.ok)throw new Error(data?.message||data?.error||('HTTP '+r.status));
+    item.promised_payment_date=promised;
+    item.followup_note=note;
+    item.serverOriginalPromisedDate=promised;
+    item.serverOriginalFollowupNote=note;
+    item.directive_status='followed_up';
+    toast('反馈已提交并同步老板端',6000);
+    await loadEmployeeArrearsDirectives(true);
+  }catch(e){
+    toast('提交失败：'+(e.message||e),6000);
+  }finally{
+    updateEmployeeDirectivePersistedState(taskId);
   }
 }
 function prefillRentFromFollowup(taskId){
