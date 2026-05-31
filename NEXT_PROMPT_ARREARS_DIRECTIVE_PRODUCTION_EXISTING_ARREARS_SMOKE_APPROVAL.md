@@ -5,12 +5,35 @@ Copy this only if Ramadan explicitly approves a minimum production write smoke f
 ```text
 进入 TASK ARREARS-DIRECTIVE-PRODUCTION-EXISTING-ARREARS-SMOKE-001。
 
-当前 schema 结论：
-SCHEMA_READY_FOR_EXISTING_ARREARS_WRITE_SMOKE
+当前 schema 结论：SCHEMA_READY_FOR_EXISTING_ARREARS_WRITE_SMOKE
+当前 auth harness 结论：AUTH_SESSION_WRITE_APPROVAL_REQUIRED
 
-我明确批准 Codex 准备 1 条 existing_arrears_record production smoke write，但必须先输出待执行命令、影响范围、rollback snapshot、write gate 开关计划，并等待最终人工确认后再执行。
+我明确批准 Codex 执行 1 条 existing_arrears_record production smoke write，范围仅限以下输入。
 
-请 Ramadan 逐项填写：
+必须先确认：
+1. production cutover 继续保持 PRODUCTION_NO_GO。
+2. 不执行 ttlock production smoke。
+3. 不执行 batch write。
+4. 不修改 financial formula。
+5. 不修改 dashboard calculation。
+6. 不打印 password/token/cookie/Set-Cookie。
+
+## 认证执行方式
+
+选择一种：
+
+- [ ] 方案 A：人工浏览器 smoke。Ramadan 使用已有登录态操作，Codex 只记录结果，不接触 cookie/token。
+- [ ] 方案 B：本地 masked API harness。Codex 使用 `.tmp/arrears-smoke-auth/production-auth.local.env`，只在内存中使用 cookie，禁止打印 secret。
+
+如果选择方案 B，必须额外批准：
+
+- [ ] 允许 owner 登录创建 production active_sessions row。
+- [ ] 允许 employee 登录创建 production active_sessions row。
+- [ ] 允许 smoke 后调用 logout/revoke session 写 `active_sessions.revoked=1`。
+- [ ] 确认 `.tmp/arrears-smoke-auth/production-auth.local.env` 只保存在本机且不提交 Git。
+- [ ] 允许 Codex 使用 masked auth harness，但禁止输出 password/token/cookie/Set-Cookie。
+
+## Production write approval
 
 1. 是否允许临时开启 production write gate：
    - [ ] YES
@@ -21,33 +44,34 @@ SCHEMA_READY_FOR_EXISTING_ARREARS_WRITE_SMOKE
    - [ ] NO
 
 3. production task:
-   - task_id:
-   - room_bed:
-   - customer_code:
-   - amount:
-   - assigned employee userid:
-   - reason selected:
+   - task_id: task-mpgzu9kp-f150e26f
+   - room_bed: 144
+   - customer_code: 139780080
+   - amount: 50 AED
+   - assigned employee userid: abdul
+   - reason selected: lowest-risk existing arrears smoke candidate
 
 4. employee follow-up payload:
-   - promised_payment_date:
-   - followup_note:
+   - promised_payment_date: 2026-06-01
+   - followup_note: QA smoke：客户承诺测试日期付款，仅用于 production-linked 最小验证
 
 5. idempotency keys:
-   - owner directive idempotency key:
-   - employee follow-up idempotency key:
+   - owner directive idempotency key: qa-prod-arrears-owner-20260531T203913-task-mpgzu9kp-f150e26f
+   - employee follow-up idempotency key: qa-prod-arrears-employee-20260531T203913-task-mpgzu9kp-f150e26f
 
 6. rollback snapshot:
-   - snapshot method:
-   - snapshot storage location:
-   - rollback operator:
+   - snapshot method: read-only pre/post snapshot of selected task, idempotency rows, audit rows, and write gate state
+   - snapshot storage location: ARREARS_DIRECTIVE_PRODUCTION_PRE_SMOKE_SNAPSHOT.md
+   - rollback operator: Ramadan Habib
 
 7. write gate:
-   - enable operator:
-   - disable operator:
-   - expected open duration:
+   - enable operator: Ramadan Habib
+   - disable operator: Ramadan Habib
+   - expected open duration: 10 minutes
+   - maximum allowed open duration: 15 minutes
 
 8. QA tag:
-   - qa_tag:
+   - qa_tag: QA_PROD_ARREARS_DIRECTIVE_MIN_SMOKE
 
 9. 是否确认 smoke 后立即关闭 write gate：
    - [ ] YES
@@ -66,5 +90,6 @@ SCHEMA_READY_FOR_EXISTING_ARREARS_WRITE_SMOKE
 - 不修改 financial formula。
 - 不修改 dashboard calculation。
 - 不提交 secret。
-- 不打印 password/token/cookie。
+- 不打印 password/token/cookie/Set-Cookie。
 ```
+
