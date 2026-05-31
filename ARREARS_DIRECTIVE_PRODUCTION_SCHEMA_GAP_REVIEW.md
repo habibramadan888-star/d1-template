@@ -4,29 +4,41 @@ Date: 2026-05-31
 
 ## Scope
 
-This is a documentation-only review for manual production approval. No production D1 query, production D1 write, production migration, production deploy, or production write gate enablement was executed.
+This review is based on a production read-only schema metadata check plus repository migrations. No production D1 write, migration, deploy, write gate enablement, or production smoke was executed.
 
-Production status below is inferred from repository migrations and current Worker code. A live production schema check requires separate explicit approval because this task forbids production D1 execute.
+Live check evidence: `ARREARS_DIRECTIVE_PRODUCTION_SCHEMA_LIVE_CHECK_RESULT.md`
 
-## Schema Gap Matrix
+## Schema Readiness Conclusion
 
-| Schema Item                                | Staging                                                                                  | Production                                                                                      | Required For Production                                                     | Migration Required                                                            | Rollback                                                                                                                                |
-| ------------------------------------------ | ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- | ----------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `request_idempotency_keys` table           | Present in staging from `migration-drafts/003_arrears_directive_idempotency_staging.sql` | Not live-verified; not part of committed production migrations                                  | Required before any production owner directive or employee follow-up write  | Yes, unless production already has equivalent table after separate live check | `DROP TABLE request_idempotency_keys` only before production writes; after writes, preserve for audit/replay unless separately approved |
-| `idx_request_idempotency_scope_action_key` | Present in staging                                                                       | Not live-verified                                                                               | Required to prevent duplicate scoped action keys                            | Yes with idempotency table                                                    | `DROP INDEX idx_request_idempotency_scope_action_key` only if table rollback approved                                                   |
-| `idx_request_idempotency_actor_action`     | Present in staging                                                                       | Not live-verified                                                                               | Recommended for actor/action audit lookup                                   | Yes with idempotency table                                                    | `DROP INDEX idx_request_idempotency_actor_action` if rollback approved                                                                  |
-| `idx_request_idempotency_resource`         | Present in staging                                                                       | Not live-verified                                                                               | Recommended for resource rollback/audit lookup                              | Yes with idempotency table                                                    | `DROP INDEX idx_request_idempotency_resource` if rollback approved                                                                      |
-| `arrear_tasks.boss_requested_at`           | Present in staging                                                                       | Migration exists in `migrations/002_add_boss_directive_fields.sql`; live production not queried | Required for owner directive timestamp                                      | Apply/confirm migration 002 before write smoke                                | `ALTER TABLE DROP COLUMN` is not recommended after writes; instead leave nullable                                                       |
-| `arrear_tasks.boss_requested_by`           | Present in staging                                                                       | Migration exists; live production not queried                                                   | Required for owner/audit trace                                              | Apply/confirm migration 002 before write smoke                                | Leave nullable; do not destructive rollback after writes                                                                                |
-| `arrear_tasks.boss_requested_due_date`     | Present in staging                                                                       | Migration exists; live production not queried                                                   | Required if owner due-date instruction is used                              | Apply/confirm migration 002 before write smoke                                | Leave nullable                                                                                                                          |
-| `arrear_tasks.directive_status`            | Present in staging                                                                       | Migration exists; live production not queried                                                   | Required for assigned/followed-up lifecycle                                 | Apply/confirm migration 002 before write smoke                                | Leave nullable/default `none`                                                                                                           |
-| `arrear_tasks.staff_promised_at`           | Present in staging                                                                       | Migration exists; live production not queried                                                   | Required for employee receipt timestamp                                     | Apply/confirm migration 002 before write smoke                                | Leave nullable                                                                                                                          |
-| `arrear_tasks.source_type`                 | Added in staging as nullable fixture support                                             | Not in production migrations reviewed                                                           | Required only if production must persist ttlock task rows in `arrear_tasks` | Yes for persisted ttlock rows; not required for existing_arrears_record smoke | Leave nullable; can remain harmless for existing rows                                                                                   |
-| `arrear_tasks.source_ref`                  | Added in staging as nullable fixture support                                             | Not in production migrations reviewed                                                           | Required only for traceable persisted ttlock source refs                    | Yes for persisted ttlock rows                                                 | Leave nullable; can remain harmless for existing rows                                                                                   |
+`SCHEMA_MIGRATION_REQUIRED_BEFORE_WRITE_SMOKE`
 
-## Proposed Production Migration Draft
+Production has the `arrear_tasks` boss directive fields from migration 002 and has core `audit_logs` fields. Production does not have the `request_idempotency_keys` table or idempotency indexes required by the directive write path.
 
-Do not run without explicit approval.
+## Final Schema Gap Matrix
+
+| Schema Item                                | Production Live Status | Required For Production Write Smoke |                                      Migration Required | Risk                                                                 | Rollback                                                                     |
+| ------------------------------------------ | ---------------------- | ----------------------------------: | ------------------------------------------------------: | -------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `request_idempotency_keys` table           | missing                |                                 yes |                                                     yes | medium; write smoke replay/conflict safety is unavailable without it | Drop only before any write; preserve after writes unless separately approved |
+| `idx_request_idempotency_scope_action_key` | missing                |                                 yes |                                                     yes | medium; duplicate keys cannot be enforced                            | Drop only with idempotency rollback approval                                 |
+| `idx_request_idempotency_actor_action`     | missing                |                         recommended |                                          yes with table | low/medium; audit lookup slower                                      | Drop with table/index rollback approval                                      |
+| `idx_request_idempotency_resource`         | missing                |                         recommended |                                          yes with table | low/medium; rollback lookup slower                                   | Drop with table/index rollback approval                                      |
+| `arrear_tasks.boss_requested_at`           | present                |                                 yes |                                                      no | low                                                                  | Leave nullable                                                               |
+| `arrear_tasks.boss_requested_by`           | present                |                                 yes |                                                      no | low                                                                  | Leave nullable                                                               |
+| `arrear_tasks.boss_requested_due_date`     | present                |                                 yes |                                                      no | low                                                                  | Leave nullable                                                               |
+| `arrear_tasks.directive_status`            | present                |                                 yes |                                                      no | low                                                                  | Leave nullable/default `none`                                                |
+| `arrear_tasks.staff_promised_at`           | present                |                                 yes |                                                      no | low                                                                  | Leave nullable                                                               |
+| `idx_arrear_tasks_directive`               | present                |                         recommended |                                                      no | low                                                                  | Keep index                                                                   |
+| `arrear_tasks.promise_date`                | present                |                                 yes |                                                      no | low                                                                  | Pre-smoke snapshot can restore field values                                  |
+| `arrear_tasks.promise_amount`              | present                |                                 yes |                                                      no | low                                                                  | Pre-smoke snapshot can restore field values                                  |
+| `arrear_tasks.staff_note`                  | present                |                                 yes |                                                      no | low                                                                  | Pre-smoke snapshot can restore field values                                  |
+| `arrear_tasks.last_followup_at`            | present                |                                 yes |                                                      no | low                                                                  | Pre-smoke snapshot can restore field values                                  |
+| `arrear_tasks.source_type`                 | missing                |                         conditional | optional unless ttlock persistent row smoke is approved | low/medium; ttlock source cannot be persisted cleanly without it     | Leave nullable if added                                                      |
+| `arrear_tasks.source_ref`                  | missing                |                         conditional | optional unless ttlock persistent row smoke is approved | low/medium; ttlock traceability weaker without it                    | Leave nullable if added                                                      |
+| `audit_logs` core table/fields             | present                |                                 yes |                                                      no | low                                                                  | Do not delete audit rows by default                                          |
+
+## Required Migration Before Write Smoke
+
+The idempotency table migration is required before any production-linked owner directive or employee follow-up write smoke.
 
 ```sql
 CREATE TABLE IF NOT EXISTS request_idempotency_keys (
@@ -57,19 +69,30 @@ CREATE INDEX IF NOT EXISTS idx_request_idempotency_actor_action
 
 CREATE INDEX IF NOT EXISTS idx_request_idempotency_resource
   ON request_idempotency_keys(resource_type, resource_id);
+```
 
+## Optional Migration If TTLock Persistent Row Smoke Is Approved
+
+Only include these if Ramadan explicitly approves a persisted `ttlock_expired_unpaid` production smoke row and the implementation must store ttlock source metadata in `arrear_tasks`.
+
+```sql
 ALTER TABLE arrear_tasks ADD COLUMN source_type TEXT;
 ALTER TABLE arrear_tasks ADD COLUMN source_ref TEXT;
 ```
 
-If production already has migration 002 fields, do not re-add them. If not, apply `migrations/002_add_boss_directive_fields.sql` first.
+If Ramadan approves only an `existing_arrears_record` production smoke, do not add `source_type` / `source_ref` in that smoke approval.
 
-## Impact
+## Rollback Completeness
 
-- All proposed columns are nullable except idempotency table required columns.
-- Existing `arrear_tasks` rows are not modified by the schema-only migration.
-- No financial formula, dashboard calculation, money logic, receivable logic, handover logic, or tenant-scope logic is changed.
+Rollback is complete for selected task field restoration through pre-smoke snapshots. For idempotency migration rollback:
 
-## Required Human Decision
+- Before any production writes, the idempotency table and indexes can be dropped if rollback is approved.
+- After production writes, do not delete idempotency or audit rows by default because they protect replay safety and traceability.
 
-Production schema migration is not approved by this document. It requires explicit Ramadan approval in the next step.
+## Production Safety Status
+
+- Production D1 write: `No`
+- Production migration: `No`
+- Production write gate: `No`
+- Production deploy: `No`
+- Production cutover: `PRODUCTION_NO_GO`

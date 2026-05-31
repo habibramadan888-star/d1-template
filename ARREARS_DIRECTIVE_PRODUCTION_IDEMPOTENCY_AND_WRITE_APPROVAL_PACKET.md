@@ -4,7 +4,7 @@ Date: 2026-05-31
 
 Status: `PRODUCTION_APPROVAL_REQUIRED`
 
-This packet is generated from staging-only QA. It does not authorize production migration, production D1 writes, production deploy, production write gate enablement, or production cutover.
+This packet is generated from staging-only QA plus production read-only schema metadata checks. It does not authorize production migration, production D1 writes, production deploy, production write gate enablement, production write smoke, or production cutover.
 
 ## Staging Evidence
 
@@ -21,27 +21,43 @@ This packet is generated from staging-only QA. It does not authorize production 
 | production deploy                   | NO               |
 | production cutover                  | PRODUCTION_NO_GO |
 
+## Production Schema Live Check Summary
+
+Live check document: `ARREARS_DIRECTIVE_PRODUCTION_SCHEMA_LIVE_CHECK_RESULT.md`
+
+| Area                           | Production Result | Impact                                              |
+| ------------------------------ | ----------------- | --------------------------------------------------- |
+| `arrear_tasks` table           | present           | can store directive/follow-up fields                |
+| boss directive fields          | present           | migration 002 appears applied                       |
+| employee follow-up fields      | present           | employee follow-up fields available                 |
+| `idx_arrear_tasks_directive`   | present           | directive query index available                     |
+| `audit_logs` table/core fields | present           | audit path schema available                         |
+| `request_idempotency_keys`     | missing           | blocker before write smoke                          |
+| idempotency unique/indexes     | missing           | blocker before write smoke                          |
+| `source_type` / `source_ref`   | missing           | required only for persisted ttlock production smoke |
+
+Schema readiness conclusion: `SCHEMA_MIGRATION_REQUIRED_BEFORE_WRITE_SMOKE`
+
 ## Approval Documents
 
-| Document                                                                | Purpose                                  |
-| ----------------------------------------------------------------------- | ---------------------------------------- |
-| `ARREARS_DIRECTIVE_PRODUCTION_SCHEMA_GAP_REVIEW.md`                     | Schema gap and migration requirements    |
-| `ARREARS_DIRECTIVE_PRODUCTION_WRITE_GATE_PLAN.md`                       | Temporary write gate rules               |
-| `ARREARS_DIRECTIVE_PRODUCTION_MINIMUM_SMOKE_PLAN.md`                    | Minimum approved production-linked smoke |
-| `ARREARS_DIRECTIVE_PRODUCTION_ROLLBACK_PLAN.md`                         | Rollback and cleanup plan                |
-| `NEXT_PROMPT_ARREARS_DIRECTIVE_PRODUCTION_SCHEMA_AND_WRITE_APPROVAL.md` | Explicit next approval prompt            |
+| Document                                                                | Purpose                                     |
+| ----------------------------------------------------------------------- | ------------------------------------------- |
+| `ARREARS_DIRECTIVE_PRODUCTION_SCHEMA_LIVE_CHECK_RESULT.md`              | Production read-only schema evidence        |
+| `ARREARS_DIRECTIVE_PRODUCTION_SCHEMA_GAP_REVIEW.md`                     | Final schema gap and migration requirements |
+| `ARREARS_DIRECTIVE_PRODUCTION_WRITE_GATE_PLAN.md`                       | Temporary write gate rules                  |
+| `ARREARS_DIRECTIVE_PRODUCTION_MINIMUM_SMOKE_PLAN.md`                    | Minimum approved production-linked smoke    |
+| `ARREARS_DIRECTIVE_PRODUCTION_ROLLBACK_PLAN.md`                         | Rollback and cleanup plan                   |
+| `ARREARS_DIRECTIVE_PRODUCTION_SMOKE_TASK_INPUT_TEMPLATE.md`             | Manual task/operator input template         |
+| `NEXT_PROMPT_ARREARS_DIRECTIVE_PRODUCTION_SCHEMA_AND_WRITE_APPROVAL.md` | Fixed readable approval prompt              |
 
-## Production Schema Gap Summary
+## Required Before Production Write Smoke
 
-Production schema was not live-queried because this task forbids production D1 execute.
-
-Repository review indicates production needs explicit confirmation/migration for:
-
-- `request_idempotency_keys` table and indexes.
-- `arrear_tasks` directive fields from `migrations/002_add_boss_directive_fields.sql` if not already applied.
-- Nullable `arrear_tasks.source_type` and `arrear_tasks.source_ref` if production must persist ttlock source rows in `arrear_tasks`.
-
-All schema work requires separate Ramadan approval before execution.
+1. Ramadan approves production idempotency schema migration.
+2. Idempotency table and indexes are applied to production.
+3. Ramadan manually fills smoke task ids.
+4. Ramadan manually fills rollback snapshot method/location/operator.
+5. Ramadan manually fills write gate enable/disable operators and expected open duration.
+6. Ramadan explicitly confirms production cutover remains `PRODUCTION_NO_GO`.
 
 ## Write Gate Summary
 
@@ -53,28 +69,15 @@ All schema work requires separate Ramadan approval before execution.
 | Allowed only after approval          | Owner directive create and employee follow-up write                           |
 | readonly_admin                       | Read-only; writes remain 403                                                  |
 
-## Minimum Production Smoke Summary
+## Current Recommendation
 
-This is not production cutover.
+Do not approve production write smoke yet.
 
-After explicit approval, the minimum smoke is:
+Approve only the next controlled step if Ramadan wants to proceed:
 
-1. Select exactly 1 safe existing arrears task.
-2. Optionally select 1 ttlock task only if production supports persisted ttlock rows and approval says yes.
-3. Owner creates directive with idempotency key.
-4. Duplicate owner request replays.
-5. Assigned employee reads directive.
-6. Employee submits `promised_payment_date` and `followup_note`.
-7. Duplicate employee request replays.
-8. Owner sees feedback.
-9. readonly_admin write returns 403.
-10. Audit and rollback evidence are recorded.
-
-## Rollback Summary
-
-Before any approved production write, snapshot selected task directive/follow-up fields. If rollback is needed, restore only those fields for the approved task ids. Keep audit/idempotency records unless separate destructive cleanup is approved.
-
-The production write gate must be disabled immediately after smoke/rollback.
+1. Production idempotency schema migration approval.
+2. Optional `source_type` / `source_ref` migration only if ttlock persisted production smoke is approved.
+3. Then re-check schema before enabling the write gate.
 
 ## Explicit Approval Requirement
 
@@ -82,9 +85,10 @@ Ramadan must explicitly approve each of the following before any production oper
 
 1. Production schema migration.
 2. Temporary production write gate enablement.
-3. 1-2 row maximum production-linked smoke write.
-4. Rollback/cleanup permission.
-5. Continued `PRODUCTION_NO_GO` status.
+3. 1 existing arrears production-linked smoke write.
+4. Optional 1 ttlock production-linked smoke write only if schema supports it.
+5. Rollback/cleanup permission.
+6. Continued `PRODUCTION_NO_GO` status.
 
 Until then:
 
