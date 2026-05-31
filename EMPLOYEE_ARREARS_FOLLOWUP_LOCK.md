@@ -86,3 +86,13 @@ Create a dedicated compatibility task to remove or ignore `promise_amount` from 
 - Employee cannot modify arrears amount.
 - Employee cannot close directive/task.
 - Write path is approval gated for production.
+
+## Boss Directive Inbox Lock - 2026-05-31
+
+- Employee FOLLOW-UP must show two separate sections: `老板下发任务` and `系统提醒`.
+- Boss directive tasks must be read from `GET /api/employee/arrears/directives`.
+- Empty boss directive state must say `暂无老板下发任务`.
+- Employee directive feedback may only collect `promised_payment_date` and `followup_note`.
+- The UI must not expose promised amount, amount edit, close, void, or employee entry write actions in the boss directive card.
+- If production write approval is required, UI must say the feedback was not written to production.
+- Production cutover remains `PRODUCTION_NO_GO`.

@@ -1260,26 +1260,14 @@ function exportArrearsWhatsApp(){
   const url='https://wa.me/?text='+encodeURIComponent(text);
   try{window.open(url,'_blank','noopener,noreferrer');}catch{}
 }
-async function sendArrearDirectives(){
+async function sendArrearDirectivesDeprecatedDisabled(){
   if(!isOwnerWriteRole())return;
   const ids=[...document.querySelectorAll('[data-arrear-select]:checked')].map(x=>x.value).filter(Boolean);
-  if(!ids.length){toast('Select arrears first','err');return;}
-  const dueInput=document.getElementById('arrearDirectiveDue');
-  let dueDate=dueInput?.value||'';
-  if(!dueDate){
-    dueDate=prompt('请输入要求员工完成更新的日期（YYYY-MM-DD）',fmtD(new Date(Date.now()+86400000)))||'';
-    if(dueInput)dueInput.value=dueDate;
-  }
-  if(!dueDate){toast('Select requested date','err');return;}
-  try{
-    const r=await apiFetch('/api/arrear_tasks/directive',{method:'POST',body:JSON.stringify({task_ids:ids,due_date:dueDate})});
-    const data=await r.json().catch(()=>({}));
-    if(!r.ok)throw new Error(data?.message||('HTTP '+r.status));
-    toast('Directive sent: '+(data.updated_count||0));
-    await refreshArrearsFromCloud();
-  }catch(e){
-    toast('Directive failed: '+(e.message||e),'err');
-  }
+  if(!ids.length){toast('请先选择要下发的欠款','err');return;}
+  const rows=ownerArrearsSelectedRows();
+  const text=buildArrearsWhatsAppText(rows);
+  toast(`真实下发未启用；已生成 dry-run 清单，未写入员工端：${ids.length} 条`,6000);
+  showArrearsWhatsAppFallback(text,'https://wa.me/?text='+encodeURIComponent(text));
 }
 function selectArrearForDirective(id){
   if(!isOwnerWriteRole())return;
@@ -1537,7 +1525,7 @@ async function sendArrearDirectives(){
   if(!ids.length){toast('请先选择要下发的欠款','err');return;}
   const rows=ownerArrearsSelectedRows();
   const text=buildArrearsWhatsAppText(rows);
-  toast(`已生成下发员工清单（dry-run）：${ids.length} 条`);
+  toast(`真实下发未启用；已生成 dry-run 清单，未写入员工端：${ids.length} 条`,6000);
   showArrearsWhatsAppFallback(text,'https://wa.me/?text='+encodeURIComponent(text));
 }
 function selectArrearForDirective(id){

@@ -109,3 +109,12 @@ During employee QA, confirm:
 5. Confirm no promised amount input is required or accepted.
 6. Confirm employee cannot close task.
 7. Confirm write path remains approval gated unless staging/production write approval is explicit.
+
+## Boss Directive Inbox Acceptance - 2026-05-31
+
+1. Open employee FOLLOW-UP.
+2. Confirm `老板下发任务` section appears above `系统提醒`.
+3. If no boss directives exist, expected text is `暂无老板下发任务`.
+4. If a directive exists, card must show bed, amount, source, due/overdue, status, owner note, promised date input, and follow-up note input.
+5. Employee feedback must not include amount edit, promised amount input, close, or void.
+6. If production write gate is off, submit attempt must explain that feedback was not written to production.

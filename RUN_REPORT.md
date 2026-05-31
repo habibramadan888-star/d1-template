@@ -6111,3 +6111,15 @@ Safety:
 - WhatsApp export format updated to the user-verified searchable `Due Follow-up | M/D HH:mm | N overdue` baseline.
 - No deploy, D1 write, D1 execute/export/import, or migration was performed.
 - Production cutover remains `PRODUCTION_NO_GO`.
+
+## Arrears Directive Employee Inbox Closure - 2026-05-31
+
+- Audited owner `下发员工` behavior: active UI is dry-run/manual list only while write gate is off.
+- Disabled stale duplicate owner function that referenced legacy `/api/arrear_tasks/directive`.
+- Updated owner status copy so dry-run is not presented as real employee delivery.
+- Added employee FOLLOW-UP boss directive inbox reading `GET /api/employee/arrears/directives`.
+- Kept system reminders separate from boss-assigned directives.
+- Employee directive feedback UI only accepts promised payment date and follow-up note.
+- Production write approval errors are shown honestly as not written to production.
+- No deploy, D1 write, D1 execute/export/import, migration, TTLock smoke, or batch dispatch was performed.
+- Production cutover remains `PRODUCTION_NO_GO`.

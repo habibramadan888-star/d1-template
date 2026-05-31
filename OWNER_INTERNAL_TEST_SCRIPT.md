@@ -295,3 +295,12 @@ Production cutover remains `PRODUCTION_NO_GO`.
 6. Confirm WhatsApp export uses the user-verified searchable format.
 7. Confirm production write approval document exists before any live write.
 8. Confirm production cutover remains `PRODUCTION_NO_GO`.
+
+## Arrears Directive Dispatch Acceptance - 2026-05-31
+
+1. Open owner arrears.
+2. Select one or more arrears cards.
+3. Click `下发员工`.
+4. Expected while production write gate is off: dry-run/WhatsApp list is generated and UI explicitly says it was not written to employee side.
+5. Do not expect employee inbox delivery unless a separate production write approval opens the gate.
+6. Verify `readonly_admin` cannot see dispatch write controls.

@@ -343,3 +343,17 @@ Production cutover remains `PRODUCTION_NO_GO`.
 - WhatsApp export must use the user-verified searchable format.
 - Production write requires separate approval.
 - Production cutover remains `PRODUCTION_NO_GO`.
+
+## Arrears Directive Owner/Employee Closure - 2026-05-31
+
+- Owner dispatch dry-run must not be treated as real employee delivery.
+- Employee FOLLOW-UP must read boss directives from `/api/employee/arrears/directives`.
+- Boss directive inbox and system reminders must be visually and logically separated.
+- Employee directive follow-up must only collect promised date and note.
+- Production write gate remains off unless explicitly approved.
+- Any future change to this flow must run:
+  - `npm run test:arrears-owner-send-status-gating`
+  - `npm run test:employee-arrears-inbox-data-source`
+  - `npm run test:employee-arrears-directive-inbox-ui`
+  - `npm run test:employee-arrears-directive-read-ui`
+  - `npm run test:employee-arrears-followup-ui-gate`

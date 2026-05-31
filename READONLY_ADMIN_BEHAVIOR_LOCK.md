@@ -71,3 +71,11 @@
 - readonly_admin cannot call employee follow-up write API.
 - readonly_admin must not see or execute real write controls.
 - Production cutover remains `PRODUCTION_NO_GO`.
+
+## Arrears Directive Readonly Lock - 2026-05-31
+
+- `readonly_admin` may inspect owner arrears cards and export/read-only information.
+- `readonly_admin` must not see or use owner batch dispatch write controls.
+- `readonly_admin` must not create directives, submit employee follow-up, close, void, or mutate arrears state.
+- Backend write requests must remain 403 or approval-gated as applicable.
+- Production cutover remains `PRODUCTION_NO_GO`.

@@ -1930,3 +1930,15 @@ Deployment verification:
 | Migration | NOT_RUN | No migration performed. |
 | Deploy | NOT_RUN | No deploy performed in this task. |
 | Production cutover | NO_GO | Remains `PRODUCTION_NO_GO`. |
+
+## Arrears Directive Employee Inbox Closure Verification - 2026-05-31
+
+| Area | Status | Notes |
+|---|---|---|
+| Owner send status | PASS | Selected rows generate dry-run list only; no real success claim while gate is off. |
+| Employee boss directive inbox | PASS | Dedicated inbox reads `/api/employee/arrears/directives`. |
+| Employee system reminders | PASS | Existing reminders remain separate. |
+| Employee follow-up fields | PASS | Promised date and note only; no amount edit. |
+| Write gate | OFF | No write gate opened. |
+| D1 write / migration | NOT_RUN | No D1 write, migration, export, import, or execute. |
+| Production cutover | NO_GO | Remains `PRODUCTION_NO_GO`. |

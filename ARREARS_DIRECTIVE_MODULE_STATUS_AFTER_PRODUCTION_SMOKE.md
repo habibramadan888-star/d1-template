@@ -43,3 +43,14 @@ This document does not approve TTLock production smoke, batch dispatch, public b
 - Dashboard calculation: unchanged.
 - Password/token/cookie/Set-Cookie: not printed.
 - Commercial launch: remains `PRODUCTION_NO_GO`.
+
+## Employee Inbox Closure Update - 2026-05-31
+
+| Capability | Status | Notes |
+|---|---|---|
+| Owner dry-run dispatch status | FIXED | UI now states dry-run/manual list only and does not imply employee-side delivery. |
+| Employee boss directive inbox | WIRED | Employee FOLLOW-UP reads `GET /api/employee/arrears/directives`. |
+| Employee system reminders | PRESERVED | TTLock overdue and historical arrears remain separate from boss directives. |
+| Employee follow-up write UI | APPROVAL_GATED | Date/note only; 409 write approval required is shown as not written. |
+| Production write gate | OFF | No new write gate opening in this task. |
+| Production cutover | PRODUCTION_NO_GO | No cutover. |
