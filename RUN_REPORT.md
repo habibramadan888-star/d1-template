@@ -6028,3 +6028,12 @@ Safety:
 - Migration: no.
 - Business write: no.
 - Production remains `PRODUCTION_NO_GO`.
+
+## P1 Arrears Promise Amount Contract Cleanup
+
+- Employee arrears follow-up default payload now uses `promised_payment_date` and `followup_note`.
+- Employee default UI does not show or submit promised amount fields.
+- Owner arrears default card continues to show system amount, promised date, note, and status only.
+- Backend accepts legacy `promise_amount`, `promised_amount`, and `promised_amount_fils` fields for compatibility, but staff updates do not write promised amount by default.
+- No deploy, migration, D1 write, business write, dashboard calculation change, or financial formula change was performed.
+- Production cutover remains `PRODUCTION_NO_GO`.

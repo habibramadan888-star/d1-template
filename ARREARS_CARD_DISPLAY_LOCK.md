@@ -72,3 +72,11 @@ Current card no longer calls `arrearPromiseAmountLabel()` in the default card pa
 4. No `none/null/undefined`.
 5. No `承诺金额`.
 6. Bed and amount remain visible.
+
+## Promise Amount Display Lock
+
+- Owner arrears cards show system arrears amount, promised payment date, follow-up note, and status.
+- Owner default cards must not show `promise_amount`, `promised_amount`, or `promised_amount_fils`.
+- Promised amount fields are legacy optional only and may not re-enter the default owner card.
+- No dashboard calculation, financial formula, D1 write, or migration was performed.
+- Production cutover remains `PRODUCTION_NO_GO`.

@@ -1830,8 +1830,8 @@ async function handleArrearTaskUpdate(request,env,user){
   const now=empNow();
   const patchAmount=Number(String(patch.arrear_amount||0).replace(/,/g,""));
   const patchStatus=cleanText(patch.followup_status||"",40);
-  const patchPromise=cleanDate(patch.promise_date||"");
-  const patchNote=cleanText(patch.staff_note||"",500);
+  const patchPromise=cleanDate(patch.promise_date||patch.promised_payment_date||"");
+  const patchNote=cleanText(patch.staff_note||patch.followup_note||"",500);
   const managerStatuses=new Set(["待跟进","已联系","承诺付款","部分支付","已结清","无法联系","转老板处理"]);
   const staffStatuses=new Set(["待跟进","已联系","承诺付款","无法联系","转老板处理"]);
   if(patchStatus&&!(isManager?managerStatuses:staffStatuses).has(patchStatus))return badRequest("followup_status_invalid");
@@ -1902,18 +1902,17 @@ async function handleArrearTaskUpdate(request,env,user){
     for(const [k,fn] of Object.entries(managerAllowed)){
       if(patch[k]!==void 0)updateValues[k]=fn();
     }
+    if(patch.promised_payment_date!==void 0)updateValues.promise_date=patchPromise;
+    if(patch.followup_note!==void 0)updateValues.staff_note=patchNote;
   }else{
-    const staffAllowed=new Set(["followup_status","promise_date","promise_amount","staff_note"]);
+    const staffAllowed=new Set(["followup_status","promise_date","promised_payment_date","promise_amount","promised_amount","promised_amount_fils","staff_note","followup_note"]);
     const illegal=Object.keys(patch).filter(k=>!staffAllowed.has(k));
     if(illegal.length)return badRequest("staff_field_not_allowed");
     if(patch.followup_status!==void 0)updateValues.followup_status=patchStatus||"待跟进";
-    if(patch.promise_date!==void 0)updateValues.promise_date=patchPromise;
-    if(patch.promise_amount!==void 0){
-      const remain=Math.max(0,Number(old.arrear_amount||0)-Number(old.actual_received||0));
-      const requested=cleanMoney(patch.promise_amount||0);
-      updateValues.promise_amount=remain>0?Math.min(requested,remain):requested;
-    }
-    if(patch.staff_note!==void 0)updateValues.staff_note=patchNote;
+    if(patch.promise_date!==void 0||patch.promised_payment_date!==void 0)updateValues.promise_date=patchPromise;
+    // promise_amount / promised_amount* are legacy optional compatibility fields.
+    // Staff follow-up now uses system amount plus promise_date and staff_note only.
+    if(patch.staff_note!==void 0||patch.followup_note!==void 0)updateValues.staff_note=patchNote;
     if(Object.keys(updateValues).length)updateValues.last_followup_at=now;
   }
   if(!Object.keys(updateValues).length)return badRequest("no_update_fields");

@@ -136,3 +136,13 @@ Locked behavior:
 - Authenticated production contract verification is `MANUAL_REQUIRED` because new login would write `active_sessions`.
 - No D1 write, migration, business write, dashboard calculation change, or financial formula change was performed.
 - Production cutover remains `PRODUCTION_NO_GO`.
+
+## Promise Amount Legacy Optional Contract
+
+- The arrears amount authority remains system-controlled by the backend SOT.
+- Employees update promised payment date and follow-up note only in the default flow.
+- `promise_amount`, `promised_amount`, and `promised_amount_fils` remain legacy optional compatibility fields.
+- Default UI must not display or submit promised amount fields.
+- Backend may accept legacy promised amount fields without making them part of the default staff update flow.
+- No migration, D1 write, or existing data rewrite was performed.
+- Production cutover remains `PRODUCTION_NO_GO`.

@@ -1836,3 +1836,14 @@ Expected invariant:
 | Authenticated owner contract  | MANUAL_REQUIRED | Not executed because creating a new production login session would write `active_sessions`, which was prohibited. |
 | D1 write / migration          | NOT_RUN         | No D1 execute/export/import/write or migration was run.                                                           |
 | Production cutover            | NO_GO           | `PRODUCTION_NO_GO` remains unchanged.                                                                             |
+
+## P1 Arrears Promise Amount Contract Cleanup Verification
+
+| Area                     | Status  | Notes                                                                                    |
+| ------------------------ | ------- | ---------------------------------------------------------------------------------------- |
+| Employee default form    | READY   | Date and note only; no promised amount input.                                            |
+| Employee default payload | READY   | Uses `promised_payment_date` and `followup_note`; no promised amount fields.             |
+| Owner default card       | READY   | Shows system amount, promised date, note, and status only.                               |
+| Backend compatibility    | READY   | Legacy promised amount fields are accepted but not written by staff default update flow. |
+| Migration / D1 write     | NOT_RUN | Prohibited and not executed.                                                             |
+| Production cutover       | NO_GO   | `PRODUCTION_NO_GO` remains unchanged.                                                    |

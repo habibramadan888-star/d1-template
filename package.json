@@ -182,6 +182,7 @@
     "test:arrears-bed-rent-mapping": "node --test tests/arrears-bed-rent-mapping.spec.mjs",
     "test:owner-arrears-hide-internal-id": "node --test tests/owner-arrears-hide-internal-id.spec.mjs",
     "test:owner-arrears-business-title": "node --test tests/owner-arrears-business-title.spec.mjs",
+    "test:arrears-promise-amount-contract": "node --test tests/arrears-promise-amount-contract.spec.mjs",
     "test:owner-arrears-no-promised-amount": "node --test tests/owner-arrears-no-promised-amount.spec.mjs",
     "test:employee-arrears-followup-fields": "node --test tests/employee-arrears-followup-simplified-fields.spec.mjs",
     "test:owner-arrears-card-simplified": "node --test tests/owner-arrears-card-simplified-layout.spec.mjs",

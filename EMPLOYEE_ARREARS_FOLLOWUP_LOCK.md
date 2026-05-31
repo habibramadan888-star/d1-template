@@ -56,3 +56,12 @@ Create a dedicated compatibility task to remove or ignore `promise_amount` from 
 2. Employee follow-up save payload does not include `promise_amount`.
 3. Backend staff patch rejects amount changes after compatibility review.
 4. Owner card does not display promised amount.
+
+## Promise Amount Contract Cleanup
+
+- Employees only fill promised payment date and follow-up note in the default arrears follow-up flow.
+- Arrears amount is system-controlled and must not be entered by employees as a promised amount.
+- `promise_amount`, `promised_amount`, and `promised_amount_fils` are legacy optional compatibility fields only.
+- Default employee UI must not display or submit promised amount fields.
+- No migration or D1 write was performed.
+- Production cutover remains `PRODUCTION_NO_GO`.

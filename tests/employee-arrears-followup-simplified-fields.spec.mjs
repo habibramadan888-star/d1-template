@@ -35,8 +35,8 @@ test("employee v3 follow-up form keeps date and note, not promised amount", asyn
   assert.match(card, /id="note_\$\{id\}"/);
   assert.doesNotMatch(card, /promise_amount|promised_amount|承诺金额/);
 
-  assert.match(save, /promise_date:promise/);
-  assert.match(save, /staff_note:note/);
+  assert.match(save, /promised_payment_date:promise/);
+  assert.match(save, /followup_note:note/);
   assert.match(save, /status==='承诺付款'&&!promise/);
   assert.doesNotMatch(save, /promise_amount/);
 });
