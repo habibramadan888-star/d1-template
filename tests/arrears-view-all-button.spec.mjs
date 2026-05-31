@@ -26,28 +26,32 @@ function extractFunction(source, name) {
   throw new Error(`Could not extract ${name}`);
 }
 
-test("view-all is a deterministic local expand/collapse action", async () => {
+test("view-all opens the full arrears page instead of silently expanding below the fold", async () => {
   const js = await readFile("deploy-worker/public/index-51-main.js", "utf8");
   const toggle = extractFunction(js, "toggleOverviewArrearsAll");
 
-  assert.match(toggle, /state\.arrearsLimit=state\.arrearsExpanded/);
+  assert.match(toggle, /state\.arrearsExpanded=true/);
   assert.match(toggle, /!state\.arrearsLoadedFull/);
   assert.match(
     toggle,
     /await loadArrearsForOwner\(\{showLoading:false,limit:ARREARS_PAGE_SIZE\}\)/
   );
+  assert.match(toggle, /switchView\('arrears'\)/);
   assert.match(toggle, /renderOwnerOverviewArrearsPanel\(\)/);
   assert.match(toggle, /renderArrearsPanel\(\)/);
   assert.doesNotMatch(toggle, /preferCache/);
 });
 
-test("overview button label includes total count when collapsed", async () => {
+test("overview button uses delegated click binding and includes total count", async () => {
   const js = await readFile("deploy-worker/public/index-51-main.js", "utf8");
   const renderer = extractFunction(js, "renderOwnerOverviewArrearsPanel");
 
   assert.match(renderer, /const viewAllLabel=state\.arrearsExpanded/);
-  assert.match(renderer, /查看全部 \$\{sorted\.length\}/);
+  assert.match(renderer, /查看全部 \$\{sorted\.length\}|鏌ョ湅鍏ㄩ儴 \$\{sorted\.length\}/);
   assert.match(renderer, /data-owner-arrears-view-all/);
+  assert.match(js, /document\.addEventListener\('click'/);
+  assert.match(js, /closest\?\.\('\[data-owner-arrears-view-all\]'\)/);
+  assert.doesNotMatch(renderer, /onclick="toggleOverviewArrearsAll\(\)"/);
 });
 
 test("overview background load uses a full first page, not only the five-card preview", async () => {
@@ -59,4 +63,10 @@ test("overview background load uses a full first page, not only the five-card pr
   assert.match(retry, /limit:ARREARS_PAGE_SIZE/);
   assert.doesNotMatch(ensure, /limit:ARREARS_OVERVIEW_PAGE_SIZE/);
   assert.doesNotMatch(retry, /limit:ARREARS_OVERVIEW_PAGE_SIZE/);
+});
+
+test("index html cache-busts the owner script after view-all hotfix", async () => {
+  const html = await readFile("deploy-worker/public/index-51.html", "utf8");
+
+  assert.match(html, /index-51-main\.js\?v=arrears-view-all-20260531c/);
 });

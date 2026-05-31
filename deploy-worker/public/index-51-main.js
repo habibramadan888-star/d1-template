@@ -1504,7 +1504,7 @@ function renderOwnerOverviewArrearsPanel(){
       ${isOwnerWriteRole()?`<label class="owner-arrears-date">下发日期 <input id="arrearDirectiveDue" type="date" min="${today}"></label>
       <button class="btn btn-primary" id="arrearDirectiveBtn" disabled onclick="sendArrearDirectives()">下发员工</button>`:''}
       <button type="button" class="btn btn-ghost" onclick="exportArrearsWhatsApp()">WhatsApp 导出</button>
-      <button type="button" class="btn btn-ghost" data-owner-arrears-view-all="true" onclick="toggleOverviewArrearsAll()">${esc(viewAllLabel)}</button>
+      <button type="button" class="btn btn-ghost" data-owner-arrears-view-all="true">${esc(viewAllLabel)}</button>
     </div>
     <div class="hist-grid owner-arrears-list" data-owner-arrears-card-list="true">
       ${pageRows.map(a=>renderOwnerArrearsTaskCard(a,today)).join('')}
@@ -1519,21 +1519,25 @@ function retryOwnerOverviewArrears(){
   loadArrearsForOwner({showLoading:false,limit:ARREARS_PAGE_SIZE});
 }
 async function toggleOverviewArrearsAll(){
-  state.arrearsExpanded=!state.arrearsExpanded;
-  state.arrearsLimit=state.arrearsExpanded
-    ? Math.max(state.arrearsLimit||ARREARS_PAGE_SIZE,ownerArrearsActiveRows().length,ARREARS_PAGE_SIZE)
-    : ARREARS_PAGE_SIZE;
+  state.arrearsExpanded=true;
+  state.arrearsLimit=Math.max(state.arrearsLimit||ARREARS_PAGE_SIZE,ownerArrearsActiveRows().length,ARREARS_PAGE_SIZE);
   renderOwnerOverviewArrearsPanel();
   renderArrearsPanel();
-  if(state.arrearsExpanded&&!state.arrearsLoadedFull&&!state.arrearsLoading){
+  if(!state.arrearsLoadedFull&&!state.arrearsLoading){
     await loadArrearsForOwner({showLoading:false,limit:ARREARS_PAGE_SIZE});
     state.arrearsLoadedFull=true;
     state.arrearsLimit=Math.max(state.arrearsLimit||ARREARS_PAGE_SIZE,ownerArrearsActiveRows().length,ARREARS_PAGE_SIZE);
-    renderOwnerOverviewArrearsPanel();
-    renderArrearsPanel();
   }
+  switchView('arrears');
+  requestAnimationFrame(()=>document.getElementById('view-arrears')?.scrollIntoView({block:'start'}));
 }
 window.toggleOverviewArrearsAll=toggleOverviewArrearsAll;
+document.addEventListener('click',e=>{
+  const btn=e.target?.closest?.('[data-owner-arrears-view-all]');
+  if(!btn)return;
+  e.preventDefault();
+  toggleOverviewArrearsAll();
+});
 function ensureOwnerOverviewArrearsAsync(){
   if(!isOwnerShellRole())return;
   renderOwnerOverviewArrearsPanel();
