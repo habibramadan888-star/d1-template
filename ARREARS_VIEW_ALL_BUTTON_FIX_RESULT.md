@@ -6,6 +6,8 @@ The overview `查看全部` button now:
 
 - Toggles `state.arrearsExpanded`.
 - Sets `state.arrearsLimit` to at least the current active arrears row count.
+- If the overview cache only has the 5-card preview, fetches a full first page with `ARREARS_PAGE_SIZE` before final render.
+- Is explicitly exposed as `window.toggleOverviewArrearsAll`.
 - Re-renders both `renderOwnerOverviewArrearsPanel()` and `renderArrearsPanel()`.
 - Does not depend on the old `preferCache` path.
 

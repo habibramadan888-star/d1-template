@@ -31,6 +31,11 @@ test("view-all is a deterministic local expand/collapse action", async () => {
   const toggle = extractFunction(js, "toggleOverviewArrearsAll");
 
   assert.match(toggle, /state\.arrearsLimit=state\.arrearsExpanded/);
+  assert.match(toggle, /!state\.arrearsLoadedFull/);
+  assert.match(
+    toggle,
+    /await loadArrearsForOwner\(\{showLoading:false,limit:ARREARS_PAGE_SIZE\}\)/
+  );
   assert.match(toggle, /renderOwnerOverviewArrearsPanel\(\)/);
   assert.match(toggle, /renderArrearsPanel\(\)/);
   assert.doesNotMatch(toggle, /preferCache/);
@@ -43,4 +48,15 @@ test("overview button label includes total count when collapsed", async () => {
   assert.match(renderer, /const viewAllLabel=state\.arrearsExpanded/);
   assert.match(renderer, /查看全部 \$\{sorted\.length\}/);
   assert.match(renderer, /data-owner-arrears-view-all/);
+});
+
+test("overview background load uses a full first page, not only the five-card preview", async () => {
+  const js = await readFile("deploy-worker/public/index-51-main.js", "utf8");
+  const ensure = extractFunction(js, "ensureOwnerOverviewArrearsAsync");
+  const retry = extractFunction(js, "retryOwnerOverviewArrears");
+
+  assert.match(ensure, /limit:ARREARS_PAGE_SIZE/);
+  assert.match(retry, /limit:ARREARS_PAGE_SIZE/);
+  assert.doesNotMatch(ensure, /limit:ARREARS_OVERVIEW_PAGE_SIZE/);
+  assert.doesNotMatch(retry, /limit:ARREARS_OVERVIEW_PAGE_SIZE/);
 });

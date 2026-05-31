@@ -1515,24 +1515,30 @@ function renderOwnerOverviewArrearsPanel(){
 }
 function retryOwnerOverviewArrears(){
   state.arrearsExpanded=false;
-  loadArrearsForOwner({showLoading:false,limit:ARREARS_OVERVIEW_PAGE_SIZE});
+  state.arrearsLoadedFull=false;
+  loadArrearsForOwner({showLoading:false,limit:ARREARS_PAGE_SIZE});
 }
-function toggleOverviewArrearsAll(){
+async function toggleOverviewArrearsAll(){
   state.arrearsExpanded=!state.arrearsExpanded;
   state.arrearsLimit=state.arrearsExpanded
     ? Math.max(state.arrearsLimit||ARREARS_PAGE_SIZE,ownerArrearsActiveRows().length,ARREARS_PAGE_SIZE)
     : ARREARS_PAGE_SIZE;
   renderOwnerOverviewArrearsPanel();
   renderArrearsPanel();
-  if(state.arrearsExpanded&&!state.arrears.length&&!state.arrearsLoading){
-    loadArrearsForOwner({showLoading:false,limit:ARREARS_PAGE_SIZE});
+  if(state.arrearsExpanded&&!state.arrearsLoadedFull&&!state.arrearsLoading){
+    await loadArrearsForOwner({showLoading:false,limit:ARREARS_PAGE_SIZE});
+    state.arrearsLoadedFull=true;
+    state.arrearsLimit=Math.max(state.arrearsLimit||ARREARS_PAGE_SIZE,ownerArrearsActiveRows().length,ARREARS_PAGE_SIZE);
+    renderOwnerOverviewArrearsPanel();
+    renderArrearsPanel();
   }
 }
+window.toggleOverviewArrearsAll=toggleOverviewArrearsAll;
 function ensureOwnerOverviewArrearsAsync(){
   if(!isOwnerShellRole())return;
   renderOwnerOverviewArrearsPanel();
   if(['loading','success','empty','timeout','error'].includes(state.arrearsStatus))return;
-  setTimeout(()=>loadArrearsForOwner({showLoading:false,limit:ARREARS_OVERVIEW_PAGE_SIZE}),0);
+  setTimeout(()=>loadArrearsForOwner({showLoading:false,limit:ARREARS_PAGE_SIZE}),0);
 }
 function showArrearsLoading(){
   const panel=document.getElementById('arrearsPanel');
@@ -1606,6 +1612,7 @@ async function loadArrearsForOwner({showLoading=false,limit=ARREARS_PAGE_SIZE}={
       ttlockExpiredUnpaid:ttlockRows
     },{previewLimit:ARREARS_OVERVIEW_PAGE_SIZE});
     state.arrears=state.arrearsPoolResult.all_tasks;
+    state.arrearsLoadedFull=Number(limit)>=ARREARS_PAGE_SIZE;
     saveArrears();
     state.arrearsStatus=state.arrears.length?'success':'empty';
     state.arrearsError='';
