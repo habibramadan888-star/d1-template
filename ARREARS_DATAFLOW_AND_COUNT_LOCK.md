@@ -110,3 +110,9 @@ Backend `/api/boss/arrears/followup-tasks` is the locked SOT for owner arrears d
 - Do not merge selected rows with filtered rows.
 - Do not merge `preview_tasks` with `tasks` inside the WhatsApp builder.
 - No frontend business aggregation may be restored.
+# Acceptance Bugfix Lock - 2026-05-31
+
+- Owner batch send is dry-run only; real employee directive delivery requires separate approval.
+- The dry-run list uses selected arrears rows; if no rows are selected, WhatsApp export uses the current filtered rows.
+- No D1 write, migration, or backend SOT rewrite is allowed in this acceptance bugfix.
+- Production cutover remains `PRODUCTION_NO_GO`.

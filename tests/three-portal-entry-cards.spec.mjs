@@ -66,7 +66,7 @@ test("owner arrears module remains available inside owner overview", async () =>
   assert.match(ownerJs, /id="ownerOverviewArrearsPanel"/);
   assert.match(ownerJs, /function renderOwnerOverviewArrearsPanel\(\)/);
   assert.match(ownerJs, /function renderArrearsPanel\(\)/);
-  assert.match(ownerJs, /\/api\/arrears/);
+  assert.match(ownerJs, /\/api\/boss\/arrears\/followup-tasks/);
   assert.match(worker, /path === "\/api\/arrears"/);
 });
 

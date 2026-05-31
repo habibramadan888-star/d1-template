@@ -15,7 +15,7 @@ function extractLastFunction(source, name) {
   throw new Error(`Could not extract ${name}`);
 }
 
-test("owner arrears batch select selects the current rendered filter scope", async () => {
+test("owner arrears batch select syncs all rendered controls", async () => {
   const js = await readFile("deploy-worker/public/index-51-main.js", "utf8");
   const controls = extractLastFunction(js, "renderOwnerArrearsControls");
   const toggleAll = extractLastFunction(js, "toggleArrearSelectAll");
@@ -28,7 +28,11 @@ test("owner arrears batch select selects the current rendered filter scope", asy
   assert.match(controls, /id="arrearSelectionCount"/);
   assert.match(visibleBoxes, /\[data-arrear-select\]/);
   assert.match(toggleAll, /ownerArrearsVisibleCheckboxes\(\)\.forEach/);
+  assert.match(sync, /ownerArrearsSelectAllInputs\(\)\.forEach/);
+  assert.match(sync, /ownerArrearsSelectionCounters\(\)\.forEach/);
   assert.match(sync, /已选择 \$\{checked\} \/ \$\{boxes\.length\}/);
+  assert.match(update, /ownerArrearsDirectiveButtons\(\)\.forEach/);
+  assert.match(update, /aria-disabled/);
   assert.match(update, /下发员工/);
 });
 

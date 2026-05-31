@@ -97,3 +97,10 @@ Current card no longer calls `arrearPromiseAmountLabel()` in the default card pa
 - Urgency uses `*`; emoji must not be required for the final baseline.
 - Raw source fields, internal ids, and debug fields must not enter the WhatsApp text.
 - The export must not duplicate the same text block.
+# Acceptance Bugfix Lock - 2026-05-31
+
+- 全选后“下发员工”按钮必须根据真实 checked state 启用，不得只更新单个重复 id。
+- “下发员工”当前仅为 dry-run 清单生成，不写 D1，不创建真实员工任务。
+- WhatsApp live button 必须使用 final baseline builder；clipboard/share/fallback 文本必须一致。
+- 三道门入口卡片文字必须对齐；入口仍只有员工/老板/管理员三项。
+- Production cutover remains `PRODUCTION_NO_GO`.

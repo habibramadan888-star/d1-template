@@ -1883,3 +1883,9 @@ Deployment verification:
 - Existing `test:owner-arrears-whatsapp-export` remains required.
 - `qa:employee-entry-staging` must remain `MANUAL_REQUIRED / DRY_RUN_ONLY`.
 - Production cutover remains `PRODUCTION_NO_GO`.
+# Acceptance Bugfix Verification Note - 2026-05-31
+
+- Required checks: `security:secrets`, `gate:commercial-launch`, focused arrears/WhatsApp/portal tests, and `qa:employee-entry-staging`.
+- `qa:employee-entry-staging` must remain `MANUAL_REQUIRED / DRY_RUN_ONLY`.
+- No production deploy, migration, D1 execute/export/import, or business write is part of this task.
+- Production cutover remains `PRODUCTION_NO_GO`.

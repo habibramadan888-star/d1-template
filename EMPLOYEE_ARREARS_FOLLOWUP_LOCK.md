@@ -72,3 +72,9 @@ Create a dedicated compatibility task to remove or ignore `promise_amount` from 
 - The owner UI no longer asks for a directive date before generating the employee execution list.
 - Employee write flows are not executed by owner arrears batch selection tests.
 - Production cutover remains `PRODUCTION_NO_GO`.
+# Acceptance Bugfix Lock - 2026-05-31
+
+- Employee can receive/read arrears follow-up tasks through existing task loading paths.
+- Real boss-to-employee directive delivery is not executed in this task and remains approval-required.
+- Owner-side “下发员工” generates a dry-run execution list only.
+- Production cutover remains `PRODUCTION_NO_GO`.

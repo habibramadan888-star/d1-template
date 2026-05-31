@@ -262,3 +262,10 @@ Deployment follow-up:
 8. Confirm the text does not include `ttlock_card`, `rent`, `deposit`, `source_type`, internal IDs, `undefined`, `null`, or `none`.
 9. Confirm the exported text is not duplicated.
 10. Confirm no D1 write or business write is performed.
+# Acceptance Bugfix Test Notes - 2026-05-31
+
+- Verify select-all makes “下发员工” clickable for owner/manager when at least one arrears task is selected.
+- Verify “下发员工” shows dry-run feedback and does not write D1.
+- Verify WhatsApp export button, clipboard, share URL, and fallback modal use identical final baseline text.
+- Verify portal cards keep exactly three entries and aligned title/subtitle text.
+- Production cutover remains `PRODUCTION_NO_GO`.

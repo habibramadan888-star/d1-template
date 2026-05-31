@@ -38,3 +38,9 @@ Allowed destinations:
 4. Portal route is based on `/api/me`, not localStorage.
 5. Legacy visible login paths redirect to canonical routes.
 6. Logout clears client hints and posts `/api/logout`.
+# Acceptance Bugfix Lock - 2026-05-31
+
+- No employee entry write is executed by arrears batch dry-run.
+- No financial formula, dashboard calculation, money, receivables, handover, or tenant-scope business rule is changed.
+- `readonly_admin` remains read-only and must not see owner batch write controls.
+- Production cutover remains `PRODUCTION_NO_GO`.

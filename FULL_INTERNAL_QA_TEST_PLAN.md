@@ -309,3 +309,11 @@ Production cutover remains `PRODUCTION_NO_GO`.
 - Verify no-selection export uses current source filter.
 - Verify export text is generated once and not duplicated.
 - Production cutover remains `PRODUCTION_NO_GO`.
+# Acceptance Bugfix QA Addendum - 2026-05-31
+
+- Batch arrears select-all must enable the send button from selected checkbox state.
+- Batch send remains dry-run until real employee directive delivery receives separate approval.
+- WhatsApp live export must keep searchable continuous codes and no raw/debug terms.
+- Clipboard and share fallback text must be the same string.
+- Three portal card text alignment is a P2 visual acceptance check.
+- Production cutover remains `PRODUCTION_NO_GO`.

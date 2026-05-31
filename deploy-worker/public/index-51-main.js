@@ -1324,28 +1324,42 @@ function setArrearDirectiveFilter(value){
   renderArrearsPanel();
 }
 function ownerArrearsVisibleCheckboxes(){
-  return [...document.querySelectorAll('[data-arrear-select]')].filter(el=>!el.disabled&&el.offsetParent!==null);
+  return [...document.querySelectorAll('[data-arrear-select]')].filter(el=>{
+    if(el.disabled)return false;
+    if(el.closest('[hidden],[aria-hidden="true"]'))return false;
+    return el.offsetParent!==null||el.getClientRects().length>0||el.checked;
+  });
+}
+function ownerArrearsDirectiveButtons(){
+  return [...document.querySelectorAll('[data-arrear-directive-btn],#arrearDirectiveBtn')];
+}
+function ownerArrearsSelectAllInputs(){
+  return [...document.querySelectorAll('[data-arrear-select-all],#arrearSelectAll')];
+}
+function ownerArrearsSelectionCounters(){
+  return [...document.querySelectorAll('[data-arrear-selection-count],#arrearSelectionCount')];
 }
 function syncArrearSelectAllState(){
   const boxes=ownerArrearsVisibleCheckboxes();
   const checked=boxes.filter(el=>el.checked).length;
-  const all=document.getElementById('arrearSelectAll');
-  const count=document.getElementById('arrearSelectionCount');
-  if(all){
+  ownerArrearsSelectAllInputs().forEach(all=>{
     all.checked=boxes.length>0&&checked===boxes.length;
     all.indeterminate=checked>0&&checked<boxes.length;
-  }
-  if(count)count.textContent=`已选择 ${checked} / ${boxes.length}`;
+  });
+  ownerArrearsSelectionCounters().forEach(count=>{count.textContent=`已选择 ${checked} / ${boxes.length}`;});
   return {boxes,checked};
 }
 function updateArrearDirectiveButtonState(){
-  const btn=document.getElementById('arrearDirectiveBtn');
-  const {checked}=syncArrearSelectAllState();
-  if(!btn)return;
-  btn.disabled=checked===0;
-  btn.style.opacity=checked?'1':'0.55';
-  btn.style.cursor=checked?'pointer':'not-allowed';
-  btn.textContent=checked?`下发员工（${checked}）`:'下发员工';
+  const synced=syncArrearSelectAllState();
+  const checkedCount=synced.checked;
+  ownerArrearsDirectiveButtons().forEach(btn=>{
+    btn.disabled=checkedCount===0;
+    btn.setAttribute('aria-disabled',checkedCount?'false':'true');
+    btn.style.opacity=checkedCount?'1':'0.55';
+    btn.style.cursor=checkedCount?'pointer':'not-allowed';
+    btn.textContent=checkedCount?`下发员工（${checkedCount}）`:'下发员工';
+  });
+  return;
 }
 function toggleArrearSelectAll(checked){
   if(!isOwnerWriteRole())return;

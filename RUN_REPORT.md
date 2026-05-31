@@ -6065,3 +6065,10 @@ Safety:
 - Export de-duplicates rows before composing text.
 - No deploy, D1 write, migration, or business write was performed for this baseline lock.
 - Production cutover remains `PRODUCTION_NO_GO`.
+# Acceptance Bugfix Run Note - 2026-05-31
+
+- Fixed arrears batch send button state closure for selected tasks.
+- Kept send directive flow dry-run only; no D1 write and no real employee directive creation.
+- Locked WhatsApp live button to final baseline text path.
+- Aligned three portal entry card text layout without changing role routing.
+- Production cutover remains `PRODUCTION_NO_GO`.
