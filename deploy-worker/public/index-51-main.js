@@ -617,7 +617,7 @@ const state={
   arrearFilter:'all',
   arrearsLimit:ARREARS_PAGE_SIZE,arrearsLoading:false,arrearsLoadSeq:0,
   arrearsStatus:'idle',arrearsError:'',arrearsSlow:false,arrearsExpanded:false,
-  arrearsSourceStatus:{},arrearsPoolResult:null,
+  arrearsSourceStatus:{},arrearsPoolResult:null,arrearsSummary:{},arrearsPagination:{},
   arrearsSlowTimer:null,
   presetPrices:DEFAULT_PRICES,
   customers:[],
@@ -1005,115 +1005,60 @@ function isAllowedArrearsSource(row){
   const source=normalizeArrearsSourceType(row?.sourceType||row?.source_type||row?.source);
   return source==='existing_arrears_record'||source==='ttlock_expired_unpaid';
 }
-function arrearsPoolDedupeKey(row){
-  const sourceType=normalizeArrearsSourceType(row.sourceType||row.source_type||row.source);
-  const sourceRef=String(row.sourceRef||row.source_ref||'').trim();
-  if(sourceRef)return `${sourceType}|${sourceRef}`;
-  return [sourceType,row.room||row.roomBed||'',row.dueDate||row.due_date||'',row.remain??'unknown'].join('|');
+function unwrapArrearsSotPayload(payload){
+  if(payload&&payload.data&&typeof payload.data==='object'&&!Array.isArray(payload.data))return payload.data;
+  return payload&&typeof payload==='object'?payload:{};
 }
-function bedRentAmountForArrears(row){
-  try{
-    const cfg=typeof rc_getRoomCfg==='function'?rc_getRoomCfg():{};
-    const keys=[
-      row?.roomBed,row?.room_bed,row?.bed,row?.room,row?.lockRoom,row?.lock_room,
-      String(row?.roomBed||row?.room_bed||row?.room||'').replace(/\s*\/\s*/g,' / '),
-      String(row?.roomBed||row?.room_bed||row?.room||'').split('/').pop()?.trim()
-    ].map(v=>String(v||'').trim()).filter(Boolean);
-    for(const key of keys){
-      const amount=Number(cfg[key]);
-      if(Number.isFinite(amount)&&amount>0)return amount;
-    }
-  }catch(e){
-    console.warn('bedRentAmountForArrears:',e);
-  }
-  return null;
-}
-function buildArrearsFollowupPool({existingArrearsRecords=[],historicalArrears=[],ttlockExpiredUnpaid=[],ttlockExpiredCards=[]}={}){
-  const existingRows=[...existingArrearsRecords,...historicalArrears];
-  const normalizeHistorical=row=>normalizeArrearFromCloud({
-    ...row,
-    source_type:'existing_arrears_record',
-    source_ref:row.source_ref||row.sourceRef||row.task_id||row.id
-  });
-  const normalizeTtlock=row=>{
-    const localRentAmount=bedRentAmountForArrears(row);
-    const backendAmount=Number(row?.amount_fils)>0
-      ? Number(row.amount_fils)/100
-      : parseMoney(row?.remain??row?.amount??row?.rentAmount??0);
-    const backendMapped=['bed_rent_mapping','bed_rent_config'].includes(String(row?.amount_source||row?.amountAuthorityStatus||row?.amount_authority_status||'').trim());
-    const rentAmount=Number.isFinite(localRentAmount)&&localRentAmount>0
-      ? localRentAmount
-      : (backendMapped&&Number.isFinite(backendAmount)&&backendAmount>0?backendAmount:null);
-    if(!(Number.isFinite(rentAmount)&&rentAmount>0)){
-      return null;
-    }
-    return normalizeArrearFromCloud({
-    id:row.id||`ttlock-expired-${row.room||row.bed||''}-${row.dueDate||row.endDate||'unknown'}`,
-    task_id:row.task_id||row.taskId||`ttlock-expired-${row.room||row.bed||''}-${row.dueDate||row.endDate||'unknown'}`,
-    source_type:'ttlock_expired_unpaid',
-    source_ref:row.source_ref||row.sourceRef||`${row.room||row.bed||''}|${row.dueDate||row.endDate||''}|${row.cardName||''}`,
-    room:row.room||row.bed||row.lockRoom,
-    room_bed:row.roomBed||row.room||row.bed||row.lockRoom,
-    customer_code:row.customerCode||row.cardName||row.tenantName||'',
-    card_code:row.cardCode||row.cardName||'',
-    package_code:row.packageCode||'ttlock_card',
-    note:row.note||'通通锁卡片已到期，按床位租金生成待跟进欠款',
-    remain:rentAmount,
-    due_date:row.dueDate||row.endDate,
-    followup_status:row.followupStatus||'待下发',
-    amount_authority_status:row.amount_authority_status||row.amountAuthorityStatus||(backendMapped?'bed_rent_mapping':'bed_rent_config'),
-    accounting_status:'open'
-  });
+function normalizeArrearsSourceContract(source={}){
+  const ok=source?.ok===true||source?.status==='ok'||(!source?.error&&!source?.error_code&&source?.ok!==false);
+  return {
+    count:Number(source?.count||0),
+    status:ok?'ok':'error',
+    error_code:String(source?.error_code||source?.error||'')
   };
-  const seen=new Set();
-  return [
-    ...existingRows.map(normalizeHistorical),
-    ...[...ttlockExpiredUnpaid,...ttlockExpiredCards].map(normalizeTtlock).filter(Boolean)
-  ].filter(isAllowedArrearsSource).filter(isArrearTaskOpen).filter(row=>Number(row.remain)>0).filter(row=>{
-    const key=arrearsPoolDedupeKey(row);
-    if(seen.has(key))return false;
-    seen.add(key);
-    return true;
-  }).sort((a,b)=>{
-    const ad=a.dueDate||'9999-12-31';
-    const bd=b.dueDate||'9999-12-31';
-    if(ad!==bd)return ad.localeCompare(bd);
-    const order={ttlock_expired_unpaid:0,existing_arrears_record:1};
-    return (order[a.sourceType]??9)-(order[b.sourceType]??9);
-  });
 }
-function buildArrearsFollowupPoolResult(sources={},opts={}){
-  const allTasks=buildArrearsFollowupPool(sources);
-  const previewLimit=Math.min(Math.max(Number(opts.previewLimit)||ARREARS_OVERVIEW_PAGE_SIZE,1),ARREARS_PAGE_SIZE);
-  const sourceRows={
-    existing_arrears_record:allTasks.filter(a=>normalizeArrearsSourceType(a?.sourceType)==='existing_arrears_record'),
-    ttlock_expired_unpaid:allTasks.filter(a=>normalizeArrearsSourceType(a?.sourceType)==='ttlock_expired_unpaid')
+function buildArrearsFollowupPool(apiPayload={}){
+  const payload=unwrapArrearsSotPayload(apiPayload);
+  const rows=Array.isArray(payload.tasks)
+    ?payload.tasks
+    :(Array.isArray(payload.all_tasks)?payload.all_tasks:[]);
+  return rows.map(normalizeArrearFromCloud).filter(isAllowedArrearsSource).filter(isArrearTaskOpen);
+}
+function buildArrearsFollowupPoolResult(apiPayload={},opts={}){
+  const payload=unwrapArrearsSotPayload(apiPayload);
+  const tasks=buildArrearsFollowupPool(payload);
+  const previewRows=Array.isArray(payload.preview_tasks)
+    ?payload.preview_tasks.map(normalizeArrearFromCloud).filter(isAllowedArrearsSource).filter(isArrearTaskOpen)
+    :tasks.slice(0,Math.min(Math.max(Number(opts.previewLimit)||ARREARS_OVERVIEW_PAGE_SIZE,1),ARREARS_PAGE_SIZE));
+  const summary=payload.summary||{};
+  const pagination=payload.pagination||{
+    limit:Number(payload.limit||tasks.length||ARREARS_PAGE_SIZE),
+    offset:Number(payload.offset||0),
+    total_count:Number(summary.total_count||payload.total_count||tasks.length),
+    has_more:!!payload.has_more
   };
-  const candidateCount=[
-    ...(sources.existingArrearsRecords||[]),
-    ...(sources.historicalArrears||[]),
-    ...(sources.ttlockExpiredUnpaid||[]),
-    ...(sources.ttlockExpiredCards||[])
-  ].length;
-  const totalAmountFils=allTasks.reduce((sum,a)=>sum+Math.max(0,Math.round(Number(a?.remain||0)*100)),0);
-  const promisedUnpaidCount=allTasks.filter(a=>arrearDirectiveStatus(a)==='promised'&&Number(a?.remain||0)>0).length;
+  const sources={
+    existing_arrears_record:normalizeArrearsSourceContract(payload.sources?.existing_arrears_record||payload.source_status?.existing_arrears_record||{}),
+    ttlock_expired_unpaid:normalizeArrearsSourceContract(payload.sources?.ttlock_expired_unpaid||payload.source_status?.ttlock_expired_unpaid||{})
+  };
   return {
     summary:{
-      total_count:allTasks.length,
-      total_amount_fils:totalAmountFils,
-      existing_arrears_count:sourceRows.existing_arrears_record.length,
-      ttlock_expired_unpaid_count:sourceRows.ttlock_expired_unpaid.length,
-      employee_promised_count:promisedUnpaidCount,
-      visible_preview_count:Math.min(previewLimit,allTasks.length)
+      total_count:Number(summary.total_count??payload.total_count??pagination.total_count??tasks.length),
+      total_amount_fils:Number(summary.total_amount_fils??payload.total_amount_fils??0),
+      existing_arrears_count:Number(summary.existing_arrears_count??payload.existing_arrears_count??sources.existing_arrears_record.count??0),
+      ttlock_expired_unpaid_count:Number(summary.ttlock_expired_unpaid_count??payload.ttlock_expired_unpaid_count??sources.ttlock_expired_unpaid.count??0),
+      promised_unpaid_count:Number(summary.promised_unpaid_count??summary.employee_promised_count??payload.promised_unpaid_count??payload.employee_promised_count??0),
+      config_missing_count:Number(summary.config_missing_count??payload.config_missing_count??payload.ttlock_missing_rent_count??0),
+      dedupe_dropped_count:Number(summary.dedupe_dropped_count??payload.dedupe_dropped_count??0),
+      visible_preview_count:Number(summary.visible_preview_count??previewRows.length)
     },
-    preview_tasks:allTasks.slice(0,previewLimit),
-    all_tasks:allTasks,
-    sources:{
-      existing_arrears_record:{count:sourceRows.existing_arrears_record.length,tasks:sourceRows.existing_arrears_record},
-      ttlock_expired_unpaid:{count:sourceRows.ttlock_expired_unpaid.length,tasks:sourceRows.ttlock_expired_unpaid}
-    },
-    dedupe_dropped_count:Math.max(0,candidateCount-allTasks.length),
-    has_more:allTasks.length>previewLimit
+    preview_tasks:previewRows,
+    all_tasks:tasks,
+    tasks,
+    pagination,
+    sources,
+    dedupe_dropped_count:Number(summary.dedupe_dropped_count??payload.dedupe_dropped_count??0),
+    has_more:!!(pagination.has_more||payload.has_more)
   };
 }
 function isArrearTaskOpen(a){
@@ -1127,76 +1072,16 @@ function isArrearTaskOpen(a){
 }
 async function loadExistingArrearsForOwner({limit=ARREARS_PAGE_SIZE,timeoutMs=ARREARS_FETCH_TIMEOUT_MS}={}){
   const safeLimit=Math.min(Math.max(Number(limit)||ARREARS_PAGE_SIZE,1),100);
-  const started=Date.now();
-  const remaining=()=>timeoutMs-(Date.now()-started);
-  let primary=null;
-  let primaryError=null;
-  try{
-    primary=await apiFetchWithTimeout(`/api/arrears/followup/tasks?limit=${safeLimit}`,{},Math.max(1000,Math.min(6500,remaining())));
-  }catch(e){
-    primaryError=e;
+  const response=await apiFetchWithTimeout(`/api/boss/arrears/followup-tasks?limit=${safeLimit}`,{},timeoutMs);
+  const payload=await response.json().catch(()=>({}));
+  if(!response.ok){
+    throw new Error(payload?.message||('HTTP '+response.status));
   }
-  if(primary?.ok)return rowsAndMetaFromApiPayload(await primary.json(),['all_tasks','tasks','arrears']);
-  if(primary&&[401,403].includes(primary.status)){
-    throw new Error(primary.status===401?'API_AUTH_DENIED_401':'API_AUTH_DENIED_403');
-  }
-  const fallbackBudget=remaining();
-  if(fallbackBudget<=1000)throw new DOMException('Arrears request timed out', 'TimeoutError');
-  const fallback=await apiFetchWithTimeout(`/api/arrears?limit=${safeLimit}`,{},fallbackBudget);
-  if(!fallback.ok){
-    const payload=await fallback.json().catch(()=>({}));
-    throw new Error(payload?.message||('HTTP '+fallback.status));
-  }
-  const result=rowsAndMetaFromApiPayload(await fallback.json(),['all_tasks','tasks','arrears']);
-  result.meta={...result.meta,primary_error:primaryError?String(primaryError?.name||primaryError?.message||primaryError):primary?.status?`HTTP_${primary.status}`:'primary_not_ok'};
-  return result;
+  const data=unwrapArrearsSotPayload(payload);
+  return {rows:buildArrearsFollowupPool(data),meta:data,payload:data};
 }
 async function loadHistoricalArrearsForOwner(opts={}){
   return (await loadExistingArrearsForOwner(opts)).rows;
-}
-async function ensureOwnerLockCardsForArrearsPool(timeoutMs=3000){
-  try{
-    if(typeof roomsData!=='undefined'&&roomsData&&Object.keys(roomsData).length)return true;
-    const r=await apiFetchWithTimeout('/api/lock/cards?purpose=arrears_pool',{method:'GET'},timeoutMs);
-    const payload=await r.json().catch(()=>({}));
-    if(!r.ok)return false;
-    if(payload?.roomsData&&typeof roomsData!=='undefined'){
-      roomsData=payload.roomsData||{};
-      _ccCache=null;
-      return Object.keys(roomsData).length>0;
-    }
-  }catch(e){
-    console.warn('ensureOwnerLockCardsForArrearsPool:',e);
-  }
-  return false;
-}
-async function loadTtlockArrearsForOwner({timeoutMs=3000}={}){
-  const loaded=await ensureOwnerLockCardsForArrearsPool(timeoutMs);
-  if(!loaded){
-    return {rows:[],meta:{source_status:{ttlock_expired_unpaid:{ok:false,error:'TTLOCK_UNAVAILABLE'}}}};
-  }
-  const rows=ttlockExpiredCardsForArrearsPool();
-  return {rows,meta:{source_status:{ttlock_expired_unpaid:{ok:true,count:rows.length}}}};
-}
-function ttlockExpiredCardsForArrearsPool(){
-  try{
-    if(typeof rc_currentOccupiedCards!=='function')return [];
-    return rc_currentOccupiedCards()
-      .filter(card=>Number(card.end||0)>0&&Number(card.end||0)<Date.now())
-      .map(card=>({
-        room:card.bed||card.lockRoom,
-        bed:card.bed,
-        lockRoom:card.lockRoom,
-        cardName:card.cardName,
-        dueDate:card.endDate instanceof Date?fmtD(card.endDate):String(card.endDate||'').slice(0,10),
-        sourceRef:`${card.bed||card.lockRoom}|${card.end||0}|${card.cardName||''}`,
-        note:'通通锁卡片已到期，按床位租金生成待跟进欠款'
-      }))
-      .filter(card=>Number(bedRentAmountForArrears(card))>0);
-  }catch(e){
-    console.warn('ttlockExpiredCardsForArrearsPool:',e);
-    return [];
-  }
 }
 function arrearSourceLabel(a){
   return {
@@ -1441,8 +1326,8 @@ function ownerArrearsSourceNotice(){
   const notices=[];
   const existing=status.existing_arrears_record;
   const ttlock=status.ttlock_expired_unpaid;
-  if(existing&&existing.ok===false)notices.push('系统已有欠款暂不可用');
-  if(ttlock&&ttlock.ok===false)notices.push('通通锁数据暂不可用');
+  if(existing&&(existing.ok===false||existing.status==='error'))notices.push('系统已有欠款暂不可用');
+  if(ttlock&&(ttlock.ok===false||ttlock.status==='error'))notices.push('通通锁数据暂不可用');
   if(!notices.length)return '';
   return `<div class="empty-text" data-owner-arrears-source-warning="true" style="margin:8px 0 0;text-align:center">${notices.map(esc).join(' · ')}；已显示可读取的数据。</div>`;
 }
@@ -1479,22 +1364,27 @@ function renderOwnerOverviewArrearsPanel(){
     </div>`;
     return;
   }
-  const summary=ownerArrearsSummary(rows);
+  const summary=state.arrearsSummary||ownerArrearsSummary(rows);
+  const pool=state.arrearsPoolResult||{};
+  const pagination=state.arrearsPagination||pool.pagination||{};
+  const totalCount=Number(summary.total_count??pagination.total_count??rows.length);
   const today=fmtD(new Date());
-  const sorted=rows.slice().sort((a,b)=>(a.dueDate||'9999').localeCompare(b.dueDate||'9999'));
-  const limit=state.arrearsExpanded?Math.min(state.arrearsLimit||ARREARS_PAGE_SIZE,sorted.length):ARREARS_OVERVIEW_PAGE_SIZE;
+  const sorted=state.arrearsExpanded
+    ? rows.slice()
+    : (Array.isArray(pool.preview_tasks)&&pool.preview_tasks.length?pool.preview_tasks:rows.slice(0,ARREARS_OVERVIEW_PAGE_SIZE));
+  const limit=state.arrearsExpanded?Math.min(state.arrearsLimit||ARREARS_PAGE_SIZE,sorted.length):sorted.length;
   const pageRows=sorted.slice(0,limit);
   const displayText=state.arrearsExpanded
-    ? `已显示全部 ${pageRows.length} / 共 ${sorted.length}`
-    : `预览 ${pageRows.length} / 共 ${sorted.length}`;
-  const viewAllLabel=state.arrearsExpanded?'收起':`查看全部 ${sorted.length}`;
+    ? `已显示 ${pageRows.length} / 共 ${totalCount}`
+    : `预览 ${pageRows.length} / 共 ${totalCount}`;
+  const viewAllLabel=state.arrearsExpanded?'收起':`查看全部 ${totalCount}`;
   panel.innerHTML=`<div class="owner-overview-arrears-content" data-owner-overview-arrears-loaded="true" data-owner-arrears-visible-count="${pageRows.length}" data-owner-arrears-total-count="${sorted.length}">
     <div class="owner-arrears-summary" data-owner-arrears-kpis="true">
-      <span>总额 ${fmtMoney(summary.totalAmount)} AED</span>
-      <span>需跟进 ${summary.followupCount}</span>
-      <span>系统欠款 ${summary.existingCount}</span>
-      <span>通通锁 ${summary.ttlockCount}</span>
-      <span>承诺未回 ${summary.promisedUnpaidCount}</span>
+      <span>总额 ${fmtMoney(Number(summary.total_amount_fils||0)/100)} AED</span>
+      <span>需跟进 ${Number(summary.total_count||totalCount||0)}</span>
+      <span>系统欠款 ${Number(summary.existing_arrears_count||0)}</span>
+      <span>通通锁 ${Number(summary.ttlock_expired_unpaid_count||0)}</span>
+      <span>承诺未回 ${Number(summary.promised_unpaid_count||summary.employee_promised_count||0)}</span>
       <span data-owner-arrears-preview-count="true">${esc(displayText)}</span>
     </div>
     ${ownerArrearsSourceNotice()}
@@ -1507,7 +1397,7 @@ function renderOwnerOverviewArrearsPanel(){
     <div class="hist-grid owner-arrears-list" data-owner-arrears-card-list="true">
       ${pageRows.map(a=>renderOwnerArrearsTaskCard(a,today)).join('')}
     </div>
-    ${state.arrearsExpanded&&sorted.length>pageRows.length?`<button class="btn btn-primary btn-block" type="button" style="margin-top:14px" onclick="state.arrearsLimit=(state.arrearsLimit||ARREARS_PAGE_SIZE)+ARREARS_PAGE_SIZE;renderOwnerOverviewArrearsPanel()">加载更多欠款</button>`:''}
+    ${state.arrearsExpanded&&(sorted.length>pageRows.length||state.arrearsPoolResult?.has_more)?`<button class="btn btn-primary btn-block" type="button" style="margin-top:14px" onclick="state.arrearsLimit=(state.arrearsLimit||ARREARS_PAGE_SIZE)+ARREARS_PAGE_SIZE;loadArrearsForOwner({showLoading:false,limit:state.arrearsLimit})">加载更多欠款</button>`:''}
   </div>`;
   updateArrearDirectiveButtonState();
 }
@@ -1518,13 +1408,12 @@ function retryOwnerOverviewArrears(){
 }
 async function toggleOverviewArrearsAll(){
   state.arrearsExpanded=true;
-  state.arrearsLimit=Math.max(state.arrearsLimit||ARREARS_PAGE_SIZE,ownerArrearsActiveRows().length,ARREARS_PAGE_SIZE);
+  const targetTotal=Number(state.arrearsSummary?.total_count||state.arrearsPagination?.total_count||ownerArrearsActiveRows().length||ARREARS_PAGE_SIZE);
+  state.arrearsLimit=Math.max(state.arrearsLimit||ARREARS_PAGE_SIZE,Math.min(targetTotal,100),ARREARS_PAGE_SIZE);
   renderOwnerOverviewArrearsPanel();
   renderArrearsPanel();
   if(!state.arrearsLoadedFull&&!state.arrearsLoading){
-    await loadArrearsForOwner({showLoading:false,limit:ARREARS_PAGE_SIZE});
-    state.arrearsLoadedFull=true;
-    state.arrearsLimit=Math.max(state.arrearsLimit||ARREARS_PAGE_SIZE,ownerArrearsActiveRows().length,ARREARS_PAGE_SIZE);
+    await loadArrearsForOwner({showLoading:false,limit:state.arrearsLimit});
   }
   switchView('arrears');
   requestAnimationFrame(()=>document.getElementById('view-arrears')?.scrollIntoView({block:'start'}));
@@ -1583,38 +1472,16 @@ async function loadArrearsForOwner({showLoading=false,limit=ARREARS_PAGE_SIZE}={
   if(showLoading)showArrearsLoading();
   renderOwnerOverviewArrearsPanel();
   try{
-    const [existingResult,ttlockResult]=await Promise.allSettled([
-      loadExistingArrearsForOwner({limit,timeoutMs:ARREARS_FETCH_TIMEOUT_MS}),
-      loadTtlockArrearsForOwner({timeoutMs:9000})
-    ]);
+    const result=await loadExistingArrearsForOwner({limit,timeoutMs:ARREARS_FETCH_TIMEOUT_MS});
     if(loadSeq!==state.arrearsLoadSeq)return false;
-    const existingOk=existingResult.status==='fulfilled';
-    const ttlockOk=ttlockResult.status==='fulfilled';
-    const rawExistingRows=existingOk?(existingResult.value.rows||[]):[];
-    const backendTtlockRows=rawExistingRows.filter(row=>normalizeArrearsSourceType(row?.source_type||row?.sourceType||row?.source)==='ttlock_expired_unpaid');
-    const existingRows=rawExistingRows.filter(row=>normalizeArrearsSourceType(row?.source_type||row?.sourceType||row?.source)!=='ttlock_expired_unpaid');
-    const backendTtlockStatus=existingOk?existingResult.value.meta?.source_status?.ttlock_expired_unpaid:null;
-    const clientTtlockRows=ttlockOk?(ttlockResult.value.rows||[]):[];
-    const ttlockRows=(backendTtlockStatus?.ok===true)?backendTtlockRows:clientTtlockRows;
-    const ttlockStatusOk=backendTtlockStatus?.ok===true||ttlockOk;
-    state.arrearsSourceStatus={
-      existing_arrears_record:existingOk
-        ?{ok:true,count:existingRows.length,...(existingResult.value.meta?.source_status?.existing_arrears_record||{})}
-        :{ok:false,error:String(existingResult.reason?.message||existingResult.reason||'EXISTING_ARREARS_FAILED')},
-      ttlock_expired_unpaid:ttlockStatusOk
-        ?{ok:true,count:ttlockRows.length,...(backendTtlockStatus||{}),...(backendTtlockStatus?.ok===true?{}:(ttlockResult.value?.meta?.source_status?.ttlock_expired_unpaid||{}))}
-        :{ok:false,error:String(ttlockResult.reason?.message||ttlockResult.reason||'TTLOCK_FAILED')}
-    };
-    if(!existingOk&&!ttlockStatusOk){
-      console.warn('owner arrears source failures', state.arrearsSourceStatus);
-      throw new Error('ALL_ARREARS_SOURCES_FAILED');
-    }
-    state.arrearsPoolResult=buildArrearsFollowupPoolResult({
-      existingArrearsRecords:existingRows,
-      ttlockExpiredUnpaid:ttlockRows
-    },{previewLimit:ARREARS_OVERVIEW_PAGE_SIZE});
+    state.arrearsPoolResult=buildArrearsFollowupPoolResult(result.payload||result.meta||{},{
+      previewLimit:ARREARS_OVERVIEW_PAGE_SIZE
+    });
+    state.arrearsSourceStatus=state.arrearsPoolResult.sources||{};
     state.arrears=state.arrearsPoolResult.all_tasks;
-    state.arrearsLoadedFull=Number(limit)>=ARREARS_PAGE_SIZE;
+    state.arrearsSummary=state.arrearsPoolResult.summary||{};
+    state.arrearsPagination=state.arrearsPoolResult.pagination||{};
+    state.arrearsLoadedFull=!state.arrearsPoolResult.has_more;
     saveArrears();
     state.arrearsStatus=state.arrears.length?'success':'empty';
     state.arrearsError='';
@@ -1681,11 +1548,13 @@ function renderArrearsPanel(){
     .sort((a,b)=>(a.dueDate||'9999').localeCompare(b.dueDate||'9999'));
   const visibleLimit=state.arrearsLimit||ARREARS_PAGE_SIZE;
   const pageRows=filtered.slice(0,visibleLimit);
-  const hasMore=filtered.length>visibleLimit;
-  const totalAmount=Math.round(active.reduce((s,a)=>s+Number(a.remain||0),0)*100)/100;
+  const hasMore=filtered.length>visibleLimit||!!state.arrearsPoolResult?.has_more;
+  const summary=state.arrearsSummary||{};
+  const totalCount=Number(summary.total_count||state.arrearsPagination?.total_count||active.length);
+  const totalAmount=Number(summary.total_amount_fils||0)/100;
   panel.innerHTML=`<div class="arrears-panel card" data-owner-arrears-info-pool="true">
     <div class="hist-toolbar owner-arrears-toolbar">
-      <span>未结清 ${active.length} 笔 · ${fmtMoney(totalAmount)} AED · 显示 ${pageRows.length}/${filtered.length}</span>
+      <span>未结清 ${totalCount} 笔 · ${fmtMoney(totalAmount)} AED · 显示 ${pageRows.length}/${totalCount}</span>
       <span class="hist-order">RECENT · FIRST</span>
     </div>
     <div class="owner-arrears-summary" data-owner-arrears-kpis="true">
@@ -1716,7 +1585,7 @@ function renderArrearsPanel(){
   </div>`;
   updateArrearDirectiveButtonState();
   const more=document.getElementById('btnArrearsLoadMore');
-  if(more)more.onclick=()=>{state.arrearsLimit=(state.arrearsLimit||ARREARS_PAGE_SIZE)+ARREARS_PAGE_SIZE;renderArrearsPanel();};
+  if(more)more.onclick=()=>{state.arrearsLimit=(state.arrearsLimit||ARREARS_PAGE_SIZE)+ARREARS_PAGE_SIZE;loadArrearsForOwner({showLoading:false,limit:state.arrearsLimit});};
 }
 /* ── 录入收款/押金 → 不直接核销，引导员工录入流水 ── */
 function enterPaymentForArrear(id){

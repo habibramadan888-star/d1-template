@@ -57,6 +57,18 @@ Production cutover remains `PRODUCTION_NO_GO`.
 - `promise_amount` / `promised_amount_fils` remain compatibility/API fields only and are not shown in default UI.
 - Production cutover remains `PRODUCTION_NO_GO`.
 
+## P0 Arrears Backend SOT Update
+
+- Backend SOT endpoint: `/api/boss/arrears/followup-tasks`.
+- Compatibility alias retained: `/api/arrears/followup/tasks`.
+- Frontend aggregation has been downgraded to API response adapter behavior.
+- Summary/list/view-all consistency is now locked to backend `summary`, `preview_tasks`, `tasks`, and `pagination`.
+- Partial failure behavior is represented through backend `sources`.
+- D1 write: no.
+- Migration: no.
+- Deployment: no.
+- Production cutover remains `PRODUCTION_NO_GO`.
+
 Date: 2026-05-23  
 Mode: NIGHT SHIFT local validation  
 Scope: governance, engineering baseline, local startup checks  

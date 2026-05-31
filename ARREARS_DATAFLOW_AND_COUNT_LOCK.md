@@ -71,3 +71,15 @@ Backend currently returns:
 6. TTLock source failure cannot hide existing rows.
 7. Amount-missing rows cannot fail the entire module.
 8. Unsupported source must not render in owner default list.
+
+## P0 SOT Update
+
+Backend `/api/boss/arrears/followup-tasks` is the locked SOT for owner arrears dataflow and counts.
+
+- `summary.total_count` is the owner-visible total count authority.
+- `summary.total_amount_fils` is the owner-visible total amount authority.
+- `summary.existing_arrears_count` and `summary.ttlock_expired_unpaid_count` are the source-count authorities.
+- `summary.config_missing_count` records TTLock rows excluded because bed rent mapping is missing.
+- `summary.dedupe_dropped_count` records backend dedupe drops.
+- Frontend must not recompute source counts, total amount, or dedupe drops.
+- View-all and load-more must use backend `pagination`.

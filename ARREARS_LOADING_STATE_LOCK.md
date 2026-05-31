@@ -43,3 +43,17 @@
 4. AbortError does not render `signal is aborted without reason`.
 5. View all remains clickable after load.
 6. Missing field in one row does not fail whole module.
+
+## P0 SOT Update
+
+Owner arrears loading must use the backend SOT endpoint as the single data request for official arrears cards.
+
+Locked loading behavior:
+
+- Show shell/skeleton before data returns.
+- Do not block first paint on frontend TTLock aggregation.
+- Do not issue a second frontend TTLock request for arrears pool construction.
+- Read partial-source status from backend `sources`.
+- Show available data when backend returns one successful source and one failed source.
+- Show retry only for real API failure, not for a replaced stale request.
+- Keep `qa:employee-entry-staging` as `MANUAL_REQUIRED / DRY_RUN_ONLY`.

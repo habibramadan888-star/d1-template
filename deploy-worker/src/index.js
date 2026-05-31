@@ -1866,6 +1866,7 @@ function empTaskToBossArrear(t){
     package_code:type,
     amount_authority_status:"known",
     accounting_status:"open",
+    amount_fils:Math.round(Math.max(0,remain)*100),
     overdue_days:dueDate?Math.max(0,empDaysBetween(dueDate,empTodayDubai())):0,
     room:cleanText(t?.bed||"",160),
     note:reason||"\u6b20\u6b3e",
@@ -1908,10 +1909,48 @@ function bossArrearsListLimit(request){
   }
 }
 __name(bossArrearsListLimit,"bossArrearsListLimit");
+function bossArrearsListParams(request){
+  try{
+    const url=new URL(request.url);
+    const rawLimit=Number(url.searchParams.get("limit")||20);
+    const rawOffset=Number(url.searchParams.get("offset")||0);
+    const rawPreview=Number(url.searchParams.get("preview_limit")||5);
+    const limit=Number.isFinite(rawLimit)?Math.min(Math.max(Math.floor(rawLimit),1),100):20;
+    const offset=Number.isFinite(rawOffset)?Math.min(Math.max(Math.floor(rawOffset),0),10000):0;
+    const previewLimit=Number.isFinite(rawPreview)?Math.min(Math.max(Math.floor(rawPreview),1),20):5;
+    return {limit,offset,previewLimit};
+  }catch{
+    return {limit:20,offset:0,previewLimit:5};
+  }
+}
+__name(bossArrearsListParams,"bossArrearsListParams");
 function empSourceStatus(ok,error="",extra={}){
   return {ok:!!ok,error:cleanText(error||"",120),...extra};
 }
 __name(empSourceStatus,"empSourceStatus");
+function empSourceContract(status={},count=0){
+  const ok=status?.ok!==false;
+  const errorCode=cleanText(status?.error_code||status?.error||"",120);
+  return {
+    count:Number(count||0),
+    status:ok?"ok":"error",
+    error_code:ok?"":(errorCode||"SOURCE_UNAVAILABLE")
+  };
+}
+__name(empSourceContract,"empSourceContract");
+function empBossArrearDedupeKey(row){
+  const sourceType=cleanText(row?.source_type||row?.sourceType||"",80);
+  const sourceRef=cleanText(row?.source_ref||row?.sourceRef||"",160);
+  if(sourceRef)return `${sourceType}|${sourceRef}`;
+  return [
+    sourceType,
+    cleanText(row?.task_id||row?.id||"",160),
+    cleanText(row?.room_bed||row?.bed||row?.room||"",160),
+    cleanText(row?.due_date||"",40),
+    Math.max(0,Math.round(cleanMoney(row?.remain||0)*100))
+  ].join("|");
+}
+__name(empBossArrearDedupeKey,"empBossArrearDedupeKey");
 function empReadErrorCode(error){
   const msg=String(error?.message||error||"").toLowerCase();
   if(msg.includes("no such table"))return "TABLE_MISSING";
@@ -2070,6 +2109,7 @@ async function empListMergedArrearTasksDetailed(env,user,opts={}){
   const tasks=[];
   let ttlockRows=[];
   let ttlockMissingRent=[];
+  let dedupeDroppedCount=0;
   const source_status={
     existing_arrears_record:empSourceStatus(false,"not_loaded"),
     ttlock_expired_unpaid:empSourceStatus(false,"not_loaded")
@@ -2103,7 +2143,10 @@ async function empListMergedArrearTasksDetailed(env,user,opts={}){
           cleanText(mapped.entry_id||mapped.original_entry_id||"",80),
           empTaskRemaining(mapped).toFixed(2)
         ].join("|");
-        if((mappedId&&seenIds.has(mappedId))||seenKeys.has(mappedKey))continue;
+        if((mappedId&&seenIds.has(mappedId))||seenKeys.has(mappedKey)){
+          dedupeDroppedCount++;
+          continue;
+        }
         if(empTaskRemaining(mapped)>0){
           tasks.push(mapped);
           legacyAdded++;
@@ -2122,7 +2165,18 @@ async function empListMergedArrearTasksDetailed(env,user,opts={}){
   ttlockMissingRent=ttlock.missingRent||[];
   source_status.ttlock_expired_unpaid=ttlock.source_status||empSourceStatus(false,"TTLOCK_READ_FAILED");
   tasks.sort((a,b)=>String(b.updated_at||b.created_at||"").localeCompare(String(a.updated_at||a.created_at||"")));
-  const mapped=[...tasks.map(empTaskToBossArrear),...ttlockRows].filter(a=>cleanMoney(a.remain)>0);
+  const seenMapped=new Set();
+  const mapped=[];
+  for(const row of [...tasks.map(empTaskToBossArrear),...ttlockRows]){
+    if(cleanMoney(row?.remain||0)<=0)continue;
+    const key=empBossArrearDedupeKey(row);
+    if(seenMapped.has(key)){
+      dedupeDroppedCount++;
+      continue;
+    }
+    seenMapped.add(key);
+    mapped.push(row);
+  }
   const existingCount=mapped.filter(a=>a.source_type==="existing_arrears_record").length;
   const ttlockCount=mapped.filter(a=>a.source_type==="ttlock_expired_unpaid").length;
   const promisedCount=mapped.filter(a=>cleanMoney(a.promised_amount_fils||0)>0||cleanText(a.promised_payment_date||"",40)).length;
@@ -2136,6 +2190,9 @@ async function empListMergedArrearTasksDetailed(env,user,opts={}){
     existing_arrears_count:existingCount,
     ttlock_expired_unpaid_count:ttlockCount,
     employee_promised_count:promisedCount,
+    promised_unpaid_count:promisedCount,
+    config_missing_count:ttlockMissingRent.length,
+    dedupe_dropped_count:dedupeDroppedCount,
     duration_ms:Date.now()-started,
     limit
   };
@@ -2152,14 +2209,30 @@ async function handleBossArrears(request,env,user){
 }
 __name(handleBossArrears,"handleBossArrears");
 async function handleBossArrearsFollowupTasks(request,env,user){
-  const detailed=await empListMergedArrearTasksDetailed(env,user,{limit:bossArrearsListLimit(request)});
-  const previewLimit=Math.min(detailed.limit,5);
-  const existingTasks=detailed.mapped.filter(a=>a.source_type==="existing_arrears_record");
-  const ttlockTasks=detailed.mapped.filter(a=>a.source_type==="ttlock_expired_unpaid");
-  const previewTasks=detailed.mapped.slice(0,previewLimit);
+  const params=bossArrearsListParams(request);
+  const sourceLimit=Math.min(Math.max(params.offset+params.limit,100),500);
+  const detailed=await empListMergedArrearTasksDetailed(env,user,{limit:sourceLimit});
+  const fullTasks=detailed.mapped;
+  const previewTasks=fullTasks.slice(0,Math.min(params.previewLimit,fullTasks.length));
+  const pageTasks=fullTasks.slice(params.offset,params.offset+params.limit);
+  const existingTasks=fullTasks.filter(a=>a.source_type==="existing_arrears_record");
+  const ttlockTasks=fullTasks.filter(a=>a.source_type==="ttlock_expired_unpaid");
+  const configMissingCount=Number(detailed.config_missing_count||0);
+  const promisedUnpaidCount=Number(detailed.promised_unpaid_count||detailed.employee_promised_count||0);
+  const dedupeDroppedCount=Number(detailed.dedupe_dropped_count||0);
+  const pagination={
+    limit:params.limit,
+    offset:params.offset,
+    total_count:detailed.total_count,
+    has_more:params.offset+params.limit<detailed.total_count
+  };
+  const sources={
+    existing_arrears_record:empSourceContract(detailed.source_status?.existing_arrears_record,existingTasks.length),
+    ttlock_expired_unpaid:empSourceContract(detailed.source_status?.ttlock_expired_unpaid,ttlockTasks.length)
+  };
   return success({
-    tasks:detailed.mapped,
-    all_tasks:detailed.mapped,
+    tasks:pageTasks,
+    all_tasks:fullTasks,
     preview_tasks:previewTasks,
     recent_tasks:previewTasks,
     summary:{
@@ -2167,26 +2240,34 @@ async function handleBossArrearsFollowupTasks(request,env,user){
       total_amount_fils:detailed.total_amount_fils,
       existing_arrears_count:detailed.existing_arrears_count,
       ttlock_expired_unpaid_count:detailed.ttlock_expired_unpaid_count,
-      employee_promised_count:detailed.employee_promised_count,
+      promised_unpaid_count:promisedUnpaidCount,
+      config_missing_count:configMissingCount,
+      dedupe_dropped_count:dedupeDroppedCount,
+      employee_promised_count:promisedUnpaidCount,
       visible_preview_count:previewTasks.length
     },
-    sources:{
-      existing_arrears_record:{count:existingTasks.length,tasks:existingTasks},
-      ttlock_expired_unpaid:{count:ttlockTasks.length,tasks:ttlockTasks}
+    pagination,
+    sources,
+    source_tasks:{
+      existing_arrears_record:existingTasks,
+      ttlock_expired_unpaid:ttlockTasks
     },
     total_amount_fils:detailed.total_amount_fils,
     total_count:detailed.total_count,
     existing_arrears_count:detailed.existing_arrears_count,
     ttlock_expired_unpaid_count:detailed.ttlock_expired_unpaid_count,
-    employee_promised_count:detailed.employee_promised_count,
-    dedupe_dropped_count:0,
-    has_more:detailed.mapped.length>previewLimit,
+    employee_promised_count:promisedUnpaidCount,
+    promised_unpaid_count:promisedUnpaidCount,
+    config_missing_count:configMissingCount,
+    dedupe_dropped_count:dedupeDroppedCount,
+    has_more:pagination.has_more,
     source_status:detailed.source_status,
     ttlock_missing_rent:detailed.ttlock_missing_rent||[],
-    ttlock_missing_rent_count:(detailed.ttlock_missing_rent||[]).length,
+    ttlock_missing_rent_count:configMissingCount,
     source_authority:["existing_arrears_record","ttlock_expired_unpaid"],
     duration_ms:detailed.duration_ms,
-    limit:detailed.limit
+    limit:params.limit,
+    offset:params.offset
   });
 }
 __name(handleBossArrearsFollowupTasks,"handleBossArrearsFollowupTasks");
@@ -3375,7 +3456,7 @@ async function handleRequest(request, env, ctx) {
       await audit(env, user, "wifi.accounts.save", "wifi_accounts", { count: Object.keys(clean).length });
       return success({ success: true, count: Object.keys(clean).length });
     }
-    if (path === "/api/arrears/followup/tasks" && method === "GET") {
+    if ((path === "/api/arrears/followup/tasks" || path === "/api/boss/arrears/followup-tasks") && method === "GET") {
       return handleBossArrearsFollowupTasks(request, env, user);
     }
     if (path === "/api/arrears" && method === "GET") {

@@ -113,3 +113,15 @@ Each task returned by the backend must include enough user-facing fields for ren
 - `close_status`
 
 The frontend may map labels but must not change business eligibility.
+
+## P0 Implementation Status
+
+The first implementation pass now supports `/api/boss/arrears/followup-tasks` as the owner arrears SOT endpoint, while keeping `/api/arrears/followup/tasks` as a compatibility alias.
+
+Locked behavior:
+
+- Backend owns source loading, source merge, amount authority, TTLock bed rent mapping, dedupe, summary, preview, pagination, source status, and config-missing counts.
+- Frontend `buildArrearsFollowupPool()` is an adapter over backend `tasks` / `all_tasks`; it no longer builds the business pool from separate source arrays.
+- Frontend `buildArrearsFollowupPoolResult()` consumes backend `summary`, `pagination`, and `sources`.
+- Frontend no longer calls TTLock directly for owner arrears pool construction.
+- Production cutover remains `PRODUCTION_NO_GO`.

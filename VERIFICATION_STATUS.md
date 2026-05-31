@@ -1802,3 +1802,24 @@ Production cutover remains `PRODUCTION_NO_GO`.
 - 顶部导航禁止横向滚动，必须固定居中。
 - 欠款不作为一级 Tab。
 - Production cutover remains `PRODUCTION_NO_GO`.
+
+## P0 Arrears Backend SOT Verification Scope
+
+New verification scripts:
+
+- `npm run test:arrears-backend-sot`
+- `npm run test:arrears-frontend-adapter`
+- `npm run test:arrears-summary-viewall`
+- `npm run test:arrears-source-isolation`
+- `npm run test:arrears-dedupe-safety`
+- `npm run test:arrears-bed-rent-mapping`
+
+Expected invariant:
+
+- Backend API is sole arrears SOT.
+- Frontend aggregation is removed/deprecated.
+- Summary/list/view-all consistency is locked.
+- Partial failure behavior is locked.
+- No D1 write.
+- No migration.
+- Production remains `PRODUCTION_NO_GO`.

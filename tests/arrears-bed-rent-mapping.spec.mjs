@@ -26,25 +26,26 @@ function extractFunction(source, name) {
   throw new Error(`Could not extract ${name}`);
 }
 
-test("backend dedupe is source-aware and reports dropped duplicate count", async () => {
+test("backend owns TTLock bed rent mapping and config-missing reporting", async () => {
   const worker = await readFile("deploy-worker/src/index.js", "utf8");
-  const key = extractFunction(worker, "empBossArrearDedupeKey");
+  const mapping = extractFunction(worker, "empTtlockRoomsToExpiredArrears");
   const detailed = extractFunction(worker, "empListMergedArrearTasksDetailed");
   const handler = extractFunction(worker, "handleBossArrearsFollowupTasks");
 
-  assert.match(key, /sourceType/);
-  assert.match(key, /sourceRef/);
-  assert.match(key, /`\$\{sourceType\}\|\$\{sourceRef\}`/);
-  assert.match(detailed, /dedupeDroppedCount\+\+/);
-  assert.match(handler, /dedupe_dropped_count:dedupeDroppedCount/);
+  assert.match(mapping, /empRentForTtlockCard/);
+  assert.match(mapping, /amount_fils:Math\.round\(rent\.amount\*100\)/);
+  assert.match(mapping, /missingRent\.push/);
+  assert.match(detailed, /config_missing_count:ttlockMissingRent\.length/);
+  assert.match(handler, /config_missing_count:configMissingCount/);
 });
 
-test("frontend adapter no longer performs dedupe", async () => {
+test("frontend does not map rent or call TTLock while loading owner arrears", async () => {
   const js = await readFile("deploy-worker/public/index-51-main.js", "utf8");
   const adapter = extractFunction(js, "buildArrearsFollowupPool");
-  const resultAdapter = extractFunction(js, "buildArrearsFollowupPoolResult");
+  const load = extractFunction(js, "loadArrearsForOwner");
 
-  assert.doesNotMatch(adapter, /Set\(/);
-  assert.doesNotMatch(adapter, /arrearsPoolDedupeKey/);
-  assert.doesNotMatch(resultAdapter, /candidateCount/);
+  assert.doesNotMatch(adapter, /bedRentAmountForArrears/);
+  assert.doesNotMatch(adapter, /rentAmount/);
+  assert.doesNotMatch(adapter, /ttlockExpiredCards/);
+  assert.doesNotMatch(load, /loadTtlockArrearsForOwner/);
 });
