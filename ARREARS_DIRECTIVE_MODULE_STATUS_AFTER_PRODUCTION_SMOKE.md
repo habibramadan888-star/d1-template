@@ -15,6 +15,7 @@ This document does not approve TTLock production smoke, batch dispatch, public b
 | production existing_arrears smoke | PASS |
 | production Abdul real inbox rollout | PASS |
 | Abdul employee inbox mobile acceptance | PASS |
+| Abdul one-task production follow-up write | PASS |
 | production ttlock smoke | NOT TESTED |
 | batch dispatch | NOT APPROVED |
 | production cutover | PRODUCTION_NO_GO |
@@ -31,6 +32,27 @@ This document does not approve TTLock production smoke, batch dispatch, public b
 | false success message | not observed |
 | production follow-up write | NOT RUN |
 | write gate | off |
+| production cutover | PRODUCTION_NO_GO |
+
+## Abdul One-Task Production Follow-up Write - 2026-06-01
+
+| Item | Result |
+|---|---|
+| target task | `task-mpgzu9kp-f150e26f` |
+| source | `existing_arrears_record` |
+| amount | 50 AED |
+| employee follow-up write | PASS |
+| employee idempotency replay | PASS |
+| owner feedback visible | PASS |
+| promised payment date | `2026-06-10` |
+| follow-up note | stored |
+| amount changed | no |
+| actual_received changed | no |
+| accounting_status changed | no |
+| owner directive create | NOT RUN |
+| TTLock smoke | NOT RUN |
+| batch dispatch | NOT RUN |
+| write gate after write | off |
 | production cutover | PRODUCTION_NO_GO |
 
 ## Abdul Real Inbox Rollout Update - 2026-05-31

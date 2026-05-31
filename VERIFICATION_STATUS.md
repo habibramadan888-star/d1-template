@@ -2003,3 +2003,17 @@ Deployment verification:
 | Write gate | OFF | No write gate opened. |
 | D1 write / migration | NOT_RUN | No D1 execute/export/import/write or migration. |
 | Production cutover | NO_GO | Remains `PRODUCTION_NO_GO`. |
+
+## Abdul One-Task Employee Follow-up Write Verification - 2026-06-01
+
+| Area | Status | Notes |
+|---|---|---|
+| Approved task scope | PASS | Only `task-mpgzu9kp-f150e26f` was used. |
+| Employee follow-up write | PASS | Approved promised date and note were submitted. |
+| Employee idempotency replay | PASS | Replay returned the already-processed result. |
+| Owner feedback visibility | PASS | Owner read sees the promised date and note. |
+| Amount / received / accounting | PASS | Amount stayed `50 AED`; `actual_received` stayed `0`; `accounting_status` stayed `open`. |
+| Write gate | OFF | Gate secrets were removed after the write and negative gate-off checks passed. |
+| Batch / TTLock / owner directive | NOT_RUN | No batch dispatch, TTLock smoke, or new owner directive create was executed. |
+| D1 migration / deploy | NOT_RUN | No migration, D1 export/import/execute, or deploy was performed. |
+| Production cutover | NO_GO | Remains `PRODUCTION_NO_GO`. |

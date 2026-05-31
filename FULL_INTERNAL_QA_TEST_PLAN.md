@@ -392,3 +392,13 @@ Production cutover remains `PRODUCTION_NO_GO`.
 - Write gate off means no real employee directive is created by owner dry-run.
 - Real production delivery still requires rollout approval.
 - Production cutover remains `PRODUCTION_NO_GO`.
+
+## Abdul One-Task Follow-up Write QA - 2026-06-01
+
+- Approved production write scope was exactly one employee follow-up on `task-mpgzu9kp-f150e26f`.
+- Verify employee side shows promised payment date `2026-06-10` and the approved follow-up note.
+- Verify owner side shows the same promised date and note.
+- Verify amount remains `50 AED`, `actual_received` remains `0`, and accounting status remains unchanged.
+- Verify write gate is closed after the acceptance write.
+- Verify no batch dispatch, TTLock smoke, owner directive create, migration, deploy, financial formula change, or dashboard calculation change occurred.
+- Production cutover remains `PRODUCTION_NO_GO`.

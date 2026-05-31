@@ -345,3 +345,14 @@ Production cutover remains `PRODUCTION_NO_GO`.
 4. Expected: UI states real dispatch is not enabled and a dry-run/manual list was generated.
 5. It must not say that employee side already received the task.
 6. No production write should be performed.
+
+## Abdul One-Task Follow-up Owner Visibility - 2026-06-01
+
+1. Log in as owner.
+2. Open arrears / follow-up task details.
+3. Locate `task-mpgzu9kp-f150e26f` / `144 / 139780080 / 50.00 AED`.
+4. Confirm Abdul's promised payment date `2026-06-10` is visible.
+5. Confirm Abdul's follow-up note is visible.
+6. Confirm amount remains `50 AED`, `actual_received` remains `0`, and accounting status remains unchanged.
+7. Confirm no batch dispatch, TTLock smoke, close, void, or handover action is part of this acceptance.
+8. Production cutover remains `PRODUCTION_NO_GO`.

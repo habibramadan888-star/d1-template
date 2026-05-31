@@ -177,3 +177,13 @@ During employee QA, confirm:
 4. If there are no real directives, confirm it displays `暂无老板下发任务`.
 5. Confirm `系统提醒` remains visible separately.
 6. Do not perform employee follow-up write unless separately approved.
+
+## Abdul One-Task Follow-up Write Acceptance - 2026-06-01
+
+1. Confirm Abdul can see the assigned boss directive for `144 / 139780080 / 50.00 AED`.
+2. Confirm the submitted promised payment date is `2026-06-10`.
+3. Confirm the submitted follow-up note is visible after refresh.
+4. Confirm the form does not allow amount edit, close, void, handover, or accounting status changes.
+5. Confirm the task amount remains `50 AED` and `actual_received` remains `0`.
+6. Confirm any further production follow-up write requires a separate approval because the write gate is closed.
+7. Production cutover remains `PRODUCTION_NO_GO`.
