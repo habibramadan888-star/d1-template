@@ -34,7 +34,6 @@ test("mobile card includes the owner-readable business blocks only", async () =>
   const card = extractFunction(js, "renderOwnerArrearsTaskCard");
 
   for (const required of [
-    "arrearCustomerLabel",
     "arrearBedLabel",
     "arrearAmountLabel",
     "arrearSourceLabel",
@@ -53,6 +52,9 @@ test("mobile card includes the owner-readable business blocks only", async () =>
   for (const forbidden of ["directive:", "promise:", "staff:", "source_type", "金额待核对"]) {
     assert.doesNotMatch(card, new RegExp(forbidden, "i"));
   }
+  assert.doesNotMatch(card, /arrearCustomerLabel/);
+  assert.match(card, /data-owner-arrears-business-title/);
+  assert.match(card, /选择欠款任务 \$\{bed\} \$\{amount\}/);
 });
 
 test("owner arrears mobile CSS uses one-column cards, not table rows", async () => {

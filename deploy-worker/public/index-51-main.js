@@ -943,7 +943,9 @@ function normalizeArrearFromCloud(a){
     taskId:a.task_id||a.id,
     sourceType,
     sourceRef:a.source_ref||a.sourceRef||a.task_id||a.id||'',
-    roomBed:a.room_bed||a.roomBed||a.room||a.bed||'',
+    roomBed:a.room_bed||a.roomBed||a.room||a.bed||a.bed_no||a.bedNo||a.room_no||a.roomNo||'',
+    bedNo:a.bed_no||a.bedNo||'',
+    roomNo:a.room_no||a.roomNo||'',
     customerCode:a.customer_code||a.customerCode||a.tenant_card_id||a.tenantCardId||a.tenant_name||'',
     cardCode:a.card_code||a.cardCode||a.tenant_card_id||a.tenantCardId||'',
     packageCode:a.package_code||a.packageCode||a.type||'rent',
@@ -1250,19 +1252,19 @@ function arrearCustomerLabel(a){
   return id.startsWith('#')?id:'#'+id;
 }
 function arrearBedLabel(a){
-  return cleanArrearText(a?.roomBed||a?.room||a?.bed||a?.lockRoom,'床位待核对');
+  return cleanArrearText(a?.roomBed||a?.bedNo||a?.bed_no||a?.roomNo||a?.room_no||a?.room||a?.bed||a?.lockRoom,'床位待确认');
 }
 function arrearAmountLabel(a){
-  return `${fmtMoney(Number(a?.remain||0))} AED`;
+  const amount=Number(a?.remain);
+  return Number.isFinite(amount)&&amount>0?`${fmtMoney(amount)} AED`:'金额待确认';
 }
 function arrearDueLine(a,today){
-  const due=cleanArrearText(a?.dueDate||a?.due_date,'截止待核对');
-  const code=cleanArrearText(a?.packageCode||a?.cardCode||a?.type,'D-');
-  if(!a?.dueDate)return `截止待核对｜${code}`;
+  const due=cleanArrearText(a?.dueDate||a?.due_date,'截止待确认');
+  if(!a?.dueDate)return '截止待确认';
   const days=Math.ceil((new Date(a.dueDate)-new Date(today))/(1000*60*60*24));
-  if(days<0)return `逾期 ${Math.abs(days)} 天 🔥｜${code}｜截止 ${due}`;
-  if(days===0)return `今天到期｜${code}｜截止 ${due}`;
-  return `${days} 天后到期｜${code}｜截止 ${due}`;
+  if(days<0)return `逾期 ${Math.abs(days)} 天｜截止 ${due}`;
+  if(days===0)return `今天到期｜截止 ${due}`;
+  return `${days} 天后到期｜截止 ${due}`;
 }
 function arrearBusinessState(a){
   const directive=arrearDirectiveStatus(a);
@@ -1305,7 +1307,6 @@ function renderOwnerArrearsTaskCard(a,today){
   const [statusLabel,statusColor,statusBg]=arrearStatusMeta(directive);
   const overdue=a?.dueDate&&a.dueDate<today;
   const taskId=esc(a?.taskId||a?.id||'');
-  const customer=esc(arrearCustomerLabel(a));
   const bed=esc(arrearBedLabel(a));
   const amount=esc(arrearAmountLabel(a));
   const source=esc(arrearSourceLabel(a));
@@ -1316,8 +1317,8 @@ function renderOwnerArrearsTaskCard(a,today){
   const note=esc(arrearFollowupNoteLabel(a));
   return `<article class="hist-card owner-arrears-task-card ${overdue?'is-overdue':''}" data-owner-arrear-task-card="true" data-arrear-pool-kind="${esc(normalizeArrearsSourceType(a?.sourceType))}">
     <div class="owner-arrears-card-top">
-      ${isOwnerWriteRole()?`<input class="arrear-task-select" type="checkbox" data-arrear-select value="${taskId}" aria-label="选择欠款任务 ${customer}">`:''}
-      <div class="owner-arrears-identity"><strong>${customer}</strong><span>｜${bed}</span><b>｜${amount}</b></div>
+      ${isOwnerWriteRole()?`<input class="arrear-task-select" type="checkbox" data-arrear-select value="${taskId}" aria-label="选择欠款任务 ${bed} ${amount}">`:''}
+      <div class="owner-arrears-identity" data-owner-arrears-business-title="true"><strong>${bed}</strong><b>｜${amount}</b></div>
     </div>
     <div class="hist-anchor owner-arrears-due-line">${source}｜${dueLine}</div>
     <div class="hist-stat"><span>承诺金额</span><span class="mono">${promiseAmount}</span></div>
