@@ -2459,7 +2459,6 @@ function empTaskToEmployeeDirective(t){
 __name(empTaskToEmployeeDirective,"empTaskToEmployeeDirective");
 async function handleBossArrearsDirectives(request,env,user){
   if(!requireManager(user))return forbidden();
-  await empEnsureSchema(env);
   let body;
   try{body=await request.json();}catch{return badRequest("invalid_json");}
   const ids=Array.isArray(body?.task_ids)?body.task_ids.map(x=>cleanId(x)).filter(Boolean):[];
@@ -2468,6 +2467,7 @@ async function handleBossArrearsDirectives(request,env,user){
   if(!uniqueIds.length)return badRequest("task_ids_required");
   if(!idempotencyKey)return badRequest("idempotency_key_required");
   if(!arrearsDirectiveWriteApproved(env))return arrearsDirectiveApprovalRequired("boss_arrears_directives_create");
+  await empEnsureSchema(env);
   const assignedFallback=cleanText(body?.assigned_employee_id||"",80);
   const note=cleanText(body?.note||"",500);
   const actor=cleanText(user.userid,80);
@@ -2548,7 +2548,6 @@ async function handleBossArrearsDirectives(request,env,user){
 __name(handleBossArrearsDirectives,"handleBossArrearsDirectives");
 async function handleEmployeeArrearsDirectives(request,env,user){
   if(!isStaffRoleValue(user?.role))return forbidden();
-  await empEnsureSchema(env);
   const rows=await env.DB.prepare(
     `SELECT * FROM arrear_tasks
       WHERE corpid=? AND userid=?
@@ -2563,7 +2562,6 @@ async function handleEmployeeArrearsDirectives(request,env,user){
 __name(handleEmployeeArrearsDirectives,"handleEmployeeArrearsDirectives");
 async function handleEmployeeArrearsDirectiveFollowup(request,env,user,taskId){
   if(!isStaffRoleValue(user?.role))return forbidden();
-  await empEnsureSchema(env);
   let body;
   try{body=await request.json();}catch{return badRequest("invalid_json");}
   if(body?.promised_amount!==void 0||body?.promise_amount!==void 0||body?.promised_amount_fils!==void 0)return badRequest("promised_amount_not_allowed");
@@ -2574,6 +2572,7 @@ async function handleEmployeeArrearsDirectiveFollowup(request,env,user,taskId){
   if(promisedDate<empTodayDubai())return badRequest("promise_date_in_past");
   const note=cleanText(body?.followup_note||"",500);
   if(!arrearsDirectiveWriteApproved(env))return arrearsDirectiveApprovalRequired("employee_arrears_directive_followup");
+  await empEnsureSchema(env);
   const action="employee_arrears_followup_update";
   const requestHash=await arrearsDirectiveRequestHash({
     corpid:user.corpid,

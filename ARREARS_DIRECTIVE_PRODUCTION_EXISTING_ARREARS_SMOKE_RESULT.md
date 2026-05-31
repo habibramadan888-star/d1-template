@@ -1,48 +1,47 @@
 # Arrears Directive Production Existing Arrears Smoke Result
 
-Timestamp: 2026-05-31T17:43:31.672Z
+Timestamp: 2026-05-31T18:05:00Z
 
-Overall: BLOCKED
+Overall: BLOCKED_PENDING_RETRY
 
-| Step | Result |
-| --- | --- |
-| final safety check | pass |
-| pre snapshot | pass |
-| write gate enabled | pass |
-| owner directive create | blocked: HTTP 404 |
-| owner idempotency replay | skipped |
-| employee read | skipped |
-| employee follow-up | skipped |
-| employee idempotency replay | skipped |
-| owner feedback visible | skipped |
-| readonly_admin blocked | skipped |
-| write gate disabled | pass |
-| rollback/cleanup | pass |
-| post verify | pass |
+## Previous Smoke Result
+
+| Item | Result |
+|---|---|
+| previous smoke commit | 60f8f3a |
+| previous status | BLOCKED |
+| previous root cause | live Worker missing directive route |
+| previous owner directive create response | 404 |
+| previous directive created | no |
+| previous employee follow-up | no |
+| previous idempotency rows | 0 |
+| previous audit rows | 0 |
+| previous task restored/verified | yes |
+
+## This Route Deploy Round
+
+| Item | Result |
+|---|---|
+| route deploy executed | yes |
+| Worker version id | 86365492-e47e-499a-95ee-960b46acb976 |
+| write gate enabled | no |
+| business write executed | no |
+| production D1 execute/export/import | no |
+| production migration | no |
+| owner directive create | no |
+| employee follow-up | no |
+| POST /api/boss/arrears/directives after deploy | 409 production_write_approval_required |
+| POST /api/boss/arrears/directives still 404 | no |
 | production cutover | PRODUCTION_NO_GO |
 
-## Root Cause
+## Interpretation
 
-The live Worker returned HTTP 404 for the approved owner directive endpoint:
+The route blocker from the previous smoke is fixed: `POST /api/boss/arrears/directives` now exists in production and returns a gated response while the write gate is off.
 
-`POST /api/boss/arrears/directives`
+This does not make the previous smoke a pass. The previous smoke remains blocked. A new, separately approved minimum production-linked smoke is required before any PASS result can be recorded.
 
-That means the currently deployed production Worker does not expose the approved Backend SOT write endpoint needed for this smoke. The smoke was stopped after the owner create attempt. Employee read/follow-up, idempotency replay, owner feedback, and readonly write-path verification were not executed.
+## Next Required Action
 
-## Scope Actually Reached
+Use `NEXT_PROMPT_ARREARS_DIRECTIVE_PRODUCTION_EXISTING_ARREARS_SMOKE_RETRY_AFTER_ROUTE_DEPLOY.md` to request explicit approval for the retry.
 
-- Task selected: task-mpgzu9kp-f150e26f
-- Write gate was temporarily enabled and then disabled.
-- The owner directive API call returned 404 and created no directive.
-- No employee follow-up was executed.
-- No idempotency rows were created for smoke keys.
-- No audit/event rows were created for directive/follow-up.
-- Selected task fields were verified/restored to pre-smoke values.
-- No ttlock smoke.
-- No batch write.
-- No financial formula change.
-- No dashboard calculation change.
-
-
-Password/token/cookie printed: no.
-Production cutover: PRODUCTION_NO_GO.
+Production cutover remains `PRODUCTION_NO_GO`.
