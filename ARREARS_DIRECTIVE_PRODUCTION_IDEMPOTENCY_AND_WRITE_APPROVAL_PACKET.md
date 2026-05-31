@@ -72,3 +72,55 @@ Do not execute smoke until the next approval prompt is explicitly filled and app
 - Production write gate enabled: `NO`
 - Production deploy: `NO`
 - Commercial launch: `PRODUCTION_NO_GO`
+
+## Existing Arrears Production Smoke PASS Addendum
+
+Date: 2026-05-31, Asia/Dubai
+
+Status update: the separately approved one-row `existing_arrears_record` production-linked smoke has completed and passed.
+
+| Area | Result |
+|---|---|
+| smoke retry commit | `a2bef0d` |
+| result file | `ARREARS_DIRECTIVE_PRODUCTION_EXISTING_ARREARS_SMOKE_RETRY_RESULT.md` |
+| selected task | `task-mpgzu9kp-f150e26f` |
+| owner directive create | PASS |
+| owner idempotency replay | PASS |
+| employee read | PASS |
+| employee follow-up | PASS |
+| employee idempotency replay | PASS |
+| owner feedback visible | PASS |
+| readonly_admin blocked | PASS |
+| rollback / cleanup | PASS |
+| write gate after smoke | closed |
+| production cutover | `PRODUCTION_NO_GO` |
+
+### Smoke Write Scope
+
+- One owner directive create for `task-mpgzu9kp-f150e26f`.
+- One employee follow-up for the same task.
+- Two idempotency evidence rows retained.
+- Two audit evidence rows retained.
+- One directive/follow-up event evidence row retained.
+- One cleanup/restore update for the same selected task.
+
+### Cleanup Result
+
+The selected task was restored to its pre-smoke business state:
+
+- `arrear_amount`: `50 AED`, unchanged.
+- `actual_received`: `0`, unchanged.
+- `directive_status`: restored to `none`.
+- `userid`: restored to `staff`.
+- `promise_date`: restored to `2026-05-24`.
+- `staff_note`: restored to the original production value.
+
+### Remaining Boundaries
+
+- TTLock production smoke: `NOT TESTED`.
+- Batch rollout: `NOT APPROVED`.
+- Financial formula: unchanged.
+- Dashboard calculation: unchanged.
+- Commercial launch: remains `PRODUCTION_NO_GO`.
+
+Recommendation: return to internal acceptance. Do not proceed to TTLock production smoke or batch rollout unless Ramadan separately approves that next scope.

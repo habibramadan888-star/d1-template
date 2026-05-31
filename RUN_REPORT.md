@@ -1,5 +1,23 @@
 # Run Report
 
+## ARREARS-DIRECTIVE-PRODUCTION-SMOKE-PASS-RECORD-001
+
+Date: 2026-05-31, Asia/Dubai
+
+Scope: record the passed one-row `existing_arrears_record` production-linked arrears directive smoke.
+
+- Smoke retry commit: `a2bef0d`.
+- Result file: `ARREARS_DIRECTIVE_PRODUCTION_EXISTING_ARREARS_SMOKE_RETRY_RESULT.md`.
+- Owner directive create, owner idempotency replay, employee read, employee follow-up, employee idempotency replay, owner feedback, readonly_admin block, write gate disable, rollback/cleanup, and post-smoke verification all passed.
+- Production write scope was limited to `task-mpgzu9kp-f150e26f`, idempotency/audit/event evidence, and cleanup restore for the same task.
+- No TTLock production smoke was executed.
+- No batch production write was executed.
+- No production cutover was executed.
+- Write gate is closed.
+- Financial formula and dashboard calculation remain unchanged.
+
+Production remains `PRODUCTION_NO_GO`.
+
 ## TTLOCK-ARREARS-SOURCE-FIX-001
 
 Date: 2026-05-31, Asia/Dubai

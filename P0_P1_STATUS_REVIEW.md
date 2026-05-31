@@ -1,5 +1,19 @@
 # P0 / P1 Status Review
 
+## Arrears Directive Production Smoke PASS Addendum
+
+Date: 2026-05-31, Asia/Dubai
+
+| Area | Status | Evidence | Production Meaning |
+|---|---|---|---|
+| Existing arrears directive production smoke | PASS | `ARREARS_DIRECTIVE_PRODUCTION_EXISTING_ARREARS_SMOKE_RETRY_RESULT.md` | One-row existing arrears owner-to-employee loop passed under temporary write gate. |
+| TTLock production smoke | NOT TESTED | Not executed | Requires separate approval before any production TTLock write smoke. |
+| Batch dispatch | NOT APPROVED | Not executed | Requires separate approval and must not be inferred from the one-row smoke. |
+| Write gate | CLOSED | Secret list check showed no `ARREARS_DIRECTIVE_WRITE_APPROVED` / `ARREARS_DIRECTIVE_WRITE_MODE` | No ongoing production write window. |
+| Production cutover | `PRODUCTION_NO_GO` | `COMMERCIAL_LAUNCH_READINESS_RESULT.md` | Smoke PASS is not production cutover or public beta approval. |
+| Financial formula | UNCHANGED | Smoke scope excluded formula changes | P0 accounting authority remains unchanged. |
+| Dashboard calculation | UNCHANGED | Smoke scope excluded dashboard changes | Dashboard authority remains unchanged. |
+
 Generated: 2026-05-23, Asia/Dubai
 
 ## Commercial Launch Review 012 Signoff Status Addendum
