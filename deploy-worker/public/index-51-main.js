@@ -1312,7 +1312,6 @@ function renderOwnerArrearsTaskCard(a,today){
   const source=esc(arrearSourceLabel(a));
   const dueLine=esc(arrearDueLine(a,today));
   const businessStatus=esc(arrearBusinessState(a)||statusLabel);
-  const promiseAmount=esc(arrearPromiseAmountLabel(a));
   const promiseDate=esc(arrearPromiseDateLabel(a));
   const note=esc(arrearFollowupNoteLabel(a));
   return `<article class="hist-card owner-arrears-task-card ${overdue?'is-overdue':''}" data-owner-arrear-task-card="true" data-arrear-pool-kind="${esc(normalizeArrearsSourceType(a?.sourceType))}">
@@ -1321,7 +1320,6 @@ function renderOwnerArrearsTaskCard(a,today){
       <div class="owner-arrears-identity" data-owner-arrears-business-title="true"><strong>${bed}</strong><b>｜${amount}</b></div>
     </div>
     <div class="hist-anchor owner-arrears-due-line">${source}｜${dueLine}</div>
-    <div class="hist-stat"><span>承诺金额</span><span class="mono">${promiseAmount}</span></div>
     <div class="hist-stat"><span>承诺日期</span><span class="mono">${promiseDate}</span></div>
     <div class="hist-stat"><span>备注</span><span>${note}</span></div>
     <div class="hist-stat"><span>状态</span><span class="owner-arrears-status-pill" style="color:${statusColor};background:${statusBg}">${businessStatus}</span></div>
@@ -1351,7 +1349,7 @@ function exportArrearsWhatsApp(){
     '欠款 ARREARS',
     `未结清任务：${active.length}`,
     ...active.slice(0,30).map((a,i)=>{
-      return `${i+1}. ${a.room||'-'} | ${arrearSourceLabel(a)} | ${arrearAmountLabel(a)} | ${arrearBusinessState(a)} | 承诺金额:${arrearPromiseAmountLabel(a)} | 承诺日期:${arrearPromiseDateLabel(a)} | 备注:${arrearFollowupNoteLabel(a)}`;
+      return `${i+1}. ${a.room||'-'} | ${arrearSourceLabel(a)} | ${arrearAmountLabel(a)} | ${arrearBusinessState(a)} | 承诺日期:${arrearPromiseDateLabel(a)} | 备注:${arrearFollowupNoteLabel(a)}`;
     })
   ];
   const text=lines.join('\n');
@@ -1402,7 +1400,6 @@ function showArrearTaskDetails(id){
     `${arrearCustomerLabel(task)}｜${arrearBedLabel(task)}｜${arrearAmountLabel(task)}`,
     `来源：${arrearSourceLabel(task)}`,
     `状态：${arrearBusinessState(task)}`,
-    `承诺金额：${arrearPromiseAmountLabel(task)}`,
     `承诺日期：${arrearPromiseDateLabel(task)}`,
     `备注：${arrearFollowupNoteLabel(task)}`
   ].join('\n');

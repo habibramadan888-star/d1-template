@@ -56,13 +56,13 @@ test("owner arrears cards expose only final business labels and no unknown amoun
     "data-owner-arrear-task-card",
     "hist-card owner-arrears-task-card",
     "arrearAmountLabel",
-    "承诺金额",
     "承诺日期",
     "备注",
     "状态"
   ]) {
     assert.match(card, new RegExp(required));
   }
+  assert.doesNotMatch(card, /arrearPromiseAmountLabel|承诺金额/);
   assert.doesNotMatch(amountLabel, /金额待核对/);
   assert.match(js, /ttlock_expired_unpaid/);
   assert.match(js, /通通锁到期未付/);

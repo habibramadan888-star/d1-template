@@ -180,6 +180,16 @@ After owner login, verify 欠款管理 is available inside the owner workspace n
 
 Production cutover remains `PRODUCTION_NO_GO`.
 
+## Owner Arrears Simplified Follow-Up Check
+
+During owner QA, confirm:
+
+- Arrears card title shows bed and system amount.
+- Default card does not show `承诺金额`.
+- Default card shows `承诺日期`, `备注`, and `状态`.
+- Detail/export text does not reintroduce promised amount as a default field.
+- Production cutover remains `PRODUCTION_NO_GO`.
+
 ## Owner Arrears Final UX Test Addendum
 
 1. Open owner `欠款` from the primary nav. The label must be `欠款`, not `欠款管理`.
@@ -210,6 +220,7 @@ Stop the test if any old row/table layout, third source, debug field, or 20-seco
 6. Confirm `查看全部` expands arrears inside overview and `WhatsApp 导出` remains available.
 7. Treat 20s+ loading as P1 and 3-minute loading as P0/P1.
 8. Production cutover remains `PRODUCTION_NO_GO`.
+
 ## Owner Arrears Loading And Fixed Nav Regression Checks
 
 1. 打开老板端总览，确认欠款跟进模块 10 秒内进入成功、空、部分失败或错误重试状态，不允许无限 loading。

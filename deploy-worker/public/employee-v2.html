@@ -334,7 +334,7 @@ function renderTasks(){
     <div class="task-top"><div><div class="bed">#${esc(t.bed||'')}</div><div class="small">${esc(t.tenant_name||'未填租客')} · ${esc(t.arrear_reason||'欠款')}</div></div><div class="money">AED ${money(t.arrear_amount)}</div></div>
     <div style="margin:10px 0"><span class="pill ${statusClass(t.followup_status)}">${esc(t.followup_status||'待跟进')}</span></div>
     <div class="grid2"><div class="field"><label>跟进状态</label><select data-k="followup_status"><option>待跟进</option><option>已联系</option><option>承诺付款</option><option>部分支付</option><option>已结清</option><option>无法联系</option><option>转老板处理</option></select></div><div class="field"><label>承诺日期</label><input type="date" data-k="promise_date" value="${esc(t.promise_date||'')}"></div></div>
-    <div class="grid2"><div class="field"><label>承诺金额</label><input inputmode="decimal" data-k="promise_amount" value="${esc(t.promise_amount||'')}"></div><div class="field"><label>实际收到</label><input inputmode="decimal" data-k="actual_received" value="${esc(t.actual_received||'')}"></div></div>
+    <div class="grid2"><div class="field"><label>实际收到</label><input inputmode="decimal" data-k="actual_received" value="${esc(t.actual_received||'')}"></div></div>
     <div class="grid2"><div class="field"><label>结案状态</label><input data-k="close_status" value="${esc(t.close_status||'')}"></div><div class="field"><label>结案原因</label><input data-k="close_reason" value="${esc(t.close_reason||'')}"></div></div>
     <div class="field"><label>老板备注</label><textarea data-k="owner_note">${esc(t.owner_note||'')}</textarea></div>
     <div class="field"><label>员工备注</label><textarea data-k="staff_note">${esc(t.staff_note||'')}</textarea></div>
@@ -359,7 +359,7 @@ async function updateTask(id){
 }
 function buildExport(){
   const lines=['员工录入导出 '+nowText(),'员工 '+operatorId(),''].concat(state.drafts.map(exportLine));
-  const updates=state.tasks.filter(t=>t.updated_at).map(t=>`#${t.bed} arrear:${money(t.arrear_amount)} status:${t.followup_status} promise:${t.promise_date||'-'} promise_amt:${money(t.promise_amount)} received:${money(t.actual_received)} reason:${t.arrear_reason||'-'} close:${t.close_status||'-'} updated:${t.updated_by||operatorId()}/${t.updated_at}`);
+  const updates=state.tasks.filter(t=>t.updated_at).map(t=>`#${t.bed} arrear:${money(t.arrear_amount)} status:${t.followup_status} promise:${t.promise_date||'-'} received:${money(t.actual_received)} reason:${t.arrear_reason||'-'} close:${t.close_status||'-'} updated:${t.updated_by||operatorId()}/${t.updated_at}`);
   if(updates.length)lines.push('', '欠款跟进', ...updates);
   $('exportText').textContent=lines.join('\n');
 }

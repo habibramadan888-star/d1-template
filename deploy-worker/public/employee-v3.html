@@ -3015,7 +3015,6 @@ async function saveFollowup(taskId){
   const patch={
     followup_status:status,
     promise_date:promise,
-    promise_amount:num(item.amount),
     staff_note:note
   };
   if(item.source==='ttlock'){

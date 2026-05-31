@@ -234,6 +234,17 @@ Owner arrears QA must validate the final source and visual contract:
 
 Production cutover remains `PRODUCTION_NO_GO`.
 
+## Arrears Follow-Up Field Simplification
+
+QA must verify:
+
+- System, not employee, determines arrears amount.
+- Employee only enters promised repayment date and note for follow-up.
+- Owner default arrears card shows system amount, promised date, note, and status.
+- `promise_amount` / `promised_amount_fils` may exist in compatibility contracts but are not default UI fields.
+- Any reappearance of `承诺金额` on default owner arrears cards is a regression.
+- Production cutover remains `PRODUCTION_NO_GO`.
+
 ## Owner Regression Audit QA Addendum
 
 Owner QA must treat these as blockers:
@@ -268,6 +279,7 @@ Required commands:
 - `npm run test:owner-arrears-two-source-only`
 
 Production cutover remains `PRODUCTION_NO_GO`.
+
 ## Owner Arrears Loading / Navigation Blockers
 
 - 欠款模块无限 loading 是 P1/P0 blocker。

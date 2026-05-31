@@ -129,6 +129,17 @@ Treat these as P1 blockers:
 
 Production remains `PRODUCTION_NO_GO`.
 
+## Arrears Follow-Up Regression Fields
+
+- Does owner card show `承诺金额` by default? Expected: no.
+- Does owner card still show top arrears amount? Expected: yes.
+- Does employee follow-up ask for promised amount? Expected: no.
+- Does employee follow-up keep promised repayment date and note? Expected: yes.
+- Screenshot URL/page:
+- Account role:
+- Device/browser:
+- Production cutover remains `PRODUCTION_NO_GO`.
+
 ## Owner Module Regression Rules
 
 Treat these as blockers:
@@ -157,6 +168,7 @@ Required evidence:
 - `npm run test:owner-overview-arrears-timeout`
 
 Production remains `PRODUCTION_NO_GO`.
+
 ## Owner Arrears / Navigation Regression Fields
 
 - 是否出现欠款模块无限 loading：是 / 否

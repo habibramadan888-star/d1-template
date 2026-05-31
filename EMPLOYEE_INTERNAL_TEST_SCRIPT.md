@@ -81,6 +81,7 @@ Additional stop conditions:
 | EMP-BLOCKER-003-01 | Employee display name   | Login as Abdul/Zhang/Li test user  | Header shows only the real name, centered; no `当前员工`, no `staff` role text | Mobile screenshot          |           |                 |
 | EMP-BLOCKER-003-02 | Script error regression | Open employee page after login     | No visible `Script error.` toast during initial render                         | Screenshot or console note |           | No write action |
 | EMP-BLOCKER-003-03 | Top nav consistency     | Check 录入 / 跟进 / 导出 on mobile | Chinese over English, consistent sizes, no truncated `EXPO...`                 | Mobile screenshot          |           |                 |
+
 ## THREE-PORTAL-FIX-001 Employee Entry Notes
 
 Use `/` only to choose the employee role. The main portal must show 员工, 老板, 管理员 only.
@@ -88,3 +89,14 @@ Use `/` only to choose the employee role. The main portal must show 员工, 老�
 员工欠款跟进任务 remains inside the employee workspace after login. Employees should not enter arrears management from a fourth main-portal card.
 
 Production cutover remains `PRODUCTION_NO_GO`.
+
+## Employee Arrears Follow-Up Simplification
+
+During employee QA, confirm:
+
+- Employee arrears follow-up form shows promised repayment date.
+- Employee arrears follow-up form shows note.
+- Employee arrears follow-up form does not ask for promised amount.
+- If status is `承诺付款`, promised repayment date is required.
+- Note is recommended for operational context.
+- Production cutover remains `PRODUCTION_NO_GO`.

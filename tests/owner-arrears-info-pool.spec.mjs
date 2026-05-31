@@ -35,11 +35,9 @@ test("owner arrears page renders the final follow-up information pool", async ()
 
   for (const required of [
     "owner-arrears-identity",
-    "arrearCustomerLabel",
     "arrearBedLabel",
     "arrearAmountLabel",
     "arrearDueLine",
-    "承诺金额",
     "承诺日期",
     "备注",
     "状态",
@@ -47,6 +45,8 @@ test("owner arrears page renders the final follow-up information pool", async ()
   ]) {
     assert.match(card, new RegExp(required));
   }
+  assert.doesNotMatch(card, /arrearCustomerLabel/);
+  assert.doesNotMatch(card, /arrearPromiseAmountLabel|承诺金额/);
   assert.match(dueLine, /逾期/);
 });
 

@@ -49,7 +49,8 @@ test("boss arrears API fields match owner card renderer expectations", async () 
   assert.match(normalizer, /promised_amount_fils/);
   assert.match(normalizer, /promised_payment_date/);
   assert.match(normalizer, /followup_note/);
-  assert.match(renderer, /arrearPromiseAmountLabel/);
+  assert.doesNotMatch(renderer, /arrearPromiseAmountLabel/);
+  assert.doesNotMatch(renderer, /承诺金额/);
   assert.match(renderer, /arrearPromiseDateLabel/);
   assert.match(renderer, /arrearFollowupNoteLabel/);
 });

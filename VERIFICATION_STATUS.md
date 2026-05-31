@@ -255,6 +255,17 @@ Date: 2026-05-28, Asia/Dubai
 
 Production cutover remains `PRODUCTION_NO_GO`.
 
+## OWNER-ARREARS-SIMPLIFY-FOLLOWUP-FIELDS-001 Verification Notes
+
+| Area                           | Status    | Notes                                                                                |
+| ------------------------------ | --------- | ------------------------------------------------------------------------------------ |
+| System arrears amount          | READY     | Amount is determined by system arrears data or bed rent mapping.                     |
+| Employee promised amount input | REMOVED   | Employee follow-up no longer asks for promised amount.                               |
+| Employee fields                | READY     | Promised repayment date and note remain.                                             |
+| Owner default card             | READY     | Shows top amount, promised date, note, and status.                                   |
+| Compatibility fields           | PRESERVED | `promise_amount` / `promised_amount_fils` are not deleted from API/DB compatibility. |
+| Production cutover             | NO_GO     | `PRODUCTION_NO_GO` remains active.                                                   |
+
 ## OWNER-ARREARS-OVERVIEW-MERGE-AND-LOADING-FIX-001 Verification Notes
 
 | Area                    | Status | Notes                                                                                                 |
@@ -1782,6 +1793,7 @@ Production cutover remains `PRODUCTION_NO_GO`.
 | Blockers                 | ACTIVE | 20s blank loading and raw debug field display are regression blockers.                                |
 
 Production cutover remains `PRODUCTION_NO_GO`.
+
 ## Owner Arrears Load / Nav Verification
 
 - 欠款模块无限 loading 是 P1/P0 blocker。

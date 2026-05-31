@@ -38,10 +38,8 @@ test("mobile card includes the owner-readable business blocks only", async () =>
     "arrearAmountLabel",
     "arrearSourceLabel",
     "arrearDueLine",
-    "arrearPromiseAmountLabel",
     "arrearPromiseDateLabel",
     "arrearFollowupNoteLabel",
-    "承诺金额",
     "承诺日期",
     "备注",
     "状态"
@@ -52,6 +50,7 @@ test("mobile card includes the owner-readable business blocks only", async () =>
   for (const forbidden of ["directive:", "promise:", "staff:", "source_type", "金额待核对"]) {
     assert.doesNotMatch(card, new RegExp(forbidden, "i"));
   }
+  assert.doesNotMatch(card, /arrearPromiseAmountLabel|承诺金额/);
   assert.doesNotMatch(card, /arrearCustomerLabel/);
   assert.match(card, /data-owner-arrears-business-title/);
   assert.match(card, /选择欠款任务 \$\{bed\} \$\{amount\}/);

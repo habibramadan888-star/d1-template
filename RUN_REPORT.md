@@ -48,6 +48,15 @@ Artifacts: `AUTH_ROUTING_ARCHITECTURE_AUDIT.md`, `THREE_PORTAL_ENTRY_DESIGN.md`,
 
 Production cutover remains `PRODUCTION_NO_GO`.
 
+## OWNER-ARREARS-SIMPLIFY-FOLLOWUP-FIELDS-001
+
+- Arrears amount is system-owned: existing arrears amount or TTLock bed-rent-mapped amount.
+- Employees no longer enter a promised amount during arrears follow-up.
+- Employee follow-up keeps only promised repayment date and note.
+- Owner arrears cards default to amount in the title plus promised date, note, and status.
+- `promise_amount` / `promised_amount_fils` remain compatibility/API fields only and are not shown in default UI.
+- Production cutover remains `PRODUCTION_NO_GO`.
+
 Date: 2026-05-23  
 Mode: NIGHT SHIFT local validation  
 Scope: governance, engineering baseline, local startup checks  
@@ -5982,6 +5991,7 @@ Safety:
 - 欠款模块不能无限 loading；20 秒以上 loading 是 P1 blocker，3 分钟 loading 是 P0/P1 blocker。
 - 欠款加载失败只能影响欠款模块自身，必须显示 timeout/error + retry，不能影响总览其他模块。
 - Production cutover remains `PRODUCTION_NO_GO`.
+
 ## Owner Overview Arrears Root Cause And Nav Fix
 
 - 欠款模块无限 loading / 反复 timeout 是 P1/P0 blocker，不能用 UI timeout 掩盖真实 API/数据错误。

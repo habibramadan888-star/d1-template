@@ -19,7 +19,6 @@ test("owner arrears render path has no raw debug labels", async () => {
   const js = await readFile("deploy-worker/public/index-51-main.js", "utf8");
   const render = extractFunction(js, "renderArrearsPanel");
   const card = extractFunction(js, "renderOwnerArrearsTaskCard");
-  const promiseAmount = extractFunction(js, "arrearPromiseAmountLabel");
   const promiseDate = extractFunction(js, "arrearPromiseDateLabel");
   const followupNote = extractFunction(js, "arrearFollowupNoteLabel");
 
@@ -31,9 +30,10 @@ test("owner arrears render path has no raw debug labels", async () => {
     assert.doesNotMatch(source, /debug/i);
   }
 
-  for (const required of ["承诺金额", "承诺日期", "备注", "状态"]) {
+  for (const required of ["承诺日期", "备注", "状态"]) {
     assert.match(card, new RegExp(required));
   }
-  assert.match(`${promiseAmount}\n${promiseDate}`, /未填写/);
+  assert.doesNotMatch(card, /arrearPromiseAmountLabel|承诺金额/);
+  assert.match(promiseDate, /未填写/);
   assert.match(followupNote, /暂无/);
 });
