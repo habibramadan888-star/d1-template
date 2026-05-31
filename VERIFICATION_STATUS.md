@@ -1,5 +1,16 @@
 # Verification Status
 
+## TTLOCK-ARREARS-SOURCE-FIX-001 Verification Addendum
+
+Date: 2026-05-31, Asia/Dubai
+
+- Only `existing_arrears_record` and `ttlock_expired_unpaid` are valid owner arrears sources.
+- TTLock expired unpaid cards must enter the pool when live TTLock data and bed-rent mapping are available.
+- TTLock amounts come from bed-rent config, not TTLock card data.
+- Missing rent rows are surfaced separately and excluded from the default total.
+- Existing system arrears must remain visible when TTLock fails.
+- Production remains `PRODUCTION_NO_GO`.
+
 ## OWNER-ARREARS-MOBILE-CARD-DEPLOY-001 Verification Addendum
 
 Date: 2026-05-31, Asia/Dubai

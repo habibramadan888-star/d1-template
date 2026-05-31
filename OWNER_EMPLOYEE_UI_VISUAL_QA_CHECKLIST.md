@@ -1,5 +1,17 @@
 # Owner Employee UI Visual QA Checklist
 
+## TTLOCK-ARREARS-SOURCE-FIX-001 Visual Checks
+
+| Screenshot / State | Required | Pass/Fail | Notes |
+| --- | ---: | --- | --- |
+| System arrears visible | Yes | | Existing arrears remain visible even if TTLock fails. |
+| TTLock source count | Yes | | Count increases when mapped expired unpaid TTLock cards exist. |
+| TTLock amount | Yes | | Amount comes from bed-rent mapping. |
+| Missing rent state | Yes | | Missing rent rows are surfaced separately, not counted in total. |
+| No secret leakage | Yes | | No password, token, cookie, access token, or client secret appears. |
+
+Production remains `PRODUCTION_NO_GO`.
+
 ## OWNER-ARREARS-MOBILE-CARD-DEPLOY-001 Visual Checks
 
 Date: 2026-05-31, Asia/Dubai

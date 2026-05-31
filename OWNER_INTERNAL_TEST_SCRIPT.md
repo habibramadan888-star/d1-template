@@ -1,5 +1,17 @@
 # Owner Internal Test Script
 
+## TTLOCK-ARREARS-SOURCE-FIX-001 Addendum
+
+Use owner overview in read-only visual mode unless explicitly testing staging writes.
+
+- Confirm system arrears still display.
+- Confirm TTLock expired unpaid count is greater than zero when live TTLock expired cards and bed-rent mapping exist.
+- Confirm TTLock amount equals mapped bed rent.
+- Confirm missing bed-rent rows do not enter the default amount total.
+- Confirm TTLock unavailable warning does not appear when TTLock source succeeds.
+- Confirm TTLock failure does not hide system arrears.
+- Do not include passwords, cookies, or TTLock tokens in reports.
+
 ## OWNER-ARREARS-MOBILE-CARD-DEPLOY-001 Addendum
 
 Date: 2026-05-31, Asia/Dubai

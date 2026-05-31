@@ -1513,6 +1513,17 @@ async function empRentForBed(env, corpid, bed){
   return Number.isFinite(value)&&value>0?Math.round(value*100)/100:0;
 }
 __name(empRentForBed,"empRentForBed");
+async function empRentConfigReadOnly(env,corpid){
+  if(!env?.DB||!await empTableExists(env,"app_settings"))return {};
+  const row=await env.DB.prepare("SELECT value FROM app_settings WHERE corpid=? AND key=? LIMIT 1").bind(corpid,"rent_ref_room").first().catch(()=>null);
+  try{
+    const parsed=row?.value?JSON.parse(row.value):{};
+    return Object.fromEntries(Object.entries(parsed||{}).map(([key,value])=>[String(key||"").trim(),Number(value)]).filter(([key,value])=>key&&Number.isFinite(value)&&value>0));
+  }catch{
+    return {};
+  }
+}
+__name(empRentConfigReadOnly,"empRentConfigReadOnly");
 async function handleEmployeeDeposit(request,env,user){
   await empEnsureSchema(env);
   const url=new URL(request.url);
@@ -1906,16 +1917,162 @@ function empReadErrorCode(error){
   if(msg.includes("no such table"))return "TABLE_MISSING";
   if(msg.includes("no such column"))return "CONTRACT_MISMATCH";
   if(msg.includes("permission")||msg.includes("forbidden"))return "AUTH_DENIED";
+  if(msg.includes("ttlock_not_configured"))return "TTLOCK_SECRET_MISSING";
+  if(msg.includes("ttlock_token")||msg.includes("token"))return "TTLOCK_TOKEN_EXPIRED";
+  if(msg.includes("timeout")||msg.includes("timed out"))return "TTLOCK_API_TIMEOUT";
+  if(msg.includes("upstream_invalid_json"))return "TTLOCK_PARSE_ERROR";
+  if(msg.includes("401")||msg.includes("403")||msg.includes("auth"))return "TTLOCK_AUTH_FAILED";
   return "READ_FAILED";
 }
 __name(empReadErrorCode,"empReadErrorCode");
+function empWithTimeout(promise,timeoutMs,label){
+  const guarded=Promise.resolve(promise);
+  guarded.catch(()=>{});
+  return Promise.race([
+    guarded,
+    new Promise((_,reject)=>setTimeout(()=>reject(new Error(`${label||"operation"}_timeout`)),Math.max(1,Number(timeoutMs)||1)))
+  ]);
+}
+__name(empWithTimeout,"empWithTimeout");
+function empTtlockReadErrorCode(resultOrError){
+  const raw=String(resultOrError?.error||resultOrError?.message||resultOrError||"").toLowerCase();
+  const status=Number(resultOrError?.status||0);
+  if(raw.includes("not_configured"))return "TTLOCK_SECRET_MISSING";
+  if(status===401||raw.includes("401"))return "TTLOCK_AUTH_FAILED";
+  if(status===403||raw.includes("403"))return "TTLOCK_AUTH_FAILED";
+  if(raw.includes("token"))return "TTLOCK_TOKEN_EXPIRED";
+  if(raw.includes("timeout")||raw.includes("timed out"))return "TTLOCK_API_TIMEOUT";
+  if(raw.includes("invalid_json")||raw.includes("parse"))return "TTLOCK_PARSE_ERROR";
+  if(raw.includes("empty"))return "TTLOCK_EMPTY_RESPONSE";
+  if(raw.includes("bed_mapping"))return "TTLOCK_BED_MAPPING_FAILED";
+  if(raw.includes("rent_mapping"))return "TTLOCK_RENT_MAPPING_FAILED";
+  return "TTLOCK_API_NOT_IMPLEMENTED";
+}
+__name(empTtlockReadErrorCode,"empTtlockReadErrorCode");
+function empTtlockBedNumber(value){
+  const match=String(value||"").trim().match(/^(\d+)/);
+  return match?match[1]:"";
+}
+__name(empTtlockBedNumber,"empTtlockBedNumber");
+function empTtlockIsVacant(value){
+  const raw=String(value||"").trim();
+  return !!raw&&(/(?:^|\s)e(?:\s|$)/i.test(raw)||/^\d+\s+empty$/i.test(raw)||/^empty$/i.test(raw));
+}
+__name(empTtlockIsVacant,"empTtlockIsVacant");
+function empTtlockIsStaff(value){
+  return /abdul|abdu|bilal|bilali|bilaili|\u963f\u5e03|\u963f\u535c|\u6bd4\u62c9/i.test(String(value||""));
+}
+__name(empTtlockIsStaff,"empTtlockIsStaff");
+function empRentLookupKeys(lockRoom,bed,cardName){
+  const room=cleanText(lockRoom||"",160);
+  const bedKey=cleanText(bed||"",80);
+  const card=cleanText(cardName||"",160);
+  const keys=[
+    bedKey,
+    room,
+    room&&bedKey?`${room}-${bedKey}`:"",
+    room&&bedKey?`${room}/${bedKey}`:"",
+    room&&bedKey?`${room} / ${bedKey}`:"",
+    card
+  ];
+  return [...new Set(keys.map(k=>String(k||"").trim()).filter(Boolean))];
+}
+__name(empRentLookupKeys,"empRentLookupKeys");
+function empRentForTtlockCard(rentConfig,lockRoom,bed,cardName){
+  for(const key of empRentLookupKeys(lockRoom,bed,cardName)){
+    const amount=Number(rentConfig?.[key]);
+    if(Number.isFinite(amount)&&amount>0)return {amount:Math.round(amount*100)/100,key};
+  }
+  return {amount:0,key:""};
+}
+__name(empRentForTtlockCard,"empRentForTtlockCard");
+function empTtlockRoomsToExpiredArrears(roomsData,rentConfig){
+  const rows=[];
+  const missingRent=[];
+  const now=Date.now();
+  for(const [lockRoom,cards] of Object.entries(roomsData||{})){
+    for(const card of cards||[]){
+      const cardName=cleanText(card?.cardName||card?.identityCardName||card?.cardAlias||card?.name||"",160);
+      if(empTtlockIsVacant(cardName)||empTtlockIsStaff(cardName))continue;
+      const endMs=Number(card?.endDate||card?.end||0);
+      if(!(Number.isFinite(endMs)&&endMs>0&&endMs<now))continue;
+      const bed=empTtlockBedNumber(cardName)||cleanText(card?.bed||card?.room||lockRoom||"",80);
+      if(!bed){
+        missingRent.push({lockRoom:cleanText(lockRoom||"",120),cardName,reason:"BED_MAPPING_FAILED"});
+        continue;
+      }
+      const rent=empRentForTtlockCard(rentConfig,lockRoom,bed,cardName);
+      const dueDate=new Date(endMs).toISOString().slice(0,10);
+      if(!(rent.amount>0)){
+        missingRent.push({room_bed:bed,lockRoom:cleanText(lockRoom||"",120),cardName,due_date:dueDate,reason:"RENT_MAPPING_FAILED"});
+        continue;
+      }
+      const sourceRef=cleanText(card?.cardId||card?.cardNumber||card?.identityCardId||"",80)||`${lockRoom}|${bed}|${endMs}|${cardName}`;
+      rows.push({
+        id:`ttlock-expired-${sourceRef}`.replace(/[^\w.-]+/g,"-").slice(0,120),
+        task_id:`ttlock-expired-${sourceRef}`.replace(/[^\w.-]+/g,"-").slice(0,120),
+        source:"ttlock",
+        source_type:"ttlock_expired_unpaid",
+        source_ref:sourceRef,
+        room_bed:bed,
+        bed,
+        room:bed,
+        customer_code:cardName||bed,
+        card_code:cardName||sourceRef,
+        package_code:"ttlock_card",
+        amount_fils:Math.round(rent.amount*100),
+        amount_source:"bed_rent_mapping",
+        amount_authority_status:"bed_rent_mapping",
+        accounting_status:"unverified",
+        remain:rent.amount,
+        due_date:dueDate,
+        followup_status:"pending_followup",
+        note:"TTLock expired unpaid; amount comes from bed rent mapping",
+        rent_mapping_key:rent.key,
+        lock_room:cleanText(lockRoom||"",120),
+        overdue_days:Math.max(0,empDaysBetween(dueDate,empTodayDubai()))
+      });
+    }
+  }
+  return {rows,missingRent};
+}
+__name(empTtlockRoomsToExpiredArrears,"empTtlockRoomsToExpiredArrears");
+async function empLoadTtlockExpiredUnpaidForArrears(env,user,opts={}){
+  const timeoutMs=Math.min(Math.max(Number(opts.timeoutMs||8000),1000),12000);
+  try{
+    const [lockResult,rentConfig]=await Promise.all([
+      empWithTimeout(loadLockCards(env),timeoutMs,"ttlock_api"),
+      empRentConfigReadOnly(env,user.corpid)
+    ]);
+    if(lockResult?.error){
+      return {rows:[],missingRent:[],source_status:empSourceStatus(false,empTtlockReadErrorCode(lockResult),{endpoint:"/api/lock/cards",status:lockResult.status||0})};
+    }
+    const mapped=empTtlockRoomsToExpiredArrears(lockResult?.roomsData||{},rentConfig);
+    return {
+      rows:mapped.rows,
+      missingRent:mapped.missingRent,
+      source_status:empSourceStatus(true,"",{
+        endpoint:"/api/lock/cards",
+        data_source:"live_api",
+        count:mapped.rows.length,
+        missing_rent_count:mapped.missingRent.length,
+        locks_count:Number(lockResult?.locksCount||0)
+      })
+    };
+  }catch(e){
+    return {rows:[],missingRent:[],source_status:empSourceStatus(false,empTtlockReadErrorCode(e),{endpoint:"/api/lock/cards"})};
+  }
+}
+__name(empLoadTtlockExpiredUnpaidForArrears,"empLoadTtlockExpiredUnpaidForArrears");
 async function empListMergedArrearTasksDetailed(env,user,opts={}){
   const limit=Math.min(Math.max(Number(opts.limit||100),1),500);
   const started=Date.now();
   const tasks=[];
+  let ttlockRows=[];
+  let ttlockMissingRent=[];
   const source_status={
     existing_arrears_record:empSourceStatus(false,"not_loaded"),
-    ttlock_expired_unpaid:empSourceStatus(false,"client_deferred",{deferred:true})
+    ttlock_expired_unpaid:empSourceStatus(false,"not_loaded")
   };
   if(await empTableExists(env,"arrear_tasks")){
     try{
@@ -1960,18 +2117,24 @@ async function empListMergedArrearTasksDetailed(env,user,opts={}){
       else source_status.existing_arrears_record={...source_status.existing_arrears_record,legacy_error:empReadErrorCode(e)};
     }
   }
+  const ttlock=await empLoadTtlockExpiredUnpaidForArrears(env,user,{timeoutMs:opts.ttlockTimeoutMs||8000});
+  ttlockRows=ttlock.rows||[];
+  ttlockMissingRent=ttlock.missingRent||[];
+  source_status.ttlock_expired_unpaid=ttlock.source_status||empSourceStatus(false,"TTLOCK_READ_FAILED");
   tasks.sort((a,b)=>String(b.updated_at||b.created_at||"").localeCompare(String(a.updated_at||a.created_at||"")));
-  const mapped=tasks.map(empTaskToBossArrear).filter(a=>a.remain>0);
+  const mapped=[...tasks.map(empTaskToBossArrear),...ttlockRows].filter(a=>cleanMoney(a.remain)>0);
   const existingCount=mapped.filter(a=>a.source_type==="existing_arrears_record").length;
+  const ttlockCount=mapped.filter(a=>a.source_type==="ttlock_expired_unpaid").length;
   const promisedCount=mapped.filter(a=>cleanMoney(a.promised_amount_fils||0)>0||cleanText(a.promised_payment_date||"",40)).length;
   return {
     tasks,
     mapped,
     source_status,
+    ttlock_missing_rent:ttlockMissingRent,
     total_count:mapped.length,
     total_amount_fils:mapped.reduce((sum,a)=>sum+Math.max(0,Math.round(cleanMoney(a.remain||0)*100)),0),
     existing_arrears_count:existingCount,
-    ttlock_expired_unpaid_count:0,
+    ttlock_expired_unpaid_count:ttlockCount,
     employee_promised_count:promisedCount,
     duration_ms:Date.now()-started,
     limit
@@ -1999,6 +2162,8 @@ async function handleBossArrearsFollowupTasks(request,env,user){
     ttlock_expired_unpaid_count:detailed.ttlock_expired_unpaid_count,
     employee_promised_count:detailed.employee_promised_count,
     source_status:detailed.source_status,
+    ttlock_missing_rent:detailed.ttlock_missing_rent||[],
+    ttlock_missing_rent_count:(detailed.ttlock_missing_rent||[]).length,
     source_authority:["existing_arrears_record","ttlock_expired_unpaid"],
     duration_ms:detailed.duration_ms,
     limit:detailed.limit

@@ -1,5 +1,16 @@
 # Full Internal QA Test Plan
 
+## TTLOCK-ARREARS-SOURCE-FIX-001 QA Addendum
+
+Owner arrears QA must validate:
+
+- Only two source classes are visible: system arrears and TTLock expired unpaid.
+- TTLock expired unpaid enters the arrears pool when live data and rent mapping are available.
+- TTLock amount comes from bed-rent mapping.
+- TTLock unavailable is not accepted as a successful end state.
+- TTLock source failure does not block system arrears.
+- Production cutover remains `PRODUCTION_NO_GO`.
+
 ## ARREARS-ROOT-CAUSE-LOCK-001 QA Addendum
 
 Owner arrears QA must validate source completeness, not just visual rendering:

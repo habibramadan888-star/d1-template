@@ -1,5 +1,19 @@
 # Run Report
 
+## TTLOCK-ARREARS-SOURCE-FIX-001
+
+Date: 2026-05-31, Asia/Dubai
+
+Scope: connect TTLock expired unpaid cards to the owner arrears follow-up pool through a read-only source path.
+
+- Valid arrears sources remain exactly two: existing system arrears records and TTLock expired unpaid cards.
+- TTLock expired unpaid rows use bed-rent mapping for amount authority.
+- TTLock unavailable is not treated as success; it is classified and retryable.
+- TTLock source failure must not block existing system arrears.
+- No production D1 write, migration, D1 export/import/execute, employee entry write, handover submit, void/delete, settings change, dashboard calculation change, financial formula change, secret print, or commercial launch GO occurred.
+
+Production remains `PRODUCTION_NO_GO`.
+
 ## OWNER-ARREARS-MOBILE-CARD-DEPLOY-001
 
 Date: 2026-05-31, Asia/Dubai

@@ -54,5 +54,6 @@ test("backend boss arrears contract exposes the two-source authority only", asyn
 
   assert.match(worker, /source_authority:\["existing_arrears_record","ttlock_expired_unpaid"\]/);
   assert.match(worker, /source_type:\/ttlock\/i\.test/);
+  assert.match(worker, /empLoadTtlockExpiredUnpaidForArrears/);
   assert.doesNotMatch(worker, /source_authority:\[[^\]]*current_due_unpaid/);
 });

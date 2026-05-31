@@ -1528,22 +1528,27 @@ async function loadArrearsForOwner({showLoading=false,limit=ARREARS_PAGE_SIZE}={
   try{
     const [existingResult,ttlockResult]=await Promise.allSettled([
       loadExistingArrearsForOwner({limit,timeoutMs:ARREARS_FETCH_TIMEOUT_MS}),
-      loadTtlockArrearsForOwner({timeoutMs:3000})
+      loadTtlockArrearsForOwner({timeoutMs:9000})
     ]);
     if(loadSeq!==state.arrearsLoadSeq)return false;
     const existingOk=existingResult.status==='fulfilled';
     const ttlockOk=ttlockResult.status==='fulfilled';
-    const existingRows=existingOk?(existingResult.value.rows||[]):[];
-    const ttlockRows=ttlockOk?(ttlockResult.value.rows||[]):[];
+    const rawExistingRows=existingOk?(existingResult.value.rows||[]):[];
+    const backendTtlockRows=rawExistingRows.filter(row=>normalizeArrearsSourceType(row?.source_type||row?.sourceType||row?.source)==='ttlock_expired_unpaid');
+    const existingRows=rawExistingRows.filter(row=>normalizeArrearsSourceType(row?.source_type||row?.sourceType||row?.source)!=='ttlock_expired_unpaid');
+    const backendTtlockStatus=existingOk?existingResult.value.meta?.source_status?.ttlock_expired_unpaid:null;
+    const clientTtlockRows=ttlockOk?(ttlockResult.value.rows||[]):[];
+    const ttlockRows=(backendTtlockStatus?.ok===true)?backendTtlockRows:clientTtlockRows;
+    const ttlockStatusOk=backendTtlockStatus?.ok===true||ttlockOk;
     state.arrearsSourceStatus={
       existing_arrears_record:existingOk
         ?{ok:true,count:existingRows.length,...(existingResult.value.meta?.source_status?.existing_arrears_record||{})}
         :{ok:false,error:String(existingResult.reason?.message||existingResult.reason||'EXISTING_ARREARS_FAILED')},
-      ttlock_expired_unpaid:ttlockOk
-        ?{ok:true,count:ttlockRows.length,...(ttlockResult.value.meta?.source_status?.ttlock_expired_unpaid||{})}
+      ttlock_expired_unpaid:ttlockStatusOk
+        ?{ok:true,count:ttlockRows.length,...(backendTtlockStatus||{}),...(backendTtlockStatus?.ok===true?{}:(ttlockResult.value?.meta?.source_status?.ttlock_expired_unpaid||{}))}
         :{ok:false,error:String(ttlockResult.reason?.message||ttlockResult.reason||'TTLOCK_FAILED')}
     };
-    if(!existingOk&&!ttlockOk){
+    if(!existingOk&&!ttlockStatusOk){
       console.warn('owner arrears source failures', state.arrearsSourceStatus);
       throw new Error('ALL_ARREARS_SOURCES_FAILED');
     }

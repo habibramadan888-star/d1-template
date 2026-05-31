@@ -1,5 +1,17 @@
 # Bug Report Template
 
+## TTLOCK-ARREARS-SOURCE-FIX-001 Severity Notes
+
+Treat these as arrears source regressions:
+
+- TTLock expired unpaid cards are absent while live TTLock expired card data and rent mapping exist.
+- TTLock unavailable is shown as if the source succeeded.
+- TTLock failure hides existing system arrears.
+- TTLock rows use an unknown amount instead of mapped bed rent.
+- Missing rent rows are silently dropped without config-missing evidence.
+
+Never include passwords, tokens, cookies, TTLock access tokens, client secrets, or unmasked sensitive screenshots.
+
 ## ARREARS-ROOT-CAUSE-LOCK-001 Severity Notes
 
 Treat these as P0/P1 arrears regressions: owner arrears pool missing TTLock expired cards, current due unpaid rows hidden, unknown-amount TTLock rows hidden instead of showing `金额待核对`, owner arrears main list showing raw debug labels, owner arrears main list showing direct write shortcuts, or `网络` wrapping to a second nav row.
