@@ -317,3 +317,19 @@ Production cutover remains `PRODUCTION_NO_GO`.
 - Clipboard and share fallback text must be the same string.
 - Three portal card text alignment is a P2 visual acceptance check.
 - Production cutover remains `PRODUCTION_NO_GO`.
+## Acceptance Bugfix Deployment QA Addendum - 2026-05-31
+
+- Deployment target: `homelink-finance`, Worker version `73517bf9-df6e-47e1-a72f-9743264ee934`.
+- Re-run owner mobile acceptance against the deployed Worker, not only local harness tests.
+- Required acceptance:
+  - Select-all enables send-employee for owner/manager when at least one task is selected.
+  - Send-employee displays dry-run list only and does not write D1.
+  - WhatsApp live button uses final baseline export.
+  - Selected rows export selected rows; no selection exports current filtered rows.
+  - Clipboard/share/fallback text is identical.
+  - Portal cards remain exactly three and visually aligned.
+- Required safety:
+  - D1 write = No.
+  - Migration = No.
+  - Business write = No.
+  - Production cutover = `PRODUCTION_NO_GO`.

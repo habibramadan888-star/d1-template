@@ -227,3 +227,15 @@ Production remains `PRODUCTION_NO_GO`.
 - [ ] readonly_admin does not see select-all or send-employee buttons.
 - [ ] Send-employee is dry-run and does not write D1.
 - [ ] Production cutover remains `PRODUCTION_NO_GO`.
+## Acceptance Bugfix Live Visual QA - 2026-05-31
+
+| Check | Required | Result | Notes |
+|---|---:|---|---|
+| Three portal cards remain exactly employee / owner / admin | Yes | | No fourth arrears/directive entry. |
+| Three portal card text is centered/aligned | Yes | | Chinese title and English subtitle must align consistently. |
+| Owner arrears select-all enables send button | Yes | | At least one selected task should make the button clickable for owner/manager. |
+| Send-employee is dry-run only | Yes | | Must show execution list only; no real directive write. |
+| WhatsApp export uses final baseline | Yes | | No raw/debug labels and no duplicated rows. |
+| Clipboard/share/fallback text matches | Yes | | Same generated text for all paths. |
+| readonly_admin has no write action | Yes | | View/export only. |
+| Production cutover remains `PRODUCTION_NO_GO` | Yes | | No GO marking from visual QA. |

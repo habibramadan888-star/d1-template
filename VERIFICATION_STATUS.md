@@ -1889,3 +1889,16 @@ Deployment verification:
 - `qa:employee-entry-staging` must remain `MANUAL_REQUIRED / DRY_RUN_ONLY`.
 - No production deploy, migration, D1 execute/export/import, or business write is part of this task.
 - Production cutover remains `PRODUCTION_NO_GO`.
+## Acceptance Bugfix Deployment Verification - 2026-05-31
+
+| Area | Status | Notes |
+|---|---|---|
+| Predeploy verification | PASS | All focused tests, security, embedded worker checks, and worker drift audit passed from clean worktree. |
+| Commercial launch gate | PASS | `COMMERCIAL_LAUNCH_READINESS=PRODUCTION_NO_GO`; not changed to GO. |
+| Employee entry QA | PASS | `MANUAL_REQUIRED`; write execution `DRY_RUN_ONLY`. |
+| Worker deploy | PASS | `homelink-finance` version `73517bf9-df6e-47e1-a72f-9743264ee934`. |
+| Static assets | PASS | `/portal.html` and `/index-51-main.js` uploaded. |
+| Live read-only smoke | PASS | Portal entries, send dry-run path, WhatsApp final path, and shared text path verified from live static assets. |
+| Authenticated mobile click-through | MANUAL_REQUIRED | Not executed because creating a fresh production session writes `active_sessions`. |
+| D1 write / migration | NOT_RUN | No D1 execute/export/import/write or migration was run. |
+| Production cutover | NO_GO | `PRODUCTION_NO_GO` remains unchanged. |

@@ -6072,3 +6072,14 @@ Safety:
 - Locked WhatsApp live button to final baseline text path.
 - Aligned three portal entry card text layout without changing role routing.
 - Production cutover remains `PRODUCTION_NO_GO`.
+## Acceptance Bugfix Deployment - 2026-05-31
+
+- Deployed approved acceptance bugfix commit `d9059db` to `homelink-finance`.
+- Worker version id: `73517bf9-df6e-47e1-a72f-9743264ee934`.
+- Uploaded assets: `/portal.html` and `/index-51-main.js`.
+- Select-all send button logic is deployed and driven by checked task state.
+- Send-employee remains dry-run only; no `/api/arrear_tasks/directive` write call is made by the deployed action.
+- WhatsApp live export button uses the final baseline builder; clipboard/share/fallback use the same text.
+- Three portal card text alignment is deployed.
+- D1 write: No. Migration: No. Business write: No.
+- Production cutover remains `PRODUCTION_NO_GO`.

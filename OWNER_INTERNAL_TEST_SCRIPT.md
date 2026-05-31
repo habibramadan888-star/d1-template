@@ -269,3 +269,19 @@ Deployment follow-up:
 - Verify WhatsApp export button, clipboard, share URL, and fallback modal use identical final baseline text.
 - Verify portal cards keep exactly three entries and aligned title/subtitle text.
 - Production cutover remains `PRODUCTION_NO_GO`.
+## Acceptance Bugfix Deployed Phone QA - 2026-05-31
+
+Run these checks on the live Worker version `73517bf9-df6e-47e1-a72f-9743264ee934`:
+
+1. Open the portal and confirm exactly three entries: employee, owner, admin.
+2. Confirm the three portal cards have aligned Chinese/English text.
+3. Log in with an existing owner session, open the arrears module, and select all visible arrears tasks.
+4. Confirm the send-employee button becomes clickable after at least one selected task.
+5. Click send-employee and confirm it shows a dry-run execution list only.
+6. Confirm no real employee directive task is created and no backend write happens.
+7. Click WhatsApp export with selected tasks and confirm only selected rows are exported.
+8. Clear selection, apply a filter, click WhatsApp export, and confirm current filtered rows are exported.
+9. Confirm clipboard/share/fallback text is identical and does not include `ttlock_card`, `rent`, `deposit`, `source_type`, `undefined`, `null`, or `none`.
+10. Confirm searchable codes such as `125`, `219`, and `4014` appear as continuous strings when present in the data.
+
+Production cutover remains `PRODUCTION_NO_GO`.
