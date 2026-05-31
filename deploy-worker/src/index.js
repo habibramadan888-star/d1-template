@@ -2153,14 +2153,34 @@ async function handleBossArrears(request,env,user){
 __name(handleBossArrears,"handleBossArrears");
 async function handleBossArrearsFollowupTasks(request,env,user){
   const detailed=await empListMergedArrearTasksDetailed(env,user,{limit:bossArrearsListLimit(request)});
+  const previewLimit=Math.min(detailed.limit,5);
+  const existingTasks=detailed.mapped.filter(a=>a.source_type==="existing_arrears_record");
+  const ttlockTasks=detailed.mapped.filter(a=>a.source_type==="ttlock_expired_unpaid");
+  const previewTasks=detailed.mapped.slice(0,previewLimit);
   return success({
     tasks:detailed.mapped,
-    recent_tasks:detailed.mapped.slice(0,Math.min(detailed.limit,5)),
+    all_tasks:detailed.mapped,
+    preview_tasks:previewTasks,
+    recent_tasks:previewTasks,
+    summary:{
+      total_count:detailed.total_count,
+      total_amount_fils:detailed.total_amount_fils,
+      existing_arrears_count:detailed.existing_arrears_count,
+      ttlock_expired_unpaid_count:detailed.ttlock_expired_unpaid_count,
+      employee_promised_count:detailed.employee_promised_count,
+      visible_preview_count:previewTasks.length
+    },
+    sources:{
+      existing_arrears_record:{count:existingTasks.length,tasks:existingTasks},
+      ttlock_expired_unpaid:{count:ttlockTasks.length,tasks:ttlockTasks}
+    },
     total_amount_fils:detailed.total_amount_fils,
     total_count:detailed.total_count,
     existing_arrears_count:detailed.existing_arrears_count,
     ttlock_expired_unpaid_count:detailed.ttlock_expired_unpaid_count,
     employee_promised_count:detailed.employee_promised_count,
+    dedupe_dropped_count:0,
+    has_more:detailed.mapped.length>previewLimit,
     source_status:detailed.source_status,
     ttlock_missing_rent:detailed.ttlock_missing_rent||[],
     ttlock_missing_rent_count:(detailed.ttlock_missing_rent||[]).length,

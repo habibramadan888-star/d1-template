@@ -617,7 +617,7 @@ const state={
   arrearFilter:'all',
   arrearsLimit:ARREARS_PAGE_SIZE,arrearsLoading:false,arrearsLoadSeq:0,
   arrearsStatus:'idle',arrearsError:'',arrearsSlow:false,arrearsExpanded:false,
-  arrearsSourceStatus:{},
+  arrearsSourceStatus:{},arrearsPoolResult:null,
   arrearsSlowTimer:null,
   presetPrices:DEFAULT_PRICES,
   customers:[],
@@ -1034,7 +1034,14 @@ function buildArrearsFollowupPool({existingArrearsRecords=[],historicalArrears=[
     source_ref:row.source_ref||row.sourceRef||row.task_id||row.id
   });
   const normalizeTtlock=row=>{
-    const rentAmount=bedRentAmountForArrears(row);
+    const localRentAmount=bedRentAmountForArrears(row);
+    const backendAmount=Number(row?.amount_fils)>0
+      ? Number(row.amount_fils)/100
+      : parseMoney(row?.remain??row?.amount??row?.rentAmount??0);
+    const backendMapped=['bed_rent_mapping','bed_rent_config'].includes(String(row?.amount_source||row?.amountAuthorityStatus||row?.amount_authority_status||'').trim());
+    const rentAmount=Number.isFinite(localRentAmount)&&localRentAmount>0
+      ? localRentAmount
+      : (backendMapped&&Number.isFinite(backendAmount)&&backendAmount>0?backendAmount:null);
     if(!(Number.isFinite(rentAmount)&&rentAmount>0)){
       return null;
     }
@@ -1052,7 +1059,7 @@ function buildArrearsFollowupPool({existingArrearsRecords=[],historicalArrears=[
     remain:rentAmount,
     due_date:row.dueDate||row.endDate,
     followup_status:row.followupStatus||'待下发',
-    amount_authority_status:'bed_rent_config',
+    amount_authority_status:row.amount_authority_status||row.amountAuthorityStatus||(backendMapped?'bed_rent_mapping':'bed_rent_config'),
     accounting_status:'open'
   });
   };
@@ -1072,6 +1079,40 @@ function buildArrearsFollowupPool({existingArrearsRecords=[],historicalArrears=[
     const order={ttlock_expired_unpaid:0,existing_arrears_record:1};
     return (order[a.sourceType]??9)-(order[b.sourceType]??9);
   });
+}
+function buildArrearsFollowupPoolResult(sources={},opts={}){
+  const allTasks=buildArrearsFollowupPool(sources);
+  const previewLimit=Math.min(Math.max(Number(opts.previewLimit)||ARREARS_OVERVIEW_PAGE_SIZE,1),ARREARS_PAGE_SIZE);
+  const sourceRows={
+    existing_arrears_record:allTasks.filter(a=>normalizeArrearsSourceType(a?.sourceType)==='existing_arrears_record'),
+    ttlock_expired_unpaid:allTasks.filter(a=>normalizeArrearsSourceType(a?.sourceType)==='ttlock_expired_unpaid')
+  };
+  const candidateCount=[
+    ...(sources.existingArrearsRecords||[]),
+    ...(sources.historicalArrears||[]),
+    ...(sources.ttlockExpiredUnpaid||[]),
+    ...(sources.ttlockExpiredCards||[])
+  ].length;
+  const totalAmountFils=allTasks.reduce((sum,a)=>sum+Math.max(0,Math.round(Number(a?.remain||0)*100)),0);
+  const promisedUnpaidCount=allTasks.filter(a=>arrearDirectiveStatus(a)==='promised'&&Number(a?.remain||0)>0).length;
+  return {
+    summary:{
+      total_count:allTasks.length,
+      total_amount_fils:totalAmountFils,
+      existing_arrears_count:sourceRows.existing_arrears_record.length,
+      ttlock_expired_unpaid_count:sourceRows.ttlock_expired_unpaid.length,
+      employee_promised_count:promisedUnpaidCount,
+      visible_preview_count:Math.min(previewLimit,allTasks.length)
+    },
+    preview_tasks:allTasks.slice(0,previewLimit),
+    all_tasks:allTasks,
+    sources:{
+      existing_arrears_record:{count:sourceRows.existing_arrears_record.length,tasks:sourceRows.existing_arrears_record},
+      ttlock_expired_unpaid:{count:sourceRows.ttlock_expired_unpaid.length,tasks:sourceRows.ttlock_expired_unpaid}
+    },
+    dedupe_dropped_count:Math.max(0,candidateCount-allTasks.length),
+    has_more:allTasks.length>previewLimit
+  };
 }
 function isArrearTaskOpen(a){
   if(!a||a.cleared)return false;
@@ -1093,7 +1134,7 @@ async function loadExistingArrearsForOwner({limit=ARREARS_PAGE_SIZE,timeoutMs=AR
   }catch(e){
     primaryError=e;
   }
-  if(primary?.ok)return rowsAndMetaFromApiPayload(await primary.json(),['arrears','tasks']);
+  if(primary?.ok)return rowsAndMetaFromApiPayload(await primary.json(),['all_tasks','tasks','arrears']);
   if(primary&&[401,403].includes(primary.status)){
     throw new Error(primary.status===401?'API_AUTH_DENIED_401':'API_AUTH_DENIED_403');
   }
@@ -1104,7 +1145,7 @@ async function loadExistingArrearsForOwner({limit=ARREARS_PAGE_SIZE,timeoutMs=AR
     const payload=await fallback.json().catch(()=>({}));
     throw new Error(payload?.message||('HTTP '+fallback.status));
   }
-  const result=rowsAndMetaFromApiPayload(await fallback.json(),['arrears','tasks']);
+  const result=rowsAndMetaFromApiPayload(await fallback.json(),['all_tasks','tasks','arrears']);
   result.meta={...result.meta,primary_error:primaryError?String(primaryError?.name||primaryError?.message||primaryError):primary?.status?`HTTP_${primary.status}`:'primary_not_ok'};
   return result;
 }
@@ -1445,20 +1486,25 @@ function renderOwnerOverviewArrearsPanel(){
   const sorted=rows.slice().sort((a,b)=>(a.dueDate||'9999').localeCompare(b.dueDate||'9999'));
   const limit=state.arrearsExpanded?Math.min(state.arrearsLimit||ARREARS_PAGE_SIZE,sorted.length):ARREARS_OVERVIEW_PAGE_SIZE;
   const pageRows=sorted.slice(0,limit);
-  panel.innerHTML=`<div class="owner-overview-arrears-content" data-owner-overview-arrears-loaded="true">
+  const displayText=state.arrearsExpanded
+    ? `已显示全部 ${pageRows.length} / 共 ${sorted.length}`
+    : `预览 ${pageRows.length} / 共 ${sorted.length}`;
+  const viewAllLabel=state.arrearsExpanded?'收起':`查看全部 ${sorted.length}`;
+  panel.innerHTML=`<div class="owner-overview-arrears-content" data-owner-overview-arrears-loaded="true" data-owner-arrears-visible-count="${pageRows.length}" data-owner-arrears-total-count="${sorted.length}">
     <div class="owner-arrears-summary" data-owner-arrears-kpis="true">
       <span>总额 ${fmtMoney(summary.totalAmount)} AED</span>
       <span>需跟进 ${summary.followupCount}</span>
       <span>系统欠款 ${summary.existingCount}</span>
       <span>通通锁 ${summary.ttlockCount}</span>
       <span>承诺未回 ${summary.promisedUnpaidCount}</span>
+      <span data-owner-arrears-preview-count="true">${esc(displayText)}</span>
     </div>
     ${ownerArrearsSourceNotice()}
     <div class="owner-arrears-controls" data-owner-arrears-actions="true">
       ${isOwnerWriteRole()?`<label class="owner-arrears-date">下发日期 <input id="arrearDirectiveDue" type="date" min="${today}"></label>
       <button class="btn btn-primary" id="arrearDirectiveBtn" disabled onclick="sendArrearDirectives()">下发员工</button>`:''}
       <button type="button" class="btn btn-ghost" onclick="exportArrearsWhatsApp()">WhatsApp 导出</button>
-      <button type="button" class="btn btn-ghost" onclick="toggleOverviewArrearsAll()">${state.arrearsExpanded?'收起':'查看全部'}</button>
+      <button type="button" class="btn btn-ghost" data-owner-arrears-view-all="true" onclick="toggleOverviewArrearsAll()">${esc(viewAllLabel)}</button>
     </div>
     <div class="hist-grid owner-arrears-list" data-owner-arrears-card-list="true">
       ${pageRows.map(a=>renderOwnerArrearsTaskCard(a,today)).join('')}
@@ -1473,11 +1519,14 @@ function retryOwnerOverviewArrears(){
 }
 function toggleOverviewArrearsAll(){
   state.arrearsExpanded=!state.arrearsExpanded;
-  if(state.arrearsExpanded&&!state.arrearsLoadedFull){
-    loadArrearsForOwner({showLoading:false,limit:ARREARS_PAGE_SIZE,preferCache:true}).then(()=>{state.arrearsLoadedFull=true;renderOwnerOverviewArrearsPanel();});
-    return;
-  }
+  state.arrearsLimit=state.arrearsExpanded
+    ? Math.max(state.arrearsLimit||ARREARS_PAGE_SIZE,ownerArrearsActiveRows().length,ARREARS_PAGE_SIZE)
+    : ARREARS_PAGE_SIZE;
   renderOwnerOverviewArrearsPanel();
+  renderArrearsPanel();
+  if(state.arrearsExpanded&&!state.arrears.length&&!state.arrearsLoading){
+    loadArrearsForOwner({showLoading:false,limit:ARREARS_PAGE_SIZE});
+  }
 }
 function ensureOwnerOverviewArrearsAsync(){
   if(!isOwnerShellRole())return;
@@ -1552,10 +1601,11 @@ async function loadArrearsForOwner({showLoading=false,limit=ARREARS_PAGE_SIZE}={
       console.warn('owner arrears source failures', state.arrearsSourceStatus);
       throw new Error('ALL_ARREARS_SOURCES_FAILED');
     }
-    state.arrears=buildArrearsFollowupPool({
+    state.arrearsPoolResult=buildArrearsFollowupPoolResult({
       existingArrearsRecords:existingRows,
       ttlockExpiredUnpaid:ttlockRows
-    });
+    },{previewLimit:ARREARS_OVERVIEW_PAGE_SIZE});
+    state.arrears=state.arrearsPoolResult.all_tasks;
     saveArrears();
     state.arrearsStatus=state.arrears.length?'success':'empty';
     state.arrearsError='';
