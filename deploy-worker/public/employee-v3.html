@@ -2913,15 +2913,7 @@ function employeeDirectiveCard(d){
   const source=employeeDirectiveSourceLabel(d.source_type);
   const overdue=d.overdue_days>0?`逾期 ${d.overdue_days} 天`:'未逾期';
   const amount=d.amount>0?`${fmtMoney(d.amount)} AED`:'金额待确认';
-  const status={
-    assigned:'老板已下发',
-    pending:'老板已下发',
-    viewed:'已查看',
-    promised:'已承诺',
-    followed_up:'已反馈',
-    needs_review:'待老板核对',
-    overdue:'承诺逾期'
-  }[d.directive_status]||'老板已下发';
+  const status=employeeDirectiveStatusLabel(d.directive_status);
   return `<div class="followup-card directive" data-employee-boss-directive-card="true" data-directive-task-id="${esc(d.task_id)}">
     <div class="followup-top">
       <div>
@@ -2930,7 +2922,7 @@ function employeeDirectiveCard(d){
           <span class="followup-tag bad">老板下发任务</span>
           <span class="followup-tag">${esc(source)}</span>
           <span class="followup-tag ${d.overdue_days>0?'bad':''}">${esc(overdue)}</span>
-          <span class="followup-tag">${esc(status)}</span>
+          <span class="followup-tag" id="directiveStatus_${id}" data-directive-status-tag="${esc(id)}">${esc(status)}</span>
         </div>
       </div>
       <div class="followup-money">${esc(amount)}</div>
@@ -2941,11 +2933,22 @@ function employeeDirectiveCard(d){
       你只需要填写承诺付款日期和跟进备注；金额不可在这里修改。
     </div>
     <div class="directive-followup-actions">
-      <input id="directivePromise_${id}" type="date" value="${esc(d.promised_payment_date||'')}" min="${today()}" aria-label="承诺付款日期">
-      <textarea id="directiveNote_${id}" placeholder="填写客户答复、未付款原因或承诺说明">${esc(d.followup_note||'')}</textarea>
+      <input id="directivePromise_${id}" data-directive-edit="${esc(id)}" type="date" value="${esc(d.promised_payment_date||'')}" min="${today()}" aria-label="承诺付款日期">
+      <textarea id="directiveNote_${id}" data-directive-edit="${esc(id)}" placeholder="填写客户答复、未付款原因或承诺说明">${esc(d.followup_note||'')}</textarea>
       <button class="mini-btn" data-save-directive-follow="${esc(d.task_id)}">提交反馈</button>
     </div>
   </div>`;
+}
+function employeeDirectiveStatusLabel(status){
+  return {
+    assigned:'老板已下发',
+    pending:'老板已下发',
+    viewed:'已查看',
+    promised:'已有承诺',
+    followed_up:'已有反馈',
+    needs_review:'待老板核对',
+    overdue:'承诺逾期'
+  }[String(status||'').trim()]||'老板已下发';
 }
 function renderEmployeeDirectiveInbox(status='ready',error=''){
   const box=$('bossDirectiveList');
@@ -2972,6 +2975,15 @@ function renderEmployeeDirectiveInbox(status='ready',error=''){
 }
 function bindEmployeeDirectiveActions(){
   document.querySelectorAll('[data-save-directive-follow]').forEach(btn=>btn.onclick=()=>saveEmployeeDirectiveFollowup(btn.dataset.saveDirectiveFollow));
+  document.querySelectorAll('[data-directive-edit]').forEach(input=>{
+    input.oninput=()=>{
+      const tag=$(`directiveStatus_${input.dataset.directiveEdit}`);
+      if(tag){
+        tag.textContent='当前修改未提交';
+        tag.classList.add('bad');
+      }
+    };
+  });
 }
 function safeDomId(v){return String(v||'').replace(/[^a-zA-Z0-9_-]/g,'_')}
 function openArrearTasks(){
@@ -3241,11 +3253,11 @@ async function saveEmployeeDirectiveFollowup(taskId){
     });
     const data=await r.json().catch(()=>({}));
     if(r.status===409||data?.error==='production_write_approval_required'||data?.message==='production_write_approval_required'){
-      toast('提交反馈需要生产写入审批；当前未写入生产，请先用 WhatsApp/线下回执。',8000);
+      toast('真实反馈写入未启用；当前不会写入生产。请先用 WhatsApp/线下回执。',8000);
       return;
     }
     if(!r.ok)throw new Error(data?.message||data?.error||('HTTP '+r.status));
-    toast('已提交老板下发任务反馈',6000);
+    toast('反馈已提交并同步老板端',6000);
     await loadEmployeeArrearsDirectives(true);
   }catch(e){
     toast('提交失败：'+(e.message||e),6000);

@@ -23,7 +23,7 @@ test("employee directive follow-up uses gated directive endpoint and handles 409
   assert.match(save, /promised_payment_date/);
   assert.match(save, /followup_note/);
   assert.match(save, /production_write_approval_required/);
-  assert.match(save, /当前未写入生产/);
+  assert.match(save, /真实反馈写入未启用；当前不会写入生产/);
   assert.doesNotMatch(save, /\/api\/arrear_tasks\/update/);
   assert.doesNotMatch(save, /promised_amount|promise_amount|close_status|arrear_amount/);
 });
