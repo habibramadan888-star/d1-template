@@ -1,5 +1,27 @@
 # Run Report
 
+## ARREARS-DIRECTIVE-ABDUL-REAL-INBOX-ROLLOUT-001
+
+Date: 2026-05-31, Asia/Dubai
+
+Scope: approved constrained production-linked rollout for exactly one `existing_arrears_record` task to Abdul's employee arrears directive inbox.
+
+- Target task: `task-mpgzu9kp-f150e26f`.
+- Source: `existing_arrears_record`.
+- Amount: 50 AED.
+- Owner directive create: PASS.
+- Abdul employee inbox visibility: PASS.
+- Abdul employee follow-up with promised payment date `2026-06-01`: PASS.
+- Owner feedback visibility: PASS.
+- Write gate was enabled only for this single-task flow and is closed after rollout.
+- Production D1 write scope: one owner directive create and one employee follow-up only.
+- TTLock production dispatch was not run.
+- Batch production write was not run.
+- Cleanup/restore was not performed; result retained per current rollout instruction.
+- Financial formula and dashboard calculation remain unchanged.
+
+Production remains `PRODUCTION_NO_GO`.
+
 ## ARREARS-DIRECTIVE-PRODUCTION-SMOKE-PASS-RECORD-001
 
 Date: 2026-05-31, Asia/Dubai

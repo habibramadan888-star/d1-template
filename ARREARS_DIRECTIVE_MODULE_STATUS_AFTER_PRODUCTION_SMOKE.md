@@ -13,8 +13,26 @@ This document does not approve TTLock production smoke, batch dispatch, public b
 | staging ttlock E2E | PASS |
 | production idempotency schema | PASS |
 | production existing_arrears smoke | PASS |
+| production Abdul real inbox rollout | PASS |
 | production ttlock smoke | NOT TESTED |
 | batch dispatch | NOT APPROVED |
+| production cutover | PRODUCTION_NO_GO |
+
+## Abdul Real Inbox Rollout Update - 2026-05-31
+
+| Item | Result |
+|---|---|
+| target task | `task-mpgzu9kp-f150e26f` |
+| source | `existing_arrears_record` |
+| amount | 50 AED |
+| owner directive create | PASS |
+| Abdul employee inbox visibility | PASS |
+| Abdul employee follow-up | PASS |
+| owner feedback visible | PASS |
+| TTLock dispatch | NOT RUN |
+| batch dispatch | NOT RUN |
+| write gate after rollout | off |
+| cleanup / restore | not performed; result retained per current rollout instruction |
 | production cutover | PRODUCTION_NO_GO |
 
 ## Production Smoke Evidence

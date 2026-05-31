@@ -1,5 +1,26 @@
 # Employee Internal Test Script
 
+## ARREARS-DIRECTIVE-ABDUL-REAL-INBOX-ROLLOUT-001 Employee Acceptance
+
+Date: 2026-05-31, Asia/Dubai
+
+Abdul's production employee arrears directive inbox was validated with exactly one approved existing arrears task.
+
+| Check | Expected |
+|---|---|
+| employee inbox contains `task-mpgzu9kp-f150e26f` | yes |
+| task source | existing system arrears |
+| amount | 50 AED |
+| promised payment date submitted | 2026-06-01 |
+| follow-up note submitted | yes, QA note only |
+| employee entry write | no |
+| handover submit | no |
+| TTLock production dispatch | not run |
+| batch dispatch | not run |
+| production cutover | PRODUCTION_NO_GO |
+
+Do not run additional employee write tests against production unless separately approved.
+
 ## AUTH-ROUTING-ARCHITECTURE-001 Entry Update
 
 Employee testers must start at `https://homelink-finance.habibramadan888.workers.dev/`, choose the employee door, then authenticate. Do not start from `/employee-v3.html`; it is a compatibility alias to `/employee`. Old PIN login UI must not appear. Production cutover remains `PRODUCTION_NO_GO`.

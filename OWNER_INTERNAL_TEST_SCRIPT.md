@@ -1,5 +1,25 @@
 # Owner Internal Test Script
 
+## ARREARS-DIRECTIVE-ABDUL-REAL-INBOX-ROLLOUT-001 Owner Acceptance
+
+Date: 2026-05-31, Asia/Dubai
+
+Owner-side production visibility was validated for exactly one approved existing arrears task assigned to Abdul.
+
+| Check | Expected |
+|---|---|
+| target task | `task-mpgzu9kp-f150e26f` |
+| owner directive create | PASS |
+| owner can see Abdul feedback | PASS |
+| promised payment date visible | 2026-06-01 |
+| follow-up note visible | yes |
+| write gate after rollout | off |
+| TTLock production dispatch | not run |
+| batch dispatch | not run |
+| production cutover | PRODUCTION_NO_GO |
+
+Do not treat this as approval for all-task dispatch, TTLock dispatch, public beta, or commercial cutover.
+
 ## TTLOCK-ARREARS-SOURCE-FIX-001 Addendum
 
 Use owner overview in read-only visual mode unless explicitly testing staging writes.
