@@ -83,3 +83,13 @@ Backend `/api/boss/arrears/followup-tasks` is the locked SOT for owner arrears d
 - `summary.dedupe_dropped_count` records backend dedupe drops.
 - Frontend must not recompute source counts, total amount, or dedupe drops.
 - View-all and load-more must use backend `pagination`.
+
+## Live Deployment Status
+
+- Production Worker version `58c0228a-a2e5-4040-8fcc-fa5eeee43860` contains the backend SOT dataflow fix.
+- Live static asset `/index-51-main.js` references `/api/boss/arrears/followup-tasks` and does not contain the legacy client TTLock loader call in owner arrears loading.
+- Summary, preview, view-all, source counts, dedupe drops, and pagination remain backend-authoritative.
+- Unauthenticated live checks confirmed protected endpoints return standardized 401 responses.
+- Authenticated live count/list/view-all verification is `MANUAL_REQUIRED` because creating a new production session would write D1.
+- No D1 write or migration was executed.
+- Production remains `PRODUCTION_NO_GO`.

@@ -6012,3 +6012,19 @@ Safety:
 - 顶部导航禁止横向滚动；老板端导航必须固定居中，不允许 `overflow-x:auto` 作为主导航方案。
 - 欠款不作为一级 Tab，只存在于总览内的欠款跟进模块。
 - Production cutover remains `PRODUCTION_NO_GO`.
+
+## P0 Arrears Backend SOT Live Deploy
+
+- Backend source-of-truth fix deployed to `homelink-finance`.
+- Worker version id: `58c0228a-a2e5-4040-8fcc-fa5eeee43860`.
+- Uploaded static asset: `/index-51-main.js`.
+- `/api/boss/arrears/followup-tasks` is the intended owner arrears source of truth.
+- `/api/arrears/followup/tasks` remains a compatibility route.
+- Frontend `buildArrearsFollowupPool()` remains adapter-only.
+- Summary, preview, view-all, and load-more are backend-contract driven.
+- Unauthenticated live protected route checks returned standardized 401 responses.
+- Authenticated live API/UI contract verification was not performed because creating a new production login session would write `active_sessions`, which was prohibited for this task.
+- D1 write: no.
+- Migration: no.
+- Business write: no.
+- Production remains `PRODUCTION_NO_GO`.

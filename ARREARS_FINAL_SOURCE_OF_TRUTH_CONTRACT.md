@@ -125,3 +125,14 @@ Locked behavior:
 - Frontend `buildArrearsFollowupPoolResult()` consumes backend `summary`, `pagination`, and `sources`.
 - Frontend no longer calls TTLock directly for owner arrears pool construction.
 - Production cutover remains `PRODUCTION_NO_GO`.
+
+## Live Deployment Status
+
+- Deployed backend SOT fix to production Worker `homelink-finance`.
+- Worker version id: `58c0228a-a2e5-4040-8fcc-fa5eeee43860`.
+- Owner arrears SOT endpoint remains `/api/boss/arrears/followup-tasks`.
+- Compatibility route remains `/api/arrears/followup/tasks`.
+- Frontend adapter must not call TTLock directly or rebuild arrears source eligibility client-side.
+- Authenticated production contract verification is `MANUAL_REQUIRED` because new login would write `active_sessions`.
+- No D1 write, migration, business write, dashboard calculation change, or financial formula change was performed.
+- Production cutover remains `PRODUCTION_NO_GO`.

@@ -2,13 +2,13 @@
 
 ## TTLOCK-ARREARS-SOURCE-FIX-001 Visual Checks
 
-| Screenshot / State | Required | Pass/Fail | Notes |
-| --- | ---: | --- | --- |
-| System arrears visible | Yes | | Existing arrears remain visible even if TTLock fails. |
-| TTLock source count | Yes | | Count increases when mapped expired unpaid TTLock cards exist. |
-| TTLock amount | Yes | | Amount comes from bed-rent mapping. |
-| Missing rent state | Yes | | Missing rent rows are surfaced separately, not counted in total. |
-| No secret leakage | Yes | | No password, token, cookie, access token, or client secret appears. |
+| Screenshot / State     | Required | Pass/Fail | Notes                                                               |
+| ---------------------- | -------: | --------- | ------------------------------------------------------------------- |
+| System arrears visible |      Yes |           | Existing arrears remain visible even if TTLock fails.               |
+| TTLock source count    |      Yes |           | Count increases when mapped expired unpaid TTLock cards exist.      |
+| TTLock amount          |      Yes |           | Amount comes from bed-rent mapping.                                 |
+| Missing rent state     |      Yes |           | Missing rent rows are surfaced separately, not counted in total.    |
+| No secret leakage      |      Yes |           | No password, token, cookie, access token, or client secret appears. |
 
 Production remains `PRODUCTION_NO_GO`.
 
@@ -195,6 +195,7 @@ Production remains `PRODUCTION_NO_GO`.
 | 20s+ loading classified as blocker            |      Yes |        | P1.                                     |
 | 3-minute loading classified as blocker        |      Yes |        | P0/P1.                                  |
 | Production cutover remains `PRODUCTION_NO_GO` |      Yes |        | No GO marking from visual QA.           |
+
 ## Owner Arrears / Top Nav Visual QA
 
 - 欠款模块不得无限 loading；必须在 10 秒内形成状态闭环。
@@ -204,3 +205,12 @@ Production remains `PRODUCTION_NO_GO`.
 - 欠款不作为一级 Tab。
 - 分析入口必须存在，网络入口必须可访问。
 - Production cutover remains `PRODUCTION_NO_GO`.
+
+## P0 Arrears Backend SOT Live Visual QA
+
+- Backend SOT has been deployed; owner arrears cards must be driven by `/api/boss/arrears/followup-tasks`.
+- Frontend `buildArrearsFollowupPool()` is adapter-only and must not merge sources or calculate rent.
+- Summary, preview, view all, and load more must follow backend `summary`, `preview_tasks`, `tasks`, and `pagination`.
+- Manual screenshot QA should verify the overview arrears module with an already-authenticated owner or readonly session.
+- Creating a new production login session is not part of this verification because it writes `active_sessions`.
+- Production remains `PRODUCTION_NO_GO`.

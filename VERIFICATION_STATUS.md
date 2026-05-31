@@ -1823,3 +1823,16 @@ Expected invariant:
 - No D1 write.
 - No migration.
 - Production remains `PRODUCTION_NO_GO`.
+
+## P0 Arrears Backend SOT Live Deployment Verification
+
+| Area                          | Status          | Notes                                                                                                             |
+| ----------------------------- | --------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Production Worker deploy      | PASS            | `homelink-finance` deployed as version `58c0228a-a2e5-4040-8fcc-fa5eeee43860`.                                    |
+| Static UI asset upload        | PASS            | Wrangler uploaded `/index-51-main.js`.                                                                            |
+| Public root smoke             | PASS            | `/` returned 200 and still exposes only employee / owner / admin doors.                                           |
+| Unauthenticated protected API | PASS            | `/api/boss/arrears/followup-tasks` and `/api/arrears/followup/tasks` returned standardized 401 responses.         |
+| Frontend SOT markers          | PASS            | Live `/index-51-main.js` contains the backend SOT endpoint and no legacy client TTLock loader fallback.           |
+| Authenticated owner contract  | MANUAL_REQUIRED | Not executed because creating a new production login session would write `active_sessions`, which was prohibited. |
+| D1 write / migration          | NOT_RUN         | No D1 execute/export/import/write or migration was run.                                                           |
+| Production cutover            | NO_GO           | `PRODUCTION_NO_GO` remains unchanged.                                                                             |
