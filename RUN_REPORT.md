@@ -1,5 +1,22 @@
 # Run Report
 
+## ARREARS-EMPLOYEE-INBOX-STATUS-COPY-MOBILE-ACCEPTANCE-001
+
+Date: 2026-06-01, Asia/Dubai
+
+Scope: record mobile acceptance for the deployed employee boss-assigned arrears task status-copy fix.
+
+- Abdul employee FOLLOW-UP page opens and shows the boss-assigned task.
+- Task visible on mobile: `144 / 139780080 / 50.00 AED`.
+- Source visible as system existing arrears.
+- After editing date or note, the UI shows `当前修改未提交`.
+- With write gate off, submit warning shows `真实反馈写入未启用；当前不会写入生产。请先用 WhatsApp/线下回执。`
+- No false success message was observed.
+- No production follow-up write, owner directive write, batch dispatch, TTLock smoke, migration, deploy, financial formula change, or dashboard calculation change occurred in this task.
+- Real employee follow-up write still requires separate production write approval.
+
+Production remains `PRODUCTION_NO_GO`.
+
 ## ARREARS-EMPLOYEE-INBOX-STATUS-COPY-DEPLOY-001
 
 Date: 2026-05-31, Asia/Dubai

@@ -1,5 +1,19 @@
 # Employee Internal Test Script
 
+## ARREARS-EMPLOYEE-INBOX-STATUS-COPY-MOBILE-ACCEPTANCE-001 Employee Acceptance
+
+Date: 2026-06-01, Asia/Dubai
+
+Mobile acceptance passed for Abdul's employee boss-assigned arrears task inbox.
+
+- Abdul can open the employee FOLLOW-UP page.
+- Abdul can see the boss-assigned task `144 / 139780080 / 50.00 AED`.
+- Editing promised date or note shows `当前修改未提交`.
+- With write gate off, submit shows `真实反馈写入未启用；当前不会写入生产。请先用 WhatsApp/线下回执。`
+- No false success message was observed.
+- Real employee follow-up write still requires separate production write approval.
+- Production cutover remains `PRODUCTION_NO_GO`.
+
 ## ARREARS-EMPLOYEE-INBOX-STATUS-COPY-DEPLOY-001 Employee Checks
 
 Date: 2026-05-31, Asia/Dubai

@@ -1,5 +1,19 @@
 # Full Internal QA Test Plan
 
+## ARREARS-EMPLOYEE-INBOX-STATUS-COPY-MOBILE-ACCEPTANCE-001 QA Addendum
+
+Mobile acceptance passed for the employee boss-assigned arrears task status-copy fix.
+
+QA status:
+
+- Abdul can see task `144 / 139780080 / 50.00 AED`.
+- The task source displays as system existing arrears.
+- Editing date or note shows `当前修改未提交`.
+- With write gate off, submit shows `真实反馈写入未启用；当前不会写入生产。请先用 WhatsApp/线下回执。`
+- No false success message appears while production write gate is off.
+- Real employee feedback write remains blocked until separate production write approval.
+- Production cutover remains `PRODUCTION_NO_GO`.
+
 ## ARREARS-EMPLOYEE-INBOX-STATUS-COPY-DEPLOY-001 QA Addendum
 
 The employee boss-assigned arrears task status-copy fix has been deployed to the production Worker as a UI/copy-only change.

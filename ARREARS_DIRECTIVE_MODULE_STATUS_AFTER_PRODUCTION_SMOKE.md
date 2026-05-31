@@ -14,8 +14,23 @@ This document does not approve TTLock production smoke, batch dispatch, public b
 | production idempotency schema | PASS |
 | production existing_arrears smoke | PASS |
 | production Abdul real inbox rollout | PASS |
+| Abdul employee inbox mobile acceptance | PASS |
 | production ttlock smoke | NOT TESTED |
 | batch dispatch | NOT APPROVED |
+| production cutover | PRODUCTION_NO_GO |
+
+## Abdul Employee Inbox Status Copy Mobile Acceptance - 2026-06-01
+
+| Item | Result |
+|---|---|
+| Abdul employee page opens | PASS |
+| boss assigned task visible | PASS |
+| task identity | `144 / 139780080 / 50.00 AED` |
+| `当前修改未提交` copy | PASS |
+| gate-off write warning | PASS |
+| false success message | not observed |
+| production follow-up write | NOT RUN |
+| write gate | off |
 | production cutover | PRODUCTION_NO_GO |
 
 ## Abdul Real Inbox Rollout Update - 2026-05-31
