@@ -1860,3 +1860,17 @@ Expected invariant:
   - `test:owner-arrears-whatsapp-export`
   - `test:readonly-admin-arrears-batch-ui`
 - `gate:commercial-launch` must remain `PRODUCTION_NO_GO`.
+
+Deployment verification:
+
+- `security:secrets`: PASS
+- `gate:commercial-launch`: `PRODUCTION_NO_GO`
+- All new owner arrears batch/display/export tests: PASS
+- `test:arrears-backend-sot`: PASS
+- `test:arrears-summary-viewall`: PASS
+- `qa:employee-entry-staging`: `MANUAL_REQUIRED / DRY_RUN_ONLY`
+- `build:embedded:dry-run`: PASS
+- `verify:embedded-worker`: PASS
+- `audit:worker-drift`: `WORKER_DRIFT_CRITICAL_MISMATCHES=0`
+- Live static smoke: PASS
+- Worker version id: `d09255c7-aa18-424b-a34f-7cb385cfea91`

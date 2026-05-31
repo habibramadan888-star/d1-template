@@ -214,3 +214,16 @@ Production remains `PRODUCTION_NO_GO`.
 - Manual screenshot QA should verify the overview arrears module with an already-authenticated owner or readonly session.
 - Creating a new production login session is not part of this verification because it writes `active_sessions`.
 - Production remains `PRODUCTION_NO_GO`.
+## Owner Arrears Batch Display / Export Checklist
+
+- [ ] Arrears cards are collapsed by default.
+- [ ] Card details expand per task.
+- [ ] Select-all selects only current filter results.
+- [ ] Selection count is visible.
+- [ ] Filters only show all / TTLock expired / existing arrears.
+- [ ] List is sorted naturally by room/bed.
+- [ ] WhatsApp export has visible response.
+- [ ] Manual copy fallback appears if clipboard or popup is blocked.
+- [ ] readonly_admin does not see select-all or send-employee buttons.
+- [ ] Send-employee is dry-run and does not write D1.
+- [ ] Production cutover remains `PRODUCTION_NO_GO`.

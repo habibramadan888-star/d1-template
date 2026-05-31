@@ -6046,3 +6046,12 @@ Safety:
 - Owner arrears cards are collapsed by default; details hold promise date, note, status, source, owner/staff, and actions.
 - WhatsApp export now uses current Backend SOT display rows and has clipboard plus manual fallback.
 - Production cutover remains `PRODUCTION_NO_GO`.
+
+## Owner Arrears Batch Display / Export Deployment
+
+- Deployed default `homelink-finance` Worker.
+- Worker version id: `d09255c7-aa18-424b-a34f-7cb385cfea91`.
+- Uploaded assets included `/index.html`, `/index-51-main.js`, `/index-51.html`, and `/employee-v3.html`.
+- Live read-only static smoke passed for select-all, three-source filter, dry-run send, collapsible cards, natural sort, WhatsApp fallback, and readonly UI gate.
+- No D1 write, migration, or business write was performed.
+- Production cutover remains `PRODUCTION_NO_GO`.

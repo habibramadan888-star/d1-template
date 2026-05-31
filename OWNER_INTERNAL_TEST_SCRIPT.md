@@ -242,3 +242,10 @@ Stop the test if any old row/table layout, third source, debug field, or 20-seco
 8. Verify WhatsApp export copies text or shows a manual fallback.
 9. Verify readonly_admin can view/export but cannot see select-all or send-employee write controls.
 10. Confirm no D1 write, migration, or production deploy was performed.
+
+Deployment follow-up:
+
+- The UI has been deployed to Worker version `d09255c7-aa18-424b-a34f-7cb385cfea91`.
+- Re-run the same checks on a real authenticated phone session.
+- Confirm "下发员工" remains dry-run and does not create production tasks.
+- Confirm WhatsApp export opens/copies on the target phone browser.

@@ -288,3 +288,13 @@ Production cutover remains `PRODUCTION_NO_GO`.
 - 顶部导航禁止横向滚动；不能通过左右滑来塞入口。
 - 欠款不作为一级 Tab，只在总览里展示。
 - Production cutover remains `PRODUCTION_NO_GO`.
+## Owner Arrears Batch Display / Export QA Addendum
+
+- Verify arrears page supports select-all within the current source filter.
+- Verify directive date is removed from owner arrears action bar.
+- Verify filters are exactly: all, TTLock expired, existing arrears.
+- Verify cards are collapsed by default and details show promise date, note, and status.
+- Verify WhatsApp export is usable and has manual fallback.
+- Verify send-employee remains dry-run until explicit write approval.
+- Verify D1 write is No.
+- Verify production cutover remains `PRODUCTION_NO_GO`.
