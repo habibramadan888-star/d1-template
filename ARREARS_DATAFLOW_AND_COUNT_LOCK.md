@@ -101,3 +101,12 @@ Backend `/api/boss/arrears/followup-tasks` is the locked SOT for owner arrears d
 - Frontend room/bed sorting is display-only and must not mutate `state.arrears`, source counts, totals, or backend SOT payloads.
 - WhatsApp export uses the currently displayed Backend SOT rows after source filter and display sort.
 - No D1 write or migration is allowed for this UI layer.
+
+## WhatsApp Export Dataflow Lock
+
+- WhatsApp export must use Backend SOT rows already present in the owner arrears state.
+- If selected rows exist, export only selected rows.
+- If selected rows do not exist, export the current source-filtered rows.
+- Do not merge selected rows with filtered rows.
+- Do not merge `preview_tasks` with `tasks` inside the WhatsApp builder.
+- No frontend business aggregation may be restored.

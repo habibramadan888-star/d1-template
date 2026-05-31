@@ -6055,3 +6055,13 @@ Safety:
 - Live read-only static smoke passed for select-all, three-source filter, dry-run send, collapsible cards, natural sort, WhatsApp fallback, and readonly UI gate.
 - No D1 write, migration, or business write was performed.
 - Production cutover remains `PRODUCTION_NO_GO`.
+
+## Arrears WhatsApp Final Baseline
+
+- Locked WhatsApp arrears export to the user-confirmed searchable baseline.
+- Export format now groups rows by room/bed and emits continuous customer codes.
+- Urgency marker uses `*` instead of emoji.
+- Export excludes `ttlock_card`, `rent`, `deposit`, `source_type`, internal ids, `undefined`, `null`, and `none`.
+- Export de-duplicates rows before composing text.
+- No deploy, D1 write, migration, or business write was performed for this baseline lock.
+- Production cutover remains `PRODUCTION_NO_GO`.

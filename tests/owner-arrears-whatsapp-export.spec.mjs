@@ -20,7 +20,7 @@ test("WhatsApp export is actionable and has manual fallback", async () => {
   const exportFn = extractLastFunction(js, "exportArrearsWhatsApp");
   const fallback = extractLastFunction(js, "showArrearsWhatsAppFallback");
 
-  assert.match(exportFn, /ownerArrearsFilteredRows\(\)/);
+  assert.match(exportFn, /ownerArrearsExportRows\(\)/);
   assert.match(exportFn, /navigator\.clipboard\?\.writeText/);
   assert.match(exportFn, /window\.open/);
   assert.match(exportFn, /showArrearsWhatsAppFallback/);
@@ -33,9 +33,9 @@ test("WhatsApp text is built from the backend SOT display rows", async () => {
   const js = await readFile("deploy-worker/public/index-51-main.js", "utf8");
   const build = extractLastFunction(js, "buildArrearsWhatsAppText");
 
-  assert.match(build, /rows=ownerArrearsFilteredRows\(\)/);
-  assert.match(build, /arrearBedLabel/);
-  assert.match(build, /customerCode/);
-  assert.match(build, /dueDate/);
-  assert.match(build, /Due \$\{dueLabel\} \| \$\{overdueCount\} overdue/);
+  assert.match(build, /rows=ownerArrearsExportRows\(\)/);
+  assert.match(build, /naturalArrearRoomBedKey/);
+  assert.match(build, /arrearsWhatsappCustomerCode/);
+  assert.match(build, /arrearsWhatsappDateCode/);
+  assert.match(build, /Due \$\{arrearsWhatsappDueHeader\(list\)\} \| \$\{overdueCount\} overdue/);
 });

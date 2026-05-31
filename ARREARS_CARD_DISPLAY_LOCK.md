@@ -89,3 +89,11 @@ Current card no longer calls `arrearPromiseAmountLabel()` in the default card pa
 - Select-all is allowed only for owner write roles and applies only to the current source filter result.
 - WhatsApp export must remain available as the employee execution-list outlet and must provide a manual fallback.
 - Production cutover remains `PRODUCTION_NO_GO`.
+
+## WhatsApp Final Baseline Lock
+
+- WhatsApp arrears export format is locked to `Due M/D | N overdue`, `---`, room/bed groups, and task lines.
+- Task line format is `customer_code  overdue_status  package_or_amount  date_code`.
+- Urgency uses `*`; emoji must not be required for the final baseline.
+- Raw source fields, internal ids, and debug fields must not enter the WhatsApp text.
+- The export must not duplicate the same text block.

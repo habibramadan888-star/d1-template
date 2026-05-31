@@ -249,3 +249,16 @@ Deployment follow-up:
 - Re-run the same checks on a real authenticated phone session.
 - Confirm "下发员工" remains dry-run and does not create production tasks.
 - Confirm WhatsApp export opens/copies on the target phone browser.
+
+## WhatsApp Final Baseline QA
+
+1. Export arrears to WhatsApp.
+2. Confirm the first line is `Due M/D | N overdue`.
+3. Confirm the second line is `---`.
+4. Confirm rooms/beds are grouped as `【room_bed】`.
+5. Confirm rows are `customer_code  overdue_status  Dxx  date_code`.
+6. Search for customer codes such as `219` and `4014`; they must highlight as continuous strings.
+7. Search for bed labels such as `1-102` and `8-202`; they must highlight as continuous strings.
+8. Confirm the text does not include `ttlock_card`, `rent`, `deposit`, `source_type`, internal IDs, `undefined`, `null`, or `none`.
+9. Confirm the exported text is not duplicated.
+10. Confirm no D1 write or business write is performed.

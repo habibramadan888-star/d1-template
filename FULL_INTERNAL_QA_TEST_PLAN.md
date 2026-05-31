@@ -298,3 +298,14 @@ Production cutover remains `PRODUCTION_NO_GO`.
 - Verify send-employee remains dry-run until explicit write approval.
 - Verify D1 write is No.
 - Verify production cutover remains `PRODUCTION_NO_GO`.
+
+## WhatsApp Arrears Export Final Baseline
+
+- Verify final format: `Due M/D | N overdue`, `---`, room/bed group, task rows.
+- Verify urgent marker uses `*` instead of emoji.
+- Verify customer code and bed searches are continuous and searchable.
+- Verify raw `source_type`, `ttlock_card`, `rent`, `deposit`, and internal ids are absent.
+- Verify selected rows export only selected rows.
+- Verify no-selection export uses current source filter.
+- Verify export text is generated once and not duplicated.
+- Production cutover remains `PRODUCTION_NO_GO`.

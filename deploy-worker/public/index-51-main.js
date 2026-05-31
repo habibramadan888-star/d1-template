@@ -1386,23 +1386,72 @@ function renderOwnerArrearsTaskCard(a,today){
     </details>
   </article>`;
 }
-function buildArrearsWhatsAppText(rows=ownerArrearsFilteredRows()){
-  const list=rows.slice(0,80);
+function arrearsWhatsappCustomerCode(a){
+  return cleanArrearText(a?.customerCode||a?.cardCode||a?.tenantCardId||a?.tenantName,'-')
+    .replace(/^#/,'')
+    .replace(/[^\w-]/g,'');
+}
+function arrearsWhatsappDateCode(a){
+  const raw=String(a?.dueDate||a?.due_date||'').trim();
+  const m=raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if(m)return `${m[2]}${m[3]}`;
+  return raw.replace(/[^\d]/g,'').slice(-4)||'----';
+}
+function arrearsWhatsappDueHeader(rows){
+  const dates=rows.map(a=>String(a?.dueDate||a?.due_date||'')).filter(Boolean).sort();
+  if(!dates.length)return '--/--';
+  const m=dates[0].match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if(!m)return dates[0];
+  return `${Number(m[2])}/${Number(m[3])}`;
+}
+function arrearsWhatsappOverdueStatus(a,today=fmtD(new Date())){
+  const raw=String(a?.dueDate||a?.due_date||'').trim();
+  if(!raw)return 'Due';
+  const days=Math.max(0,Math.ceil((new Date(today)-new Date(raw))/(1000*60*60*24)));
+  if(days<=0)return 'Due';
+  return days>1?`${days}d*`:`${days}d`;
+}
+function arrearsWhatsappPackageLabel(a){
+  const raw=String(a?.packageCode||a?.package_code||'').trim();
+  if(/^D\d+$/i.test(raw))return raw.toUpperCase();
+  const amount=Number(a?.packageAmount||a?.package_amount||a?.remain||0);
+  return Number.isFinite(amount)&&amount>0?`D${Math.round(amount)}`:'D0';
+}
+function dedupeArrearsExportRows(rows=[]){
+  const seen=new Set();
+  return rows.filter(a=>{
+    const key=String(a?.taskId||a?.id||a?.sourceRef||`${arrearBedLabel(a)}:${arrearsWhatsappCustomerCode(a)}:${arrearsWhatsappDateCode(a)}`);
+    if(seen.has(key))return false;
+    seen.add(key);
+    return true;
+  });
+}
+function ownerArrearsExportRows(){
+  const selected=ownerArrearsSelectedRows();
+  return selected.length?selected:ownerArrearsFilteredRows();
+}
+function buildArrearsWhatsAppText(rows=ownerArrearsExportRows()){
+  const list=dedupeArrearsExportRows(rows).slice(0,120);
   const today=fmtD(new Date());
-  const dueLabel=list[0]?.dueDate?String(list[0].dueDate).slice(5).replace('-','/'):'--/--';
-  const overdueCount=list.filter(a=>a?.dueDate&&a.dueDate<today).length;
-  return [
-    `Due ${dueLabel} | ${overdueCount} overdue`,
-    '',
-    ...list.map((a,i)=>{
-      const bed=arrearBedLabel(a);
-      const code=cleanArrearText(a?.customerCode||a?.cardCode||a?.tenantCardId,'-').replace(/^#/,'');
-      const days=a?.dueDate?Math.max(0,Math.ceil((new Date(today)-new Date(a.dueDate))/(1000*60*60*24))):0;
-      const pkg=cleanArrearText(a?.packageCode||a?.type,'D100');
-      const due=cleanArrearText(a?.dueDate,'--');
-      return `${i+1}. ${bed}  ${days}d${days>0?'🔥':''}  ${pkg}  ${code}  ${due}`;
-    })
-  ].join('\n');
+  const overdueCount=list.filter(a=>arrearsWhatsappOverdueStatus(a,today)!=='Due').length;
+  const groups=new Map();
+  list.forEach(a=>{
+    const bed=naturalArrearRoomBedKey(a)||'床位待确认';
+    if(!groups.has(bed))groups.set(bed,[]);
+    groups.get(bed).push(a);
+  });
+  const lines=[`Due ${arrearsWhatsappDueHeader(list)} | ${overdueCount} overdue`,'---'];
+  [...groups.keys()].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true,sensitivity:'base'})).forEach((bed,idx)=>{
+    if(idx>0)lines.push('');
+    lines.push(`【${bed}】`);
+    groups.get(bed)
+      .slice()
+      .sort((a,b)=>arrearsWhatsappCustomerCode(a).localeCompare(arrearsWhatsappCustomerCode(b),undefined,{numeric:true,sensitivity:'base'}))
+      .forEach(a=>{
+        lines.push(`${arrearsWhatsappCustomerCode(a)}  ${arrearsWhatsappOverdueStatus(a,today)}  ${arrearsWhatsappPackageLabel(a)}  ${arrearsWhatsappDateCode(a)}`);
+      });
+  });
+  return lines.join('\n');
 }
 function showArrearsWhatsAppFallback(text,url){
   const old=document.querySelector('.owner-arrears-export-fallback');
@@ -1419,7 +1468,7 @@ function showArrearsWhatsAppFallback(text,url){
   hydrateInlineHandlers(box);
 }
 async function exportArrearsWhatsApp(){
-  const rows=ownerArrearsFilteredRows();
+  const rows=ownerArrearsExportRows();
   if(!rows.length){toast('当前筛选没有可导出的欠款','err');return;}
   const text=buildArrearsWhatsAppText(rows);
   const url='https://wa.me/?text='+encodeURIComponent(text);

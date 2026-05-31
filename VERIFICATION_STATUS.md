@@ -1874,3 +1874,12 @@ Deployment verification:
 - `audit:worker-drift`: `WORKER_DRIFT_CRITICAL_MISMATCHES=0`
 - Live static smoke: PASS
 - Worker version id: `d09255c7-aa18-424b-a34f-7cb385cfea91`
+
+## Arrears WhatsApp Final Baseline Verification
+
+- Added `test:arrears-whatsapp-final-baseline`.
+- Added `test:arrears-whatsapp-search-baseline`.
+- Added `test:arrears-whatsapp-no-duplicate`.
+- Existing `test:owner-arrears-whatsapp-export` remains required.
+- `qa:employee-entry-staging` must remain `MANUAL_REQUIRED / DRY_RUN_ONLY`.
+- Production cutover remains `PRODUCTION_NO_GO`.
