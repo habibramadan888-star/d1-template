@@ -1,39 +1,95 @@
 # Arrears Directive Production Idempotency And Write Approval Packet
 
+Date: 2026-05-31
+
 Status: `PRODUCTION_APPROVAL_REQUIRED`
 
-This packet is generated from staging-only QA. It does not authorize production migration or production writes.
+This packet is generated from staging-only QA. It does not authorize production migration, production D1 writes, production deploy, production write gate enablement, or production cutover.
 
-## Staging Coverage
+## Staging Evidence
 
-| Area | Result |
-|---|---|
-| existing_arrears_record E2E staging QA | PASS |
-| ttlock_expired_unpaid E2E staging QA | PASS |
-| idempotency | PASS |
-| audit | PASS |
-| rollback | PASS |
-| readonly_admin | PASS |
-| production D1 write | NO |
-| production migration | NO |
-| production cutover | PRODUCTION_NO_GO |
+| Area                                | Result           |
+| ----------------------------------- | ---------------- |
+| staging existing_arrears_record E2E | PASS             |
+| staging ttlock_expired_unpaid E2E   | PASS             |
+| idempotency replay                  | PASS             |
+| audit traceability                  | PASS             |
+| rollback                            | PASS             |
+| readonly_admin write block          | PASS             |
+| production D1 write                 | NO               |
+| production migration                | NO               |
+| production deploy                   | NO               |
+| production cutover                  | PRODUCTION_NO_GO |
 
-## Production Schema / Write Approval Still Required
+## Approval Documents
 
-- Production migration/write must be approved separately.
-- Production write gate must not be enabled automatically.
-- If persisted ttlock directive tasks are required in production, source metadata such as `source_type='ttlock_expired_unpaid'` requires an explicit production schema/data plan.
+| Document                                                                | Purpose                                  |
+| ----------------------------------------------------------------------- | ---------------------------------------- |
+| `ARREARS_DIRECTIVE_PRODUCTION_SCHEMA_GAP_REVIEW.md`                     | Schema gap and migration requirements    |
+| `ARREARS_DIRECTIVE_PRODUCTION_WRITE_GATE_PLAN.md`                       | Temporary write gate rules               |
+| `ARREARS_DIRECTIVE_PRODUCTION_MINIMUM_SMOKE_PLAN.md`                    | Minimum approved production-linked smoke |
+| `ARREARS_DIRECTIVE_PRODUCTION_ROLLBACK_PLAN.md`                         | Rollback and cleanup plan                |
+| `NEXT_PROMPT_ARREARS_DIRECTIVE_PRODUCTION_SCHEMA_AND_WRITE_APPROVAL.md` | Explicit next approval prompt            |
 
-## Idempotency Strategy
+## Production Schema Gap Summary
 
-- Same key + same scope/action/actor/payload returns stored replay.
-- Same key + different actor or payload returns `409 idempotency_conflict`.
-- Duplicate active task assignment is skipped.
+Production schema was not live-queried because this task forbids production D1 execute.
 
-## Rollback Strategy
+Repository review indicates production needs explicit confirmation/migration for:
 
-- Disable write gate.
-- Use QA tag, idempotency keys, audit logs, and task ids to identify affected rows.
-- Restore or delete selected rows only after separate approval.
+- `request_idempotency_keys` table and indexes.
+- `arrear_tasks` directive fields from `migrations/002_add_boss_directive_fields.sql` if not already applied.
+- Nullable `arrear_tasks.source_type` and `arrear_tasks.source_ref` if production must persist ttlock source rows in `arrear_tasks`.
 
-Explicit user approval is required before production migration or production-linked write.
+All schema work requires separate Ramadan approval before execution.
+
+## Write Gate Summary
+
+| Item                                 | Status                                                                        |
+| ------------------------------------ | ----------------------------------------------------------------------------- |
+| Gate                                 | `ARREARS_DIRECTIVE_WRITE_APPROVED` or `ARREARS_DIRECTIVE_WRITE_MODE=approved` |
+| Default production state             | Closed                                                                        |
+| Current task enabled production gate | No                                                                            |
+| Allowed only after approval          | Owner directive create and employee follow-up write                           |
+| readonly_admin                       | Read-only; writes remain 403                                                  |
+
+## Minimum Production Smoke Summary
+
+This is not production cutover.
+
+After explicit approval, the minimum smoke is:
+
+1. Select exactly 1 safe existing arrears task.
+2. Optionally select 1 ttlock task only if production supports persisted ttlock rows and approval says yes.
+3. Owner creates directive with idempotency key.
+4. Duplicate owner request replays.
+5. Assigned employee reads directive.
+6. Employee submits `promised_payment_date` and `followup_note`.
+7. Duplicate employee request replays.
+8. Owner sees feedback.
+9. readonly_admin write returns 403.
+10. Audit and rollback evidence are recorded.
+
+## Rollback Summary
+
+Before any approved production write, snapshot selected task directive/follow-up fields. If rollback is needed, restore only those fields for the approved task ids. Keep audit/idempotency records unless separate destructive cleanup is approved.
+
+The production write gate must be disabled immediately after smoke/rollback.
+
+## Explicit Approval Requirement
+
+Ramadan must explicitly approve each of the following before any production operation:
+
+1. Production schema migration.
+2. Temporary production write gate enablement.
+3. 1-2 row maximum production-linked smoke write.
+4. Rollback/cleanup permission.
+5. Continued `PRODUCTION_NO_GO` status.
+
+Until then:
+
+- Production D1 write: `NO`
+- Production migration: `NO`
+- Production deploy: `NO`
+- Production write gate enabled: `NO`
+- Commercial launch: `PRODUCTION_NO_GO`
