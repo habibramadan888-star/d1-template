@@ -1,5 +1,20 @@
 # Verification Status
 
+## ARREARS-EMPLOYEE-INBOX-STATUS-COPY-DEPLOY-001 Verification Addendum
+
+Date: 2026-05-31, Asia/Dubai
+
+| Verification | Result | Evidence | Commercial Meaning |
+|---|---:|---|---|
+| predeploy worktree safety | PASS | `ARREARS_EMPLOYEE_INBOX_STATUS_COPY_DEPLOY_WORKTREE_CHECK.md` | Existing unrelated generated reports were not included in the deploy commit. |
+| focused employee inbox tests | PASS | `test:employee-arrears-followup-status-copy`, `test:employee-arrears-inbox-mobile-acceptance`, `test:employee-arrears-directive-read-ui`, `test:employee-arrears-followup-ui-gate`, `test:employee-arrears-directive-read` | Status copy and gated-follow-up behavior are covered. |
+| security and launch gates | PASS | `security:secrets`, `gate:commercial-launch` | No secret committed; launch remains blocked. |
+| dry-run/embedded gates | PASS | `build:embedded:dry-run`, `verify:embedded-worker`, `audit:worker-drift` | Worker asset deploy was prepared without critical drift. |
+| production static deploy | PASS | `ARREARS_EMPLOYEE_INBOX_STATUS_COPY_DEPLOY_RESULT.md` | Worker version `8307d5e9-c209-4789-8d1d-9664cbbd5fcc` published `/employee-v3.html`. |
+| live read-only smoke | PARTIAL | `ARREARS_EMPLOYEE_INBOX_STATUS_COPY_LIVE_SMOKE_RESULT.md` | Public route/auth behavior and deploy evidence checked; authenticated task visibility not checked to avoid session/D1 writes. |
+| production write gate | OFF | post-task Wrangler secret-name check | Employee feedback still requires separate production write approval. |
+| production cutover | PRODUCTION_NO_GO | commercial launch gate | This deploy is not rollout/cutover approval. |
+
 ## ARREARS-DIRECTIVE-ABDUL-REAL-INBOX-ROLLOUT-001 Verification Addendum
 
 Date: 2026-05-31, Asia/Dubai

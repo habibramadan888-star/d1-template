@@ -1,5 +1,23 @@
 # Run Report
 
+## ARREARS-EMPLOYEE-INBOX-STATUS-COPY-DEPLOY-001
+
+Date: 2026-05-31, Asia/Dubai
+
+Scope: deployed the employee boss-assigned arrears task status-copy UI fix to the default `homelink-finance` Worker.
+
+- Deploy commit before deployment: `ab9d8ab`.
+- Worker version: `8307d5e9-c209-4789-8d1d-9664cbbd5fcc`.
+- Uploaded asset: `/employee-v3.html`.
+- Employee card copy now distinguishes `已有反馈` from `当前修改未提交`.
+- When production write gate is off, the submit message states: `真实反馈写入未启用；当前不会写入生产。请先用 WhatsApp/线下回执。`
+- Employee follow-up still requires separate production write approval.
+- This was a UI/copy deployment only.
+- No production write gate was opened.
+- No owner directive create, employee follow-up write, batch dispatch, TTLock smoke, migration, financial formula change, or dashboard calculation change occurred.
+
+Production remains `PRODUCTION_NO_GO`.
+
 ## ARREARS-DIRECTIVE-ABDUL-REAL-INBOX-ROLLOUT-001
 
 Date: 2026-05-31, Asia/Dubai

@@ -1,5 +1,17 @@
 # Owner Internal Test Script
 
+## ARREARS-EMPLOYEE-INBOX-STATUS-COPY-DEPLOY-001 Owner Notes
+
+Date: 2026-05-31, Asia/Dubai
+
+The employee-side status-copy fix is deployed. Owner-side validation should remain read-only unless a separate write approval is granted.
+
+- Employee follow-up copy now clearly says production write is not enabled when the gate is off.
+- Owner should not treat the deployed copy fix as employee feedback write approval.
+- Real Abdul follow-up write requires the separate approval prompt.
+- No batch dispatch, TTLock smoke, migration, financial formula change, dashboard calculation change, or production cutover is approved.
+- Production remains `PRODUCTION_NO_GO`.
+
 ## ARREARS-DIRECTIVE-ABDUL-REAL-INBOX-ROLLOUT-001 Owner Acceptance
 
 Date: 2026-05-31, Asia/Dubai

@@ -1,5 +1,20 @@
 # Employee Internal Test Script
 
+## ARREARS-EMPLOYEE-INBOX-STATUS-COPY-DEPLOY-001 Employee Checks
+
+Date: 2026-05-31, Asia/Dubai
+
+The employee boss-assigned arrears task status-copy fix is deployed to production Worker version `8307d5e9-c209-4789-8d1d-9664cbbd5fcc`.
+
+Manual employee QA should confirm:
+
+- Existing historical feedback shows `已有反馈`, not a misleading new-submit success state.
+- Editing promised payment date or note changes the visible state to `当前修改未提交`.
+- With production write gate off, pressing submit shows `真实反馈写入未启用；当前不会写入生产。请先用 WhatsApp/线下回执。`
+- Submit must not show success while the write gate is off.
+- Real employee follow-up write still requires separate production write approval.
+- Production cutover remains `PRODUCTION_NO_GO`.
+
 ## ARREARS-DIRECTIVE-ABDUL-REAL-INBOX-ROLLOUT-001 Employee Acceptance
 
 Date: 2026-05-31, Asia/Dubai

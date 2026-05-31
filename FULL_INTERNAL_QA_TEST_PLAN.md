@@ -1,5 +1,18 @@
 # Full Internal QA Test Plan
 
+## ARREARS-EMPLOYEE-INBOX-STATUS-COPY-DEPLOY-001 QA Addendum
+
+The employee boss-assigned arrears task status-copy fix has been deployed to the production Worker as a UI/copy-only change.
+
+QA must verify:
+
+- Employee boss-assigned task cards use `已有反馈` for existing feedback.
+- Editing promised date or note shows `当前修改未提交`.
+- With write gate off, submit shows `真实反馈写入未启用；当前不会写入生产。请先用 WhatsApp/线下回执。`
+- No real feedback write occurs without separate production write approval.
+- This deployment does not approve owner directive create, employee follow-up write, batch dispatch, TTLock smoke, migration, public rollout, or production cutover.
+- Production cutover remains `PRODUCTION_NO_GO`.
+
 ## TTLOCK-ARREARS-SOURCE-FIX-001 QA Addendum
 
 Owner arrears QA must validate:
