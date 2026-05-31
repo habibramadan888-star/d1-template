@@ -1897,11 +1897,37 @@ function bossArrearsListLimit(request){
   }
 }
 __name(bossArrearsListLimit,"bossArrearsListLimit");
-async function empListMergedArrearTasks(env,user,opts={}){
-  await empEnsureSchema(env);
+function empSourceStatus(ok,error="",extra={}){
+  return {ok:!!ok,error:cleanText(error||"",120),...extra};
+}
+__name(empSourceStatus,"empSourceStatus");
+function empReadErrorCode(error){
+  const msg=String(error?.message||error||"").toLowerCase();
+  if(msg.includes("no such table"))return "TABLE_MISSING";
+  if(msg.includes("no such column"))return "CONTRACT_MISMATCH";
+  if(msg.includes("permission")||msg.includes("forbidden"))return "AUTH_DENIED";
+  return "READ_FAILED";
+}
+__name(empReadErrorCode,"empReadErrorCode");
+async function empListMergedArrearTasksDetailed(env,user,opts={}){
   const limit=Math.min(Math.max(Number(opts.limit||100),1),500);
-  const taskRows=await env.DB.prepare("SELECT * FROM arrear_tasks WHERE corpid=? ORDER BY COALESCE(updated_at,created_at) DESC LIMIT ?").bind(user.corpid,limit).all();
-  const tasks=(taskRows.results||[]).filter(t=>empCloseStatusIsOpen(t.close_status)&&empTaskRemaining(t)>0);
+  const started=Date.now();
+  const tasks=[];
+  const source_status={
+    existing_arrears_record:empSourceStatus(false,"not_loaded"),
+    ttlock_expired_unpaid:empSourceStatus(false,"client_deferred",{deferred:true})
+  };
+  if(await empTableExists(env,"arrear_tasks")){
+    try{
+      const taskRows=await env.DB.prepare("SELECT * FROM arrear_tasks WHERE corpid=? ORDER BY COALESCE(updated_at,created_at) DESC LIMIT ?").bind(user.corpid,limit).all();
+      tasks.push(...(taskRows.results||[]).filter(t=>empCloseStatusIsOpen(t.close_status)&&empTaskRemaining(t)>0));
+      source_status.existing_arrears_record=empSourceStatus(true,"",{table:"arrear_tasks",count:tasks.length});
+    }catch(e){
+      source_status.existing_arrears_record=empSourceStatus(false,empReadErrorCode(e),{table:"arrear_tasks"});
+    }
+  }else{
+    source_status.existing_arrears_record=empSourceStatus(true,"",{table:"arrear_tasks",missing:true,count:0});
+  }
   const seenIds=new Set(tasks.map(t=>cleanText(t.task_id,100)).filter(Boolean));
   const seenKeys=new Set(tasks.map(t=>[
     cleanText(t.bed||"",160),
@@ -1909,37 +1935,73 @@ async function empListMergedArrearTasks(env,user,opts={}){
     empTaskRemaining(t).toFixed(2)
   ].join("|")));
   if(await empTableExists(env,"arrears")){
-    const legacy=await env.DB.prepare("SELECT * FROM arrears WHERE corpid=? AND cleared=0 AND COALESCE(voided_at,'')='' ORDER BY created_at DESC LIMIT ?").bind(user.corpid,limit).all();
-    for(const row of legacy.results||[]){
-      const mapped=empLegacyArrearToTask(row);
-      const mappedId=cleanText(mapped.task_id,100);
-      const mappedKey=[
-        cleanText(mapped.bed||"",160),
-        cleanText(mapped.entry_id||mapped.original_entry_id||"",80),
-        empTaskRemaining(mapped).toFixed(2)
-      ].join("|");
-      if((mappedId&&seenIds.has(mappedId))||seenKeys.has(mappedKey))continue;
-      if(empTaskRemaining(mapped)>0){
-        tasks.push(mapped);
-        if(mappedId)seenIds.add(mappedId);
-        seenKeys.add(mappedKey);
+    try{
+      const legacy=await env.DB.prepare("SELECT * FROM arrears WHERE corpid=? AND cleared=0 AND COALESCE(voided_at,'')='' ORDER BY created_at DESC LIMIT ?").bind(user.corpid,limit).all();
+      let legacyAdded=0;
+      for(const row of legacy.results||[]){
+        const mapped=empLegacyArrearToTask(row);
+        const mappedId=cleanText(mapped.task_id,100);
+        const mappedKey=[
+          cleanText(mapped.bed||"",160),
+          cleanText(mapped.entry_id||mapped.original_entry_id||"",80),
+          empTaskRemaining(mapped).toFixed(2)
+        ].join("|");
+        if((mappedId&&seenIds.has(mappedId))||seenKeys.has(mappedKey))continue;
+        if(empTaskRemaining(mapped)>0){
+          tasks.push(mapped);
+          legacyAdded++;
+          if(mappedId)seenIds.add(mappedId);
+          seenKeys.add(mappedKey);
+        }
       }
+      source_status.existing_arrears_record=empSourceStatus(true,"",{table:"arrear_tasks+arrears",count:tasks.length,legacy_added:legacyAdded});
+    }catch(e){
+      if(!tasks.length)source_status.existing_arrears_record=empSourceStatus(false,empReadErrorCode(e),{table:"arrears"});
+      else source_status.existing_arrears_record={...source_status.existing_arrears_record,legacy_error:empReadErrorCode(e)};
     }
   }
   tasks.sort((a,b)=>String(b.updated_at||b.created_at||"").localeCompare(String(a.updated_at||a.created_at||"")));
-  return tasks;
+  const mapped=tasks.map(empTaskToBossArrear).filter(a=>a.remain>0);
+  const existingCount=mapped.filter(a=>a.source_type==="existing_arrears_record").length;
+  const promisedCount=mapped.filter(a=>cleanMoney(a.promised_amount_fils||0)>0||cleanText(a.promised_payment_date||"",40)).length;
+  return {
+    tasks,
+    mapped,
+    source_status,
+    total_count:mapped.length,
+    total_amount_fils:mapped.reduce((sum,a)=>sum+Math.max(0,Math.round(cleanMoney(a.remain||0)*100)),0),
+    existing_arrears_count:existingCount,
+    ttlock_expired_unpaid_count:0,
+    employee_promised_count:promisedCount,
+    duration_ms:Date.now()-started,
+    limit
+  };
+}
+__name(empListMergedArrearTasksDetailed,"empListMergedArrearTasksDetailed");
+async function empListMergedArrearTasks(env,user,opts={}){
+  const detailed=await empListMergedArrearTasksDetailed(env,user,opts);
+  return detailed.tasks;
 }
 __name(empListMergedArrearTasks,"empListMergedArrearTasks");
 async function handleBossArrears(request,env,user){
-  const tasks=await empListMergedArrearTasks(env,user,{limit:bossArrearsListLimit(request)});
-  return success(tasks.map(empTaskToBossArrear).filter(a=>a.remain>0));
+  const detailed=await empListMergedArrearTasksDetailed(env,user,{limit:bossArrearsListLimit(request)});
+  return success(detailed.mapped);
 }
 __name(handleBossArrears,"handleBossArrears");
 async function handleBossArrearsFollowupTasks(request,env,user){
-  const tasks=await empListMergedArrearTasks(env,user,{limit:bossArrearsListLimit(request)});
+  const detailed=await empListMergedArrearTasksDetailed(env,user,{limit:bossArrearsListLimit(request)});
   return success({
-    tasks:tasks.map(empTaskToBossArrear).filter(a=>a.remain>0),
-    source_authority:["existing_arrears_record","ttlock_expired_unpaid"]
+    tasks:detailed.mapped,
+    recent_tasks:detailed.mapped.slice(0,Math.min(detailed.limit,5)),
+    total_amount_fils:detailed.total_amount_fils,
+    total_count:detailed.total_count,
+    existing_arrears_count:detailed.existing_arrears_count,
+    ttlock_expired_unpaid_count:detailed.ttlock_expired_unpaid_count,
+    employee_promised_count:detailed.employee_promised_count,
+    source_status:detailed.source_status,
+    source_authority:["existing_arrears_record","ttlock_expired_unpaid"],
+    duration_ms:detailed.duration_ms,
+    limit:detailed.limit
   });
 }
 __name(handleBossArrearsFollowupTasks,"handleBossArrearsFollowupTasks");

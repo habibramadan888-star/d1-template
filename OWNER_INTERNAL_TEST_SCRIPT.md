@@ -198,3 +198,12 @@ Stop the test if any old row/table layout, third source, debug field, or 20-seco
 6. Confirm `查看全部` expands arrears inside overview and `WhatsApp 导出` remains available.
 7. Treat 20s+ loading as P1 and 3-minute loading as P0/P1.
 8. Production cutover remains `PRODUCTION_NO_GO`.
+## Owner Arrears Loading And Fixed Nav Regression Checks
+
+1. 打开老板端总览，确认欠款跟进模块 10 秒内进入成功、空、部分失败或错误重试状态，不允许无限 loading。
+2. 如果通通锁数据失败，系统已有欠款仍应显示；如果系统已有欠款失败，通通锁有效欠款仍可显示。
+3. 点击重试只能触发一次新请求，不能形成请求风暴。
+4. 顶部导航必须固定居中，不允许左右滑动。
+5. 欠款不允许出现在一级 Tab。
+6. 分析入口必须存在，网络入口必须可访问。
+7. Production cutover remains `PRODUCTION_NO_GO`.

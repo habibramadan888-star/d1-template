@@ -5968,3 +5968,11 @@ Safety:
 - 欠款模块不能无限 loading；20 秒以上 loading 是 P1 blocker，3 分钟 loading 是 P0/P1 blocker。
 - 欠款加载失败只能影响欠款模块自身，必须显示 timeout/error + retry，不能影响总览其他模块。
 - Production cutover remains `PRODUCTION_NO_GO`.
+## Owner Overview Arrears Root Cause And Nav Fix
+
+- 欠款模块无限 loading / 反复 timeout 是 P1/P0 blocker，不能用 UI timeout 掩盖真实 API/数据错误。
+- 欠款模块必须有状态闭环：loading、partial success、empty、error、retry。
+- 欠款来源必须独立失败隔离：系统已有欠款和通通锁到期未付不能互相拖垮。
+- 顶部导航禁止横向滚动；老板端导航必须固定居中，不允许 `overflow-x:auto` 作为主导航方案。
+- 欠款不作为一级 Tab，只存在于总览内的欠款跟进模块。
+- Production cutover remains `PRODUCTION_NO_GO`.

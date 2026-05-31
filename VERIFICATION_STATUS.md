@@ -1771,3 +1771,11 @@ Production cutover remains `PRODUCTION_NO_GO`.
 | Blockers                 | ACTIVE | 20s blank loading and raw debug field display are regression blockers.                                |
 
 Production cutover remains `PRODUCTION_NO_GO`.
+## Owner Arrears Load / Nav Verification
+
+- 欠款模块无限 loading 是 P1/P0 blocker。
+- 欠款模块必须有状态闭环，并且 partial source failure must render available data.
+- 欠款来源必须独立失败隔离：`existing_arrears_record` 和 `ttlock_expired_unpaid`。
+- 顶部导航禁止横向滚动，必须固定居中。
+- 欠款不作为一级 Tab。
+- Production cutover remains `PRODUCTION_NO_GO`.

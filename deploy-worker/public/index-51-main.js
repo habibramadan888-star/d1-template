@@ -617,6 +617,7 @@ const state={
   arrearFilter:'all',
   arrearsLimit:ARREARS_PAGE_SIZE,arrearsLoading:false,arrearsLoadSeq:0,
   arrearsStatus:'idle',arrearsError:'',arrearsSlow:false,arrearsExpanded:false,
+  arrearsSourceStatus:{},
   arrearsSlowTimer:null,
   presetPrices:DEFAULT_PRICES,
   customers:[],
@@ -986,6 +987,12 @@ function rowsFromApiPayload(payload,keys=[]){
   }
   return [];
 }
+function rowsAndMetaFromApiPayload(payload,keys=[]){
+  return {
+    rows:rowsFromApiPayload(payload,keys),
+    meta:(payload&&typeof payload==='object'&&!Array.isArray(payload))?payload:{}
+  };
+}
 function normalizeArrearsSourceType(source){
   const raw=String(source||'existing_arrears_record').trim().toLowerCase();
   if(['arrears','arrear','arrear_tasks','historical_arrears','existing_arrears','legacy_arrears','existing_arrears_record'].includes(raw))return 'existing_arrears_record';
@@ -1075,19 +1082,21 @@ function isArrearTaskOpen(a){
   const remain=Number(a.remain);
   return Number.isFinite(remain)&&remain>0;
 }
-async function loadHistoricalArrearsForOwner({limit=ARREARS_PAGE_SIZE,timeoutMs=ARREARS_FETCH_TIMEOUT_MS}={}){
+async function loadExistingArrearsForOwner({limit=ARREARS_PAGE_SIZE,timeoutMs=ARREARS_FETCH_TIMEOUT_MS}={}){
   const safeLimit=Math.min(Math.max(Number(limit)||ARREARS_PAGE_SIZE,1),100);
   const started=Date.now();
-  const remaining=()=>Math.max(1000,timeoutMs-(Date.now()-started));
+  const remaining=()=>timeoutMs-(Date.now()-started);
   let primary=null;
   let primaryError=null;
   try{
-    primary=await apiFetchWithTimeout(`/api/arrears/followup/tasks?limit=${safeLimit}`,{},Math.min(6500,remaining()));
+    primary=await apiFetchWithTimeout(`/api/arrears/followup/tasks?limit=${safeLimit}`,{},Math.max(1000,Math.min(6500,remaining())));
   }catch(e){
     primaryError=e;
   }
-  if(primary?.ok)return rowsFromApiPayload(await primary.json(),['arrears','tasks']);
-  if(primaryError&&!isAbortLikeError(primaryError))throw primaryError;
+  if(primary?.ok)return rowsAndMetaFromApiPayload(await primary.json(),['arrears','tasks']);
+  if(primary&&[401,403].includes(primary.status)){
+    throw new Error(primary.status===401?'API_AUTH_DENIED_401':'API_AUTH_DENIED_403');
+  }
   const fallbackBudget=remaining();
   if(fallbackBudget<=1000)throw new DOMException('Arrears request timed out', 'TimeoutError');
   const fallback=await apiFetchWithTimeout(`/api/arrears?limit=${safeLimit}`,{},fallbackBudget);
@@ -1095,12 +1104,17 @@ async function loadHistoricalArrearsForOwner({limit=ARREARS_PAGE_SIZE,timeoutMs=
     const payload=await fallback.json().catch(()=>({}));
     throw new Error(payload?.message||('HTTP '+fallback.status));
   }
-  return rowsFromApiPayload(await fallback.json(),['arrears','tasks']);
+  const result=rowsAndMetaFromApiPayload(await fallback.json(),['arrears','tasks']);
+  result.meta={...result.meta,primary_error:primaryError?String(primaryError?.name||primaryError?.message||primaryError):primary?.status?`HTTP_${primary.status}`:'primary_not_ok'};
+  return result;
 }
-async function ensureOwnerLockCardsForArrearsPool(){
+async function loadHistoricalArrearsForOwner(opts={}){
+  return (await loadExistingArrearsForOwner(opts)).rows;
+}
+async function ensureOwnerLockCardsForArrearsPool(timeoutMs=3000){
   try{
     if(typeof roomsData!=='undefined'&&roomsData&&Object.keys(roomsData).length)return true;
-    const r=await apiFetchWithTimeout('/api/lock/cards?purpose=arrears_pool',{method:'GET'},3000);
+    const r=await apiFetchWithTimeout('/api/lock/cards?purpose=arrears_pool',{method:'GET'},timeoutMs);
     const payload=await r.json().catch(()=>({}));
     if(!r.ok)return false;
     if(payload?.roomsData&&typeof roomsData!=='undefined'){
@@ -1112,6 +1126,14 @@ async function ensureOwnerLockCardsForArrearsPool(){
     console.warn('ensureOwnerLockCardsForArrearsPool:',e);
   }
   return false;
+}
+async function loadTtlockArrearsForOwner({timeoutMs=3000}={}){
+  const loaded=await ensureOwnerLockCardsForArrearsPool(timeoutMs);
+  if(!loaded){
+    return {rows:[],meta:{source_status:{ttlock_expired_unpaid:{ok:false,error:'TTLOCK_UNAVAILABLE'}}}};
+  }
+  const rows=ttlockExpiredCardsForArrearsPool();
+  return {rows,meta:{source_status:{ttlock_expired_unpaid:{ok:true,count:rows.length}}}};
 }
 function ttlockExpiredCardsForArrearsPool(){
   try{
@@ -1375,6 +1397,16 @@ function ownerArrearsSummary(rows=ownerArrearsActiveRows()){
     promisedUnpaidCount:rows.filter(a=>arrearDirectiveStatus(a)==='promised'&&Number(a?.remain||0)>0).length
   };
 }
+function ownerArrearsSourceNotice(){
+  const status=state.arrearsSourceStatus||{};
+  const notices=[];
+  const existing=status.existing_arrears_record;
+  const ttlock=status.ttlock_expired_unpaid;
+  if(existing&&existing.ok===false)notices.push('系统已有欠款暂不可用');
+  if(ttlock&&ttlock.ok===false)notices.push('通通锁数据暂不可用');
+  if(!notices.length)return '';
+  return `<div class="empty-text" data-owner-arrears-source-warning="true" style="margin:8px 0 0;text-align:center">${notices.map(esc).join(' · ')}；已显示可读取的数据。</div>`;
+}
 function renderOwnerOverviewArrearsPanel(){
   const panel=document.getElementById('ownerOverviewArrearsPanel');
   if(!panel)return;
@@ -1390,11 +1422,10 @@ function renderOwnerOverviewArrearsPanel(){
     return;
   }
   if(status==='timeout'||status==='error'){
-    const label=status==='timeout'?'读取超时，请重试':'欠款数据加载失败，请重试';
+    const label='欠款数据读取失败';
     panel.innerHTML=`<div class="empty-state hl-empty-state" data-owner-overview-arrears-error="true">
       <div class="empty-title">${label}</div>
       <div class="empty-text">欠款模块失败不会影响总览其他模块。</div>
-      ${state.arrearsError?`<div class="empty-text">${esc(state.arrearsError)}</div>`:''}
       <button class="btn btn-primary" type="button" onclick="retryOwnerOverviewArrears()">重试</button>
     </div>`;
     return;
@@ -1404,6 +1435,7 @@ function renderOwnerOverviewArrearsPanel(){
     panel.innerHTML=`<div class="empty-state hl-empty-state" data-owner-overview-arrears-empty="true">
       <div class="empty-title">暂无未结清欠款</div>
       <div class="empty-text">这里只显示系统已有欠款记录，以及通通锁到期未付且已匹配床位租金的任务。</div>
+      ${ownerArrearsSourceNotice()}
       <button class="btn btn-ghost" type="button" onclick="retryOwnerOverviewArrears()">重新读取</button>
     </div>`;
     return;
@@ -1421,6 +1453,7 @@ function renderOwnerOverviewArrearsPanel(){
       <span>通通锁 ${summary.ttlockCount}</span>
       <span>承诺未回 ${summary.promisedUnpaidCount}</span>
     </div>
+    ${ownerArrearsSourceNotice()}
     <div class="owner-arrears-controls" data-owner-arrears-actions="true">
       ${isOwnerWriteRole()?`<label class="owner-arrears-date">下发日期 <input id="arrearDirectiveDue" type="date" min="${today}"></label>
       <button class="btn btn-primary" id="arrearDirectiveBtn" disabled onclick="sendArrearDirectives()">下发员工</button>`:''}
@@ -1468,8 +1501,8 @@ function showArrearsLoadError(error){
   panel.innerHTML=`<div class="arrears-panel">
     <div class="hist-toolbar"><span>欠款跟进</span><span class="hist-order">ERROR</span></div>
     <div style="padding:18px;color:#b91c1c;font-size:13px;text-align:center">
-      欠款数据加载失败，请刷新重试。
-      <div style="font-size:10px;color:#991b1b;margin-top:4px">${esc(error?.message||String(error||''))}</div>
+      欠款数据读取失败
+      <div style="font-size:10px;color:#991b1b;margin-top:4px">请点击重试；该错误不会影响总览其他模块。</div>
       <button class="btn btn-primary" type="button" style="margin-top:12px" onclick="loadArrearsForOwner({showLoading:true})">重试</button>
     </div>
   </div>`;
@@ -1493,39 +1526,36 @@ async function loadArrearsForOwner({showLoading=false,limit=ARREARS_PAGE_SIZE}={
   if(showLoading)showArrearsLoading();
   renderOwnerOverviewArrearsPanel();
   try{
-    const rows=await loadHistoricalArrearsForOwner({limit,timeoutMs:ARREARS_FETCH_TIMEOUT_MS});
+    const [existingResult,ttlockResult]=await Promise.allSettled([
+      loadExistingArrearsForOwner({limit,timeoutMs:ARREARS_FETCH_TIMEOUT_MS}),
+      loadTtlockArrearsForOwner({timeoutMs:3000})
+    ]);
     if(loadSeq!==state.arrearsLoadSeq)return false;
+    const existingOk=existingResult.status==='fulfilled';
+    const ttlockOk=ttlockResult.status==='fulfilled';
+    const existingRows=existingOk?(existingResult.value.rows||[]):[];
+    const ttlockRows=ttlockOk?(ttlockResult.value.rows||[]):[];
+    state.arrearsSourceStatus={
+      existing_arrears_record:existingOk
+        ?{ok:true,count:existingRows.length,...(existingResult.value.meta?.source_status?.existing_arrears_record||{})}
+        :{ok:false,error:String(existingResult.reason?.message||existingResult.reason||'EXISTING_ARREARS_FAILED')},
+      ttlock_expired_unpaid:ttlockOk
+        ?{ok:true,count:ttlockRows.length,...(ttlockResult.value.meta?.source_status?.ttlock_expired_unpaid||{})}
+        :{ok:false,error:String(ttlockResult.reason?.message||ttlockResult.reason||'TTLOCK_FAILED')}
+    };
+    if(!existingOk&&!ttlockOk){
+      console.warn('owner arrears source failures', state.arrearsSourceStatus);
+      throw new Error('ALL_ARREARS_SOURCES_FAILED');
+    }
     state.arrears=buildArrearsFollowupPool({
-      existingArrearsRecords:rows,
-      ttlockExpiredUnpaid:[]
+      existingArrearsRecords:existingRows,
+      ttlockExpiredUnpaid:ttlockRows
     });
     saveArrears();
     state.arrearsStatus=state.arrears.length?'success':'empty';
     state.arrearsError='';
     renderArrearsPanel();
     renderOwnerOverviewArrearsPanel();
-    if(showLoading){
-      setTimeout(async()=>{
-        try{
-          if(loadSeq!==state.arrearsLoadSeq)return;
-          await ensureOwnerLockCardsForArrearsPool();
-          if(loadSeq!==state.arrearsLoadSeq)return;
-          const ttlockRows=ttlockExpiredCardsForArrearsPool();
-          if(ttlockRows.length){
-            state.arrears=buildArrearsFollowupPool({
-              existingArrearsRecords:state.arrears.filter(a=>normalizeArrearsSourceType(a.sourceType)==='existing_arrears_record'),
-              ttlockExpiredUnpaid:ttlockRows
-            });
-            saveArrears();
-            state.arrearsStatus=state.arrears.length?'success':'empty';
-            renderArrearsPanel();
-            renderOwnerOverviewArrearsPanel();
-          }
-        }catch(e){
-          console.warn('hydrate ttlock arrears:',e);
-        }
-      },0);
-    }
     return true;
   }catch(e){
     console.warn('loadArrearsForOwner:',e);
@@ -1543,7 +1573,7 @@ async function loadArrearsForOwner({showLoading=false,limit=ARREARS_PAGE_SIZE}={
     if(isAbortLikeError(e)){
       if(loadSeq!==state.arrearsLoadSeq)return false;
       state.arrearsStatus='timeout';
-      state.arrearsError=e?.name==='AbortError'?'请求已中断，请重试':'读取超时，请重试';
+      state.arrearsError=e?.name==='AbortError'?'CURRENT_REQUEST_ABORTED':'ARREARS_TIMEOUT';
       renderOwnerOverviewArrearsPanel();
       if(showLoading)showArrearsLoadError(new Error(state.arrearsError));
       return false;

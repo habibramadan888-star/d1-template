@@ -145,3 +145,13 @@ Required evidence:
 - `npm run test:owner-overview-arrears-timeout`
 
 Production remains `PRODUCTION_NO_GO`.
+## Owner Arrears / Navigation Regression Fields
+
+- 是否出现欠款模块无限 loading：是 / 否
+- 是否超过 10 秒仍无成功、空、部分失败、错误重试状态：是 / 否
+- 是否只有“读取超时”但没有可恢复闭环：是 / 否
+- 是否系统已有欠款和通通锁来源互相影响：是 / 否
+- 顶部导航是否可横向滑动：是 / 否
+- 欠款是否错误恢复为一级 Tab：是 / 否
+- 分析入口是否丢失：是 / 否
+- Production cutover remains `PRODUCTION_NO_GO`.

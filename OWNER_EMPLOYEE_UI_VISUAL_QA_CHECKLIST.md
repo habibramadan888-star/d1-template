@@ -183,3 +183,12 @@ Production remains `PRODUCTION_NO_GO`.
 | 20s+ loading classified as blocker            |      Yes |        | P1.                                     |
 | 3-minute loading classified as blocker        |      Yes |        | P0/P1.                                  |
 | Production cutover remains `PRODUCTION_NO_GO` |      Yes |        | No GO marking from visual QA.           |
+## Owner Arrears / Top Nav Visual QA
+
+- 欠款模块不得无限 loading；必须在 10 秒内形成状态闭环。
+- 部分来源失败时，卡片区应显示可用数据和业务提示。
+- 顶部导航必须固定居中。
+- 顶部导航禁止左右滑动、禁止 scroll-snap、禁止 `overflow-x:auto`。
+- 欠款不作为一级 Tab。
+- 分析入口必须存在，网络入口必须可访问。
+- Production cutover remains `PRODUCTION_NO_GO`.

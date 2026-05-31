@@ -257,3 +257,11 @@ Required commands:
 - `npm run test:owner-arrears-two-source-only`
 
 Production cutover remains `PRODUCTION_NO_GO`.
+## Owner Arrears Loading / Navigation Blockers
+
+- 欠款模块无限 loading 是 P1/P0 blocker。
+- 欠款模块必须有状态闭环：loading、success、empty、partial failure、error、retry。
+- 欠款来源必须独立失败隔离，避免 TTLock 或 rent mapping 单点拖垮系统已有欠款。
+- 顶部导航禁止横向滚动；不能通过左右滑来塞入口。
+- 欠款不作为一级 Tab，只在总览里展示。
+- Production cutover remains `PRODUCTION_NO_GO`.
