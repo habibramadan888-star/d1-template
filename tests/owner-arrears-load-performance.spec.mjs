@@ -28,13 +28,16 @@ function extractFunction(source, name) {
 
 test("arrears shell and skeleton render before data fetch completes", async () => {
   const js = await readFile("deploy-worker/public/index-51-main.js", "utf8");
-  const loading = extractFunction(js, "showArrearsLoading");
+  const loading = extractFunction(js, "renderOwnerOverviewArrearsPanel");
   const load = extractFunction(js, "loadArrearsForOwner");
 
-  assert.match(loading, /data-owner-arrears-shell="true"/);
-  assert.match(loading, /data-owner-arrears-skeleton="true"/);
-  assert.match(load, /showArrearsLoading\(\)/);
-  assert.ok(load.indexOf("showArrearsLoading()") < load.indexOf("loadHistoricalArrearsForOwner()"));
+  assert.match(loading, /data-owner-overview-arrears-skeleton="true"/);
+  assert.match(loading, /仍在读取，请稍候/);
+  assert.match(load, /renderOwnerOverviewArrearsPanel\(\)/);
+  assert.ok(
+    load.indexOf("renderOwnerOverviewArrearsPanel()") <
+      load.indexOf("loadHistoricalArrearsForOwner")
+  );
 });
 
 test("arrears first page has a limit and no duplicate fetch guard regression", async () => {
@@ -45,8 +48,10 @@ test("arrears first page has a limit and no duplicate fetch guard regression", a
   const worker = await readFile("deploy-worker/src/index.js", "utf8");
 
   assert.match(js, /const ARREARS_PAGE_SIZE=20/);
-  assert.match(loadHistorical, /\/api\/arrears\/followup\/tasks\?limit=\$\{ARREARS_PAGE_SIZE\}/);
-  assert.match(loadHistorical, /\/api\/arrears\?limit=\$\{ARREARS_PAGE_SIZE\}/);
+  assert.match(js, /const ARREARS_OVERVIEW_PAGE_SIZE=5/);
+  assert.match(loadHistorical, /\/api\/arrears\/followup\/tasks\?limit=\$\{safeLimit\}/);
+  assert.match(loadHistorical, /\/api\/arrears\?limit=\$\{safeLimit\}/);
+  assert.match(loadHistorical, /timeoutMs=ARREARS_FETCH_TIMEOUT_MS/);
   assert.match(load, /if\(state\.arrearsLoading\)return/);
   assert.match(load, /setTimeout\(async\(\)=>/);
   assert.match(render, /slice\(0,visibleLimit\)/);

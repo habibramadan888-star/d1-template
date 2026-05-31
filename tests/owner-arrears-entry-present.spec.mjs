@@ -19,15 +19,15 @@ function extractFunction(source, name) {
   throw new Error(`Could not extract ${name}`);
 }
 
-test("owner internal navigation contains the shortened arrears entry", async () => {
+test("owner overview contains the arrears module instead of a top-level arrears tab", async () => {
   const html = await readFile("deploy-worker/public/index-51.html", "utf8");
   const js = await readFile("deploy-worker/public/index-51-main.js", "utf8");
 
-  assert.match(html, /data-view="arrears"/);
-  assert.match(html, /id="navArrears"/);
-  assert.match(html, />欠款<span class="en-sub">ARREARS<\/span>/);
+  const nav = html.match(/<nav class="nav" id="navTabs">[\s\S]*?<\/nav>/)?.[0] || "";
+  assert.doesNotMatch(nav, /data-view="arrears"|id="navArrears"|>欠款<span/);
   assert.doesNotMatch(html, /欠款管理<span class="en-sub">ARREARS<\/span>/);
-  assert.match(js, /if\(v==='arrears'\)\{loadArrearsForOwner\(\{showLoading:true\}\);\}/);
+  assert.match(js, /id="ownerOverviewArrearsPanel"/);
+  assert.match(js, /function renderOwnerOverviewArrearsPanel\(\)/);
 });
 
 test("main three-door portal does not expose arrears as login identity", async () => {
@@ -44,7 +44,7 @@ test("overview arrears summary is a summary, not the full arrears page", async (
   const js = await readFile("deploy-worker/public/index-51-main.js", "utf8");
   const overview = extractFunction(js, "renderOwnerOverview");
 
-  assert.match(overview, /OUTSTANDING FOLLOW-UP/);
+  assert.match(overview, /ARREARS FOLLOW-UP/);
+  assert.match(overview, /id="ownerOverviewArrearsPanel"/);
   assert.doesNotMatch(overview, /data-owner-arrears-info-pool/);
-  assert.doesNotMatch(overview, /WhatsApp 导出/);
 });

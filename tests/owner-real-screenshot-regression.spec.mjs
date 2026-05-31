@@ -35,8 +35,7 @@ test("owner primary navigation is compact and does not expose employee entry", a
   assert.doesNotMatch(nav, />\s*录入\s*</);
   assert.match(nav, /data-view="overview" id="navOverview"/);
   assert.match(nav, />总览<span class="en-sub">OVERVIEW<\/span>/);
-  assert.match(nav, /data-view="arrears" id="navArrears"/);
-  assert.match(nav, />欠款<span class="en-sub">ARREARS<\/span>/);
+  assert.doesNotMatch(nav, /data-view="arrears"|id="navArrears"|>欠款<span/);
   assert.match(nav, /data-view="analysis" id="navAnalysis"/);
   assert.doesNotMatch(nav, /ANALYTICS|欠款管理/);
 });

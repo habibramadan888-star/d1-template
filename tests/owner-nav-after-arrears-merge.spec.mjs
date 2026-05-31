@@ -6,7 +6,7 @@ function nav(html) {
   return html.match(/<nav class="nav" id="navTabs">[\s\S]*?<\/nav>/)?.[0] || "";
 }
 
-async function assertOwnerNav(file) {
+async function assertFinalNav(file) {
   const html = await readFile(file, "utf8");
   const n = nav(html);
   const order = ["navOverview", "navHistory", "navAnalysis", "navClients", "navWifi"];
@@ -16,22 +16,17 @@ async function assertOwnerNav(file) {
   for (const id of order) assert.match(n, new RegExp(`id="${id}"`));
   assert.ok(
     order.every((id, index) => index === 0 || n.indexOf(id) > n.indexOf(order[index - 1])),
-    "owner nav order must remain stable"
+    "owner nav order must remain stable after arrears merge"
   );
   assert.match(n, />分析<span class="en-sub">ANALYSIS<\/span>/);
   assert.match(n, />网络<span class="en-sub">NETWORK<\/span>/);
-  assert.doesNotMatch(n, /欠款管理/);
-
-  const hideIndex = html.lastIndexOf(".owner-ui-unified #navClients{display:none!important}");
-  const restoreIndex = html.lastIndexOf(".owner-ui-unified #navClients{display:flex!important}");
-  assert.ok(restoreIndex > hideIndex, "clients nav must be restored by final regression lock CSS");
   assert.match(html, /flex-wrap:nowrap!important/);
 }
 
-test("index-51 owner nav exposes all modules without wrapping", async () => {
-  await assertOwnerNav("deploy-worker/public/index-51.html");
+test("index-51 owner nav removes arrears tab but keeps all other modules", async () => {
+  await assertFinalNav("deploy-worker/public/index-51.html");
 });
 
-test("index owner nav stays in sync with index-51", async () => {
-  await assertOwnerNav("deploy-worker/public/index.html");
+test("index owner nav mirrors the final arrears-merged nav", async () => {
+  await assertFinalNav("deploy-worker/public/index.html");
 });

@@ -187,3 +187,14 @@ Stop the test if any old row/table layout, third source, debug field, or 20-seco
 3. Confirm the arrears page does not display `signal is aborted without reason`; slow requests should keep skeleton/cache.
 4. Run `npm run test:owner-regression-smoke` before accepting any owner shell change.
 5. Production cutover remains `PRODUCTION_NO_GO`.
+
+## Owner Arrears Overview Merge Test Addendum
+
+1. Confirm owner navigation no longer exposes `欠款` as a top-level tab.
+2. Confirm owner navigation still exposes `总览 / 历史 / 分析 / 客户 / 网络` without wrapping.
+3. Confirm overview contains `欠款跟进`.
+4. Confirm `欠款跟进` shows a skeleton quickly and cannot remain loading beyond 10 seconds without retry state.
+5. Confirm arrears timeout/error only affects the arrears module and does not break overview KPIs, alerts, sessions, or ledger.
+6. Confirm `查看全部` expands arrears inside overview and `WhatsApp 导出` remains available.
+7. Treat 20s+ loading as P1 and 3-minute loading as P0/P1.
+8. Production cutover remains `PRODUCTION_NO_GO`.

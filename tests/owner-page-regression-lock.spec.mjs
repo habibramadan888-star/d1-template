@@ -24,11 +24,14 @@ test("owner overview remains a dashboard and does not reintroduce quick action b
   assert.doesNotMatch(overview, /data-quick-action|quick-action|quickActions/i);
 });
 
-test("arrears remains inside owner internal navigation, not root portal", async () => {
+test("arrears remains inside owner overview, not root portal or top nav", async () => {
   const ownerHtml = await readFile("deploy-worker/public/index-51.html", "utf8");
+  const ownerJs = await readFile("deploy-worker/public/index-51-main.js", "utf8");
   const portalHtml = await readFile("deploy-worker/public/portal.html", "utf8");
+  const nav = ownerHtml.match(/<nav class="nav" id="navTabs">[\s\S]*?<\/nav>/)?.[0] || "";
 
-  assert.match(ownerHtml, /data-view="arrears"/);
-  assert.match(ownerHtml, />欠款<span class="en-sub">ARREARS<\/span>/);
+  assert.doesNotMatch(nav, /data-view="arrears"|id="navArrears"|>欠款<span/);
+  assert.match(ownerJs, /id="ownerOverviewArrearsPanel"/);
+  assert.match(ownerJs, /function renderOwnerOverviewArrearsPanel\(\)/);
   assert.doesNotMatch(portalHtml, /欠款管理|ARREARS FOLLOW-UP|要求员工更新|下发员工/);
 });

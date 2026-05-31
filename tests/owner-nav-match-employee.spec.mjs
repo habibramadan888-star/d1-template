@@ -7,11 +7,10 @@ test("owner nav uses employee-style pill tabs and final owner information archit
   const nav = owner.match(/<nav class="nav" id="navTabs">[\s\S]*?<\/nav>/)?.[0] || "";
 
   assert.match(nav, /data-view="overview" id="navOverview"/);
-  assert.match(nav, /data-view="arrears" id="navArrears"/);
-  assert.doesNotMatch(nav, /id="navArrears"[^>]*locked/);
+  assert.doesNotMatch(nav, /data-view="arrears"|id="navArrears"|>欠款<span/);
   assert.match(nav, />总览<span class="en-sub">OVERVIEW<\/span>/);
-  assert.match(nav, />欠款<span class="en-sub">ARREARS<\/span>/);
   assert.match(nav, />历史<span class="en-sub">HISTORY<\/span>/);
+  assert.match(nav, />分析<span class="en-sub">ANALYSIS<\/span>/);
   assert.match(nav, />客户<span class="en-sub">CLIENTS<\/span>/);
   assert.match(nav, />网络<span class="en-sub">NETWORK<\/span>/);
   assert.doesNotMatch(nav, />\s*录入\s*</);

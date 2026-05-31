@@ -28,6 +28,9 @@ const CC_GRACE=3;
 const DEFAULT_PRICES=[600,650,700,750];
 const HISTORY_PAGE_SIZE=20;
 const ARREARS_PAGE_SIZE=20;
+const ARREARS_OVERVIEW_PAGE_SIZE=5;
+const ARREARS_FETCH_TIMEOUT_MS=10000;
+const ARREARS_SLOW_LOADING_MS=3000;
 const HISTORY_FETCH_TIMEOUT_MS=4500;
 
 /* ── CLOUD AUTH ── */
@@ -73,7 +76,7 @@ function isOwnerShellRole(){return role==='manager'||role==='readonly_admin';}
 function isOwnerWriteRole(){return role==='manager';}
 function requestedOwnerView(){
   const raw=(new URLSearchParams(location.search).get('view')||location.hash.replace(/^#\/?/,'')).trim();
-  return ['overview','arrears','history','analysis','clients','wifi'].includes(raw)?raw:'overview';
+  return ['overview','history','analysis','clients','wifi'].includes(raw)?raw:'overview';
 }
 function defaultViewForRole(){return isOwnerShellRole()?requestedOwnerView():'entry';}
 function clearLegacyAuthStorage(){
@@ -612,7 +615,9 @@ const state={
   from:'',to:'',txCatFilter:'all',txSearch:'',historyViewing:null,historyLimit:HISTORY_PAGE_SIZE,
   arrears:[], // [{id,room,roomTo?,totalRent,paid,remain,dueDate,sessionId,cleared}]
   arrearFilter:'all',
-arrearsLimit:ARREARS_PAGE_SIZE,arrearsLoading:false,arrearsLoadSeq:0,
+  arrearsLimit:ARREARS_PAGE_SIZE,arrearsLoading:false,arrearsLoadSeq:0,
+  arrearsStatus:'idle',arrearsError:'',arrearsSlow:false,arrearsExpanded:false,
+  arrearsSlowTimer:null,
   presetPrices:DEFAULT_PRICES,
   customers:[],
   anaOpen:{session:false,finance:false,people:false,continuity:false,tx:false},
@@ -1070,17 +1075,22 @@ function isArrearTaskOpen(a){
   const remain=Number(a.remain);
   return Number.isFinite(remain)&&remain>0;
 }
-async function loadHistoricalArrearsForOwner(){
+async function loadHistoricalArrearsForOwner({limit=ARREARS_PAGE_SIZE,timeoutMs=ARREARS_FETCH_TIMEOUT_MS}={}){
+  const safeLimit=Math.min(Math.max(Number(limit)||ARREARS_PAGE_SIZE,1),100);
+  const started=Date.now();
+  const remaining=()=>Math.max(1000,timeoutMs-(Date.now()-started));
   let primary=null;
   let primaryError=null;
   try{
-    primary=await apiFetchWithTimeout(`/api/arrears/followup/tasks?limit=${ARREARS_PAGE_SIZE}`,{},12000);
+    primary=await apiFetchWithTimeout(`/api/arrears/followup/tasks?limit=${safeLimit}`,{},Math.min(6500,remaining()));
   }catch(e){
     primaryError=e;
   }
   if(primary?.ok)return rowsFromApiPayload(await primary.json(),['arrears','tasks']);
   if(primaryError&&!isAbortLikeError(primaryError))throw primaryError;
-  const fallback=await apiFetchWithTimeout(`/api/arrears?limit=${ARREARS_PAGE_SIZE}`,{},12000);
+  const fallbackBudget=remaining();
+  if(fallbackBudget<=1000)throw new DOMException('Arrears request timed out', 'TimeoutError');
+  const fallback=await apiFetchWithTimeout(`/api/arrears?limit=${safeLimit}`,{},fallbackBudget);
   if(!fallback.ok){
     const payload=await fallback.json().catch(()=>({}));
     throw new Error(payload?.message||('HTTP '+fallback.status));
@@ -1090,7 +1100,7 @@ async function loadHistoricalArrearsForOwner(){
 async function ensureOwnerLockCardsForArrearsPool(){
   try{
     if(typeof roomsData!=='undefined'&&roomsData&&Object.keys(roomsData).length)return true;
-    const r=await apiFetch('/api/lock/cards?purpose=arrears_pool',{method:'GET'});
+    const r=await apiFetchWithTimeout('/api/lock/cards?purpose=arrears_pool',{method:'GET'},3000);
     const payload=await r.json().catch(()=>({}));
     if(!r.ok)return false;
     if(payload?.roomsData&&typeof roomsData!=='undefined'){
@@ -1339,6 +1349,109 @@ function showArrearTaskActionHint(id){
   const label=task?`${arrearCustomerLabel(task)} ${arrearBedLabel(task)}`:'该欠款任务';
   toast(`${label} 的关闭/核对仍需通过正式审核流程处理`);
 }
+function clearArrearsLoadingTimers(){
+  if(state.arrearsSlowTimer){
+    clearTimeout(state.arrearsSlowTimer);
+    state.arrearsSlowTimer=null;
+  }
+}
+function setArrearsUiState(status,error=''){
+  state.arrearsStatus=status;
+  state.arrearsError=error?String(error):'';
+  if(status!=='loading')state.arrearsSlow=false;
+  renderOwnerOverviewArrearsPanel();
+}
+function ownerArrearsActiveRows(){
+  const visible=isOwnerShellRole()?state.arrears:state.arrears.filter(a=>a.sessionId===state.session.id);
+  return visible.filter(isAllowedArrearsSource).filter(isArrearTaskOpen);
+}
+function ownerArrearsSummary(rows=ownerArrearsActiveRows()){
+  const totalAmount=Math.round(rows.reduce((s,a)=>s+Number(a.remain||0),0)*100)/100;
+  return {
+    totalAmount,
+    followupCount:rows.length,
+    existingCount:rows.filter(a=>normalizeArrearsSourceType(a?.sourceType)==='existing_arrears_record').length,
+    ttlockCount:rows.filter(a=>normalizeArrearsSourceType(a?.sourceType)==='ttlock_expired_unpaid').length,
+    promisedUnpaidCount:rows.filter(a=>arrearDirectiveStatus(a)==='promised'&&Number(a?.remain||0)>0).length
+  };
+}
+function renderOwnerOverviewArrearsPanel(){
+  const panel=document.getElementById('ownerOverviewArrearsPanel');
+  if(!panel)return;
+  const status=state.arrearsStatus||'idle';
+  if(status==='idle'||status==='loading'){
+    panel.innerHTML=`<div class="owner-overview-arrears-skeleton" data-owner-overview-arrears-skeleton="true">
+      <div class="hist-toolbar"><span>欠款跟进</span><span class="hist-order">${state.arrearsSlow?'仍在读取，请稍候':'LOADING'}</span></div>
+      <div class="hist-grid owner-arrears-skeleton">
+        ${Array.from({length:2}).map(()=>'<div class="hist-card skeleton-card" style="min-height:116px;background:linear-gradient(90deg,rgba(255,255,255,.58),rgba(226,239,233,.72),rgba(255,255,255,.58));background-size:220% 100%;animation:pulse 1.2s ease-in-out infinite"></div>').join('')}
+      </div>
+      ${state.arrearsSlow?'<div class="empty-text" style="text-align:center;margin-top:8px">仍在读取，请稍候；超过 10 秒会自动给出重试。</div>':''}
+    </div>`;
+    return;
+  }
+  if(status==='timeout'||status==='error'){
+    const label=status==='timeout'?'读取超时，请重试':'欠款数据加载失败，请重试';
+    panel.innerHTML=`<div class="empty-state hl-empty-state" data-owner-overview-arrears-error="true">
+      <div class="empty-title">${label}</div>
+      <div class="empty-text">欠款模块失败不会影响总览其他模块。</div>
+      ${state.arrearsError?`<div class="empty-text">${esc(state.arrearsError)}</div>`:''}
+      <button class="btn btn-primary" type="button" onclick="retryOwnerOverviewArrears()">重试</button>
+    </div>`;
+    return;
+  }
+  const rows=ownerArrearsActiveRows();
+  if(!rows.length||status==='empty'){
+    panel.innerHTML=`<div class="empty-state hl-empty-state" data-owner-overview-arrears-empty="true">
+      <div class="empty-title">暂无未结清欠款</div>
+      <div class="empty-text">这里只显示系统已有欠款记录，以及通通锁到期未付且已匹配床位租金的任务。</div>
+      <button class="btn btn-ghost" type="button" onclick="retryOwnerOverviewArrears()">重新读取</button>
+    </div>`;
+    return;
+  }
+  const summary=ownerArrearsSummary(rows);
+  const today=fmtD(new Date());
+  const sorted=rows.slice().sort((a,b)=>(a.dueDate||'9999').localeCompare(b.dueDate||'9999'));
+  const limit=state.arrearsExpanded?Math.min(state.arrearsLimit||ARREARS_PAGE_SIZE,sorted.length):ARREARS_OVERVIEW_PAGE_SIZE;
+  const pageRows=sorted.slice(0,limit);
+  panel.innerHTML=`<div class="owner-overview-arrears-content" data-owner-overview-arrears-loaded="true">
+    <div class="owner-arrears-summary" data-owner-arrears-kpis="true">
+      <span>总额 ${fmtMoney(summary.totalAmount)} AED</span>
+      <span>需跟进 ${summary.followupCount}</span>
+      <span>系统欠款 ${summary.existingCount}</span>
+      <span>通通锁 ${summary.ttlockCount}</span>
+      <span>承诺未回 ${summary.promisedUnpaidCount}</span>
+    </div>
+    <div class="owner-arrears-controls" data-owner-arrears-actions="true">
+      ${isOwnerWriteRole()?`<label class="owner-arrears-date">下发日期 <input id="arrearDirectiveDue" type="date" min="${today}"></label>
+      <button class="btn btn-primary" id="arrearDirectiveBtn" disabled onclick="sendArrearDirectives()">下发员工</button>`:''}
+      <button type="button" class="btn btn-ghost" onclick="exportArrearsWhatsApp()">WhatsApp 导出</button>
+      <button type="button" class="btn btn-ghost" onclick="toggleOverviewArrearsAll()">${state.arrearsExpanded?'收起':'查看全部'}</button>
+    </div>
+    <div class="hist-grid owner-arrears-list" data-owner-arrears-card-list="true">
+      ${pageRows.map(a=>renderOwnerArrearsTaskCard(a,today)).join('')}
+    </div>
+    ${state.arrearsExpanded&&sorted.length>pageRows.length?`<button class="btn btn-primary btn-block" type="button" style="margin-top:14px" onclick="state.arrearsLimit=(state.arrearsLimit||ARREARS_PAGE_SIZE)+ARREARS_PAGE_SIZE;renderOwnerOverviewArrearsPanel()">加载更多欠款</button>`:''}
+  </div>`;
+  updateArrearDirectiveButtonState();
+}
+function retryOwnerOverviewArrears(){
+  state.arrearsExpanded=false;
+  loadArrearsForOwner({showLoading:false,limit:ARREARS_OVERVIEW_PAGE_SIZE});
+}
+function toggleOverviewArrearsAll(){
+  state.arrearsExpanded=!state.arrearsExpanded;
+  if(state.arrearsExpanded&&!state.arrearsLoadedFull){
+    loadArrearsForOwner({showLoading:false,limit:ARREARS_PAGE_SIZE,preferCache:true}).then(()=>{state.arrearsLoadedFull=true;renderOwnerOverviewArrearsPanel();});
+    return;
+  }
+  renderOwnerOverviewArrearsPanel();
+}
+function ensureOwnerOverviewArrearsAsync(){
+  if(!isOwnerShellRole())return;
+  renderOwnerOverviewArrearsPanel();
+  if(['loading','success','empty','timeout','error'].includes(state.arrearsStatus))return;
+  setTimeout(()=>loadArrearsForOwner({showLoading:false,limit:ARREARS_OVERVIEW_PAGE_SIZE}),0);
+}
 function showArrearsLoading(){
   const panel=document.getElementById('arrearsPanel');
   if(!panel)return;
@@ -1357,25 +1470,40 @@ function showArrearsLoadError(error){
     <div style="padding:18px;color:#b91c1c;font-size:13px;text-align:center">
       欠款数据加载失败，请刷新重试。
       <div style="font-size:10px;color:#991b1b;margin-top:4px">${esc(error?.message||String(error||''))}</div>
+      <button class="btn btn-primary" type="button" style="margin-top:12px" onclick="loadArrearsForOwner({showLoading:true})">重试</button>
     </div>
   </div>`;
 }
-async function loadArrearsForOwner({showLoading=false}={}){
+async function loadArrearsForOwner({showLoading=false,limit=ARREARS_PAGE_SIZE}={}){
   if(!isOwnerShellRole())return false;
   if(state.arrearsLoading)return false;
   const loadSeq=(state.arrearsLoadSeq||0)+1;
   state.arrearsLoadSeq=loadSeq;
   state.arrearsLoading=true;
+  state.arrearsSlow=false;
+  state.arrearsStatus='loading';
+  state.arrearsError='';
+  clearArrearsLoadingTimers();
+  state.arrearsSlowTimer=setTimeout(()=>{
+    if(loadSeq===state.arrearsLoadSeq&&state.arrearsLoading){
+      state.arrearsSlow=true;
+      renderOwnerOverviewArrearsPanel();
+    }
+  },ARREARS_SLOW_LOADING_MS);
   if(showLoading)showArrearsLoading();
+  renderOwnerOverviewArrearsPanel();
   try{
-    const rows=await loadHistoricalArrearsForOwner();
+    const rows=await loadHistoricalArrearsForOwner({limit,timeoutMs:ARREARS_FETCH_TIMEOUT_MS});
     if(loadSeq!==state.arrearsLoadSeq)return false;
     state.arrears=buildArrearsFollowupPool({
       existingArrearsRecords:rows,
       ttlockExpiredUnpaid:[]
     });
     saveArrears();
+    state.arrearsStatus=state.arrears.length?'success':'empty';
+    state.arrearsError='';
     renderArrearsPanel();
+    renderOwnerOverviewArrearsPanel();
     if(showLoading){
       setTimeout(async()=>{
         try{
@@ -1389,7 +1517,9 @@ async function loadArrearsForOwner({showLoading=false}={}){
               ttlockExpiredUnpaid:ttlockRows
             });
             saveArrears();
+            state.arrearsStatus=state.arrears.length?'success':'empty';
             renderArrearsPanel();
+            renderOwnerOverviewArrearsPanel();
           }
         }catch(e){
           console.warn('hydrate ttlock arrears:',e);
@@ -1403,19 +1533,32 @@ async function loadArrearsForOwner({showLoading=false}={}){
       const cached=LS.get(ARREARS_KEY);
       if(cached){
         state.arrears=JSON.parse(cached)||[];
+        state.arrearsStatus=state.arrears.length?'success':'empty';
         renderArrearsPanel();
+        renderOwnerOverviewArrearsPanel();
         if(showLoading)toast('欠款接口暂不可用，已显示本地缓存。','err');
         return false;
       }
     }catch{}
     if(isAbortLikeError(e)){
-      if(showLoading)showArrearsLoading();
+      if(loadSeq!==state.arrearsLoadSeq)return false;
+      state.arrearsStatus='timeout';
+      state.arrearsError=e?.name==='AbortError'?'请求已中断，请重试':'读取超时，请重试';
+      renderOwnerOverviewArrearsPanel();
+      if(showLoading)showArrearsLoadError(new Error(state.arrearsError));
       return false;
     }
+    state.arrearsStatus='error';
+    state.arrearsError=e?.message||String(e||'');
+    renderOwnerOverviewArrearsPanel();
     if(showLoading)showArrearsLoadError(e);
     return false;
   }finally{
-    if(loadSeq===state.arrearsLoadSeq)state.arrearsLoading=false;
+    if(loadSeq===state.arrearsLoadSeq){
+      clearArrearsLoadingTimers();
+      state.arrearsLoading=false;
+      renderOwnerOverviewArrearsPanel();
+    }
   }
 }
 /* 老板视角：从云端静默刷新欠款列表 */
@@ -3951,12 +4094,6 @@ function renderOwnerOverview(){
       <b style="color:${color}">${esc(value)}</b>
       ${note?`<span>${esc(note)}</span>`:''}
     </div>`;
-  const arrearsHtml=openArrears.length?openArrears.slice(0,5).map(a=>`
-    <div class="detail-row owner-mobile-row">
-      <div class="room">${esc(a.room||'—')}</div>
-      <div class="note">${esc(a.note||a.type||'待收尾款')}${a.dueDate?` · ${esc(a.dueDate)}`:''}</div>
-      <div class="amount" style="color:var(--color-warning)">${fmtMoney(a.remain||0)}</div>
-    </div>`).join(''):`<div class="empty-state hl-empty-state"><div class="empty-title">暂无待收尾款</div><div class="empty-text">加载通通锁和流水后会在这里显示需要关注的项目。</div></div>`;
   const latestHtml=latest.length?latest.map(s=>`
     <div class="detail-row owner-mobile-row">
       <div class="room">${esc((s.date||'').slice(0,10)||'—')}</div>
@@ -3983,12 +4120,12 @@ function renderOwnerOverview(){
       ${kpi('最近交接','LATEST HANDOVER',latest[0]?(latest[0].date||'').slice(0,10):'暂无','#1a73e8',latest[0]?`${latest[0].entries?.length||latest[0].entriesCount||0} 笔记录`:'等待员工提交或导入')}
     </div>
     <div class="card hl-card owner-overview-section" style="margin-top:16px">
-      <div class="card-head"><div><div class="card-title">异常提醒</div><div class="card-sub">BUSINESS ALERTS</div></div></div>
-      <div class="card-body"><div class="detail-list">${alertHtml}</div></div>
+      <div class="card-head"><div><div class="card-title">欠款跟进</div><div class="card-sub">ARREARS FOLLOW-UP · ASYNC</div></div></div>
+      <div class="card-body"><div id="ownerOverviewArrearsPanel" data-owner-overview-arrears-section="true"></div></div>
     </div>
     <div class="card hl-card owner-overview-section" style="margin-top:16px">
-      <div class="card-head"><div><div class="card-title">待收尾款</div><div class="card-sub">OUTSTANDING FOLLOW-UP</div></div></div>
-      <div class="card-body"><div class="detail-list">${arrearsHtml}</div></div>
+      <div class="card-head"><div><div class="card-title">异常提醒</div><div class="card-sub">BUSINESS ALERTS</div></div></div>
+      <div class="card-body"><div class="detail-list">${alertHtml}</div></div>
     </div>
     <div class="card hl-card owner-overview-section" style="margin-top:16px">
       <div class="card-head"><div><div class="card-title">最近会话</div><div class="card-sub">RECENT SESSIONS</div></div></div>
@@ -3998,6 +4135,7 @@ function renderOwnerOverview(){
       <div class="card-head"><div><div class="card-title">最近流水摘要</div><div class="card-sub">RECENT LEDGER</div></div></div>
       <div class="card-body"><div class="detail-list">${recentEntryHtml}</div></div>
     </div>`;
+  ensureOwnerOverviewArrearsAsync();
 }
 
 /* ── ANALYSIS IMPORT — 双重去重：锚点ID + 内容指纹 ── */

@@ -34,6 +34,7 @@ test("owner overview keeps only business summary sections, not duplicate nav but
     "待收尾款",
     "今日待处理",
     "最近交接",
+    "欠款跟进",
     "异常提醒",
     "最近会话",
     "最近流水摘要"
@@ -49,7 +50,11 @@ test("owner overview keeps only business summary sections, not duplicate nav but
 test("top navigation still exposes real owner modules outside overview shortcuts", async () => {
   const html = await readFile("deploy-worker/public/index-51.html", "utf8");
 
-  for (const view of ["overview", "arrears", "history", "analysis", "clients", "wifi"]) {
+  for (const view of ["overview", "history", "analysis", "clients", "wifi"]) {
     assert.match(html, new RegExp(`data-view="${view}"`));
   }
+  assert.doesNotMatch(
+    html.match(/<nav class="nav" id="navTabs">[\s\S]*?<\/nav>/)?.[0] || "",
+    /data-view="arrears"/
+  );
 });

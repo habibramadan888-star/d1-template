@@ -54,15 +54,17 @@ test("main portal does not expose arrears management as a fourth login identity"
   assert.doesNotMatch(html, /selectedNextView/);
 });
 
-test("owner arrears module remains available inside the owner app", async () => {
+test("owner arrears module remains available inside owner overview", async () => {
   const portal = await portalHtml();
   const ownerHtml = await readFile("deploy-worker/public/index-51.html", "utf8");
   const ownerJs = await readFile("deploy-worker/public/index-51-main.js", "utf8");
   const worker = await readFile("deploy-worker/src/index.js", "utf8");
+  const nav = ownerHtml.match(/<nav class="nav" id="navTabs">[\s\S]*?<\/nav>/)?.[0] || "";
 
   assert.match(portal, /if\(OWNER_ROLES\.has\(r\)\)return"\/owner"/);
-  assert.match(ownerHtml, /data-view="arrears"/);
-  assert.match(ownerHtml, />欠款<span class="en-sub">ARREARS<\/span>/);
+  assert.doesNotMatch(nav, /data-view="arrears"|id="navArrears"|>欠款<span/);
+  assert.match(ownerJs, /id="ownerOverviewArrearsPanel"/);
+  assert.match(ownerJs, /function renderOwnerOverviewArrearsPanel\(\)/);
   assert.match(ownerJs, /function renderArrearsPanel\(\)/);
   assert.match(ownerJs, /\/api\/arrears/);
   assert.match(worker, /path === "\/api\/arrears"/);

@@ -244,6 +244,18 @@ Date: 2026-05-28, Asia/Dubai
 
 Production cutover remains `PRODUCTION_NO_GO`.
 
+## OWNER-ARREARS-OVERVIEW-MERGE-AND-LOADING-FIX-001 Verification Notes
+
+| Area                    | Status | Notes                                                                                                 |
+| ----------------------- | ------ | ----------------------------------------------------------------------------------------------------- |
+| Top nav                 | READY  | `欠款` removed from top-level owner navigation; `分析`, `历史`, `客户`, and `网络` remain accessible. |
+| Overview arrears module | READY  | `欠款跟进` renders inside overview and loads asynchronously.                                          |
+| Loading state closure   | READY  | `idle/loading/success/empty/error/timeout` states prevent infinite loading.                           |
+| Timeout                 | READY  | `ARREARS_FETCH_TIMEOUT_MS=10000`; retry UI appears on timeout/error.                                  |
+| Isolation               | READY  | Arrears failure does not block overview KPIs, alerts, recent sessions, or ledger.                     |
+
+Production cutover remains `PRODUCTION_NO_GO`.
+
 ## OWNER-REGRESSION-AUDIT-FIX-001 Verification Notes
 
 | Area                   | Status   | Notes                                                              |

@@ -235,3 +235,25 @@ Owner QA must treat these as blockers:
 Required module smoke: 总览, 欠款, 历史, 分析, 客户, 网络.
 
 Production cutover remains `PRODUCTION_NO_GO`.
+
+## Owner Arrears Overview Merge QA Addendum
+
+Owner QA must validate the new product decision:
+
+- Arrears is merged into overview and must not be a top-level owner tab.
+- Overview must contain `欠款跟进`.
+- Arrears loading must close to success, empty, error, or timeout; infinite loading is a blocker.
+- Arrears timeout/error must show retry inside the module only.
+- Arrears failure must not affect overview KPIs, alerts, recent sessions, or recent ledger.
+- 20s+ loading is P1.
+- 3-minute loading is P0/P1.
+
+Required commands:
+
+- `npm run test:owner-arrears-infinite-loading`
+- `npm run test:owner-overview-arrears-async`
+- `npm run test:owner-overview-arrears-timeout`
+- `npm run test:owner-nav-after-arrears-merge`
+- `npm run test:owner-arrears-two-source-only`
+
+Production cutover remains `PRODUCTION_NO_GO`.

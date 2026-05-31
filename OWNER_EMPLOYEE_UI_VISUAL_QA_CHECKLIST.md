@@ -168,3 +168,18 @@ Production remains `PRODUCTION_NO_GO`.
 | Full owner smoke run              |      Yes |        | `npm run test:owner-regression-smoke`.    |
 
 Production remains `PRODUCTION_NO_GO`.
+
+## Owner Arrears Overview Merge Visual Checklist
+
+| Check                                         | Required | Result | Notes                                   |
+| --------------------------------------------- | -------: | ------ | --------------------------------------- |
+| Top nav does not show `欠款`                  |      Yes |        | Arrears belongs inside overview.        |
+| Top nav keeps `分析`                          |      Yes |        | Regression blocker if missing.          |
+| Top nav keeps `历史 / 客户 / 网络`            |      Yes |        | Network may be horizontally reachable.  |
+| Overview shows `欠款跟进`                     |      Yes |        | Core operating module.                  |
+| Arrears skeleton appears quickly              |      Yes |        | Should be visible before data resolves. |
+| Arrears timeout shows retry                   |      Yes |        | No infinite loading.                    |
+| Arrears error does not break overview         |      Yes |        | Other overview cards remain visible.    |
+| 20s+ loading classified as blocker            |      Yes |        | P1.                                     |
+| 3-minute loading classified as blocker        |      Yes |        | P0/P1.                                  |
+| Production cutover remains `PRODUCTION_NO_GO` |      Yes |        | No GO marking from visual QA.           |

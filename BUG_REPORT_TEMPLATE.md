@@ -127,3 +127,21 @@ Treat these as blockers:
 - Owner shell changes deployed without `npm run test:owner-regression-smoke`: QA process blocker.
 
 Production remains `PRODUCTION_NO_GO`.
+
+## Owner Arrears Overview Loading Rules
+
+Treat these as blockers:
+
+- `欠款` appears as a top-level owner tab after the merge.
+- Overview is missing the `欠款跟进` module.
+- Arrears loading lasts longer than 20 seconds: P1.
+- Arrears loading lasts 3 minutes: P0/P1.
+- Arrears API failure breaks overview KPIs, sessions, alerts, or ledger.
+- Timeout does not show retry.
+
+Required evidence:
+
+- `npm run test:owner-arrears-infinite-loading`
+- `npm run test:owner-overview-arrears-timeout`
+
+Production remains `PRODUCTION_NO_GO`.

@@ -9,16 +9,14 @@ test("owner primary nav uses the final compact mobile information architecture",
   assert.doesNotMatch(nav, /data-view="entry"/);
   assert.doesNotMatch(nav, />\s*录入\s*</);
   assert.match(nav, /data-view="overview" id="navOverview"/);
-  assert.match(nav, /data-view="arrears" id="navArrears"/);
-  assert.doesNotMatch(nav, /id="navArrears"[^>]*locked/);
+  assert.doesNotMatch(nav, /data-view="arrears"|id="navArrears"|>欠款<span/);
   assert.match(nav, />总览<span class="en-sub">OVERVIEW<\/span>/);
-  assert.match(nav, />欠款<span class="en-sub">ARREARS<\/span>/);
   assert.match(nav, /data-view="history"/);
   assert.match(nav, /data-view="analysis" id="navAnalysis"/);
   assert.match(nav, /data-view="clients"/);
   assert.match(nav, /data-view="wifi"/);
   assert.doesNotMatch(nav, /ANALYTICS|欠款管理/);
-  assert.equal([...nav.matchAll(/class="nav-btn/g)].length, 6);
+  assert.equal([...nav.matchAll(/class="nav-btn/g)].length, 5);
 });
 
 test("legacy owner proxy entry remains hidden, not primary navigation", async () => {
@@ -50,17 +48,20 @@ test("dashboard and financial formula markers remain unchanged", async () => {
   assert.match(ownerJs, /const netIncome=t\.total/);
 });
 
-test("owner arrears view keeps selected tab during bootstrap and shows loading state", async () => {
+test("owner overview owns arrears follow-up and shows closed loading state", async () => {
   const ownerJs = await readFile("deploy-worker/public/index-51-main.js", "utf8");
   const ownerHtml = await readFile("deploy-worker/public/index-51.html", "utf8");
 
   assert.match(ownerJs, /const initialView=defaultViewForRole\(\)/);
   assert.match(ownerJs, /switchView\(state\.view\|\|initialView\)/);
-  assert.match(ownerJs, /if\(v==='arrears'\)\{loadArrearsForOwner\(\{showLoading:true\}\);\}/);
-  assert.match(ownerJs, /function showArrearsLoading\(\)/);
+  assert.doesNotMatch(ownerJs, /return \['overview','arrears'/);
+  assert.match(ownerJs, /function renderOwnerOverviewArrearsPanel\(\)/);
+  assert.match(ownerJs, /function ensureOwnerOverviewArrearsAsync\(\)/);
+  assert.match(ownerJs, /ARREARS_FETCH_TIMEOUT_MS=10000/);
   assert.match(
     ownerJs,
     /const active=visible\.filter\(isAllowedArrearsSource\)\.filter\(isArrearTaskOpen\)/
   );
+  assert.match(ownerJs, /id="ownerOverviewArrearsPanel"/);
   assert.match(ownerHtml, /\.owner-arrears-task-card\.is-overdue/);
 });

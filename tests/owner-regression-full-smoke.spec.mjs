@@ -19,12 +19,14 @@ test("owner page contains all primary modules and no employee entry tab", async 
   const js = await readFile("deploy-worker/public/index-51-main.js", "utf8");
   const nav = ownerNav(html);
 
-  for (const view of ["overview", "arrears", "history", "analysis", "clients", "wifi"]) {
+  for (const view of ["overview", "history", "analysis", "clients", "wifi"]) {
     assert.match(nav, new RegExp(`data-view="${view}"`));
     assert.match(js, new RegExp(`'${view}'`));
     assert.match(html, new RegExp(`id="view-${view}"`));
   }
 
+  assert.doesNotMatch(nav, /data-view="arrears"|id="navArrears"|>欠款<span/);
+  assert.match(js, /id="ownerOverviewArrearsPanel"/);
   assert.doesNotMatch(nav, /data-view="entry"/);
   assert.match(js, /function switchView\(v\)/);
 });

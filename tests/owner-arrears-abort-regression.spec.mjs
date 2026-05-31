@@ -50,5 +50,6 @@ test("arrears duplicate fetches are sequenced so stale requests cannot overwrite
   assert.match(js, /arrearsLoadSeq:0/);
   assert.match(load, /const loadSeq=\(state\.arrearsLoadSeq\|\|0\)\+1/);
   assert.match(load, /if\(loadSeq!==state\.arrearsLoadSeq\)return false/);
-  assert.match(load, /if\(loadSeq===state\.arrearsLoadSeq\)state\.arrearsLoading=false/);
+  assert.match(load, /if\(loadSeq===state\.arrearsLoadSeq\)\{/);
+  assert.match(load, /state\.arrearsLoading=false/);
 });

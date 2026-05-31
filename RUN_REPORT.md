@@ -5960,3 +5960,11 @@ Safety:
 - Owner navigation must keep all modules reachable: 总览 / 欠款 / 历史 / 分析 / 客户 / 网络.
 - Any owner shell change must run `npm run test:owner-regression-smoke`.
 - Production cutover remains `PRODUCTION_NO_GO`.
+
+## OWNER-ARREARS-OVERVIEW-MERGE-AND-LOADING-FIX-001
+
+- 欠款已并入老板端总览，顶部不再显示欠款一级 Tab。
+- 总览中的 `欠款跟进` 模块必须异步加载，不能阻塞总览首屏。
+- 欠款模块不能无限 loading；20 秒以上 loading 是 P1 blocker，3 分钟 loading 是 P0/P1 blocker。
+- 欠款加载失败只能影响欠款模块自身，必须显示 timeout/error + retry，不能影响总览其他模块。
+- Production cutover remains `PRODUCTION_NO_GO`.
