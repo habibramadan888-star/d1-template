@@ -3714,6 +3714,7 @@ function dueFromLockCards(){
     const remark=cardRemarkText(c);
     return {
       source:'ttlock',
+      source_type:'ttlock_expired_unpaid',
       task_id:`LOCKDUE-${c.bed}-${String(c.end).replaceAll('-','')}`,
       bed:c.bed,
       tenant_name:remark,
@@ -3741,6 +3742,27 @@ function lockCardForFollowup(t){
   const cid=String(t.tenant_card_id||'').trim();
   return state.lockCards.find(c=>(cid&&String(c.tenant_card_id||'')===cid)||(bed&&String(c.bed||'')===bed))||null;
 }
+function normalizeEmployeeReminderSourceType(row){
+  const raw=String(row?.source_type||row?.sourceType||row?.source||'').trim().toLowerCase();
+  if(raw.includes('ttlock'))return 'ttlock_expired_unpaid';
+  if(['existing_arrears_record','historical_arrears','history','history_unmatched','system_arrears','arrears','arrear_tasks'].includes(raw))return 'existing_arrears_record';
+  return raw||'existing_arrears_record';
+}
+function isEmployeeTtlockReminder(item){
+  return normalizeEmployeeReminderSourceType(item)==='ttlock_expired_unpaid'||String(item?.source||'').trim()==='ttlock';
+}
+function isEmployeeSystemArrearsReminder(item){
+  return normalizeEmployeeReminderSourceType(item)==='existing_arrears_record'&&!isEmployeeTtlockReminder(item);
+}
+function stripTtlockAccountPhoneForEmployee(value){
+  return String(value||'')
+    .replace(/\+?971[\s-]?\d{8,10}\b/g,'')
+    .replace(/\bttlock_card\b/ig,'')
+    .replace(/\bsource_ref\b/ig,'')
+    .replace(/\s{2,}/g,' ')
+    .replace(/\s+([|,;])/g,'$1')
+    .trim();
+}
 function historyFollowupItems(){
   return openArrearTasks().map(t=>{
     const card=lockCardForFollowup(t);
@@ -3755,9 +3777,11 @@ function historyFollowupItems(){
     const directiveStatus=t.directive_status||'none';
     const bossDue=t.boss_requested_due_date||'';
     const bossPending=directiveStatus==='pending';
+    const sourceType=normalizeEmployeeReminderSourceType(t);
     const remark=card?cardRemarkText(card):String(t.tenant_name||'').trim();
     return {
-      source:card?'history':'history_unmatched',
+      source:sourceType==='ttlock_expired_unpaid'?'ttlock':(card?'history':'history_unmatched'),
+      source_type:sourceType,
       task_id:t.task_id,
       bed:t.bed||'',
       tenant_name:remark,
@@ -3796,7 +3820,7 @@ function currentFollowupItems(){
 }
 function followupTitle(item){
   const bed=String(item.bed||'').trim();
-  const remark=String(item.lock_remark||item.tenant_name||'').trim();
+  const remark=stripTtlockAccountPhoneForEmployee(item.lock_remark||item.tenant_name||'');
   if(remark&&bed&&new RegExp(`(^|\\D)${bed}(\\D|$)`).test(remark))return remark;
   return [bed,remark].filter(Boolean).join(' · ')||'-';
 }
@@ -3804,7 +3828,7 @@ function followupCard(item){
   const id=safeDomId(item.task_id);
   const force=item.force;
   const cls=item.boss_directive?'directive':(force?'force':(item.source==='history'||item.source==='history_unmatched'?'history':'overdue'));
-  const source=item.source==='ttlock'?'TTLock overdue / \u901a\u901a\u9501\u8fc7\u671f':(item.source==='history_unmatched'?'System arrears / \u7cfb\u7edf\u5df2\u6709\u6b20\u6b3e':'System arrears / \u7cfb\u7edf\u5df2\u6709\u6b20\u6b3e');
+  const source=isEmployeeTtlockReminder(item)?'TTLock overdue / \u901a\u901a\u9501\u8fc7\u671f':'System arrears / \u7cfb\u7edf\u5df2\u6709\u6b20\u6b3e';
   const rentNote=item.amount>0?`${fmtMoney(item.amount)} AED`:'Amount to confirm / \u91d1\u989d\u5f85\u786e\u8ba4';
   const editableStatuses=['\u5f85\u8ddf\u8fdb','\u5df2\u8054\u7cfb','\u627f\u8bfa\u4ed8\u6b3e','\u65e0\u6cd5\u8054\u7cfb','\u8f6c\u8001\u677f\u5904\u7406'];
   const currentStatus=String(item.followup_status||'\u5f85\u8ddf\u8fdb');
@@ -3846,8 +3870,8 @@ function followupCard(item){
 function renderTasks(){
   renderEmployeeDirectiveInbox();
   const items=currentFollowupItems();
-  const history=items.filter(x=>x.source==='history'||x.source==='history_unmatched');
-  const due=items.filter(x=>x.source==='ttlock');
+  const history=items.filter(isEmployeeSystemArrearsReminder);
+  const due=items.filter(isEmployeeTtlockReminder);
   const force=items.filter(x=>x.force).length;
   const total=items.reduce((s,x)=>s+num(x.amount),0);
   const dashboard=`<div class="kpi-grid followup-dashboard">

@@ -2273,3 +2273,17 @@ Date: 2026-06-01, Asia/Dubai
 | requested / created / skipped / blocked | PASS | `46 / 45 / 1 / 0` |
 | employee follow-up batch write | NOT_RUN | explicitly excluded |
 | Production cutover | NO_GO | Remains `PRODUCTION_NO_GO` |
+
+## EMPLOYEE-FOLLOWUP-SYSTEM-REMINDER-COUNT-AND-PHONE-HIDE-001 Verification Addendum
+
+Date: 2026-06-01, Asia/Dubai
+
+| Verification | Result | Evidence |
+|---|---:|---|
+| System Reminders source-count audit | PASS | `EMPLOYEE_SYSTEM_REMINDER_COUNT_SOURCE_AUDIT.md` |
+| System Reminders count fix | PASS | `EMPLOYEE_SYSTEM_REMINDER_COUNT_FIX_RESULT.md` |
+| TTLock account phone display audit | PASS | `EMPLOYEE_FOLLOWUP_PHONE_DISPLAY_SOURCE_AUDIT.md` |
+| TTLock account phone hidden from title | PASS | `EMPLOYEE_FOLLOWUP_HIDE_TTLOCK_ACCOUNT_PHONE_RESULT.md` |
+| Display-title sanitizer | PASS | `EMPLOYEE_FOLLOWUP_DISPLAY_TITLE_SANITIZER_RESULT.md` |
+| production write | NO | no write gate, no D1 write |
+| Production cutover | NO_GO | Remains `PRODUCTION_NO_GO` |

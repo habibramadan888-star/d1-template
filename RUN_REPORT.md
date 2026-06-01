@@ -6433,3 +6433,16 @@ Result: `PASS_FOR_INTERNAL_TESTING`.
 - Owner visibility verification matched 46 assigned tasks.
 - No employee follow-up batch write, amount change, actual_received change, accounting_status change, close/void, financial formula change, dashboard calculation change, commercial launch, or production cutover was performed.
 - Production cutover remains `PRODUCTION_NO_GO`.
+
+## EMPLOYEE-FOLLOWUP-SYSTEM-REMINDER-COUNT-AND-PHONE-HIDE-001 - 2026-06-01
+
+Result: `UI_FIX_READY_FOR_ACCEPTANCE`.
+
+- Employee System Reminders now classify counters from normalized active `source_type`.
+- `ttlock_expired_unpaid` rows are counted under TTLock Overdue and are not counted as Arrears.
+- `existing_arrears_record` rows remain counted under Arrears.
+- Boss Assigned count remains separate from System Reminders and continues to come from persisted employee directives.
+- Employee FOLLOW-UP system reminder titles now hide TTLock account phone identifiers such as `+971...`.
+- Raw TTLock data, `source_ref`, dedupe keys, materialization data, financial formulas, and dashboard calculations were not changed.
+- No production write, write gate opening, migration, D1 execute/export/import, deploy, employee follow-up write, owner directive create, batch dispatch, or TTLock smoke was performed.
+- Production cutover remains `PRODUCTION_NO_GO`.

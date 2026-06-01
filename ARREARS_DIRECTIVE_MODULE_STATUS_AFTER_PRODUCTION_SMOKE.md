@@ -155,3 +155,17 @@ This document does not approve TTLock production smoke, batch dispatch, public b
 | production write gate after dispatch | OFF |
 | employee follow-up batch write | NOT_RUN |
 | production cutover | PRODUCTION_NO_GO |
+
+## Employee Follow-up System Reminder UI Update - 2026-06-01
+
+| Capability | Status |
+|---|---|
+| Abdul real assigned directives | PASS |
+| System Reminders count source alignment | PASS |
+| TTLock Overdue source bucket | `ttlock_expired_unpaid` |
+| System Arrears source bucket | `existing_arrears_record` |
+| TTLock account phone hidden from employee title | PASS |
+| raw TTLock/source_ref preservation | PASS |
+| production write gate | OFF |
+| employee follow-up write | NOT_RUN |
+| production cutover | PRODUCTION_NO_GO |

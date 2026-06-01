@@ -399,3 +399,14 @@ When approval is later granted, employee QA must verify:
 5. Internal source refs, raw source types, and debug fields are not shown.
 6. No employee follow-up batch write is included in the dispatch validation.
 7. Production cutover remains `PRODUCTION_NO_GO`.
+
+## Employee Follow-up System Reminder Count and Title QA
+
+1. Open Abdul employee FOLLOW-UP page.
+2. Confirm Boss Assigned count comes from persisted `/api/employee/arrears/directives` rows.
+3. Confirm System Reminders counters are source-based, not copied from the Boss Assigned count.
+4. For the current 46 real dispatch split, confirm TTLock Overdue maps to `ttlock_expired_unpaid` and Arrears maps to `existing_arrears_record`.
+5. Confirm TTLock rows are not counted as Arrears.
+6. Confirm employee task card titles do not show `+971...` TTLock account identifiers.
+7. Confirm raw `source_ref`, dedupe keys, and backend TTLock data are not shown in the default employee card.
+8. No production write, follow-up write, owner directive create, batch dispatch, or write gate opening is authorized by this QA.

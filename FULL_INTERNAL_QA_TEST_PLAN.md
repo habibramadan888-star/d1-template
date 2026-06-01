@@ -621,3 +621,14 @@ QA must verify before any later write approval:
 - Production write gate is opened only for the approved dispatch window and closed immediately afterward.
 - No employee follow-up batch write, TTLock smoke, financial formula change, dashboard calculation change, or production cutover is included.
 - Production cutover remains `PRODUCTION_NO_GO`.
+
+## Employee Follow-up System Reminder Count and Phone-Hide Acceptance
+
+- System Reminders must count by active business source type.
+- `ttlock_expired_unpaid` must appear under TTLock Overdue, not Arrears.
+- `existing_arrears_record` must appear under Arrears.
+- Boss Assigned count must remain separate from System Reminders.
+- Employee default task card titles must hide TTLock account phone identifiers such as `+971...`.
+- Raw TTLock data, `source_ref`, and dedupe/materialization fields must not be deleted or changed.
+- This is a UI/count classification fix only; no production write, migration, deploy, financial formula change, or dashboard calculation change is included.
+- Production cutover remains `PRODUCTION_NO_GO`.
