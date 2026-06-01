@@ -36,8 +36,6 @@ test("employee entry nav remains intact on employee-v3", async () => {
     employee,
     /data-view="arrears"><span class="tab-cn">跟进<\/span><span class="en">FOLLOW-UP<\/span>/
   );
-  assert.match(
-    employee,
-    /data-view="export"><span class="tab-cn">导出<\/span><span class="en">EXPORT<\/span>/
-  );
+  assert.doesNotMatch(employee, /data-view="export"/);
+  assert.doesNotMatch(employee, /id="view-export"/);
 });

@@ -229,3 +229,14 @@ During employee QA, confirm:
 3. Do not submit another employee follow-up to validate this UI state.
 4. Do not open write gate for UI acceptance.
 5. Production cutover remains `PRODUCTION_NO_GO`.
+## EMPLOYEE-FOLLOWUP-MATCH-ENTRY-UX-001
+
+Status: ready for internal mobile acceptance, not deployed by default.
+
+- Follow-up page must visually match the Entry page layout system.
+- Employee app now exposes only `Entry / 录入` and `Follow-up / 跟进`.
+- Employee Export tab/page is removed; Entry handover internals remain hidden and preserved.
+- Header employee name and `Logout / 退出` use the same size, color, font, and centered layout.
+- Follow-up task cards default to a compact execution view and support expand/collapse.
+- No production write, no migration, write gate off.
+- Production cutover remains `PRODUCTION_NO_GO`.

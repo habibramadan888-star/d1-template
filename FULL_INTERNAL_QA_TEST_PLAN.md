@@ -463,3 +463,16 @@ Production cutover remains `PRODUCTION_NO_GO`.
 - All employee boss directive renderers must use the same saved/dirty state model.
 - Owner followed-up tasks must not show clickable primary `下发员工`.
 - Production cutover remains `PRODUCTION_NO_GO`.
+## EMPLOYEE-FOLLOWUP-MATCH-ENTRY-UX-001
+
+QA scope:
+
+- Verify employee tabs show only Entry and Follow-up.
+- Verify no visible employee Export page or Export tab.
+- Verify Follow-up cards use the same card radius, padding, buttons, and typography as Entry.
+- Verify employee name and Logout controls use matching styles.
+- Verify boss assigned tasks show compact fields by default and details on expand.
+- Verify old employee export route lands in Follow-up.
+- Verify boss WhatsApp/arrears export remains unaffected.
+- Verify no production write and write gate remains off.
+- Verify production cutover remains `PRODUCTION_NO_GO`.

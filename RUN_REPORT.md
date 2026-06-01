@@ -6253,3 +6253,15 @@ Safety:
 - Default action is no deploy; deployment requires separate approval and must be limited to UI state/button fixes only.
 - No production write, write gate opening, deploy, migration, batch dispatch, TTLock smoke, financial formula change, or dashboard calculation change was performed.
 - Production cutover remains `PRODUCTION_NO_GO`.
+## EMPLOYEE-FOLLOWUP-MATCH-ENTRY-UX-001
+
+Result: implemented locally, not deployed.
+
+- Follow-up aligned with Entry layout tokens/classes.
+- Employee navigation reduced to Entry and Follow-up.
+- Employee Export visible page/entry removed; hidden buffer retained only for Entry handover internals.
+- Header account/logout style aligned.
+- New regression tests added and passing.
+- No production write.
+- Write gate off.
+- Production cutover remains `PRODUCTION_NO_GO`.

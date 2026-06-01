@@ -239,3 +239,16 @@ Production remains `PRODUCTION_NO_GO`.
 | Clipboard/share/fallback text matches | Yes | | Same generated text for all paths. |
 | readonly_admin has no write action | Yes | | View/export only. |
 | Production cutover remains `PRODUCTION_NO_GO` | Yes | | No GO marking from visual QA. |
+## EMPLOYEE-FOLLOWUP-MATCH-ENTRY-UX-001
+
+Employee mobile visual checklist:
+
+- Header shows one employee identity display and one `Logout / 退出` control.
+- Employee identity and Logout controls use matching background, font, size, radius, and centered text.
+- Top tabs show only `Entry / 录入` and `Follow-up / 跟进`.
+- Follow-up page visually matches Entry page card, button, spacing, and typography rules.
+- Boss Assigned Tasks appear before System Reminders.
+- Default Follow-up card shows only Bed, Amount, Due, Status, and Details.
+- Expanded card shows Promise Date, Note, Boss Note, Source, and Submit/Saved state.
+- No visible employee Export page.
+- Boss WhatsApp export remains available on owner side.

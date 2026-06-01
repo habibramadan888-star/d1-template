@@ -22,7 +22,7 @@ test("button copy distinguishes saved, submit feedback, and submit changes", asy
 
   assert.match(update, /textContent='.*'/);
   assert.match(update, /hasPersisted&&!dirty/);
-  assert.match(update, /hasPersisted\?'提交修改':'提交反馈'/);
+  assert.match(update, /hasPersisted\?'Submit Changes \/ 提交修改':'Submit Feedback \/ 提交反馈'/);
   assert.match(update, /aria-disabled/);
 });
 

@@ -2084,3 +2084,14 @@ Deployment verification:
 | Production write / gate | NOT_RUN | No production write and no write gate opening in this audit. |
 | D1 migration / deploy | NOT_RUN | No migration, D1 execute/export/import, or deploy was performed. |
 | Production cutover | NO_GO | Remains `PRODUCTION_NO_GO`. |
+## EMPLOYEE-FOLLOWUP-MATCH-ENTRY-UX-001
+
+Verification status:
+
+- `security:secrets`: PASS.
+- `gate:commercial-launch`: `PRODUCTION_NO_GO`.
+- Employee Follow-up layout/interaction/export/header/bilingual tests: PASS.
+- No production write.
+- No migration.
+- No deploy.
+- Write gate off.

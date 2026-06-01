@@ -3510,6 +3510,7 @@ async function handleAppEntryRoute(request, env, path, method) {
   if (path === "/" || path === "/home") return fetchStaticAsset(request, env, "/portal");
   if (path === "/login" || path === "/unified-login.html") return redirectToRootEntry(request);
   if (path === "/employee-login" || path === "/staff-login" || path === "/employee.html") return redirectToRootEntry(request, "employee");
+  if (path === "/employee/export") return redirectToPath(request, "/employee#arrears");
   if (path === "/owner-login") return redirectToRootEntry(request, "owner");
   if (path === "/admin-login") return redirectToRootEntry(request, "admin");
   if (path === "/employee-v3.html" || path === "/employee-v2.html") return redirectToPath(request, "/employee");
