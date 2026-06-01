@@ -2331,3 +2331,21 @@ Date: 2026-06-01, Asia/Dubai
 | production business write | NO | no write API invoked |
 | write gate | OFF | no write gate opened |
 | Production cutover | NO_GO | Remains `PRODUCTION_NO_GO` |
+
+## Bed Transfer Accounting Closure Verification
+
+| Check | Status | Evidence |
+|---|---|---|
+| from_bed field | PASS | `transferFromBed` |
+| to_bed field | PASS | `bedTo` |
+| transfer date | PASS | `transferDate` |
+| transfer reason | PASS | `transferReason` |
+| from/to validation | PASS | `bedTransferValidationSummary` |
+| deposit carry rule | DOCUMENTED | `BED_TRANSFER_ACCOUNTING_RULES.md` |
+| arrears carry rule | DOCUMENTED | `BED_TRANSFER_ACCOUNTING_RULES.md` |
+| TTLock preservation | DOCUMENTED | `BED_TRANSFER_TTLOCK_MIGRATION_RULES.md` |
+| traceability model | DOCUMENTED | `BED_TRANSFER_TRACEABILITY_MODEL.md` |
+| statistical anchors | DOCUMENTED | `BED_TRANSFER_STATISTICAL_ANCHORS.md` |
+| production business write | NO | no write API invoked |
+| production migration | NO | no migration executed |
+| Production cutover | NO_GO | Remains `PRODUCTION_NO_GO` |

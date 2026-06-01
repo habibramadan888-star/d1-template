@@ -659,3 +659,14 @@ Employee navigation split QA update:
 - System Reminders count logic and source classification are unchanged.
 - No production write, write gate opening, migration, deploy, employee follow-up write, owner directive create, batch dispatch, TTLock smoke, financial formula change, dashboard calculation change, or production cutover is authorized by this QA item.
 - Production cutover remains `PRODUCTION_NO_GO`.
+
+Bed Transfer accounting closure QA update:
+
+- Bed Transfer must include `from_bed` and `to_bed`; a single generic bed field is insufficient.
+- Deposit liability follows the customer and is not revenue.
+- Carry-over arrears do not disappear during transfer.
+- Old TTLock records must be retained and linked to the transfer trace.
+- Bed Transfer is not new tenant and not checkout.
+- Bed Transfer creates statistical anchors such as monthly/quarterly transfer counts, reason distribution, and transfer-with-arrears counts.
+- No production write, production migration, deploy, financial formula change, dashboard calculation change, or production cutover is authorized by this QA item.
+- Production cutover remains `PRODUCTION_NO_GO`.

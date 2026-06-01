@@ -2253,6 +2253,49 @@ label .label-en{
 .employee-system-view .followup-actions select,
 .employee-system-view .followup-actions input{min-height:48px;border-radius:16px;padding:14px 15px;font-size:14px}
 .employee-system-view .followup-actions .mini-btn{min-height:48px;border-radius:17px;padding:12px 16px;font-size:13px}
+.bed-transfer-context{
+  grid-column:1/-1;
+  border:1px dashed #d7e3dd;
+  border-radius:18px;
+  background:#f8fcfa;
+  padding:14px 16px;
+  color:#445063;
+  font-size:13px;
+  line-height:1.55;
+}
+.bed-transfer-context strong{
+  display:block;
+  color:#142033;
+  font-size:14px;
+  margin-bottom:6px;
+}
+.bed-transfer-context .transfer-check-grid{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:8px;
+  margin-top:10px;
+}
+.transfer-check{
+  border:1px solid var(--line);
+  border-radius:14px;
+  background:#fff;
+  padding:10px;
+}
+.transfer-check span{
+  display:block;
+  color:#617086;
+  font-size:10px;
+  font-weight:950;
+  text-transform:uppercase;
+  letter-spacing:.04em;
+}
+.transfer-check b{
+  display:block;
+  margin-top:4px;
+  color:#142033;
+  font-size:12px;
+  word-break:break-word;
+}
 @media(max-width:720px){
   .brand{
     grid-template-columns:1fr auto;
@@ -2361,6 +2404,9 @@ label .label-en{
   }
   .employee-followup-view .employee-directive-actions{
     justify-content:stretch;
+  }
+  .bed-transfer-context .transfer-check-grid{
+    grid-template-columns:1fr 1fr;
   }
 }
 </style>
@@ -2495,8 +2541,25 @@ label .label-en{
           <div class="field"><label>扣款说明 ded_note</label><input id="dedNote" placeholder="其他扣款必须说明"></div>
         </div>
         <div class="grid" id="transferFields">
-          <div class="field"><label>换至床位 bed_to</label><input id="bedTo" placeholder="852"></div>
+          <div class="field"><label>原床位 from_bed</label><input id="transferFromBed" data-bed-transfer-from="true" placeholder="431"></div>
+          <div class="field"><label>新床位 to_bed</label><input id="bedTo" data-bed-transfer-to="true" placeholder="852"></div>
+          <div class="field"><label>换床日期 transfer_date</label><input id="transferDate" data-bed-transfer-date="true" type="date"></div>
+          <div class="field"><label>换床原因 reason</label><select id="transferReason" data-bed-transfer-reason="true"><option value="">请选择原因</option><option value="customer_request">customer request / 客户要求</option><option value="room_issue">room issue / 房间问题</option><option value="management_adjustment">management adjustment / 管理调整</option><option value="bed_upgrade">bed upgrade / 升级</option><option value="other">other / 其他</option></select></div>
           <div class="field"><label>换床费处理</label><select id="feePaid"><option value="Y">收取 50 AED</option><option value="N">免收，必须填原因</option></select></div>
+          <div class="bed-transfer-context" id="transferReviewPanel" data-bed-transfer-review="true">
+            <strong>系统资料核对 / Verify System Context</strong>
+            <div>选择原床位后，系统会保留当前住客、押金、租金周期、欠款和 TTLock 锚点。换床事件不会被统计为新入住或退房。</div>
+            <div class="transfer-check-grid">
+              <div class="transfer-check"><span>Occupant</span><b id="transferOccupantReview">待选择原床位</b></div>
+              <div class="transfer-check"><span>Deposit</span><b id="transferDepositReview">待核对</b></div>
+              <div class="transfer-check"><span>Rent Period</span><b id="transferPeriodReview">待核对</b></div>
+              <div class="transfer-check"><span>Arrears</span><b id="transferArrearsReview">待核对</b></div>
+              <div class="transfer-check"><span>Old TTLock</span><b id="transferOldTtlockReview">待核对</b></div>
+              <div class="transfer-check"><span>New Bed</span><b id="transferNewBedReview">待填写</b></div>
+              <div class="transfer-check"><span>Rent Difference</span><b id="transferRentDiffReview">待核对</b></div>
+              <div class="transfer-check"><span>Audit</span><b id="transferAuditReview">将记录 from/to/operator/reason</b></div>
+            </div>
+          </div>
         </div>
         <div class="grid" id="expenseFields">
           <div class="field"><label>支出类别</label><select id="expenseCategory"><option value="ROOM">指定房间</option><option value="COMMON">公共区域</option><option value="SUPPLIES">采购耗材</option><option value="OTHER">其他</option></select></div>
@@ -3054,6 +3117,65 @@ function renderContextNotice(){
   $('contextNotice').innerHTML='';
   $('contextNotice').style.display='none';
 }
+function transferValue(id){
+  return ($(id)?.value||'').trim().replace(/^#/,'');
+}
+function bedTransferValidationSummary(fromBed,toBed,context={}){
+  const errors=[], review=[];
+  if(!fromBed)errors.push('from_bed_required');
+  if(!toBed)errors.push('to_bed_required');
+  if(fromBed&&toBed&&fromBed===toBed)errors.push('from_bed_must_differ_from_to_bed');
+  if(context.fromBedHasActiveTenant===false)errors.push('from_bed_no_active_tenant');
+  if(context.toBedAvailable===false)review.push('to_bed_occupied_or_needs_review');
+  if(context.depositFound===false)review.push('deposit_review_required');
+  if(context.rentPeriodFound===false)review.push('rent_period_review_required');
+  if(context.ttlockFound===false)review.push('ttlock_review_required');
+  if(context.pendingTransfer===true)review.push('pending_transfer_exists');
+  if(context.rentDifferenceFils&&Number(context.rentDifferenceFils)!==0)review.push('rent_difference_review');
+  return {ok:errors.length===0,errors,review,status:errors.length?'blocked':(review.length?'pending_review':'validated')};
+}
+function bedTransferReviewContext(){
+  const fromBed=transferValue('transferFromBed')||transferValue('bed');
+  const toBed=transferValue('bedTo');
+  const current=state.current;
+  const fromRent=rentForBed(fromBed);
+  const toRent=rentForBed(toBed);
+  const toMatches=toBed?state.lockCards.filter(c=>String(c.bed)===toBed):[];
+  const toOccupied=toMatches.some(c=>!c.vacant);
+  const open=openTasksForBed();
+  return {
+    fromBed,
+    toBed,
+    fromRent,
+    toRent,
+    rentDifferenceFils:toRent&&fromRent?Math.round((toRent-fromRent)*100):0,
+    fromBedHasActiveTenant:!!(current&&!current.vacant),
+    toBedAvailable:toBed?!toOccupied:undefined,
+    depositFound:!!depositHeld(),
+    rentPeriodFound:!!(current?.start_md||current?.start||current?.end),
+    ttlockFound:!!current,
+    arrearsCount:open.length,
+    arrearsAed:open.reduce((s,t)=>s+taskRemain(t),0)
+  };
+}
+function updateBedTransferReviewPanel(){
+  const panel=$('transferReviewPanel');
+  if(!panel)return;
+  const ctx=bedTransferReviewContext();
+  const summary=bedTransferValidationSummary(ctx.fromBed,ctx.toBed,ctx);
+  const set=(id,value)=>{const el=$(id);if(el)el.textContent=value};
+  set('transferOccupantReview',ctx.fromBedHasActiveTenant?($('tenantName').value||state.current?.tenant||'active tenant'):(ctx.fromBed?'no active tenant / 需核对':'待选择原床位'));
+  set('transferDepositReview',ctx.depositFound?`${fmtMoney(depositHeld())} AED carried`:'deposit_review_required / 押金需核对');
+  set('transferPeriodReview',ctx.rentPeriodFound?`${state.current?.start_md||state.current?.start||'-'} → ${state.current?.end||'-'}`:'rent_period_review_required');
+  set('transferArrearsReview',ctx.arrearsCount?`${ctx.arrearsCount} open / ${fmtMoney(ctx.arrearsAed)} AED carry-over`:'no open arrears found');
+  set('transferOldTtlockReview',ctx.ttlockFound?`old ref kept: ${state.current?.tenant_card_id||'-'}`:'ttlock_review_required');
+  set('transferNewBedReview',ctx.toBed?(ctx.toBedAvailable===false?'occupied / needs_review':'available or pending verification'):'待填写新床位');
+  set('transferRentDiffReview',ctx.fromRent&&ctx.toRent?`${fmtMoney(toRentMinusFrom(ctx))} AED review`:'rent config review');
+  set('transferAuditReview',`${summary.status}: from/to/operator/reason`);
+}
+function toRentMinusFrom(ctx){
+  return ((ctx.toRent||0)-(ctx.fromRent||0));
+}
 function renderTaskInfo(){
   const t=selectedTask();
   $('apTaskInfo').innerHTML=t?`关联欠款：<strong>#${esc(t.bed||'')}</strong> ${esc(t.tenant_name||'-')}，剩余 <strong>${fmtMoney(taskRemain(t))} AED</strong>，账期 ${esc(t.original_period_start||'-')} → ${esc(t.original_period_end||'-')}，状态 ${esc(t.followup_status||'待跟进')}`:'请选择一条欠款任务；系统会把本次收款自动回写到该任务。';
@@ -3156,7 +3278,7 @@ function setEntryType(type){
   const prev=$('entryType').value;
   $('entryType').value=type;
   if(prev!==type){
-    ['amount','due','paid','periodStart','periodEnd','periodDays','periodDue','customReason','remark','arrearAmount','arrearPromiseDate','arrearReasonDetail','depositDeduction','depositReturnAmount','overdayDeduction','noNoticeDeduction','otherDeduction','dedNote','bedTo','expenseDesc','excessTo'].forEach(id=>$(id).value='');
+    ['amount','due','paid','periodStart','periodEnd','periodDays','periodDue','customReason','remark','arrearAmount','arrearPromiseDate','arrearReasonDetail','depositDeduction','depositReturnAmount','overdayDeduction','noNoticeDeduction','otherDeduction','dedNote','transferFromBed','bedTo','transferDate','transferReason','expenseDesc','excessTo'].forEach(id=>$(id).value='');
     $('arrearHandling').value='ARREAR';
     $('reasonCode').value='';
     $('entryClr').value='Y';
@@ -3221,6 +3343,11 @@ function renderSummary(){
   }
   if(type==='R'&&num($('amount').value)>num($('due').value))items.push(['超收处理',$('excessTo').value||'未选择']);
   if(type==='CO'){const co=checkoutCalc();items.push(['退房扣款',`${fmtMoney(co.total)} / 超期${co.overDays}天 / 提前${co.earlyDays}天`]);}
+  if(type==='TF'){
+    items.push(['BED TRANSFER',`#${$('transferFromBed').value||$('bed').value||'-'} -> #${$('bedTo').value||'-'}`]);
+    items.push(['TRANSFER DATE',$('transferDate').value||'-']);
+    items.push(['TRANSFER REASON',$('transferReason').value||'-']);
+  }
   $('entrySummary').innerHTML=items.map(([k,v])=>`<div><span>${esc(k)}</span><b>${esc(v)}</b></div>`).join('');
 }
 function syncForm(){
@@ -3228,6 +3355,10 @@ function syncForm(){
   const hasPeriod=['R','AP','TFF'].includes(type);
   const rent=rentForBed();
   if(type==='R')$('listPrice').value=rent?fmtMoney(rent):'';
+  if(type==='TF'){
+    if(!$('transferFromBed').value.trim()&&$('bed').value.trim())$('transferFromBed').value=$('bed').value.trim().replace(/^#/,'');
+    if(!$('transferDate').value)$('transferDate').value=today();
+  }
   updateEventChips();
   $('objectHint').textContent=type==='E'?'支出不需要床位时可以只选择类别；如果是指定房间维修，可在备注写床位。':(type==='TF'?'换床需要填写原床位和新床位，系统会保留换床前后锚点。':'收租/收押金/退押金/还欠款：填写床位号，系统自动抓取租客上下文。');
   visible(['periodStep'],hasPeriod);visible(['apFields'],type==='AP');visible(['checkoutFields'],type==='CO');visible(['transferFields'],type==='TF');visible(['expenseFields'],type==='E');visible(['paymentStep'],!['E','CO'].includes(type));
@@ -3278,6 +3409,7 @@ function syncForm(){
   visible(['excessWrap'],type==='R'&&num($('amount').value)>num($('due').value));
   renderTaskInfo();
   renderContextNotice();
+  updateBedTransferReviewPanel();
   renderSummary();
   validate();
 }
@@ -3312,7 +3444,15 @@ function validate(){
   if(type==='CO'&&num($('otherDeduction').value)>0&&!$('dedNote').value.trim())errors.push('退房其他扣款必须填写扣款说明。');
   if(type==='CO'&&Math.max(0,depositHeld()-num($('depositDeduction').value))>0)warns.push('退房后仍有应退押金，请继续录入 DR 退押金完成现金流。');
   if(type==='R'&&due>0&&amt>due&&!$('excessTo').value)errors.push('收租超收必须选择处理方式：找零已退还，或转老板处理。');
-  if(type==='TF'&&!$('bedTo').value.trim())errors.push('换床必须填写目标床位。');
+  if(type==='TF'&&!$('transferFromBed').value.trim())errors.push('换床必须填写原床位 from_bed。');
+  if(type==='TF'&&!$('bedTo').value.trim())errors.push('换床必须填写目标床位 to_bed。');
+  if(type==='TF'&&$('transferFromBed').value.trim().replace(/^#/,'')===$('bedTo').value.trim().replace(/^#/,''))errors.push('换床 from_bed 和 to_bed 不能相同。');
+  if(type==='TF'&&!$('transferDate').value)errors.push('换床必须填写换床日期 transfer_date。');
+  if(type==='TF'&&state.current?.vacant)errors.push('原床位没有 active tenant，不能直接保存换床。');
+  if(type==='TF'){
+    const transferReview=bedTransferValidationSummary(transferValue('transferFromBed')||transferValue('bed'),transferValue('bedTo'),bedTransferReviewContext());
+    transferReview.review.forEach(code=>warns.push(`换床需复核：${code}`));
+  }
   if(type==='TF'&&$('feePaid').value==='Y'&&amt!==50)errors.push('换床收取费用时，系统固定按 50 AED 计入，员工不能手动改金额。');
   if(type==='E'&&!$('expenseDesc').value.trim())errors.push('支出必须填写说明。');
   if(type==='AP'&&!$('linkedTaskId').value)errors.push('还欠款必须选择一条欠款任务，不能自由录入。');
@@ -3339,7 +3479,7 @@ function entryPayload(){
   const reasonCode=tail>0?'SHORT_PAID':($('reasonCode').value||type);
   return {
     id:uid('E'),entry_id:null,type,reason_code:reasonCode,cat:pay==='B'?'bank':(type==='E'||type==='DR'?'expense':'cash'),pay_type:pay,bank_ref:$('bankRef').value.trim(),
-    room:$('bed').value.trim().replace(/^#/,''),roomTo:$('bedTo').value.trim().replace(/^#/,''),bed_from:$('bed').value.trim().replace(/^#/,''),bed_to:$('bedTo').value.trim().replace(/^#/,''),
+    room:$('bed').value.trim().replace(/^#/,''),roomTo:$('bedTo').value.trim().replace(/^#/,''),bed_from:($('transferFromBed').value.trim()||$('bed').value.trim()).replace(/^#/,''),bed_to:$('bedTo').value.trim().replace(/^#/,''),
     tenant_name:$('tenantName').value.trim(),tenant_card_id:$('tenantCardId').value.trim(),tag:type==='D'?'N':type==='TF'?'T':'O',
     amount:amt,due,paid,deficit:Math.max(0,due-paid),entry_clr:$('entryClr').value,clr:$('entryClr').value,excess:Math.max(0,amt-due),excess_to:$('excessTo').value,
     list_price:num($('listPrice').value),period_start:$('periodStart').value,period_end:$('periodEnd').value,cycle:$('cycle').value,
@@ -3347,6 +3487,8 @@ function entryPayload(){
     checkout_date:$('checkoutDate').value,deposit_held:depositHeld(),deposit_return:type==='CO'?depositReturnStatus(depositHeld(),co.total):'',deposit_amt:type==='CO'?Math.max(0,depositHeld()-co.total):0,deposit_deduction:type==='CO'?co.total:num($('depositDeduction').value),
     ded_reason:dedReasons.join('+'),ded_days:co.overDays,ded_rate:40,ded_note:$('dedNote').value.trim(),early_days:co.earlyDays,
     fee_paid:$('feePaid').value,fee_waiver_reason:$('feePaid').value==='N'?$('customReason').value.trim():'',
+    transfer_date:$('transferDate').value,transfer_reason:$('transferReason').value,transfer_validation_status:type==='TF'?bedTransferValidationSummary(transferValue('transferFromBed')||transferValue('bed'),transferValue('bedTo'),bedTransferReviewContext()).status:'',
+    carry_over_arrears:openTasksForBed().reduce((s,t)=>s+taskRemain(t),0),deposit_carried:depositHeld(),old_ttlock_ref:state.current?.tenant_card_id||'',old_lock_valid_from:state.current?.start||state.current?.start_md||'',old_lock_valid_until:state.current?.end||'',rent_difference:toRentMinusFrom(bedTransferReviewContext()),
     expense_category:$('expenseCategory').value,expense_desc:$('expenseDesc').value.trim(),
     linked_task_id:$('linkedTaskId').value,original_period_start:$('periodStart').value,original_period_end:$('periodEnd').value,
     arrear_handling:tail>0?$('arrearHandling').value:'',arrear_promise_date:tail>0?$('arrearPromiseDate').value:'',arrear_reason_detail:tail>0?tailReason:'',
@@ -3365,7 +3507,7 @@ function exportLine(e){
   if(e.type==='DR')return `#${e.room} ${name} DR ${fmtMoney(e.amount)} AED ${e.pay_type}\n  card ${cid} EID ${e.id}`;
   if(e.type==='CO')return `#${e.room} ${name} left ${e.checkout_date||'-'} CO\n  card ${cid}\n  deposit held ${fmtMoney(e.deposit_held)} deducted ${fmtMoney(e.deposit_deduction)} return ${fmtMoney(e.deposit_amt)} DED ${e.ded_reason||'-'} ${e.ded_days||0}D rate ${fmtMoney(e.ded_rate||40)} early ${e.early_days||0}D note ${e.ded_note||'-'} EID ${e.id}`;
   if(e.type==='AP')return `#${e.room} ${name} AP ${fmtMoney(e.amount)} AED ${e.pay_type} closes TASK ${e.linked_task_id||'-'}\n  card ${cid}${period} EID ${e.id}`;
-  if(e.type==='TF')return `#${e.bed_from} -> #${e.bed_to} ${name} TF ${e.fee_paid==='Y'?'FEE50 '+e.pay_type:'FEE0 waived '+(e.fee_waiver_reason||'-')}\n  card ${cid} EID ${e.id}`;
+  if(e.type==='TF')return `#${e.bed_from} -> #${e.bed_to} ${name} TF ${e.fee_paid==='Y'?'FEE50 '+e.pay_type:'FEE0 waived '+(e.fee_waiver_reason||'-')}\n  transfer ${e.transfer_date||'-'} reason ${e.transfer_reason||'-'} deposit carried ${fmtMoney(e.deposit_carried||0)} arrears carried ${fmtMoney(e.carry_over_arrears||0)} old_ttlock ${e.old_ttlock_ref||cid||'-'} EID ${e.id}`;
   if(e.type==='TFF')return `#${e.room} ${name} TFF ${fmtMoney(e.amount)} AED ${e.pay_type}\n  card ${cid} EID ${e.id}`;
   return `#${e.room||e.expense_category} ${fmtMoney(e.amount)} AED ${e.pay_type} ${e.expense_desc||e.note||''}\n  EID ${e.id}`;
 }
@@ -3392,7 +3534,7 @@ async function saveEntry(){
   $('validationBox').innerHTML=localOk?'<div>已加入本票流水。本笔暂存本地，点击“导出交接”后整票统一上传云端并生成交接文本。</div>':'<div class="warn">已加入页面本票，但本地保存失败，请先不要关闭页面。</div>';
   toast(localOk?'已加入本票流水；整票上云请点导出交接':'已加入页面本票，本地保存失败');
 }
-function resetForm(){['bed','bedTo','amount','due','paid','tenantName','tenantCardId','periodStart','periodEnd','periodDays','periodDue','listPrice','customReason','bankRef','checkoutDate','depositDeduction','depositReturnAmount','overdayDeduction','noNoticeDeduction','otherDeduction','dedNote','expenseDesc','remark','excessTo','arrearAmount','arrearPromiseDate','arrearReasonDetail'].forEach(id=>$(id).value='');$('arrearHandling').value='ARREAR';state.current=null;state.depositBalance=null;renderContext();syncForm();refreshSessionViews()}
+function resetForm(){['bed','transferFromBed','bedTo','transferDate','transferReason','amount','due','paid','tenantName','tenantCardId','periodStart','periodEnd','periodDays','periodDue','listPrice','customReason','bankRef','checkoutDate','depositDeduction','depositReturnAmount','overdayDeduction','noNoticeDeduction','otherDeduction','dedNote','expenseDesc','remark','excessTo','arrearAmount','arrearPromiseDate','arrearReasonDetail'].forEach(id=>$(id).value='');$('arrearHandling').value='ARREAR';state.current=null;state.depositBalance=null;renderContext();syncForm();refreshSessionViews()}
 function hasLocalOnly(){return state.drafts.some(e=>e.sync_status!=='SYNCED')}
 function newSession(){
   if(hasLocalOnly()){toast('仍有云端未确认记录，不能开始新会话');return}
@@ -4317,9 +4459,11 @@ if(location.hash==='#export'){
 showEmployeeView(location.hash||'entry',{pushHash:false});
 document.querySelectorAll('.event-chip').forEach(btn=>btn.addEventListener('click',e=>{e.preventDefault();setEntryType(btn.dataset.type);}));
 document.querySelectorAll('.pay-option').forEach(btn=>btn.addEventListener('click',e=>{e.preventDefault();setPaymentType(btn.dataset.pay);}));
-['entryType','cycle','payType','amount','reasonCode','feePaid','customReason','tenantName','bankRef','periodDays','depositDeduction','checkoutDate','noNoticeDeduction','otherDeduction','dedNote','excessTo','bedTo','expenseCategory','expenseDesc','remark','arrearHandling','arrearPromiseDate','arrearReasonDetail'].forEach(id=>$(id).addEventListener('input',syncForm));
+['entryType','cycle','payType','amount','reasonCode','feePaid','customReason','tenantName','bankRef','periodDays','depositDeduction','checkoutDate','noNoticeDeduction','otherDeduction','dedNote','excessTo','transferFromBed','bedTo','transferDate','transferReason','expenseCategory','expenseDesc','remark','arrearHandling','arrearPromiseDate','arrearReasonDetail'].forEach(id=>$(id).addEventListener('input',syncForm));
 $('linkedTaskId').addEventListener('change',applyLinkedTask);
-$('bed').addEventListener('input',lookupBed);$('tenantCardId').addEventListener('change',e=>{state.depositBalance=null;if(e.target.value.trim())loadDepositBalance(e.target.value.trim());else renderContext();});$('btnLoadLock').onclick=loadLock;$('btnSaveEntry').onclick=saveEntry;$('btnReset').onclick=()=>{resetForm();showStatus('表单已清空。');toast('表单已清空')};$('btnRefreshTasks').onclick=refreshFollowup;$('btnBuildExport').onclick=commitSessionAndExport;$('btnCopyExport').onclick=async()=>{try{await navigator.clipboard.writeText($('exportText').textContent);showStatus('导出文本已复制。');toast('已复制')}catch{showStatus('复制失败，请手动选择导出文本。','warn');toast('复制失败，请手动选择文本',6000)}};$('btnClearLocal').onclick=()=>{if(hasLocalOnly()){showStatus('仍有云端未确认记录，不能清空。','warn');toast('仍有云端未确认记录，不能清空',6000);return}if(confirm('清空本机草稿？')){state.drafts=[];saveDrafts();buildExport();refreshSessionViews();showStatus('本机草稿已清空。');toast('已清空')}};$('btnNewSessionTop').onclick=newSession;$('btnPreviewSession').onclick=previewSession;$('btnExportSession').onclick=commitSessionAndExport;$('operatorId').value=localStorage.getItem('empv3:operator')||'';$('operatorId').onchange=e=>{setOperator(e.target.value.trim());refreshSessionViews();showStatus('员工编号已更新。')};
+$('bed').addEventListener('input',()=>{if($('entryType').value==='TF')$('transferFromBed').value=$('bed').value.trim().replace(/^#/,'');lookupBed();});
+$('transferFromBed').addEventListener('change',()=>{if($('entryType').value==='TF'){$('bed').value=$('transferFromBed').value.trim().replace(/^#/,'');lookupBed();}});
+$('tenantCardId').addEventListener('change',e=>{state.depositBalance=null;if(e.target.value.trim())loadDepositBalance(e.target.value.trim());else renderContext();});$('btnLoadLock').onclick=loadLock;$('btnSaveEntry').onclick=saveEntry;$('btnReset').onclick=()=>{resetForm();showStatus('表单已清空。');toast('表单已清空')};$('btnRefreshTasks').onclick=refreshFollowup;$('btnBuildExport').onclick=commitSessionAndExport;$('btnCopyExport').onclick=async()=>{try{await navigator.clipboard.writeText($('exportText').textContent);showStatus('导出文本已复制。');toast('已复制')}catch{showStatus('复制失败，请手动选择导出文本。','warn');toast('复制失败，请手动选择文本',6000)}};$('btnClearLocal').onclick=()=>{if(hasLocalOnly()){showStatus('仍有云端未确认记录，不能清空。','warn');toast('仍有云端未确认记录，不能清空',6000);return}if(confirm('清空本机草稿？')){state.drafts=[];saveDrafts();buildExport();refreshSessionViews();showStatus('本机草稿已清空。');toast('已清空')}};$('btnNewSessionTop').onclick=newSession;$('btnPreviewSession').onclick=previewSession;$('btnExportSession').onclick=commitSessionAndExport;$('operatorId').value=localStorage.getItem('empv3:operator')||'';$('operatorId').onchange=e=>{setOperator(e.target.value.trim());refreshSessionViews();showStatus('员工编号已更新。')};
 $('btnClosePreview').onclick=closePreviewModal;
 $('previewModal').addEventListener('click',e=>{if(e.target===$('previewModal'))closePreviewModal()});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closePreviewModal()});
@@ -4365,7 +4509,7 @@ function applyBilingualUILegacy(){
   label('periodDue','账期应收','PERIOD DUE');label('due','本条应收','ENTRY DUE');label('linkedTaskId','选择欠款任务','ARREARS TASK');
   label('checkoutDate','实际离开日期','CHECKOUT DATE');label('overdayDeduction','超期扣款','OVERDAY DEDUCTION');label('noNoticeDeduction','未提前告知扣款','NO NOTICE DEDUCTION');
   label('otherDeduction','其他扣款','OTHER DEDUCTION');label('depositDeduction','押金扣款合计','DEPOSIT DEDUCTION');label('depositReturnAmount','应退押金','DEPOSIT REFUND');
-  label('dedNote','扣款说明','DEDUCTION NOTE');label('bedTo','换至床位','BED TO');label('feePaid','换床费处理','TRANSFER FEE');
+  label('dedNote','扣款说明','DEDUCTION NOTE');label('transferFromBed','原床位','FROM BED');label('bedTo','新床位','TO BED');label('transferDate','换床日期','TRANSFER DATE');label('transferReason','换床原因','TRANSFER REASON');label('feePaid','换床费处理','TRANSFER FEE');
   label('expenseCategory','支出类别','EXPENSE CATEGORY');label('expenseDesc','支出说明','EXPENSE DESCRIPTION');label('paid','系统计入','SYSTEM PAID');label('entryClr','系统结清','SYSTEM CLEAR');
   label('excessTo','超收处理','EXCESS HANDLING');label('arrearAmount','尾款金额','TAIL BALANCE');label('arrearPromiseDate','承诺支付日期','PROMISE DATE');label('arrearHandling','处理方式','HANDLING');label('arrearReasonDetail','尾款原因','TAIL REASON');label('reasonCode','原因代码','REASON CODE');label('customReason','异常原因','EXCEPTION REASON');label('remark','备注','REMARK');
 }
@@ -4448,7 +4592,7 @@ function applyBilingualUI(){
   label('periodDue','账期应收','PERIOD DUE');label('due','本条应收','ENTRY DUE');label('linkedTaskId','选择欠款任务','ARREARS TASK');
   label('checkoutDate','实际离开日期','CHECKOUT DATE');label('overdayDeduction','超期扣款','OVERDAY DEDUCTION');label('noNoticeDeduction','未提前告知扣款','NO NOTICE DEDUCTION');
   label('otherDeduction','其他扣款','OTHER DEDUCTION');label('depositDeduction','押金扣款合计','DEPOSIT DEDUCTION');label('depositReturnAmount','应退押金','DEPOSIT REFUND');
-  label('dedNote','扣款说明','DEDUCTION NOTE');label('bedTo','换至床位','BED TO');label('feePaid','换床费处理','TRANSFER FEE');
+  label('dedNote','扣款说明','DEDUCTION NOTE');label('transferFromBed','原床位','FROM BED');label('bedTo','新床位','TO BED');label('transferDate','换床日期','TRANSFER DATE');label('transferReason','换床原因','TRANSFER REASON');label('feePaid','换床费处理','TRANSFER FEE');
   label('expenseCategory','支出类别','EXPENSE CATEGORY');label('expenseDesc','支出说明','EXPENSE DESCRIPTION');label('paid','系统计入','SYSTEM PAID');label('entryClr','系统结清','SYSTEM CLEAR');
   label('excessTo','超收处理','EXCESS HANDLING');label('arrearAmount','尾款金额','TAIL BALANCE');label('arrearPromiseDate','承诺支付日期','PROMISE DATE');label('arrearHandling','处理方式','HANDLING');label('arrearReasonDetail','尾款原因','TAIL REASON');label('reasonCode','原因代码','REASON CODE');label('customReason','异常原因','EXCEPTION REASON');label('remark','备注','REMARK');
 }

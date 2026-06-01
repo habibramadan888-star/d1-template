@@ -6475,3 +6475,12 @@ Deployment addendum:
 - Legacy `#export` redirects to `#followup`; no Export page was restored.
 - No production write, write gate opening, migration, D1 execute/export/import, deploy, employee follow-up write, owner directive create, batch dispatch, TTLock smoke, financial formula change, dashboard calculation change, or production cutover was performed.
 - Production cutover remains `PRODUCTION_NO_GO`.
+
+## Employee Bed Transfer Accounting Closure
+
+- Audited the current Bed Transfer path and confirmed the previous UI was missing explicit accounting anchors.
+- Added local UI fields for From Bed, To Bed, Transfer Date, Transfer Reason, and a read-only system context review panel.
+- Defined bed transfer event contract, validation service, accounting rules, TTLock migration rules, state machine, traceability model, statistical anchors, owner visibility, staging E2E requirements, and production rollout decision.
+- Bed Transfer remains separate from new tenant, checkout, rent payment, deposit receipt, deposit refund, and arrears payment.
+- No production write, write gate opening, production migration, D1 execute/export/import, deploy, financial formula change, dashboard calculation change, or production cutover was performed.
+- Production cutover remains `PRODUCTION_NO_GO`.

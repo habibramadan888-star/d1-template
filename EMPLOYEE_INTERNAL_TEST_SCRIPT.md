@@ -426,3 +426,15 @@ Deployment acceptance note:
 5. Confirm `#export` does not restore an Export page and redirects to Follow-up.
 6. Confirm mobile navigation does not wrap or horizontally scroll.
 7. Confirm no production write, write gate opening, migration, employee follow-up write, owner directive create, or batch dispatch is part of this QA.
+
+## Employee Bed Transfer Accounting Closure QA
+
+1. Select `TF / Bed Transfer` from Entry.
+2. Confirm the UI shows explicit From Bed, To Bed, Transfer Date, and Transfer Reason fields.
+3. Confirm From Bed and To Bed cannot be the same.
+4. Confirm System Context shows occupant, deposit, rent period, arrears, old TTLock, new bed, rent difference, and audit review anchors.
+5. Confirm deposit is described as carried with the customer and not treated as revenue.
+6. Confirm arrears remain carry-over receivables and are not cleared by transfer.
+7. Confirm old TTLock references are preserved for review.
+8. Confirm bed transfer is not counted as new tenant or checkout.
+9. Confirm no production write, write gate opening, production migration, deploy, financial formula change, or dashboard calculation change is performed by this QA.
