@@ -6418,3 +6418,18 @@ Result: `BLOCKED` before production write.
 - Production secret list did not include `ARREARS_DIRECTIVE_WRITE_APPROVED` or `ARREARS_DIRECTIVE_WRITE_MODE`.
 - No production D1 business write, owner directive create, employee follow-up write, batch dispatch, migration, financial formula change, dashboard calculation change, or production cutover was performed.
 - Production cutover remains `PRODUCTION_NO_GO`.
+
+## ARREARS-DIRECTIVE-CURRENT-46-REAL-DISPATCH-EXECUTE-001 - 2026-06-01
+
+Result: `PASS_FOR_INTERNAL_TESTING`.
+
+- Ramadan explicitly approved dispatching the actual current production SOT count of 46.
+- Production preflight after deploy returned 46 tasks: 5 existing arrears and 41 TTLock expired unpaid.
+- Production materialization migration succeeded after correcting the migration to include nullable `source_type` and `source_ref`.
+- Worker deployed with materialization-capable code: version `3139b0f5-1ef1-4c81-9250-12986068fc3b`.
+- Production write gate was opened only for the dispatch window and closed immediately afterward.
+- Dispatch result: requested 46, materialized 45, created 45, skipped already assigned 1, blocked 0.
+- Abdul inbox verification matched 46 assigned directives.
+- Owner visibility verification matched 46 assigned tasks.
+- No employee follow-up batch write, amount change, actual_received change, accounting_status change, close/void, financial formula change, dashboard calculation change, commercial launch, or production cutover was performed.
+- Production cutover remains `PRODUCTION_NO_GO`.

@@ -26,9 +26,8 @@ test("materializable arrears task contract supports existing and TTLock sources"
     assert.match(worker, new RegExp(field));
   }
 
-  assert.match(migration, /Precondition: source_type and source_ref already exist/);
-  assert.match(migration, /source_type/);
-  assert.match(migration, /source_ref/);
+  assert.match(migration, /source_type TEXT/);
+  assert.match(migration, /source_ref TEXT/);
   assert.match(migration, /source_fingerprint TEXT/);
   assert.match(migration, /materialized_from TEXT/);
 });

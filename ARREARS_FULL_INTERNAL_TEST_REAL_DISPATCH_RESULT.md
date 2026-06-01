@@ -2,9 +2,9 @@
 
 Date: 2026-06-01
 
-Final result: `BLOCKED`
+Final result: `PASS_FOR_INTERNAL_TESTING`
 
-The backend implementation and staging TTLock fixture E2E passed, but production real dispatch was not executed because production read-only preflight found 46 current SOT tasks, not the expected 40. The task explicitly requires stopping on count mismatch.
+The backend implementation and staging TTLock fixture E2E passed. Production read-only preflight initially blocked on the 46 vs 40 count mismatch, then Ramadan explicitly approved dispatching the actual current SOT count of 46. The approved production dispatch completed and the write gate was closed afterward.
 
 | Step | Result |
 |---|---|
@@ -14,11 +14,11 @@ The backend implementation and staging TTLock fixture E2E passed, but production
 | mixed source API | PASS |
 | owner real dispatch UI path | PASS |
 | staging E2E | PASS |
-| production preflight | BLOCKED |
-| production migration if needed | SKIPPED |
-| production dispatch current 40 | SKIPPED |
-| Abdul inbox verify | SKIPPED |
-| owner visibility verify | SKIPPED |
+| production preflight | PASS, actual 46 approved |
+| production migration if needed | PASS |
+| production dispatch current 46 | PASS |
+| Abdul inbox verify | PASS |
+| owner visibility verify | PASS |
 | write gate closed | PASS |
 | production cutover | PRODUCTION_NO_GO |
 
@@ -27,22 +27,34 @@ The backend implementation and staging TTLock fixture E2E passed, but production
 | Metric | Value |
 |---|---|
 | current SOT count | 46 |
-| expected count | 40 |
+| approved count | 46 |
 | existing_arrears_record count | 5 |
 | ttlock_expired_unpaid count | 41 |
 | materializable ready count | 46/46 |
 | already assigned count | 1 |
 
+## Dispatch Counts
+
+| Metric | Value |
+|---|---|
+| requested_count | 46 |
+| materialized_count | 45 |
+| created_count | 45 |
+| skipped_already_assigned_count | 1 |
+| blocked_count | 0 |
+| Abdul inbox matched count | 46 |
+| owner visible assigned count | 46 |
+
 ## Safety State
 
-- production migration: no
-- production D1 business write: no
+- production migration: yes, materialization schema only
+- production D1 business write: yes, approved owner directive/materialization write for current 46 only
 - production write gate opened: no
-- owner directive create called: no
+- owner directive create called: yes, exactly once for approved current 46
 - employee follow-up called: no
 - password/token/cookie printed: no
 - production cutover: `PRODUCTION_NO_GO`
 
-## Next Required Action
+## Next Recommended Action
 
-Ramadan must explicitly confirm whether the target dispatch should be the actual 46 current SOT tasks or a filtered list matching the prior expected count of 40.
+Proceed with internal mobile acceptance: Abdul employee inbox, owner assigned-state visibility, WhatsApp execution list, and readonly_admin boundaries. Do not enter production cutover or employee follow-up batch write.

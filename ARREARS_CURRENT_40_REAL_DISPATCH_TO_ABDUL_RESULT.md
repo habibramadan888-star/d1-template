@@ -26,3 +26,7 @@ No production real dispatch was executed.
 ## Required Next Decision
 
 Ramadan must explicitly confirm whether to dispatch the actual 46 current SOT tasks or provide a filtered target set. Until then, production dispatch remains blocked.
+
+## Superseded By Current 46 Approval
+
+Ramadan later explicitly approved dispatching the actual current SOT count of 46. The execution result is recorded in `ARREARS_CURRENT_46_REAL_DISPATCH_TO_ABDUL_RESULT.md`.

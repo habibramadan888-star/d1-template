@@ -136,3 +136,22 @@ This document does not approve TTLock production smoke, batch dispatch, public b
 | production write gate | OFF |
 | batch dispatch | NOT_APPROVED |
 | production cutover | PRODUCTION_NO_GO |
+
+## Current 46 Real Dispatch Execution Update - 2026-06-01
+
+| Capability | Status |
+|---|---|
+| production current SOT actual count | 46 |
+| Ramadan approval for actual 46 | PASS |
+| production materialization migration | PASS |
+| production real dispatch to Abdul | PASS |
+| requested_count | 46 |
+| materialized_count | 45 |
+| created_count | 45 |
+| skipped_already_assigned_count | 1 |
+| blocked_count | 0 |
+| Abdul inbox verify | PASS |
+| owner visibility verify | PASS |
+| production write gate after dispatch | OFF |
+| employee follow-up batch write | NOT_RUN |
+| production cutover | PRODUCTION_NO_GO |

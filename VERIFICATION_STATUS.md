@@ -2257,3 +2257,19 @@ Date: 2026-06-01, Asia/Dubai
 | production dispatch | NOT_RUN | blocked by count mismatch |
 | write gate | OFF | production secret list has no write approval keys |
 | Production cutover | NO_GO | Remains `PRODUCTION_NO_GO` |
+
+## ARREARS-DIRECTIVE-CURRENT-46-REAL-DISPATCH-EXECUTE-001 Verification Addendum
+
+Date: 2026-06-01, Asia/Dubai
+
+| Verification | Result | Evidence |
+|---|---:|---|
+| production preflight after deploy | PASS | `ARREARS_CURRENT_46_PRODUCTION_PREFLIGHT_AFTER_DEPLOY.md` |
+| production materialization migration | PASS | `ARREARS_MATERIALIZATION_PRODUCTION_MIGRATION_RESULT.md` |
+| production dispatch | PASS | `ARREARS_CURRENT_46_REAL_DISPATCH_TO_ABDUL_RESULT.md` |
+| Abdul inbox verify | PASS | `ARREARS_CURRENT_46_ABDUL_INBOX_VERIFY_RESULT.md` |
+| owner visibility verify | PASS | `ARREARS_CURRENT_46_OWNER_VISIBILITY_VERIFY_RESULT.md` |
+| post-write gate check | PASS | `ARREARS_CURRENT_46_POST_WRITE_VERIFY.md` |
+| requested / created / skipped / blocked | PASS | `46 / 45 / 1 / 0` |
+| employee follow-up batch write | NOT_RUN | explicitly excluded |
+| Production cutover | NO_GO | Remains `PRODUCTION_NO_GO` |
