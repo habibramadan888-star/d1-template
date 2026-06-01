@@ -6279,3 +6279,16 @@ Result: deployed UI-only employee Follow-up Entry-aligned UX.
 - Authenticated Abdul/owner phone acceptance was not executed by Codex in this deploy record and remains required.
 - No production D1 write, migration, D1 export/import/execute, owner directive create, employee follow-up write, batch dispatch, TTLock smoke, financial formula change, or dashboard calculation change was performed.
 - Production cutover remains `PRODUCTION_NO_GO`.
+
+## EMPLOYEE-FOLLOWUP-FULL-UX-PARITY-WITH-ENTRY-001 - 2026-06-01
+
+Result: implemented locally, not deployed.
+
+- Entry is documented as the only employee visual and interaction source of truth.
+- Follow-up now reuses Entry shell/card/section/KPI/form/button primitives.
+- Header identity and Logout controls are unified; the extra visible role pill was removed.
+- Boss Assigned Task cards default to collapsed essentials and hide `customer_code` / technical source text.
+- System Reminders now use Entry-style section title, KPI cards, and step cards.
+- Employee Export visible tab/page remains removed.
+- No production write, write gate opening, D1 execute/export/import, migration, employee follow-up write, owner directive create, batch dispatch, TTLock smoke, financial formula change, or dashboard calculation change was performed.
+- Production cutover remains `PRODUCTION_NO_GO`.

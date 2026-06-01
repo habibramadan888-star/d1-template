@@ -38,3 +38,13 @@ Verification:
 
 - `npm run test:employee-followup-final-information-structure`: PASS.
 - Production cutover remains `PRODUCTION_NO_GO`.
+## EMPLOYEE-FOLLOWUP-FULL-UX-PARITY-WITH-ENTRY-001 Update
+
+- Entry is the only employee visual and interaction source of truth.
+- Follow-up default boss task cards now show only high-value execution information: bed, amount, due date, status, and Details.
+- `customer_code`, internal ids, raw technical source text, and long instructional copy are hidden from the default task card.
+- Boss Assigned Tasks default to collapsed details.
+- System Reminders use Entry-style KPI and card primitives.
+- Employee Export visible tab/page remains removed.
+- No production write, no migration, write gate off.
+- Production cutover remains `PRODUCTION_NO_GO`.

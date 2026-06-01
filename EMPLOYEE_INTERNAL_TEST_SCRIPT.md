@@ -256,3 +256,19 @@ Employee authenticated phone acceptance should verify:
 7. Confirm raw `customer_code` and `existing_arrears_record` are not shown in the default card.
 8. Confirm no production write is performed during visual acceptance.
 9. Confirm production cutover remains `PRODUCTION_NO_GO`.
+
+## EMPLOYEE-FOLLOWUP-FULL-UX-PARITY-WITH-ENTRY-001
+
+Status: implemented locally, not deployed by default.
+
+Employee acceptance checks:
+
+1. Treat Entry as the only employee visual and interaction source of truth.
+2. Confirm the header has one employee identity control and one matching `Logout / 退出` control.
+3. Confirm only Entry and Follow-up tabs are visible; Export remains hidden.
+4. Confirm Follow-up section uses the same card, head, body, step, KPI, button, and form control system as Entry.
+5. Confirm Boss Assigned Tasks default to collapsed essentials: bed, amount, due date, status, and Details.
+6. Confirm `customer_code`, internal ids, and raw technical source labels are not shown in the default task card.
+7. Confirm System Reminders use Entry-style `step-title`, `kpi-grid`, `kpi-card`, and `step` cards.
+8. Confirm no production write is performed and write gate remains off.
+9. Confirm production cutover remains `PRODUCTION_NO_GO`.

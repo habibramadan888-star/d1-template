@@ -1140,11 +1140,11 @@ label .label-en{
   margin-bottom:18px;
 }
 .followup-metric{
-  padding:16px 18px;
-  border-radius:22px;
-  background:linear-gradient(145deg,rgba(255,255,255,.82),rgba(255,255,255,.48));
-  border:1px solid rgba(255,255,255,.78);
-  box-shadow:0 14px 38px rgba(15,23,42,.08),inset 0 1px 0 rgba(255,255,255,.92);
+  padding:18px;
+  border-radius:20px;
+  background:rgba(255,255,255,.88);
+  border:1px solid var(--line);
+  box-shadow:0 10px 24px rgba(20,32,51,.06);
 }
 .followup-metric span{
   display:block;
@@ -1175,17 +1175,17 @@ label .label-en{
   gap:14px;
 }
 .followup-card{
-  border:1px solid rgba(255,255,255,.78);
+  border:1px solid rgba(207,216,220,.85);
   border-left:5px solid #aab4c2;
   border-radius:24px;
-  padding:18px;
-  background:linear-gradient(145deg,rgba(255,255,255,.84),rgba(255,255,255,.52));
-  box-shadow:0 18px 46px rgba(15,23,42,.09),inset 0 1px 0 rgba(255,255,255,.9);
+  padding:20px;
+  background:rgba(255,255,255,.72);
+  box-shadow:var(--halo),var(--inner);
 }
 .followup-card.overdue{border-left-color:#f59e0b}
 .followup-card.force{border-left-color:#dc2626}
 .followup-card.history{border-left-color:#2563eb}
-.followup-card.directive{border-left-color:#f59e0b;background:#fffbeb}
+.followup-card.directive{border-left-color:#f59e0b;background:rgba(255,255,255,.72)}
 .boss-directive-inbox{
   display:grid;
   gap:12px;
@@ -1193,12 +1193,29 @@ label .label-en{
 }
 .boss-directive-title{
   display:flex;
-  justify-content:space-between;
+  justify-content:flex-start;
   align-items:center;
   gap:10px;
   color:#142033;
   font-weight:920;
+  font-size:18px;
+  margin-bottom:14px;
+}
+.boss-directive-title>span:first-child{
+  display:grid;
+  place-items:center;
+  width:30px;
+  height:30px;
+  border-radius:999px;
+  background:var(--green);
+  color:#fff;
+  font-family:Consolas,monospace;
   font-size:15px;
+}
+.boss-directive-title .boss-directive-heading{
+  display:flex;
+  flex-direction:column;
+  gap:2px;
 }
 .boss-directive-title small{
   color:#7b8797;
@@ -1225,11 +1242,11 @@ label .label-en{
 }
 .directive-followup-actions input,
 .directive-followup-actions textarea{
-  min-height:44px;
-  border-radius:14px;
-  border:1px solid rgba(203,213,225,.9);
-  background:rgba(255,255,255,.72);
-  padding:10px 12px;
+  min-height:48px;
+  border-radius:16px;
+  border:1.5px solid #d4dde0;
+  background:#fff;
+  padding:14px 15px;
   color:#142033;
   font-size:14px;
   font-family:inherit;
@@ -1336,17 +1353,17 @@ label .label-en{
 }
 .followup-actions select,
 .followup-actions input{
-  min-height:44px;
-  border-radius:14px;
-  border:1px solid rgba(203,213,225,.9);
-  background:rgba(255,255,255,.72);
-  padding:0 12px;
+  min-height:48px;
+  border-radius:16px;
+  border:1.5px solid #d4dde0;
+  background:#fff;
+  padding:14px 15px;
   color:#142033;
   font-size:14px;
 }
 .followup-actions .mini-btn{
-  min-height:44px;
-  border-radius:14px;
+  min-height:48px;
+  border-radius:17px;
 }
 .followup-note{
   margin-top:10px;
@@ -2006,7 +2023,6 @@ label .label-en{
     <div class="logo"><div class="badge"><div>HOME<small>LINK.</small></div></div><div class="word"><span class="g">HOME</span><span>LINK</span><i>.</i><em>流水管理</em></div></div>
     <div class="actions">
       <div class="operator" hidden><input id="operatorId" placeholder="未登录" readonly aria-label="员工姓名"></div>
-      <span class="pill">员工</span>
       <div class="employee-user" id="employeeUser">
         <div class="employee-identity-card" id="employeeIdentityCard" data-employee-identity-display="true">
           <span id="employeeIdentityName">Not signed in</span><span class="label-en">STAFF / 员工</span>
@@ -2167,7 +2183,18 @@ label .label-en{
     </div>
   </section>
 
-  <section id="view-arrears" class="hidden employee-followup-view employee-panel"><div class="card employee-panel-card"><div class="head"><div><div class="title employee-section-title">Follow-up / 跟进</div><div class="small">Boss tasks + system reminders / 老板下发任务 + 系统提醒</div></div><button class="btn primary employee-action-button" id="btnRefreshTasks">Refresh / 刷新</button></div><div class="body"><div id="bossDirectiveList" class="boss-directive-inbox"><div class="boss-directive-empty">No boss assigned tasks / 暂无老板下发任务</div></div><div id="taskList" class="small">Refresh to load system reminders / 点击刷新后生成系统提醒。</div></div></div></section>
+  <section id="view-arrears" class="hidden employee-followup-view employee-panel">
+    <div class="card employee-panel-card">
+      <div class="head">
+        <div><div class="title employee-section-title">Follow-up / 跟进</div><div class="small">Boss tasks + system reminders / 老板下发任务 + 系统提醒</div></div>
+        <button class="btn primary employee-action-button" id="btnRefreshTasks">Refresh / 刷新</button>
+      </div>
+      <div class="body">
+        <div id="bossDirectiveList" class="boss-directive-inbox"><div class="boss-directive-empty">No boss assigned tasks / 暂无老板下发任务</div></div>
+        <div id="taskList" class="small">Refresh to load system reminders / 点击刷新后生成系统提醒。</div>
+      </div>
+    </div>
+  </section>
   <div id="employeeExportBuffer" class="hidden employee-export-buffer" aria-hidden="true">
     <button class="btn primary" id="btnBuildExport" type="button" tabindex="-1">Build hidden export buffer</button>
     <button class="btn" id="btnCopyExport" type="button" tabindex="-1">Copy hidden export buffer</button>
@@ -3280,7 +3307,7 @@ function bindEmployeeDirectiveActions(){
 function renderEmployeeDirectiveInbox(status='ready',error=''){
   const box=$('bossDirectiveList');
   if(!box)return;
-  const title='<div class="boss-directive-title"><span>Boss Assigned Tasks / 老板下发任务</span><small>BOSS ASSIGNED</small></div>';
+  const title='<div class="boss-directive-title step-title"><span>1</span><div class="boss-directive-heading">Boss Assigned Tasks / 老板下发任务<small>BOSS ASSIGNED</small></div></div>';
   if(status==='loading'){
     box.innerHTML=title+'<div class="boss-directive-empty">Loading boss assigned tasks / 正在读取老板下发任务...</div>';
     return;
@@ -3298,7 +3325,7 @@ function renderEmployeeDirectiveInbox(status='ready',error=''){
     box.innerHTML=title+'<div class="boss-directive-empty">No boss assigned tasks / 暂无老板下发任务</div>';
     return;
   }
-  box.innerHTML=`<div class="boss-directive-title"><span>Boss Assigned Tasks / 老板下发任务</span><small>${rows.length} ASSIGNED</small></div>${rows.map(employeeDirectiveCard).join('')}`;
+  box.innerHTML=`<div class="boss-directive-title step-title"><span>1</span><div class="boss-directive-heading">Boss Assigned Tasks / 老板下发任务<small>${rows.length} ASSIGNED</small></div></div>${rows.map(employeeDirectiveCard).join('')}`;
   bindEmployeeDirectiveActions();
 }
 function updateEmployeeDirectivePersistedState(taskId){
@@ -3463,7 +3490,6 @@ function followupCard(item){
   const source=item.source==='ttlock'?'通通锁过期 TTLOCK':(item.source==='history_unmatched'?'历史欠款 / 未匹配当前通通锁':'历史欠款 HISTORY');
   const matchTag=item.lock_match==='UNMATCHED'?'<span class="followup-tag bad">未匹配当前通通锁 · UNMATCHED</span>':'';
   const directiveTag=item.boss_directive?`<span class="followup-tag bad">BOSS REQUEST · due ${esc(item.boss_requested_due_date||'-')}</span>`:'';
-  const ownerNote=item.owner_note?`<br>老板备注 OWNER NOTE: ${esc(item.owner_note)}`:'';
   const rentNote=item.amount>0?`${fmtMoney(item.amount)} AED`:'未配置月租';
   const editableStatuses=['待跟进','已联系','承诺付款','无法联系','转老板处理'];
   const currentStatus=String(item.followup_status||'待跟进');
@@ -3471,7 +3497,7 @@ function followupCard(item){
     ...(!editableStatuses.includes(currentStatus)?[`<option value="${esc(currentStatus)}" selected disabled>${esc(currentStatus)} · 系统状态</option>`]:[]),
     ...editableStatuses.map(s=>`<option value="${s}" ${s===currentStatus?'selected':''}>${s}</option>`)
   ].join('');
-  return `<div class="followup-card ${cls}" data-followup-id="${esc(item.task_id)}">
+  return `<div class="followup-card step ${cls}" data-followup-id="${esc(item.task_id)}">
     <div class="followup-top">
       <div>
         <div class="followup-bed">${esc(followupTitle(item))}</div>
@@ -3484,11 +3510,6 @@ function followupCard(item){
         </div>
       </div>
       <div class="followup-money">${esc(rentNote)}</div>
-    </div>
-    <div class="followup-note">
-      备注锚点 REMARK: ${esc(item.lock_remark||item.tenant_name||'-')} · CID: ${esc(item.tenant_card_id||'-')} · 押金 DEPOSIT: ${esc(item.deposit?fmtMoney(item.deposit):'-')}<br>
-      日期锚点 PERIOD: ${esc(item.period_start||'-')} → ${esc(item.period_end||'-')} · 到期 DUE: ${esc(item.due_date||'-')}<br>
-      原因 REASON: ${esc(item.reason||'-')}${ownerNote}
     </div>
     <div class="followup-actions">
       <select id="followStatus_${id}">
@@ -3508,17 +3529,17 @@ function renderTasks(){
   const due=items.filter(x=>x.source==='ttlock');
   const force=items.filter(x=>x.force).length;
   const total=items.reduce((s,x)=>s+num(x.amount),0);
-  const dashboard=`<div class="followup-dashboard">
-    <div class="followup-metric bad"><span>强制跟进</span><small>REQUIRED</small><b>${force}</b></div>
-    <div class="followup-metric warn"><span>通通锁过期</span><small>TTLOCK OVERDUE</small><b>${due.length}</b></div>
-    <div class="followup-metric"><span>历史欠款</span><small>ARREARS</small><b>${history.length}</b></div>
-    <div class="followup-metric"><span>应收提醒</span><small>AMOUNT</small><b>${fmtMoney(total)}</b></div>
+  const dashboard=`<div class="kpi-grid followup-dashboard">
+    <div class="kpi-card followup-metric bad"><span>强制跟进</span><small>REQUIRED</small><b>${force}</b></div>
+    <div class="kpi-card followup-metric warn"><span>通通锁过期</span><small>TTLOCK OVERDUE</small><b>${due.length}</b></div>
+    <div class="kpi-card followup-metric"><span>历史欠款</span><small>ARREARS</small><b>${history.length}</b></div>
+    <div class="kpi-card followup-metric"><span>应收提醒</span><small>AMOUNT</small><b>${fmtMoney(total)}</b></div>
   </div>`;
   if(!items.length){
     $('taskList').innerHTML=dashboard+'<div class="hint">当前没有通通锁过期租金或历史欠款。若刚打开页面，请先点击“刷新通通锁”。</div>';
     return;
   }
-  $('taskList').innerHTML='<div class="boss-directive-title employee-system-reminders-title"><span>System Reminders / 系统提醒</span><small>SYSTEM REMINDERS</small></div>'+dashboard+`<div class="followup-list">${items.map(followupCard).join('')}</div>`;
+  $('taskList').innerHTML='<div class="boss-directive-title step-title employee-system-reminders-title"><span>2</span><div class="boss-directive-heading">System Reminders / 系统提醒<small>SYSTEM REMINDERS</small></div></div>'+dashboard+`<div class="followup-list">${items.map(followupCard).join('')}</div>`;
   bindFollowupActions();
 }
 function bindFollowupActions(){

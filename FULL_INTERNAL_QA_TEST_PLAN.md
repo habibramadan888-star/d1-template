@@ -492,3 +492,17 @@ Deployment QA scope:
 - Authenticated phone acceptance is required because Codex only performed public asset smoke.
 - No production write, migration, D1 execute/export/import, owner directive create, employee follow-up write, batch dispatch, TTLock smoke, dashboard calculation change, or financial formula change is approved by this deploy.
 - Production cutover remains `PRODUCTION_NO_GO`.
+
+## EMPLOYEE-FOLLOWUP-FULL-UX-PARITY-WITH-ENTRY-001
+
+QA scope:
+
+- Entry is the only visual and interaction source of truth for employee pages.
+- Follow-up must use the same card, section, KPI, form, and button primitives as Entry.
+- Header identity and Logout must share the same visual system.
+- Boss Assigned Tasks must be collapsed by default and show only high-value execution information.
+- System Reminders must use Entry-style sections and cards, not a separate reminder UI.
+- `customer_code`, technical/internal text, `existing_arrears_record`, raw source fields, and long instructions must not face employees by default.
+- Employee Export visible tab/page remains removed.
+- No production write, write gate opening, migration, batch dispatch, TTLock smoke, financial formula change, or dashboard calculation change is authorized.
+- Production cutover remains `PRODUCTION_NO_GO`.

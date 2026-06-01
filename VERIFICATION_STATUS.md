@@ -2112,3 +2112,18 @@ Verification status:
 | Production write / gate | NOT_RUN | No business write and no write gate opening. |
 | D1 migration / execute | NOT_RUN | No migration, D1 execute/export/import/write. |
 | Production cutover | NO_GO | Remains `PRODUCTION_NO_GO`. |
+
+## EMPLOYEE-FOLLOWUP-FULL-UX-PARITY-WITH-ENTRY-001
+
+| Area | Status | Notes |
+|---|---|---|
+| Entry source audit | COMPLETE | `ENTRY_IS_THE_ONLY_VISUAL_AND_INTERACTION_SOURCE_OF_TRUTH`. |
+| Header/top nav parity | FIXED | Identity and Logout share one visual system; visible role pill removed. |
+| Follow-up layout parity | FIXED | Follow-up uses Entry card/head/body/step/KPI/form/button primitives. |
+| Boss assigned card reduction | FIXED | Default card shows execution essentials only; details are collapsed. |
+| System Reminders cleanup | FIXED | Reminders use Entry-style KPI and step cards; default debug text removed. |
+| Bilingual consistency | FIXED | Core action labels remain concise bilingual. |
+| Employee Export | REMOVED | Visible Export tab/page not restored. |
+| Production write / gate | NOT_RUN | No production business write and no write gate opening. |
+| D1 migration / execute | NOT_RUN | No migration, D1 execute/export/import/write. |
+| Production cutover | NO_GO | Remains `PRODUCTION_NO_GO`. |
