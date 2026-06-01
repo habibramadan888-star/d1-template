@@ -541,3 +541,20 @@ QA scope:
 - Employee Export visible tab/page remains removed.
 - No production write, write gate opening, migration, batch dispatch, TTLock smoke, financial formula change, or dashboard calculation change is authorized.
 - Production cutover remains `PRODUCTION_NO_GO`.
+
+## EMPLOYEE-FOLLOWUP-ENTRY-HARD-PARITY-DEPLOY-001 QA Addendum
+
+The employee UI-only hard parity fix is deployed to Worker version `5d949970-115e-4208-8a39-dac981c4bf61`.
+
+QA must verify:
+
+- Employee `/employee-v3` opens and renders the current hard parity asset.
+- Header compact parity is visible on mobile.
+- Entry / Follow-up nav is centered, does not wrap, and does not show Export.
+- Follow-up body uses Entry-style cards, spacing, and controls.
+- System Reminders are Entry-style and collapsed by default.
+- Details / Collapse works without any production write.
+- Owner WhatsApp export remains available.
+- Authenticated mobile acceptance is manual required before closing the UI bug.
+- No production write gate, D1 write, migration, batch dispatch, TTLock smoke, financial formula change, or dashboard calculation change is authorized by this deploy.
+- Production cutover remains `PRODUCTION_NO_GO`.

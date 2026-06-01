@@ -313,3 +313,19 @@ Employee acceptance checks:
 7. Confirm System Reminders use Entry-style `step-title`, `kpi-grid`, `kpi-card`, and `step` cards.
 8. Confirm no production write is performed and write gate remains off.
 9. Confirm production cutover remains `PRODUCTION_NO_GO`.
+
+## EMPLOYEE-FOLLOWUP-ENTRY-HARD-PARITY-DEPLOY-001 Mobile Checks
+
+Live Worker version: `5d949970-115e-4208-8a39-dac981c4bf61`.
+
+Employee phone acceptance after the UI-only deploy:
+
+1. Open the employee page and confirm the header remains compact.
+2. Confirm only Entry and Follow-up tabs are visible; Export must not appear.
+3. Confirm Entry / Follow-up tabs are centered and do not wrap.
+4. Open Follow-up and confirm the page body uses the Entry-style card rhythm.
+5. Confirm Boss Assigned Tasks use compact cards and do not show default customer codes.
+6. Confirm System Reminders use Entry-style KPI/cards and are collapsed by default.
+7. Tap Details / Collapse and confirm the card expands and collapses without page jump.
+8. Confirm no write is triggered by viewing or expanding cards.
+9. Confirm write gate remains off and production cutover remains `PRODUCTION_NO_GO`.

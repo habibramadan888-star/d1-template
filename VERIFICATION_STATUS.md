@@ -2160,3 +2160,20 @@ Verification status:
 | Production write / gate | NOT_RUN | No production business write and no write gate opening. |
 | D1 migration / execute | NOT_RUN | No migration, D1 execute/export/import/write. |
 | Production cutover | NO_GO | Remains `PRODUCTION_NO_GO`. |
+
+## EMPLOYEE-FOLLOWUP-ENTRY-HARD-PARITY-DEPLOY-001 Verification Addendum
+
+Date: 2026-06-01, Asia/Dubai
+
+| Verification | Result | Evidence |
+|---|---:|---|
+| Predeploy tests | PASS | `EMPLOYEE_FOLLOWUP_ENTRY_HARD_PARITY_PREDEPLOY_VERIFY_RESULT.md` |
+| Deployment | PASS | Worker version `5d949970-115e-4208-8a39-dac981c4bf61` |
+| Live asset verify | PASS | `EMPLOYEE_FOLLOWUP_ENTRY_HARD_PARITY_LIVE_ASSET_VERIFY_RESULT.md` |
+| Live read-only smoke | PASS | `EMPLOYEE_FOLLOWUP_ENTRY_HARD_PARITY_LIVE_SMOKE_RESULT.md` |
+| Employee Export visible UI | REMOVED | No visible employee export tab in live `/employee-v3` asset |
+| Owner WhatsApp export | PRESERVED | Owner export functions remain in live `/index-51-main.js` |
+| Authenticated phone acceptance | MANUAL_REQUIRED | No credentials were used in this deploy verification |
+| Production write / gate | NOT_RUN | No write gate opening and no business write |
+| D1 migration / execute | NOT_RUN | No migration or D1 execute/export/import/write |
+| Production cutover | NO_GO | Remains `PRODUCTION_NO_GO` |

@@ -303,3 +303,19 @@ Live Worker version: `bae1241e-ac4b-4747-bebe-a4bb4a9bd00f`.
 | Owner WhatsApp export | Still available | | |
 | Production write | None during visual QA | | |
 | Production cutover | `PRODUCTION_NO_GO` | | |
+
+## EMPLOYEE-FOLLOWUP-ENTRY-HARD-PARITY-DEPLOY-001 Visual Checks
+
+Live Worker version: `5d949970-115e-4208-8a39-dac981c4bf61`.
+
+| Screenshot / State | Required | Pass/Fail | Notes |
+|---|---|---|---|
+| Employee header | Compact header with clear identity/logout controls | | |
+| Employee nav | Entry / Follow-up centered; no Export tab | | |
+| Follow-up first paint | Entry-style card system, no separate legacy layout | | |
+| Boss Assigned Tasks | Compact card, default customer code hidden | | |
+| System Reminders | Entry-style KPI/cards and collapsed by default | | |
+| Details / Collapse | Expand/collapse works without visual jump | | |
+| Owner regression | WhatsApp export still available | | |
+| Production write | None during visual QA | | |
+| Production cutover | `PRODUCTION_NO_GO` | | |

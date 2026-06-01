@@ -6330,3 +6330,19 @@ Result: implemented locally, not deployed.
 - Employee Export visible tab/page remains removed.
 - No production write, write gate opening, D1 execute/export/import, migration, employee follow-up write, owner directive create, batch dispatch, TTLock smoke, financial formula change, or dashboard calculation change was performed.
 - Production cutover remains `PRODUCTION_NO_GO`.
+
+## EMPLOYEE-FOLLOWUP-ENTRY-HARD-PARITY-DEPLOY-001 - 2026-06-01
+
+Result: deployed employee UI-only hard Entry parity fix to the default production Worker.
+
+- Deploy commit before publish: `f45e017`.
+- Worker version: `5d949970-115e-4208-8a39-dac981c4bf61`.
+- Uploaded asset scope: `/employee-v3.html` only.
+- Live canonical employee asset `/employee-v3` returns HTTP 200 and contains the hard parity marker.
+- Header compact parity, centered Entry / Follow-up nav, Entry-style Follow-up body, Entry-style System Reminders, collapsed reminders, and Details / Collapse controls are present in the live asset.
+- Employee visible Export tab/page remains removed.
+- Owner WhatsApp export functions remain present in `/index-51-main.js`.
+- Live unauthenticated `/api/me` returns HTTP 401 as expected.
+- Authenticated mobile acceptance is still manual required; no credentials were read and no production session was created in this deploy verification.
+- No production D1 write, migration, write gate opening, owner directive create, employee follow-up write, batch dispatch, TTLock smoke, financial formula change, dashboard calculation change, or production cutover was performed.
+- Production cutover remains `PRODUCTION_NO_GO`.

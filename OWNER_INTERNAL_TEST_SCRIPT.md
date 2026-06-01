@@ -412,3 +412,16 @@ Owner regression checks after the employee UI-only deploy:
 4. Confirm owner navigation and arrears module were not changed by the employee asset deploy.
 5. Confirm no production business write was performed.
 6. Confirm production cutover remains `PRODUCTION_NO_GO`.
+
+## Employee Follow-up Hard Entry Parity Deploy Owner Regression
+
+Live Worker version: `5d949970-115e-4208-8a39-dac981c4bf61`.
+
+Owner-side regression checks for this employee UI-only deploy:
+
+1. Confirm owner portal and owner static JS still load.
+2. Confirm owner WhatsApp export functions remain available.
+3. Confirm owner arrears navigation and card rendering are unchanged by the employee asset deploy.
+4. Confirm no owner directive write, employee follow-up write, batch dispatch, or TTLock smoke was executed.
+5. Confirm no production D1 write or migration was performed.
+6. Confirm production cutover remains `PRODUCTION_NO_GO`.
