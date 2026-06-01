@@ -6457,3 +6457,12 @@ Deployment addendum:
 - Owner export code remains present in `/index-51-main.js`.
 - No production business write, migration, D1 execute/export/import, owner directive create, employee follow-up write, batch dispatch, TTLock smoke, financial formula change, dashboard calculation change, or production cutover was performed.
 - Production cutover remains `PRODUCTION_NO_GO`.
+
+## Owner Overview Comparative BI
+
+- Added an additive read-only owner overview comparative BI endpoint and UI panel.
+- Added month-to-date and quarter-to-date comparison context against last month and same month/quarter last year.
+- Added accounting separation for rent, deposits, arrears recovery, deposit refunds, expenses, and net cashflow.
+- Added occupancy flow and risk watch sections for senior-accountant style review.
+- No production write, migration, deploy, financial formula change, dashboard calculation change, or production cutover was performed.
+- Production cutover remains `PRODUCTION_NO_GO`.

@@ -469,3 +469,14 @@ Owner regression checks:
 4. Confirm task `144` feedback remains visible where applicable.
 5. Confirm no owner directive write, employee follow-up write, batch dispatch, or TTLock smoke was executed.
 6. Confirm production cutover remains `PRODUCTION_NO_GO`.
+
+## Owner Overview Comparative BI Acceptance
+
+1. Open owner overview.
+2. Confirm existing KPI cards remain visible.
+3. Confirm Comparative Business Intelligence panel appears below current KPIs.
+4. Confirm Business Snapshot shows month-to-date comparison against last month and same month last year.
+5. Confirm Accounting Control separates rent, deposit received, arrears recovered, deposit refund, and expenses.
+6. Confirm Occupancy Flow separates new tenants, checkouts, and bed transfers.
+7. Confirm Risk Watch shows overdue, broken promise, partial payment, and needs review.
+8. Confirm no production write, migration, financial formula change, dashboard calculation change, or production cutover occurred.

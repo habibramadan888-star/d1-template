@@ -619,6 +619,7 @@ const state={
   arrearsStatus:'idle',arrearsError:'',arrearsSlow:false,arrearsExpanded:false,
   arrearsSourceStatus:{},arrearsPoolResult:null,arrearsSummary:{},arrearsPagination:{},
   arrearsSlowTimer:null,
+  overviewComparative:null,overviewComparativeStatus:'idle',overviewComparativeError:'',
   presetPrices:DEFAULT_PRICES,
   customers:[],
   anaOpen:{session:false,finance:false,people:false,continuity:false,tx:false},
@@ -4430,6 +4431,131 @@ function buildCharts(a){
   }
 }
 
+function ownerOverviewTrendMeta(metric){
+  const direction=String(metric?.direction||'flat');
+  const interpretation=String(metric?.interpretation||'flat');
+  if(interpretation==='no_data')return ['No comparable data','NO DATA','#667085'];
+  if(direction==='up')return ['Up vs comparison','UP','#1a8a4a'];
+  if(direction==='down')return ['Down vs comparison','DOWN','#d93025'];
+  return ['Flat vs comparison','FLAT','#5b6b7f'];
+}
+function ownerOverviewDeltaLabel(metric){
+  if(!metric||metric.interpretation==='no_data')return 'no data';
+  const delta=Number(metric.absolute_delta||0);
+  const pct=metric.percent_delta===null||metric.percent_delta===undefined?'n/a':`${Number(metric.percent_delta).toFixed(1)}%`;
+  return `${delta>=0?'+':''}${fmtMoney(delta)} / ${pct}`;
+}
+function ownerOverviewMetricCard(title,metric){
+  const [label,badge,color]=ownerOverviewTrendMeta(metric);
+  return `<div class="ana-kpi owner-overview-bi-metric" data-owner-overview-trend-interpretation="${esc(metric?.interpretation||'flat')}">
+    <div class="ana-kpi-lbl">${esc(title)}</div>
+    <div class="ana-kpi-val" style="color:${color}">${fmtMoney(metric?.current||0)}</div>
+    <div class="hist-anchor">${esc(ownerOverviewDeltaLabel(metric))}</div>
+    <div class="hist-order" style="color:${color}">${badge} · ${esc(label)}</div>
+  </div>`;
+}
+function ownerOverviewBiShell(){
+  return `<div class="owner-overview-bi-shell" data-owner-overview-comparative-shell="true">
+    <div class="owner-overview-arrears-skeleton" data-owner-overview-comparative-skeleton="true">
+      <div class="hist-toolbar"><span>Business Snapshot</span><span class="hist-order">LOADING</span></div>
+      <div class="hist-grid owner-arrears-skeleton"><div></div><div></div><div></div></div>
+    </div>
+  </div>`;
+}
+function renderOwnerOverviewComparativePanel(){
+  const panel=document.getElementById('ownerOverviewComparativePanel');
+  if(!panel)return;
+  const status=state.overviewComparativeStatus||'idle';
+  if(status==='loading'||status==='idle'){
+    panel.innerHTML=ownerOverviewBiShell();
+    return;
+  }
+  if(status==='error'){
+    panel.innerHTML=`<div class="empty-state hl-empty-state" data-owner-overview-comparative-error="true">
+      <div class="empty-title">经营对比读取失败</div>
+      <div class="empty-text">${esc(state.overviewComparativeError||'Please retry')}</div>
+    </div>`;
+    return;
+  }
+  const data=state.overviewComparative||{};
+  const comp=data.comparisons||{};
+  const month=data.current?.month||{};
+  const accounting=data.accounting_separation||{};
+  const flow=data.occupancy_flow||{};
+  const arrears=data.arrears||{};
+  const risk=data.risk_watch||{};
+  const quality=data.data_quality||{};
+  panel.innerHTML=`<div class="owner-overview-comparative-bi" data-owner-overview-comparative-bi="true">
+    <div class="hist-toolbar">
+      <span>Business Snapshot</span>
+      <span class="hist-order">MTD · vs last month · vs same month last year</span>
+    </div>
+    <div class="ana-kpi-grid" data-owner-overview-business-snapshot="true">
+      ${ownerOverviewMetricCard('Gross received',comp.last_month?.gross_received)}
+      ${ownerOverviewMetricCard('Rent received',comp.last_month?.rent_received)}
+      ${ownerOverviewMetricCard('Net cashflow',comp.last_month?.net_cashflow)}
+      ${ownerOverviewMetricCard('Arrears recovered',comp.last_month?.arrears_recovered)}
+    </div>
+    <div class="hist-grid" style="margin-top:12px" data-owner-overview-accounting-separation="true">
+      <div class="hist-card"><div class="hist-title">Accounting Control</div>
+        <div class="hist-stat"><span>Rent</span><b>${fmtMoney(accounting.rent_received||0)}</b></div>
+        <div class="hist-stat"><span>Deposit received</span><b>${fmtMoney(accounting.deposit_received||0)}</b></div>
+        <div class="hist-stat"><span>Arrears recovered</span><b>${fmtMoney(accounting.arrears_recovered||0)}</b></div>
+        <div class="hist-stat"><span>Deposit refund</span><b>${fmtMoney(accounting.deposit_refund||0)}</b></div>
+        <div class="hist-stat"><span>Expenses</span><b>${fmtMoney(accounting.expenses||0)}</b></div>
+      </div>
+      <div class="hist-card" data-owner-overview-occupancy-flow="true"><div class="hist-title">Occupancy Flow</div>
+        <div class="hist-stat"><span>New tenants</span><b>${Number(flow.new_tenants||0)}</b></div>
+        <div class="hist-stat"><span>Checkouts</span><b>${Number(flow.checkouts||0)}</b></div>
+        <div class="hist-stat"><span>Bed transfers</span><b>${Number(flow.bed_transfers||0)}</b></div>
+        <div class="hist-anchor">Transfers are excluded from new/checkouts.</div>
+      </div>
+      <div class="hist-card" data-owner-overview-arrears-collection="true"><div class="hist-title">Arrears & Collection</div>
+        <div class="hist-stat"><span>Open tasks</span><b>${Number(arrears.open_count||0)}</b></div>
+        <div class="hist-stat"><span>Outstanding</span><b>${fmtMoney(arrears.outstanding_amount||0)}</b></div>
+        <div class="hist-stat"><span>Followed up</span><b>${Number(arrears.employee_followup?.followed_up_count||0)}</b></div>
+        <div class="hist-stat"><span>Assigned</span><b>${Number(arrears.employee_followup?.assigned_count||0)}</b></div>
+      </div>
+      <div class="hist-card" data-owner-overview-risk-watch="true"><div class="hist-title">Risk Watch</div>
+        <div class="hist-stat"><span>Overdue</span><b>${Number(risk.overdue_count||0)}</b></div>
+        <div class="hist-stat"><span>Broken promise</span><b>${Number(risk.broken_promise_count||0)}</b></div>
+        <div class="hist-stat"><span>Partial payment</span><b>${Number(risk.partial_payment_count||0)}</b></div>
+        <div class="hist-stat"><span>Needs review</span><b>${Number(risk.needs_review_count||0)}</b></div>
+      </div>
+    </div>
+    <div class="hist-anchor" style="margin-top:10px" data-owner-overview-comparison-rules="true">
+      Compare MTD with same elapsed days last month and same month last year. QTD uses same elapsed quarter window.
+      ${quality.warnings?.length?` · ${esc(quality.warnings.join(' '))}`:''}
+      ${quality.no_data?.length?` · No data: ${esc(quality.no_data.join(', '))}`:''}
+      · Rows checked: ${Number(month.rows_checked||0)}
+    </div>
+  </div>`;
+}
+async function loadOwnerOverviewComparativeSummary(){
+  if(state.overviewComparativeStatus==='loading')return false;
+  state.overviewComparativeStatus='loading';
+  state.overviewComparativeError='';
+  renderOwnerOverviewComparativePanel();
+  try{
+    const res=await apiFetch('/api/owner/overview/comparative-summary?period=month&include_last_month=true&include_same_month_last_year=true&include_quarter=true');
+    const data=await res.json();
+    state.overviewComparative=data||{};
+    state.overviewComparativeStatus='success';
+    renderOwnerOverviewComparativePanel();
+    return true;
+  }catch(e){
+    state.overviewComparativeStatus='error';
+    state.overviewComparativeError=e?.message||String(e||'');
+    renderOwnerOverviewComparativePanel();
+    return false;
+  }
+}
+function ensureOwnerOverviewComparativeAsync(){
+  renderOwnerOverviewComparativePanel();
+  if(['loading','success'].includes(state.overviewComparativeStatus))return;
+  setTimeout(()=>loadOwnerOverviewComparativeSummary(),0);
+}
+
 function renderOwnerOverview(){
   const wrap=document.getElementById('ownerOverviewContent');
   if(!wrap)return;
@@ -4475,6 +4601,10 @@ function renderOwnerOverview(){
       ${kpi('最近交接','LATEST HANDOVER',latest[0]?(latest[0].date||'').slice(0,10):'暂无','#1a73e8',latest[0]?`${latest[0].entries?.length||latest[0].entriesCount||0} 笔记录`:'等待员工提交或导入')}
     </div>
     <div class="card hl-card owner-overview-section" style="margin-top:16px">
+      <div class="card-head"><div><div class="card-title">经营对比</div><div class="card-sub">COMPARATIVE BUSINESS INTELLIGENCE</div></div></div>
+      <div class="card-body"><div id="ownerOverviewComparativePanel" data-owner-overview-comparative-section="true"></div></div>
+    </div>
+    <div class="card hl-card owner-overview-section" style="margin-top:16px">
       <div class="card-head"><div><div class="card-title">欠款跟进</div><div class="card-sub">ARREARS FOLLOW-UP · ASYNC</div></div></div>
       <div class="card-body"><div id="ownerOverviewArrearsPanel" data-owner-overview-arrears-section="true"></div></div>
     </div>
@@ -4490,6 +4620,7 @@ function renderOwnerOverview(){
       <div class="card-head"><div><div class="card-title">最近流水摘要</div><div class="card-sub">RECENT LEDGER</div></div></div>
       <div class="card-body"><div class="detail-list">${recentEntryHtml}</div></div>
     </div>`;
+  ensureOwnerOverviewComparativeAsync();
   ensureOwnerOverviewArrearsAsync();
 }
 

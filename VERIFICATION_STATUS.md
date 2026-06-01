@@ -2304,3 +2304,16 @@ Date: 2026-06-01, Asia/Dubai
 | production business write | NO | no write API invoked |
 | write gate | OFF | no write-gate secret names present |
 | Production cutover | NO_GO | Remains `PRODUCTION_NO_GO` |
+
+## Owner Overview Comparative BI Verification
+
+| Check | Status | Evidence |
+|---|---|---|
+| read-only comparative API | ADDED | `/api/owner/overview/comparative-summary` |
+| comparative UI panel | ADDED | `ownerOverviewComparativePanel` |
+| accounting separation | ADDED | rent/deposit/arrears/refund/expense separated |
+| occupancy flow | ADDED | new tenants/checkouts/transfers separated |
+| risk watch | ADDED | overdue/broken promise/partial/review metrics |
+| production business write | NO | no write API invoked |
+| migration | NO | no schema migration executed |
+| Production cutover | NO_GO | Remains `PRODUCTION_NO_GO` |

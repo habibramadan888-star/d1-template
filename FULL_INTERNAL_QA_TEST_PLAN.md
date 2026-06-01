@@ -640,3 +640,12 @@ Deployment acceptance update:
 - Boss owner export functions remain present.
 - No production business write, migration, write gate opening, batch dispatch, TTLock smoke, financial formula change, dashboard calculation change, or production cutover was performed.
 - Production cutover remains `PRODUCTION_NO_GO`.
+
+Owner overview comparative BI QA update:
+
+- Owner overview now has an additive read-only comparative BI panel.
+- QA must verify month-to-date, quarter-to-date, last-month, and same-month-last-year context.
+- QA must verify accounting separation: rent, deposits, arrears recovery, deposit refund, expenses, and net cashflow.
+- QA must verify occupancy flow: new tenants, checkouts, bed transfers, with transfers excluded from new/checkouts.
+- QA must verify no production write, migration, financial formula change, dashboard calculation change, or production cutover.
+- Production cutover remains `PRODUCTION_NO_GO`.

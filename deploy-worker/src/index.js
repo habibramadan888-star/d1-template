@@ -3102,6 +3102,302 @@ async function phase0DashboardTotals(env,user){
   return success(createDashboardTotalsPayload({paymentRows,receivablesRow,rowsChecked,user,computationId:crypto.randomUUID(),startedAt:Date.now()}));
 }
 __name(phase0DashboardTotals,"phase0DashboardTotals");
+function ownerOverviewDateParts(value){
+  return empDateParts(String(value||"").slice(0,10));
+}
+__name(ownerOverviewDateParts,"ownerOverviewDateParts");
+function ownerOverviewDateFromParts(year,month,day){
+  const dt=new Date(Date.UTC(year,month-1,1));
+  const last=new Date(Date.UTC(year,month,0)).getUTCDate();
+  dt.setUTCDate(Math.min(Math.max(1,Number(day)||1),last));
+  return empFormatDate(dt);
+}
+__name(ownerOverviewDateFromParts,"ownerOverviewDateFromParts");
+function ownerOverviewMonthRange(today,offsetMonths=0){
+  const p=ownerOverviewDateParts(today);
+  if(!p)return {start:today,end:today,label:"month"};
+  const first=new Date(Date.UTC(p.y,p.mo-1,1));
+  first.setUTCMonth(first.getUTCMonth()+offsetMonths);
+  const year=first.getUTCFullYear();
+  const month=first.getUTCMonth()+1;
+  return {
+    start:ownerOverviewDateFromParts(year,month,1),
+    end:ownerOverviewDateFromParts(year,month,p.d),
+    label:`${year}-${String(month).padStart(2,"0")}`
+  };
+}
+__name(ownerOverviewMonthRange,"ownerOverviewMonthRange");
+function ownerOverviewQuarterRange(today,offsetQuarters=0){
+  const p=ownerOverviewDateParts(today);
+  if(!p)return {start:today,end:today,label:"quarter"};
+  const currentQuarter=Math.floor((p.mo-1)/3);
+  const quarterStartMonth=currentQuarter*3+1;
+  const start=new Date(Date.UTC(p.y,quarterStartMonth-1,1));
+  start.setUTCMonth(start.getUTCMonth()+offsetQuarters*3);
+  const year=start.getUTCFullYear();
+  const month=start.getUTCMonth()+1;
+  const elapsedDays=Math.max(0,Math.round((empDateMs(today)-empDateMs(ownerOverviewDateFromParts(p.y,quarterStartMonth,1)))/86400000));
+  return {
+    start:ownerOverviewDateFromParts(year,month,1),
+    end:empAddDays(ownerOverviewDateFromParts(year,month,1),elapsedDays),
+    label:`${year}-Q${Math.floor((month-1)/3)+1}`
+  };
+}
+__name(ownerOverviewQuarterRange,"ownerOverviewQuarterRange");
+function ownerOverviewSameMonthLastYearRange(today){
+  const p=ownerOverviewDateParts(today);
+  if(!p)return {start:today,end:today,label:"same_month_last_year"};
+  return {
+    start:ownerOverviewDateFromParts(p.y-1,p.mo,1),
+    end:ownerOverviewDateFromParts(p.y-1,p.mo,p.d),
+    label:`${p.y-1}-${String(p.mo).padStart(2,"0")}`
+  };
+}
+__name(ownerOverviewSameMonthLastYearRange,"ownerOverviewSameMonthLastYearRange");
+function ownerOverviewSameQuarterLastYearRange(today){
+  const p=ownerOverviewDateParts(today);
+  if(!p)return {start:today,end:today,label:"same_quarter_last_year"};
+  const currentQuarter=Math.floor((p.mo-1)/3);
+  const quarterStartMonth=currentQuarter*3+1;
+  const currentStart=ownerOverviewDateFromParts(p.y,quarterStartMonth,1);
+  const elapsedDays=Math.max(0,Math.round((empDateMs(today)-empDateMs(currentStart))/86400000));
+  const start=ownerOverviewDateFromParts(p.y-1,quarterStartMonth,1);
+  return {start,end:empAddDays(start,elapsedDays),label:`${p.y-1}-Q${currentQuarter+1}`};
+}
+__name(ownerOverviewSameQuarterLastYearRange,"ownerOverviewSameQuarterLastYearRange");
+async function ownerOverviewFetchTransactions(env,user,range){
+  if(!await phase0TableExists(env,"transactions"))return [];
+  return phase0All(env,
+    "SELECT id, session_id, cat, amount, type, tag, room, room_to, bed_from, bed_to, note, linked_task_id, arrear_handling, deposit_collection, deposit_amt, deposit_held, deposit_deduction, period_start, period_end, due_date, ts, created_at FROM transactions WHERE corpid=? AND COALESCE(voided_at,'')='' AND COALESCE(status,'ACTIVE')<>'VOID' AND substr(COALESCE(ts,created_at,period_start,due_date,''),1,10) BETWEEN ? AND ? ORDER BY substr(COALESCE(ts,created_at,period_start,due_date,''),1,10) ASC LIMIT 5000",
+    [user.corpid,range.start,range.end]
+  );
+}
+__name(ownerOverviewFetchTransactions,"ownerOverviewFetchTransactions");
+async function ownerOverviewFetchArrears(env,user){
+  if(!await phase0TableExists(env,"arrear_tasks"))return [];
+  return phase0All(env,
+    "SELECT task_id, customer_code, room_bed, room, bed_no, arrear_amount, actual_received, close_status, accounting_status, followup_status, directive_status, promise_date, promise_amount, promised_payment_date, promised_amount_fils, staff_note, followup_note, source_type, due_date, created_at, updated_at, userid FROM arrear_tasks WHERE corpid=? AND COALESCE(close_status,'')<>'closed' AND COALESCE(accounting_status,'')<>'voided' ORDER BY COALESCE(room_bed,room,bed_no,''), task_id LIMIT 1000",
+    [user.corpid]
+  );
+}
+__name(ownerOverviewFetchArrears,"ownerOverviewFetchArrears");
+function ownerOverviewMoney(value){
+  const n=Number(value||0);
+  return Number.isFinite(n)?Math.round(n*100)/100:0;
+}
+__name(ownerOverviewMoney,"ownerOverviewMoney");
+function ownerOverviewClassifyTransaction(row){
+  const cat=String(row?.cat||"").toLowerCase();
+  const type=String(row?.type||"").toUpperCase();
+  const tag=String(row?.tag||"").toLowerCase();
+  const note=String(row?.note||"").toLowerCase();
+  const isDeposit=type==="DR"||Number(row?.deposit_collection||0)===1||Number(row?.deposit_amt||0)>0||Number(row?.deposit_held||0)>0;
+  const isRefund=cat==="refund"||type==="CO"&&Number(row?.deposit_deduction||0)>0;
+  const isExpense=cat==="expense";
+  const isArrearsRecovery=!!row?.linked_task_id||["paid","recovered","partial"].includes(String(row?.arrear_handling||"").toLowerCase())||note.includes("arrear");
+  const isReceived=cat==="cash"||cat==="bank";
+  const isTransfer=tag==="transfer"||!!row?.bed_from||!!row?.bed_to;
+  return {
+    isReceived,
+    isDeposit,
+    isRefund,
+    isExpense,
+    isArrearsRecovery,
+    isRent:isReceived&&!isDeposit&&!isArrearsRecovery,
+    isNewTenant:tag==="new"&&!isTransfer,
+    isCheckout:type==="CO"&&!isTransfer,
+    isTransfer
+  };
+}
+__name(ownerOverviewClassifyTransaction,"ownerOverviewClassifyTransaction");
+function ownerOverviewSummarizeTransactions(rows=[]){
+  const out={
+    rows_checked:rows.length,
+    gross_received:0,
+    rent_received:0,
+    deposit_received:0,
+    arrears_recovered:0,
+    deposit_refund:0,
+    expenses:0,
+    net_cashflow:0,
+    new_tenants:0,
+    checkouts:0,
+    bed_transfers:0,
+    active_beds:new Set()
+  };
+  for(const row of rows){
+    const amount=ownerOverviewMoney(row?.amount);
+    const cls=ownerOverviewClassifyTransaction(row);
+    if(cls.isReceived)out.gross_received+=amount;
+    if(cls.isRent)out.rent_received+=amount;
+    if(cls.isDeposit)out.deposit_received+=amount;
+    if(cls.isArrearsRecovery)out.arrears_recovered+=amount;
+    if(cls.isRefund)out.deposit_refund+=amount;
+    if(cls.isExpense)out.expenses+=amount;
+    if(cls.isNewTenant)out.new_tenants+=1;
+    if(cls.isCheckout)out.checkouts+=1;
+    if(cls.isTransfer)out.bed_transfers+=1;
+    const bed=String(row?.room||row?.bed_to||row?.bed_from||"").trim();
+    if(bed)out.active_beds.add(bed);
+  }
+  out.net_cashflow=ownerOverviewMoney(out.gross_received-out.deposit_refund-out.expenses);
+  out.current_occupied_count=out.active_beds.size;
+  delete out.active_beds;
+  for(const key of Object.keys(out)){
+    if(typeof out[key]==="number")out[key]=ownerOverviewMoney(out[key]);
+  }
+  return out;
+}
+__name(ownerOverviewSummarizeTransactions,"ownerOverviewSummarizeTransactions");
+function ownerOverviewDelta(current,comparison){
+  const currentValue=ownerOverviewMoney(current);
+  const comparisonValue=ownerOverviewMoney(comparison);
+  const absolute_delta=ownerOverviewMoney(currentValue-comparisonValue);
+  const percent_delta=comparisonValue===0?null:ownerOverviewMoney(absolute_delta/comparisonValue*100);
+  const direction=absolute_delta>0?"up":absolute_delta<0?"down":"flat";
+  const interpretation=comparisonValue===0&&currentValue===0?"no_data":direction==="up"?"improving":direction==="down"?"declining":"flat";
+  return {current:currentValue,comparison:comparisonValue,absolute_delta,percent_delta,direction,interpretation};
+}
+__name(ownerOverviewDelta,"ownerOverviewDelta");
+function ownerOverviewArrearsSummary(rows=[],today=empTodayDubai()){
+  const summary={
+    open_count:0,
+    outstanding_amount:0,
+    overdue_count:0,
+    overdue_amount:0,
+    broken_promise_count:0,
+    needs_review_count:0,
+    partial_payment_count:0,
+    source_counts:{existing_arrears_record:0,ttlock_expired_unpaid:0,other:0},
+    employee_followup:{assigned_count:0,followed_up_count:0,promise_count:0,unassigned_count:0}
+  };
+  for(const row of rows){
+    const amount=ownerOverviewMoney(row?.arrear_amount);
+    const received=ownerOverviewMoney(row?.actual_received);
+    const remaining=Math.max(0,ownerOverviewMoney(amount-received));
+    const source=String(row?.source_type||"existing_arrears_record").toLowerCase();
+    const directive=String(row?.directive_status||"none").toLowerCase();
+    const follow=String(row?.followup_status||"").toLowerCase();
+    const promise=String(row?.promise_date||row?.promised_payment_date||"").slice(0,10);
+    const due=String(row?.due_date||promise||"").slice(0,10);
+    summary.open_count+=1;
+    summary.outstanding_amount+=remaining;
+    if(due&&due<today&&remaining>0){
+      summary.overdue_count+=1;
+      summary.overdue_amount+=remaining;
+    }
+    if(promise&&promise<today&&remaining>0)summary.broken_promise_count+=1;
+    if(["needs_review","paid_reported"].includes(follow)||directive==="followed_up")summary.needs_review_count+=1;
+    if(received>0&&remaining>0)summary.partial_payment_count+=1;
+    if(source==="ttlock_expired_unpaid"||source==="ttlock_expired_card")summary.source_counts.ttlock_expired_unpaid+=1;
+    else if(source==="existing_arrears_record"||source==="historical_arrears")summary.source_counts.existing_arrears_record+=1;
+    else summary.source_counts.other+=1;
+    if(["assigned","viewed","pending"].includes(directive))summary.employee_followup.assigned_count+=1;
+    else if(["followed_up","promised"].includes(directive))summary.employee_followup.followed_up_count+=1;
+    else summary.employee_followup.unassigned_count+=1;
+    if(promise)summary.employee_followup.promise_count+=1;
+  }
+  summary.outstanding_amount=ownerOverviewMoney(summary.outstanding_amount);
+  summary.overdue_amount=ownerOverviewMoney(summary.overdue_amount);
+  return summary;
+}
+__name(ownerOverviewArrearsSummary,"ownerOverviewArrearsSummary");
+async function phase0OwnerOverviewComparativeSummary(env,user,url){
+  const today=empTodayDubai();
+  const currentMonth=ownerOverviewMonthRange(today,0);
+  const lastMonth=ownerOverviewMonthRange(today,-1);
+  const sameMonthLastYear=ownerOverviewSameMonthLastYearRange(today);
+  const currentQuarter=ownerOverviewQuarterRange(today,0);
+  const lastQuarter=ownerOverviewQuarterRange(today,-1);
+  const sameQuarterLastYear=ownerOverviewSameQuarterLastYearRange(today);
+  const [
+    monthRows,
+    lastMonthRows,
+    sameMonthLastYearRows,
+    quarterRows,
+    lastQuarterRows,
+    sameQuarterLastYearRows,
+    arrearRows
+  ]=await Promise.all([
+    ownerOverviewFetchTransactions(env,user,currentMonth),
+    ownerOverviewFetchTransactions(env,user,lastMonth),
+    ownerOverviewFetchTransactions(env,user,sameMonthLastYear),
+    ownerOverviewFetchTransactions(env,user,currentQuarter),
+    ownerOverviewFetchTransactions(env,user,lastQuarter),
+    ownerOverviewFetchTransactions(env,user,sameQuarterLastYear),
+    ownerOverviewFetchArrears(env,user)
+  ]);
+  const month=ownerOverviewSummarizeTransactions(monthRows);
+  const prevMonth=ownerOverviewSummarizeTransactions(lastMonthRows);
+  const sameLastYear=ownerOverviewSummarizeTransactions(sameMonthLastYearRows);
+  const quarter=ownerOverviewSummarizeTransactions(quarterRows);
+  const prevQuarter=ownerOverviewSummarizeTransactions(lastQuarterRows);
+  const sameQuarterLastYearSummary=ownerOverviewSummarizeTransactions(sameQuarterLastYearRows);
+  const arrears=ownerOverviewArrearsSummary(arrearRows,today);
+  const noData=[];
+  if(!monthRows.length)noData.push("current_month_transactions");
+  if(!lastMonthRows.length)noData.push("last_month_transactions");
+  if(!sameMonthLastYearRows.length)noData.push("same_month_last_year_transactions");
+  if(!arrearRows.length)noData.push("open_arrears");
+  return success({
+    generated_at:empNow(),
+    production_cutover:"PRODUCTION_NO_GO",
+    readonly:true,
+    period:{today,current_month:currentMonth,last_month:lastMonth,same_month_last_year:sameMonthLastYear,current_quarter:currentQuarter,last_quarter:lastQuarter,same_quarter_last_year:sameQuarterLastYear},
+    current:{month,quarter},
+    comparisons:{
+      last_month:{
+        gross_received:ownerOverviewDelta(month.gross_received,prevMonth.gross_received),
+        rent_received:ownerOverviewDelta(month.rent_received,prevMonth.rent_received),
+        net_cashflow:ownerOverviewDelta(month.net_cashflow,prevMonth.net_cashflow),
+        arrears_recovered:ownerOverviewDelta(month.arrears_recovered,prevMonth.arrears_recovered)
+      },
+      same_month_last_year:{
+        gross_received:ownerOverviewDelta(month.gross_received,sameLastYear.gross_received),
+        rent_received:ownerOverviewDelta(month.rent_received,sameLastYear.rent_received),
+        net_cashflow:ownerOverviewDelta(month.net_cashflow,sameLastYear.net_cashflow),
+        arrears_recovered:ownerOverviewDelta(month.arrears_recovered,sameLastYear.arrears_recovered)
+      },
+      last_quarter:{
+        gross_received:ownerOverviewDelta(quarter.gross_received,prevQuarter.gross_received),
+        net_cashflow:ownerOverviewDelta(quarter.net_cashflow,prevQuarter.net_cashflow)
+      },
+      same_quarter_last_year:{
+        gross_received:ownerOverviewDelta(quarter.gross_received,sameQuarterLastYearSummary.gross_received),
+        net_cashflow:ownerOverviewDelta(quarter.net_cashflow,sameQuarterLastYearSummary.net_cashflow)
+      }
+    },
+    accounting_separation:{
+      rent_received:month.rent_received,
+      deposit_received:month.deposit_received,
+      arrears_recovered:month.arrears_recovered,
+      deposit_refund:month.deposit_refund,
+      expenses:month.expenses,
+      net_cashflow:month.net_cashflow
+    },
+    occupancy_flow:{
+      new_tenants:month.new_tenants,
+      checkouts:month.checkouts,
+      bed_transfers:month.bed_transfers,
+      current_occupied_count:month.current_occupied_count,
+      transfer_rule:"bed transfers are not counted as new tenants or checkouts"
+    },
+    arrears,
+    risk_watch:{
+      overdue_count:arrears.overdue_count,
+      overdue_amount:arrears.overdue_amount,
+      broken_promise_count:arrears.broken_promise_count,
+      partial_payment_count:arrears.partial_payment_count,
+      needs_review_count:arrears.needs_review_count
+    },
+    data_quality:{
+      rows_checked:{current_month:month.rows_checked,last_month:prevMonth.rows_checked,same_month_last_year:sameLastYear.rows_checked,current_quarter:quarter.rows_checked,arrears:arrearRows.length},
+      no_data,
+      warnings:noData.length?["Some comparison windows have no source rows; show no-data instead of fabricating trend."]:[]
+    }
+  });
+}
+__name(phase0OwnerOverviewComparativeSummary,"phase0OwnerOverviewComparativeSummary");
 async function phase0Audit(env,user,url){
   const limit=phase0Limit(url);
   if(await phase0TableExists(env,"audit_logs")){
@@ -3137,6 +3433,7 @@ async function handlePhase0ReadOnlyApi(request,env,user){
     if(!canReadOwnerData(user))return forbidden();
     if(path==="/api/owner/properties")return phase0Properties(env,user,url);
     if(path==="/api/owner/totals")return phase0DashboardTotals(env,user);
+    if(path==="/api/owner/overview/comparative-summary")return phase0OwnerOverviewComparativeSummary(env,user,url);
     if(path==="/api/owner/history")return phase0Entries(env,user,url);
     if(path==="/api/owner/arrears")return phase0Receivables(env,user,url);
     return success({status:"ok",scope:"owner",path});
@@ -4291,6 +4588,10 @@ async function handleRequest(request, env, ctx) {
       const changed=await empCloseArrearEverywhere(env,user,id,empNow());
       await audit(env, user, "arrear.clear", id, { changed });
       return success({ success: true, changed });
+    }
+    if (path === "/api/owner/overview/comparative-summary" && method === "GET") {
+      if (!canReadOwnerData(user)) return forbidden();
+      return phase0OwnerOverviewComparativeSummary(env,user,url);
     }
     if (path === "/api/history") {
       if(!await empTableExists(env,"sessions"))return success([]);
