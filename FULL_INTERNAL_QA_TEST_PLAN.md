@@ -1,5 +1,23 @@
 # Full Internal QA Test Plan
 
+## EMPLOYEE-FOLLOWUP-ENTRY-PERFECT-PARITY-DEPLOY-001 QA Addendum
+
+The employee Follow-up UI parity with Entry page has been deployed to the production Worker as a UI-only change.
+
+QA must verify:
+
+- Employee navigation has only `Entry` and `Follow-up`; no employee `Export` tab or page is visible.
+- Header identity and logout controls are visually unified and not duplicated.
+- Follow-up uses the same layout tokens as Entry: KPI cards, step cards, buttons, spacing, and compact density.
+- Boss assigned task cards default to compact state and support expand/collapse.
+- Default Follow-up cards do not show long customer codes, internal ids, raw source fields, or debug labels.
+- System Reminders use the same visual system as Entry.
+- Owner WhatsApp and owner arrears exports still work and were not removed.
+- Authenticated mobile acceptance is still required after deploy.
+- No production write, write gate, migration, batch dispatch, TTLock smoke, financial formula change, dashboard calculation change, or production cutover is approved.
+
+Production cutover remains `PRODUCTION_NO_GO`.
+
 ## ARREARS-EMPLOYEE-INBOX-STATUS-COPY-MOBILE-ACCEPTANCE-001 QA Addendum
 
 Mobile acceptance passed for the employee boss-assigned arrears task status-copy fix.

@@ -1,5 +1,19 @@
 # Owner Internal Test Script
 
+## EMPLOYEE-FOLLOWUP-ENTRY-PERFECT-PARITY-DEPLOY-001 Owner Notes
+
+Date: 2026-06-01, Asia/Dubai
+
+Employee Follow-up/Entry parity UI is deployed. Owner-side validation remains read-only unless a separate write approval is granted.
+
+- Owner WhatsApp arrears export markers were preserved in `index-51-main.js`.
+- Owner arrears export row helper markers were preserved in `index-51-main.js`.
+- No owner directive create, batch dispatch, TTLock smoke, migration, financial formula change, dashboard calculation change, or production cutover is approved by this deploy.
+- Owner should continue verifying Abdul feedback visibility through existing read-only acceptance scripts.
+- Real employee follow-up writes still require separate production write approval.
+
+Production remains `PRODUCTION_NO_GO`.
+
 ## ARREARS-EMPLOYEE-INBOX-STATUS-COPY-DEPLOY-001 Owner Notes
 
 Date: 2026-05-31, Asia/Dubai

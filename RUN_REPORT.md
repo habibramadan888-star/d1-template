@@ -1,5 +1,26 @@
 # Run Report
 
+## EMPLOYEE-FOLLOWUP-ENTRY-PERFECT-PARITY-DEPLOY-001
+
+Date: 2026-06-01, Asia/Dubai
+
+Scope: deployed the employee Follow-up UI parity with Entry page to the default `homelink-finance` Worker.
+
+- Baseline commit before deploy: `dcd0a7a`.
+- Worker version: `e839de0d-3740-4494-9703-8bc8137b11bd`.
+- Uploaded asset: `/employee-v3.html`.
+- Employee navigation remains `Entry` and `Follow-up` only; employee `Export` tab/page remains removed.
+- Employee header identity/logout UI uses the unified Entry-style button treatment.
+- Follow-up task cards use compact default state with `Expand Details / 展开详情` and `Collapse Details / 收起详情`.
+- Boss assigned task cards and System Reminders use Entry-style card/layout tokens.
+- Owner WhatsApp and owner arrears exports were preserved.
+- Public live smoke passed for `/`, `/employee-v3`, `/index-51.html`, and unauthenticated `/api/me`.
+- Authenticated Abdul phone acceptance was not executed in this deploy task and remains manual required.
+- No production write gate was opened.
+- No production D1 write, owner directive create, employee follow-up write, batch dispatch, TTLock smoke, migration, financial formula change, or dashboard calculation change occurred.
+
+Production remains `PRODUCTION_NO_GO`.
+
 ## ARREARS-EMPLOYEE-INBOX-STATUS-COPY-MOBILE-ACCEPTANCE-001
 
 Date: 2026-06-01, Asia/Dubai

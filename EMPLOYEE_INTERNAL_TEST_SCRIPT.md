@@ -1,5 +1,26 @@
 # Employee Internal Test Script
 
+## EMPLOYEE-FOLLOWUP-ENTRY-PERFECT-PARITY-DEPLOY-001 Employee Checks
+
+Date: 2026-06-01, Asia/Dubai
+
+The employee Follow-up UI parity with Entry page is deployed to production Worker version `e839de0d-3740-4494-9703-8bc8137b11bd`.
+
+Manual employee QA should confirm:
+
+- Employee top navigation shows only `Entry` and `Follow-up`; there is no `Export` tab.
+- Legacy employee export page is not available as an employee workflow.
+- Header shows one employee identity display and one explicit `Logout / 退出` action.
+- Follow-up page uses the same visual density, card rhythm, and controls as Entry.
+- Boss assigned task card opens in compact/default state and uses `Expand Details / 展开详情`.
+- Expanded task card can be collapsed with `Collapse Details / 收起详情`.
+- Default task card does not show long customer code, internal ids, or debug fields.
+- System Reminders use the same Entry-style card treatment.
+- Saved, unsaved, and write-gated states remain distinguishable.
+- No production write should be attempted during visual QA unless separately approved.
+
+Production cutover remains `PRODUCTION_NO_GO`.
+
 ## ARREARS-EMPLOYEE-INBOX-STATUS-COPY-MOBILE-ACCEPTANCE-001 Employee Acceptance
 
 Date: 2026-06-01, Asia/Dubai

@@ -1,5 +1,22 @@
 # Owner Employee UI Visual QA Checklist
 
+## EMPLOYEE-FOLLOWUP-ENTRY-PERFECT-PARITY-DEPLOY-001 Visual Checks
+
+Date: 2026-06-01, Asia/Dubai
+
+| Screenshot / State | Required | Pass/Fail | Notes |
+|---|---:|---|---|
+| Employee header identity/logout | Yes | | One employee identity display plus one explicit `Logout / 退出` action. |
+| Employee nav Entry/Follow-up only | Yes | | No employee `Export` tab. |
+| Follow-up compact card default | Yes | | Boss assigned tasks should not open as long instruction blocks by default. |
+| Follow-up expand/collapse | Yes | | `Expand Details / 展开详情` and `Collapse Details / 收起详情` are present and usable. |
+| Follow-up matches Entry visual density | Yes | | Cards, spacing, buttons, and KPI tiles should feel identical to Entry. |
+| No default customer code/internal id | Yes | | Default card should not show long customer code, raw task id, or debug labels. |
+| System Reminders visual parity | Yes | | Reminders use Entry-style card treatment. |
+| Owner exports preserved | Yes | | Owner WhatsApp and arrears export actions remain visible and usable. |
+
+Production remains `PRODUCTION_NO_GO`. This checklist does not approve production writes, write gate, migration, rollout, or production cutover.
+
 ## TTLOCK-ARREARS-SOURCE-FIX-001 Visual Checks
 
 | Screenshot / State     | Required | Pass/Fail | Notes                                                               |

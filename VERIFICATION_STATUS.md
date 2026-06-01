@@ -1,5 +1,22 @@
 # Verification Status
 
+## EMPLOYEE-FOLLOWUP-ENTRY-PERFECT-PARITY-DEPLOY-001 Verification Addendum
+
+Date: 2026-06-01, Asia/Dubai
+
+| Verification | Result | Evidence | Commercial Meaning |
+|---|---:|---|---|
+| predeploy worktree safety | PASS | `EMPLOYEE_FOLLOWUP_ENTRY_PARITY_DEPLOY_WORKTREE_CHECK.md` | Only this deploy's evidence and test alias updates are intended for commit. |
+| employee parity tests | PASS | 16 focused employee UI/read-only tests | Follow-up/Entry parity, header/logout, export removal, persisted/dirty state, and readonly admin checks passed. |
+| security and launch gates | PASS | `security:secrets`, `gate:commercial-launch` | No secret committed; launch remains blocked. |
+| dry-run/embedded gates | PASS | `build:embedded:dry-run`, `verify:embedded-worker`, `audit:worker-drift` | Worker asset deploy was prepared without critical drift. |
+| production static deploy | PASS | `EMPLOYEE_FOLLOWUP_ENTRY_PARITY_DEPLOY_RESULT.md` | Worker version `e839de0d-3740-4494-9703-8bc8137b11bd` published `/employee-v3.html`. |
+| live asset verification | PASS | `EMPLOYEE_FOLLOWUP_ENTRY_PARITY_LIVE_ASSET_VERIFY_RESULT.md` | `/employee-v3` contains the deployed parity markers; owner export markers are preserved. |
+| live read-only smoke | PASS | `EMPLOYEE_FOLLOWUP_ENTRY_PARITY_LIVE_SMOKE_RESULT.md` | Public routes and unauthenticated auth guard were checked without production writes. |
+| authenticated phone acceptance | MANUAL_REQUIRED | Not executed by Codex in this deploy task | Requires user phone verification with real login session. |
+| production write gate | OFF | no write gate command executed | Employee follow-up writes still require separate production approval. |
+| production cutover | PRODUCTION_NO_GO | commercial launch gate | This deploy is not rollout/cutover approval. |
+
 ## ARREARS-EMPLOYEE-INBOX-STATUS-COPY-MOBILE-ACCEPTANCE-001 Verification Addendum
 
 Date: 2026-06-01, Asia/Dubai
