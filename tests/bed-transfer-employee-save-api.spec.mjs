@@ -12,13 +12,15 @@ function extractFunction(source, name) {
   return source.slice(start, end);
 }
 
-test("employee Bed Transfer API writes pending_review event ledger records", async () => {
+test("employee Bed Transfer API writes recorded event ledger records", async () => {
   const worker = await readFile(workerPath, "utf8");
   const handler = extractFunction(worker, "handleEmployeeBedTransferCreate");
 
   assert.match(worker, /path===\"\/api\/employee\/bed-transfers\"&&request\.method===\"POST\"/);
   assert.match(handler, /bed_transfer_events/);
-  assert.match(handler, /status:\"pending_review\"/);
+  assert.match(handler, /status:\"recorded\"/);
+  assert.match(handler, /message:\"Bed transfer recorded \/ 换床记录已保存\"/);
+  assert.match(handler, /review_required:false/);
   assert.match(handler, /from_bed_required/);
   assert.match(handler, /to_bed_required/);
   assert.match(handler, /transfer_date_required/);

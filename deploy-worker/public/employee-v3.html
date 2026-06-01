@@ -2683,8 +2683,8 @@ function readSessionId(userid){
 }
 const state={lockCards:[],current:null,depositBalance:null,rentConfig:{},rentConfigLoaded:false,drafts:[],tasks:[],employeeDirectives:[],followupItems:[],sessionId:'',user:null};
 const BED_TRANSFER_WRITE_ENABLED=true;
-const BED_TRANSFER_EVENT_LEDGER_MESSAGE='换床申请会写入事件账本，状态为 pending_review，等待老板核对；不会直接改床位、押金、欠款或通通锁。 Bed transfer saves to the event ledger for owner review only.';
-const BED_TRANSFER_SUBMITTED_MESSAGE='Bed transfer submitted for owner review / 换床申请已提交老板核对';
+const BED_TRANSFER_EVENT_LEDGER_MESSAGE='Bed transfer records save event anchors only. This does not directly change bed occupancy, deposit, arrears, or TTLock. 换床记录只保存信息锚点，不会直接改变床位、押金、欠款或通通锁。';
+const BED_TRANSFER_SUBMITTED_MESSAGE='Bed transfer recorded / 换床记录已保存';
 const BED_TRANSFER_WRITE_DISABLED_MESSAGE='换床事件账本写入不可用，请稍后重试。 Bed transfer event-ledger write is unavailable.';
 function apiUrl(path){return location.protocol!=='file:'&&location.host.includes('workers.dev')?path:API_ORIGIN+path}
 async function apiFetch(path,opts={}){return wrapStandardJsonResponse(await fetch(apiUrl(path),{credentials:'include',...opts,headers:{'Content-Type':'application/json',...(opts.headers||{})}}))}
@@ -3159,7 +3159,7 @@ function bedTransferValidationSummary(fromBed,toBed,context={}){
   if(context.ttlockFound===false)review.push('ttlock_review_required');
   if(context.pendingTransfer===true)review.push('pending_transfer_exists');
   if(context.rentDifferenceFils&&Number(context.rentDifferenceFils)!==0)review.push('rent_difference_review');
-  return {ok:errors.length===0,errors,review,status:errors.length?'blocked':(review.length?'pending_review':'validated')};
+  return {ok:errors.length===0,errors,review,status:errors.length?'blocked':(review.length?'recorded_with_notes':'validated')};
 }
 function bedTransferReviewContext(){
   const fromBed=transferValue('transferFromBed')||transferValue('bed');
@@ -3391,7 +3391,7 @@ function syncForm(){
   }
   updateEventChips();
   $('objectHint').textContent=type==='E'?'支出不需要床位时可以只选择类别；如果是指定房间维修，可在备注写床位。':(type==='TF'?'换床需要填写原床位和新床位，系统会保留换床前后锚点。':'收租/收押金/退押金/还欠款：填写床位号，系统自动抓取租客上下文。');
-  if($('btnSaveEntry'))$('btnSaveEntry').innerHTML=type==='TF'?'提交老板核对<span class="label-en">SUBMIT FOR REVIEW</span>':'加入本票<span class="label-en">ADD TO SESSION</span>';
+  if($('btnSaveEntry'))$('btnSaveEntry').innerHTML=type==='TF'?'保存换床记录<span class="label-en">RECORD TRANSFER</span>':'加入本票<span class="label-en">ADD TO SESSION</span>';
   visible(['periodStep'],hasPeriod);visible(['apFields'],type==='AP');visible(['checkoutFields'],type==='CO');visible(['transferFields'],type==='TF');visible(['expenseFields'],type==='E');visible(['paymentStep'],!['E','CO'].includes(type));visible(['genericBedFieldWrap'],type!=='TF');
   updatePaymentButtons();
   visible(['exceptionStep'],needsException());
@@ -4466,7 +4466,7 @@ async function commitSessionAndExport(){
   buildExport();
   if(!state.drafts.length){showStatus('当前本票没有流水，不能导出交接。','warn');toast('当前本票没有流水，不能导出交接',6000);return}
   if(state.drafts.some(e=>e.type==='TF')){
-    const message='Bed Transfer requests submit directly for owner review and cannot be included in handover export. 请重新用换床表单提交老板核对。';
+    const message='Bed Transfer records are saved separately and cannot be included in handover export. 请使用换床表单单独保存记录。';
     $('validationBox').innerHTML=`<div class="warn">${esc(message)}</div>`;
     showStatus(message,'warn');
     toast(message,6000);
@@ -4734,7 +4734,7 @@ function renderBedTransferSystemContext(){
       <div class="priority-card"><span>New bed status<small>新床位状态</small></span><b>${esc(newBedStatus)}</b><div class="sub">Review before real write</div></div>
       <div class="priority-card rent-check"><span>New bed rent<small>新床位租金</small></span><b>${esc(newRent)}</b><div class="sub">From rent config when available</div></div>
       <div class="priority-card rent-check"><span>Rent difference review<small>租金差异核对</small></span><b>${esc(rentDiff)}</b><div class="sub">Review required before write</div></div>
-      <div class="priority-card warn"><span>Write status<small>写入状态</small></span><b>Pending owner review / 待老板核对</b><div class="sub">${esc(BED_TRANSFER_EVENT_LEDGER_MESSAGE)}</div></div>
+      <div class="priority-card warn"><span>Record status<small>记录状态</small></span><b>Recorded / 已记录</b><div class="sub">${esc(BED_TRANSFER_EVENT_LEDGER_MESSAGE)}</div></div>
     </div>
   </div>`;
 }

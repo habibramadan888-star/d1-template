@@ -17,11 +17,12 @@ test("employee TF save posts the event-ledger payload with required anchors", as
   assert.match(html, /idempotency_key:bedTransferEventIdempotencyKey\(e\)/);
 });
 
-test("employee TF save shows owner-review wording instead of completed-transfer wording", async () => {
+test("employee TF save shows record-only wording instead of owner-review wording", async () => {
   const html = await readFile(htmlPath, "utf8");
 
-  assert.match(html, /Bed transfer submitted for owner review/);
-  assert.match(html, /pending_review/);
-  assert.match(html, /不会直接改床位、押金、欠款或通通锁/);
-  assert.doesNotMatch(html, /换床已完成/);
+  assert.match(html, /Bed transfer recorded \/ 换床记录已保存/);
+  assert.match(html, /RECORD TRANSFER/);
+  assert.match(html, /recorded_with_notes/);
+  assert.doesNotMatch(html, /Bed transfer submitted for owner review/);
+  assert.doesNotMatch(html, /SUBMIT FOR REVIEW/);
 });

@@ -8,7 +8,7 @@ test("validation service defines block and review outcomes", async () => {
   const html = await readFile(htmlPath, "utf8");
 
   assert.match(html, /function bedTransferValidationSummary\(fromBed,toBed,context=\{\}\)/);
-  assert.match(html, /status:errors\.length\?'blocked':\(review\.length\?'pending_review':'validated'\)/);
+  assert.match(html, /status:errors\.length\?'blocked':\(review\.length\?'recorded_with_notes':'validated'\)/);
   assert.match(html, /deposit_review_required/);
   assert.match(html, /rent_period_review_required/);
   assert.match(html, /ttlock_review_required/);

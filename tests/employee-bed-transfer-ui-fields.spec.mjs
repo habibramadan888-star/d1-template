@@ -51,8 +51,9 @@ test("Bed Transfer event-ledger write is wired in the UI", async () => {
   assert.match(html, /function isBedTransferWriteGated/);
   assert.match(html, /async function submitBedTransferEvent\(\)/);
   assert.match(html, /\/api\/employee\/bed-transfers/);
-  assert.match(html, /pending_review/);
-  assert.match(html, /owner review/);
+  assert.match(html, /Bed transfer recorded \/ 换床记录已保存/);
+  assert.match(html, /recorded_with_notes/);
+  assert.doesNotMatch(html, /SUBMIT FOR REVIEW/);
   assert.match(html, /state\.drafts\.some\(e=>e\.type==='TF'\)/);
 });
 

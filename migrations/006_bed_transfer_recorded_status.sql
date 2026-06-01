@@ -1,9 +1,10 @@
--- Migration 005: Bed Transfer event closure schema
--- Scope: staging-only unless separately approved for production.
--- Purpose: persist Bed Transfer from_bed -> to_bed events with accounting,
--- TTLock, audit, traceability, and QA rollback anchors.
+-- Migration 006: Bed Transfer record-only status
+-- Purpose: allow record-only Bed Transfer events to use status='recorded'.
+-- Existing pending_review smoke rows are preserved for traceability.
 
-CREATE TABLE IF NOT EXISTS bed_transfer_events (
+DROP TABLE IF EXISTS bed_transfer_events_recorded_migration;
+
+CREATE TABLE bed_transfer_events_recorded_migration (
   id TEXT PRIMARY KEY,
   transfer_id TEXT UNIQUE,
   corp_id TEXT NOT NULL,
@@ -42,6 +43,26 @@ CREATE TABLE IF NOT EXISTS bed_transfer_events (
   CHECK (from_bed <> to_bed),
   CHECK (status IN ('draft','validated','recorded','pending_review','completed','rolled_back','voided'))
 );
+
+INSERT OR IGNORE INTO bed_transfer_events_recorded_migration (
+  id, transfer_id, corp_id, tenant_scope, from_bed, to_bed, transfer_date, effective_date,
+  customer_id, customer_code, customer_display_name, original_checkin_date, original_rent_period_start,
+  original_rent_period_end, original_deposit_amount_fils, current_rent_amount_fils, new_bed_rent_amount_fils,
+  rent_difference_fils, transfer_fee_fils, carry_over_arrears_fils, old_ttlock_ref, new_ttlock_ref,
+  old_lock_valid_from, old_lock_valid_until, new_lock_valid_from, new_lock_valid_until, reason, note,
+  operator_employee, status, audit_id, trace_id, qa_tag, created_at, updated_at
+)
+SELECT
+  id, transfer_id, corp_id, tenant_scope, from_bed, to_bed, transfer_date, effective_date,
+  customer_id, customer_code, customer_display_name, original_checkin_date, original_rent_period_start,
+  original_rent_period_end, original_deposit_amount_fils, current_rent_amount_fils, new_bed_rent_amount_fils,
+  rent_difference_fils, transfer_fee_fils, carry_over_arrears_fils, old_ttlock_ref, new_ttlock_ref,
+  old_lock_valid_from, old_lock_valid_until, new_lock_valid_from, new_lock_valid_until, reason, note,
+  operator_employee, COALESCE(NULLIF(status,''),'recorded'), audit_id, trace_id, qa_tag, created_at, updated_at
+FROM bed_transfer_events;
+
+DROP TABLE bed_transfer_events;
+ALTER TABLE bed_transfer_events_recorded_migration RENAME TO bed_transfer_events;
 
 CREATE INDEX IF NOT EXISTS idx_bed_transfer_events_from_bed
   ON bed_transfer_events(from_bed);

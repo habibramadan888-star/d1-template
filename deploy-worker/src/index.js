@@ -3104,12 +3104,13 @@ function bedTransferEventView(row){
     reason:cleanText(row?.reason||"",120),
     note:cleanText(row?.note||"",500),
     operator_employee:cleanText(row?.operator_employee||"",80),
-    status:cleanText(row?.status||"pending_review",40),
+    status:cleanText(row?.status==="pending_review"?"recorded":row?.status||"recorded",40),
     audit_id:cleanText(row?.audit_id||"",80),
     trace_id:cleanText(row?.trace_id||"",80),
     qa_tag:cleanText(row?.qa_tag||"",120),
     created_at:cleanText(row?.created_at||"",40),
-    review_required:String(row?.status||"")==="pending_review"
+    review_required:false,
+    record_only:true
   };
 }
 __name(bedTransferEventView,"bedTransferEventView");
@@ -3181,7 +3182,7 @@ async function handleEmployeeBedTransferCreate(request,env,user){
     reason,
     note,
     operator_employee:user.userid,
-    status:"pending_review",
+    status:"recorded",
     audit_id:auditId,
     trace_id:traceId,
     qa_tag:cleanText(body?.qa_tag||"",120),
@@ -3191,17 +3192,17 @@ async function handleEmployeeBedTransferCreate(request,env,user){
   const responseData={
     success:true,
     transfer_id:transferId,
-    status:"pending_review",
+    status:"recorded",
     from_bed:fromBed,
     to_bed:toBed,
     transfer_date:transferDate,
-    review_required:true,
+    review_required:false,
     audit_id:authSafeId(auditId),
     trace_id:authSafeId(traceId),
     deposit_carried_fils:eventValues.original_deposit_amount_fils,
     carry_over_arrears_fils:eventValues.carry_over_arrears_fils,
     old_ttlock_ref:eventValues.old_ttlock_ref,
-    message:"Bed transfer submitted for owner review / 换床申请已提交老板核对",
+    message:"Bed transfer recorded / 换床记录已保存",
     idempotency_status:"NEW"
   };
   const responseBody=ok(responseData);
@@ -3212,9 +3213,9 @@ async function handleEmployeeBedTransferCreate(request,env,user){
     env.DB.prepare(`INSERT INTO entry_events
       (event_id, corpid, userid, ref_id, ref_type, event_type, field_name, old_value, new_value, operator_id, ts)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-      .bind(traceId,user.corpid,user.userid,transferId,"bed_transfer_event","create","status","",JSON.stringify({status:"pending_review",from_bed:fromBed,to_bed:toBed}),user.userid,now)
+      .bind(traceId,user.corpid,user.userid,transferId,"bed_transfer_event","create","status","",JSON.stringify({status:"recorded",from_bed:fromBed,to_bed:toBed}),user.userid,now)
   ]);
-  await audit(env,user,"employee.bed_transfer.create",transferId,{from_bed:fromBed,to_bed:toBed,status:"pending_review",audit_id:auditId,trace_id:traceId}).catch(()=>{});
+  await audit(env,user,"employee.bed_transfer.create",transferId,{from_bed:fromBed,to_bed:toBed,status:"recorded",audit_id:auditId,trace_id:traceId}).catch(()=>{});
   await arrearsDirectiveRecordIdempotency(env,{...idemOptions,resourceId:transferId,status:"RECORDED"},responseBody);
   return json(responseBody,201);
 }
@@ -3234,7 +3235,12 @@ async function handleOwnerBedTransfers(request,env,user){
   const limit=Number.isFinite(rawLimit)&&rawLimit>0?Math.min(Math.floor(rawLimit),100):50;
   const where=["corp_id=?"];
   const params=[user.corpid];
-  if(status){where.push("status=?");params.push(status);}
+  if(status==="recorded"){
+    where.push("status IN ('recorded','pending_review')");
+  }else if(status){
+    where.push("status=?");
+    params.push(status);
+  }
   params.push(limit);
   const rows=await env.DB.prepare(`SELECT * FROM bed_transfer_events
     WHERE ${where.join(" AND ")}
@@ -3587,7 +3593,7 @@ __name(ownerOverviewArrearsSummary,"ownerOverviewArrearsSummary");
 async function ownerOverviewFetchBedTransferReviews(env,user){
   if(!await empTableExists(env,"bed_transfer_events").catch(()=>false))return [];
   const rows=await env.DB.prepare(`SELECT * FROM bed_transfer_events
-    WHERE corp_id=? AND status='pending_review'
+    WHERE corp_id=? AND status IN ('recorded','pending_review')
     ORDER BY created_at DESC
     LIMIT 5`).bind(user.corpid).all().catch(()=>({results:[]}));
   return (rows.results||[]).map(bedTransferEventView);
@@ -3676,8 +3682,10 @@ async function phase0OwnerOverviewComparativeSummary(env,user,url){
       transfer_rule:"bed transfers are not counted as new tenants or checkouts"
     },
     bed_transfer_review:{
-      pending_review_count:bedTransferReviews.length,
-      pending_review:bedTransferReviews
+      recorded_count:bedTransferReviews.length,
+      records:bedTransferReviews,
+      pending_review_count:0,
+      pending_review:[]
     },
     arrears,
     risk_watch:{
