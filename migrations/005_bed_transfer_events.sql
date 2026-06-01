@@ -25,6 +25,8 @@ CREATE TABLE IF NOT EXISTS bed_transfer_events (
   transfer_fee_fils INTEGER DEFAULT 0,
   amount_fils INTEGER DEFAULT 5000,
   fee_mode TEXT DEFAULT 'charged',
+  fee_status TEXT DEFAULT 'paid',
+  payment_method TEXT,
   waiver_reason TEXT,
   category TEXT DEFAULT 'bed_transfer_fee',
   review_flags TEXT,
@@ -48,6 +50,7 @@ CREATE TABLE IF NOT EXISTS bed_transfer_events (
   CHECK (from_bed <> to_bed),
   CHECK (status IN ('draft','validated','recorded','pending_review','completed','rolled_back','voided')),
   CHECK (fee_mode IN ('charged','waived')),
+  CHECK (fee_status IN ('paid','waived')),
   CHECK (fee_mode <> 'waived' OR COALESCE(waiver_reason,'') <> '')
 );
 

@@ -38,9 +38,11 @@ test("Bed Transfer fee schema columns are declared", async () => {
   const worker = await readFile("deploy-worker/src/index.js", "utf8");
   const migration = await readFile("migrations/007_bed_transfer_fee_ledger.sql", "utf8");
 
-  assert.match(worker, /"amount_fils","fee_mode","waiver_reason","category"/);
+  assert.match(worker, /"amount_fils","fee_mode","fee_status","payment_method","waiver_reason","category"/);
   assert.match(worker, /"entry_event_id"/);
   assert.match(migration, /amount_fils INTEGER DEFAULT 5000/);
   assert.match(migration, /fee_mode TEXT DEFAULT 'charged'/);
+  assert.match(migration, /fee_status TEXT DEFAULT 'paid'/);
+  assert.match(migration, /payment_method TEXT/);
   assert.match(migration, /category TEXT DEFAULT 'bed_transfer_fee'/);
 });

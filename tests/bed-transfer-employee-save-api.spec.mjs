@@ -12,20 +12,22 @@ function extractFunction(source, name) {
   return source.slice(start, end);
 }
 
-test("employee Bed Transfer API writes recorded event ledger records", async () => {
+test("employee Bed Transfer API writes recorded entry-ledger records", async () => {
   const worker = await readFile(workerPath, "utf8");
   const handler = extractFunction(worker, "handleEmployeeBedTransferCreate");
 
-  assert.match(worker, /path===\"\/api\/employee\/bed-transfers\"&&request\.method===\"POST\"/);
-  assert.match(handler, /bed_transfer_events/);
-  assert.match(handler, /status:\"recorded\"/);
-  assert.match(handler, /message:\"Bed transfer recorded \/ 换床记录已保存\"/);
+  assert.match(worker, /path==="\/api\/employee\/bed-transfers"&&request\.method==="POST"/);
+  assert.match(handler, /INSERT INTO entry_events/);
+  assert.match(handler, /INSERT INTO bed_transfer_events/);
+  assert.match(handler, /status:"recorded"/);
+  assert.match(handler, /Bed transfer recorded\. Fee: 50 AED/);
+  assert.match(handler, /Bed transfer recorded\. Fee waived/);
   assert.match(handler, /review_required:false/);
   assert.match(handler, /from_bed_required/);
   assert.match(handler, /to_bed_required/);
   assert.match(handler, /transfer_date_required/);
-  assert.match(handler, /transfer_reason_required/);
-  assert.match(handler, /transfer_note_required/);
+  assert.doesNotMatch(handler, /transfer_reason_required/);
+  assert.doesNotMatch(handler, /transfer_note_required/);
 });
 
 test("employee Bed Transfer API records audit, trace, and idempotency evidence", async () => {

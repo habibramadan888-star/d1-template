@@ -1134,7 +1134,7 @@ const BED_TRANSFER_EVENT_COLUMNS = [
   "id","transfer_id","corp_id","tenant_scope","from_bed","to_bed","transfer_date","effective_date",
   "customer_id","customer_code","customer_display_name","original_checkin_date","original_rent_period_start",
   "original_rent_period_end","original_deposit_amount_fils","current_rent_amount_fils","new_bed_rent_amount_fils",
-  "rent_difference_fils","transfer_fee_fils","amount_fils","fee_mode","waiver_reason","category",
+  "rent_difference_fils","transfer_fee_fils","amount_fils","fee_mode","fee_status","payment_method","waiver_reason","category",
   "review_flags",
   "carry_over_arrears_fils","old_ttlock_ref","new_ttlock_ref",
   "old_lock_valid_from","old_lock_valid_until","new_lock_valid_from","new_lock_valid_until","reason","note",
@@ -3142,31 +3142,34 @@ async function handleEmployeeBedTransferCreate(request,env,user){
   const fromBed=bedTransferCleanBed(body?.from_bed||body?.bed_from||body?.fromBed||body?.room);
   const toBed=bedTransferCleanBed(body?.to_bed||body?.bed_to||body?.toBed||body?.room_to);
   const transferDate=empCleanIsoDate(body?.transfer_date||body?.transferDate||"");
-  const reason=cleanText(body?.reason||body?.transfer_reason||body?.transferReason||"",120);
-  const note=cleanText(body?.note||body?.remark||body?.transfer_note||"",500);
+  const reason=cleanText(body?.reason||body?.transfer_reason||body?.transferReason||"customer_request",120);
+  const waiverReason=cleanText(body?.waiver_reason||body?.fee_waiver_reason||body?.waiverReason||"",240);
+  const note=cleanText(body?.note||body?.remark||body?.transfer_note||reason||waiverReason||"bed_transfer",500);
   const idempotencyKey=cleanText(body?.idempotency_key||body?.idempotencyKey||request.headers.get("Idempotency-Key")||"",160);
   if(!fromBed)return badRequest("from_bed_required");
   if(!toBed)return badRequest("to_bed_required");
   if(fromBed===toBed)return badRequest("from_bed_must_differ_from_to_bed");
   if(!transferDate)return badRequest("transfer_date_required");
-  if(!reason)return badRequest("transfer_reason_required");
-  if(!note)return badRequest("transfer_note_required");
   if(!idempotencyKey)return badRequest("idempotency_key_required");
-  const rawFeeMode=cleanText(body?.fee_mode||body?.feeMode||"",20).toLowerCase();
+  const rawFeeInput=cleanText(body?.fee_status||body?.feeStatus||body?.fee_mode||body?.feeMode||"",20).toLowerCase();
+  const rawFeeMode=rawFeeInput==="paid"?"charged":rawFeeInput;
   const rawAmountFils=Number(body?.amount_fils ?? body?.transfer_fee_fils ?? NaN);
   const legacyFeeAed=Number(String(body?.transfer_fee ?? body?.transfer_fee_aed ?? "").replace(/,/g,""));
   const legacyFeeFils=Number.isFinite(legacyFeeAed)?bedTransferAedToFils(legacyFeeAed):NaN;
   const inferredAmountFils=Number.isFinite(rawAmountFils)?rawAmountFils:(Number.isFinite(legacyFeeFils)?legacyFeeFils:5000);
   const feeMode=rawFeeMode||((inferredAmountFils===0)?"waived":"charged");
-  const waiverReason=cleanText(body?.waiver_reason||body?.fee_waiver_reason||body?.waiverReason||"",240);
   if(!["charged","waived"].includes(feeMode))return badRequest("bed_transfer_fee_mode_invalid");
   if(feeMode==="waived"&&!waiverReason)return badRequest("bed_transfer_waiver_reason_required");
+  const feeStatus=feeMode==="waived"?"waived":"paid";
+  const rawPaymentMethod=cleanText(body?.payment_method||body?.paymentMethod||body?.pay_type||body?.payType||"",20).toLowerCase();
+  const paymentMethod=feeStatus==="waived"?"none":({c:"cash",cash:"cash",b:"bank",bank:"bank"}[rawPaymentMethod]||rawPaymentMethod);
+  if(feeStatus==="paid"&&!["cash","bank","other"].includes(paymentMethod))return badRequest("payment_method_required");
   const amountFils=feeMode==="waived"?0:5000;
   const category="bed_transfer_fee";
   const reviewFlags=Array.isArray(body?.review_flags)
     ? body.review_flags.map((x)=>cleanText(x,80)).filter(Boolean).slice(0,12)
     : [];
-  const requestPayload={corp_id:user.corpid,actor:user.userid,from_bed:fromBed,to_bed:toBed,transfer_date:transferDate,fee_mode:feeMode,amount_fils:amountFils,waiver_reason:waiverReason,reason,note,category,review_flags:reviewFlags};
+  const requestPayload={corp_id:user.corpid,actor:user.userid,from_bed:fromBed,to_bed:toBed,transfer_date:transferDate,fee_status:feeStatus,fee_mode:feeMode,payment_method:paymentMethod,amount_fils:amountFils,waiver_reason:waiverReason,reason,note,category,review_flags:reviewFlags};
   const requestHash=await bedTransferRequestHash(requestPayload);
   const idemOptions={
     scope:`${user.corpid}:bed_transfer_events`,
@@ -3208,6 +3211,8 @@ async function handleEmployeeBedTransferCreate(request,env,user){
     transfer_fee_fils:amountFils,
     amount_fils:amountFils,
     fee_mode:feeMode,
+    fee_status:feeStatus,
+    payment_method:paymentMethod,
     waiver_reason:waiverReason,
     category,
     review_flags:JSON.stringify(reviewFlags),
@@ -3229,6 +3234,44 @@ async function handleEmployeeBedTransferCreate(request,env,user){
     created_at:now,
     updated_at:now
   };
+  const sessionEntry={
+    id:entryEventId,
+    cloud_entry_id:entryEventId,
+    transfer_id:transferId,
+    entry_event_id:entryEventId,
+    type:"TF",
+    event_type:"bed_transfer",
+    category,
+    room:fromBed,
+    roomTo:toBed,
+    bed_from:fromBed,
+    bed_to:toBed,
+    tenant_name:snapshot.customer_display_name,
+    tenant_card_id:snapshot.customer_code,
+    amount:bedTransferFilsToAed(amountFils),
+    amount_fils:amountFils,
+    due:bedTransferFilsToAed(amountFils),
+    paid:bedTransferFilsToAed(amountFils),
+    pay_type:paymentMethod==="bank"?"B":(paymentMethod==="cash"?"C":""),
+    payment_method:paymentMethod,
+    fee_status:feeStatus,
+    fee_mode:feeMode,
+    fee_paid:feeStatus==="waived"?"N":"Y",
+    fee_waiver_reason:waiverReason,
+    waiver_reason:waiverReason,
+    transfer_date:transferDate,
+    transfer_reason:reason,
+    reason,
+    note,
+    remark:note,
+    review_flags:reviewFlags,
+    operator_id:user.userid,
+    operator_name:user.employee_name||user.userid,
+    sync_status:"SYNCED",
+    status:"RECORDED",
+    created_at:now,
+    ts:now
+  };
   const responseData={
     success:true,
     transfer_id:transferId,
@@ -3244,11 +3287,15 @@ async function handleEmployeeBedTransferCreate(request,env,user){
     old_ttlock_ref:eventValues.old_ttlock_ref,
     amount_fils:amountFils,
     amount_aed:bedTransferFilsToAed(amountFils),
+    event_type:"bed_transfer",
+    fee_status:feeStatus,
     fee_mode:feeMode,
+    payment_method:paymentMethod,
     waiver_reason:waiverReason,
     category,
     review_flags:reviewFlags,
     entry_event_id:authSafeId(entryEventId),
+    session_entry:sessionEntry,
     message:feeMode==="waived"?"Bed transfer recorded. Fee waived / 换床记录已保存，费用已豁免。":"Bed transfer recorded. Fee: 50 AED / 换床记录已保存，已记录 50 AED 换床费。",
     idempotency_status:"NEW"
   };
@@ -3257,15 +3304,15 @@ async function handleEmployeeBedTransferCreate(request,env,user){
   const insertColumns=BED_TRANSFER_EVENT_COLUMNS.filter((key)=>bedTransferColumns.has(key));
   if(!insertColumns.length)return errorResponse("bed_transfer_schema_missing",503,void 0,{missing_columns:["bed_transfer_events"]});
   await env.DB.batch([
-    env.DB.prepare(`INSERT INTO bed_transfer_events (${insertColumns.join(",")})
-      VALUES (${insertColumns.map(()=>"?").join(",")})`)
-      .bind(...insertColumns.map((key)=>eventValues[key])),
     env.DB.prepare(`INSERT INTO entry_events
       (event_id, corpid, userid, ref_id, ref_type, event_type, field_name, old_value, new_value, operator_id, ts)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-      .bind(entryEventId,user.corpid,user.userid,transferId,"bed_transfer_event","bed_transfer","bed_transfer_fee","",JSON.stringify({status:"recorded",category,amount_fils:amountFils,fee_mode:feeMode,waiver_reason:waiverReason,review_flags:reviewFlags,from_bed:fromBed,to_bed:toBed,transfer_date:transferDate,reason,note}),user.userid,now)
+      .bind(entryEventId,user.corpid,user.userid,transferId,"bed_transfer_event","bed_transfer","bed_transfer_fee","",JSON.stringify({status:"recorded",event_type:"bed_transfer",category,amount_fils:amountFils,fee_status:feeStatus,fee_mode:feeMode,payment_method:paymentMethod,waiver_reason:waiverReason,review_flags:reviewFlags,from_bed:fromBed,to_bed:toBed,transfer_date:transferDate,reason,note,session_entry:sessionEntry}),user.userid,now),
+    env.DB.prepare(`INSERT INTO bed_transfer_events (${insertColumns.join(",")})
+      VALUES (${insertColumns.map(()=>"?").join(",")})`)
+      .bind(...insertColumns.map((key)=>eventValues[key]))
   ]);
-  await audit(env,user,"employee.bed_transfer.create",transferId,{from_bed:fromBed,to_bed:toBed,status:"recorded",category,amount_fils:amountFils,fee_mode:feeMode,waiver_reason:waiverReason,review_flags:reviewFlags,audit_id:auditId,trace_id:traceId,entry_event_id:entryEventId}).catch(()=>{});
+  await audit(env,user,"employee.bed_transfer.create",transferId,{from_bed:fromBed,to_bed:toBed,status:"recorded",category,amount_fils:amountFils,fee_status:feeStatus,fee_mode:feeMode,payment_method:paymentMethod,waiver_reason:waiverReason,review_flags:reviewFlags,audit_id:auditId,trace_id:traceId,entry_event_id:entryEventId}).catch(()=>{});
   await arrearsDirectiveRecordIdempotency(env,{...idemOptions,resourceId:transferId,status:"RECORDED"},responseBody);
   return json(responseBody,201);
 }

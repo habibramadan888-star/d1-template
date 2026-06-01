@@ -3577,8 +3577,54 @@ function entryPayload(){
   };
 }
 function bedTransferEventIdempotencyKey(e){
-  const random=crypto?.randomUUID?crypto.randomUUID().slice(0,8):Date.now().toString(36).slice(-8);
-  return `employee-bed-transfer-${today().replaceAll('-','')}-${e.bed_from||'from'}-${e.bed_to||'to'}-${random}`.replace(/[^A-Za-z0-9_-]/g,'-').slice(0,150);
+  const basis=[
+    operatorId(),
+    e.bed_from||'from',
+    e.bed_to||'to',
+    e.transfer_date||today(),
+    e.fee_mode||'charged'
+  ].join('-');
+  return `employee-bed-transfer-${basis}`.replace(/[^A-Za-z0-9_-]/g,'-').slice(0,150);
+}
+function bedTransferPaymentMethod(){
+  const pay=$('payType')?.value||'C';
+  if(pay==='B')return 'bank';
+  if(pay==='C')return 'cash';
+  return 'other';
+}
+function bedTransferSessionEntryFromResponse(data,fallback){
+  const serverEntry=data?.session_entry||{};
+  const feeStatus=data?.fee_status||serverEntry.fee_status||(fallback.fee_mode==='waived'?'waived':'paid');
+  const rawAmountFils=data?.amount_fils ?? serverEntry.amount_fils ?? fallback.amount_fils ?? 0;
+  const amount=Number.isFinite(Number(serverEntry.amount))?Number(serverEntry.amount):((Number(rawAmountFils)||0)/100);
+  return {
+    ...fallback,
+    ...serverEntry,
+    id:serverEntry.id||data?.entry_event_id||fallback.id,
+    cloud_entry_id:serverEntry.cloud_entry_id||data?.entry_event_id||data?.transfer_id||'',
+    transfer_id:data?.transfer_id||serverEntry.transfer_id||'',
+    entry_event_id:data?.entry_event_id||serverEntry.entry_event_id||'',
+    type:'TF',
+    event_type:'bed_transfer',
+    category:'bed_transfer_fee',
+    amount,
+    due:amount,
+    paid:amount,
+    amount_fils:Number(rawAmountFils)||0,
+    fee_status:feeStatus,
+    fee_mode:data?.fee_mode||serverEntry.fee_mode||fallback.fee_mode,
+    payment_method:data?.payment_method||serverEntry.payment_method||bedTransferPaymentMethod(),
+    sync_status:'SYNCED',
+    status:'RECORDED',
+    created_at:serverEntry.created_at||fallback.created_at||nowIso(),
+    ts:serverEntry.ts||fallback.ts||nowIso()
+  };
+}
+function appendSyncedBedTransferSessionEntry(entry){
+  if(!entry?.id)return;
+  state.drafts=state.drafts.filter(e=>e.id!==entry.id&&e.entry_event_id!==entry.entry_event_id&&e.transfer_id!==entry.transfer_id);
+  state.drafts.unshift(entry);
+  saveDrafts();
 }
 async function submitBedTransferEvent(){
   let e;
@@ -3602,6 +3648,9 @@ async function submitBedTransferEvent(){
     transfer_date:e.transfer_date,
     reason:e.transfer_reason,
     note:e.note,
+    payment_method:bedTransferPaymentMethod(),
+    pay_type:e.pay_type,
+    fee_status:e.fee_mode==='waived'?'waived':'paid',
     fee_mode:e.fee_mode,
     amount_fils:e.amount_fils,
     waiver_reason:e.fee_waiver_reason,
@@ -3624,6 +3673,7 @@ async function submitBedTransferEvent(){
       const msg=data?.message||data?.error||`bed_transfer_submit_failed_${r.status}`;
       throw new Error(msg);
     }
+    appendSyncedBedTransferSessionEntry(bedTransferSessionEntryFromResponse(data,e));
     resetForm();
     refreshSessionViews();
     const transferId=data?.transfer_id?` · ${data.transfer_id}`:'';
@@ -4527,7 +4577,7 @@ async function commitSessionAndExport(){
   if(!state.user){applyEmployeeUser(null);toast('请先登录员工账号',6000);return}
   buildExport();
   if(!state.drafts.length){showStatus('当前本票没有流水，不能导出交接。','warn');toast('当前本票没有流水，不能导出交接',6000);return}
-  if(state.drafts.some(e=>e.type==='TF')){
+  if(state.drafts.some(e=>e.type==='TF'&&e.sync_status!=='SYNCED')){
     const message='Bed Transfer records are saved separately and cannot be included in handover export. 请使用换床表单单独保存记录。';
     $('validationBox').innerHTML=`<div class="warn">${esc(message)}</div>`;
     showStatus(message,'warn');
