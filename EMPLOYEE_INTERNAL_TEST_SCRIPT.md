@@ -367,3 +367,13 @@ Employee phone acceptance after deploy:
 12. Confirm changing date or note shows Unsaved / 当前修改未提交.
 13. Confirm no promised amount input appears and amount cannot be edited.
 14. Confirm no production write is triggered during visual QA.
+
+## Directive Inbox Count Regression Check
+
+1. Open Employee Follow-up as Abdul.
+2. Confirm Boss Assigned count equals the real persisted assigned directives returned by `/api/employee/arrears/directives`.
+3. Confirm owner-side dry-run selected count is not shown in the employee inbox.
+4. If only one persisted Abdul directive exists, the employee page must show `1 ASSIGNED`.
+5. If no persisted directive exists, it must show `No boss assigned tasks / 暂无老板下发任务`.
+6. Do not use fake rows or owner dry-run rows to inflate employee count.
+7. No production write is authorized during this check.

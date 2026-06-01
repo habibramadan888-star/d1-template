@@ -1362,7 +1362,7 @@ function updateArrearDirectiveButtonState(){
     btn.setAttribute('aria-disabled',checkedCount?'false':'true');
     btn.style.opacity=checkedCount?'1':'0.55';
     btn.style.cursor=checkedCount?'pointer':'not-allowed';
-    btn.textContent=checkedCount?`下发员工（${checkedCount}）`:'下发员工';
+    btn.textContent=checkedCount?`生成下发清单（${checkedCount}）`:'生成下发清单';
   });
   return;
 }
@@ -1529,7 +1529,7 @@ async function sendArrearDirectives(){
   if(!ids.length){toast('请先选择要下发的欠款','err');return;}
   const rows=ownerArrearsSelectedRows();
   const text=buildArrearsWhatsAppText(rows);
-  toast(`真实下发未启用；已生成 dry-run 清单，未写入员工端：${ids.length} 条`,6000);
+  toast(`已生成 dry-run 下发清单：${ids.length} 条；真实下发未启用，未写入员工端，员工不会收到这些任务。`,6000);
   showArrearsWhatsAppFallback(text,'https://wa.me/?text='+encodeURIComponent(text));
 }
 function selectArrearForDirective(id){
@@ -1843,7 +1843,7 @@ function renderOwnerArrearsControls(){
   return `<div class="owner-arrears-controls" data-owner-arrears-actions="true">
     ${isOwnerWriteRole()?`<label class="owner-arrears-select-all"><input id="arrearSelectAll" type="checkbox" onchange="toggleArrearSelectAll(this.checked)"> 全选</label>
     <span class="owner-arrears-selection-count" id="arrearSelectionCount">已选择 0 / 0</span>
-    <button class="btn btn-primary" id="arrearDirectiveBtn" disabled onclick="sendArrearDirectives()">下发员工</button>`:''}
+    <button class="btn btn-primary" id="arrearDirectiveBtn" disabled onclick="sendArrearDirectives()">生成下发清单</button>`:''}
     <button type="button" class="btn btn-ghost" onclick="exportArrearsWhatsApp()">WhatsApp 导出</button>
     <label class="owner-arrears-filter-label">来源</label>
     <select class="sel owner-arrears-filter" onchange="setArrearDirectiveFilter(this.value)">

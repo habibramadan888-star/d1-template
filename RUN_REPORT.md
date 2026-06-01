@@ -170,6 +170,19 @@ Production cutover remains `PRODUCTION_NO_GO`.
 - `promise_amount` / `promised_amount_fils` remain compatibility/API fields only and are not shown in default UI.
 - Production cutover remains `PRODUCTION_NO_GO`.
 
+## ARREARS-DIRECTIVE-COUNT-MISMATCH-AUDIT-001 - 2026-06-01
+
+Result: audited owner 40-count vs Abdul `1 ASSIGNED` mismatch and clarified copy.
+
+- Employee inbox count is the real persisted assigned directive count from `GET /api/employee/arrears/directives`.
+- Owner dry-run/selected count is not a real persisted dispatch count.
+- With write gate off, owner batch action generates a dry-run list and does not write to employee inbox.
+- Current Abdul persisted directive evidence remains `1 ASSIGNED`; exact production DB count was not re-queried in this task because D1 execute/export/import and new production writes were forbidden.
+- If Ramadan wants 40 real employee inbox tasks, that requires separate rollout approval.
+- Owner button copy now says `生成下发清单`, not real-send wording.
+- No production write, write gate opening, D1 execute/export/import, migration, deploy, batch dispatch, TTLock smoke, financial formula change, dashboard calculation change, or production cutover was performed.
+- Production cutover remains `PRODUCTION_NO_GO`.
+
 ## P0 Arrears Backend SOT Update
 
 - Backend SOT endpoint: `/api/boss/arrears/followup-tasks`.

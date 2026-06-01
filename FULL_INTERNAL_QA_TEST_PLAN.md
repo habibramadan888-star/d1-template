@@ -49,6 +49,15 @@ QA status:
 - Real employee feedback write remains blocked until separate production write approval.
 - Production cutover remains `PRODUCTION_NO_GO`.
 
+## Arrears Directive Count Mismatch QA Rule
+
+- Employee Follow-up `ASSIGNED` count must equal persisted assigned directives from `/api/employee/arrears/directives`.
+- Owner selected count / dry-run list count does not equal real dispatch count.
+- With write gate off, owner batch action must not write to employee inbox.
+- Current Abdul real production directive evidence is 1; any larger real rollout requires explicit approval.
+- If QA sees owner dry-run count treated as employee-received count, classify as P1 misleading workflow bug.
+- Production cutover remains `PRODUCTION_NO_GO`.
+
 ## ARREARS-EMPLOYEE-INBOX-STATUS-COPY-DEPLOY-001 QA Addendum
 
 The employee boss-assigned arrears task status-copy fix has been deployed to the production Worker as a UI/copy-only change.

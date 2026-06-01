@@ -413,6 +413,15 @@ Owner regression checks after the employee UI-only deploy:
 5. Confirm no production business write was performed.
 6. Confirm production cutover remains `PRODUCTION_NO_GO`.
 
+Owner directive count check:
+
+1. Select multiple arrears tasks.
+2. Confirm the button says `生成下发清单（N）`, not real-send copy.
+3. Click the button only to generate the dry-run/WhatsApp list.
+4. Confirm the toast says dry-run, not written to employee inbox, and employees will not receive those tasks.
+5. Confirm real employee inbox count is not expected to change while write gate is off.
+6. If 40 real tasks are needed, stop and request separate production rollout approval.
+
 ## Employee Follow-up Hard Entry Parity Deploy Owner Regression
 
 Live Worker version: `5d949970-115e-4208-8a39-dac981c4bf61`.

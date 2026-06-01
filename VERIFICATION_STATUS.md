@@ -2178,6 +2178,22 @@ Date: 2026-06-01, Asia/Dubai
 | D1 migration / execute | NOT_RUN | No migration or D1 execute/export/import/write |
 | Production cutover | NO_GO | Remains `PRODUCTION_NO_GO` |
 
+## ARREARS-DIRECTIVE-COUNT-MISMATCH-AUDIT-001 Verification Addendum
+
+Date: 2026-06-01, Asia/Dubai
+
+| Verification | Result | Evidence |
+|---|---:|---|
+| owner 40 reality audit | COMPLETE | `ARREARS_OWNER_40_DIRECTIVES_REALITY_AUDIT.md` |
+| production directive count audit | EVIDENCE_ONLY | `ARREARS_PRODUCTION_DIRECTIVE_COUNT_READONLY_AUDIT.md`; no D1/API reread executed |
+| employee inbox count source | LOCKED | `EMPLOYEE_ARREARS_DIRECTIVE_INBOX_COUNT_AUDIT.md` |
+| assigned employee mapping | LOCKED | `ARREARS_DIRECTIVE_ASSIGNED_EMPLOYEE_MAPPING_AUDIT.md` |
+| owner dry-run copy | FIXED | `ARREARS_OWNER_DRY_RUN_REAL_SENT_COUNT_COPY_FIX_RESULT.md` |
+| Abdul persisted directive evidence | 1 | Based on latest authenticated mobile acceptance and prior production rollout records |
+| production write / gate | NOT_RUN | No write gate opening and no business write |
+| D1 migration / execute | NOT_RUN | No migration or D1 execute/export/import/write |
+| Production cutover | NO_GO | Remains `PRODUCTION_NO_GO` |
+
 ## EMPLOYEE-FOLLOWUP-BOSS-CARD-COMPACT-UI-001 Verification Addendum
 
 Date: 2026-06-01, Asia/Dubai
