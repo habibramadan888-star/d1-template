@@ -1,5 +1,35 @@
 # Bed Transfer Production Rollout Decision
 
+## Production Schema And Event Smoke Addendum
+
+Date: 2026-06-01
+
+Decision: `EVENT_LEDGER_SMOKE_PASS_BROAD_WRITE_BLOCKED`
+
+| Question | Decision |
+|---|---|
+| Was production schema migration executed? | Yes, `migrations/005_bed_transfer_events.sql`. |
+| Was the approved one-row smoke executed? | Yes, `144 -> 122`. |
+| Was the smoke an occupancy mutation? | No, event-ledger only. |
+| Was audit/trace evidence written? | Yes, one audit row and one trace row. |
+| Was deposit/arrears/TTLock state mutated? | No. |
+| Was broad internal employee UI write enabled? | No. |
+| Why not enabled? | Current employee UI is gated and lacks a safe backend adapter to `bed_transfer_events`. |
+| Production cutover | `PRODUCTION_NO_GO` |
+
+Evidence:
+
+- `BED_TRANSFER_PRODUCTION_SCHEMA_PREFLIGHT.md`
+- `BED_TRANSFER_PRODUCTION_SCHEMA_MIGRATION_RESULT.md`
+- `BED_TRANSFER_PRODUCTION_PRE_SMOKE_SNAPSHOT.md`
+- `BED_TRANSFER_PRODUCTION_SMOKE_SAVE_RESULT.md`
+- `BED_TRANSFER_PRODUCTION_ACCOUNTING_VERIFY.md`
+- `BED_TRANSFER_PRODUCTION_TTLOCK_TRACE_VERIFY.md`
+- `BED_TRANSFER_PRODUCTION_STATS_VERIFY.md`
+- `BED_TRANSFER_PRODUCTION_OWNER_VISIBILITY_RESULT.md`
+- `BED_TRANSFER_INTERNAL_TEST_ENABLEMENT_RESULT.md`
+- `BED_TRANSFER_PRODUCTION_SMOKE_FINAL_RESULT.md`
+
 ## Live Render Path Fix Addendum
 
 Date: 2026-06-01

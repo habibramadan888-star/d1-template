@@ -1,5 +1,21 @@
 # Verification Status
 
+## BED-TRANSFER-PRODUCTION-SCHEMA-AND-SMOKE-001 Verification Addendum
+
+Date: 2026-06-01, Asia/Dubai
+
+| Verification | Result | Evidence | Commercial Meaning |
+|---|---:|---|---|
+| production schema migration | PASS | `BED_TRANSFER_PRODUCTION_SCHEMA_MIGRATION_RESULT.md` | Production now has the event ledger table needed for supervised Bed Transfer smoke evidence. |
+| pre-smoke snapshot | PASS | `BED_TRANSFER_PRODUCTION_PRE_SMOKE_SNAPSHOT.md` | Source/target/rent/arrears/card anchors were captured before the write. |
+| one event-ledger smoke | PASS | `BED_TRANSFER_PRODUCTION_SMOKE_SAVE_RESULT.md` | Exactly one Bed Transfer event row was created for `144 -> 122`. |
+| accounting preservation | PASS | `BED_TRANSFER_PRODUCTION_ACCOUNTING_VERIFY.md` | Deposit and arrears were carried as anchors; no revenue or balance mutation occurred. |
+| TTLock/card trace | PASS | `BED_TRANSFER_PRODUCTION_TTLOCK_TRACE_VERIFY.md` | Old card ref preserved; new card remains review-required. |
+| statistics separation | PASS | `BED_TRANSFER_PRODUCTION_STATS_VERIFY.md` | No new tenant or checkout transaction was created. |
+| owner visibility | PARTIAL_PASS | `BED_TRANSFER_PRODUCTION_OWNER_VISIBILITY_RESULT.md` | Database/audit visibility exists; owner UI/API event history still needs implementation. |
+| internal write enablement | BLOCKED | `BED_TRANSFER_INTERNAL_TEST_ENABLEMENT_RESULT.md` | Employee UI write remains gated pending a safe backend adapter. |
+| production cutover | PRODUCTION_NO_GO | commercial launch gate | This smoke is not production rollout/cutover approval. |
+
 ## BED-TRANSFER-LIVE-UI-RENDER-PATH-FIX-001 Verification Addendum
 
 Date: 2026-06-01, Asia/Dubai

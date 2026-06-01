@@ -1,5 +1,21 @@
 # Run Report
 
+## BED-TRANSFER-PRODUCTION-SCHEMA-AND-SMOKE-001
+
+Date: 2026-06-01, Asia/Dubai
+
+Scope: applied the approved production Bed Transfer event schema and executed the approved one-row production event-ledger smoke for `144 -> 122`.
+
+- Production `bed_transfer_events` schema was absent before this task and was created from `migrations/005_bed_transfer_events.sql`.
+- One smoke event was written: `bt-prod-smoke-20260601-144-122`, status `pending_review`.
+- One audit row and one trace row were written for the smoke.
+- Deposit, arrears, TTLock/card, occupancy, transaction, financial formula, and dashboard calculation data were not mutated.
+- The smoke preserved the old card anchor `139780080`, carried arrears as `5000` fils, and recorded both current and target rents as `77000` fils.
+- No new tenant or checkout transaction was created.
+- Broad employee UI Bed Transfer write remains gated because a dedicated backend adapter to `bed_transfer_events` is still required.
+
+Production remains `PRODUCTION_NO_GO`.
+
 ## BED-TRANSFER-LIVE-UI-RENDER-PATH-FIX-001
 
 Date: 2026-06-01, Asia/Dubai
