@@ -421,6 +421,20 @@ Owner regression checks after the employee UI-only deploy:
 5. Confirm no production business write was performed.
 6. Confirm production cutover remains `PRODUCTION_NO_GO`.
 
+## Mixed Source Dispatch Blocked Preflight Owner Check
+
+Production full dispatch is currently blocked because the live owner SOT count is 46, not the expected 40.
+
+Before any later approved write, owner QA must verify:
+
+1. The target count is explicitly approved as 46 or a filtered target set is provided.
+2. Existing arrears and TTLock expired unpaid tasks are both included in the approved target set.
+3. Already assigned tasks are safely skipped or reused and not duplicated.
+4. The owner result shows requested, materialized, created, skipped, and blocked counts.
+5. `blocked_count` must be zero for an approved production dispatch.
+6. Write gate closes immediately after dispatch.
+7. Production cutover remains `PRODUCTION_NO_GO`.
+
 Owner directive count check:
 
 1. Select multiple arrears tasks.

@@ -15,15 +15,16 @@ function extractLastFunction(source, name) {
   throw new Error(`Could not extract ${name}`);
 }
 
-test("owner send directive action is dry-run only and generates an execution list", async () => {
+test("owner send directive action calls the gated real dispatch endpoint", async () => {
   const js = await readFile("deploy-worker/public/index-51-main.js", "utf8");
   const send = extractLastFunction(js, "sendArrearDirectives");
 
-  assert.match(send, /ownerArrearsSelectedRows\(\)/);
-  assert.match(send, /buildArrearsWhatsAppText\(rows\)/);
-  assert.match(send, /showArrearsWhatsAppFallback/);
-  assert.match(send, /dry-run/);
-  assert.doesNotMatch(send, /apiFetch\(|\/api\/arrear_tasks\/directive|method:\s*['"]POST['"]/);
+  assert.match(send, /apiFetch\('\/api\/boss\/arrears\/directives'/);
+  assert.match(send, /method:'POST'/);
+  assert.match(send, /Idempotency-Key/);
+  assert.match(send, /approval_required/);
+  assert.match(send, /当前未写入员工端/);
+  assert.doesNotMatch(send, /\/api\/arrear_tasks\/directive/);
   assert.doesNotMatch(send, /arrearDirectiveDue|prompt\(/);
 });
 
@@ -40,4 +41,3 @@ test("production cutover remains blocked", async () => {
   const gate = await readFile("scripts/gate-commercial-launch-readiness.mjs", "utf8");
   assert.match(gate, /PRODUCTION_NO_GO/);
 });
-

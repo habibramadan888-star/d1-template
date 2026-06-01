@@ -1114,6 +1114,7 @@ const EMP_TASK_COLUMNS = [
   "tenant_card_id","original_entry_id","original_period_start","original_period_end","created_by",
   "boss_requested_at","boss_requested_by","boss_requested_due_date","directive_status","staff_promised_at",
   "write_off_authorized","write_off_reason","write_off_at",
+  "source_type","source_ref","source_fingerprint","materialized_from",
   "voided_at","voided_by","void_reason","void_source"
 ];
 const EMP_SESSION_COLUMNS = [
@@ -1287,6 +1288,10 @@ async function empEnsureSchema(env){
   await empAddColumn(env,"arrear_tasks","write_off_authorized","TEXT");
   await empAddColumn(env,"arrear_tasks","write_off_reason","TEXT");
   await empAddColumn(env,"arrear_tasks","write_off_at","TEXT");
+  await empAddColumn(env,"arrear_tasks","source_type","TEXT");
+  await empAddColumn(env,"arrear_tasks","source_ref","TEXT");
+  await empAddColumn(env,"arrear_tasks","source_fingerprint","TEXT");
+  await empAddColumn(env,"arrear_tasks","materialized_from","TEXT");
   await empAddVoidColumns(env,"arrear_tasks");
   await empAddVoidColumns(env,"deposit_ledger");
   if(await empTableExists(env,"arrears")){
@@ -1298,6 +1303,7 @@ async function empEnsureSchema(env){
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_arrear_tasks_status ON arrear_tasks(corpid, followup_status, promise_date)").run();
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_arrear_tasks_directive ON arrear_tasks(corpid, directive_status, boss_requested_due_date, promise_date)").run().catch(()=>{});
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_arrear_tasks_cid_period ON arrear_tasks(corpid, tenant_card_id, original_period_start, original_period_end)").run().catch(()=>{});
+  await env.DB.prepare("CREATE UNIQUE INDEX IF NOT EXISTS idx_arrear_tasks_source_unique ON arrear_tasks(corpid, source_type, source_ref) WHERE source_type IS NOT NULL AND source_type!='' AND source_ref IS NOT NULL AND source_ref!=''").run().catch(()=>{});
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_entry_events_ref ON entry_events(corpid, ref_type, ref_id, ts)").run();
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_deposit_ledger_cid ON deposit_ledger(corpid, tenant_card_id, ts)").run();
 }
@@ -1407,6 +1413,19 @@ async function empInsertDynamic(env, table, values, allowed){
   return {inserted:true,columns:names};
 }
 __name(empInsertDynamic,"empInsertDynamic");
+async function empInsertDynamicMode(env, table, values, allowed, mode="INSERT"){
+  const cols=await empTableColumns(env,table);
+  const names=[];
+  const vals=[];
+  for(const k of allowed){
+    if(cols.has(k)&&values[k]!==void 0){names.push(k);vals.push(values[k]);}
+  }
+  if(!names.length)return {inserted:false,columns:[]};
+  const verb=mode==="INSERT_OR_IGNORE"?"INSERT OR IGNORE":"INSERT";
+  const result=await env.DB.prepare(`${verb} INTO ${table} (${names.join(",")}) VALUES (${names.map(()=>"?").join(",")})`).bind(...vals).run();
+  return {inserted:Number(result?.meta?.changes??result?.changes??0)>0,columns:names};
+}
+__name(empInsertDynamicMode,"empInsertDynamicMode");
 async function empEvent(env,user,event){
   await empInsertDynamic(env,"entry_events",{
     event_id:empId("evt"),corpid:user.corpid,userid:user.userid,ref_id:event.ref_id,ref_type:event.ref_type,
@@ -1974,6 +1993,129 @@ function empBossArrearDedupeKey(row){
   ].join("|");
 }
 __name(empBossArrearDedupeKey,"empBossArrearDedupeKey");
+function empNormalizeMaterializedSourceType(value){
+  const raw=cleanText(value||"",80);
+  if(raw==="ttlock_expired_unpaid"||/ttlock/i.test(raw))return "ttlock_expired_unpaid";
+  return "existing_arrears_record";
+}
+__name(empNormalizeMaterializedSourceType,"empNormalizeMaterializedSourceType");
+function empMaterializationSourceRef(sotTask){
+  const sourceType=empNormalizeMaterializedSourceType(sotTask?.source_type||sotTask?.source||"");
+  const explicit=cleanText(sotTask?.source_ref||sotTask?.sourceRef||"",160);
+  if(sourceType==="existing_arrears_record")return explicit||cleanText(sotTask?.task_id||sotTask?.id||"",160);
+  if(explicit)return explicit;
+  const room=cleanText(sotTask?.room_bed||sotTask?.bed||sotTask?.room||"",80);
+  const due=empCleanIsoDate(sotTask?.due_date||"");
+  const amount=String(Math.max(0,Math.round(Number(sotTask?.amount_fils||cleanMoney(sotTask?.remain||0)*100)||0)));
+  const card=cleanText(sotTask?.card_code||sotTask?.customer_code||sotTask?.tenant_card_id||"",80);
+  if(!room||!due||!amount||!card)return "";
+  return `ttlock:${room}:${due}:${amount}:${card}`;
+}
+__name(empMaterializationSourceRef,"empMaterializationSourceRef");
+async function empMaterializableTaskContract(sotTask,user){
+  const sourceType=empNormalizeMaterializedSourceType(sotTask?.source_type||sotTask?.source||"");
+  const sourceRef=empMaterializationSourceRef(sotTask);
+  if(!sourceRef)return {ok:false,reason:"BLOCKED_TASK_ID_UNSTABLE",source_type:sourceType};
+  const roomBed=cleanText(sotTask?.room_bed||sotTask?.bed||sotTask?.room||"",160);
+  const dueDate=empCleanIsoDate(sotTask?.due_date||"");
+  const amountFils=Math.max(0,Math.round(Number(sotTask?.amount_fils||cleanMoney(sotTask?.remain||0)*100)||0));
+  if(!roomBed||!dueDate||amountFils<=0)return {ok:false,reason:"BLOCKED_MISSING_REQUIRED_FIELDS",source_type:sourceType,source_ref:sourceRef};
+  const rawTaskId=cleanId(sotTask?.task_id||sotTask?.id||"",120);
+  const stableTaskId=rawTaskId||cleanId(`${sourceType}-${sourceRef}`,120);
+  if(!stableTaskId)return {ok:false,reason:"BLOCKED_TASK_ID_UNSTABLE",source_type:sourceType,source_ref:sourceRef};
+  const fingerprint=await hscSha256(JSON.stringify(hscStableValue({
+    source_type:sourceType,
+    source_ref:sourceRef,
+    room_bed:roomBed,
+    due_date:dueDate,
+    amount_fils:amountFils,
+    corpid:user.corpid
+  })));
+  return {
+    ok:true,
+    stable_task_id:stableTaskId,
+    source_type:sourceType,
+    source_ref:sourceRef,
+    source_fingerprint:fingerprint,
+    room_bed:roomBed,
+    customer_code:cleanText(sotTask?.customer_code||sotTask?.tenant_card_id||sotTask?.tenant_name||"",120),
+    amount_fils:amountFils,
+    due_date:dueDate,
+    overdue_days:Number(sotTask?.overdue_days||0),
+    status:cleanText(sotTask?.followup_status||"pending_followup",80),
+    corpid:user.corpid,
+    idempotency_scope:`${user.corpid}:${sourceType}:${sourceRef}`
+  };
+}
+__name(empMaterializableTaskContract,"empMaterializableTaskContract");
+async function empResolveBossSotTaskMap(env,user,ids){
+  const wanted=new Set(ids.map(x=>cleanText(x,160)).filter(Boolean));
+  const detailed=await empListMergedArrearTasksDetailed(env,user,{limit:500,ttlockTimeoutMs:12000});
+  const map=new Map();
+  for(const task of detailed.mapped||[]){
+    const keys=[task?.task_id,task?.id,task?.source_ref].map(x=>cleanText(x,160)).filter(Boolean);
+    for(const key of keys){
+      if(wanted.has(key)&&!map.has(key))map.set(key,task);
+    }
+  }
+  return {map,detailed};
+}
+__name(empResolveBossSotTaskMap,"empResolveBossSotTaskMap");
+async function materializeArrearsTaskFromSot(env,user,sotTask,options={}){
+  const existingById=await env.DB.prepare("SELECT * FROM arrear_tasks WHERE task_id=? AND corpid=? LIMIT 1")
+    .bind(cleanId(sotTask?.task_id||sotTask?.id||"",120),user.corpid).first().catch(()=>null);
+  if(existingById)return {ok:true,row:existingById,materialized:false,reused:true,contract:null};
+  const contract=await empMaterializableTaskContract(sotTask,user);
+  if(!contract.ok)return {ok:false,reason:contract.reason,contract};
+  const existingBySource=await env.DB.prepare(
+    "SELECT * FROM arrear_tasks WHERE corpid=? AND source_type=? AND source_ref=? LIMIT 1"
+  ).bind(user.corpid,contract.source_type,contract.source_ref).first().catch(()=>null);
+  if(existingBySource)return {ok:true,row:existingBySource,materialized:false,reused:true,contract};
+  const now=options.now||empNow();
+  const row={
+    task_id:contract.stable_task_id,
+    corpid:user.corpid,
+    userid:cleanText(options.assigned_employee_id||sotTask?.assigned_employee_id||sotTask?.userid||"",80),
+    entry_id:cleanText(sotTask?.entry_id||"",80),
+    bed:contract.room_bed,
+    tenant_name:contract.customer_code,
+    tenant_card_id:contract.customer_code,
+    arrear_amount:cleanMoney(contract.amount_fils/100),
+    arrear_reason:contract.source_type==="ttlock_expired_unpaid"?"TTLock expired unpaid; amount from bed rent mapping":"existing arrears record",
+    created_at:now,
+    followup_status:"pending_followup",
+    promise_date:contract.due_date,
+    promise_amount:0,
+    actual_received:0,
+    close_status:"",
+    close_reason:"",
+    owner_note:"",
+    staff_note:"",
+    last_followup_at:"",
+    updated_by:cleanText(options.actor||user.userid||"",80),
+    updated_at:now,
+    created_by:cleanText(options.actor||user.userid||"",80),
+    original_entry_id:cleanText(sotTask?.entry_id||"",80),
+    original_period_start:"",
+    original_period_end:contract.due_date,
+    boss_requested_at:"",
+    boss_requested_by:"",
+    boss_requested_due_date:"",
+    directive_status:"none",
+    staff_promised_at:"",
+    source_type:contract.source_type,
+    source_ref:contract.source_ref,
+    source_fingerprint:contract.source_fingerprint,
+    materialized_from:"boss_arrears_followup_sot"
+  };
+  await empInsertDynamicMode(env,"arrear_tasks",row,EMP_TASK_COLUMNS,"INSERT_OR_IGNORE");
+  const inserted=await env.DB.prepare("SELECT * FROM arrear_tasks WHERE corpid=? AND source_type=? AND source_ref=? LIMIT 1")
+    .bind(user.corpid,contract.source_type,contract.source_ref).first();
+  if(!inserted)return {ok:false,reason:"MATERIALIZATION_INSERT_FAILED",contract};
+  await empEvent(env,user,{ref_id:inserted.task_id,ref_type:"arrear_task",event_type:"materialized",field_name:"source_ref",old_value:"",new_value:contract.source_ref,operator_id:options.actor||user.userid,ts:now});
+  return {ok:true,row:inserted,materialized:true,reused:false,contract};
+}
+__name(materializeArrearsTaskFromSot,"materializeArrearsTaskFromSot");
 function empReadErrorCode(error){
   const msg=String(error?.message||error||"").toLowerCase();
   if(msg.includes("no such table"))return "TABLE_MISSING";
@@ -2477,6 +2619,7 @@ async function handleBossArrearsDirectives(request,env,user){
     actor,
     assigned_employee_id:assignedFallback,
     note,
+    materialization_version:"v1",
     task_ids:uniqueIds
   });
   const replay=await arrearsDirectiveIdempotencyReplay(env,{
@@ -2489,12 +2632,75 @@ async function handleBossArrearsDirectives(request,env,user){
   });
   if(replay)return replay;
   const now=empNow();
+  const sourceResolution=await empResolveBossSotTaskMap(env,user,uniqueIds);
+  const candidates=[];
+  const blocked=[];
+  for(const taskId of uniqueIds){
+    const persisted=await env.DB.prepare("SELECT * FROM arrear_tasks WHERE task_id=? AND corpid=? LIMIT 1").bind(taskId,user.corpid).first();
+    if(persisted){
+      if(!empCloseStatusIsOpen(persisted.close_status)){
+        blocked.push({task_id:taskId,reason:"not_open"});
+      }else{
+        candidates.push({input_task_id:taskId,row:persisted,materialized:false,reused:true});
+      }
+      continue;
+    }
+    const sotTask=sourceResolution.map.get(taskId);
+    if(!sotTask){
+      blocked.push({task_id:taskId,reason:"not_found_in_boss_sot"});
+      continue;
+    }
+    const contract=await empMaterializableTaskContract(sotTask,user);
+    if(!contract.ok){
+      blocked.push({task_id:taskId,reason:contract.reason||"materialization_contract_failed"});
+      continue;
+    }
+    candidates.push({input_task_id:taskId,sotTask,contract,materialized:false,reused:false});
+  }
+  if(blocked.length){
+    return errorResponse("materialization_blocked",422,void 0,{
+      requested_count:uniqueIds.length,
+      materialized_count:0,
+      created_count:0,
+      skipped_already_assigned_count:0,
+      blocked_count:blocked.length,
+      blocked_reasons:blocked,
+      all_or_nothing:true
+    });
+  }
+  let materializedCount=0;
+  const materializedTaskIds=[];
+  for(const candidate of candidates){
+    if(candidate.row){
+      materializedTaskIds.push(candidate.row.task_id);
+      continue;
+    }
+    const materialized=await materializeArrearsTaskFromSot(env,user,candidate.sotTask,{assigned_employee_id:assignedFallback,actor,now});
+    if(!materialized.ok){
+      return errorResponse("materialization_blocked",422,void 0,{
+        requested_count:uniqueIds.length,
+        materialized_count:materializedCount,
+        created_count:0,
+        skipped_already_assigned_count:0,
+        blocked_count:1,
+        blocked_reasons:[{task_id:candidate.input_task_id,reason:materialized.reason||"materialization_failed"}],
+        all_or_nothing:true
+      });
+    }
+    candidate.row=materialized.row;
+    candidate.materialized=!!materialized.materialized;
+    candidate.reused=!!materialized.reused;
+    if(materialized.materialized)materializedCount+=1;
+    materializedTaskIds.push(materialized.row.task_id);
+  }
   let createdCount=0;
   let skippedDuplicateCount=0;
   const notFound=[];
   const directives=[];
-  for(const taskId of uniqueIds){
-    const old=await env.DB.prepare("SELECT * FROM arrear_tasks WHERE task_id=? AND corpid=? LIMIT 1").bind(taskId,user.corpid).first();
+  const createdTaskIds=[];
+  for(const candidate of candidates){
+    const old=candidate.row;
+    const taskId=old?.task_id||candidate.input_task_id;
     if(!old||!empCloseStatusIsOpen(old.close_status)){notFound.push(taskId);continue;}
     const current=empDirectiveStatus(old);
     if(["assigned","pending","viewed","promised","followed_up","needs_review"].includes(current)){
@@ -2518,6 +2724,7 @@ async function handleBossArrearsDirectives(request,env,user){
     const changes=Number(result?.meta?.changes??result?.changes??0);
     if(changes>0){
       createdCount+=changes;
+      createdTaskIds.push(taskId);
       const updated={...old,userid:assigned,boss_requested_at:now,boss_requested_by:actor,directive_status:"assigned",owner_note:note||old.owner_note,updated_by:actor,updated_at:now};
       directives.push(empTaskToEmployeeDirective(updated));
       await empEvent(env,user,{ref_id:taskId,ref_type:"arrear_task",event_type:"directive_assigned",field_name:"directive_status",old_value:old.directive_status||"none",new_value:"assigned",operator_id:actor,ts:now});
@@ -2525,7 +2732,21 @@ async function handleBossArrearsDirectives(request,env,user){
       notFound.push(taskId);
     }
   }
-  const responseBody=ok({ok:true,created_count:createdCount,skipped_duplicate_count:skippedDuplicateCount,not_found:notFound,directives,idempotency_status:"NEW"});
+  const responseBody=ok({
+    ok:true,
+    requested_count:uniqueIds.length,
+    materialized_count:materializedCount,
+    created_count:createdCount,
+    skipped_already_assigned_count:skippedDuplicateCount,
+    skipped_duplicate_count:skippedDuplicateCount,
+    blocked_count:notFound.length,
+    blocked_reasons:notFound.map(task_id=>({task_id,reason:"not_open_or_update_failed"})),
+    created_task_ids:createdTaskIds,
+    materialized_task_ids:materializedTaskIds,
+    not_found:notFound,
+    directives,
+    idempotency_status:"NEW"
+  });
   await arrearsDirectiveRecordIdempotency(env,{
     scope:user.corpid,
     action,
@@ -2534,13 +2755,16 @@ async function handleBossArrearsDirectives(request,env,user){
     actorUserId:actor,
     actorRole:user.role,
     resourceType:"arrear_task",
-    resourceId:uniqueIds.join(","),
+    resourceId:materializedTaskIds.join(",")||uniqueIds.join(","),
     status:"SUCCESS"
   },responseBody);
   await audit(env,user,"boss.arrears.directives.create",uniqueIds.join(","),{
     idempotency_key:idempotencyKey,
+    requested_count:uniqueIds.length,
+    materialized_count:materializedCount,
     created_count:createdCount,
     skipped_duplicate_count:skippedDuplicateCount,
+    blocked_count:notFound.length,
     not_found:notFound.length
   }).catch(()=>{});
   return json(responseBody);

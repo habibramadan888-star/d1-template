@@ -385,3 +385,17 @@ Employee phone acceptance after deploy:
 5. If no persisted directive exists, it must show `No boss assigned tasks / 暂无老板下发任务`.
 6. Do not use fake rows or owner dry-run rows to inflate employee count.
 7. No production write is authorized during this check.
+
+## Mixed Source Dispatch Blocked Preflight Employee Check
+
+Production full dispatch to Abdul is blocked until Ramadan confirms whether the actual current SOT count 46 should be dispatched.
+
+When approval is later granted, employee QA must verify:
+
+1. Abdul sees persisted assigned directives only.
+2. Existing arrears and TTLock materialized rows both appear.
+3. The employee inbox count matches the actual created plus already-assigned directives.
+4. No owner dry-run rows appear in Abdul's inbox.
+5. Internal source refs, raw source types, and debug fields are not shown.
+6. No employee follow-up batch write is included in the dispatch validation.
+7. Production cutover remains `PRODUCTION_NO_GO`.

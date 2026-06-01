@@ -6405,3 +6405,16 @@ Result: deployed employee Follow-up boss-assigned task compact UI fix to the def
 - Authenticated Abdul phone acceptance remains manual required; automated deploy verification did not read credentials or create production sessions.
 - No production write, write gate opening, D1 execute/export/import, migration, owner directive create, employee follow-up write, batch dispatch, TTLock smoke, financial formula change, dashboard calculation change, or production cutover was performed.
 - Production cutover remains `PRODUCTION_NO_GO`.
+
+## ARREARS-DIRECTIVE-FULL-INTERNAL-TEST-REAL-DISPATCH-001 - 2026-06-01
+
+Result: `BLOCKED` before production write.
+
+- Implemented backend materialization support for mixed `existing_arrears_record` and `ttlock_expired_unpaid` directive sources.
+- Added staging schema extension `migrations/004_arrears_task_materialization_source.sql`.
+- Staging TTLock fixture E2E passed after temporary staging-only write gate enablement; the staging gate secret was removed afterward.
+- Production read-only preflight found 46 current owner SOT tasks, not the expected 40.
+- Because of the count mismatch, production materialization migration, production write gate opening, and real dispatch to Abdul were not executed.
+- Production secret list did not include `ARREARS_DIRECTIVE_WRITE_APPROVED` or `ARREARS_DIRECTIVE_WRITE_MODE`.
+- No production D1 business write, owner directive create, employee follow-up write, batch dispatch, migration, financial formula change, dashboard calculation change, or production cutover was performed.
+- Production cutover remains `PRODUCTION_NO_GO`.

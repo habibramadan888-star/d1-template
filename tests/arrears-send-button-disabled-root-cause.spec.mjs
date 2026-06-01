@@ -34,11 +34,10 @@ test("send button enablement does not depend on removed requested date or employ
   const update = extractLastFunction(js, "updateArrearDirectiveButtonState");
 
   assert.doesNotMatch(update, /arrearDirectiveDue|requestedDate|employeeSelected|employeeTarget|directiveEnabled/);
-  assert.match(update, /下发员工/);
+  assert.match(update, /真实下发员工端/);
 });
 
 test("production cutover remains blocked", async () => {
   const gate = await readFile("scripts/gate-commercial-launch-readiness.mjs", "utf8");
   assert.match(gate, /PRODUCTION_NO_GO/);
 });
-

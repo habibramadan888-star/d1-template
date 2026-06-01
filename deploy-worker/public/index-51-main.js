@@ -1362,7 +1362,7 @@ function updateArrearDirectiveButtonState(){
     btn.setAttribute('aria-disabled',checkedCount?'false':'true');
     btn.style.opacity=checkedCount?'1':'0.55';
     btn.style.cursor=checkedCount?'pointer':'not-allowed';
-    btn.textContent=checkedCount?`生成下发清单（${checkedCount}）`:'生成下发清单';
+    btn.textContent=checkedCount?`真实下发员工端（${checkedCount}）`:'真实下发员工端';
   });
   return;
 }
@@ -1527,10 +1527,38 @@ async function sendArrearDirectives(){
   if(!isOwnerWriteRole())return;
   const ids=[...document.querySelectorAll('[data-arrear-select]:checked')].map(x=>x.value).filter(Boolean);
   if(!ids.length){toast('请先选择要下发的欠款','err');return;}
-  const rows=ownerArrearsSelectedRows();
-  const text=buildArrearsWhatsAppText(rows);
-  toast(`已生成 dry-run 下发清单：${ids.length} 条；真实下发未启用，未写入员工端，员工不会收到这些任务。`,6000);
-  showArrearsWhatsAppFallback(text,'https://wa.me/?text='+encodeURIComponent(text));
+  const uniqueIds=[...new Set(ids)];
+  const btn=document.getElementById('arrearDirectiveBtn');
+  if(btn){btn.disabled=true;btn.textContent='正在真实下发...';}
+  try{
+    const idempotencyKey=`owner-arrears-real-dispatch-${Date.now()}-${uniqueIds.length}`;
+    const r=await apiFetch('/api/boss/arrears/directives',{
+      method:'POST',
+      headers:{'Idempotency-Key':idempotencyKey},
+      body:JSON.stringify({
+        task_ids:uniqueIds,
+        assigned_employee_id:window.HOMELINK_DEFAULT_ARREARS_ASSIGNEE||'staff',
+        idempotency_key:idempotencyKey,
+        note:'owner real dispatch from arrears follow-up UI'
+      })
+    });
+    const data=await r.json().catch(()=>({}));
+    if(!r.ok){
+      const msg=data?.message||data?.error||'真实下发失败';
+      const gated=data?.approval_required||r.status===409;
+      toast(gated?'真实下发需要生产写入审批；当前未写入员工端。':msg,'err',7000);
+      return;
+    }
+    const created=Number(data?.created_count||0);
+    const skipped=Number(data?.skipped_already_assigned_count||data?.skipped_duplicate_count||0);
+    const blocked=Number(data?.blocked_count||0);
+    toast(`已真实下发 ${created} 条；已存在 ${skipped} 条；阻断 ${blocked} 条。`,7000);
+    await loadArrearsForOwner({showLoading:false,limit:state.arrearsLimit||ARREARS_PAGE_SIZE});
+  }catch(err){
+    toast(`真实下发失败：${String(err?.message||err)}`,'err',7000);
+  }finally{
+    updateArrearDirectiveButtonState();
+  }
 }
 function selectArrearForDirective(id){
   if(!isOwnerWriteRole())return;
@@ -1636,7 +1664,7 @@ function renderOwnerOverviewArrearsPanel(){
     ${ownerArrearsSourceNotice()}
     <div class="owner-arrears-controls" data-owner-arrears-actions="true">
       ${isOwnerWriteRole()?`<label class="owner-arrears-date">下发日期 <input id="arrearDirectiveDue" type="date" min="${today}"></label>
-      <button class="btn btn-primary" id="arrearDirectiveBtn" disabled onclick="sendArrearDirectives()">下发员工</button>`:''}
+      <button class="btn btn-primary" id="arrearDirectiveBtn" disabled onclick="sendArrearDirectives()">真实下发员工端</button>`:''}
       <button type="button" class="btn btn-ghost" onclick="exportArrearsWhatsApp()">WhatsApp 导出</button>
       <button type="button" class="btn btn-ghost" data-owner-arrears-view-all="true">${esc(viewAllLabel)}</button>
     </div>
@@ -1811,7 +1839,7 @@ function renderArrearsPanel(){
     </div>
     <div class="owner-arrears-controls" data-owner-arrears-actions="true">
       ${isOwnerWriteRole()?`<label class="owner-arrears-date">下发日期 <input id="arrearDirectiveDue" type="date" min="${today}"></label>
-      <button class="btn btn-primary" id="arrearDirectiveBtn" disabled onclick="sendArrearDirectives()">下发员工</button>`:''}
+      <button class="btn btn-primary" id="arrearDirectiveBtn" disabled onclick="sendArrearDirectives()">真实下发员工端</button>`:''}
       <button type="button" class="btn btn-ghost" onclick="exportArrearsWhatsApp()">WhatsApp 导出</button>
       <label class="owner-arrears-filter-label">状态</label>
       <select class="sel owner-arrears-filter" onchange="setArrearDirectiveFilter(this.value)">
@@ -1843,7 +1871,7 @@ function renderOwnerArrearsControls(){
   return `<div class="owner-arrears-controls" data-owner-arrears-actions="true">
     ${isOwnerWriteRole()?`<label class="owner-arrears-select-all"><input id="arrearSelectAll" type="checkbox" onchange="toggleArrearSelectAll(this.checked)"> 全选</label>
     <span class="owner-arrears-selection-count" id="arrearSelectionCount">已选择 0 / 0</span>
-    <button class="btn btn-primary" id="arrearDirectiveBtn" disabled onclick="sendArrearDirectives()">生成下发清单</button>`:''}
+    <button class="btn btn-primary" id="arrearDirectiveBtn" disabled onclick="sendArrearDirectives()">真实下发员工端</button>`:''}
     <button type="button" class="btn btn-ghost" onclick="exportArrearsWhatsApp()">WhatsApp 导出</button>
     <label class="owner-arrears-filter-label">来源</label>
     <select class="sel owner-arrears-filter" onchange="setArrearDirectiveFilter(this.value)">

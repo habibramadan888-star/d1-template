@@ -121,3 +121,18 @@ This document does not approve TTLock production smoke, batch dispatch, public b
 | Employee follow-up write UI | APPROVAL_GATED | Date/note only; 409 write approval required is shown as not written. |
 | Production write gate | OFF | No new write gate opening in this task. |
 | Production cutover | PRODUCTION_NO_GO | No cutover. |
+
+## Full Internal Real Dispatch Readiness Update - 2026-06-01
+
+| Capability | Status |
+|---|---|
+| Backend mixed-source materialization | PASS |
+| staging TTLock fixture E2E | PASS |
+| production current SOT preflight | BLOCKED |
+| production current SOT actual count | 46 |
+| production current SOT expected count | 40 |
+| production materialization migration | NOT_RUN |
+| production real dispatch to Abdul | NOT_RUN |
+| production write gate | OFF |
+| batch dispatch | NOT_APPROVED |
+| production cutover | PRODUCTION_NO_GO |

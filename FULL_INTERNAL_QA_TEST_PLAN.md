@@ -608,3 +608,16 @@ QA must verify:
 - Owner WhatsApp and arrears exports are not deleted.
 - No production write, write gate opening, D1 execute/export/import, migration, batch dispatch, TTLock smoke, financial formula change, or dashboard calculation change is authorized by this deploy.
 - Production cutover remains `PRODUCTION_NO_GO`.
+
+## ARREARS-DIRECTIVE-FULL-INTERNAL-TEST-REAL-DISPATCH-001 QA Addendum
+
+Mixed-source directive materialization is implemented and staging TTLock fixture E2E has passed. Production full dispatch is not authorized yet because production read-only preflight found 46 current SOT tasks, not the expected 40.
+
+QA must verify before any later write approval:
+
+- The target dispatch count is explicitly approved as 46 or a filtered target list is provided.
+- `existing_arrears_record` and `ttlock_expired_unpaid` remain the only dispatchable source types.
+- Abdul assignment target is confirmed.
+- Production write gate is opened only for the approved dispatch window and closed immediately afterward.
+- No employee follow-up batch write, TTLock smoke, financial formula change, dashboard calculation change, or production cutover is included.
+- Production cutover remains `PRODUCTION_NO_GO`.

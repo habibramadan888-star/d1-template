@@ -2238,3 +2238,22 @@ Date: 2026-06-01, Asia/Dubai
 | Production write / gate | NOT_RUN | No write gate opening and no business write |
 | D1 migration / execute | NOT_RUN | No migration or D1 execute/export/import/write |
 | Production cutover | NO_GO | Remains `PRODUCTION_NO_GO` |
+
+## ARREARS-DIRECTIVE-FULL-INTERNAL-TEST-REAL-DISPATCH-001 Verification Addendum
+
+Date: 2026-06-01, Asia/Dubai
+
+| Verification | Result | Evidence |
+|---|---:|---|
+| materializable contract tests | PASS | `npm run test:arrears-materializable-task-contract` |
+| TTLock materialization tests | PASS | `npm run test:arrears-ttlock-materialization` |
+| mixed source directive API tests | PASS | `npm run test:arrears-mixed-source-directive-api` |
+| current SOT batch dispatch tests | PASS | `npm run test:arrears-current-sot-batch-dispatch` |
+| employee inbox mixed source tests | PASS | `npm run test:employee-inbox-mixed-source-count` |
+| materialization idempotency tests | PASS | `npm run test:arrears-materialization-idempotency` |
+| staging TTLock fixture E2E | PASS | `ARREARS_MATERIALIZATION_STAGING_E2E_RESULT.md` |
+| production read-only preflight | BLOCKED | `ARREARS_CURRENT_40_PRODUCTION_PREFLIGHT.md`; actual count 46 vs expected 40 |
+| production migration | NOT_RUN | blocked by count mismatch |
+| production dispatch | NOT_RUN | blocked by count mismatch |
+| write gate | OFF | production secret list has no write approval keys |
+| Production cutover | NO_GO | Remains `PRODUCTION_NO_GO` |

@@ -2,10 +2,9 @@
 
 | Check | Result | Evidence |
 | --- | --- | --- |
-| fixture traceable | PASS | qa_tag=ARREARS_TTLOCK_E2E_QA_20260531155612 |
+| fixture traceable | PASS | qa_tag=ARREARS_TTLOCK_E2E_QA_20260601122116 |
 | owner idempotency recorded | PASS | records=2 |
 | employee idempotency recorded | PASS | records=2 |
 | audit recorded | PASS | audit_rows=2 |
 | rollback executed | PASS | fixture_deleted=true |
-| staging write gate disabled after QA | PASS | ARREARS_DIRECTIVE_WRITE_APPROVED deleted from staging |
 | production impact | NO | no production D1/write/migration/deploy |
