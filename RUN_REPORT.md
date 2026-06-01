@@ -1,5 +1,22 @@
 # Run Report
 
+## BED-TRANSFER-PRODUCTION-UI-ONLY-DEPLOY-001
+
+Date: 2026-06-01, Asia/Dubai
+
+Scope: deployed employee Bed Transfer UI-only fields to the default `homelink-finance` Worker.
+
+- Worker version: `5b17b7f2-0551-4cdb-a439-38fcc965b1cb`.
+- Production schema metadata check found no `bed_transfer_events` columns; real writes require a separate production schema migration approval.
+- Employee UI now shows Bed Transfer fields and system context review markers.
+- Bed Transfer save/export remains gated by `BED_TRANSFER_WRITE_ENABLED=false`.
+- The production UI copy is `换床真实写入未启用，需要生产审批。 Bed transfer write is not enabled.`
+- Live read-only smoke against `/employee-v3` confirmed the fields and write-gate markers are present.
+- No production write gate was opened.
+- No production D1 write, production migration, D1 export/import, employee entry write, Bed Transfer write, occupancy mutation, TTLock mutation, financial formula change, or dashboard calculation change occurred.
+
+Production remains `PRODUCTION_NO_GO`.
+
 ## ARREARS-DIRECTIVE-SELECTED-3-TTLOCK-REAL-DISPATCH-001
 
 Date: 2026-06-01, Asia/Dubai

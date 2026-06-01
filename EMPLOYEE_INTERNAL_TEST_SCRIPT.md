@@ -1,5 +1,23 @@
 # Employee Internal Test Script
 
+## BED-TRANSFER-PRODUCTION-UI-ONLY-DEPLOY-001 Employee Checks
+
+Date: 2026-06-01, Asia/Dubai
+
+The employee Bed Transfer UI-only fields are deployed to production Worker version `5b17b7f2-0551-4cdb-a439-38fcc965b1cb`.
+
+Manual employee QA should confirm:
+
+- Entry page includes Bed Transfer / TF selection.
+- Bed Transfer UI shows From Bed, To Bed, Transfer Date, Reason, and Note fields.
+- System context review block is visible for occupant, original check-in date, rent period, deposit, arrears, TTLock record, new bed status, and rent difference review where data exists.
+- Pressing save for Bed Transfer must not create a production entry.
+- The UI must show `换床真实写入未启用，需要生产审批。 Bed transfer write is not enabled.`
+- Export/commit must not upload a TF draft while the production Bed Transfer write gate is off.
+- Any real Bed Transfer smoke requires separate production schema migration and write approval.
+
+Production cutover remains `PRODUCTION_NO_GO`.
+
 ## Selected 3 TTLock Dispatch Audit - 2026-06-01
 
 1. Do not expect Abdul inbox to show new `112`, `113`, or `125` tasks from this audit.

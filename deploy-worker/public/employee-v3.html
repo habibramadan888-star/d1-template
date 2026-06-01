@@ -2681,6 +2681,8 @@ function readSessionId(userid){
   catch{return ''}
 }
 const state={lockCards:[],current:null,depositBalance:null,rentConfig:{},rentConfigLoaded:false,drafts:[],tasks:[],employeeDirectives:[],followupItems:[],sessionId:'',user:null};
+const BED_TRANSFER_WRITE_ENABLED=false;
+const BED_TRANSFER_WRITE_DISABLED_MESSAGE='换床真实写入未启用，需要生产审批。 Bed transfer write is not enabled.';
 function apiUrl(path){return location.protocol!=='file:'&&location.host.includes('workers.dev')?path:API_ORIGIN+path}
 async function apiFetch(path,opts={}){return wrapStandardJsonResponse(await fetch(apiUrl(path),{credentials:'include',...opts,headers:{'Content-Type':'application/json',...(opts.headers||{})}}))}
 function wrapStandardJsonResponse(response){
@@ -2748,6 +2750,12 @@ function employeeDisplayName(user){
   ].map(v=>String(v||'').trim()).filter(v=>!['staff','employee'].includes(v.toLowerCase())).find(Boolean)||'unknown';
 }
 function toast(msg,duration=2600){const el=$('toast');el.textContent=msg;el.style.display='block';clearTimeout(window.__toast);window.__toast=setTimeout(()=>el.style.display='none',duration)}
+function isBedTransferWriteGated(type=$('entryType')?.value){
+  return type==='TF'&&!BED_TRANSFER_WRITE_ENABLED;
+}
+function bedTransferWriteGateHtml(){
+  return `<div class="warn">${esc(BED_TRANSFER_WRITE_DISABLED_MESSAGE)}</div>`;
+}
 function showStatus(msg,type='ok'){
   const box=$('validationBox');
   if(box)box.innerHTML=`<div class="${type==='bad'?'bad':type==='warn'?'warn':''}">${esc(msg)}</div>`;
@@ -3451,6 +3459,7 @@ function validate(){
   if(type==='TF'&&state.current?.vacant)errors.push('原床位没有 active tenant，不能直接保存换床。');
   if(type==='TF'){
     const transferReview=bedTransferValidationSummary(transferValue('transferFromBed')||transferValue('bed'),transferValue('bedTo'),bedTransferReviewContext());
+    if(isBedTransferWriteGated(type))warns.push(BED_TRANSFER_WRITE_DISABLED_MESSAGE);
     transferReview.review.forEach(code=>warns.push(`换床需复核：${code}`));
   }
   if(type==='TF'&&$('feePaid').value==='Y'&&amt!==50)errors.push('换床收取费用时，系统固定按 50 AED 计入，员工不能手动改金额。');
@@ -3516,6 +3525,11 @@ async function saveEntry(){
   const btn=$('btnSaveEntry');
   if(btn?.dataset.busy==='1')return;
   const v=validate();if(v.errors.length){toast('请先处理阻断校验');return}
+  if(isBedTransferWriteGated()){
+    $('validationBox').innerHTML=bedTransferWriteGateHtml();
+    toast(BED_TRANSFER_WRITE_DISABLED_MESSAGE,6000);
+    return;
+  }
   let e;
   try{e=entryPayload();}catch(err){
     console.error('entryPayload failed',err);
@@ -4373,6 +4387,12 @@ async function commitSessionAndExport(){
   if(!state.user){applyEmployeeUser(null);toast('请先登录员工账号',6000);return}
   buildExport();
   if(!state.drafts.length){showStatus('当前本票没有流水，不能导出交接。','warn');toast('当前本票没有流水，不能导出交接',6000);return}
+  if(!BED_TRANSFER_WRITE_ENABLED&&state.drafts.some(e=>e.type==='TF')){
+    $('validationBox').innerHTML=bedTransferWriteGateHtml();
+    showStatus(BED_TRANSFER_WRITE_DISABLED_MESSAGE,'warn');
+    toast(BED_TRANSFER_WRITE_DISABLED_MESSAGE,6000);
+    return;
+  }
   const btns=[$('btnExportSession'),$('btnBuildExport')].filter(Boolean);
   if(btns.some(b=>b.dataset.busy==='1'))return;
   const oldLabels=btns.map(b=>[b,b.innerHTML]);

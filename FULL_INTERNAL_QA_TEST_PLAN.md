@@ -1,5 +1,21 @@
 # Full Internal QA Test Plan
 
+## BED-TRANSFER-PRODUCTION-UI-ONLY-DEPLOY-001 QA Addendum
+
+The employee Bed Transfer UI-only fields have been deployed for phone inspection, but real Bed Transfer writes remain blocked.
+
+QA must verify:
+
+- Employee Entry exposes From Bed, To Bed, Transfer Date, Reason, and Note for Bed Transfer.
+- The context review block is visible and readable.
+- Bed Transfer save is blocked with approval-required copy.
+- Bed Transfer TF drafts cannot be exported/uploaded while `BED_TRANSFER_WRITE_ENABLED=false`.
+- No occupancy, TTLock, deposit, arrears, financial formula, or dashboard calculation is changed by UI inspection.
+- Production schema migration is still required before any real Bed Transfer write.
+- No production write, write gate, migration, D1 execute/export/import, batch rollout, or production cutover is approved.
+
+Production cutover remains `PRODUCTION_NO_GO`.
+
 ## Selected 3 TTLock Dispatch Blocker QA - 2026-06-01
 
 - Selected TTLock rooms/beds `112`, `113`, and `125` are visible in the owner read SOT.

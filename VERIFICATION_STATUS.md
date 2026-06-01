@@ -1,5 +1,21 @@
 # Verification Status
 
+## BED-TRANSFER-PRODUCTION-UI-ONLY-DEPLOY-001 Verification Addendum
+
+Date: 2026-06-01, Asia/Dubai
+
+| Verification | Result | Evidence | Commercial Meaning |
+|---|---:|---|---|
+| production schema metadata | BLOCKED_FOR_REAL_WRITE | `BED_TRANSFER_PRODUCTION_SCHEMA_LIVE_READINESS_CHECK.md` | Production lacks Bed Transfer event schema; real write requires separate migration approval. |
+| focused Bed Transfer tests | PASS | 10 focused Bed Transfer/read-only commands passed | UI, validation, accounting, TTLock review, state machine, traceability, statistical anchors, and readonly admin checks passed. |
+| security and launch gates | PASS | `security:secrets`, `gate:commercial-launch` | No secret committed; launch remains blocked. |
+| dry-run/embedded gates | PASS | `build:embedded:dry-run`, `verify:embedded-worker`, `audit:worker-drift` | Worker asset deploy was prepared without critical drift. |
+| production UI-only deploy | PASS | `BED_TRANSFER_PRODUCTION_UI_ONLY_DEPLOY_RESULT.md` | Worker version `5b17b7f2-0551-4cdb-a439-38fcc965b1cb` published the UI-only gate. |
+| live read-only smoke | PASS | `BED_TRANSFER_PRODUCTION_UI_ONLY_LIVE_SMOKE_RESULT.md` | `/employee-v3` contains Bed Transfer fields and write-gate markers. |
+| production write gate | OFF | no write gate command executed | Bed Transfer real write remains unavailable. |
+| production write | NO | no business write executed | Phone QA can inspect UI only; no production Bed Transfer save is approved. |
+| production cutover | PRODUCTION_NO_GO | commercial launch gate | This deploy is not rollout/cutover approval. |
+
 ## Selected 3 TTLock Real Dispatch Readiness - 2026-06-01
 
 | Check | Status | Evidence |

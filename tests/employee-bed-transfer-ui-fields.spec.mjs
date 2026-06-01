@@ -41,6 +41,18 @@ test("Bed Transfer validation blocks missing or equal from/to beds", async () =>
   assert.match(html, /from_bed_no_active_tenant/);
 });
 
+test("Bed Transfer production write remains gated in the UI", async () => {
+  const html = await readFile(htmlPath, "utf8");
+
+  assert.match(html, /const BED_TRANSFER_WRITE_ENABLED=false/);
+  assert.match(html, /BED_TRANSFER_WRITE_DISABLED_MESSAGE/);
+  assert.match(html, /Bed transfer write is not enabled/);
+  assert.match(html, /function isBedTransferWriteGated/);
+  assert.match(html, /function bedTransferWriteGateHtml/);
+  assert.match(html, /if\(isBedTransferWriteGated\(\)\)/);
+  assert.match(html, /state\.drafts\.some\(e=>e\.type==='TF'\)/);
+});
+
 test("production cutover remains blocked", async () => {
   const gate = await readFile("scripts/gate-commercial-launch-readiness.mjs", "utf8");
   assert.match(gate, /PRODUCTION_NO_GO/);
