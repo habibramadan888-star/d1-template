@@ -6466,3 +6466,12 @@ Deployment addendum:
 - Added occupancy flow and risk watch sections for senior-accountant style review.
 - No production write, migration, deploy, financial formula change, dashboard calculation change, or production cutover was performed.
 - Production cutover remains `PRODUCTION_NO_GO`.
+
+## Employee Entry / Follow-up / System Split
+
+- Employee navigation now separates Entry, Follow-up, and System.
+- Follow-up is limited to Boss Assigned Tasks and no longer hosts System Reminders.
+- System Reminders moved to the standalone System tab while preserving existing reminder sources and counters.
+- Legacy `#export` redirects to `#followup`; no Export page was restored.
+- No production write, write gate opening, migration, D1 execute/export/import, deploy, employee follow-up write, owner directive create, batch dispatch, TTLock smoke, financial formula change, dashboard calculation change, or production cutover was performed.
+- Production cutover remains `PRODUCTION_NO_GO`.

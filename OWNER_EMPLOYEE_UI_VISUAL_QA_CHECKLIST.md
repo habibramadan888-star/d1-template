@@ -338,3 +338,17 @@ Live Worker version: `1ef96378-7259-4605-ac46-7e5dfe169488`.
 | Owner arrears export | Still available | | |
 | Production write | None during visual QA | | |
 | Production cutover | `PRODUCTION_NO_GO` | | |
+
+## EMPLOYEE-NAV-SPLIT-FOLLOWUP-SYSTEM-001 Visual Checks
+
+| Screenshot / State | Required | Pass/Fail | Notes |
+|---|---|---|---|
+| Employee top nav | Entry / Follow-up / System only | | |
+| Employee top nav mobile | Three tabs, no wrap, no horizontal scroll | | |
+| Follow-up page | Boss Assigned Tasks only | | |
+| Follow-up page | No System Reminders block | | |
+| System page | System Reminders visible after refresh | | |
+| System page | Required / TTLock Overdue / Arrears / Amount reminders preserved | | |
+| Export page | Not restored | | |
+| Production write | None during visual QA | | |
+| Production cutover | `PRODUCTION_NO_GO` | | |

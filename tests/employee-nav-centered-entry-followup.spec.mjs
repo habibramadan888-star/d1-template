@@ -4,16 +4,16 @@ import test from "node:test";
 
 const htmlPath = "deploy-worker/public/employee-v3.html";
 
-test("Entry and Follow-up nav is explicitly centered and has two tabs only", async () => {
+test("Entry, Follow-up, and System nav is explicitly centered and has three tabs only", async () => {
   const html = await readFile(htmlPath, "utf8");
 
   assert.match(html, /class="tabs employee-tabs" data-entry-parity-tabs="true"/);
   assert.match(html, /\.employee-tabs\{\s*justify-content:center;/);
   assert.match(html, /\.employee-tabs \.tab\{/);
-  assert.match(html, /grid-template-columns:repeat\(2,minmax\(0,1fr\)\);/);
+  assert.match(html, /grid-template-columns:repeat\(3,minmax\(0,1fr\)\);/);
 
   const matches = [...html.matchAll(/<button class="tab[^"]*" data-view="([^"]+)"/g)].map((m) => m[1]);
-  assert.deepEqual(matches, ["entry", "arrears"]);
+  assert.deepEqual(matches, ["entry", "arrears", "system"]);
   assert.doesNotMatch(html, /data-view="export"/);
 });
 

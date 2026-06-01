@@ -649,3 +649,13 @@ Owner overview comparative BI QA update:
 - QA must verify occupancy flow: new tenants, checkouts, bed transfers, with transfers excluded from new/checkouts.
 - QA must verify no production write, migration, financial formula change, dashboard calculation change, or production cutover.
 - Production cutover remains `PRODUCTION_NO_GO`.
+
+Employee navigation split QA update:
+
+- Employee navigation must show Entry, Follow-up, and System only.
+- Follow-up must show only Boss Assigned Tasks from persisted directive rows.
+- System must show System Reminders, including Required, TTLock Overdue, Arrears, and Amount reminders.
+- Export must remain removed; `#export` may only redirect to Follow-up.
+- System Reminders count logic and source classification are unchanged.
+- No production write, write gate opening, migration, deploy, employee follow-up write, owner directive create, batch dispatch, TTLock smoke, financial formula change, dashboard calculation change, or production cutover is authorized by this QA item.
+- Production cutover remains `PRODUCTION_NO_GO`.

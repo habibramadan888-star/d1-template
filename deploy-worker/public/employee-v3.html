@@ -2043,26 +2043,27 @@ label .label-en{
   font-size:8px;
   line-height:1;
 }
-.employee-followup-view .employee-panel-card{
+.employee-followup-view .employee-panel-card,
+.employee-system-view .employee-panel-card{
   border-radius:var(--r2);
 }
 .employee-followup-view .boss-directive-inbox,
-.employee-followup-view #taskList{
+.employee-system-view #taskList{
   display:grid;
   gap:16px;
 }
 .employee-followup-view .boss-directive-title.step-title,
-.employee-followup-view .employee-system-reminders-title{
+.employee-system-view .employee-system-reminders-title{
   margin:0 0 14px;
   padding:0;
 }
-.employee-followup-view .followup-dashboard{
+.employee-system-view .followup-dashboard{
   display:grid;
   grid-template-columns:repeat(4,minmax(0,1fr));
   gap:12px;
   margin:0 0 16px;
 }
-.employee-followup-view .followup-metric{
+.employee-system-view .followup-metric{
   padding:18px;
   border-radius:20px;
   background:rgba(255,255,255,.88);
@@ -2226,6 +2227,32 @@ label .label-en{
   min-height:42px;
   padding:9px 13px;
 }
+.employee-system-view .followup-list{display:grid;gap:14px}
+.employee-system-view .followup-card,
+.employee-system-view .followup-card.step,
+.employee-system-view .followup-card.directive,
+.employee-system-view .followup-card.overdue,
+.employee-system-view .followup-card.force,
+.employee-system-view .followup-card.history{
+  border:1px solid rgba(207,216,220,.85);
+  border-left:1px solid rgba(207,216,220,.85);
+  border-radius:24px;
+  padding:20px;
+  margin:0;
+  background:rgba(255,255,255,.72);
+  box-shadow:var(--halo),var(--inner);
+}
+.employee-system-view .followup-top{display:grid;grid-template-columns:1fr auto;gap:14px;align-items:start}
+.employee-system-view .followup-bed{color:#111827;font-size:22px;font-weight:950;line-height:1.15}
+.employee-system-view .followup-money{align-self:start;min-width:112px;text-align:right;font-size:20px}
+.employee-system-view .followup-tags{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+.employee-system-view .followup-tag{display:inline-flex;align-items:center;min-height:24px;border:1px solid rgba(148,163,184,.28);border-radius:999px;padding:4px 9px;background:rgba(255,255,255,.70);color:#435168;font-size:11px;font-weight:850;line-height:1.15}
+.employee-system-view .followup-tag.bad{background:#fff7ed;color:#b45309;border-color:rgba(245,158,11,.28)}
+.employee-system-view .followup-note{margin-top:12px;border:1px dashed #d7e3dd;border-radius:18px;background:rgba(255,255,255,.62);padding:12px 14px;color:#566174;font-size:13px;line-height:1.65}
+.employee-system-view .followup-actions{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:10px;margin-top:14px;align-items:end}
+.employee-system-view .followup-actions select,
+.employee-system-view .followup-actions input{min-height:48px;border-radius:16px;padding:14px 15px;font-size:14px}
+.employee-system-view .followup-actions .mini-btn{min-height:48px;border-radius:17px;padding:12px 16px;font-size:13px}
 @media(max-width:720px){
   .brand{
     grid-template-columns:1fr auto;
@@ -2254,9 +2281,10 @@ label .label-en{
   }
   .employee-tabs{
     display:grid;
-    grid-template-columns:repeat(2,minmax(0,1fr));
+    grid-template-columns:repeat(3,minmax(0,1fr));
     gap:8px;
     padding:6px 16px 14px;
+    overflow:hidden;
   }
   .employee-tabs .tab{
     width:100%;
@@ -2266,14 +2294,24 @@ label .label-en{
   }
   .employee-tabs .tab .en{font-size:8px}
   .employee-followup-view .head,
-  .employee-followup-view .body{
+  .employee-followup-view .body,
+  .employee-system-view .head,
+  .employee-system-view .body{
     padding:16px;
   }
   .employee-followup-view .followup-dashboard{
     grid-template-columns:repeat(2,minmax(0,1fr));
     gap:8px;
   }
+  .employee-system-view .followup-dashboard{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:8px;
+  }
   .employee-followup-view .followup-metric{
+    padding:12px;
+    border-radius:17px;
+  }
+  .employee-system-view .followup-metric{
     padding:12px;
     border-radius:17px;
   }
@@ -2282,32 +2320,43 @@ label .label-en{
   .employee-followup-view .followup-card.directive,
   .employee-followup-view .followup-card.overdue,
   .employee-followup-view .followup-card.force,
-  .employee-followup-view .followup-card.history{
+  .employee-followup-view .followup-card.history,
+  .employee-system-view .followup-card,
+  .employee-system-view .followup-card.step,
+  .employee-system-view .followup-card.directive,
+  .employee-system-view .followup-card.overdue,
+  .employee-system-view .followup-card.force,
+  .employee-system-view .followup-card.history{
     padding:14px;
     border-radius:18px;
   }
   .employee-followup-view .followup-top,
-  .employee-followup-view .employee-directive-summary{
+  .employee-followup-view .employee-directive-summary,
+  .employee-system-view .followup-top{
     grid-template-columns:1fr;
     gap:8px;
   }
-  .employee-followup-view .followup-money{
+  .employee-followup-view .followup-money,
+  .employee-system-view .followup-money{
     min-width:0;
     text-align:left;
     font-size:17px;
   }
   .employee-followup-view .followup-bed,
-  .employee-followup-view .employee-directive-title{
+  .employee-followup-view .employee-directive-title,
+  .employee-system-view .followup-bed{
     font-size:18px;
   }
   .employee-followup-view .followup-actions,
-  .employee-followup-view .directive-followup-actions{
+  .employee-followup-view .directive-followup-actions,
+  .employee-system-view .followup-actions{
     grid-template-columns:1fr;
     gap:8px;
   }
   .employee-followup-view .followup-actions .mini-btn,
   .employee-followup-view .directive-followup-actions .mini-btn,
-  .employee-followup-view .employee-directive-actions .mini-btn{
+  .employee-followup-view .employee-directive-actions .mini-btn,
+  .employee-system-view .followup-actions .mini-btn{
     width:100%;
   }
   .employee-followup-view .employee-directive-actions{
@@ -2353,6 +2402,7 @@ label .label-en{
   <div class="tabs employee-tabs" data-entry-parity-tabs="true">
     <button class="tab active" data-view="entry"><span class="tab-cn">录入</span><span class="en">ENTRY</span></button>
     <button class="tab" data-view="arrears"><span class="tab-cn">跟进</span><span class="en">FOLLOW-UP</span></button>
+    <button class="tab" data-view="system"><span class="tab-cn">系统</span><span class="en">SYSTEM</span></button>
   </div>
 </div>
 <main class="wrap">
@@ -2498,11 +2548,21 @@ label .label-en{
   <section id="view-arrears" class="hidden employee-followup-view employee-panel">
     <div class="card employee-panel-card">
       <div class="head">
-        <div><div class="title employee-section-title">Follow-up / 跟进</div><div class="small">Boss tasks + system reminders / 老板下发任务 + 系统提醒</div></div>
-        <button class="btn primary employee-action-button" id="btnRefreshTasks">Refresh / 刷新</button>
+        <div><div class="title employee-section-title">Follow-up / 跟进</div><div class="small">Boss assigned tasks / 老板下发任务</div></div>
       </div>
       <div class="body">
         <div id="bossDirectiveList" class="boss-directive-inbox"><div class="boss-directive-empty">No boss assigned tasks / 暂无老板下发任务</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="view-system" class="hidden employee-system-view employee-panel">
+    <div class="card employee-panel-card">
+      <div class="head">
+        <div><div class="title employee-section-title">System / 系统</div><div class="small">System reminders / 系统提醒</div></div>
+        <button class="btn primary employee-action-button" id="btnRefreshTasks">Refresh / 刷新</button>
+      </div>
+      <div class="body">
         <div id="taskList" class="small">Refresh to load system reminders / 点击刷新后生成系统提醒。</div>
       </div>
     </div>
@@ -3868,7 +3928,6 @@ function followupCard(item){
   </div>`;
 }
 function renderTasks(){
-  renderEmployeeDirectiveInbox();
   const items=currentFollowupItems();
   const history=items.filter(isEmployeeSystemArrearsReminder);
   const due=items.filter(isEmployeeTtlockReminder);
@@ -3884,7 +3943,7 @@ function renderTasks(){
     $('taskList').innerHTML=dashboard+'<div class="hint">当前没有通通锁过期租金或历史欠款。若刚打开页面，请先点击“刷新通通锁”。</div>';
     return;
   }
-  $('taskList').innerHTML='<div class="boss-directive-title step-title employee-system-reminders-title"><span>2</span><div class="boss-directive-heading">System Reminders / 系统提醒<small>SYSTEM REMINDERS</small></div></div>'+dashboard+`<div class="followup-list">${items.map(followupCard).join('')}</div>`;
+  $('taskList').innerHTML='<div class="boss-directive-title step-title employee-system-reminders-title"><span>1</span><div class="boss-directive-heading">System Reminders / 系统提醒<small>SYSTEM REMINDERS</small></div></div>'+dashboard+`<div class="followup-list">${items.map(followupCard).join('')}</div>`;
   bindFollowupActions();
 }
 function bindFollowupActions(){
@@ -4228,17 +4287,34 @@ async function commitSessionAndExport(){
     toast(localOk?'交接导出完成：云端已完成，本地也已保存。':'云端已完成，但本地保存失败，请不要关闭页面。',6000);
   }
 }
-function showEmployeeView(view){
-  const next=view==='export'?'arrears':view;
-  document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',b.dataset.view===next));
-  ['entry','arrears'].forEach(v=>$('view-'+v)?.classList.toggle('hidden',v!==next));
-  if(next==='arrears'){loadEmployeeArrearsDirectives(true);loadTasks(true)}
+function normalizeEmployeeView(view){
+  const raw=String(view||'').replace(/^#/,'').trim().toLowerCase();
+  if(raw==='followup'||raw==='arrears'||raw==='export')return 'arrears';
+  if(raw==='system')return 'system';
+  return 'entry';
 }
-document.querySelectorAll('.tab').forEach(btn=>btn.onclick=()=>showEmployeeView(btn.dataset.view));
+function employeeViewHash(view){
+  const next=normalizeEmployeeView(view);
+  return next==='arrears'?'followup':next;
+}
+function showEmployeeView(view,opts={}){
+  const next=normalizeEmployeeView(view);
+  const pushHash=opts.pushHash===true;
+  document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active',normalizeEmployeeView(b.dataset.view)===next));
+  ['entry','arrears','system'].forEach(v=>$('view-'+v)?.classList.toggle('hidden',v!==next));
+  if(pushHash){
+    const hash='#'+employeeViewHash(next);
+    if(location.hash!==hash)history.pushState(null,'',location.pathname+location.search+hash);
+  }
+  if(next==='arrears')loadEmployeeArrearsDirectives(true);
+  if(next==='system')loadTasks(true);
+}
+document.querySelectorAll('.tab').forEach(btn=>btn.onclick=()=>showEmployeeView(btn.dataset.view,{pushHash:true}));
+window.addEventListener('hashchange',()=>showEmployeeView(location.hash,{pushHash:false}));
 if(location.hash==='#export'){
-  history.replaceState(null,'',location.pathname+location.search+'#arrears');
-  setTimeout(()=>showEmployeeView('arrears'),0);
+  history.replaceState(null,'',location.pathname+location.search+'#followup');
 }
+showEmployeeView(location.hash||'entry',{pushHash:false});
 document.querySelectorAll('.event-chip').forEach(btn=>btn.addEventListener('click',e=>{e.preventDefault();setEntryType(btn.dataset.type);}));
 document.querySelectorAll('.pay-option').forEach(btn=>btn.addEventListener('click',e=>{e.preventDefault();setPaymentType(btn.dataset.pay);}));
 ['entryType','cycle','payType','amount','reasonCode','feePaid','customReason','tenantName','bankRef','periodDays','depositDeduction','checkoutDate','noNoticeDeduction','otherDeduction','dedNote','excessTo','bedTo','expenseCategory','expenseDesc','remark','arrearHandling','arrearPromiseDate','arrearReasonDetail'].forEach(id=>$(id).addEventListener('input',syncForm));

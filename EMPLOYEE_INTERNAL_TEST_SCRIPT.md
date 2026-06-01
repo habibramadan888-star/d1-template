@@ -416,3 +416,13 @@ Deployment acceptance note:
 - Worker version `5db7d12a-6b54-4ed2-ba79-f2eee35c19f7` contains the System Reminders count and title sanitizer fix.
 - Internal mobile QA should confirm the visible counters show TTLock Overdue `41` and Arrears `5`.
 - Internal mobile QA should confirm task titles no longer display TTLock account phone identifiers such as `+971525199099` or `+971521030402`.
+
+## Employee Entry / Follow-up / System Split QA
+
+1. Open the employee page and confirm the navigation shows exactly three tabs: Entry, Follow-up, System.
+2. Confirm Follow-up only shows Boss Assigned Tasks from persisted `/api/employee/arrears/directives` rows.
+3. Confirm System opens a separate System Reminders page and owns the reminder refresh button.
+4. Confirm System Reminders still show Required, TTLock Overdue, Arrears, and Amount reminder families.
+5. Confirm `#export` does not restore an Export page and redirects to Follow-up.
+6. Confirm mobile navigation does not wrap or horizontally scroll.
+7. Confirm no production write, write gate opening, migration, employee follow-up write, owner directive create, or batch dispatch is part of this QA.

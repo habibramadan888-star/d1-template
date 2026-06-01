@@ -2317,3 +2317,17 @@ Date: 2026-06-01, Asia/Dubai
 | production business write | NO | no write API invoked |
 | migration | NO | no schema migration executed |
 | Production cutover | NO_GO | Remains `PRODUCTION_NO_GO` |
+
+## Employee Navigation Split Verification
+
+| Check | Status | Evidence |
+|---|---|---|
+| Entry tab | PASS | `data-view="entry"` |
+| Follow-up tab | PASS | `data-view="arrears"` routed as `#followup` |
+| System tab | PASS | `data-view="system"` |
+| Follow-up data boundary | PASS | `/api/employee/arrears/directives` only |
+| System reminder boundary | PASS | existing `loadTasks()` / `renderTasks()` path |
+| Export page restored | NO | `#export` redirects to `#followup` |
+| production business write | NO | no write API invoked |
+| write gate | OFF | no write gate opened |
+| Production cutover | NO_GO | Remains `PRODUCTION_NO_GO` |
