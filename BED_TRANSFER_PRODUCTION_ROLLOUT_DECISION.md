@@ -1,25 +1,36 @@
 # Bed Transfer Production Rollout Decision
 
+Date: 2026-06-01
 Decision: `DO_NOT_ENABLE_PRODUCTION_YET`
 
-Production enablement requirements:
+## Basis
 
-1. Current work is local/code/test/documentation only.
-2. Any schema migration requires separate explicit approval.
-3. Any production write smoke requires separate explicit approval.
-4. Recommended production smoke, if later approved: one low-risk bed transfer only.
-5. Do not enable for all employees before staging E2E passes.
-6. Production cutover remains `PRODUCTION_NO_GO`.
+The staging E2E did not pass. It stopped at schema preflight because staging does not have `bed_transfer_events` or equivalent fields for transfer date, original occupancy anchors, deposit carry-over, arrears carry-over, TTLock old/new refs, audit linkage, and traceability linkage.
 
-Allowed later deploy scope, if approved:
+## Production Decision
 
-- Employee Bed Transfer UI fields.
-- Validation summary logic.
-- State/data anchors.
+| Question | Decision |
+|---|---|
+| Recommend production UI-only deploy? | No, not until staging schema/E2E is unblocked. |
+| Need production schema migration? | Likely yes later, but not approved here. Validate in staging first. |
+| Need production smoke? | Yes later, after staging E2E passes and separate approval is granted. |
+| Recommended production smoke scope | One low-risk bed transfer only. |
+| Enable all employees? | No. Do not enable before staging E2E passes. |
+| Production cutover | `PRODUCTION_NO_GO` |
 
-Disallowed without separate approval:
+## Allowed Later Scope, If Separately Approved
+
+- Staging schema migration for bed-transfer event persistence.
+- Staging fixture setup and rollback.
+- One staging Bed Transfer E2E.
+- Later production migration/smoke only after a separate approval packet.
+
+## Disallowed In This Task
 
 - Production write.
-- Write gate opening.
-- Migration.
+- Production write gate opening.
+- Production migration.
+- Production deploy.
 - Automatic real bed relationship updates.
+- Financial formula changes.
+- Dashboard calculation changes.
