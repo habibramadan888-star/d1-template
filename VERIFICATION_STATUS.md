@@ -1,5 +1,21 @@
 # Verification Status
 
+## BED-TRANSFER-EMPLOYEE-SAVE-PATH-E2E-DEPLOY-SMOKE-001 Verification Addendum
+
+Date: 2026-06-01, Asia/Dubai
+
+| Verification | Result | Evidence | Commercial Meaning |
+|---|---:|---|---|
+| staging E2E | PASS | `BED_TRANSFER_EMPLOYEE_SAVE_PATH_STAGING_E2E_RESULT.md` | Employee save path works against staging through the real API. |
+| predeploy gates | PASS | `BED_TRANSFER_EMPLOYEE_SAVE_PATH_PREDEPLOY_VERIFY_RESULT.md` | Required security, launch, focused tests, and embedded checks passed. |
+| production deploy | PASS | `BED_TRANSFER_EMPLOYEE_SAVE_PATH_DEPLOY_RESULT.md` | Worker version `832d3ac2-3b3a-4839-92e8-698fbeffe24c`. |
+| production smoke preflight | PASS | `BED_TRANSFER_EMPLOYEE_SAVE_PATH_PRODUCTION_SMOKE_PREFLIGHT.md` | Safe pair selected as `103 -> 111`; no pending duplicate. |
+| one-row production smoke | PASS | `BED_TRANSFER_EMPLOYEE_SAVE_PATH_PRODUCTION_SMOKE_RESULT.md` | One pending-review event-ledger row was created. |
+| owner visibility | PASS | `BED_TRANSFER_EMPLOYEE_SAVE_PATH_OWNER_VISIBILITY_RESULT.md` | Owner can see the pending review item. |
+| no-mutation verification | PASS | `BED_TRANSFER_EMPLOYEE_SAVE_PATH_NO_MUTATION_VERIFY.md` | Occupancy, deposit, arrears, and TTLock remained unchanged. |
+| internal testing enablement | PASS | `BED_TRANSFER_EMPLOYEE_SAVE_PATH_INTERNAL_ENABLEMENT_RESULT.md` | Employee Bed Transfer requests are enabled for internal testing only. |
+| production cutover | PRODUCTION_NO_GO | commercial launch gate | This is not commercial launch or cutover approval. |
+
 ## BED-TRANSFER-EMPLOYEE-UI-WRITE-PATH-CLOSURE-001 Verification Addendum
 
 Date: 2026-06-01, Asia/Dubai

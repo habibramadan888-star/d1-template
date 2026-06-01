@@ -1,5 +1,23 @@
 # Owner Internal Test Script
 
+## BED-TRANSFER-EMPLOYEE-SAVE-PATH-E2E-DEPLOY-SMOKE-001 Owner Checks
+
+Date: 2026-06-01, Asia/Dubai
+
+The owner pending-review path passed after the production employee API smoke.
+
+Owner QA should confirm:
+
+- Owner overview includes the `Bed Transfer Review` card.
+- `GET /api/owner/bed-transfers` shows pending review Bed Transfer requests.
+- The production smoke request `103 -> 111` is visible as `pending_review`.
+- The owner view shows From Bed, To Bed, Transfer Date, Operator, Reason, Note, Audit ID, and Trace ID where available.
+- Owner view remains review-only at this stage.
+- No owner screen implies that occupancy, deposit, arrears, or TTLock has already been changed.
+- Approve/reject remains future work and must not be treated as enabled by this smoke.
+
+Production cutover remains `PRODUCTION_NO_GO`.
+
 ## BED-TRANSFER-EMPLOYEE-UI-WRITE-PATH-CLOSURE-001 Owner Checks
 
 Date: 2026-06-01, Asia/Dubai

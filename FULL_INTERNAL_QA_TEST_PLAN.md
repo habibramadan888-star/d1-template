@@ -1,5 +1,24 @@
 # Full Internal QA Test Plan
 
+## BED-TRANSFER-EMPLOYEE-SAVE-PATH-E2E-DEPLOY-SMOKE-001 QA Addendum
+
+The employee Bed Transfer event-ledger save path is enabled for internal testing only.
+
+QA must verify:
+
+- Employee can submit Bed Transfer as a `pending_review` owner-review event.
+- Required fields remain From Bed, To Bed, Transfer Date, Reason, Note, and idempotency.
+- Owner can see the pending review request.
+- Replay/network retry does not duplicate the event.
+- Bed Transfer is not a new tenant.
+- Bed Transfer is not checkout.
+- Bed Transfer does not mutate occupancy.
+- Bed Transfer does not mutate deposit.
+- Bed Transfer does not clear or mutate arrears.
+- Bed Transfer does not mutate TTLock.
+- Approve/reject is not enabled by this task.
+- Production cutover remains `PRODUCTION_NO_GO`.
+
 ## BED-TRANSFER-EMPLOYEE-UI-WRITE-PATH-CLOSURE-001 QA Addendum
 
 QA must verify the new event-ledger write path without treating it as production cutover:

@@ -1,5 +1,38 @@
 # Bed Transfer Production Rollout Decision
 
+## Employee Save Path E2E Deploy Smoke Addendum
+
+Date: 2026-06-01
+
+Decision: `EMPLOYEE_SAVE_PATH_ENABLED_FOR_INTERNAL_TESTING`
+
+| Question | Decision |
+|---|---|
+| Was staging E2E executed? | Yes, PASS through `POST /api/employee/bed-transfers`. |
+| Was production Worker deployed? | Yes, Worker version `832d3ac2-3b3a-4839-92e8-698fbeffe24c`. |
+| Was production UI-originated API smoke executed? | Yes, one row for `103 -> 111`. |
+| Was the smoke status `pending_review`? | Yes. |
+| Was owner visibility verified? | Yes, owner read API showed the pending review item. |
+| Was idempotency replay verified? | Yes, replay returned the same transfer without a duplicate event row. |
+| Was occupancy mutated? | No. |
+| Was deposit mutated? | No. |
+| Were arrears cleared or changed? | No. |
+| Was TTLock mutated? | No. |
+| Internal testing decision | `enabled_for_internal_testing`. |
+| Production cutover | `PRODUCTION_NO_GO` |
+
+Evidence:
+
+- `BED_TRANSFER_EMPLOYEE_SAVE_PATH_STAGING_E2E_RESULT.md`
+- `BED_TRANSFER_EMPLOYEE_SAVE_PATH_PREDEPLOY_VERIFY_RESULT.md`
+- `BED_TRANSFER_EMPLOYEE_SAVE_PATH_DEPLOY_RESULT.md`
+- `BED_TRANSFER_EMPLOYEE_SAVE_PATH_PRODUCTION_SMOKE_PREFLIGHT.md`
+- `BED_TRANSFER_EMPLOYEE_SAVE_PATH_PRODUCTION_SMOKE_RESULT.md`
+- `BED_TRANSFER_EMPLOYEE_SAVE_PATH_OWNER_VISIBILITY_RESULT.md`
+- `BED_TRANSFER_EMPLOYEE_SAVE_PATH_NO_MUTATION_VERIFY.md`
+- `BED_TRANSFER_EMPLOYEE_SAVE_PATH_INTERNAL_ENABLEMENT_RESULT.md`
+- `BED_TRANSFER_EMPLOYEE_SAVE_PATH_LIVE_SMOKE_RESULT.md`
+
 ## Employee UI Event-Ledger Save Path Addendum
 
 Date: 2026-06-01

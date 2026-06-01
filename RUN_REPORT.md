@@ -1,5 +1,21 @@
 # Run Report
 
+## BED-TRANSFER-EMPLOYEE-SAVE-PATH-E2E-DEPLOY-SMOKE-001
+
+Date: 2026-06-01, Asia/Dubai
+
+Scope: executed staging E2E, deployed the Bed Transfer employee save path, and ran the approved one-row production UI-originated API smoke.
+
+- Staging E2E passed after deploying the current Worker to `homelink-finance-staging`.
+- Production Worker deploy succeeded with version `832d3ac2-3b3a-4839-92e8-698fbeffe24c`.
+- Production smoke wrote one `bed_transfer_events` row for `103 -> 111`, status `pending_review`.
+- The smoke wrote one audit row, one entry trace row, and one idempotency row.
+- Owner visibility passed through `GET /api/owner/bed-transfers`.
+- Idempotency replay returned the same transfer without creating a duplicate event row.
+- Occupancy, deposit, arrears, TTLock, financial formula, and dashboard calculation data were not mutated.
+- Bed Transfer employee save path is now `enabled_for_internal_testing`.
+- Production cutover remains `PRODUCTION_NO_GO`.
+
 ## BED-TRANSFER-EMPLOYEE-UI-WRITE-PATH-CLOSURE-001
 
 Date: 2026-06-01, Asia/Dubai

@@ -1,5 +1,24 @@
 # Employee Internal Test Script
 
+## BED-TRANSFER-EMPLOYEE-SAVE-PATH-E2E-DEPLOY-SMOKE-001 Employee Checks
+
+Date: 2026-06-01, Asia/Dubai
+
+The employee Bed Transfer save path is enabled for internal testing after staging E2E and one production pending-review smoke.
+
+Manual employee QA should confirm:
+
+- Select `Bed Transfer / 换床`.
+- Enter From Bed, To Bed, Transfer Date, Reason, and Note.
+- Save button reads `提交老板核对 / SUBMIT FOR REVIEW`.
+- Saving creates a pending owner-review request, not a completed bed move.
+- Success copy says `Bed transfer submitted for owner review / 换床申请已提交老板核对`.
+- The request does not appear as a generic handover draft.
+- No employee screen claims the bed, deposit, arrears, or TTLock record has already changed.
+- If the same save is replayed by network retry, it must not create a duplicate transfer request.
+
+Production cutover remains `PRODUCTION_NO_GO`.
+
 ## BED-TRANSFER-EMPLOYEE-UI-WRITE-PATH-CLOSURE-001 Employee Checks
 
 Date: 2026-06-01, Asia/Dubai
