@@ -2444,3 +2444,20 @@ Date: 2026-06-01, Asia/Dubai
 | production business write | NO | no write API invoked |
 | production migration | NO | no migration executed |
 | Production cutover | NO_GO | Remains `PRODUCTION_NO_GO` |
+
+## Bed Transfer Fee Ledger Verification
+
+| Check | Status | Evidence |
+|---|---|---|
+| Default fee | PASS | `amount_fils=5000` for charged |
+| Waived fee | PASS | `amount_fils=0` for waived |
+| Waiver reason required | PASS | `bed_transfer_waiver_reason_required` |
+| Category | PASS | `bed_transfer_fee` |
+| Entry event anchor | PASS | `event_type=bed_transfer`, `field_name=bed_transfer_fee` |
+| Owner record view | PASS | fee, waiver, entry event, audit anchors |
+| Owner approval | NO | no approve/reject path |
+| Occupancy mutation | NO | no mutation in handler |
+| Deposit mutation | NO | no mutation in handler |
+| Arrears clearing | NO | no mutation in handler |
+| TTLock mutation | NO | no mutation in handler |
+| Production cutover | NO_GO | Remains `PRODUCTION_NO_GO` |

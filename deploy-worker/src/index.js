@@ -1134,9 +1134,10 @@ const BED_TRANSFER_EVENT_COLUMNS = [
   "id","transfer_id","corp_id","tenant_scope","from_bed","to_bed","transfer_date","effective_date",
   "customer_id","customer_code","customer_display_name","original_checkin_date","original_rent_period_start",
   "original_rent_period_end","original_deposit_amount_fils","current_rent_amount_fils","new_bed_rent_amount_fils",
-  "rent_difference_fils","transfer_fee_fils","carry_over_arrears_fils","old_ttlock_ref","new_ttlock_ref",
+  "rent_difference_fils","transfer_fee_fils","amount_fils","fee_mode","waiver_reason","category",
+  "carry_over_arrears_fils","old_ttlock_ref","new_ttlock_ref",
   "old_lock_valid_from","old_lock_valid_until","new_lock_valid_from","new_lock_valid_until","reason","note",
-  "operator_employee","status","audit_id","trace_id","qa_tag","created_at","updated_at"
+  "operator_employee","status","audit_id","trace_id","entry_event_id","qa_tag","created_at","updated_at"
 ];
 async function empTableColumns(env, table){
   const r=await env.DB.prepare(`PRAGMA table_info(${table})`).all();
@@ -1703,6 +1704,8 @@ async function handleEmployeeEntry(request,env,user){
     const feePaid=cleanText(entry.fee_paid,5);
     if(!["Y","N"].includes(feePaid))return badRequest("transfer_fee_choice_required");
     if(feePaid==="N"){
+      const waiverReason=cleanText(entry.fee_waiver_reason||entry.custom_reason||entry.note,240);
+      if(!waiverReason)return badRequest("bed_transfer_waiver_reason_required");
       amount=0;
       due=0;
       paid=0;
@@ -3096,7 +3099,11 @@ function bedTransferEventView(row){
     current_rent_amount_fils:Number(row?.current_rent_amount_fils||0),
     new_bed_rent_amount_fils:Number(row?.new_bed_rent_amount_fils||0),
     rent_difference_fils:Number(row?.rent_difference_fils||0),
-    transfer_fee_fils:Number(row?.transfer_fee_fils||0),
+    transfer_fee_fils:Number(row?.transfer_fee_fils ?? row?.amount_fils ?? 0),
+    amount_fils:Number(row?.amount_fils ?? row?.transfer_fee_fils ?? 0),
+    fee_mode:cleanText(row?.fee_mode||((Number(row?.amount_fils ?? row?.transfer_fee_fils ?? 0)>0)?"charged":"waived"),20),
+    waiver_reason:cleanText(row?.waiver_reason||"",240),
+    category:cleanText(row?.category||"bed_transfer_fee",40),
     carry_over_arrears_fils:Number(row?.carry_over_arrears_fils||0),
     old_ttlock_ref:cleanText(row?.old_ttlock_ref||"",80),
     old_lock_valid_from:cleanDate(row?.old_lock_valid_from||""),
@@ -3107,6 +3114,7 @@ function bedTransferEventView(row){
     status:cleanText(row?.status==="pending_review"?"recorded":row?.status||"recorded",40),
     audit_id:cleanText(row?.audit_id||"",80),
     trace_id:cleanText(row?.trace_id||"",80),
+    entry_event_id:cleanText(row?.entry_event_id||row?.trace_id||"",80),
     qa_tag:cleanText(row?.qa_tag||"",120),
     created_at:cleanText(row?.created_at||"",40),
     review_required:false,
@@ -3133,7 +3141,18 @@ async function handleEmployeeBedTransferCreate(request,env,user){
   if(!reason)return badRequest("transfer_reason_required");
   if(!note)return badRequest("transfer_note_required");
   if(!idempotencyKey)return badRequest("idempotency_key_required");
-  const requestPayload={corp_id:user.corpid,actor:user.userid,from_bed:fromBed,to_bed:toBed,transfer_date:transferDate,reason,note};
+  const rawFeeMode=cleanText(body?.fee_mode||body?.feeMode||"",20).toLowerCase();
+  const rawAmountFils=Number(body?.amount_fils ?? body?.transfer_fee_fils ?? NaN);
+  const legacyFeeAed=Number(String(body?.transfer_fee ?? body?.transfer_fee_aed ?? "").replace(/,/g,""));
+  const legacyFeeFils=Number.isFinite(legacyFeeAed)?bedTransferAedToFils(legacyFeeAed):NaN;
+  const inferredAmountFils=Number.isFinite(rawAmountFils)?rawAmountFils:(Number.isFinite(legacyFeeFils)?legacyFeeFils:5000);
+  const feeMode=rawFeeMode||((inferredAmountFils===0)?"waived":"charged");
+  const waiverReason=cleanText(body?.waiver_reason||body?.fee_waiver_reason||body?.waiverReason||"",240);
+  if(!["charged","waived"].includes(feeMode))return badRequest("bed_transfer_fee_mode_invalid");
+  if(feeMode==="waived"&&!waiverReason)return badRequest("bed_transfer_waiver_reason_required");
+  const amountFils=feeMode==="waived"?0:5000;
+  const category="bed_transfer_fee";
+  const requestPayload={corp_id:user.corpid,actor:user.userid,from_bed:fromBed,to_bed:toBed,transfer_date:transferDate,fee_mode:feeMode,amount_fils:amountFils,waiver_reason:waiverReason,reason,note,category};
   const requestHash=await bedTransferRequestHash(requestPayload);
   const idemOptions={
     scope:`${user.corpid}:bed_transfer_events`,
@@ -3151,6 +3170,7 @@ async function handleEmployeeBedTransferCreate(request,env,user){
   const transferId=cleanText(body?.transfer_id||`bt-${now.slice(0,10).replaceAll("-","")}-${fromBed}-${toBed}-${crypto.randomUUID().slice(0,8)}`,100);
   const auditId=empId("audit");
   const traceId=empId("trace");
+  const entryEventId=traceId;
   const snapshot=await bedTransferEventSnapshot(env,user,fromBed,toBed,body);
   const eventValues={
     id,
@@ -3171,7 +3191,11 @@ async function handleEmployeeBedTransferCreate(request,env,user){
     current_rent_amount_fils:snapshot.current_rent_amount_fils,
     new_bed_rent_amount_fils:snapshot.new_bed_rent_amount_fils,
     rent_difference_fils:snapshot.rent_difference_fils,
-    transfer_fee_fils:bedTransferAedToFils(body?.transfer_fee||body?.transfer_fee_aed||0),
+    transfer_fee_fils:amountFils,
+    amount_fils:amountFils,
+    fee_mode:feeMode,
+    waiver_reason:waiverReason,
+    category,
     carry_over_arrears_fils:snapshot.carry_over_arrears_fils,
     old_ttlock_ref:snapshot.old_ttlock_ref,
     new_ttlock_ref:"",
@@ -3185,6 +3209,7 @@ async function handleEmployeeBedTransferCreate(request,env,user){
     status:"recorded",
     audit_id:auditId,
     trace_id:traceId,
+    entry_event_id:entryEventId,
     qa_tag:cleanText(body?.qa_tag||"",120),
     created_at:now,
     updated_at:now
@@ -3202,7 +3227,13 @@ async function handleEmployeeBedTransferCreate(request,env,user){
     deposit_carried_fils:eventValues.original_deposit_amount_fils,
     carry_over_arrears_fils:eventValues.carry_over_arrears_fils,
     old_ttlock_ref:eventValues.old_ttlock_ref,
-    message:"Bed transfer recorded / 换床记录已保存",
+    amount_fils:amountFils,
+    amount_aed:bedTransferFilsToAed(amountFils),
+    fee_mode:feeMode,
+    waiver_reason:waiverReason,
+    category,
+    entry_event_id:authSafeId(entryEventId),
+    message:feeMode==="waived"?"Bed transfer recorded. Fee waived / 换床记录已保存，费用已豁免。":"Bed transfer recorded. Fee: 50 AED / 换床记录已保存，已记录 50 AED 换床费。",
     idempotency_status:"NEW"
   };
   const responseBody=ok(responseData);
@@ -3213,9 +3244,9 @@ async function handleEmployeeBedTransferCreate(request,env,user){
     env.DB.prepare(`INSERT INTO entry_events
       (event_id, corpid, userid, ref_id, ref_type, event_type, field_name, old_value, new_value, operator_id, ts)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-      .bind(traceId,user.corpid,user.userid,transferId,"bed_transfer_event","create","status","",JSON.stringify({status:"recorded",from_bed:fromBed,to_bed:toBed}),user.userid,now)
+      .bind(entryEventId,user.corpid,user.userid,transferId,"bed_transfer_event","bed_transfer","bed_transfer_fee","",JSON.stringify({status:"recorded",category,amount_fils:amountFils,fee_mode:feeMode,waiver_reason:waiverReason,from_bed:fromBed,to_bed:toBed,transfer_date:transferDate,reason,note}),user.userid,now)
   ]);
-  await audit(env,user,"employee.bed_transfer.create",transferId,{from_bed:fromBed,to_bed:toBed,status:"recorded",audit_id:auditId,trace_id:traceId}).catch(()=>{});
+  await audit(env,user,"employee.bed_transfer.create",transferId,{from_bed:fromBed,to_bed:toBed,status:"recorded",category,amount_fils:amountFils,fee_mode:feeMode,waiver_reason:waiverReason,audit_id:auditId,trace_id:traceId,entry_event_id:entryEventId}).catch(()=>{});
   await arrearsDirectiveRecordIdempotency(env,{...idemOptions,resourceId:transferId,status:"RECORDED"},responseBody);
   return json(responseBody,201);
 }
@@ -3761,12 +3792,12 @@ const HSC_CATEGORY_ALIASES = {
   R:"rent",RENT:"rent",RENT_INCOME:"rent",
   D:"deposit_in",DEPOSIT:"deposit_in",DEPOSIT_IN:"deposit_in",
   AP:"arrears",ARREARS:"arrears",ARREARS_PAYMENT:"arrears",
-  TF:"transfer_fee",TRANSFER_FEE:"transfer_fee",
+  TF:"bed_transfer_fee",BED_TRANSFER_FEE:"bed_transfer_fee",TRANSFER_FEE:"transfer_fee",
   DR:"deposit_refund",DEPOSIT_REFUND:"deposit_refund",
   E:"expense",EXPENSE:"expense"
 };
 const HSC_PAYMENT_ALIASES = {C:"cash",CASH:"cash",B:"bank",BANK:"bank",TRANSFER:"bank"};
-const HSC_INCOME_CATEGORIES = new Set(["rent","deposit_in","arrears","transfer_fee"]);
+const HSC_INCOME_CATEGORIES = new Set(["rent","deposit_in","arrears","transfer_fee","bed_transfer_fee"]);
 const HSC_OUTFLOW_CATEGORIES = new Set(["deposit_refund","expense"]);
 function hscIssue(code,message,extra={}){
   return {code,message,...extra};
@@ -3923,7 +3954,7 @@ function hscCreateTotals(rows){
     if(row.category==="rent")totals.rentReceivedFils+=amount;
     if(row.category==="deposit_in")totals.depositReceivedFils+=amount;
     if(row.category==="arrears")totals.arrearsPaidFils+=amount;
-    if(row.category==="transfer_fee")totals.transferFeeFils+=amount;
+    if(row.category==="transfer_fee"||row.category==="bed_transfer_fee")totals.transferFeeFils+=amount;
     if(row.category==="deposit_refund")totals.refundFils+=amount;
     if(row.category==="expense")totals.expenseFils+=amount;
     if(HSC_INCOME_CATEGORIES.has(row.category)){

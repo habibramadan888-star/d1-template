@@ -2546,7 +2546,8 @@ label .label-en{
           <div class="field"><label>新床位 to_bed</label><input id="bedTo" data-bed-transfer-to="true" placeholder="852"></div>
           <div class="field"><label>换床日期 transfer_date</label><input id="transferDate" data-bed-transfer-date="true" type="date"></div>
           <div class="field"><label>换床原因 reason</label><select id="transferReason" data-bed-transfer-reason="true"><option value="">请选择原因</option><option value="customer_request">customer request / 客户要求</option><option value="room_issue">room issue / 房间问题</option><option value="management_adjustment">management adjustment / 管理调整</option><option value="bed_upgrade">bed upgrade / 升级</option><option value="other">other / 其他</option></select></div>
-          <div class="field"><label>换床费处理</label><select id="feePaid"><option value="Y">收取 50 AED</option><option value="N">免收，必须填原因</option></select></div>
+          <div class="field"><label>Fee Option / 费用选项</label><select id="feePaid" data-bed-transfer-fee-mode="true"><option value="Y">Charge 50 AED / 收取 50 AED</option><option value="N">Waive fee / 豁免费用</option></select></div>
+          <div class="field hidden" id="transferWaiverReasonWrap"><label>Waiver Reason / 豁免原因</label><input id="transferWaiverReason" data-bed-transfer-waiver-reason="true" placeholder="Required when fee is waived"></div>
           <div class="bed-transfer-context" id="transferReviewPanel" data-bed-transfer-review="true">
             <strong>系统资料核对 / Verify System Context</strong>
             <div>选择原床位后，系统会保留当前住客、押金、租金周期、欠款和 TTLock 锚点。换床事件不会被统计为新入住或退房。</div>
@@ -3396,7 +3397,8 @@ function syncForm(){
   updatePaymentButtons();
   visible(['exceptionStep'],needsException());
   visible(['excessWrap'],type==='R'&&num($('amount').value)>num($('due').value));
-  visible(['customReasonWrap'],['DISCOUNT','OTHER'].includes($('reasonCode').value)||$('feePaid').value==='N');
+  visible(['customReasonWrap'],['DISCOUNT','OTHER'].includes($('reasonCode').value));
+  visible(['transferWaiverReasonWrap'],type==='TF'&&$('feePaid').value==='N');
   $('bankRefWrap').classList.add('hidden');
   if(type==='AP'&&!state.tasks.length)loadTasks(false);
   $('periodStart').readOnly=true;$('periodEnd').readOnly=true;$('periodDays').readOnly=$('cycle').value!=='CUST';
@@ -3491,7 +3493,7 @@ function validate(){
   if(type==='AP'&&!$('linkedTaskId').value)errors.push('还欠款必须选择一条欠款任务，不能自由录入。');
   if($('reasonCode').value==='OTHER'&&!$('remark').value.trim())errors.push('RC=OTHER 时备注不能为空。');
   if($('reasonCode').value==='DISCOUNT'&&!$('customReason').value.trim())errors.push('折扣必须填写原因，方便老板端复核。');
-  if($('feePaid').value==='N'&&!$('customReason').value.trim())errors.push('免收换床费必须填写原因。');
+  if(type==='TF'&&$('feePaid').value==='N'&&!$('transferWaiverReason').value.trim())errors.push('Waiver Reason is required when Bed Transfer fee is waived / 免收换床费必须填写豁免原因。');
   if(amt>due&&due>0&&type==='R')warns.push('AMT>DUE：系统不会自动把超收当作本期收入，必须明确超收去向。');
   $('validationBox').innerHTML=[...errors.map(x=>`<div class="bad">阻断：${esc(x)}</div>`),...warns.map(x=>`<div class="warn">提醒：${esc(x)}</div>`),(!errors.length&&!warns.length?'<div>校验通过，可以加入本票。整票上云请点击“导出交接”。</div>':'')].join('');
   const submit=$('btnSaveEntry');
@@ -3519,7 +3521,7 @@ function entryPayload(){
     period_day_count:num($('periodDays').value),period_due:num($('periodDue').value)||due,custom_reason:$('customReason').value.trim()||tailReason,
     checkout_date:$('checkoutDate').value,deposit_held:depositHeld(),deposit_return:type==='CO'?depositReturnStatus(depositHeld(),co.total):'',deposit_amt:type==='CO'?Math.max(0,depositHeld()-co.total):0,deposit_deduction:type==='CO'?co.total:num($('depositDeduction').value),
     ded_reason:dedReasons.join('+'),ded_days:co.overDays,ded_rate:40,ded_note:$('dedNote').value.trim(),early_days:co.earlyDays,
-    fee_paid:$('feePaid').value,fee_waiver_reason:$('feePaid').value==='N'?$('customReason').value.trim():'',
+    fee_paid:$('feePaid').value,fee_mode:$('feePaid').value==='N'?'waived':'charged',amount_fils:$('feePaid').value==='N'?0:5000,fee_waiver_reason:$('feePaid').value==='N'?$('transferWaiverReason').value.trim():'',
     transfer_date:$('transferDate').value,transfer_reason:$('transferReason').value,transfer_validation_status:type==='TF'?bedTransferValidationSummary(transferValue('transferFromBed')||transferValue('bed'),transferValue('bedTo'),bedTransferReviewContext()).status:'',
     carry_over_arrears:openTasksForBed().reduce((s,t)=>s+taskRemain(t),0),deposit_carried:depositHeld(),old_ttlock_ref:state.current?.tenant_card_id||'',old_lock_valid_from:state.current?.start||state.current?.start_md||'',old_lock_valid_until:state.current?.end||'',rent_difference:toRentMinusFrom(bedTransferReviewContext()),
     expense_category:$('expenseCategory').value,expense_desc:$('expenseDesc').value.trim(),
@@ -3543,6 +3545,11 @@ async function submitBedTransferEvent(){
   }
   const btn=$('btnSaveEntry');
   const old=btn?.innerHTML;
+  if(e.fee_mode==='waived'&&!e.fee_waiver_reason){
+    $('validationBox').innerHTML='<div class="bad">Waiver Reason is required when Bed Transfer fee is waived / 免收换床费必须填写豁免原因。</div>';
+    toast('Waiver Reason required / 必须填写豁免原因',6000);
+    return false;
+  }
   if(btn){btn.dataset.busy='1';btn.disabled=true;btn.classList.add('disabled');btn.innerHTML='Submitting<span class="label-en">提交中</span>'}
   const payload={
     from_bed:e.bed_from,
@@ -3550,6 +3557,9 @@ async function submitBedTransferEvent(){
     transfer_date:e.transfer_date,
     reason:e.transfer_reason,
     note:e.note,
+    fee_mode:e.fee_mode,
+    amount_fils:e.amount_fils,
+    waiver_reason:e.fee_waiver_reason,
     old_ttlock_ref:e.old_ttlock_ref,
     old_lock_valid_from:e.old_lock_valid_from,
     old_lock_valid_until:e.old_lock_valid_until,
@@ -3567,8 +3577,9 @@ async function submitBedTransferEvent(){
     resetForm();
     refreshSessionViews();
     const transferId=data?.transfer_id?` · ${data.transfer_id}`:'';
-    $('validationBox').innerHTML=`<div>${esc(BED_TRANSFER_SUBMITTED_MESSAGE)}${esc(transferId)}</div>`;
-    toast(BED_TRANSFER_SUBMITTED_MESSAGE,6000);
+    const successMessage=data?.message||BED_TRANSFER_SUBMITTED_MESSAGE;
+    $('validationBox').innerHTML=`<div>${esc(successMessage)}${esc(transferId)}</div>`;
+    toast(successMessage,6000);
     return true;
   }catch(err){
     const msg=err?.message||String(err||'submit_failed');
@@ -4558,7 +4569,7 @@ if(location.hash==='#export'){
 showEmployeeView(location.hash||'entry',{pushHash:false});
 document.querySelectorAll('.event-chip').forEach(btn=>btn.addEventListener('click',e=>{e.preventDefault();setEntryType(btn.dataset.type);}));
 document.querySelectorAll('.pay-option').forEach(btn=>btn.addEventListener('click',e=>{e.preventDefault();setPaymentType(btn.dataset.pay);}));
-['entryType','cycle','payType','amount','reasonCode','feePaid','customReason','tenantName','bankRef','periodDays','depositDeduction','checkoutDate','noNoticeDeduction','otherDeduction','dedNote','excessTo','transferFromBed','bedTo','transferDate','transferReason','expenseCategory','expenseDesc','remark','arrearHandling','arrearPromiseDate','arrearReasonDetail'].forEach(id=>$(id).addEventListener('input',syncForm));
+['entryType','cycle','payType','amount','reasonCode','feePaid','transferWaiverReason','customReason','tenantName','bankRef','periodDays','depositDeduction','checkoutDate','noNoticeDeduction','otherDeduction','dedNote','excessTo','transferFromBed','bedTo','transferDate','transferReason','expenseCategory','expenseDesc','remark','arrearHandling','arrearPromiseDate','arrearReasonDetail'].forEach(id=>$(id).addEventListener('input',syncForm));
 $('linkedTaskId').addEventListener('change',applyLinkedTask);
 $('bed').addEventListener('input',()=>{if($('entryType').value==='TF')$('transferFromBed').value=$('bed').value.trim().replace(/^#/,'');lookupBed();});
 $('transferFromBed').addEventListener('input',()=>{if($('entryType').value==='TF'){$('bed').value=$('transferFromBed').value.trim().replace(/^#/,'');lookupBed();}});
@@ -4609,7 +4620,7 @@ function applyBilingualUILegacy(){
   label('periodDue','账期应收','PERIOD DUE');label('due','本条应收','ENTRY DUE');label('linkedTaskId','选择欠款任务','ARREARS TASK');
   label('checkoutDate','实际离开日期','CHECKOUT DATE');label('overdayDeduction','超期扣款','OVERDAY DEDUCTION');label('noNoticeDeduction','未提前告知扣款','NO NOTICE DEDUCTION');
   label('otherDeduction','其他扣款','OTHER DEDUCTION');label('depositDeduction','押金扣款合计','DEPOSIT DEDUCTION');label('depositReturnAmount','应退押金','DEPOSIT REFUND');
-  label('dedNote','扣款说明','DEDUCTION NOTE');label('transferFromBed','原床位','FROM BED');label('bedTo','新床位','TO BED');label('transferDate','换床日期','TRANSFER DATE');label('transferReason','换床原因','TRANSFER REASON');label('feePaid','换床费处理','TRANSFER FEE');
+  label('dedNote','扣款说明','DEDUCTION NOTE');label('transferFromBed','原床位','FROM BED');label('bedTo','新床位','TO BED');label('transferDate','换床日期','TRANSFER DATE');label('transferReason','换床原因','TRANSFER REASON');label('feePaid','费用选项','FEE OPTION');label('transferWaiverReason','豁免原因','WAIVER REASON');
   label('expenseCategory','支出类别','EXPENSE CATEGORY');label('expenseDesc','支出说明','EXPENSE DESCRIPTION');label('paid','系统计入','SYSTEM PAID');label('entryClr','系统结清','SYSTEM CLEAR');
   label('excessTo','超收处理','EXCESS HANDLING');label('arrearAmount','尾款金额','TAIL BALANCE');label('arrearPromiseDate','承诺支付日期','PROMISE DATE');label('arrearHandling','处理方式','HANDLING');label('arrearReasonDetail','尾款原因','TAIL REASON');label('reasonCode','原因代码','REASON CODE');label('customReason','异常原因','EXCEPTION REASON');label('remark','备注','REMARK');
 }
@@ -4692,7 +4703,7 @@ function applyBilingualUI(){
   label('periodDue','账期应收','PERIOD DUE');label('due','本条应收','ENTRY DUE');label('linkedTaskId','选择欠款任务','ARREARS TASK');
   label('checkoutDate','实际离开日期','CHECKOUT DATE');label('overdayDeduction','超期扣款','OVERDAY DEDUCTION');label('noNoticeDeduction','未提前告知扣款','NO NOTICE DEDUCTION');
   label('otherDeduction','其他扣款','OTHER DEDUCTION');label('depositDeduction','押金扣款合计','DEPOSIT DEDUCTION');label('depositReturnAmount','应退押金','DEPOSIT REFUND');
-  label('dedNote','扣款说明','DEDUCTION NOTE');label('transferFromBed','原床位','FROM BED');label('bedTo','新床位','TO BED');label('transferDate','换床日期','TRANSFER DATE');label('transferReason','换床原因','TRANSFER REASON');label('feePaid','换床费处理','TRANSFER FEE');
+  label('dedNote','扣款说明','DEDUCTION NOTE');label('transferFromBed','原床位','FROM BED');label('bedTo','新床位','TO BED');label('transferDate','换床日期','TRANSFER DATE');label('transferReason','换床原因','TRANSFER REASON');label('feePaid','费用选项','FEE OPTION');label('transferWaiverReason','豁免原因','WAIVER REASON');
   label('expenseCategory','支出类别','EXPENSE CATEGORY');label('expenseDesc','支出说明','EXPENSE DESCRIPTION');label('paid','系统计入','SYSTEM PAID');label('entryClr','系统结清','SYSTEM CLEAR');
   label('excessTo','超收处理','EXCESS HANDLING');label('arrearAmount','尾款金额','TAIL BALANCE');label('arrearPromiseDate','承诺支付日期','PROMISE DATE');label('arrearHandling','处理方式','HANDLING');label('arrearReasonDetail','尾款原因','TAIL REASON');label('reasonCode','原因代码','REASON CODE');label('customReason','异常原因','EXCEPTION REASON');label('remark','备注','REMARK');
 }
@@ -4719,12 +4730,18 @@ function renderBedTransferSystemContext(){
   const newBedStatus=toBed&&toBed!=='Not selected / 未选择'?'Review required / 需核对':'Not selected / 未选择';
   const newRent=ctx.toRent?`${fmtMoney(ctx.toRent)} AED`:'Review required / 需核对';
   const rentDiff=ctx.rentDifferenceFils!=null?`${fmtMoney(ctx.rentDifferenceFils/100)} AED`:'Review required / 需核对';
+  const feeMode=$('feePaid')?.value==='N'?'waived':'charged';
+  const waiverReason=$('transferWaiverReason')?.value?.trim()||'Not provided / 未填写';
+  const feeText=feeMode==='waived'?'Waived / 已豁免':'50.00 AED';
+  const accountingEffect=feeMode==='waived'?'No income / 不计收入':'Bed Transfer Fee income / 换床费收入';
   const box=$('bedContext');
   box.className='ctx clean-context bed-transfer-context-live';
   box.innerHTML=`<div class="context-board" data-bed-transfer-step3-context="true">
     <div class="priority-grid">
       <div class="priority-card bed-check strong"><span>From Bed<small>原床位</small></span><b>${esc(fromBed)}</b><div class="sub">Current bed before transfer</div></div>
       <div class="priority-card bed-check strong"><span>To Bed<small>新床位</small></span><b>${esc(toBed)}</b><div class="sub">New bed after transfer</div></div>
+      <div class="priority-card fee-check strong"><span>Fee<small>费用</small></span><b>${esc(feeText)}</b><div class="sub">${esc(accountingEffect)}</div></div>
+      ${feeMode==='waived'?`<div class="priority-card warn"><span>Waiver Reason<small>豁免原因</small></span><b>${esc(waiverReason)}</b><div class="sub">Required for waived transfers</div></div>`:''}
       <div class="priority-card"><span>Current occupant<small>当前住客</small></span><b>${esc(occupant)}</b><div class="sub">Must remain same customer</div></div>
       <div class="priority-card date-check"><span>Original check-in date<small>原入住日期</small></span><b>${esc(checkin)}</b><div class="sub">Do not treat as new check-in</div></div>
       <div class="priority-card"><span>Rent period<small>租金周期</small></span><b>${esc(period)}</b><div class="sub">Carry existing billing anchor</div></div>

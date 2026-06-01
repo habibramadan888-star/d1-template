@@ -529,3 +529,13 @@ Owner regression checks:
 6. Confirm Occupancy Flow separates new tenants, checkouts, and bed transfers.
 7. Confirm Risk Watch shows overdue, broken promise, partial payment, and needs review.
 8. Confirm no production write, migration, financial formula change, dashboard calculation change, or production cutover occurred.
+## Bed Transfer Fee Record Review
+
+1. Open Owner Overview.
+2. Find `Bed Transfer Records / 换床记录`.
+3. Confirm each transfer shows `from_bed -> to_bed`.
+4. Confirm charged records show `50.00 AED`.
+5. Confirm waived records show `Waived / 已豁免` and waiver reason.
+6. Confirm employee/operator, transfer date, reason, note, entry event id, and audit id are visible.
+7. Confirm there are no Approve, Reject, Pending Review, or Apply Transfer buttons.
+8. Confirm the view remains read-only for readonly_admin.

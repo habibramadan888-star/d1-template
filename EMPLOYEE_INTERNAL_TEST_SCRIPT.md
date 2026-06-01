@@ -525,3 +525,15 @@ Deployment acceptance note:
 7. Confirm old TTLock references are preserved for review.
 8. Confirm bed transfer is not counted as new tenant or checkout.
 9. Confirm no production write, write gate opening, production migration, deploy, financial formula change, or dashboard calculation change is performed by this QA.
+## Bed Transfer Fee Ledger Acceptance
+
+1. Open Employee Entry.
+2. Select Bed Transfer.
+3. Confirm fields are visible: From Bed, To Bed, Transfer Date, Fee Option, Transfer Reason, Note.
+4. Confirm default Fee Option is `Charge 50 AED / 收取 50 AED`.
+5. Select `Waive fee / 豁免费用` and confirm `Waiver Reason / 豁免原因` is required.
+6. Save charged transfer only in an approved staging/production smoke window.
+7. Save waived transfer only in an approved staging/production smoke window.
+8. Confirm success copy says either `Fee: 50 AED` or `Fee waived`.
+9. Confirm no owner approval message appears.
+10. Confirm no occupancy/deposit/arrears/TTLock automatic mutation is claimed.

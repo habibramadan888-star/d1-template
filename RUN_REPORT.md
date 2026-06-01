@@ -6584,3 +6584,14 @@ Deployment addendum:
 - Bed Transfer remains separate from new tenant, checkout, rent payment, deposit receipt, deposit refund, and arrears payment.
 - No production write, write gate opening, production migration, D1 execute/export/import, deploy, financial formula change, dashboard calculation change, or production cutover was performed.
 - Production cutover remains `PRODUCTION_NO_GO`.
+
+## Bed Transfer Fee Ledger Revision
+
+- Revised Bed Transfer from record-only transfer anchor to fee-aware ledger event.
+- Default charged transfer records `bed_transfer_fee` with `amount_fils=5000` (50 AED).
+- Waived transfer records `amount_fils=0` and requires `waiver_reason`.
+- Employee UI now exposes Fee Option and dedicated Waiver Reason.
+- Owner read-only view now shows fee, waiver reason, entry event id, and audit id.
+- No owner approve/reject workflow was introduced.
+- No occupancy, deposit, arrears, TTLock, financial formula, dashboard calculation, or production cutover change was performed.
+- Production cutover remains `PRODUCTION_NO_GO`.

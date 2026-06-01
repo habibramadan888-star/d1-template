@@ -749,3 +749,18 @@ Bed Transfer accounting closure QA update:
 - Bed Transfer creates statistical anchors such as monthly/quarterly transfer counts, reason distribution, and transfer-with-arrears counts.
 - No production write, production migration, deploy, financial formula change, dashboard calculation change, or production cutover is authorized by this QA item.
 - Production cutover remains `PRODUCTION_NO_GO`.
+## Bed Transfer Fee Ledger QA
+
+| Area | Expected |
+|---|---|
+| Charged transfer | 50 AED recorded as `bed_transfer_fee` |
+| Waived transfer | 0 AED recorded with required waiver reason |
+| Entry event | `event_type=bed_transfer` with fee anchors |
+| Bed transfer event | linked transfer record with from/to/date/fee mode |
+| Owner view | fee, waiver, entry event id, audit id visible |
+| Owner review | no approve/reject workflow |
+| Occupancy | unchanged |
+| Deposit | unchanged |
+| Arrears | unchanged |
+| TTLock | unchanged |
+| Production cutover | `PRODUCTION_NO_GO` |

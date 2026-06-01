@@ -4514,7 +4514,13 @@ function renderOwnerOverviewComparativePanel(){
       </div>
       <div class="hist-card" data-owner-bed-transfer-records="true"><div class="hist-title">Bed Transfer Records / 换床记录</div>
         <div class="hist-stat"><span>Recorded events</span><b>${Number(bedReview.recorded_count||bedReview.pending_review_count||transferRecords.length||0)}</b></div>
-        ${transferRecords.length?transferRecords.map(t=>`<div class="hist-stat"><span>#${esc(t.from_bed||'-')} → #${esc(t.to_bed||'-')}</span><b>${esc(t.status==='pending_review'?'recorded':t.status||'recorded')}</b></div><div class="hist-anchor">${esc(t.transfer_date||'-')} · ${esc(t.operator_employee||'-')} · ${esc(t.reason||'-')} · ${esc(t.note||'-')}</div>`).join(''):'<div class="hist-anchor">No bed transfer records yet.</div>'}
+        ${transferRecords.length?transferRecords.map(t=>{
+          const feeMode=String(t.fee_mode||'charged').toLowerCase();
+          const feeLabel=feeMode==='waived'?'Waived / 已豁免':`${fmtMoney(Number(t.amount_fils??t.transfer_fee_fils??5000)/100)} AED`;
+          const waiver=feeMode==='waived'&&t.waiver_reason?` · Waiver: ${esc(t.waiver_reason)}`:'';
+          const anchor=[t.transfer_date||'-',t.operator_employee||'-',feeLabel,t.reason||'-',t.note||'-'].map(x=>esc(x)).join(' · ');
+          return `<div class="hist-stat"><span>#${esc(t.from_bed||'-')} → #${esc(t.to_bed||'-')}</span><b>${esc(t.status==='pending_review'?'recorded':t.status||'recorded')}</b></div><div class="hist-anchor">${anchor}${waiver} · entry ${esc(t.entry_event_id||'-')} · audit ${esc(t.audit_id||'-')}</div>`;
+        }).join(''):'<div class="hist-anchor">No bed transfer records yet.</div>'}
         <div class="hist-anchor">Record only: no occupancy, deposit, arrears, or TTLock mutation.</div>
       </div>
       <div class="hist-card" data-owner-overview-arrears-collection="true"><div class="hist-title">Arrears & Collection</div>

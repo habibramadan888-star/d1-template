@@ -17,7 +17,8 @@ test("Bed Transfer save API records events with status recorded", async () => {
   const handler = extractFunction(worker, "handleEmployeeBedTransferCreate");
 
   assert.match(handler, /status:"recorded"/);
-  assert.match(handler, /message:"Bed transfer recorded \/ 换床记录已保存"/);
+  assert.match(handler, /Bed transfer recorded\. Fee: 50 AED/);
+  assert.match(handler, /Bed transfer recorded\. Fee waived/);
   assert.match(handler, /review_required:false/);
   assert.match(handler, /arrearsDirectiveRecordIdempotency/);
   assert.doesNotMatch(handler, /status:"pending_review"/);

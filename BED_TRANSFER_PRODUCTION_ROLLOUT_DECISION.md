@@ -188,3 +188,15 @@ The E2E verified:
 - Automatic real bed relationship updates in production.
 - Financial formula changes.
 - Dashboard calculation changes.
+## Fee Ledger Revision Decision
+
+Bed Transfer now has a fee-aware event ledger model:
+
+- Default Bed Transfer fee is 50 AED.
+- Charged transfer creates `bed_transfer_fee` income anchor.
+- Waived transfer creates a zero-amount event and requires waiver reason.
+- Owner review is not part of the workflow.
+- Occupancy, deposit, arrears, and TTLock are not mutated by this event.
+- Production cutover remains `PRODUCTION_NO_GO`.
+
+Production rollout remains gated on separate migration/deploy/smoke approval.

@@ -23,6 +23,10 @@ CREATE TABLE IF NOT EXISTS bed_transfer_events (
   new_bed_rent_amount_fils INTEGER DEFAULT 0,
   rent_difference_fils INTEGER DEFAULT 0,
   transfer_fee_fils INTEGER DEFAULT 0,
+  amount_fils INTEGER DEFAULT 5000,
+  fee_mode TEXT DEFAULT 'charged',
+  waiver_reason TEXT,
+  category TEXT DEFAULT 'bed_transfer_fee',
   carry_over_arrears_fils INTEGER DEFAULT 0,
   old_ttlock_ref TEXT,
   new_ttlock_ref TEXT,
@@ -36,11 +40,14 @@ CREATE TABLE IF NOT EXISTS bed_transfer_events (
   status TEXT DEFAULT 'recorded',
   audit_id TEXT,
   trace_id TEXT,
+  entry_event_id TEXT,
   qa_tag TEXT,
   created_at TEXT DEFAULT CURRENT_TIMESTAMP,
   updated_at TEXT,
   CHECK (from_bed <> to_bed),
-  CHECK (status IN ('draft','validated','recorded','pending_review','completed','rolled_back','voided'))
+  CHECK (status IN ('draft','validated','recorded','pending_review','completed','rolled_back','voided')),
+  CHECK (fee_mode IN ('charged','waived')),
+  CHECK (fee_mode <> 'waived' OR COALESCE(waiver_reason,'') <> '')
 );
 
 CREATE INDEX IF NOT EXISTS idx_bed_transfer_events_from_bed

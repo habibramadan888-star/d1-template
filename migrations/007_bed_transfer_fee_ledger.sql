@@ -1,10 +1,10 @@
--- Migration 006: Bed Transfer record-only status
--- Purpose: allow record-only Bed Transfer events to use status='recorded'.
--- Existing pending_review smoke rows are preserved for traceability.
+-- Migration 007: Bed Transfer fee ledger anchors
+-- Purpose: record charged/waived Bed Transfer fee details without owner review
+-- or automatic occupancy, deposit, arrears, or TTLock mutation.
 
-DROP TABLE IF EXISTS bed_transfer_events_recorded_migration;
+DROP TABLE IF EXISTS bed_transfer_events_fee_ledger_migration;
 
-CREATE TABLE bed_transfer_events_recorded_migration (
+CREATE TABLE bed_transfer_events_fee_ledger_migration (
   id TEXT PRIMARY KEY,
   transfer_id TEXT UNIQUE,
   corp_id TEXT NOT NULL,
@@ -51,7 +51,7 @@ CREATE TABLE bed_transfer_events_recorded_migration (
   CHECK (fee_mode <> 'waived' OR COALESCE(waiver_reason,'') <> '')
 );
 
-INSERT OR IGNORE INTO bed_transfer_events_recorded_migration (
+INSERT OR IGNORE INTO bed_transfer_events_fee_ledger_migration (
   id, transfer_id, corp_id, tenant_scope, from_bed, to_bed, transfer_date, effective_date,
   customer_id, customer_code, customer_display_name, original_checkin_date, original_rent_period_start,
   original_rent_period_end, original_deposit_amount_fils, current_rent_amount_fils, new_bed_rent_amount_fils,
@@ -74,7 +74,7 @@ SELECT
 FROM bed_transfer_events;
 
 DROP TABLE bed_transfer_events;
-ALTER TABLE bed_transfer_events_recorded_migration RENAME TO bed_transfer_events;
+ALTER TABLE bed_transfer_events_fee_ledger_migration RENAME TO bed_transfer_events;
 
 CREATE INDEX IF NOT EXISTS idx_bed_transfer_events_from_bed
   ON bed_transfer_events(from_bed);
@@ -96,3 +96,9 @@ CREATE INDEX IF NOT EXISTS idx_bed_transfer_events_qa_tag
 
 CREATE INDEX IF NOT EXISTS idx_bed_transfer_events_status
   ON bed_transfer_events(status);
+
+CREATE INDEX IF NOT EXISTS idx_bed_transfer_events_fee_mode
+  ON bed_transfer_events(fee_mode);
+
+CREATE INDEX IF NOT EXISTS idx_bed_transfer_events_category
+  ON bed_transfer_events(category);
