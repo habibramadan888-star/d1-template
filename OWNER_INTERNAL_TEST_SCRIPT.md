@@ -1,5 +1,20 @@
 # Owner Internal Test Script
 
+## BED-TRANSFER-EMPLOYEE-UI-WRITE-PATH-CLOSURE-001 Owner Checks
+
+Date: 2026-06-01, Asia/Dubai
+
+Owner QA should confirm after deployment:
+
+- Owner overview includes the `Bed Transfer Review` card.
+- A submitted employee Bed Transfer request appears as `pending_review`.
+- The card shows From Bed, To Bed, Transfer Date, Operator, and Reason.
+- Owner view is read-only at this stage.
+- Bed Transfer is not counted as a new tenant or checkout.
+- No deposit, arrears, or TTLock mutation is implied by the owner view.
+
+Production cutover remains `PRODUCTION_NO_GO`.
+
 ## Selected 3 TTLock Dispatch Audit - 2026-06-01
 
 1. Owner read model may show TTLock expired unpaid rows for `112`, `113`, and `125`.

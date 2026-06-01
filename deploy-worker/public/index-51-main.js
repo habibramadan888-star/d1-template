@@ -4482,6 +4482,8 @@ function renderOwnerOverviewComparativePanel(){
   const month=data.current?.month||{};
   const accounting=data.accounting_separation||{};
   const flow=data.occupancy_flow||{};
+  const bedReview=data.bed_transfer_review||{};
+  const pendingTransfers=Array.isArray(bedReview.pending_review)?bedReview.pending_review:[];
   const arrears=data.arrears||{};
   const risk=data.risk_watch||{};
   const quality=data.data_quality||{};
@@ -4509,6 +4511,11 @@ function renderOwnerOverviewComparativePanel(){
         <div class="hist-stat"><span>Checkouts</span><b>${Number(flow.checkouts||0)}</b></div>
         <div class="hist-stat"><span>Bed transfers</span><b>${Number(flow.bed_transfers||0)}</b></div>
         <div class="hist-anchor">Transfers are excluded from new/checkouts.</div>
+      </div>
+      <div class="hist-card" data-owner-bed-transfer-pending-review="true"><div class="hist-title">Bed Transfer Review</div>
+        <div class="hist-stat"><span>Pending review</span><b>${Number(bedReview.pending_review_count||pendingTransfers.length||0)}</b></div>
+        ${pendingTransfers.length?pendingTransfers.map(t=>`<div class="hist-stat"><span>#${esc(t.from_bed||'-')} → #${esc(t.to_bed||'-')}</span><b>${esc(t.status||'pending_review')}</b></div><div class="hist-anchor">${esc(t.transfer_date||'-')} · ${esc(t.operator_employee||'-')} · ${esc(t.reason||'-')}</div>`).join(''):'<div class="hist-anchor">No pending bed transfer event-ledger requests.</div>'}
+        <div class="hist-anchor">Review only: no occupancy, deposit, arrears, or TTLock mutation.</div>
       </div>
       <div class="hist-card" data-owner-overview-arrears-collection="true"><div class="hist-title">Arrears & Collection</div>
         <div class="hist-stat"><span>Open tasks</span><b>${Number(arrears.open_count||0)}</b></div>

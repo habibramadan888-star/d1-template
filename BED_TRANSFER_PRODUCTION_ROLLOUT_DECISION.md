@@ -1,5 +1,21 @@
 # Bed Transfer Production Rollout Decision
 
+## Employee UI Event-Ledger Save Path Addendum
+
+Date: 2026-06-01
+
+Decision: `EMPLOYEE_UI_EVENT_LEDGER_PATH_IMPLEMENTED_SMOKE_NOT_RUN`
+
+| Question | Decision |
+|---|---|
+| Is there now a backend adapter to `bed_transfer_events`? | Yes, `POST /api/employee/bed-transfers`. |
+| Does employee TF save still create generic handover drafts? | No, TF submits directly for owner review. |
+| Does this mutate occupancy/deposit/arrears/TTLock? | No, event-ledger/audit/trace/idempotency only. |
+| Can owner read pending review requests? | Yes, `GET /api/owner/bed-transfers` and overview review card. |
+| Was staging E2E run in this step? | Not yet. |
+| Was production UI-originated smoke run in this step? | Not yet. |
+| Production cutover | `PRODUCTION_NO_GO` |
+
 ## Production Schema And Event Smoke Addendum
 
 Date: 2026-06-01

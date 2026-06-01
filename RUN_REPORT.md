@@ -1,5 +1,20 @@
 # Run Report
 
+## BED-TRANSFER-EMPLOYEE-UI-WRITE-PATH-CLOSURE-001
+
+Date: 2026-06-01, Asia/Dubai
+
+Scope: implemented the employee Bed Transfer save path as an event-ledger request path.
+
+- Added `POST /api/employee/bed-transfers`.
+- Employee TF save now writes a `bed_transfer_events` row with `pending_review` instead of creating a generic handover draft.
+- The API records idempotency, audit, and trace evidence.
+- Owner read-only visibility is available through `GET /api/owner/bed-transfers` and the owner overview Bed Transfer review card.
+- No occupancy, deposit, arrears, TTLock, financial formula, or dashboard calculation mutation was implemented.
+- Staging E2E and production UI-originated smoke are not recorded as executed in this local implementation step.
+
+Production remains `PRODUCTION_NO_GO`.
+
 ## BED-TRANSFER-PRODUCTION-SCHEMA-AND-SMOKE-001
 
 Date: 2026-06-01, Asia/Dubai

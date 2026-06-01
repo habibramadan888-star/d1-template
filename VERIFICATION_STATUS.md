@@ -1,5 +1,19 @@
 # Verification Status
 
+## BED-TRANSFER-EMPLOYEE-UI-WRITE-PATH-CLOSURE-001 Verification Addendum
+
+Date: 2026-06-01, Asia/Dubai
+
+| Verification | Result | Evidence | Commercial Meaning |
+|---|---:|---|---|
+| employee save API | IMPLEMENTED | `BED_TRANSFER_EMPLOYEE_SAVE_API_RESULT.md` | Employee TF has a dedicated event-ledger adapter. |
+| employee UI wiring | IMPLEMENTED | `BED_TRANSFER_EMPLOYEE_UI_SAVE_WIRING_RESULT.md` | TF save posts to `/api/employee/bed-transfers`. |
+| owner pending review visibility | IMPLEMENTED | `OWNER_BED_TRANSFER_PENDING_REVIEW_VIEW_RESULT.md` | Owner can read pending-review transfer requests. |
+| business mutation boundary | PRESERVED | `tests/bed-transfer-no-occupancy-mutation.spec.mjs` | No occupancy/deposit/arrears/TTLock mutation in handler. |
+| staging E2E | NOT RUN | `BED_TRANSFER_EMPLOYEE_UI_WRITE_STAGING_E2E_RESULT.md` | Must be run after deployment to staging. |
+| production UI smoke | NOT RUN | `BED_TRANSFER_EMPLOYEE_UI_WRITE_PRODUCTION_SMOKE_RESULT.md` | Must be run only after prechecks and explicit smoke readiness. |
+| production cutover | PRODUCTION_NO_GO | commercial launch gate | This is not commercial launch or cutover approval. |
+
 ## BED-TRANSFER-PRODUCTION-SCHEMA-AND-SMOKE-001 Verification Addendum
 
 Date: 2026-06-01, Asia/Dubai

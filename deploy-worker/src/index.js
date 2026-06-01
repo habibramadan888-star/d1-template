@@ -1130,6 +1130,14 @@ const EMP_DEPOSIT_COLUMNS = [
   "ledger_id","corpid","userid","tenant_card_id","tenant_name","bed","entry_id","type","amount","delta",
   "balance_after","note","operator_id","ts","voided_at","voided_by","void_reason","void_source"
 ];
+const BED_TRANSFER_EVENT_COLUMNS = [
+  "id","transfer_id","corp_id","tenant_scope","from_bed","to_bed","transfer_date","effective_date",
+  "customer_id","customer_code","customer_display_name","original_checkin_date","original_rent_period_start",
+  "original_rent_period_end","original_deposit_amount_fils","current_rent_amount_fils","new_bed_rent_amount_fils",
+  "rent_difference_fils","transfer_fee_fils","carry_over_arrears_fils","old_ttlock_ref","new_ttlock_ref",
+  "old_lock_valid_from","old_lock_valid_until","new_lock_valid_from","new_lock_valid_until","reason","note",
+  "operator_employee","status","audit_id","trace_id","qa_tag","created_at","updated_at"
+];
 async function empTableColumns(env, table){
   const r=await env.DB.prepare(`PRAGMA table_info(${table})`).all();
   return new Set((r.results||[]).map(x=>x.name));
@@ -2969,6 +2977,279 @@ async function handleArrearTaskUpdate(request,env,user){
   return success({success:true,directive_status:updateValues.directive_status||empDirectiveStatus(old)});
 }
 __name(handleArrearTaskUpdate,"handleArrearTaskUpdate");
+function bedTransferCleanBed(value){
+  return cleanText(value,40).replace(/^#+/,"").trim();
+}
+__name(bedTransferCleanBed,"bedTransferCleanBed");
+function bedTransferAedToFils(value){
+  const amount=cleanMoney(value||0,0,MAX_MONEY);
+  return Math.round(amount*100);
+}
+__name(bedTransferAedToFils,"bedTransferAedToFils");
+function bedTransferFilsToAed(value){
+  const num=Number(value||0);
+  return Number.isFinite(num)?Math.round(num)/100:0;
+}
+__name(bedTransferFilsToAed,"bedTransferFilsToAed");
+async function bedTransferRequiredTablesReady(env){
+  const required=["bed_transfer_events","request_idempotency_keys","entry_events"];
+  const missing=[];
+  for(const table of required){
+    if(!await empTableExists(env,table).catch(()=>false))missing.push(table);
+  }
+  return {ready:missing.length===0,missing};
+}
+__name(bedTransferRequiredTablesReady,"bedTransferRequiredTablesReady");
+async function bedTransferActiveTenantSnapshot(env,user,fromBed){
+  const snapshot={
+    customer_id:"",
+    customer_code:"",
+    customer_display_name:"",
+    original_checkin_date:"",
+    original_rent_period_start:"",
+    original_rent_period_end:"",
+    old_ttlock_ref:""
+  };
+  if(await empTableExists(env,"transactions").catch(()=>false)){
+    const tx=await env.DB.prepare(`SELECT * FROM transactions
+      WHERE corpid=? AND (room=? OR bed_from=? OR room_to=?)
+        AND COALESCE(voided_at,'')=''
+        AND COALESCE(status,'ACTIVE')<>'VOID'
+      ORDER BY CASE WHEN COALESCE(tenant_card_id,'')<>'' THEN 0 ELSE 1 END, created_at DESC
+      LIMIT 1`).bind(user.corpid,fromBed,fromBed,fromBed).first().catch(()=>null);
+    if(tx){
+      snapshot.customer_id=cleanText(tx.tenant_card_id||"",80);
+      snapshot.customer_code=cleanText(tx.tenant_card_id||"",80);
+      snapshot.customer_display_name=cleanText(tx.tenant_name||tx.operator_name||"",120);
+      snapshot.original_checkin_date=cleanDate(tx.start_date||tx.period_start||"");
+      snapshot.original_rent_period_start=cleanDate(tx.period_start||"");
+      snapshot.original_rent_period_end=cleanDate(tx.period_end||"");
+      snapshot.old_ttlock_ref=cleanText(tx.tenant_card_id||"",80);
+    }
+  }
+  if(await empTableExists(env,"arrear_tasks").catch(()=>false)){
+    const task=await env.DB.prepare(`SELECT * FROM arrear_tasks
+      WHERE corpid=? AND bed=?
+      ORDER BY updated_at DESC, created_at DESC
+      LIMIT 1`).bind(user.corpid,fromBed).first().catch(()=>null);
+    if(task){
+      snapshot.customer_id=snapshot.customer_id||cleanText(task.tenant_card_id||"",80);
+      snapshot.customer_code=snapshot.customer_code||cleanText(task.tenant_card_id||"",80);
+      snapshot.customer_display_name=snapshot.customer_display_name||cleanText(task.tenant_name||"",120);
+      snapshot.original_rent_period_start=snapshot.original_rent_period_start||cleanDate(task.original_period_start||"");
+      snapshot.original_rent_period_end=snapshot.original_rent_period_end||cleanDate(task.original_period_end||"");
+      snapshot.old_ttlock_ref=snapshot.old_ttlock_ref||cleanText(task.tenant_card_id||"",80);
+    }
+  }
+  return snapshot;
+}
+__name(bedTransferActiveTenantSnapshot,"bedTransferActiveTenantSnapshot");
+async function bedTransferOpenArrearsAed(env,user,fromBed){
+  if(!await empTableExists(env,"arrear_tasks").catch(()=>false))return 0;
+  const rows=await env.DB.prepare(`SELECT arrear_amount, actual_received, close_status
+    FROM arrear_tasks
+    WHERE corpid=? AND bed=?
+      AND COALESCE(close_status,'') NOT IN ('PAID','CLEARED','CLOSED','VOID','WAIVED','WRITTEN_OFF','已结清','结清','作废')`)
+    .bind(user.corpid,fromBed).all().catch(()=>({results:[]}));
+  return (rows.results||[]).reduce((sum,row)=>{
+    const amount=cleanMoney(row?.arrear_amount||0);
+    const received=cleanMoney(row?.actual_received||0);
+    return sum+Math.max(0,amount-received);
+  },0);
+}
+__name(bedTransferOpenArrearsAed,"bedTransferOpenArrearsAed");
+async function bedTransferEventSnapshot(env,user,fromBed,toBed,body){
+  const tenant=await bedTransferActiveTenantSnapshot(env,user,fromBed);
+  const oldRef=cleanText(body?.old_ttlock_ref||body?.old_lock_ref||tenant.old_ttlock_ref||"",80);
+  const currentRent=await empRentForBed(env,user.corpid,fromBed).catch(()=>0);
+  const newRent=await empRentForBed(env,user.corpid,toBed).catch(()=>0);
+  const depositAed=oldRef?await empDepositBalance(env,user.corpid,oldRef).catch(()=>0):0;
+  const arrearsAed=await bedTransferOpenArrearsAed(env,user,fromBed).catch(()=>0);
+  return {
+    ...tenant,
+    old_ttlock_ref:oldRef,
+    old_lock_valid_from:cleanDate(body?.old_lock_valid_from||tenant.original_rent_period_start||""),
+    old_lock_valid_until:cleanDate(body?.old_lock_valid_until||tenant.original_rent_period_end||""),
+    original_deposit_amount_fils:bedTransferAedToFils(depositAed),
+    current_rent_amount_fils:bedTransferAedToFils(currentRent),
+    new_bed_rent_amount_fils:bedTransferAedToFils(newRent),
+    rent_difference_fils:bedTransferAedToFils(newRent-currentRent),
+    carry_over_arrears_fils:bedTransferAedToFils(arrearsAed)
+  };
+}
+__name(bedTransferEventSnapshot,"bedTransferEventSnapshot");
+async function bedTransferRequestHash(payload){
+  return hscSha256(JSON.stringify(hscStableValue(payload)));
+}
+__name(bedTransferRequestHash,"bedTransferRequestHash");
+function bedTransferEventView(row){
+  return {
+    id:cleanText(row?.id||"",80),
+    transfer_id:cleanText(row?.transfer_id||"",100),
+    from_bed:cleanText(row?.from_bed||"",40),
+    to_bed:cleanText(row?.to_bed||"",40),
+    transfer_date:cleanDate(row?.transfer_date||""),
+    effective_date:cleanDate(row?.effective_date||""),
+    customer_code:cleanText(row?.customer_code||"",80),
+    customer_display_name:cleanText(row?.customer_display_name||"",120),
+    original_deposit_amount_fils:Number(row?.original_deposit_amount_fils||0),
+    current_rent_amount_fils:Number(row?.current_rent_amount_fils||0),
+    new_bed_rent_amount_fils:Number(row?.new_bed_rent_amount_fils||0),
+    rent_difference_fils:Number(row?.rent_difference_fils||0),
+    transfer_fee_fils:Number(row?.transfer_fee_fils||0),
+    carry_over_arrears_fils:Number(row?.carry_over_arrears_fils||0),
+    old_ttlock_ref:cleanText(row?.old_ttlock_ref||"",80),
+    old_lock_valid_from:cleanDate(row?.old_lock_valid_from||""),
+    old_lock_valid_until:cleanDate(row?.old_lock_valid_until||""),
+    reason:cleanText(row?.reason||"",120),
+    note:cleanText(row?.note||"",500),
+    operator_employee:cleanText(row?.operator_employee||"",80),
+    status:cleanText(row?.status||"pending_review",40),
+    audit_id:cleanText(row?.audit_id||"",80),
+    trace_id:cleanText(row?.trace_id||"",80),
+    qa_tag:cleanText(row?.qa_tag||"",120),
+    created_at:cleanText(row?.created_at||"",40),
+    review_required:String(row?.status||"")==="pending_review"
+  };
+}
+__name(bedTransferEventView,"bedTransferEventView");
+async function handleEmployeeBedTransferCreate(request,env,user){
+  if(!isStaffRoleValue(user?.role))return forbidden();
+  const tableState=await bedTransferRequiredTablesReady(env);
+  if(!tableState.ready)return errorResponse("bed_transfer_schema_missing",503,void 0,{missing_tables:tableState.missing});
+  let body;
+  try{body=await request.json();}catch{return badRequest("invalid_json");}
+  const fromBed=bedTransferCleanBed(body?.from_bed||body?.bed_from||body?.fromBed||body?.room);
+  const toBed=bedTransferCleanBed(body?.to_bed||body?.bed_to||body?.toBed||body?.room_to);
+  const transferDate=empCleanIsoDate(body?.transfer_date||body?.transferDate||"");
+  const reason=cleanText(body?.reason||body?.transfer_reason||body?.transferReason||"",120);
+  const note=cleanText(body?.note||body?.remark||body?.transfer_note||"",500);
+  const idempotencyKey=cleanText(body?.idempotency_key||body?.idempotencyKey||request.headers.get("Idempotency-Key")||"",160);
+  if(!fromBed)return badRequest("from_bed_required");
+  if(!toBed)return badRequest("to_bed_required");
+  if(fromBed===toBed)return badRequest("from_bed_must_differ_from_to_bed");
+  if(!transferDate)return badRequest("transfer_date_required");
+  if(!reason)return badRequest("transfer_reason_required");
+  if(!note)return badRequest("transfer_note_required");
+  if(!idempotencyKey)return badRequest("idempotency_key_required");
+  const requestPayload={corp_id:user.corpid,actor:user.userid,from_bed:fromBed,to_bed:toBed,transfer_date:transferDate,reason,note};
+  const requestHash=await bedTransferRequestHash(requestPayload);
+  const idemOptions={
+    scope:`${user.corpid}:bed_transfer_events`,
+    action:"employee.bed_transfer.create",
+    idempotencyKey,
+    actorUserId:user.userid,
+    actorRole:user.role,
+    requestHash,
+    resourceType:"bed_transfer_event"
+  };
+  const replay=await arrearsDirectiveIdempotencyReplay(env,idemOptions).catch((err)=>{throw err;});
+  if(replay)return replay;
+  const now=empNow();
+  const id=empId("bt");
+  const transferId=cleanText(body?.transfer_id||`bt-${now.slice(0,10).replaceAll("-","")}-${fromBed}-${toBed}-${crypto.randomUUID().slice(0,8)}`,100);
+  const auditId=empId("audit");
+  const traceId=empId("trace");
+  const snapshot=await bedTransferEventSnapshot(env,user,fromBed,toBed,body);
+  const eventValues={
+    id,
+    transfer_id:transferId,
+    corp_id:user.corpid,
+    tenant_scope:user.corpid,
+    from_bed:fromBed,
+    to_bed:toBed,
+    transfer_date:transferDate,
+    effective_date:transferDate,
+    customer_id:snapshot.customer_id,
+    customer_code:snapshot.customer_code,
+    customer_display_name:snapshot.customer_display_name,
+    original_checkin_date:snapshot.original_checkin_date,
+    original_rent_period_start:snapshot.original_rent_period_start,
+    original_rent_period_end:snapshot.original_rent_period_end,
+    original_deposit_amount_fils:snapshot.original_deposit_amount_fils,
+    current_rent_amount_fils:snapshot.current_rent_amount_fils,
+    new_bed_rent_amount_fils:snapshot.new_bed_rent_amount_fils,
+    rent_difference_fils:snapshot.rent_difference_fils,
+    transfer_fee_fils:bedTransferAedToFils(body?.transfer_fee||body?.transfer_fee_aed||0),
+    carry_over_arrears_fils:snapshot.carry_over_arrears_fils,
+    old_ttlock_ref:snapshot.old_ttlock_ref,
+    new_ttlock_ref:"",
+    old_lock_valid_from:snapshot.old_lock_valid_from,
+    old_lock_valid_until:snapshot.old_lock_valid_until,
+    new_lock_valid_from:"",
+    new_lock_valid_until:"",
+    reason,
+    note,
+    operator_employee:user.userid,
+    status:"pending_review",
+    audit_id:auditId,
+    trace_id:traceId,
+    qa_tag:cleanText(body?.qa_tag||"",120),
+    created_at:now,
+    updated_at:now
+  };
+  const responseData={
+    success:true,
+    transfer_id:transferId,
+    status:"pending_review",
+    from_bed:fromBed,
+    to_bed:toBed,
+    transfer_date:transferDate,
+    review_required:true,
+    audit_id:authSafeId(auditId),
+    trace_id:authSafeId(traceId),
+    deposit_carried_fils:eventValues.original_deposit_amount_fils,
+    carry_over_arrears_fils:eventValues.carry_over_arrears_fils,
+    old_ttlock_ref:eventValues.old_ttlock_ref,
+    message:"Bed transfer submitted for owner review / 换床申请已提交老板核对",
+    idempotency_status:"NEW"
+  };
+  const responseBody=ok(responseData);
+  await env.DB.batch([
+    env.DB.prepare(`INSERT INTO bed_transfer_events (${BED_TRANSFER_EVENT_COLUMNS.join(",")})
+      VALUES (${BED_TRANSFER_EVENT_COLUMNS.map(()=>"?").join(",")})`)
+      .bind(...BED_TRANSFER_EVENT_COLUMNS.map((key)=>eventValues[key])),
+    env.DB.prepare(`INSERT INTO entry_events
+      (event_id, corpid, userid, ref_id, ref_type, event_type, field_name, old_value, new_value, operator_id, ts)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .bind(traceId,user.corpid,user.userid,transferId,"bed_transfer_event","create","status","",JSON.stringify({status:"pending_review",from_bed:fromBed,to_bed:toBed}),user.userid,now)
+  ]);
+  await audit(env,user,"employee.bed_transfer.create",transferId,{from_bed:fromBed,to_bed:toBed,status:"pending_review",audit_id:auditId,trace_id:traceId}).catch(()=>{});
+  await arrearsDirectiveRecordIdempotency(env,{...idemOptions,resourceId:transferId,status:"RECORDED"},responseBody);
+  return json(responseBody,201);
+}
+__name(handleEmployeeBedTransferCreate,"handleEmployeeBedTransferCreate");
+function authSafeId(value){
+  return cleanText(value,100);
+}
+__name(authSafeId,"authSafeId");
+async function handleOwnerBedTransfers(request,env,user){
+  if(!canReadOwnerData(user))return forbidden();
+  if(!await empTableExists(env,"bed_transfer_events").catch(()=>false)){
+    return success({transfers:[],count:0,schema_ready:false,readonly:isReadonlyAdminRoleValue(user.role)});
+  }
+  const url=new URL(request.url);
+  const status=cleanText(url.searchParams.get("status")||"",40);
+  const rawLimit=Number(url.searchParams.get("limit")||50);
+  const limit=Number.isFinite(rawLimit)&&rawLimit>0?Math.min(Math.floor(rawLimit),100):50;
+  const where=["corp_id=?"];
+  const params=[user.corpid];
+  if(status){where.push("status=?");params.push(status);}
+  params.push(limit);
+  const rows=await env.DB.prepare(`SELECT * FROM bed_transfer_events
+    WHERE ${where.join(" AND ")}
+    ORDER BY created_at DESC
+    LIMIT ?`).bind(...params).all().catch(()=>({results:[]}));
+  const transfers=(rows.results||[]).map(bedTransferEventView);
+  return success({
+    transfers,
+    count:transfers.length,
+    schema_ready:true,
+    readonly:isReadonlyAdminRoleValue(user.role),
+    production_cutover:"PRODUCTION_NO_GO"
+  });
+}
+__name(handleOwnerBedTransfers,"handleOwnerBedTransfers");
 async function handleEmployeeApi(request,env,user){
   const path=new URL(request.url).pathname;
   if(isReadonlyAdminRoleValue(user?.role)&&request.method!=="GET")return forbidden();
@@ -2981,6 +3262,7 @@ async function handleEmployeeApi(request,env,user){
   }
   if(path==="/api/employee/lock/cards"&&request.method==="GET")return handleEmployeeLockCards(request,env,user);
   if(path==="/api/employee/deposit"&&request.method==="GET")return handleEmployeeDeposit(request,env,user);
+  if(path==="/api/employee/bed-transfers"&&request.method==="POST")return handleEmployeeBedTransferCreate(request,env,user);
   if(path==="/api/employee/entry"&&request.method==="POST")return handleEmployeeEntry(request,env,user);
   if(path==="/api/arrear_tasks"&&request.method==="GET")return handleArrearTasks(request,env,user);
   if(path==="/api/arrear_tasks/directive"&&request.method==="POST")return handleArrearTaskDirective(request,env,user);
@@ -3302,6 +3584,15 @@ function ownerOverviewArrearsSummary(rows=[],today=empTodayDubai()){
   return summary;
 }
 __name(ownerOverviewArrearsSummary,"ownerOverviewArrearsSummary");
+async function ownerOverviewFetchBedTransferReviews(env,user){
+  if(!await empTableExists(env,"bed_transfer_events").catch(()=>false))return [];
+  const rows=await env.DB.prepare(`SELECT * FROM bed_transfer_events
+    WHERE corp_id=? AND status='pending_review'
+    ORDER BY created_at DESC
+    LIMIT 5`).bind(user.corpid).all().catch(()=>({results:[]}));
+  return (rows.results||[]).map(bedTransferEventView);
+}
+__name(ownerOverviewFetchBedTransferReviews,"ownerOverviewFetchBedTransferReviews");
 async function phase0OwnerOverviewComparativeSummary(env,user,url){
   const today=empTodayDubai();
   const currentMonth=ownerOverviewMonthRange(today,0);
@@ -3317,7 +3608,8 @@ async function phase0OwnerOverviewComparativeSummary(env,user,url){
     quarterRows,
     lastQuarterRows,
     sameQuarterLastYearRows,
-    arrearRows
+    arrearRows,
+    bedTransferReviews
   ]=await Promise.all([
     ownerOverviewFetchTransactions(env,user,currentMonth),
     ownerOverviewFetchTransactions(env,user,lastMonth),
@@ -3325,7 +3617,8 @@ async function phase0OwnerOverviewComparativeSummary(env,user,url){
     ownerOverviewFetchTransactions(env,user,currentQuarter),
     ownerOverviewFetchTransactions(env,user,lastQuarter),
     ownerOverviewFetchTransactions(env,user,sameQuarterLastYear),
-    ownerOverviewFetchArrears(env,user)
+    ownerOverviewFetchArrears(env,user),
+    ownerOverviewFetchBedTransferReviews(env,user)
   ]);
   const month=ownerOverviewSummarizeTransactions(monthRows);
   const prevMonth=ownerOverviewSummarizeTransactions(lastMonthRows);
@@ -3382,6 +3675,10 @@ async function phase0OwnerOverviewComparativeSummary(env,user,url){
       current_occupied_count:month.current_occupied_count,
       transfer_rule:"bed transfers are not counted as new tenants or checkouts"
     },
+    bed_transfer_review:{
+      pending_review_count:bedTransferReviews.length,
+      pending_review:bedTransferReviews
+    },
     arrears,
     risk_watch:{
       overdue_count:arrears.overdue_count,
@@ -3433,6 +3730,7 @@ async function handlePhase0ReadOnlyApi(request,env,user){
     if(!canReadOwnerData(user))return forbidden();
     if(path==="/api/owner/properties")return phase0Properties(env,user,url);
     if(path==="/api/owner/totals")return phase0DashboardTotals(env,user);
+    if(path==="/api/owner/bed-transfers")return handleOwnerBedTransfers(request,env,user);
     if(path==="/api/owner/overview/comparative-summary")return phase0OwnerOverviewComparativeSummary(env,user,url);
     if(path==="/api/owner/history")return phase0Entries(env,user,url);
     if(path==="/api/owner/arrears")return phase0Receivables(env,user,url);
@@ -4245,6 +4543,9 @@ async function handleRequest(request, env, ctx) {
     }
     if (path === "/api/boss/arrears/directives" && method === "POST") {
       return handleBossArrearsDirectives(request, env, user);
+    }
+    if (path === "/api/owner/bed-transfers" && method === "GET") {
+      return handleOwnerBedTransfers(request, env, user);
     }
     if (path === "/api/arrears" && method === "GET") {
       return handleBossArrears(request, env, user);

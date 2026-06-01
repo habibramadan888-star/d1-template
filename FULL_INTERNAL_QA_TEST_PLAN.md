@@ -1,5 +1,17 @@
 # Full Internal QA Test Plan
 
+## BED-TRANSFER-EMPLOYEE-UI-WRITE-PATH-CLOSURE-001 QA Addendum
+
+QA must verify the new event-ledger write path without treating it as production cutover:
+
+- Employee TF save writes one `bed_transfer_events` request with `pending_review`.
+- Employee TF save requires From Bed, To Bed, Transfer Date, Reason, Note, and idempotency.
+- Owner can see pending-review transfer requests.
+- Idempotent replay returns the existing response without duplicate event rows.
+- Transactions, deposit ledger, arrear tasks, TTLock, financial formulas, and dashboard calculations remain unchanged.
+- Bed Transfer is still not a new tenant and not a checkout.
+- Production cutover remains `PRODUCTION_NO_GO`.
+
 ## BED-TRANSFER-LIVE-UI-RENDER-PATH-FIX-001 QA Addendum
 
 The employee Bed Transfer live render path has been fixed and deployed as UI-only.

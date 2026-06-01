@@ -1,5 +1,21 @@
 # Employee Internal Test Script
 
+## BED-TRANSFER-EMPLOYEE-UI-WRITE-PATH-CLOSURE-001 Employee Checks
+
+Date: 2026-06-01, Asia/Dubai
+
+Employee QA should confirm after deployment:
+
+- Select `Bed Transfer / 换床`.
+- Enter From Bed `144`, To Bed `122`, Transfer Date, Reason, and Note.
+- Save button reads `提交老板核对 / SUBMIT FOR REVIEW`.
+- Saving submits the request for owner review and does not add a TF row to handover drafts.
+- Success copy says the request was submitted for owner review, not that the bed was moved.
+- Handover export rejects any stale TF draft and instructs the employee to submit through the Bed Transfer form.
+- No employee screen claims occupancy/deposit/arrears/TTLock has changed.
+
+Production cutover remains `PRODUCTION_NO_GO`.
+
 ## BED-TRANSFER-LIVE-UI-RENDER-PATH-FIX-001 Employee Checks
 
 Date: 2026-06-01, Asia/Dubai

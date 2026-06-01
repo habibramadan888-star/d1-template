@@ -2682,8 +2682,10 @@ function readSessionId(userid){
   catch{return ''}
 }
 const state={lockCards:[],current:null,depositBalance:null,rentConfig:{},rentConfigLoaded:false,drafts:[],tasks:[],employeeDirectives:[],followupItems:[],sessionId:'',user:null};
-const BED_TRANSFER_WRITE_ENABLED=false;
-const BED_TRANSFER_WRITE_DISABLED_MESSAGE='换床真实写入未启用，需要生产审批。 Bed transfer write is not enabled.';
+const BED_TRANSFER_WRITE_ENABLED=true;
+const BED_TRANSFER_EVENT_LEDGER_MESSAGE='换床申请会写入事件账本，状态为 pending_review，等待老板核对；不会直接改床位、押金、欠款或通通锁。 Bed transfer saves to the event ledger for owner review only.';
+const BED_TRANSFER_SUBMITTED_MESSAGE='Bed transfer submitted for owner review / 换床申请已提交老板核对';
+const BED_TRANSFER_WRITE_DISABLED_MESSAGE='换床事件账本写入不可用，请稍后重试。 Bed transfer event-ledger write is unavailable.';
 function apiUrl(path){return location.protocol!=='file:'&&location.host.includes('workers.dev')?path:API_ORIGIN+path}
 async function apiFetch(path,opts={}){return wrapStandardJsonResponse(await fetch(apiUrl(path),{credentials:'include',...opts,headers:{'Content-Type':'application/json',...(opts.headers||{})}}))}
 function wrapStandardJsonResponse(response){
@@ -3389,6 +3391,7 @@ function syncForm(){
   }
   updateEventChips();
   $('objectHint').textContent=type==='E'?'支出不需要床位时可以只选择类别；如果是指定房间维修，可在备注写床位。':(type==='TF'?'换床需要填写原床位和新床位，系统会保留换床前后锚点。':'收租/收押金/退押金/还欠款：填写床位号，系统自动抓取租客上下文。');
+  if($('btnSaveEntry'))$('btnSaveEntry').innerHTML=type==='TF'?'提交老板核对<span class="label-en">SUBMIT FOR REVIEW</span>':'加入本票<span class="label-en">ADD TO SESSION</span>';
   visible(['periodStep'],hasPeriod);visible(['apFields'],type==='AP');visible(['checkoutFields'],type==='CO');visible(['transferFields'],type==='TF');visible(['expenseFields'],type==='E');visible(['paymentStep'],!['E','CO'].includes(type));visible(['genericBedFieldWrap'],type!=='TF');
   updatePaymentButtons();
   visible(['exceptionStep'],needsException());
@@ -3526,6 +3529,56 @@ function entryPayload(){
     note:noteText,remark:noteText,operator_id:operatorId(),operator_name:operatorName(),src:'EMP',status:'ACTIVE',created_at:nowIso(),ts:nowIso()
   };
 }
+function bedTransferEventIdempotencyKey(e){
+  const random=crypto?.randomUUID?crypto.randomUUID().slice(0,8):Date.now().toString(36).slice(-8);
+  return `employee-bed-transfer-${today().replaceAll('-','')}-${e.bed_from||'from'}-${e.bed_to||'to'}-${random}`.replace(/[^A-Za-z0-9_-]/g,'-').slice(0,150);
+}
+async function submitBedTransferEvent(){
+  let e;
+  try{e=entryPayload();}catch(err){
+    console.error('bed transfer payload failed',err);
+    $('validationBox').innerHTML=`<div class="bad">阻断：换床申请数据异常，未提交。${esc(err?.message||err)}</div>`;
+    toast('换床申请失败：页面数据异常',6000);
+    return false;
+  }
+  const btn=$('btnSaveEntry');
+  const old=btn?.innerHTML;
+  if(btn){btn.dataset.busy='1';btn.disabled=true;btn.classList.add('disabled');btn.innerHTML='Submitting<span class="label-en">提交中</span>'}
+  const payload={
+    from_bed:e.bed_from,
+    to_bed:e.bed_to,
+    transfer_date:e.transfer_date,
+    reason:e.transfer_reason,
+    note:e.note,
+    old_ttlock_ref:e.old_ttlock_ref,
+    old_lock_valid_from:e.old_lock_valid_from,
+    old_lock_valid_until:e.old_lock_valid_until,
+    transfer_fee:e.fee_paid==='Y'?50:0,
+    qa_tag:'employee-ui-bed-transfer',
+    idempotency_key:bedTransferEventIdempotencyKey(e)
+  };
+  try{
+    const r=await apiFetch('/api/employee/bed-transfers',{method:'POST',body:JSON.stringify(payload),headers:{'Idempotency-Key':payload.idempotency_key}});
+    const data=await r.json().catch(()=>({}));
+    if(!r.ok){
+      const msg=data?.message||data?.error||`bed_transfer_submit_failed_${r.status}`;
+      throw new Error(msg);
+    }
+    resetForm();
+    refreshSessionViews();
+    const transferId=data?.transfer_id?` · ${data.transfer_id}`:'';
+    $('validationBox').innerHTML=`<div>${esc(BED_TRANSFER_SUBMITTED_MESSAGE)}${esc(transferId)}</div>`;
+    toast(BED_TRANSFER_SUBMITTED_MESSAGE,6000);
+    return true;
+  }catch(err){
+    const msg=err?.message||String(err||'submit_failed');
+    $('validationBox').innerHTML=`<div class="bad">换床申请未提交：${esc(msg)}</div>`;
+    toast('换床申请未提交，请重试',6000);
+    return false;
+  }finally{
+    if(btn){btn.dataset.busy='0';btn.disabled=false;btn.classList.remove('disabled');btn.innerHTML=old||'保存';validate();}
+  }
+}
 function exportLine(e){
   const name=e.tenant_name||'-', cid=e.tenant_card_id||'-', period=e.period_start&&e.period_end?` ${e.period_start}->${e.period_end}`:'';
   if(e.type==='R'){
@@ -3546,6 +3599,10 @@ async function saveEntry(){
   const btn=$('btnSaveEntry');
   if(btn?.dataset.busy==='1')return;
   const v=validate();if(v.errors.length){toast('请先处理阻断校验');return}
+  if($('entryType').value==='TF'){
+    await submitBedTransferEvent();
+    return;
+  }
   if(isBedTransferWriteGated()){
     $('validationBox').innerHTML=bedTransferWriteGateHtml();
     toast(BED_TRANSFER_WRITE_DISABLED_MESSAGE,6000);
@@ -4408,10 +4465,11 @@ async function commitSessionAndExport(){
   if(!state.user){applyEmployeeUser(null);toast('请先登录员工账号',6000);return}
   buildExport();
   if(!state.drafts.length){showStatus('当前本票没有流水，不能导出交接。','warn');toast('当前本票没有流水，不能导出交接',6000);return}
-  if(!BED_TRANSFER_WRITE_ENABLED&&state.drafts.some(e=>e.type==='TF')){
-    $('validationBox').innerHTML=bedTransferWriteGateHtml();
-    showStatus(BED_TRANSFER_WRITE_DISABLED_MESSAGE,'warn');
-    toast(BED_TRANSFER_WRITE_DISABLED_MESSAGE,6000);
+  if(state.drafts.some(e=>e.type==='TF')){
+    const message='Bed Transfer requests submit directly for owner review and cannot be included in handover export. 请重新用换床表单提交老板核对。';
+    $('validationBox').innerHTML=`<div class="warn">${esc(message)}</div>`;
+    showStatus(message,'warn');
+    toast(message,6000);
     return;
   }
   const btns=[$('btnExportSession'),$('btnBuildExport')].filter(Boolean);
@@ -4676,7 +4734,7 @@ function renderBedTransferSystemContext(){
       <div class="priority-card"><span>New bed status<small>新床位状态</small></span><b>${esc(newBedStatus)}</b><div class="sub">Review before real write</div></div>
       <div class="priority-card rent-check"><span>New bed rent<small>新床位租金</small></span><b>${esc(newRent)}</b><div class="sub">From rent config when available</div></div>
       <div class="priority-card rent-check"><span>Rent difference review<small>租金差异核对</small></span><b>${esc(rentDiff)}</b><div class="sub">Review required before write</div></div>
-      <div class="priority-card warn"><span>Write status<small>写入状态</small></span><b>Write not enabled / 写入未启用</b><div class="sub">${esc(BED_TRANSFER_WRITE_DISABLED_MESSAGE)}</div></div>
+      <div class="priority-card warn"><span>Write status<small>写入状态</small></span><b>Pending owner review / 待老板核对</b><div class="sub">${esc(BED_TRANSFER_EVENT_LEDGER_MESSAGE)}</div></div>
     </div>
   </div>`;
 }
