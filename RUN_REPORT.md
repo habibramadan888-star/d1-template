@@ -1,5 +1,22 @@
 # Run Report
 
+## EMPLOYEE-FOLLOWUP-ENTRY-LAYOUT-PARITY-HARD-FIX-001
+
+Date: 2026-06-01, Asia/Dubai
+
+Scope: local-only hard fix for employee Follow-up layout parity with Entry page.
+
+- Follow-up page now has a final Entry parity layer for header, tabs, cards, buttons, inputs, spacing, and mobile density.
+- Header Abdul/account and Logout controls were compacted to one shared size/token strategy.
+- Entry/Follow-up tabs are centered, equal-size, and remain the only employee nav tabs.
+- Employee Export remains removed.
+- System Reminders and reminder follow-up list were rebuilt into Entry-style KPI/card/form structure.
+- System reminder task forms are collapsed by default and reveal controls only in details.
+- Legacy red-line Follow-up card styling was removed from the active visual system.
+- No deploy, production write, write gate, D1 command, migration, financial formula change, or dashboard calculation change occurred.
+
+Production remains `PRODUCTION_NO_GO`.
+
 ## EMPLOYEE-FOLLOWUP-ENTRY-PERFECT-PARITY-DEPLOY-001
 
 Date: 2026-06-01, Asia/Dubai

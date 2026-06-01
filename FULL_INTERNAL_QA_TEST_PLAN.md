@@ -1,5 +1,22 @@
 # Full Internal QA Test Plan
 
+## EMPLOYEE-FOLLOWUP-ENTRY-LAYOUT-PARITY-HARD-FIX-001 QA Addendum
+
+The employee Follow-up page has been locally refactored to enforce hard Entry layout parity.
+
+QA must verify after an approved deploy:
+
+- Follow-up looks like Entry with different business content, not a separate page design.
+- Header account/logout controls are compact and unified.
+- Entry/Follow-up tabs are centered and equal-sized.
+- Export remains removed.
+- System Reminders and reminder follow-up list use Entry card/grid/form styling.
+- Old Follow-up red-line cards are absent.
+- Reminder cards are collapsed by default with details on demand.
+- No production write, write gate, migration, D1 execute/export/import, batch dispatch, TTLock smoke, or cutover is approved.
+
+Production cutover remains `PRODUCTION_NO_GO`.
+
 ## EMPLOYEE-FOLLOWUP-ENTRY-PERFECT-PARITY-DEPLOY-001 QA Addendum
 
 The employee Follow-up UI parity with Entry page has been deployed to the production Worker as a UI-only change.

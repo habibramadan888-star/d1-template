@@ -1,5 +1,21 @@
 # Verification Status
 
+## EMPLOYEE-FOLLOWUP-ENTRY-LAYOUT-PARITY-HARD-FIX-001 Verification Addendum
+
+Date: 2026-06-01, Asia/Dubai
+
+| Verification | Result | Evidence | Commercial Meaning |
+|---|---:|---|---|
+| Entry real layout baseline | PASS | `EMPLOYEE_ENTRY_REAL_LAYOUT_BASELINE_REAUDIT.md` | The gap was classified as Follow-up not fully matching Entry. |
+| Header compact parity | PASS | `EMPLOYEE_HEADER_COMPACT_PARITY_FIX_RESULT.md` | Abdul/account and Logout controls now share compact sizing. |
+| Entry/Follow-up nav center | PASS | `EMPLOYEE_ENTRY_FOLLOWUP_NAV_CENTER_FIX_RESULT.md` | Two-tab nav is centered and Export remains absent. |
+| Follow-up body rebuild | PASS | `EMPLOYEE_FOLLOWUP_BODY_ENTRY_PARITY_REBUILD_RESULT.md` | Follow-up uses Entry section/card/form primitives. |
+| System reminders rebuild | PASS | `EMPLOYEE_SYSTEM_REMINDERS_AND_FOLLOWUP_LIST_REBUILD_RESULT.md` | Reminder cards are collapsed Entry-style cards. |
+| Legacy CSS cleanup | PASS | `EMPLOYEE_FOLLOWUP_LEGACY_CSS_REMOVAL_RESULT.md` | Red-line legacy Follow-up card styling removed from active UI. |
+| deploy | NOT RUN | `EMPLOYEE_FOLLOWUP_ENTRY_HARD_PARITY_DEPLOY_APPROVAL_REQUIRED.md` | Phone verification requires separate approval/deploy. |
+| production write gate | OFF | no write gate command executed | Employee follow-up writes still require separate production approval. |
+| production cutover | PRODUCTION_NO_GO | commercial launch gate | This local UI fix is not rollout/cutover approval. |
+
 ## EMPLOYEE-FOLLOWUP-ENTRY-PERFECT-PARITY-DEPLOY-001 Verification Addendum
 
 Date: 2026-06-01, Asia/Dubai

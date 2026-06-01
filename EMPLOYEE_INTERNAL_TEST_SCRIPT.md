@@ -1,5 +1,25 @@
 # Employee Internal Test Script
 
+## EMPLOYEE-FOLLOWUP-ENTRY-LAYOUT-PARITY-HARD-FIX-001 Employee Checks
+
+Date: 2026-06-01, Asia/Dubai
+
+This local fix requires Follow-up to match the Entry page layout system, not a separate Follow-up visual system.
+
+Manual employee QA after an approved deploy should confirm:
+
+- Abdul/account and `Logout / 退出` controls are compact, same-size, and not visually dominant.
+- `Entry` and `Follow-up` tabs are centered and equal-sized.
+- Employee `Export` tab/page is still absent.
+- Boss Assigned Tasks use compact Entry-style task cards.
+- System Reminders use Entry-style KPI cards.
+- Reminder follow-up cards are not old red-line cards.
+- Reminder follow-up cards are collapsed by default and expand to show status/date/note/actions.
+- Buttons, inputs, selects, cards, radius, spacing, and typography match Entry.
+- No production write should be attempted during visual QA unless separately approved.
+
+Production cutover remains `PRODUCTION_NO_GO`.
+
 ## EMPLOYEE-FOLLOWUP-ENTRY-PERFECT-PARITY-DEPLOY-001 Employee Checks
 
 Date: 2026-06-01, Asia/Dubai

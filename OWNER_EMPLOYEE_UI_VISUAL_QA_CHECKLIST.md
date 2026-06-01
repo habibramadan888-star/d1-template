@@ -1,5 +1,21 @@
 # Owner Employee UI Visual QA Checklist
 
+## EMPLOYEE-FOLLOWUP-ENTRY-LAYOUT-PARITY-HARD-FIX-001 Visual Checks
+
+Date: 2026-06-01, Asia/Dubai
+
+| Screenshot / State | Required | Pass/Fail | Notes |
+|---|---:|---|---|
+| Header compact controls | Yes | | Abdul/account and Logout are compact and same-size. |
+| Centered Entry/Follow-up tabs | Yes | | Two tabs centered, equal-size, no Export. |
+| Boss Assigned Entry-style card | Yes | | Compact card, Entry-style radius/spacing/buttons. |
+| System Reminders Entry-style grid | Yes | | KPI cards match Entry tokens. |
+| Reminder list Entry-style cards | Yes | | No red-line legacy cards. |
+| Reminder details collapsed | Yes | | Status/date/note/actions hidden until expand. |
+| No mixed visual systems | Yes | | Follow-up should look copied from Entry and content-swapped. |
+
+Production remains `PRODUCTION_NO_GO`. This checklist does not approve production writes, write gate, deployment, or cutover.
+
 ## EMPLOYEE-FOLLOWUP-ENTRY-PERFECT-PARITY-DEPLOY-001 Visual Checks
 
 Date: 2026-06-01, Asia/Dubai
