@@ -1,24 +1,27 @@
 # Bed Transfer Staging Save Result
 
 Date: 2026-06-01
-Status: `NOT_EXECUTED_SCHEMA_BLOCKED`
+Status: `PASS`
 
-No staging bed-transfer save was executed.
+One staging-only QA event was saved and then rolled back.
 
 | Save Check | Expected | Actual | Result |
 |---|---|---|---|
-| create bed_transfer_event | one QA-tagged event | not executed | BLOCKED |
-| from_bed to to_bed relation | persisted | not executed | BLOCKED |
-| tenant/customer anchor | preserved | not executed | BLOCKED |
-| deposit responsibility transfer | liability carried, no revenue | not executed | BLOCKED |
-| rent period transfer | carried | not executed | BLOCKED |
-| arrears carry-over | preserved, not cleared | not executed | BLOCKED |
-| old TTLock ref | preserved | not executed | BLOCKED |
-| new TTLock ref | created or review required | not executed | BLOCKED |
-| audit write | linked | not executed | BLOCKED |
-| new tenant count | unchanged | not executed | BLOCKED |
-| checkout count | unchanged | not executed | BLOCKED |
-| financial formula | unchanged | unchanged | PASS |
-| dashboard calculation | unchanged | unchanged | PASS |
+| create bed_transfer_event | one QA-tagged event | `bt-20260601185154` created | PASS |
+| from_bed to to_bed relation | persisted | `STG-valid` to `STG-transfer-to-20260601185154` | PASS |
+| tenant/customer anchor | preserved | `STG-CID-1779711007144-1e4a78-valid` | PASS |
+| deposit responsibility transfer | liability carried, no revenue | `original_deposit_amount_fils=0`, no revenue row created | PASS |
+| rent period transfer | carried | `2026-06-01` to `2026-06-02` | PASS |
+| arrears carry-over | preserved, not cleared | `carry_over_arrears_fils=0`, no arrears update | PASS |
+| old TTLock ref | preserved | `STG-CID-1779711007144-1e4a78-valid` | PASS |
+| new TTLock ref | created or review required | `review_required` | PASS |
+| audit write | linked | `audit-bt-20260601185154` | PASS |
+| new tenant count | unchanged | no occupancy/new tenant table update | PASS |
+| checkout count | unchanged | no checkout table update | PASS |
+| financial formula | unchanged | no formula/code touched | PASS |
+| dashboard calculation | unchanged | no dashboard/code touched | PASS |
 
-The save path is blocked until staging schema migration is approved.
+The event and audit rows were deleted during rollback.
+
+Production write: no
+Production cutover: `PRODUCTION_NO_GO`

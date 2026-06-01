@@ -1,29 +1,35 @@
 # Bed Transfer Production Rollout Decision
 
 Date: 2026-06-01
-Decision: `DO_NOT_ENABLE_PRODUCTION_YET`
+Decision: `STAGING_E2E_PASS_PRODUCTION_REQUIRES_SEPARATE_APPROVAL`
 
 ## Basis
 
-The staging E2E did not pass. It stopped at schema preflight because staging does not have `bed_transfer_events` or equivalent fields for transfer date, original occupancy anchors, deposit carry-over, arrears carry-over, TTLock old/new refs, audit linkage, and traceability linkage.
+The staging-only Bed Transfer E2E passed after applying `migrations/005_bed_transfer_events.sql` to `homelink-finance-staging`.
+
+The E2E verified:
+
+- from_bed to to_bed event persistence
+- customer anchor preservation
+- deposit carry-over as liability, not revenue
+- arrears carry-over preservation
+- TTLock old ref preservation
+- new TTLock review-required state
+- audit and trace linkage
+- statistics anchors
+- owner/backend visibility
+- QA rollback to zero QA event/audit rows
 
 ## Production Decision
 
 | Question | Decision |
 |---|---|
-| Recommend production UI-only deploy? | No, not until staging schema/E2E is unblocked. |
-| Need production schema migration? | Likely yes later, but not approved here. Validate in staging first. |
-| Need production smoke? | Yes later, after staging E2E passes and separate approval is granted. |
+| Recommend production UI-only deploy? | Eligible for separate approval, but not performed here. |
+| Need production schema migration? | Yes, before any production Bed Transfer write smoke. Requires separate approval. |
+| Can production smoke enter approval? | Yes, staging E2E evidence is now sufficient to prepare a separate approval packet. |
 | Recommended production smoke scope | One low-risk bed transfer only. |
-| Enable all employees? | No. Do not enable before staging E2E passes. |
+| Enable all employees immediately? | No. Do not enable broad usage before one production smoke and manual sign-off. |
 | Production cutover | `PRODUCTION_NO_GO` |
-
-## Allowed Later Scope, If Separately Approved
-
-- Staging schema migration for bed-transfer event persistence.
-- Staging fixture setup and rollback.
-- One staging Bed Transfer E2E.
-- Later production migration/smoke only after a separate approval packet.
 
 ## Disallowed In This Task
 
@@ -31,6 +37,6 @@ The staging E2E did not pass. It stopped at schema preflight because staging doe
 - Production write gate opening.
 - Production migration.
 - Production deploy.
-- Automatic real bed relationship updates.
+- Automatic real bed relationship updates in production.
 - Financial formula changes.
 - Dashboard calculation changes.

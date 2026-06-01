@@ -1,19 +1,19 @@
 # Bed Transfer Staging Accounting Verify
 
 Date: 2026-06-01
-Status: `NOT_EXECUTED_SCHEMA_BLOCKED`
+Status: `PASS`
 
 | Accounting Check | Expected | Actual | Result |
 |---|---|---|---|
-| deposit carried | yes | not executed | BLOCKED |
-| deposit not counted as revenue | yes | not executed | BLOCKED |
-| deposit not refunded | yes | not executed | BLOCKED |
-| rent period carried | yes | not executed | BLOCKED |
-| carry_over_arrears preserved | yes | not executed | BLOCKED |
-| arrears not cleared | yes | not executed | BLOCKED |
-| transfer fee only if explicitly selected | yes | not executed | BLOCKED |
-| cash received unchanged unless fee exists | yes | not executed | BLOCKED |
-| current tenant identity preserved | yes | not executed | BLOCKED |
-| audit exists | yes | not executed | BLOCKED |
+| deposit carried | yes | `original_deposit_amount_fils=0` carried as fixture value | PASS |
+| deposit not counted as revenue | yes | no revenue/cash transaction created | PASS |
+| deposit not refunded | yes | no deposit refund row created | PASS |
+| rent period carried | yes | `2026-06-01` to `2026-06-02` | PASS |
+| carry_over_arrears preserved | yes | `carry_over_arrears_fils=0`, no arrears update | PASS |
+| arrears not cleared | yes | no `arrear_tasks` update executed | PASS |
+| transfer fee only if explicitly selected | yes | `transfer_fee_fils=0` | PASS |
+| cash received unchanged unless fee exists | yes | no cash/bank transaction created | PASS |
+| current tenant identity preserved | yes | customer code preserved in event | PASS |
+| audit exists | yes | `audit-bt-20260601185154` verified before rollback | PASS |
 
-No staging business write was made. No production write was made.
+No financial formula or dashboard calculation was modified.

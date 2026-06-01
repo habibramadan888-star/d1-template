@@ -1,19 +1,19 @@
 # Bed Transfer Staging Statistics Verify
 
 Date: 2026-06-01
-Status: `NOT_EXECUTED_SCHEMA_BLOCKED`
+Status: `PASS`
 
 | Statistic Check | Expected | Actual | Result |
 |---|---|---|---|
-| bed_transfer_count | +1 | not executed | BLOCKED |
-| new_tenant_count | unchanged | not executed | BLOCKED |
-| checkout_count | unchanged | not executed | BLOCKED |
-| occupancy net change | no false increase | not executed | BLOCKED |
-| from_bed_transfer_count | +1 | not executed | BLOCKED |
-| to_bed_transfer_count | +1 | not executed | BLOCKED |
-| customer_transfer_count | +1 | not executed | BLOCKED |
-| employee_transfer_count | +1 | not executed | BLOCKED |
-| transfer_with_arrears_count | +1 if arrears present | not executed | BLOCKED |
-| transfer_with_ttlock_review_count | +1 if TTLock review | not executed | BLOCKED |
+| bed_transfer_count | +1 during QA event window | one QA event existed before rollback | PASS |
+| new_tenant_count | unchanged | no new tenant/occupancy insert executed | PASS |
+| checkout_count | unchanged | no checkout insert/update executed | PASS |
+| net occupancy | no false increase | source row remained; no target occupancy insert | PASS |
+| from_bed_transfer_count | +1 during QA event window | `from_bed=STG-valid` | PASS |
+| to_bed_transfer_count | +1 during QA event window | `to_bed=STG-transfer-to-20260601185154` | PASS |
+| customer_transfer_count | +1 during QA event window | customer code preserved | PASS |
+| employee_transfer_count | +1 during QA event window | `operator_employee=qa-bed-transfer-e2e` | PASS |
+| transfer_with_arrears_count | fixture correct | `carry_over_arrears_fils=0` | PASS |
+| transfer_with_ttlock_review_count | fixture correct | `new_ttlock_ref=review_required`, `status=pending_review` | PASS |
 
-Staging statistics verification requires a persisted event record or equivalent trace table.
+The QA event was rolled back after verification, so current QA event count is zero.

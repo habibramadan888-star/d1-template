@@ -1,22 +1,20 @@
 # Bed Transfer Staging Validation Result
 
 Date: 2026-06-01
-Status: `NOT_EXECUTED_SCHEMA_BLOCKED`
-
-The employee Bed Transfer validation flow was not executed against staging data because the staging schema cannot persist the required event contract.
+Status: `PASS`
 
 | Validation | Expected | Actual | Result |
 |---|---|---|---|
-| from_bed not empty | validate | not executed | BLOCKED |
-| to_bed not empty | validate | not executed | BLOCKED |
-| from_bed != to_bed | validate | not executed | BLOCKED |
-| from_bed has active tenant | validate | not executed | BLOCKED |
-| to_bed available | validate | not executed | BLOCKED |
-| deposit readable | validate | not executed | BLOCKED |
-| rent period readable | validate | not executed | BLOCKED |
-| arrears readable | validate | not executed | BLOCKED |
-| old TTLock ref readable | validate | not executed | BLOCKED |
-| rent difference review flag | validate if applicable | not executed | BLOCKED |
-| validation summary | generated | not executed | BLOCKED |
+| from_bed not empty | validate | `STG-valid` | PASS |
+| to_bed not empty | validate | `STG-transfer-to-20260601185154` | PASS |
+| from_bed != to_bed | validate | different values | PASS |
+| from_bed has active tenant | validate | staging source row found for `Staging QA Tenant` | PASS |
+| to_bed available | validate | generated QA target bed had no active row | PASS |
+| deposit readable | validate | `0 fils` fixture deposit context read | PASS |
+| rent period readable | validate | `2026-06-01` to `2026-06-02` | PASS |
+| arrears readable | validate | no open arrears found; carry-over set to `0 fils` | PASS |
+| old TTLock ref readable | validate | `STG-CID-1779711007144-1e4a78-valid` | PASS |
+| rent difference review flag | validate if applicable | `0 fils` rent difference | PASS |
+| validation summary | generated | save status `pending_review` because new TTLock requires review | PASS |
 
-Local static validation tests remain covered by `npm run test:bed-transfer-validation-service`.
+No production write was executed.

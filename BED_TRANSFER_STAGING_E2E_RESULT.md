@@ -2,37 +2,45 @@
 
 Date: 2026-06-01
 Environment: staging D1 only
-Result: `BLOCKED_SCHEMA_UNSUPPORTED`
+Result: `PASS`
 
-Staging schema preflight was executed with read-only schema queries. The required `bed_transfer_events` table or equivalent closure contract is missing, so the E2E stopped before fixture setup or staging write.
+The E2E used a staging-only schema migration, one QA-tagged event, one QA audit row, verification reads, and rollback. The QA event/audit rows were deleted after verification.
 
 | Step | Result |
 |---|---|
-| schema preflight | FAIL |
-| fixture setup | BLOCKED |
-| validation | BLOCKED |
-| save | BLOCKED |
-| accounting verify | BLOCKED |
-| TTLock trace verify | BLOCKED |
-| statistics verify | BLOCKED |
-| owner visibility | BLOCKED |
-| rollback | PASS, no fixture created |
+| staging migration | PASS |
+| schema preflight | PASS |
+| fixture setup | PASS |
+| validation | PASS |
+| save | PASS |
+| accounting verify | PASS |
+| TTLock trace verify | PASS |
+| statistics verify | PASS |
+| owner visibility | PASS |
+| rollback | PASS |
 
-## Blocking Finding
+## Fixture
 
-Staging currently has legacy `transactions.bed_from` and `transactions.bed_to`, but it does not have:
+| Field | Value |
+|---|---|
+| from_bed | `STG-valid` |
+| to_bed | `STG-transfer-to-20260601185154` |
+| customer | `Staging QA Tenant` |
+| customer_code | `STG-CID-1779711007144-1e4a78-valid` |
+| transfer_id | `bt-20260601185154` |
+| audit_id | `audit-bt-20260601185154` |
+| qa_tag | `qa_bed_transfer_e2e_20260601185154` |
+| status | `pending_review` |
 
-- `bed_transfer_events`
-- `transfer_date`
-- `original_checkin_date`
-- `original_deposit_amount_fils`
-- `carry_over_arrears_fils`
-- `old_ttlock_ref`
-- `new_ttlock_ref`
-- dedicated audit/trace linkage
+## Safety
 
-## Safety Result
-
-No staging fixture was created. No staging Bed Transfer save was executed. No production write, production migration, production D1 execute/export/import, deploy, or production cutover was performed.
-
-Production cutover remains `PRODUCTION_NO_GO`.
+| Check | Result |
+|---|---|
+| production write | no |
+| production migration | no |
+| production deploy | no |
+| production write gate | off |
+| staging rollback | completed |
+| financial formula changed | no |
+| dashboard calculation changed | no |
+| production cutover | `PRODUCTION_NO_GO` |
