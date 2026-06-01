@@ -1,5 +1,23 @@
 # Run Report
 
+## BED-TRANSFER-RECORD-ONLY-WORKFLOW-001
+
+Date: 2026-06-01, Asia/Dubai
+
+Scope: switched Bed Transfer from owner approval/pending-review wording to record-only event ledger semantics.
+
+- Employee Bed Transfer save now targets `status=recorded`.
+- Employee success copy is `Bed transfer recorded / 换床记录已保存`.
+- Owner overview now shows `Bed Transfer Records / 换床记录`, not an approval queue.
+- Legacy `pending_review` rows remain readable and are displayed as record-only legacy records.
+- `migrations/006_bed_transfer_recorded_status.sql` is required for existing remote D1 tables before `status=recorded` writes can pass.
+- Staging migration/deploy/E2E passed; QA rows were cleaned back to zero.
+- Production recorded-status schema migration and Worker deploy passed.
+- Production record-only smoke wrote one event-ledger row for `103 -> 947`, status `recorded`.
+- Owner visibility, idempotency replay, and no-mutation snapshots passed.
+- Occupancy, deposit, arrears, TTLock, financial formulas, and dashboard calculations were not modified.
+- Production cutover remains `PRODUCTION_NO_GO`.
+
 ## BED-TRANSFER-EMPLOYEE-SAVE-PATH-E2E-DEPLOY-SMOKE-001
 
 Date: 2026-06-01, Asia/Dubai

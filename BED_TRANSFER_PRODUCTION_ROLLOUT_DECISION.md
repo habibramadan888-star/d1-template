@@ -1,5 +1,24 @@
 # Bed Transfer Production Rollout Decision
 
+## Record-Only Workflow Addendum
+
+Date: 2026-06-01
+
+Decision: `RECORD_ONLY_WORKFLOW_READY_FOR_STAGING_E2E`
+
+| Question | Decision |
+|---|---|
+| Is Bed Transfer still an owner approval workflow? | No. |
+| What status should new employee saves use? | `recorded`. |
+| What does owner see? | Read-only Bed Transfer records. |
+| Are legacy `pending_review` rows preserved? | Yes, and normalized as records in owner-facing views. |
+| Is production schema upgrade required before new `recorded` writes? | Completed with `migrations/006_bed_transfer_recorded_status.sql`. |
+| Was staging record-only E2E executed? | Yes, PASS with cleanup. |
+| Was production record-only smoke executed? | Yes, one row `103 -> 947`, status `recorded`. |
+| Does save mutate occupancy/deposit/arrears/TTLock? | No. |
+| Does save modify financial formulas or dashboard calculations? | No. |
+| Production cutover | `PRODUCTION_NO_GO` |
+
 ## Employee Save Path E2E Deploy Smoke Addendum
 
 Date: 2026-06-01

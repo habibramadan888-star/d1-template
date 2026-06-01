@@ -1,5 +1,21 @@
 # Full Internal QA Test Plan
 
+## BED-TRANSFER-RECORD-ONLY-WORKFLOW-001 QA Addendum
+
+Bed Transfer is now a record-only event ledger workflow.
+
+QA must verify:
+
+- Employee save writes a `bed_transfer_events` record with `status=recorded`.
+- Employee save success copy is `Bed transfer recorded / 换床记录已保存`.
+- Owner sees Bed Transfer records, not an approval/reject queue.
+- Existing legacy `pending_review` rows remain visible as record-only legacy records.
+- No occupancy, deposit, arrears, TTLock, financial formula, or dashboard calculation mutation occurs.
+- Existing remote D1 databases must receive `migrations/006_bed_transfer_recorded_status.sql` before `status=recorded` writes.
+- Staging record-only E2E passed and cleaned all QA rows.
+- Production record-only smoke passed for `103 -> 947` with no business-state mutation.
+- Production cutover remains `PRODUCTION_NO_GO`.
+
 ## BED-TRANSFER-EMPLOYEE-SAVE-PATH-E2E-DEPLOY-SMOKE-001 QA Addendum
 
 The employee Bed Transfer event-ledger save path is enabled for internal testing only.

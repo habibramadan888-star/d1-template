@@ -1,5 +1,21 @@
 # Owner Internal Test Script
 
+## BED-TRANSFER-RECORD-ONLY-WORKFLOW-001 Owner Checks
+
+Date: 2026-06-01, Asia/Dubai
+
+Owner QA should confirm after deploy:
+
+- Owner overview includes `Bed Transfer Records / 换床记录`.
+- `GET /api/owner/bed-transfers?status=recorded` shows recorded rows and legacy pending rows as records.
+- No approve/reject buttons are visible.
+- Records show From Bed, To Bed, Transfer Date, Employee, Reason, and Note where available.
+- Bed Transfer is not counted as a new tenant or checkout.
+- Owner view does not imply occupancy, deposit, arrears, or TTLock changed.
+- Production smoke `103 -> 947` should appear as a record-only Bed Transfer event.
+
+Production cutover remains `PRODUCTION_NO_GO`.
+
 ## BED-TRANSFER-EMPLOYEE-SAVE-PATH-E2E-DEPLOY-SMOKE-001 Owner Checks
 
 Date: 2026-06-01, Asia/Dubai

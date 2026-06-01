@@ -1,5 +1,21 @@
 # Verification Status
 
+## BED-TRANSFER-RECORD-ONLY-WORKFLOW-001 Verification Addendum
+
+Date: 2026-06-01, Asia/Dubai
+
+| Verification | Result | Evidence | Commercial Meaning |
+|---|---:|---|---|
+| owner review removal | PASS | `BED_TRANSFER_OWNER_REVIEW_REMOVAL_RESULT.md` | Bed Transfer is no longer presented as an approval/reject workflow. |
+| employee record copy | PASS | `BED_TRANSFER_EMPLOYEE_RECORD_COPY_RESULT.md` | Employee sees record-only copy and no false owner-review success. |
+| save API contract | PASS | `BED_TRANSFER_RECORD_ONLY_SAVE_API_RESULT.md` | New saves use `status=recorded` and preserve audit/trace/idempotency. |
+| owner record view | PASS | `OWNER_BED_TRANSFER_RECORD_VIEW_RESULT.md` | Owner sees records, including legacy pending rows normalized for display. |
+| record-only anchors | PASS | `BED_TRANSFER_RECORD_ONLY_ANCHOR_RESULT.md` | Anchors remain snapshots, not state mutation. |
+| staging E2E | PASS | `BED_TRANSFER_RECORD_ONLY_STAGING_E2E_RESULT.md` | Staging accepted `recorded` and cleaned QA rows. |
+| production deploy | PASS | `BED_TRANSFER_RECORD_ONLY_DEPLOY_RESULT.md` | Worker version `b3c57137-a963-4763-b87a-5894f29e2fd2`. |
+| production smoke | PASS | `BED_TRANSFER_RECORD_ONLY_PRODUCTION_SMOKE_RESULT.md` | One `103 -> 947` record-only event was saved with no business-state mutation. |
+| production cutover | PRODUCTION_NO_GO | commercial launch gate | This is not commercial launch or full production cutover. |
+
 ## BED-TRANSFER-EMPLOYEE-SAVE-PATH-E2E-DEPLOY-SMOKE-001 Verification Addendum
 
 Date: 2026-06-01, Asia/Dubai

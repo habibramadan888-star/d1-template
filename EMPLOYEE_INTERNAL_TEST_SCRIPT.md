@@ -1,5 +1,22 @@
 # Employee Internal Test Script
 
+## BED-TRANSFER-RECORD-ONLY-WORKFLOW-001 Employee Checks
+
+Date: 2026-06-01, Asia/Dubai
+
+Manual employee QA should confirm after deploy:
+
+- Select `Bed Transfer / 换床`.
+- From Bed, To Bed, Transfer Date, Reason, and Note remain required.
+- Save button reads `保存换床记录 / RECORD TRANSFER`.
+- Successful save says `Bed transfer recorded / 换床记录已保存`.
+- The record is not added to handover drafts.
+- The UI does not claim that occupancy, deposit, arrears, or TTLock changed.
+- If validation warnings exist, they are trace notes, not an owner approval queue.
+- Production smoke `103 -> 947` confirmed the live save path records status `recorded`.
+
+Production cutover remains `PRODUCTION_NO_GO`.
+
 ## BED-TRANSFER-EMPLOYEE-SAVE-PATH-E2E-DEPLOY-SMOKE-001 Employee Checks
 
 Date: 2026-06-01, Asia/Dubai
