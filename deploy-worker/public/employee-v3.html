@@ -1063,6 +1063,59 @@ label .label-en{
 @media(max-width:560px){
   .handover-details{grid-template-columns:1fr}
 }
+/* Final Entry session amount layout: keep handover numbers readable on mobile. */
+.handover-anchors .kpi-card,
+.handover-details .kpi-card,
+.preview-anchor{
+  min-width:0!important;
+  overflow:hidden!important;
+}
+.entry-session-money,
+[data-entry-summary-money="true"]{
+  display:block!important;
+  max-width:100%!important;
+  font-family:var(--num-font)!important;
+  font-variant-numeric:tabular-nums!important;
+  font-feature-settings:"tnum" 1!important;
+  white-space:normal!important;
+  overflow-wrap:anywhere!important;
+  word-break:normal!important;
+  line-height:1.08!important;
+}
+.handover-anchors .kpi-card b.entry-session-money,
+.preview-anchor b.entry-session-money{
+  font-size:clamp(18px,4.6vw,32px)!important;
+}
+.handover-details .kpi-card b.entry-session-money{
+  font-size:clamp(15px,3.3vw,20px)!important;
+}
+.entry-session-whatsapp-fallback pre{
+  white-space:pre-wrap;
+  word-break:break-word;
+  max-height:44vh;
+}
+@media(max-width:720px){
+  .handover-anchors{
+    grid-template-columns:repeat(3,minmax(0,1fr))!important;
+    gap:7px!important;
+  }
+  .handover-anchors .kpi-card{
+    min-height:88px!important;
+    padding:10px 7px!important;
+  }
+  .handover-anchors .kpi-card b.entry-session-money{
+    font-size:clamp(12px,3.45vw,16px)!important;
+    letter-spacing:-.02em!important;
+  }
+  #view-entry>.card:nth-child(3) .row{
+    grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  }
+  #view-entry>.card:nth-child(3) .row .btn{
+    min-width:0!important;
+    padding:10px 7px!important;
+    font-size:12px!important;
+  }
+}
 /* Final context alignment: five equal business anchors, then secondary evidence. */
 .priority-grid{
   grid-template-columns:repeat(5,minmax(0,1fr))!important;
@@ -2604,7 +2657,7 @@ label .label-en{
     <div class="card">
       <div class="head">
         <div><div class="title">本次会话</div><div class="small" id="sessionMeta">0 条记录</div></div>
-        <div class="row" style="flex:0 0 auto"><button class="btn" id="btnPreviewSession">预览<span class="label-en">PREVIEW</span></button><button class="btn primary" id="btnExportSession">导出交接<span class="label-en">EXPORT HANDOVER</span></button></div>
+        <div class="row" style="flex:0 0 auto"><button class="btn" id="btnPreviewSession">预览<span class="label-en">PREVIEW</span></button><button class="btn" id="btnWhatsAppSession">WhatsApp 导出<span class="label-en">WHATSAPP EXPORT</span></button><button class="btn primary" id="btnExportSession">导出交接<span class="label-en">EXPORT HANDOVER</span></button></div>
       </div>
       <div class="body"><div class="preview-list" id="sessionPreview"></div></div>
     </div>
@@ -4529,6 +4582,87 @@ function buildExport(){
   refreshSessionViews();
   showStatus(`导出文本已生成：本票 ${drafts.length} 笔，现金结余 ${fmtMoney(cashIn-cashOut)}，银行 ${fmtMoney(bankIn)}，收款总计 ${fmtMoney(cashIn+bankIn)}。`);
 }
+function entryWhatsappSafe(value){
+  return String(value||'')
+    .replace(/\+971[\d\s().-]{5,}/g,'')
+    .replace(/\b(EID|trace|trace_id|source_ref|request_id|idempotency_key|audit_id|debug)\b[:=]?\s*[\w:.-]*/ig,'')
+    .replace(/[{}[\]"]/g,'')
+    .replace(/\s+/g,' ')
+    .trim()
+    .slice(0,90);
+}
+function entryWhatsappType(e){
+  return ({R:'rent',AP:'arrears',D:'deposit_in',DR:'deposit_out',CO:'checkout',E:'expense',TF:'bed_transfer',TFF:'bed_transfer'}[e?.type]||String(e?.type||'entry').toLowerCase());
+}
+function entryWhatsappPayment(e){
+  const pay=String(e?.payment_method||e?.pay_type||'').toLowerCase();
+  if(pay==='b'||pay==='bank')return 'bank';
+  if(pay==='c'||pay==='cash')return 'cash';
+  if(pay==='none'||pay==='n')return 'none';
+  if(e?.type==='TF'&&(e?.fee_status==='waived'||e?.fee_mode==='waived'||Number(e?.amount||0)===0))return 'none';
+  return pay||'cash';
+}
+function entryWhatsappBed(e){
+  if(e?.type==='TF'){
+    const from=entryWhatsappSafe(e.bed_from||e.from_bed||e.fromBed||e.room||'bed');
+    const to=entryWhatsappSafe(e.bed_to||e.to_bed||e.toBed||e.roomTo||'to');
+    return `${from}->${to}`;
+  }
+  return entryWhatsappSafe(e?.room||e?.bed||e?.expense_category||'item');
+}
+function entryWhatsappAmount(e){
+  if(e?.type==='R')return num(e?.paid||e?.amount);
+  return num(e?.amount);
+}
+function entryWhatsappLine(e,i){
+  const type=entryWhatsappType(e);
+  const bed=entryWhatsappBed(e);
+  const pay=entryWhatsappPayment(e);
+  const amount=fmtMoney(entryWhatsappAmount(e));
+  if(type==='bed_transfer'){
+    const waived=e?.fee_status==='waived'||e?.fee_mode==='waived'||e?.fee_paid==='N'||entryWhatsappAmount(e)===0;
+    const reason=entryWhatsappSafe(e?.waiver_reason||e?.fee_waiver_reason||e?.transfer_reason||e?.reason||e?.note||e?.remark||'bed_transfer');
+    return `${i+1}. ${bed} bed_transfer ${waived?'waived ':''}${amount} ${pay} ${reason}`.trim();
+  }
+  const period=e?.period_start&&e?.period_end?` ${e.period_start} to ${e.period_end}`:'';
+  const reason=entryWhatsappSafe(e?.reason_code||e?.custom_reason||e?.note||e?.remark||e?.expense_desc||'');
+  return `${i+1}. ${bed} ${type} ${amount} ${pay}${period}${reason?' '+reason:''}`.trim();
+}
+function buildEntrySessionWhatsAppText(){
+  const s=sessionStats();
+  const lines=[
+    `Homelink Entry | ${today()} | ${entryWhatsappSafe(operatorName()||operatorId())}`,
+    `Cash ${fmtMoney(s.cashBalance)} AED | Bank ${fmtMoney(s.bankIn)} AED | Total ${fmtMoney(s.grossReceived)} AED`
+  ];
+  state.drafts.forEach((e,i)=>lines.push(entryWhatsappLine(e,i)));
+  return lines.join('\n');
+}
+function showEntryWhatsappFallback(text,url){
+  const body=$('previewModalBody');
+  if(body){
+    body.innerHTML=`<div class="preview-detail-card entry-session-whatsapp-fallback"><div class="preview-detail-top"><b>WhatsApp Export</b><button class="btn" type="button" onclick="window.open('${esc(url)}','_blank','noopener,noreferrer')">Open WhatsApp</button></div><div class="small">Text copied. If WhatsApp did not open, copy manually below.</div><pre>${esc(text)}</pre></div>`;
+    $('previewModal').classList.add('show');
+  }
+}
+async function exportEntrySessionWhatsApp(){
+  refreshSessionViews();
+  if(!state.drafts.length){toast('Current Session has no entries to export',6000);showStatus('Current Session has no entries to export.','warn');return '';}
+  const text=buildEntrySessionWhatsAppText();
+  const url='https://wa.me/?text='+encodeURIComponent(text);
+  let copied=false;
+  try{
+    if(navigator.clipboard?.writeText){
+      await navigator.clipboard.writeText(text);
+      copied=true;
+    }
+  }catch{}
+  let opened=null;
+  try{opened=window.open(url,'_blank','noopener,noreferrer');}catch{}
+  if(!opened)showEntryWhatsappFallback(text,url);
+  showStatus(copied?'WhatsApp text copied for Current Session.':'WhatsApp text generated; copy manually if needed.',copied?'ok':'warn');
+  toast(copied?'WhatsApp text copied':'WhatsApp text ready',6000);
+  return text;
+}
 function previewField(label,value){
   return `<div class="preview-field"><span>${esc(label)}</span><b>${esc(value||'-')}</b></div>`;
 }
@@ -4675,7 +4809,7 @@ $('linkedTaskId').addEventListener('change',applyLinkedTask);
 $('bed').addEventListener('input',()=>{if($('entryType').value==='TF')$('transferFromBed').value=$('bed').value.trim().replace(/^#/,'');lookupBed();});
 $('transferFromBed').addEventListener('input',()=>{if($('entryType').value==='TF'){$('bed').value=$('transferFromBed').value.trim().replace(/^#/,'');lookupBed();}});
 $('transferFromBed').addEventListener('change',()=>{if($('entryType').value==='TF'){$('bed').value=$('transferFromBed').value.trim().replace(/^#/,'');lookupBed();}});
-$('tenantCardId').addEventListener('change',e=>{state.depositBalance=null;if(e.target.value.trim())loadDepositBalance(e.target.value.trim());else renderContext();});$('btnLoadLock').onclick=loadLock;$('btnSaveEntry').onclick=saveEntry;$('btnReset').onclick=()=>{resetForm();showStatus('表单已清空。');toast('表单已清空')};$('btnRefreshTasks').onclick=refreshFollowup;$('btnBuildExport').onclick=commitSessionAndExport;$('btnCopyExport').onclick=async()=>{try{await navigator.clipboard.writeText($('exportText').textContent);showStatus('导出文本已复制。');toast('已复制')}catch{showStatus('复制失败，请手动选择导出文本。','warn');toast('复制失败，请手动选择文本',6000)}};$('btnClearLocal').onclick=()=>{if(hasLocalOnly()){showStatus('仍有云端未确认记录，不能清空。','warn');toast('仍有云端未确认记录，不能清空',6000);return}if(confirm('清空本机草稿？')){state.drafts=[];saveDrafts();buildExport();refreshSessionViews();showStatus('本机草稿已清空。');toast('已清空')}};$('btnNewSessionTop').onclick=newSession;$('btnPreviewSession').onclick=previewSession;$('btnExportSession').onclick=commitSessionAndExport;$('operatorId').value=localStorage.getItem('empv3:operator')||'';$('operatorId').onchange=e=>{setOperator(e.target.value.trim());refreshSessionViews();showStatus('员工编号已更新。')};
+$('tenantCardId').addEventListener('change',e=>{state.depositBalance=null;if(e.target.value.trim())loadDepositBalance(e.target.value.trim());else renderContext();});$('btnLoadLock').onclick=loadLock;$('btnSaveEntry').onclick=saveEntry;$('btnReset').onclick=()=>{resetForm();showStatus('表单已清空。');toast('表单已清空')};$('btnRefreshTasks').onclick=refreshFollowup;$('btnBuildExport').onclick=commitSessionAndExport;$('btnCopyExport').onclick=async()=>{try{await navigator.clipboard.writeText($('exportText').textContent);showStatus('导出文本已复制。');toast('已复制')}catch{showStatus('复制失败，请手动选择导出文本。','warn');toast('复制失败，请手动选择文本',6000)}};$('btnClearLocal').onclick=()=>{if(hasLocalOnly()){showStatus('仍有云端未确认记录，不能清空。','warn');toast('仍有云端未确认记录，不能清空',6000);return}if(confirm('清空本机草稿？')){state.drafts=[];saveDrafts();buildExport();refreshSessionViews();showStatus('本机草稿已清空。');toast('已清空')}};$('btnNewSessionTop').onclick=newSession;$('btnPreviewSession').onclick=previewSession;$('btnWhatsAppSession').onclick=exportEntrySessionWhatsApp;$('btnExportSession').onclick=commitSessionAndExport;$('operatorId').value=localStorage.getItem('empv3:operator')||'';$('operatorId').onchange=e=>{setOperator(e.target.value.trim());refreshSessionViews();showStatus('员工编号已更新。')};
 $('btnClosePreview').onclick=closePreviewModal;
 $('previewModal').addEventListener('click',e=>{if(e.target===$('previewModal'))closePreviewModal()});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closePreviewModal()});
@@ -4764,7 +4898,7 @@ function renderSessionKpis(){
     ['押金退款','DEP. REFUND',s.depRefund,'orange','现金支出项'],
     ['其他支出','EXPENSES',s.expenses,'red','现金支出项']
   ];
-  const card=([cn,en,v,cls,note])=>`<div class="kpi-card ${esc(cls)}"><span>${esc(cn)}</span><small>${esc(en)}</small><b>${fmtDisplayMoney(v)}</b><small>${esc(note)}</small></div>`;
+  const card=([cn,en,v,cls,note])=>`<div class="kpi-card ${esc(cls)}"><span>${esc(cn)}</span><small>${esc(en)}</small><b class="entry-session-money" data-entry-summary-money="true">${fmtDisplayMoney(v)}</b><small>${esc(note)}</small></div>`;
   grid.innerHTML=`<div class="kpi-section-label">交接核心<small>HANDOVER CORE</small></div><div class="handover-anchors">${anchors.map(card).join('')}</div><div class="kpi-section-label">流水明细<small>DETAIL BREAKDOWN</small></div><div class="handover-details">${details.map(card).join('')}</div>`;
 }
 function applyBilingualUI(){
