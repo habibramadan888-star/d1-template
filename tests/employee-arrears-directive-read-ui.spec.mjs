@@ -28,7 +28,7 @@ test("employee directive inbox reads the dedicated directive API", async () => {
 test("employee directive inbox has empty and auth failure states", async () => {
   const html = await readFile("deploy-worker/public/employee-v3.html", "utf8");
 
-  assert.match(html, /暂无老板下发任务/);
-  assert.match(html, /无法读取老板下发任务/);
-  assert.match(html, /老板下发任务读取失败/);
+  assert.match(html, /No boss assigned tasks \/ 暂无老板下发任务/);
+  assert.match(html, /Employee account required/);
+  assert.match(html, /Failed to load boss assigned tasks/);
 });

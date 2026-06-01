@@ -442,6 +442,18 @@ Production cutover remains `PRODUCTION_NO_GO`.
 - Write gate remains off by default.
 - Production cutover remains `PRODUCTION_NO_GO`.
 
+## Employee Follow-up Simplified Bilingual UI QA - 2026-06-01
+
+- Employee FOLLOW-UP page follows the efficient execution principle: task first, details on demand.
+- Header identity and logout are split: one employee identity display, one `Logout / 退出` button.
+- Boss assigned task cards default to minimal fields only: bed, amount, due date, status, expand action.
+- `customer_code` is not shown by default on employee task cards.
+- Cards support `Expand Details / 展开详情` and `Collapse Details / 收起详情`.
+- Expanded details show promise date and note only; no promised amount or amount edit.
+- Core employee-facing copy is English-first bilingual.
+- No production write, write gate opening, migration, batch dispatch, TTLock smoke, financial formula change, or dashboard calculation change is authorized by this QA.
+- Production cutover remains `PRODUCTION_NO_GO`.
+
 ## Live Persisted State Audit QA - 2026-06-01
 
 - If phone acceptance still shows the old warning, first inspect live assets for the `223cbbb` UI markers.

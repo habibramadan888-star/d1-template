@@ -2059,6 +2059,20 @@ Deployment verification:
 | Migration / D1 execute | NOT_RUN | No migration, D1 export/import/execute. |
 | Production cutover | NO_GO | Remains `PRODUCTION_NO_GO`. |
 
+## Employee Follow-up Simplified Bilingual UI Verification - 2026-06-01
+
+| Area | Status | Notes |
+|---|---|---|
+| Header identity/logout split | PASS | One visible identity display and visible `Logout / 退出`. |
+| Minimal directive card | PASS | Default card shows bed, amount, due date, status, expand action. |
+| customer_code default display | REMOVED | Hidden from default employee task card. |
+| Expand / collapse | PASS | Details are hidden by default and toggle on demand. |
+| Bilingual copy | PASS | English-first bilingual core labels and actions. |
+| Production write / gate | NOT_RUN | No production business write and no write gate opening. |
+| Deploy | NOT_RUN | Deployment requires separate approval. |
+| D1 migration / execute | NOT_RUN | No D1 execute/export/import/write or migration. |
+| Production cutover | NO_GO | Remains `PRODUCTION_NO_GO`. |
+
 ## Arrears Follow-up Persisted State Live Audit Verification - 2026-06-01
 
 | Area | Status | Notes |

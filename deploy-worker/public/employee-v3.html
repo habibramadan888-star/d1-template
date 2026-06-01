@@ -1238,6 +1238,57 @@ label .label-en{
   resize:vertical;
   min-height:44px;
 }
+.employee-directive-summary{
+  display:grid;
+  grid-template-columns:1fr auto;
+  gap:14px;
+  align-items:start;
+}
+.employee-directive-kicker{
+  color:#64748b;
+  font-size:11px;
+  font-weight:900;
+  letter-spacing:.04em;
+  text-transform:uppercase;
+}
+.employee-directive-title{
+  margin-top:4px;
+  color:#111827;
+  font-size:22px;
+  font-weight:950;
+  line-height:1.15;
+}
+.employee-directive-meta{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin-top:10px;
+}
+.employee-directive-actions{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin-top:14px;
+}
+.employee-directive-details{
+  margin-top:14px;
+  padding-top:14px;
+  border-top:1px solid rgba(148,163,184,.24);
+}
+.employee-directive-details[hidden]{display:none!important}
+.employee-directive-hint{
+  margin-bottom:10px;
+  color:#475569;
+  font-size:12px;
+  font-weight:850;
+}
+.employee-directive-field-label{
+  display:block;
+  margin-bottom:5px;
+  color:#334155;
+  font-size:12px;
+  font-weight:900;
+}
 .followup-top{
   display:grid;
   grid-template-columns:1fr auto;
@@ -1662,6 +1713,13 @@ label .label-en{
     grid-template-columns:1fr!important;
     gap:8px!important;
   }
+  .employee-directive-summary{
+    grid-template-columns:1fr!important;
+    gap:8px!important;
+  }
+  .employee-directive-title{
+    font-size:18px!important;
+  }
   .followup-bed{
     font-size:17px!important;
     line-height:1.22!important;
@@ -1772,27 +1830,49 @@ label .label-en{
   position:relative;
   display:flex;
   align-items:center;
+  gap:8px;
+}
+.operator[hidden]{display:none!important}
+.employee-identity-card{
+  border:1px solid rgba(148,163,184,.25);
+  border-radius:16px;
+  padding:8px 12px;
+  min-height:38px;
+  color:#142033;
+  background:rgba(255,255,255,.76);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.8);
+  font-weight:950;
+  line-height:1.08;
+}
+.employee-identity-card .label-en{
+  display:block;
+  margin-top:2px;
+  color:#64748b;
+  font-size:9px;
+  letter-spacing:.13em;
+  opacity:.88;
 }
 .employee-user-button{
-  border:0;
-  border-radius:999px;
-  padding:9px 16px;
+  display:none!important;
+  border:1px solid rgba(148,163,184,.25);
+  border-radius:16px;
+  padding:8px 12px;
   min-height:38px;
-  color:#fff;
-  cursor:pointer;
-  font:inherit;
+  color:#142033;
+  background:rgba(255,255,255,.76);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.8);
   font-weight:950;
-  background:linear-gradient(180deg,#10ad5a,#078d42);
-  box-shadow:0 14px 30px rgba(9,166,79,.22),inset 0 1px 0 rgba(255,255,255,.24);
 }
 .employee-user-button .label-en{
   display:block;
-  margin-top:1px;
+  margin-top:2px;
+  color:#64748b;
   font-size:9px;
   letter-spacing:.13em;
-  opacity:.82;
+  opacity:.88;
 }
 .employee-user-menu{
+  display:none!important;
   position:absolute;
   right:0;
   top:calc(100% + 10px);
@@ -1812,7 +1892,6 @@ label .label-en{
   font-weight:800;
 }
 .employee-logout{
-  width:100%;
   border:0;
   border-radius:14px;
   padding:10px 12px;
@@ -1830,12 +1909,19 @@ label .label-en{
   opacity:.82;
 }
 @media(max-width:720px){
-  .employee-user-button{
-    padding:8px 11px;
-    max-width:132px;
+  .employee-user{
+    gap:6px;
+  }
+  .employee-identity-card{
+    padding:7px 10px;
+    max-width:118px;
     overflow:hidden;
     text-overflow:ellipsis;
     white-space:nowrap;
+  }
+  .employee-logout{
+    padding:8px 10px;
+    font-size:12px;
   }
   .employee-user-menu{
     right:-4px;
@@ -1865,6 +1951,10 @@ label .label-en{
       <div class="operator" hidden><input id="operatorId" placeholder="未登录" readonly aria-label="员工姓名"></div>
       <span class="pill">员工</span>
       <div class="employee-user" id="employeeUser">
+        <div class="employee-identity-card" id="employeeIdentityCard" data-employee-identity-display="true">
+          <span id="employeeIdentityName">Not signed in</span><span class="label-en">STAFF / 员工</span>
+        </div>
+        <button class="employee-logout" id="btnEmployeeLogoutTop" type="button">Logout<span class="label-en">退出</span></button>
         <button class="employee-user-button" id="employeeUserButton" type="button" aria-haspopup="menu" aria-expanded="false">
           <span id="employeeUserName">未登录</span><span class="label-en">ACCOUNT</span>
         </button>
@@ -2021,7 +2111,7 @@ label .label-en{
     </div>
   </section>
 
-  <section id="view-arrears" class="hidden"><div class="card"><div class="head"><div><div class="title">收租跟进</div><div class="small">FOLLOW-UP · 老板下发任务 + 系统提醒</div></div><button class="btn primary" id="btnRefreshTasks">刷新跟进</button></div><div class="body"><div id="bossDirectiveList" class="boss-directive-inbox"><div class="boss-directive-empty">暂无老板下发任务</div></div><div id="taskList" class="small">点击刷新后生成系统提醒。</div></div></div></section>
+  <section id="view-arrears" class="hidden"><div class="card"><div class="head"><div><div class="title">Follow-up / 跟进</div><div class="small">Boss Assigned Tasks / 老板下发任务 + System Reminders / 系统提醒</div></div><button class="btn primary" id="btnRefreshTasks">Refresh / 刷新</button></div><div class="body"><div id="bossDirectiveList" class="boss-directive-inbox"><div class="boss-directive-empty">No boss assigned tasks / 暂无老板下发任务</div></div><div id="taskList" class="small">Refresh to load system reminders / 点击刷新后生成系统提醒。</div></div></div></section>
   <section id="view-export" class="hidden"><div class="card"><div class="head"><div class="title">TXT 导出</div><button class="btn" id="btnCopyExport">复制</button></div><div class="body"><div class="row" style="margin-bottom:12px"><button class="btn primary" id="btnBuildExport">生成今日文本</button><button class="btn danger" id="btnClearLocal">清空本机草稿</button></div><div class="hint" id="exportStatus">点击导出交接后，系统会上传整票流水并生成交接文本。</div><pre id="exportText">暂无导出内容</pre></div></div></section>
 </main>
 <div class="toast" id="toast"></div>
@@ -2104,7 +2194,7 @@ function setEmployeeMenuOpen(open){
   button.setAttribute('aria-expanded',open?'true':'false');
 }
 async function employeeLogout(){
-  const btn=$('btnEmployeeLogout');
+  const btn=$('btnEmployeeLogoutTop')||$('btnEmployeeLogout');
   const old=btn?.innerHTML;
   if(btn){btn.disabled=true;btn.innerHTML='退出中<span class="label-en">SIGNING OUT</span>'}
   try{
@@ -2213,6 +2303,7 @@ function applyEmployeeUser(user){
     $('operatorId').title=user.userid?`employee_id: ${user.userid}`:'';
     $('operatorId').readOnly=true;
     if($('employeeUserName'))$('employeeUserName').textContent=display;
+    if($('employeeIdentityName'))$('employeeIdentityName').textContent=display;
     if($('employeeUserMeta'))$('employeeUserMeta').textContent=user.userid?`employee_id: ${user.userid}`:'signed in';
     if($('employeeUserButton'))$('employeeUserButton').disabled=false;
     setEmployeeMenuOpen(false);
@@ -2231,6 +2322,7 @@ function applyEmployeeUser(user){
     $('operatorId').value='';
     $('operatorId').title='';
     $('operatorId').readOnly=false;
+    if($('employeeIdentityName'))$('employeeIdentityName').textContent='Not signed in';
     if($('employeeUserName'))$('employeeUserName').textContent='未登录';
     if($('employeeUserMeta'))$('employeeUserMeta').textContent='未登录';
     setEmployeeMenuOpen(false);
@@ -2872,6 +2964,15 @@ function employeeDirectiveSourceLabel(source){
     historical_arrears:'系统已有欠款'
   }[raw]||'老板下发任务';
 }
+function employeeDirectiveSourceLabel(source){
+  const raw=String(source||'').trim();
+  return {
+    existing_arrears_record:'Existing Arrears / 系统已有欠款',
+    ttlock_expired_unpaid:'Expired TTLock Unpaid / 通通锁到期未付',
+    ttlock_expired_card:'Expired TTLock Unpaid / 通通锁到期未付',
+    historical_arrears:'Existing Arrears / 系统已有欠款'
+  }[raw]||'Boss Assigned / 老板下发';
+}
 function normalizeEmployeeDirective(d){
   const amount=Number(d?.amount_fils??d?.amountFils??0)/100;
   const promisedPaymentDate=String(d?.promised_payment_date||d?.promise_date||'');
@@ -2953,6 +3054,55 @@ function employeeDirectiveStatusLabel(status){
     needs_review:'待老板核对',
     overdue:'承诺逾期'
   }[String(status||'').trim()]||'老板已下发';
+}
+function employeeDirectiveStatusLabel(status){
+  return {
+    assigned:'No Feedback Yet / 待反馈',
+    pending:'No Feedback Yet / 待反馈',
+    viewed:'No Feedback Yet / 待反馈',
+    promised:'Saved / 已保存',
+    followed_up:'Saved / 已保存',
+    needs_review:'Saved / 已保存',
+    overdue:'Promise Overdue / 承诺逾期'
+  }[String(status||'').trim()]||'No Feedback Yet / 待反馈';
+}
+function employeeDirectiveCard(d){
+  const id=safeDomId(d.task_id);
+  const source=employeeDirectiveSourceLabel(d.source_type);
+  const overdue=d.overdue_days>0?`Overdue ${d.overdue_days} days / 逾期 ${d.overdue_days} 天`:'Not overdue / 未逾期';
+  const amount=d.amount>0?`${fmtMoney(d.amount)} AED`:'Amount to confirm / 金额待确认';
+  const status=employeeDirectiveStatusLabel(d.directive_status);
+  const due=d.due_date||'To confirm / 待确认';
+  return `<div class="followup-card directive employee-directive-card" data-employee-boss-directive-card="true" data-directive-card-collapsed="true" data-directive-task-id="${esc(d.task_id)}">
+    <div class="employee-directive-summary">
+      <div>
+        <div class="employee-directive-kicker">Bed / 床位</div>
+        <div class="employee-directive-title">${esc(d.room_bed||'Bed to confirm / 床位待确认')}</div>
+        <div class="employee-directive-meta">
+          <span class="followup-tag bad">Boss Assigned / 老板下发</span>
+          <span class="followup-tag">Due Date / 截止日期：${esc(due)}</span>
+          <span class="followup-tag ${d.overdue_days>0?'bad':''}">${esc(overdue)}</span>
+          <span class="followup-tag" id="directiveStatus_${id}" data-directive-status-tag="${esc(id)}">${esc(status)}</span>
+        </div>
+      </div>
+      <div class="followup-money">${esc(amount)}</div>
+    </div>
+    <div class="employee-directive-actions">
+      <button class="mini-btn" data-toggle-directive-details="${esc(id)}" aria-expanded="false">Expand Details / 展开详情</button>
+    </div>
+    <div class="employee-directive-details" id="directiveDetails_${id}" hidden>
+      <div class="employee-directive-hint">Only update promise date and note. / 只需填写承诺日期和备注。</div>
+      <div class="followup-note">
+        Source / 来源：${esc(source)}<br>
+        Boss Note / 老板备注：${esc(d.owner_note||'None / 暂无')}
+      </div>
+      <div class="directive-followup-actions">
+        <label><span class="employee-directive-field-label">Promise Date / 承诺日期</span><input id="directivePromise_${id}" data-directive-edit="${esc(id)}" type="date" value="${esc(d.promised_payment_date||'')}" min="${today()}" aria-label="Promise Date / 承诺日期"></label>
+        <label><span class="employee-directive-field-label">Note / 备注</span><textarea id="directiveNote_${id}" data-directive-edit="${esc(id)}" placeholder="Customer response or reason / 客户答复或未付款原因">${esc(d.followup_note||'')}</textarea></label>
+        <button class="mini-btn" data-save-directive-follow="${esc(d.task_id)}">Submit Feedback / 提交反馈</button>
+      </div>
+    </div>
+  </div>`;
 }
 function renderEmployeeDirectiveInbox(status='ready',error=''){
   const box=$('bossDirectiveList');
@@ -3061,6 +3211,83 @@ function bindEmployeeDirectiveActions(){
       const card=input.closest('[data-directive-task-id]');
       const taskId=card?.dataset?.directiveTaskId||'';
       if(taskId)updateEmployeeDirectivePersistedState(taskId);
+    };
+  });
+  (state.employeeDirectives||[]).forEach(d=>updateEmployeeDirectivePersistedState(d.task_id));
+}
+function renderEmployeeDirectiveInbox(status='ready',error=''){
+  const box=$('bossDirectiveList');
+  if(!box)return;
+  const title='<div class="boss-directive-title"><span>Boss Assigned Tasks / 老板下发任务</span><small>BOSS ASSIGNED</small></div>';
+  if(status==='loading'){
+    box.innerHTML=title+'<div class="boss-directive-empty">Loading boss assigned tasks / 正在读取老板下发任务...</div>';
+    return;
+  }
+  if(status==='denied'){
+    box.innerHTML=title+'<div class="boss-directive-empty">Employee account required / 当前账号无法读取老板下发任务，请重新登录员工账号。</div>';
+    return;
+  }
+  if(status==='error'){
+    box.innerHTML=title+`<div class="boss-directive-empty">Failed to load boss assigned tasks / 老板下发任务读取失败：${esc(error||'Please refresh / 请刷新重试')}</div>`;
+    return;
+  }
+  const rows=state.employeeDirectives||[];
+  if(!rows.length){
+    box.innerHTML=title+'<div class="boss-directive-empty">No boss assigned tasks / 暂无老板下发任务</div>';
+    return;
+  }
+  box.innerHTML=`<div class="boss-directive-title"><span>Boss Assigned Tasks / 老板下发任务</span><small>${rows.length} ASSIGNED</small></div>${rows.map(employeeDirectiveCard).join('')}`;
+  bindEmployeeDirectiveActions();
+}
+function updateEmployeeDirectivePersistedState(taskId){
+  const item=(state.employeeDirectives||[]).find(x=>x.task_id===taskId);
+  if(!item)return;
+  const id=safeDomId(taskId);
+  const tag=$(`directiveStatus_${id}`);
+  const btn=document.querySelector(`[data-save-directive-follow="${CSS.escape(taskId)}"]`);
+  const hasPersisted=employeeDirectiveHasPersistedFeedback(item);
+  const dirty=employeeDirectiveIsDirty(item);
+  if(tag){
+    tag.classList.toggle('bad',dirty);
+    tag.dataset.directiveDirty=dirty?'true':'false';
+    tag.textContent=dirty?'Unsaved Changes / 当前修改未提交':(hasPersisted?'Saved / 已保存':employeeDirectiveStatusLabel(item.directive_status));
+  }
+  if(btn){
+    btn.dataset.directiveDirty=dirty?'true':'false';
+    btn.dataset.directivePersisted=hasPersisted?'true':'false';
+    if(hasPersisted&&!dirty){
+      btn.textContent='Saved / 已保存';
+      btn.disabled=true;
+      btn.classList.add('disabled');
+      btn.setAttribute('aria-disabled','true');
+    }else{
+      btn.textContent=hasPersisted?'Submit Changes / 提交修改':'Submit Feedback / 提交反馈';
+      btn.disabled=false;
+      btn.classList.remove('disabled');
+      btn.removeAttribute('aria-disabled');
+    }
+  }
+}
+function bindEmployeeDirectiveActions(){
+  document.querySelectorAll('[data-save-directive-follow]').forEach(btn=>btn.onclick=()=>saveEmployeeDirectiveFollowup(btn.dataset.saveDirectiveFollow));
+  document.querySelectorAll('[data-directive-edit]').forEach(input=>{
+    input.oninput=()=>{
+      const card=input.closest('[data-directive-task-id]');
+      const taskId=card?.dataset?.directiveTaskId||'';
+      if(taskId)updateEmployeeDirectivePersistedState(taskId);
+    };
+  });
+  document.querySelectorAll('[data-toggle-directive-details]').forEach(btn=>{
+    btn.onclick=()=>{
+      const id=btn.dataset.toggleDirectiveDetails;
+      const details=$(`directiveDetails_${id}`);
+      const card=btn.closest('[data-employee-boss-directive-card]');
+      if(!details)return;
+      const open=details.hidden;
+      details.hidden=!open;
+      btn.setAttribute('aria-expanded',open?'true':'false');
+      btn.textContent=open?'Collapse Details / 收起详情':'Expand Details / 展开详情';
+      if(card)card.dataset.directiveCardCollapsed=open?'false':'true';
     };
   });
   (state.employeeDirectives||[]).forEach(d=>updateEmployeeDirectivePersistedState(d.task_id));
@@ -3326,7 +3553,7 @@ async function saveEmployeeDirectiveFollowup(taskId){
   if(!promised){toast('请填写承诺付款日期',6000);return}
   if(!note){toast('请填写跟进备注，说明客户答复或原因',6000);return}
   const btn=document.querySelector(`[data-save-directive-follow="${CSS.escape(taskId)}"]`);
-  if(btn){btn.disabled=true;btn.textContent='提交中';}
+  if(btn){btn.disabled=true;btn.textContent='Submitting / 提交中';}
   try{
     const idempotency=`emp-directive-${Date.now()}-${taskId}`.replace(/[^a-zA-Z0-9_-]/g,'-').slice(0,120);
     const r=await apiFetch(`/api/employee/arrears/directives/${encodeURIComponent(taskId)}/followup`,{
@@ -3371,7 +3598,7 @@ async function saveEmployeeDirectiveFollowup(taskId){
   if(!promised){toast('请填写承诺付款日期',6000);return}
   if(!note){toast('请填写跟进备注，说明客户答复或原因',6000);return}
   const btn=document.querySelector(`[data-save-directive-follow="${CSS.escape(taskId)}"]`);
-  if(btn){btn.disabled=true;btn.textContent='提交中';}
+  if(btn){btn.disabled=true;btn.textContent='Submitting / 提交中';}
   try{
     const idempotency=`emp-directive-${Date.now()}-${taskId}`.replace(/[^a-zA-Z0-9_-]/g,'-').slice(0,120);
     const r=await apiFetch(`/api/employee/arrears/directives/${encodeURIComponent(taskId)}/followup`,{
@@ -3575,6 +3802,7 @@ $('loginPin').addEventListener('keydown',e=>{if(e.key==='Enter')employeeLogin()}
 $('loginEmployeeId').addEventListener('keydown',e=>{if(e.key==='Enter')$('loginPin').focus()});
 $('employeeUserButton').onclick=e=>{e.stopPropagation();setEmployeeMenuOpen($('employeeUserMenu')?.hidden!==false)};
 $('btnEmployeeLogout').onclick=employeeLogout;
+if($('btnEmployeeLogoutTop'))$('btnEmployeeLogoutTop').onclick=employeeLogout;
 document.addEventListener('click',e=>{if(!e.target.closest?.('#employeeUser'))setEmployeeMenuOpen(false)});
 function applyBilingualUILegacy(){
   const label=(id,zh,en)=>{const el=$(id);const l=el?.closest('.field')?.querySelector('label');if(l)l.innerHTML=`${zh}<span class="label-en">${en}</span>`};

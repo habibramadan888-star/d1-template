@@ -209,6 +209,19 @@ During employee QA, confirm:
 7. Confirm promised amount input, amount edit, close, void, handover, and accounting status changes remain unavailable.
 8. Production cutover remains `PRODUCTION_NO_GO`.
 
+## Employee Follow-up Simplified Bilingual UI Acceptance - 2026-06-01
+
+1. Confirm header shows one employee identity display only.
+2. Confirm visible button says `Logout / 退出`.
+3. Open FOLLOW-UP and confirm module labels are English-first bilingual.
+4. Confirm boss assigned task cards default to compact view: bed, amount, due date, status, expand action.
+5. Confirm default card does not show customer_code such as `139780080`.
+6. Tap `Expand Details / 展开详情` and confirm date/note inputs appear.
+7. Tap `Collapse Details / 收起详情` and confirm details are hidden again.
+8. Confirm no promised amount input, amount edit, close, void, handover, or accounting status edit exists.
+9. Confirm no production write is performed during this acceptance.
+10. Production cutover remains `PRODUCTION_NO_GO`.
+
 ## Live Persisted State Deployment Check - 2026-06-01
 
 1. Before repeating phone acceptance, confirm the live asset contains `serverOriginalPromisedDate` and `updateEmployeeDirectivePersistedState`.

@@ -6235,6 +6235,16 @@ Safety:
 - No production write, migration, deploy, batch dispatch, TTLock smoke, financial formula change, or dashboard calculation change was performed in this documentation task.
 - Production cutover remains `PRODUCTION_NO_GO`.
 
+## Employee Follow-up UI Simplification - 2026-06-01
+
+- Simplified employee FOLLOW-UP boss assigned task cards around high-speed execution.
+- Header account display and logout action are split: one identity display, visible `Logout / 退出`.
+- Boss assigned cards now default to compact view and move inputs/details behind expand/collapse.
+- `customer_code` is hidden from the default employee task card.
+- Core action/status/module copy is English-first bilingual.
+- No production write, write gate opening, deploy, migration, batch dispatch, TTLock smoke, financial formula change, or dashboard calculation change was performed.
+- Production cutover remains `PRODUCTION_NO_GO`.
+
 ## Arrears Follow-up Persisted State Live Audit - 2026-06-01
 
 - Read-only live audit concluded `LIVE_NOT_DEPLOYED`.
