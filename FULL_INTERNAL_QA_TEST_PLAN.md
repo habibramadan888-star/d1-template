@@ -476,3 +476,19 @@ QA scope:
 - Verify boss WhatsApp/arrears export remains unaffected.
 - Verify no production write and write gate remains off.
 - Verify production cutover remains `PRODUCTION_NO_GO`.
+
+## EMPLOYEE-FOLLOWUP-MATCH-ENTRY-UX-DEPLOY-001
+
+Live Worker version: `bae1241e-ac4b-4747-bebe-a4bb4a9bd00f`.
+
+Deployment QA scope:
+
+- Verify deployed employee UI shows only Entry and Follow-up.
+- Verify employee Export tab/page remains absent.
+- Verify Follow-up visual system matches Entry page cards, spacing, buttons, and typography.
+- Verify Details / Collapse works on boss-assigned task cards.
+- Verify the visible header has employee identity plus `Logout / 退出`.
+- Verify owner arrears WhatsApp/export behavior remains intact.
+- Authenticated phone acceptance is required because Codex only performed public asset smoke.
+- No production write, migration, D1 execute/export/import, owner directive create, employee follow-up write, batch dispatch, TTLock smoke, dashboard calculation change, or financial formula change is approved by this deploy.
+- Production cutover remains `PRODUCTION_NO_GO`.

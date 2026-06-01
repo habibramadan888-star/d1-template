@@ -240,3 +240,19 @@ Status: ready for internal mobile acceptance, not deployed by default.
 - Follow-up task cards default to a compact execution view and support expand/collapse.
 - No production write, no migration, write gate off.
 - Production cutover remains `PRODUCTION_NO_GO`.
+
+## EMPLOYEE-FOLLOWUP-MATCH-ENTRY-UX-DEPLOY-001
+
+Live Worker version: `bae1241e-ac4b-4747-bebe-a4bb4a9bd00f`.
+
+Employee authenticated phone acceptance should verify:
+
+1. Open the employee app through the root three-door entry.
+2. Confirm only `Entry / 录入` and `Follow-up / 跟进` are visible in the employee tab bar.
+3. Confirm no visible employee Export tab or Export page is available.
+4. Confirm the header shows one employee identity area and a clear `Logout / 退出` control.
+5. Open Follow-up and confirm task cards visually match Entry page cards and controls.
+6. Confirm boss-assigned task details are behind Details / Collapse.
+7. Confirm raw `customer_code` and `existing_arrears_record` are not shown in the default card.
+8. Confirm no production write is performed during visual acceptance.
+9. Confirm production cutover remains `PRODUCTION_NO_GO`.

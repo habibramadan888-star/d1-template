@@ -385,3 +385,16 @@ Production cutover remains `PRODUCTION_NO_GO`.
 3. Do not create another owner directive to validate this UI state.
 4. Do not open write gate for UI acceptance.
 5. Production cutover remains `PRODUCTION_NO_GO`.
+
+## Employee Follow-up Entry-Aligned UX Deploy Owner Regression
+
+Live Worker version: `bae1241e-ac4b-4747-bebe-a4bb4a9bd00f`.
+
+Owner regression checks after the employee UI-only deploy:
+
+1. Open owner arrears and confirm the module still loads.
+2. Confirm WhatsApp export still opens from the owner arrears UI.
+3. Confirm arrears export text still excludes `ttlock_card`, `rent`, `deposit`, internal ids, `undefined`, `null`, and `none`.
+4. Confirm owner navigation and arrears module were not changed by the employee asset deploy.
+5. Confirm no production business write was performed.
+6. Confirm production cutover remains `PRODUCTION_NO_GO`.

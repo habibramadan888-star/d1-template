@@ -2095,3 +2095,20 @@ Verification status:
 - No migration.
 - No deploy.
 - Write gate off.
+
+## EMPLOYEE-FOLLOWUP-MATCH-ENTRY-UX-DEPLOY-001
+
+| Area | Status | Notes |
+|---|---|---|
+| Predeploy validation | PASS | Security, launch gate, focused employee Follow-up tests, QA dry-run, embedded checks, and drift audit passed. |
+| Worker deploy | PASS | Version `bae1241e-ac4b-4747-bebe-a4bb4a9bd00f`. |
+| Uploaded asset | PASS | `/employee-v3.html`. |
+| Employee Export visible tab/page | REMOVED | Live asset has no visible Export tab/page markers. |
+| Employee Entry / Follow-up navigation | PASS | Live asset contains Entry and Follow-up markers only. |
+| Follow-up compact card | PASS | Live asset contains Details / Collapse interaction markers. |
+| Header logout | PASS | Live asset contains visible Logout control; old account button is CSS-hidden. |
+| Owner export preservation | PASS | Owner WhatsApp and arrears export markers remain live. |
+| Authenticated phone acceptance | MANUAL_REQUIRED | Not run in this Codex deploy task because no password/token/cookie was used. |
+| Production write / gate | NOT_RUN | No business write and no write gate opening. |
+| D1 migration / execute | NOT_RUN | No migration, D1 execute/export/import/write. |
+| Production cutover | NO_GO | Remains `PRODUCTION_NO_GO`. |

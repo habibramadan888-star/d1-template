@@ -252,3 +252,21 @@ Employee mobile visual checklist:
 - Expanded card shows Promise Date, Note, Boss Note, Source, and Submit/Saved state.
 - No visible employee Export page.
 - Boss WhatsApp export remains available on owner side.
+
+## EMPLOYEE-FOLLOWUP-MATCH-ENTRY-UX-DEPLOY-001
+
+Live Worker version: `bae1241e-ac4b-4747-bebe-a4bb4a9bd00f`.
+
+| Check | Expected | Actual | Pass/Fail |
+|---|---|---|---|
+| Employee tabs | Entry and Follow-up only | | |
+| Employee Export tab/page | Not visible | | |
+| Header identity | One identity display | | |
+| Header logout | `Logout / 退出` visible | | |
+| Follow-up card style | Matches Entry card visual system | | |
+| Details / Collapse | Works without page jump | | |
+| Raw customer code | Hidden from default card | | |
+| `existing_arrears_record` raw label | Hidden from default card | | |
+| Owner WhatsApp export | Still available | | |
+| Production write | None during visual QA | | |
+| Production cutover | `PRODUCTION_NO_GO` | | |

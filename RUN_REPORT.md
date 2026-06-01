@@ -6265,3 +6265,17 @@ Result: implemented locally, not deployed.
 - No production write.
 - Write gate off.
 - Production cutover remains `PRODUCTION_NO_GO`.
+
+## EMPLOYEE-FOLLOWUP-MATCH-ENTRY-UX-DEPLOY-001 - 2026-06-01
+
+Result: deployed UI-only employee Follow-up Entry-aligned UX.
+
+- Worker version id: `bae1241e-ac4b-4747-bebe-a4bb4a9bd00f`.
+- Uploaded asset: `/employee-v3.html`.
+- Employee app live asset exposes Entry and Follow-up only; visible Export tab/page is removed.
+- Follow-up page shell, compact card, and Details / Collapse markers are live.
+- Header now has a visible Logout control; the old account button remains only as hidden compatibility DOM.
+- Owner WhatsApp/arrears export markers remain present in `index-51-main.js`.
+- Authenticated Abdul/owner phone acceptance was not executed by Codex in this deploy record and remains required.
+- No production D1 write, migration, D1 export/import/execute, owner directive create, employee follow-up write, batch dispatch, TTLock smoke, financial formula change, or dashboard calculation change was performed.
+- Production cutover remains `PRODUCTION_NO_GO`.
