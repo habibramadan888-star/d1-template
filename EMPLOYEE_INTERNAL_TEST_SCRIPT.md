@@ -1,5 +1,13 @@
 # Employee Internal Test Script
 
+## Selected 3 TTLock Dispatch Audit - 2026-06-01
+
+1. Do not expect Abdul inbox to show new `112`, `113`, or `125` tasks from this audit.
+2. The selected TTLock rows were blocked before production write because they are read-model virtual rows, not confirmed persisted directive rows.
+3. Abdul's persisted directive inbox count remains the real API count and must not be inflated by owner TTLock dry-run rows.
+4. Production write gate remains off.
+5. Production cutover remains `PRODUCTION_NO_GO`.
+
 ## EMPLOYEE-FOLLOWUP-ENTRY-LAYOUT-PARITY-HARD-FIX-001 Employee Checks
 
 Date: 2026-06-01, Asia/Dubai

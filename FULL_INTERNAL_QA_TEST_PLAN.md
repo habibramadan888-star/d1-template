@@ -1,5 +1,15 @@
 # Full Internal QA Test Plan
 
+## Selected 3 TTLock Dispatch Blocker QA - 2026-06-01
+
+- Selected TTLock rooms/beds `112`, `113`, and `125` are visible in the owner read SOT.
+- Real dispatch is blocked until TTLock expired unpaid rows are materialized into the persisted directive write model.
+- Do not expect Abdul inbox to show +3 from this audit.
+- Do not retry production write until a separate TTLock materialization plan is approved and staged.
+- Write gate remains off.
+- No production D1 write, migration, D1 execute/export/import, batch dispatch, TTLock full rollout, financial formula change, or dashboard calculation change occurred.
+- Production cutover remains `PRODUCTION_NO_GO`.
+
 ## EMPLOYEE-FOLLOWUP-ENTRY-LAYOUT-PARITY-HARD-FIX-001 QA Addendum
 
 The employee Follow-up page has been locally refactored to enforce hard Entry layout parity.

@@ -1,5 +1,17 @@
 # Arrears Directive Module Status After Production Smoke
 
+## Selected 3 TTLock Dispatch Audit - 2026-06-01
+
+| Capability | Status | Notes |
+|---|---|---|
+| Selected TTLock read model | PASS | Rooms/beds `112`, `113`, `125` visible from owner read SOT. |
+| Selected TTLock real dispatch | BLOCKED | TTLock rows are virtual aggregation rows and are not confirmed persisted `arrear_tasks` rows. |
+| Owner directive create | NOT_RUN | Stopped before write. |
+| Employee inbox +3 | NOT_RUN | Abdul persisted directive count remains baseline only. |
+| TTLock materialization | REQUIRED | Separate implementation/approval needed before real TTLock dispatch. |
+| Production write gate | OFF | Not opened. |
+| Production cutover | PRODUCTION_NO_GO | No cutover. |
+
 Date: 2026-05-31, Asia/Dubai
 
 Scope: record the completed `existing_arrears_record` minimum production-linked smoke only.

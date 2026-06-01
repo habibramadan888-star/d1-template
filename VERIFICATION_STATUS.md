@@ -1,5 +1,17 @@
 # Verification Status
 
+## Selected 3 TTLock Real Dispatch Readiness - 2026-06-01
+
+| Check | Status | Evidence |
+|---|---|---|
+| Selected rooms/beds | PASS | `112`, `113`, `125` only |
+| Owner read model visibility | PASS | TTLock expired unpaid rows visible in read-only SOT |
+| Write endpoint compatibility | BLOCKED | `/api/boss/arrears/directives` updates persisted `arrear_tasks` only |
+| Write gate | OFF | Not opened |
+| Production D1 write | NO | No owner directive create or employee follow-up |
+| Abdul inbox +3 | NOT_RUN | Dispatch blocked; baseline count remains 1 |
+| Production cutover | NO_GO | Remains `PRODUCTION_NO_GO` |
+
 ## EMPLOYEE-FOLLOWUP-ENTRY-LAYOUT-PARITY-HARD-FIX-001 Verification Addendum
 
 Date: 2026-06-01, Asia/Dubai

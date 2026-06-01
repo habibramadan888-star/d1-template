@@ -1,5 +1,13 @@
 # Owner Internal Test Script
 
+## Selected 3 TTLock Dispatch Audit - 2026-06-01
+
+1. Owner read model may show TTLock expired unpaid rows for `112`, `113`, and `125`.
+2. Do not treat those rows as real assigned employee directives unless they have been materialized into persisted `arrear_tasks`.
+3. This audit did not open write gate and did not send the three rows to Abdul.
+4. Any future real TTLock dispatch requires a separate materialization plan and approval.
+5. Production cutover remains `PRODUCTION_NO_GO`.
+
 ## EMPLOYEE-FOLLOWUP-ENTRY-PERFECT-PARITY-DEPLOY-001 Owner Notes
 
 Date: 2026-06-01, Asia/Dubai
