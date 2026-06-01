@@ -1,5 +1,32 @@
 # Bed Transfer Production Rollout Decision
 
+## Live Render Path Fix Addendum
+
+Date: 2026-06-01
+
+Decision: `LIVE_UI_RENDER_PATH_FIXED_REAL_WRITE_BLOCKED`
+
+| Question | Decision |
+|---|---|
+| Was the live Bed Transfer render path fixed? | Yes. Step 2 now mounts the dedicated Bed Transfer form. |
+| Does Bed Transfer show From Bed / To Bed? | Yes. |
+| Does Bed Transfer show Transfer Date / Reason / Note? | Yes. |
+| Does Step 3 show Bed Transfer-specific context? | Yes. |
+| Is real production write enabled? | No. Save/export remains gated. |
+| Was production D1 written? | No. |
+| Was production migration executed? | No. |
+| Production cutover | `PRODUCTION_NO_GO` |
+
+Evidence:
+
+- `BED_TRANSFER_LIVE_RENDER_PATH_AUDIT.md`
+- `BED_TRANSFER_EVENT_SELECTION_FIX_RESULT.md`
+- `BED_TRANSFER_STEP2_FORM_FIX_RESULT.md`
+- `BED_TRANSFER_STEP3_CONTEXT_FIX_RESULT.md`
+- `BED_TRANSFER_SAVE_GATED_UI_RESULT.md`
+- `BED_TRANSFER_LIVE_UI_RENDER_FIX_DEPLOY_RESULT.md`
+- `BED_TRANSFER_LIVE_UI_RENDER_FIX_SMOKE_RESULT.md`
+
 ## UI-Only Production Deploy Addendum
 
 Date: 2026-06-01

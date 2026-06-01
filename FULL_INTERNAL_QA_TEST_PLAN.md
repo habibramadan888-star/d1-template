@@ -1,5 +1,21 @@
 # Full Internal QA Test Plan
 
+## BED-TRANSFER-LIVE-UI-RENDER-PATH-FIX-001 QA Addendum
+
+The employee Bed Transfer live render path has been fixed and deployed as UI-only.
+
+QA must verify:
+
+- Selecting Bed Transfer switches the active Step 2 renderer to the dedicated Bed Transfer form.
+- From Bed, To Bed, Transfer Date, Reason, and Note are visible without scrolling to unrelated later sections.
+- The generic one-field Bed target UI is hidden for Bed Transfer.
+- Step 3 uses Bed Transfer-specific context, not generic Bed Check-only context.
+- Save/export remains gated; no production write is allowed.
+- Production migration and real Bed Transfer smoke remain separate approval items.
+- No D1 execute/export/import, occupancy mutation, deposit mutation, arrears mutation, TTLock mutation, financial formula change, dashboard calculation change, or production cutover is approved.
+
+Production cutover remains `PRODUCTION_NO_GO`.
+
 ## BED-TRANSFER-PRODUCTION-UI-ONLY-DEPLOY-001 QA Addendum
 
 The employee Bed Transfer UI-only fields have been deployed for phone inspection, but real Bed Transfer writes remain blocked.

@@ -1,5 +1,23 @@
 # Run Report
 
+## BED-TRANSFER-LIVE-UI-RENDER-PATH-FIX-001
+
+Date: 2026-06-01, Asia/Dubai
+
+Scope: fixed and deployed the employee Bed Transfer live render path.
+
+- Root cause: Bed Transfer fields existed in the asset but were not mounted into Step 2, and the final live `renderContext()` path still rendered generic Bed Check context.
+- Step 2 now mounts Bed Transfer fields into `bedTransferStep2Mount`.
+- Selecting Bed Transfer hides the generic single Bed input and shows From Bed, To Bed, Transfer Date, Reason, and Note.
+- Step 3 now renders Bed Transfer-specific system context: occupant, original check-in, rent period, deposit, arrears, TTLock record, new bed status, new rent, and rent difference review.
+- Save/export remains gated by `BED_TRANSFER_WRITE_ENABLED=false`.
+- Deployed Worker version: `21b8ddb4-0c9c-4558-bc49-0e7ee9b55069`.
+- Live asset smoke passed for `/employee-v3`.
+- No production write gate was opened.
+- No production D1 write, production migration, D1 execute/export/import, Bed Transfer write, occupancy mutation, deposit mutation, arrears mutation, TTLock mutation, financial formula change, or dashboard calculation change occurred.
+
+Production remains `PRODUCTION_NO_GO`.
+
 ## BED-TRANSFER-PRODUCTION-UI-ONLY-DEPLOY-001
 
 Date: 2026-06-01, Asia/Dubai

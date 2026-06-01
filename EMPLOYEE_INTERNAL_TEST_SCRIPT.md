@@ -1,5 +1,22 @@
 # Employee Internal Test Script
 
+## BED-TRANSFER-LIVE-UI-RENDER-PATH-FIX-001 Employee Checks
+
+Date: 2026-06-01, Asia/Dubai
+
+The live Employee Entry Bed Transfer render path has been fixed and deployed to Worker version `21b8ddb4-0c9c-4558-bc49-0e7ee9b55069`.
+
+Manual employee QA should confirm:
+
+- Select `Bed Transfer / 换床` in Step 1.
+- Step 2 immediately shows From Bed, To Bed, Transfer Date, Reason, and Note.
+- Step 2 no longer shows only one generic Bed field for Bed Transfer.
+- Step 3 shows Bed Transfer-specific context: Current occupant, Original check-in date, Rent period, Deposit, Current arrears, TTLock record, New bed status, New bed rent, and Rent difference review.
+- Pressing save must show the write-not-enabled/approval-required message and must not create a production entry.
+- Other entry types still render normally.
+
+Production cutover remains `PRODUCTION_NO_GO`.
+
 ## BED-TRANSFER-PRODUCTION-UI-ONLY-DEPLOY-001 Employee Checks
 
 Date: 2026-06-01, Asia/Dubai

@@ -1,5 +1,22 @@
 # Verification Status
 
+## BED-TRANSFER-LIVE-UI-RENDER-PATH-FIX-001 Verification Addendum
+
+Date: 2026-06-01, Asia/Dubai
+
+| Verification | Result | Evidence | Commercial Meaning |
+|---|---:|---|---|
+| live render path audit | PASS | `BED_TRANSFER_LIVE_RENDER_PATH_AUDIT.md` | Root cause identified as wrong active UI path, not schema/write behavior. |
+| Step 2 Bed Transfer form | PASS | `BED_TRANSFER_STEP2_FORM_FIX_RESULT.md` | From/To/Date/Reason/Note are in the active Step 2 path. |
+| Step 3 context | PASS | `BED_TRANSFER_STEP3_CONTEXT_FIX_RESULT.md` | Bed Transfer no longer falls back to generic Bed Check-only context. |
+| save gate | PASS | `BED_TRANSFER_SAVE_GATED_UI_RESULT.md` | Real production write remains disabled. |
+| focused tests | PASS | 15 focused Bed Transfer UI/render tests plus existing Bed Transfer suites passed | UI-only path is locked by tests. |
+| production static deploy | PASS | `BED_TRANSFER_LIVE_UI_RENDER_FIX_DEPLOY_RESULT.md` | Worker version `21b8ddb4-0c9c-4558-bc49-0e7ee9b55069`. |
+| live read-only smoke | PASS | `BED_TRANSFER_LIVE_UI_RENDER_FIX_SMOKE_RESULT.md` | `/employee-v3` contains the deployed markers. |
+| production write | NO | no business write executed | Phone QA may inspect UI only. |
+| production migration | NO | no migration executed | Real write still requires separate approval. |
+| production cutover | PRODUCTION_NO_GO | commercial launch gate | This deploy is not rollout/cutover approval. |
+
 ## BED-TRANSFER-PRODUCTION-UI-ONLY-DEPLOY-001 Verification Addendum
 
 Date: 2026-06-01, Asia/Dubai
