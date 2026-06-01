@@ -16,13 +16,15 @@ function extractLastFunction(source, name, asyncKeyword = false) {
   throw new Error(`Could not extract ${name}`);
 }
 
-test("button copy distinguishes saved, submit feedback, and submit changes", async () => {
+test("button copy distinguishes saved state from compact save action", async () => {
   const html = await readFile("deploy-worker/public/employee-v3.html", "utf8");
   const update = extractLastFunction(html, "updateEmployeeDirectivePersistedState");
 
   assert.match(update, /textContent='.*'/);
   assert.match(update, /hasPersisted&&!dirty/);
-  assert.match(update, /hasPersisted\?'Submit Changes \/ 提交修改':'Submit Feedback \/ 提交反馈'/);
+  assert.match(update, /btn\.textContent='Saved \/ 已保存'/);
+  assert.match(update, /btn\.textContent='Save \/ 保存'/);
+  assert.doesNotMatch(update, /Submit Feedback|Submit Changes/);
   assert.match(update, /aria-disabled/);
 });
 

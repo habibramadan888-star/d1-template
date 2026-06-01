@@ -2177,3 +2177,18 @@ Date: 2026-06-01, Asia/Dubai
 | Production write / gate | NOT_RUN | No write gate opening and no business write |
 | D1 migration / execute | NOT_RUN | No migration or D1 execute/export/import/write |
 | Production cutover | NO_GO | Remains `PRODUCTION_NO_GO` |
+
+## EMPLOYEE-FOLLOWUP-BOSS-CARD-COMPACT-UI-001 Verification Addendum
+
+Date: 2026-06-01, Asia/Dubai
+
+| Verification | Result | Evidence |
+|---|---:|---|
+| compact boss card test | PASS | `npm run test:employee-followup-boss-card-compact` |
+| expanded fields test | PASS | `npm run test:employee-followup-boss-card-expanded-fields` |
+| note default test | PASS | `npm run test:employee-followup-note-default-value` |
+| compact layout test | PASS | `npm run test:employee-followup-boss-card-compact-layout` |
+| production write / gate | NOT_RUN | No production business write and no write gate opening |
+| D1 migration / execute | NOT_RUN | No migration or D1 execute/export/import/write |
+| deploy | NOT_RUN | Deploy approval file generated only |
+| Production cutover | NO_GO | Remains `PRODUCTION_NO_GO` |

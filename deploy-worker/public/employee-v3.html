@@ -2176,6 +2176,56 @@ label .label-en{
   justify-content:flex-end;
   margin-top:14px;
 }
+.employee-followup-view .employee-directive-card{
+  padding:14px;
+}
+.employee-followup-view .employee-directive-card .employee-directive-summary{
+  gap:10px;
+}
+.employee-followup-view .employee-directive-card .employee-directive-title{
+  font-size:20px;
+}
+.employee-followup-view .employee-directive-card .followup-money{
+  min-width:96px;
+  font-size:18px;
+}
+.employee-followup-view .employee-directive-card .employee-directive-meta{
+  gap:5px;
+  margin-top:8px;
+}
+.employee-followup-view .employee-directive-card .followup-tag{
+  min-height:20px;
+  padding:3px 8px;
+  font-size:10px;
+}
+.employee-followup-view .employee-directive-card .employee-directive-actions{
+  margin-top:10px;
+}
+.employee-followup-view .employee-directive-card .employee-directive-details{
+  margin-top:10px;
+  padding-top:10px;
+  border-top:1px solid rgba(207,216,220,.72);
+}
+.employee-followup-view .employee-directive-card .directive-followup-actions{
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;
+  gap:8px;
+  margin-top:0;
+}
+.employee-followup-view .employee-directive-card .directive-followup-actions input,
+.employee-followup-view .employee-directive-card .directive-followup-actions textarea{
+  min-height:42px;
+  padding:10px 12px;
+  border-radius:14px;
+}
+.employee-followup-view .employee-directive-card .directive-followup-actions textarea{
+  height:42px;
+  min-height:42px;
+}
+.employee-followup-view .employee-directive-card .directive-followup-actions .mini-btn,
+.employee-followup-view .employee-directive-card .employee-directive-actions .mini-btn{
+  min-height:42px;
+  padding:9px 13px;
+}
 @media(max-width:720px){
   .brand{
     grid-template-columns:1fr auto;
@@ -3324,10 +3374,21 @@ function employeeDirectiveSourceLabel(source){
     historical_arrears:'Existing Arrears / 系统已有欠款'
   }[raw]||'Boss Assigned / 老板下发';
 }
+function isDirectiveDemoNote(value){
+  const raw=String(value||'').trim();
+  if(!raw)return false;
+  return /^(QA\s*smoke|QA\s*测试|QA smoke：|QA smoke:)/i.test(raw)||
+    raw.includes('仅用于 production-linked 最小验证')||
+    raw.includes('production-linked minimal validation');
+}
+function employeeDirectiveEditableNote(value){
+  const raw=String(value||'').trim();
+  return isDirectiveDemoNote(raw)?'':raw;
+}
 function normalizeEmployeeDirective(d){
   const amount=Number(d?.amount_fils??d?.amountFils??0)/100;
   const promisedPaymentDate=String(d?.promised_payment_date||d?.promise_date||'');
-  const followupNote=String(d?.followup_note||d?.staff_note||'');
+  const followupNote=employeeDirectiveEditableNote(d?.followup_note||d?.staff_note||'');
   return {
     directive_id:String(d?.directive_id||d?.task_id||d?.id||''),
     task_id:String(d?.task_id||d?.directive_id||d?.id||''),
@@ -3419,7 +3480,6 @@ function employeeDirectiveStatusLabel(status){
 }
 function employeeDirectiveCard(d){
   const id=safeDomId(d.task_id);
-  const source=employeeDirectiveSourceLabel(d.source_type);
   const overdue=d.overdue_days>0?`Overdue ${d.overdue_days} days / 逾期 ${d.overdue_days} 天`:'Not overdue / 未逾期';
   const amount=d.amount>0?`${fmtMoney(d.amount)} AED`:'Amount to confirm / 金额待确认';
   const status=employeeDirectiveStatusLabel(d.directive_status);
@@ -3442,15 +3502,10 @@ function employeeDirectiveCard(d){
       <button class="mini-btn" data-toggle-directive-details="${esc(id)}" aria-expanded="false">Expand Details / 展开详情</button>
     </div>
     <div class="employee-directive-details" id="directiveDetails_${id}" hidden>
-      <div class="employee-directive-hint">Only update promise date and note. / 只需填写承诺日期和备注。</div>
-      <div class="followup-note">
-        Source / 来源：${esc(source)}<br>
-        Boss Note / 老板备注：${esc(d.owner_note||'None / 暂无')}
-      </div>
       <div class="directive-followup-actions">
         <label><span class="employee-directive-field-label">Promise Date / 承诺日期</span><input id="directivePromise_${id}" data-directive-edit="${esc(id)}" type="date" value="${esc(d.promised_payment_date||'')}" min="${today()}" aria-label="Promise Date / 承诺日期"></label>
-        <label><span class="employee-directive-field-label">Note / 备注</span><textarea id="directiveNote_${id}" data-directive-edit="${esc(id)}" placeholder="Customer response or reason / 客户答复或未付款原因">${esc(d.followup_note||'')}</textarea></label>
-        <button class="mini-btn" data-save-directive-follow="${esc(d.task_id)}">Submit Feedback / 提交反馈</button>
+        <label><span class="employee-directive-field-label">Note / 备注</span><textarea id="directiveNote_${id}" data-directive-edit="${esc(id)}" placeholder="Note / 备注">${esc(employeeDirectiveEditableNote(d.followup_note))}</textarea></label>
+        <button class="mini-btn" data-save-directive-follow="${esc(d.task_id)}">Save / 保存</button>
       </div>
     </div>
   </div>`;
@@ -3612,7 +3667,7 @@ function updateEmployeeDirectivePersistedState(taskId){
       btn.classList.add('disabled');
       btn.setAttribute('aria-disabled','true');
     }else{
-      btn.textContent=hasPersisted?'Submit Changes / 提交修改':'Submit Feedback / 提交反馈';
+      btn.textContent='Save / 保存';
       btn.disabled=false;
       btn.classList.remove('disabled');
       btn.removeAttribute('aria-disabled');

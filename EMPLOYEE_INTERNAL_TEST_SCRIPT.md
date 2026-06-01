@@ -329,3 +329,20 @@ Employee phone acceptance after the UI-only deploy:
 7. Tap Details / Collapse and confirm the card expands and collapses without page jump.
 8. Confirm no write is triggered by viewing or expanding cards.
 9. Confirm write gate remains off and production cutover remains `PRODUCTION_NO_GO`.
+
+## EMPLOYEE-FOLLOWUP-BOSS-CARD-COMPACT-UI-001 Employee Checks
+
+Date: 2026-06-01, Asia/Dubai
+
+Boss Assigned Tasks compact-card acceptance:
+
+1. Confirm the default card shows only bed, amount, due date, overdue/not-overdue state, and saved/unsaved state.
+2. Confirm helper text such as `Only update promise date and note` is not visible.
+3. Confirm source and boss-note blocks are not visible in the employee task card.
+4. Confirm Details opens a short form with only Promise Date, Note, and Save.
+5. Confirm the Note field is blank when there is no saved note.
+6. Confirm a real saved note still appears if the server has saved feedback.
+7. Confirm known QA/demo smoke note text is not prefilled.
+8. Confirm `Saved / 已保存` is shown only for saved unchanged feedback.
+9. Confirm unsaved/edited feedback uses `Save / 保存`.
+10. Confirm no production write is performed and write gate remains off.

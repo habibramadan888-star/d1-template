@@ -558,3 +558,19 @@ QA must verify:
 - Authenticated mobile acceptance is manual required before closing the UI bug.
 - No production write gate, D1 write, migration, batch dispatch, TTLock smoke, financial formula change, or dashboard calculation change is authorized by this deploy.
 - Production cutover remains `PRODUCTION_NO_GO`.
+
+## EMPLOYEE-FOLLOWUP-BOSS-CARD-COMPACT-UI-001 QA Addendum
+
+The boss-assigned task card on employee Follow-up is locally compacted.
+
+QA must verify:
+
+- Employee sees only execution-critical fields by default.
+- Expanded card shows only Promise Date, Note, and Save.
+- Helper/source/boss-note blocks are removed from the employee task card.
+- Note defaults blank when there is no saved note.
+- Known QA/demo smoke note text is not prefilled.
+- Button state is simple: `Saved / 已保存` for unchanged saved feedback, `Save / 保存` for new/edited feedback.
+- No production write, write gate opening, migration, D1 execute/export/import, financial formula change, or dashboard calculation change is authorized.
+- Deploy is not included unless separately approved.
+- Production cutover remains `PRODUCTION_NO_GO`.

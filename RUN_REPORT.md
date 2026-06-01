@@ -6346,3 +6346,17 @@ Result: deployed employee UI-only hard Entry parity fix to the default productio
 - Authenticated mobile acceptance is still manual required; no credentials were read and no production session was created in this deploy verification.
 - No production D1 write, migration, write gate opening, owner directive create, employee follow-up write, batch dispatch, TTLock smoke, financial formula change, dashboard calculation change, or production cutover was performed.
 - Production cutover remains `PRODUCTION_NO_GO`.
+
+## EMPLOYEE-FOLLOWUP-BOSS-CARD-COMPACT-UI-001 - 2026-06-01
+
+Result: implemented locally, not deployed.
+
+- Employee Follow-up boss-assigned task card has been compacted for execution use.
+- Default card keeps only bed, amount, due date, overdue/not-overdue state, boss-assigned marker, and saved/unsaved state.
+- Expanded details now only show Promise Date, Note, and Save.
+- Helper text, source block, and boss-note block were removed from the employee task card.
+- Note textarea defaults blank when no saved note exists.
+- Known QA/demo smoke note text is filtered out of the editable default value.
+- Button copy is simplified to `Save / 保存`; saved unchanged feedback remains `Saved / 已保存`.
+- No production write, write gate opening, D1 execute/export/import, migration, deploy, employee follow-up write, owner directive create, financial formula change, dashboard calculation change, or production cutover was performed.
+- Production cutover remains `PRODUCTION_NO_GO`.
