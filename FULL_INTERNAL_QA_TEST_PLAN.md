@@ -574,3 +574,18 @@ QA must verify:
 - No production write, write gate opening, migration, D1 execute/export/import, financial formula change, or dashboard calculation change is authorized.
 - Deploy is not included unless separately approved.
 - Production cutover remains `PRODUCTION_NO_GO`.
+
+## EMPLOYEE-FOLLOWUP-BOSS-CARD-COMPACT-DEPLOY-001 QA Addendum
+
+The compact boss-assigned employee Follow-up card is deployed to Worker version `1ef96378-7259-4605-ac46-7e5dfe169488`.
+
+QA must verify:
+
+- Employee Follow-up expanded state is compact.
+- Helper/source/boss-note blocks are removed.
+- Expanded state only keeps Promise Date, Note, Save, and Collapse.
+- Note defaults blank when no saved non-QA note exists.
+- Blank note does not override old notes.
+- Owner WhatsApp and arrears exports are not deleted.
+- No production write, write gate opening, D1 execute/export/import, migration, batch dispatch, TTLock smoke, financial formula change, or dashboard calculation change is authorized by this deploy.
+- Production cutover remains `PRODUCTION_NO_GO`.

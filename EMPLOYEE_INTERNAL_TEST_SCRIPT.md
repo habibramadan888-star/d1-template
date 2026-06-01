@@ -346,3 +346,24 @@ Boss Assigned Tasks compact-card acceptance:
 8. Confirm `Saved / 已保存` is shown only for saved unchanged feedback.
 9. Confirm unsaved/edited feedback uses `Save / 保存`.
 10. Confirm no production write is performed and write gate remains off.
+
+## EMPLOYEE-FOLLOWUP-BOSS-CARD-COMPACT-DEPLOY-001 Mobile Checks
+
+Live Worker version: `1ef96378-7259-4605-ac46-7e5dfe169488`.
+
+Employee phone acceptance after deploy:
+
+1. Open Abdul employee page.
+2. Open Follow-up.
+3. Confirm Boss Assigned task `144 / 50 AED` remains visible.
+4. Tap `Expand Details / 展开详情`.
+5. Confirm expanded state is compact and does not take almost a full screen.
+6. Confirm helper instruction box is gone.
+7. Confirm source / existing arrears box is gone.
+8. Confirm boss-note box is gone.
+9. Confirm expanded area only has Promise Date, Note, Save, and Collapse.
+10. Confirm Note is blank unless there is a real saved non-QA note.
+11. Confirm blank Note does not create dirty state.
+12. Confirm changing date or note shows Unsaved / 当前修改未提交.
+13. Confirm no promised amount input appears and amount cannot be edited.
+14. Confirm no production write is triggered during visual QA.

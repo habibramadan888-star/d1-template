@@ -319,3 +319,22 @@ Live Worker version: `5d949970-115e-4208-8a39-dac981c4bf61`.
 | Owner regression | WhatsApp export still available | | |
 | Production write | None during visual QA | | |
 | Production cutover | `PRODUCTION_NO_GO` | | |
+
+## EMPLOYEE-FOLLOWUP-BOSS-CARD-COMPACT-DEPLOY-001 Visual Checks
+
+Live Worker version: `1ef96378-7259-4605-ac46-7e5dfe169488`.
+
+| Screenshot / State | Required | Pass/Fail | Notes |
+|---|---|---|---|
+| Employee Follow-up card collapsed | Bed, amount, due date, overdue state, saved state only | | |
+| Employee Follow-up card expanded | Promise Date, Note, Save, Collapse only | | |
+| Helper instruction | Not visible | | |
+| Source / existing arrears box | Not visible in employee card | | |
+| Boss note box | Not visible in employee card | | |
+| Note default | Blank unless a real saved non-QA note exists | | |
+| Dirty state | Only appears after date or note edit | | |
+| Amount editing | No amount input and no amount edit path | | |
+| Owner WhatsApp export | Still available | | |
+| Owner arrears export | Still available | | |
+| Production write | None during visual QA | | |
+| Production cutover | `PRODUCTION_NO_GO` | | |

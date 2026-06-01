@@ -2192,3 +2192,21 @@ Date: 2026-06-01, Asia/Dubai
 | D1 migration / execute | NOT_RUN | No migration or D1 execute/export/import/write |
 | deploy | NOT_RUN | Deploy approval file generated only |
 | Production cutover | NO_GO | Remains `PRODUCTION_NO_GO` |
+
+## EMPLOYEE-FOLLOWUP-BOSS-CARD-COMPACT-DEPLOY-001 Verification Addendum
+
+Date: 2026-06-01, Asia/Dubai
+
+| Verification | Result | Evidence |
+|---|---:|---|
+| Worktree check | PASS | `EMPLOYEE_FOLLOWUP_BOSS_CARD_COMPACT_DEPLOY_WORKTREE_CHECK.md` |
+| Predeploy verification | PASS | `EMPLOYEE_FOLLOWUP_BOSS_CARD_COMPACT_PREDEPLOY_VERIFY_RESULT.md` |
+| Deployment | PASS | Worker version `1ef96378-7259-4605-ac46-7e5dfe169488` |
+| Live asset verify | PASS | `EMPLOYEE_FOLLOWUP_BOSS_CARD_COMPACT_LIVE_ASSET_VERIFY_RESULT.md` |
+| Live public smoke | PASS | `EMPLOYEE_FOLLOWUP_BOSS_CARD_COMPACT_LIVE_SMOKE_RESULT.md` |
+| Authenticated mobile smoke | MANUAL_REQUIRED | No credential read or production session creation authorized in this deploy task |
+| Employee Export | REMOVED | Not restored |
+| Owner exports | PRESERVED | WhatsApp / arrears export code remains |
+| Production write / gate | NOT_RUN | No write gate opening and no business write |
+| D1 migration / execute | NOT_RUN | No migration or D1 execute/export/import/write |
+| Production cutover | NO_GO | Remains `PRODUCTION_NO_GO` |

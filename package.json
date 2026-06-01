@@ -257,6 +257,8 @@
     "test:employee-followup-boss-card-expanded-fields": "node --test tests/employee-followup-boss-card-expanded-fields.spec.mjs",
     "test:employee-followup-note-default-value": "node --test tests/employee-followup-note-default-value.spec.mjs",
     "test:employee-followup-boss-card-compact-layout": "node --test tests/employee-followup-boss-card-compact-layout.spec.mjs",
+    "test:employee-followup-boss-card-button-state": "node --test tests/employee-arrears-followup-button-copy.spec.mjs",
+    "test:employee-followup-boss-card-interaction": "node --test tests/employee-followup-boss-card-expanded-fields.spec.mjs",
     "test:employee-arrears-inbox-mobile-acceptance": "node --test tests/employee-arrears-inbox-mobile-acceptance.spec.mjs",
     "test:owner-arrears-directive-feedback": "node --test tests/owner-arrears-directive-feedback-display.spec.mjs",
     "test:arrears-whatsapp-user-format": "node --test tests/arrears-whatsapp-user-verified-format.spec.mjs",

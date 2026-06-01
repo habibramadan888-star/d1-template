@@ -425,3 +425,16 @@ Owner-side regression checks for this employee UI-only deploy:
 4. Confirm no owner directive write, employee follow-up write, batch dispatch, or TTLock smoke was executed.
 5. Confirm no production D1 write or migration was performed.
 6. Confirm production cutover remains `PRODUCTION_NO_GO`.
+
+## Employee Follow-up Compact Boss Card Deploy Owner Regression
+
+Live Worker version: `1ef96378-7259-4605-ac46-7e5dfe169488`.
+
+Owner regression checks:
+
+1. Open owner arrears module.
+2. Confirm owner WhatsApp export remains available.
+3. Confirm owner arrears export remains available.
+4. Confirm task `144` feedback remains visible where applicable.
+5. Confirm no owner directive write, employee follow-up write, batch dispatch, or TTLock smoke was executed.
+6. Confirm production cutover remains `PRODUCTION_NO_GO`.

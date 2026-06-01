@@ -6360,3 +6360,19 @@ Result: implemented locally, not deployed.
 - Button copy is simplified to `Save / 保存`; saved unchanged feedback remains `Saved / 已保存`.
 - No production write, write gate opening, D1 execute/export/import, migration, deploy, employee follow-up write, owner directive create, financial formula change, dashboard calculation change, or production cutover was performed.
 - Production cutover remains `PRODUCTION_NO_GO`.
+
+## EMPLOYEE-FOLLOWUP-BOSS-CARD-COMPACT-DEPLOY-001 - 2026-06-01
+
+Result: deployed employee Follow-up boss-assigned task compact UI fix to the default production Worker.
+
+- Deploy source commit: `5655701`.
+- Worker version: `1ef96378-7259-4605-ac46-7e5dfe169488`.
+- Uploaded asset scope: `/employee-v3.html` only.
+- Expanded boss-assigned task card now removes helper/source/boss-note blocks.
+- Expanded details retain only Promise Date, Note, Save, and Collapse.
+- Note default blank rule and QA smoke note filter are live in the employee asset.
+- Employee Export remains removed.
+- Owner WhatsApp / arrears exports remain present.
+- Authenticated Abdul phone acceptance remains manual required; automated deploy verification did not read credentials or create production sessions.
+- No production write, write gate opening, D1 execute/export/import, migration, owner directive create, employee follow-up write, batch dispatch, TTLock smoke, financial formula change, dashboard calculation change, or production cutover was performed.
+- Production cutover remains `PRODUCTION_NO_GO`.
