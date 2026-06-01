@@ -24,9 +24,9 @@ test("Current Session WhatsApp baseline includes compact header and all rows", a
     }
   ]);
 
-  assert.match(text, /^Homelink Entry \| 2026-06-02 \| Abdul/m);
-  assert.match(text, /Cash 820\.00 AED \| Bank 0\.00 AED \| Total 820\.00 AED/);
-  assert.match(text, /1\. 144 rent 770\.00 cash 2026-06-05 to 2026-07-05/);
+  assert.match(text, /^Entry 06\/02 \| Abdul \| 2 records/m);
+  assert.match(text, /Cash 820\.00 \| Bank 0\.00 \| Total 820\.00/);
+  assert.match(text, /1\. 144 rent 770\.00 cash 0605-0705/);
   assert.match(text, /2\. 144->145 bed_transfer 50\.00 cash customer_request/);
 });
 

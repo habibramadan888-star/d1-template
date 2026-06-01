@@ -2782,6 +2782,40 @@ async function handleBossArrearsDirectives(request,env,user){
   return json(responseBody);
 }
 __name(handleBossArrearsDirectives,"handleBossArrearsDirectives");
+async function handleEmployeeSystemReminders(request,env,user){
+  if(!isStaffRoleValue(user?.role))return forbidden();
+  const url=new URL(request.url);
+  const limit=Math.min(Math.max(Number(url.searchParams.get("limit")||100),1),500);
+  const detailed=await empListMergedArrearTasksDetailed(env,user,{limit,ttlockTimeoutMs:8000});
+  return success({
+    success:true,
+    readonly:true,
+    tasks:detailed.mapped||[],
+    all_tasks:detailed.mapped||[],
+    summary:{
+      total_count:detailed.total_count||0,
+      total_amount_fils:detailed.total_amount_fils||0,
+      existing_arrears_count:detailed.existing_arrears_count||0,
+      ttlock_expired_unpaid_count:detailed.ttlock_expired_unpaid_count||0,
+      promised_unpaid_count:detailed.promised_unpaid_count||detailed.employee_promised_count||0,
+      config_missing_count:detailed.config_missing_count||0,
+      required_followup_count:(detailed.mapped||[]).filter((row)=>{
+        const directive=String(row?.directive_status||"").toLowerCase();
+        const follow=String(row?.followup_status||"").toLowerCase();
+        return ["assigned","pending","viewed","needs_review","overdue"].includes(directive)||["needs_review","promise_overdue","pending_followup"].includes(follow);
+      }).length
+    },
+    sources:{
+      existing_arrears_record:empSourceContract(detailed.source_status?.existing_arrears_record,detailed.existing_arrears_count||0),
+      ttlock_expired_unpaid:empSourceContract(detailed.source_status?.ttlock_expired_unpaid,detailed.ttlock_expired_unpaid_count||0)
+    },
+    source_authority:["existing_arrears_record","ttlock_expired_unpaid"],
+    source_status:detailed.source_status,
+    generated_at:empNow(),
+    production_cutover:"PRODUCTION_NO_GO"
+  });
+}
+__name(handleEmployeeSystemReminders,"handleEmployeeSystemReminders");
 async function handleEmployeeArrearsDirectives(request,env,user){
   if(!isStaffRoleValue(user?.role))return forbidden();
   const rows=await env.DB.prepare(
@@ -3358,6 +3392,7 @@ async function handleEmployeeApi(request,env,user){
   if(isReadonlyAdminRoleValue(user?.role)&&request.method!=="GET")return forbidden();
   const employeeDirectiveFollowup=path.match(/^\/api\/employee\/arrears\/directives\/([^/]+)\/followup$/);
   if(employeeDirectiveFollowup&&request.method==="POST")return handleEmployeeArrearsDirectiveFollowup(request,env,user,cleanId(employeeDirectiveFollowup[1]));
+  if(path==="/api/employee/system/reminders"&&request.method==="GET")return handleEmployeeSystemReminders(request,env,user);
   if(path==="/api/employee/arrears/directives"&&request.method==="GET")return handleEmployeeArrearsDirectives(request,env,user);
   if(path==="/api/employee/migrate"&&request.method==="POST"){
     if(!requireManager(user))return forbidden();
@@ -3581,14 +3616,16 @@ function ownerOverviewClassifyTransaction(row){
   const isExpense=cat==="expense";
   const isArrearsRecovery=!!row?.linked_task_id||["paid","recovered","partial"].includes(String(row?.arrear_handling||"").toLowerCase())||note.includes("arrear");
   const isReceived=cat==="cash"||cat==="bank";
-  const isTransfer=tag==="transfer"||!!row?.bed_from||!!row?.bed_to;
+  const isTransfer=tag==="transfer"||type==="TF"||type==="TFF"||!!row?.bed_from||!!row?.bed_to;
+  const isBedTransferFee=isTransfer&&isReceived;
   return {
     isReceived,
     isDeposit,
     isRefund,
     isExpense,
     isArrearsRecovery,
-    isRent:isReceived&&!isDeposit&&!isArrearsRecovery,
+    isBedTransferFee,
+    isRent:isReceived&&!isDeposit&&!isArrearsRecovery&&!isBedTransferFee,
     isNewTenant:tag==="new"&&!isTransfer,
     isCheckout:type==="CO"&&!isTransfer,
     isTransfer
@@ -3602,6 +3639,7 @@ function ownerOverviewSummarizeTransactions(rows=[]){
     rent_received:0,
     deposit_received:0,
     arrears_recovered:0,
+    bed_transfer_fee:0,
     deposit_refund:0,
     expenses:0,
     net_cashflow:0,
@@ -3617,6 +3655,7 @@ function ownerOverviewSummarizeTransactions(rows=[]){
     if(cls.isRent)out.rent_received+=amount;
     if(cls.isDeposit)out.deposit_received+=amount;
     if(cls.isArrearsRecovery)out.arrears_recovered+=amount;
+    if(cls.isBedTransferFee)out.bed_transfer_fee+=amount;
     if(cls.isRefund)out.deposit_refund+=amount;
     if(cls.isExpense)out.expenses+=amount;
     if(cls.isNewTenant)out.new_tenants+=1;
@@ -3741,6 +3780,9 @@ async function phase0OwnerOverviewComparativeSummary(env,user,url){
     readonly:true,
     period:{today,current_month:currentMonth,last_month:lastMonth,same_month_last_year:sameMonthLastYear,current_quarter:currentQuarter,last_quarter:lastQuarter,same_quarter_last_year:sameQuarterLastYear},
     current:{month,quarter},
+    last_month:prevMonth,
+    same_month_last_year:sameLastYear,
+    quarter_to_date:quarter,
     comparisons:{
       last_month:{
         gross_received:ownerOverviewDelta(month.gross_received,prevMonth.gross_received),
@@ -3767,6 +3809,7 @@ async function phase0OwnerOverviewComparativeSummary(env,user,url){
       rent_received:month.rent_received,
       deposit_received:month.deposit_received,
       arrears_recovered:month.arrears_recovered,
+      bed_transfer_fee:month.bed_transfer_fee,
       deposit_refund:month.deposit_refund,
       expenses:month.expenses,
       net_cashflow:month.net_cashflow

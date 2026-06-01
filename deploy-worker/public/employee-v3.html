@@ -2735,7 +2735,7 @@ function readSessionId(userid){
   try{return localStorage.getItem(employeeStorageKey('empv3:sessionId',userid))||''}
   catch{return ''}
 }
-const state={lockCards:[],current:null,depositBalance:null,rentConfig:{},rentConfigLoaded:false,drafts:[],tasks:[],employeeDirectives:[],followupItems:[],sessionId:'',user:null};
+const state={lockCards:[],current:null,depositBalance:null,rentConfig:{},rentConfigLoaded:false,drafts:[],tasks:[],employeeDirectives:[],followupItems:[],systemReminderItems:[],systemReminderStatus:'idle',systemReminderSummary:null,systemReminderSources:null,sessionId:'',user:null};
 const BED_TRANSFER_WRITE_ENABLED=true;
 const BED_TRANSFER_EVENT_LEDGER_MESSAGE='Bed transfer records save event anchors only. This does not directly change bed occupancy, deposit, arrears, or TTLock. 换床记录只保存信息锚点，不会直接改变床位、押金、欠款或通通锁。';
 const BED_TRANSFER_SUBMITTED_MESSAGE='Bed transfer recorded / 换床记录已保存';
@@ -4213,6 +4213,66 @@ function isEmployeeTtlockReminder(item){
 function isEmployeeSystemArrearsReminder(item){
   return normalizeEmployeeReminderSourceType(item)==='existing_arrears_record'&&!isEmployeeTtlockReminder(item);
 }
+function employeeSystemReminderAmount(row){
+  const fils=Number(row?.amount_fils??row?.total_amount_fils??row?.remaining_amount_fils??row?.outstanding_amount_fils);
+  if(Number.isFinite(fils)&&fils>0)return Math.round(fils)/100;
+  const amount=Number(row?.amount??row?.remain??row?.remaining_amount??row?.outstanding_amount??row?.arrear_amount);
+  const received=Number(row?.actual_received||0);
+  if(Number.isFinite(amount))return Math.max(0,amount-(Number.isFinite(received)?received:0));
+  return 0;
+}
+function normalizeEmployeeSystemReminder(row){
+  const sourceType=normalizeEmployeeReminderSourceType(row);
+  const bed=String(row?.room_bed||row?.bed||row?.room||row?.bed_no||'').trim();
+  const customer=String(row?.customer_code||row?.tenant_card_id||row?.tenant_name||'').trim();
+  return {
+    source:sourceType==='ttlock_expired_unpaid'?'ttlock':'history',
+    source_type:sourceType,
+    task_id:String(row?.task_id||row?.id||row?.source_ref||`${sourceType}-${bed}-${customer}`).trim(),
+    bed,
+    tenant_name:customer,
+    tenant_card_id:customer,
+    lock_remark:customer,
+    followup_class:'customer',
+    amount:employeeSystemReminderAmount(row),
+    reason:row?.arrear_reason||row?.reason||'system_sot',
+    period_start:row?.period_start||row?.original_period_start||'',
+    period_end:row?.period_end||row?.original_period_end||'',
+    due_date:row?.due_date||row?.promise_date||row?.original_period_end||'',
+    overdue_days:Number(row?.overdue_days||0),
+    followup_status:row?.followup_status||'待跟进',
+    promise_date:row?.promise_date||row?.promised_payment_date||'',
+    staff_note:row?.staff_note||row?.followup_note||'',
+    directive_status:row?.directive_status||'none',
+    boss_requested_due_date:row?.boss_requested_due_date||'',
+    boss_directive:['assigned','pending','viewed'].includes(String(row?.directive_status||'').toLowerCase()),
+    force:['assigned','pending','viewed','needs_review','overdue'].includes(String(row?.directive_status||'').toLowerCase())||Number(row?.overdue_days||0)>3,
+    raw:row
+  };
+}
+async function loadEmployeeSystemReminders(render=true){
+  state.systemReminderStatus='loading';
+  if(render)$('taskList').innerHTML='<div class="hint">Loading real system reminders / 正在读取真实系统提醒...</div>';
+  try{
+    const r=await apiFetch('/api/employee/system/reminders?limit=100');
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    const data=await r.json();
+    const rows=Array.isArray(data.tasks)?data.tasks:(Array.isArray(data.all_tasks)?data.all_tasks:[]);
+    state.systemReminderItems=rows.map(normalizeEmployeeSystemReminder).filter(x=>x.task_id&&employeeSystemReminderAmount(x)>=0);
+    state.systemReminderSummary=data.summary||{};
+    state.systemReminderSources=data.sources||data.source_status||{};
+    state.systemReminderStatus='success';
+    if(render)renderTasks();
+    return true;
+  }catch(e){
+    state.systemReminderItems=[];
+    state.systemReminderSummary=null;
+    state.systemReminderSources=null;
+    state.systemReminderStatus='error';
+    if(render)$('taskList').innerHTML='<div class="hint">无法读取真实系统提醒，请重试。No fake data is shown.</div>';
+    return false;
+  }
+}
 function stripTtlockAccountPhoneForEmployee(value){
   return String(value||'')
     .replace(/\+?971[\s-]?\d{8,10}\b/g,'')
@@ -4270,6 +4330,12 @@ function historyFollowupItems(){
   }).filter(Boolean);
 }
 function currentFollowupItems(){
+  if(state.systemReminderStatus==='success'||state.systemReminderStatus==='error'){
+    const items=(state.systemReminderItems||[]).slice();
+    items.sort((a,b)=>(Number(b.boss_directive)-Number(a.boss_directive))||(Number(b.force)-Number(a.force))||(b.overdue_days-a.overdue_days)||(b.amount-a.amount));
+    state.followupItems=items;
+    return items;
+  }
   const history=historyFollowupItems();
   const historyBeds=new Set(history.map(x=>String(x.bed||'')).filter(Boolean));
   const items=[...dueFromLockCards().filter(x=>!historyBeds.has(String(x.bed||''))),...history];
@@ -4328,6 +4394,10 @@ function followupCard(item){
 }
 function renderTasks(){
   const items=currentFollowupItems();
+  if(state.systemReminderStatus==='error'){
+    $('taskList').innerHTML='<div class="hint">无法读取真实系统提醒，请点击刷新重试。TTLock 和历史欠款不会显示假数。</div>';
+    return;
+  }
   const history=items.filter(isEmployeeSystemArrearsReminder);
   const due=items.filter(isEmployeeTtlockReminder);
   const force=items.filter(x=>x.force).length;
@@ -4339,7 +4409,7 @@ function renderTasks(){
     <div class="kpi-card followup-metric"><span>应收提醒</span><small>AMOUNT</small><b>${fmtMoney(total)}</b></div>
   </div>`;
   if(!items.length){
-    $('taskList').innerHTML=dashboard+'<div class="hint">当前没有通通锁过期租金或历史欠款。若刚打开页面，请先点击“刷新通通锁”。</div>';
+    $('taskList').innerHTML=dashboard+'<div class="hint">当前真实 SOT 没有通通锁过期未付或系统已有欠款。请点击刷新重新读取后端。</div>';
     return;
   }
   $('taskList').innerHTML='<div class="boss-directive-title step-title employee-system-reminders-title"><span>1</span><div class="boss-directive-heading">System Reminders / 系统提醒<small>SYSTEM REMINDERS</small></div></div>'+dashboard+`<div class="followup-list">${items.map(followupCard).join('')}</div>`;
@@ -4369,9 +4439,7 @@ async function refreshFollowup(){
   btn.disabled=true;btn.classList.add('disabled');btn.innerHTML='正在刷新<span class="label-en">REFRESHING</span>';
   try{
     await loadEmployeeArrearsDirectives(false);
-    await loadTasks(false);
-    await loadLock();
-    await loadTasks(false);
+    await loadEmployeeSystemReminders(false);
     renderEmployeeDirectiveInbox();
     renderTasks();
     toast(`跟进已刷新：老板下发 ${state.employeeDirectives.length} 条，系统提醒 ${state.followupItems.length} 条`,6000);
@@ -4614,6 +4682,11 @@ function entryWhatsappAmount(e){
   if(e?.type==='R')return num(e?.paid||e?.amount);
   return num(e?.amount);
 }
+function entryWhatsappShortDate(value){
+  const raw=String(value||'').slice(0,10);
+  const m=raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m?`${m[2]}${m[3]}`:entryWhatsappSafe(raw);
+}
 function entryWhatsappLine(e,i){
   const type=entryWhatsappType(e);
   const bed=entryWhatsappBed(e);
@@ -4624,15 +4697,19 @@ function entryWhatsappLine(e,i){
     const reason=entryWhatsappSafe(e?.waiver_reason||e?.fee_waiver_reason||e?.transfer_reason||e?.reason||e?.note||e?.remark||'bed_transfer');
     return `${i+1}. ${bed} bed_transfer ${waived?'waived ':''}${amount} ${pay} ${reason}`.trim();
   }
-  const period=e?.period_start&&e?.period_end?` ${e.period_start} to ${e.period_end}`:'';
+  const start=e?.period_start||e?.startDate||e?.start_date;
+  const end=e?.period_end||e?.endDate||e?.end_date;
+  const period=start&&end?` ${entryWhatsappShortDate(start)}-${entryWhatsappShortDate(end)}`:'';
   const reason=entryWhatsappSafe(e?.reason_code||e?.custom_reason||e?.note||e?.remark||e?.expense_desc||'');
   return `${i+1}. ${bed} ${type} ${amount} ${pay}${period}${reason?' '+reason:''}`.trim();
 }
 function buildEntrySessionWhatsAppText(){
   const s=sessionStats();
+  const entryDate=today().slice(5).replace('-','/');
+  const count=state.drafts.length;
   const lines=[
-    `Homelink Entry | ${today()} | ${entryWhatsappSafe(operatorName()||operatorId())}`,
-    `Cash ${fmtMoney(s.cashBalance)} AED | Bank ${fmtMoney(s.bankIn)} AED | Total ${fmtMoney(s.grossReceived)} AED`
+    `Entry ${entryDate} | ${entryWhatsappSafe(operatorName()||operatorId())} | ${count} ${count===1?'record':'records'}`,
+    `Cash ${fmtMoney(s.cashBalance)} | Bank ${fmtMoney(s.bankIn)} | Total ${fmtMoney(s.grossReceived)}`
   ];
   state.drafts.forEach((e,i)=>lines.push(entryWhatsappLine(e,i)));
   return lines.join('\n');
@@ -4794,7 +4871,7 @@ function showEmployeeView(view,opts={}){
     if(location.hash!==hash)history.pushState(null,'',location.pathname+location.search+hash);
   }
   if(next==='arrears')loadEmployeeArrearsDirectives(true);
-  if(next==='system')loadTasks(true);
+  if(next==='system')loadEmployeeSystemReminders(true);
 }
 document.querySelectorAll('.tab').forEach(btn=>btn.onclick=()=>showEmployeeView(btn.dataset.view,{pushHash:true}));
 window.addEventListener('hashchange',()=>showEmployeeView(location.hash,{pushHash:false}));

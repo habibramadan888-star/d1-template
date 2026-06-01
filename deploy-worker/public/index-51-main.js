@@ -4637,6 +4637,235 @@ function renderOwnerOverview(){
   ensureOwnerOverviewArrearsAsync();
 }
 
+function ownerOverviewCloudData(){
+  return state.overviewComparativeStatus==='success'&&state.overviewComparative?state.overviewComparative:{};
+}
+function ownerOverviewCurrentMonth(){
+  return ownerOverviewCloudData().current?.month||ownerOverviewCloudData().quarter_to_date||{};
+}
+function ownerOverviewArrearsCloud(){
+  return ownerOverviewCloudData().arrears||{};
+}
+function ownerOverviewRiskCloud(){
+  return ownerOverviewCloudData().risk_watch||{};
+}
+function ownerOverviewFlowCloud(){
+  return ownerOverviewCloudData().occupancy_flow||{};
+}
+function ownerOverviewTrendMeta(metric){
+  const direction=String(metric?.direction||'flat');
+  const interpretation=String(metric?.interpretation||'flat');
+  if(interpretation==='no_data')return ['历史数据不足','NO DATA','#667085'];
+  if(direction==='up')return ['较对比期上升','UP','#1a8a4a'];
+  if(direction==='down')return ['较对比期下降','DOWN','#d93025'];
+  return ['较对比期持平','FLAT','#5b6b7f'];
+}
+function ownerOverviewDeltaLabel(metric){
+  if(!metric||metric.interpretation==='no_data')return '历史数据不足';
+  const delta=Number(metric.absolute_delta||0);
+  const pct=metric.percent_delta===null||metric.percent_delta===undefined?'无基数':`${Number(metric.percent_delta).toFixed(1)}%`;
+  return `差额 ${delta>=0?'+':''}${fmtMoney(delta)} / ${pct}`;
+}
+function ownerOverviewMetricCard(title,metric){
+  const [label,badge,color]=ownerOverviewTrendMeta(metric);
+  return `<div class="ana-kpi owner-overview-bi-metric" data-owner-overview-trend-interpretation="${esc(metric?.interpretation||'flat')}">
+    <div class="ana-kpi-lbl">${esc(title)}</div>
+    <div class="ana-kpi-val" style="color:${color}">${fmtMoney(metric?.current||0)}</div>
+    <div class="hist-anchor">${esc(ownerOverviewDeltaLabel(metric))}</div>
+    <div class="hist-order" style="color:${color}">${badge} · ${esc(label)}</div>
+  </div>`;
+}
+function ownerOverviewBiShell(){
+  return `<div class="owner-overview-bi-shell" data-owner-overview-comparative-shell="true">
+    <div class="owner-overview-arrears-skeleton" data-owner-overview-comparative-skeleton="true">
+      <div class="hist-toolbar"><span>经营对比</span><span class="hist-order">读取云端流水中</span></div>
+      <div class="hist-grid owner-arrears-skeleton"><div></div><div></div><div></div></div>
+    </div>
+  </div>`;
+}
+function renderOwnerOverviewComparativePanel(){
+  const panel=document.getElementById('ownerOverviewComparativePanel');
+  if(!panel)return;
+  const status=state.overviewComparativeStatus||'idle';
+  if(status==='loading'||status==='idle'){
+    panel.innerHTML=ownerOverviewBiShell();
+    return;
+  }
+  if(status==='error'){
+    panel.innerHTML=`<div class="empty-state hl-empty-state" data-owner-overview-comparative-error="true">
+      <div class="empty-title">经营对比读取失败</div>
+      <div class="empty-text">${esc(state.overviewComparativeError||'请刷新重试')}</div>
+    </div>`;
+    return;
+  }
+  const data=state.overviewComparative||{};
+  const comp=data.comparisons||{};
+  const month=data.current?.month||{};
+  const accounting=data.accounting_separation||{};
+  const flow=data.occupancy_flow||{};
+  const bedReview=data.bed_transfer_review||{};
+  const transferRecords=Array.isArray(bedReview.records)?bedReview.records:(Array.isArray(bedReview.pending_review)?bedReview.pending_review:[]);
+  const arrears=data.arrears||{};
+  const risk=data.risk_watch||{};
+  const quality=data.data_quality||{};
+  panel.innerHTML=`<div class="owner-overview-comparative-bi" data-owner-overview-comparative-bi="true">
+    <div class="hist-toolbar">
+      <span>经营对比</span>
+      <span class="hist-order">本月 vs 上月 / 去年同月 / 本季度累计</span>
+    </div>
+    <div class="ana-kpi-grid" data-owner-overview-business-snapshot="true">
+      ${ownerOverviewMetricCard('本月实收',comp.last_month?.gross_received)}
+      ${ownerOverviewMetricCard('租金收入',comp.last_month?.rent_received)}
+      ${ownerOverviewMetricCard('净现金流',comp.last_month?.net_cashflow)}
+      ${ownerOverviewMetricCard('欠款回收',comp.last_month?.arrears_recovered)}
+    </div>
+    <div class="hist-grid" style="margin-top:12px" data-owner-overview-accounting-separation="true">
+      <div class="hist-card"><div class="hist-title">会计口径</div>
+        <div class="hist-stat"><span>租金收入</span><b>${fmtMoney(accounting.rent_received||0)}</b></div>
+        <div class="hist-stat"><span>押金收入</span><b>${fmtMoney(accounting.deposit_received||0)}</b></div>
+        <div class="hist-stat"><span>欠款回收</span><b>${fmtMoney(accounting.arrears_recovered||0)}</b></div>
+        <div class="hist-stat"><span>换床费</span><b>${fmtMoney(accounting.bed_transfer_fee||0)}</b></div>
+        <div class="hist-stat"><span>押金退款</span><b>${fmtMoney(accounting.deposit_refund||0)}</b></div>
+        <div class="hist-stat"><span>支出</span><b>${fmtMoney(accounting.expenses||0)}</b></div>
+      </div>
+      <div class="hist-card" data-owner-overview-occupancy-flow="true"><div class="hist-title">入住净变化</div>
+        <div class="hist-stat"><span>新入住</span><b>${Number(flow.new_tenants||0)}</b></div>
+        <div class="hist-stat"><span>退房</span><b>${Number(flow.checkouts||0)}</b></div>
+        <div class="hist-stat"><span>净变化</span><b>${Number(flow.new_tenants||0)-Number(flow.checkouts||0)}</b></div>
+        <div class="hist-stat"><span>换床</span><b>${Number(flow.bed_transfers||0)}</b></div>
+        <div class="hist-anchor">换床不计入新入住/退房。</div>
+      </div>
+      <div class="hist-card" data-owner-bed-transfer-records="true"><div class="hist-title">换床记录</div>
+        <div class="hist-stat"><span>已记录事件</span><b>${Number(bedReview.recorded_count||bedReview.pending_review_count||transferRecords.length||0)}</b></div>
+        ${transferRecords.length?transferRecords.map(t=>{
+          const feeMode=String(t.fee_mode||'charged').toLowerCase();
+          const feeLabel=feeMode==='waived'?'已豁免':`${fmtMoney(Number(t.amount_fils??t.transfer_fee_fils??5000)/100)} AED`;
+          const waiver=feeMode==='waived'&&t.waiver_reason?` · 豁免原因: ${esc(t.waiver_reason)}`:'';
+          const anchor=[t.transfer_date||'-',t.operator_employee||'-',feeLabel,t.reason||'-',t.note||'-'].map(x=>esc(x)).join(' · ');
+          return `<div class="hist-stat"><span>${esc(t.from_bed||'-')} → ${esc(t.to_bed||'-')}</span><b>${esc(t.status==='pending_review'?'已记录':t.status||'已记录')}</b></div><div class="hist-anchor">${anchor}${waiver} · entry ${esc(t.entry_event_id||'-')}</div>`;
+        }).join(''):'<div class="hist-anchor">暂无换床记录。</div>'}
+        <div class="hist-anchor">只读锚点：不改变入住、押金、欠款或通通锁。</div>
+      </div>
+      <div class="hist-card" data-owner-overview-arrears-collection="true"><div class="hist-title">欠款与回收</div>
+        <div class="hist-stat"><span>未结清任务</span><b>${Number(arrears.open_count||0)}</b></div>
+        <div class="hist-stat"><span>待收尾款</span><b>${fmtMoney(arrears.outstanding_amount||0)}</b></div>
+        <div class="hist-stat"><span>员工已反馈</span><b>${Number(arrears.employee_followup?.followed_up_count||0)}</b></div>
+        <div class="hist-stat"><span>已下发</span><b>${Number(arrears.employee_followup?.assigned_count||0)}</b></div>
+      </div>
+      <div class="hist-card" data-owner-overview-risk-watch="true"><div class="hist-title">待办与风险</div>
+        <div class="hist-stat"><span>已逾期</span><b>${Number(risk.overdue_count||0)}</b></div>
+        <div class="hist-stat"><span>承诺逾期</span><b>${Number(risk.broken_promise_count||0)}</b></div>
+        <div class="hist-stat"><span>部分收款</span><b>${Number(risk.partial_payment_count||0)}</b></div>
+        <div class="hist-stat"><span>待核对</span><b>${Number(risk.needs_review_count||0)}</b></div>
+      </div>
+    </div>
+    <div class="hist-anchor" style="margin-top:10px" data-owner-overview-comparison-rules="true">
+      对比规则：本月按已过天数对比上月和去年同月，本季度按已过季度窗口对比。
+      ${quality.warnings?.length?` · ${esc(quality.warnings.join(' '))}`:''}
+      ${quality.no_data?.length?` · 历史数据不足: ${esc(quality.no_data.join(', '))}`:''}
+      · 已检查行数: ${Number(month.rows_checked||0)}
+    </div>
+  </div>`;
+}
+async function loadOwnerOverviewComparativeSummary(){
+  if(state.overviewComparativeStatus==='loading')return false;
+  state.overviewComparativeStatus='loading';
+  state.overviewComparativeError='';
+  renderOwnerOverviewComparativePanel();
+  try{
+    const res=await apiFetch('/api/owner/overview/comparative-summary?period=month&include_last_month=true&include_same_month_last_year=true&include_quarter=true');
+    const data=await res.json();
+    state.overviewComparative=data||{};
+    state.overviewComparativeStatus='success';
+    renderOwnerOverview();
+    return true;
+  }catch(e){
+    state.overviewComparativeStatus='error';
+    state.overviewComparativeError=e?.message||String(e||'');
+    renderOwnerOverviewComparativePanel();
+    return false;
+  }
+}
+function ensureOwnerOverviewComparativeAsync(){
+  renderOwnerOverviewComparativePanel();
+  if(['loading','success'].includes(state.overviewComparativeStatus))return;
+  setTimeout(()=>loadOwnerOverviewComparativeSummary(),0);
+}
+function renderOwnerOverview(){
+  const wrap=document.getElementById('ownerOverviewContent');
+  if(!wrap)return;
+  const sessions=state.analysisSessions&&state.analysisSessions.length?state.analysisSessions:state.saved;
+  const today=(fmtDT(new Date())||'').slice(0,10);
+  const entries=sessions.flatMap(s=>Array.isArray(s.entries)?s.entries.map(e=>({...e,_sessionDate:s.date,_sessionId:s.id,_anchorId:s.anchorId})):[]);
+  const openArrears=(state.arrears||[]).filter(a=>!a.cleared);
+  const overdue=openArrears.filter(a=>a.dueDate&&a.dueDate<today);
+  const latest=sessions.slice().sort((a,b)=>(b.date||'').localeCompare(a.date||'')).slice(0,3);
+  const recentEntries=entries.slice().reverse().slice(0,4);
+  const month=ownerOverviewCurrentMonth();
+  const cloudArrears=ownerOverviewArrearsCloud();
+  const cloudRisk=ownerOverviewRiskCloud();
+  const flow=ownerOverviewFlowCloud();
+  const outstandingAmount=Number.isFinite(Number(cloudArrears.outstanding_amount))?Number(cloudArrears.outstanding_amount):openArrears.reduce((sum,a)=>sum+(Number(a.remain)||0),0);
+  const outstandingCount=Number.isFinite(Number(cloudArrears.open_count))?Number(cloudArrears.open_count):openArrears.length;
+  const todayTodo=Number(cloudRisk.overdue_count||0)+Number(cloudRisk.broken_promise_count||0)+Number(cloudRisk.needs_review_count||0)||openArrears.length+overdue.length;
+  const monthReceived=Number(month.gross_received||0);
+  const netChange=Number(flow.new_tenants||0)-Number(flow.checkouts||0);
+  const kpi=(label,en,value,color='var(--color-primary)',note='')=>`
+    <div class="owner-overview-card hl-card">
+      <strong>${esc(label)}</strong>
+      <span>${esc(en)}</span>
+      <b style="color:${color}">${esc(value)}</b>
+      ${note?`<span>${esc(note)}</span>`:''}
+    </div>`;
+  const latestHtml=latest.length?latest.map(s=>`
+    <div class="detail-row owner-mobile-row">
+      <div class="room">${esc((s.date||'').slice(0,10)||'-')}</div>
+      <div class="note">${esc(s.anchorId||s.id||'会话')}</div>
+      <div class="amount">${Array.isArray(s.entries)?s.entries.length:0} 笔</div>
+    </div>`).join(''):`<div class="empty-state hl-empty-state"><div class="empty-title">暂无历史会话</div><div class="empty-text">导入或刷新数据后显示最近会话。</div></div>`;
+  const alertHtml=[
+    {label:'待收尾款',value:outstandingCount?`${outstandingCount} 项`:'暂无',tone:outstandingCount?'var(--color-warning)':'var(--color-primary)'},
+    {label:'今日待办',value:todayTodo?`${todayTodo} 项`:'暂无',tone:todayTodo?'var(--color-danger)':'var(--color-primary)'},
+    {label:'待核对',value:Number(cloudRisk.needs_review_count||0)?`${Number(cloudRisk.needs_review_count||0)} 项`:'暂无',tone:Number(cloudRisk.needs_review_count||0)?'var(--color-warning)':'var(--color-primary)'},
+    {label:'承诺逾期',value:Number(cloudRisk.broken_promise_count||0)?`${Number(cloudRisk.broken_promise_count||0)} 项`:'暂无',tone:Number(cloudRisk.broken_promise_count||0)?'var(--color-danger)':'var(--color-primary)'}
+  ].map(a=>`<div class="detail-row owner-mobile-row"><div class="room">${esc(a.label)}</div><div class="note">BUSINESS ALERT</div><div class="amount" style="color:${a.tone}">${esc(a.value)}</div></div>`).join('');
+  const recentEntryHtml=recentEntries.length?recentEntries.map(e=>`
+    <div class="detail-row owner-mobile-row">
+      <div class="room">${esc(e.room||'-')}</div>
+      <div class="note">${esc(CATS[e.cat]?.label||e.cat||'流水')} · ${esc((e._sessionDate||'').slice(0,10)||'未归档')}</div>
+      <div class="amount">${fmtMoney(e.amount||0)}</div>
+    </div>`).join(''):`<div class="empty-state hl-empty-state"><div class="empty-title">暂无最近流水</div><div class="empty-text">刷新历史或导入流水后显示最近记录。</div></div>`;
+  wrap.innerHTML=`
+    <div class="owner-overview-grid">
+      ${kpi('待收尾款','OUTSTANDING COLLECTION',fmtMoney(outstandingAmount),'var(--color-warning)',`${outstandingCount} 项未结清`)}
+      ${kpi('今日待办','TODAY ACTIONS',String(todayTodo),'#142033','逾期、承诺逾期、待核对')}
+      ${kpi('本月实收','MONTH RECEIVED',fmtMoney(monthReceived),'var(--color-primary)',state.overviewComparativeStatus==='success'?'来自云端 entry_events':'读取云端中')}
+      ${kpi('入住净变化','OCCUPANCY NET',String(netChange),'#1a73e8',`新入住 ${Number(flow.new_tenants||0)} / 退房 ${Number(flow.checkouts||0)}，换床不计入`)}
+    </div>
+    <div class="card hl-card owner-overview-section" style="margin-top:16px">
+      <div class="card-head"><div><div class="card-title">经营对比</div><div class="card-sub">COMPARATIVE BUSINESS INTELLIGENCE</div></div></div>
+      <div class="card-body"><div id="ownerOverviewComparativePanel" data-owner-overview-comparative-section="true"></div></div>
+    </div>
+    <div class="card hl-card owner-overview-section" style="margin-top:16px">
+      <div class="card-head"><div><div class="card-title">欠款跟进</div><div class="card-sub">ARREARS FOLLOW-UP · ASYNC</div></div></div>
+      <div class="card-body"><div id="ownerOverviewArrearsPanel" data-owner-overview-arrears-section="true"></div></div>
+    </div>
+    <div class="card hl-card owner-overview-section" style="margin-top:16px">
+      <div class="card-head"><div><div class="card-title">异常提醒</div><div class="card-sub">BUSINESS ALERTS</div></div></div>
+      <div class="card-body"><div class="detail-list">${alertHtml}</div></div>
+    </div>
+    <div class="card hl-card owner-overview-section" style="margin-top:16px">
+      <div class="card-head"><div><div class="card-title">最近会话</div><div class="card-sub">RECENT SESSIONS</div></div></div>
+      <div class="card-body"><div class="detail-list">${latestHtml}</div></div>
+    </div>
+    <div class="card hl-card owner-overview-section" style="margin-top:16px">
+      <div class="card-head"><div><div class="card-title">最近流水摘要</div><div class="card-sub">RECENT LEDGER</div></div></div>
+      <div class="card-body"><div class="detail-list">${recentEntryHtml}</div></div>
+    </div>`;
+  ensureOwnerOverviewComparativeAsync();
+  ensureOwnerOverviewArrearsAsync();
+}
+
 /* ── ANALYSIS IMPORT — 双重去重：锚点ID + 内容指纹 ── */
 
 // 内容指纹：日期 + 笔数 + 各类总额（四舍五入到分）
