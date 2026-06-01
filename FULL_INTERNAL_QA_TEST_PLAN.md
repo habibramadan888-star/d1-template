@@ -632,3 +632,11 @@ QA must verify before any later write approval:
 - Raw TTLock data, `source_ref`, and dedupe/materialization fields must not be deleted or changed.
 - This is a UI/count classification fix only; no production write, migration, deploy, financial formula change, or dashboard calculation change is included.
 - Production cutover remains `PRODUCTION_NO_GO`.
+
+Deployment acceptance update:
+
+- Worker version `5db7d12a-6b54-4ed2-ba79-f2eee35c19f7` was deployed for the employee System Reminders count and TTLock phone-hide UI fix.
+- Live read-only verification found Abdul Boss Assigned `46`, TTLock Overdue `41`, Arrears `5`.
+- Boss owner export functions remain present.
+- No production business write, migration, write gate opening, batch dispatch, TTLock smoke, financial formula change, dashboard calculation change, or production cutover was performed.
+- Production cutover remains `PRODUCTION_NO_GO`.

@@ -169,3 +169,18 @@ This document does not approve TTLock production smoke, batch dispatch, public b
 | production write gate | OFF |
 | employee follow-up write | NOT_RUN |
 | production cutover | PRODUCTION_NO_GO |
+
+## Employee Follow-up System Reminder UI Deploy - 2026-06-01
+
+| Capability | Status |
+|---|---|
+| deployed Worker version | `5db7d12a-6b54-4ed2-ba79-f2eee35c19f7` |
+| deployed asset | `/employee-v3.html` |
+| live Abdul Boss Assigned count | 46 |
+| live System Reminders TTLock count | 41 |
+| live System Reminders Arrears count | 5 |
+| TTLock account phone hidden from employee title | PASS |
+| owner exports preserved | PASS |
+| production business write | NO |
+| production write gate | OFF |
+| production cutover | PRODUCTION_NO_GO |

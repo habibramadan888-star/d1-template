@@ -410,3 +410,9 @@ When approval is later granted, employee QA must verify:
 6. Confirm employee task card titles do not show `+971...` TTLock account identifiers.
 7. Confirm raw `source_ref`, dedupe keys, and backend TTLock data are not shown in the default employee card.
 8. No production write, follow-up write, owner directive create, batch dispatch, or write gate opening is authorized by this QA.
+
+Deployment acceptance note:
+
+- Worker version `5db7d12a-6b54-4ed2-ba79-f2eee35c19f7` contains the System Reminders count and title sanitizer fix.
+- Internal mobile QA should confirm the visible counters show TTLock Overdue `41` and Arrears `5`.
+- Internal mobile QA should confirm task titles no longer display TTLock account phone identifiers such as `+971525199099` or `+971521030402`.

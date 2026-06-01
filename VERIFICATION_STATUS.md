@@ -2287,3 +2287,20 @@ Date: 2026-06-01, Asia/Dubai
 | Display-title sanitizer | PASS | `EMPLOYEE_FOLLOWUP_DISPLAY_TITLE_SANITIZER_RESULT.md` |
 | production write | NO | no write gate, no D1 write |
 | Production cutover | NO_GO | Remains `PRODUCTION_NO_GO` |
+
+## EMPLOYEE-FOLLOWUP-SYSTEM-REMINDER-COUNT-AND-PHONE-HIDE-001 Deploy Verification
+
+Date: 2026-06-01, Asia/Dubai
+
+| Verification | Result | Evidence |
+|---|---:|---|
+| deploy result | PASS | `EMPLOYEE_SYSTEM_REMINDER_COUNT_PHONE_HIDE_DEPLOY_RESULT.md` |
+| live asset verify | PASS | `EMPLOYEE_SYSTEM_REMINDER_COUNT_PHONE_HIDE_LIVE_ASSET_VERIFY_RESULT.md` |
+| live read-only smoke | PASS | `EMPLOYEE_SYSTEM_REMINDER_COUNT_PHONE_HIDE_LIVE_SMOKE_RESULT.md` |
+| Worker version id | PASS | `5db7d12a-6b54-4ed2-ba79-f2eee35c19f7` |
+| employee TTLock count | PASS | `41` |
+| employee Arrears count | PASS | `5` |
+| owner exports preserved | PASS | `/index-51-main.js` export functions present |
+| production business write | NO | no write API invoked |
+| write gate | OFF | no write-gate secret names present |
+| Production cutover | NO_GO | Remains `PRODUCTION_NO_GO` |
