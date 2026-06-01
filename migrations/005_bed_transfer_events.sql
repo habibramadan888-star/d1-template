@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS bed_transfer_events (
   fee_mode TEXT DEFAULT 'charged',
   waiver_reason TEXT,
   category TEXT DEFAULT 'bed_transfer_fee',
+  review_flags TEXT,
   carry_over_arrears_fils INTEGER DEFAULT 0,
   old_ttlock_ref TEXT,
   new_ttlock_ref TEXT,

@@ -28,6 +28,7 @@ CREATE TABLE bed_transfer_events_recorded_migration (
   fee_mode TEXT DEFAULT 'charged',
   waiver_reason TEXT,
   category TEXT DEFAULT 'bed_transfer_fee',
+  review_flags TEXT,
   carry_over_arrears_fils INTEGER DEFAULT 0,
   old_ttlock_ref TEXT,
   new_ttlock_ref TEXT,
@@ -55,7 +56,7 @@ INSERT OR IGNORE INTO bed_transfer_events_recorded_migration (
   id, transfer_id, corp_id, tenant_scope, from_bed, to_bed, transfer_date, effective_date,
   customer_id, customer_code, customer_display_name, original_checkin_date, original_rent_period_start,
   original_rent_period_end, original_deposit_amount_fils, current_rent_amount_fils, new_bed_rent_amount_fils,
-  rent_difference_fils, transfer_fee_fils, amount_fils, fee_mode, waiver_reason, category,
+  rent_difference_fils, transfer_fee_fils, amount_fils, fee_mode, waiver_reason, category, review_flags,
   carry_over_arrears_fils, old_ttlock_ref, new_ttlock_ref,
   old_lock_valid_from, old_lock_valid_until, new_lock_valid_from, new_lock_valid_until, reason, note,
   operator_employee, status, audit_id, trace_id, entry_event_id, qa_tag, created_at, updated_at
@@ -67,7 +68,7 @@ SELECT
   rent_difference_fils, transfer_fee_fils, COALESCE(transfer_fee_fils, 0),
   CASE WHEN COALESCE(transfer_fee_fils, 0) > 0 THEN 'charged' ELSE 'waived' END,
   CASE WHEN COALESCE(transfer_fee_fils, 0) > 0 THEN '' ELSE 'legacy zero-fee transfer' END,
-  'bed_transfer_fee',
+  'bed_transfer_fee', '[]',
   carry_over_arrears_fils, old_ttlock_ref, new_ttlock_ref,
   old_lock_valid_from, old_lock_valid_until, new_lock_valid_from, new_lock_valid_until, reason, note,
   operator_employee, COALESCE(NULLIF(status,''),'recorded'), audit_id, trace_id, trace_id, qa_tag, created_at, updated_at

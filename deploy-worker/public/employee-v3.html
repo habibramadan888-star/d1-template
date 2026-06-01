@@ -2687,6 +2687,24 @@ const BED_TRANSFER_WRITE_ENABLED=true;
 const BED_TRANSFER_EVENT_LEDGER_MESSAGE='Bed transfer records save event anchors only. This does not directly change bed occupancy, deposit, arrears, or TTLock. 换床记录只保存信息锚点，不会直接改变床位、押金、欠款或通通锁。';
 const BED_TRANSFER_SUBMITTED_MESSAGE='Bed transfer recorded / 换床记录已保存';
 const BED_TRANSFER_WRITE_DISABLED_MESSAGE='换床事件账本写入不可用，请稍后重试。 Bed transfer event-ledger write is unavailable.';
+function isTtlockAccountPhone(value){
+  return /\+971\d{7,12}/.test(String(value||''));
+}
+function sanitizeBedTransferDisplay(value,fallback='Kept in audit / 后台留存'){
+  const raw=String(value||'').trim();
+  if(!raw)return '';
+  return isTtlockAccountPhone(raw)?fallback:raw.replace(/\+971\d{7,12}/g,'[hidden]');
+}
+function bedTransferReviewLabel(code){
+  return {
+    to_bed_occupied_or_needs_review:'New bed review',
+    deposit_review_required:'Deposit review',
+    rent_period_review_required:'Rent period review',
+    ttlock_review_required:'TTLock review',
+    pending_transfer_exists:'Pending transfer review',
+    rent_difference_review:'Rent difference review'
+  }[String(code||'')]||String(code||'Review required');
+}
 function apiUrl(path){return location.protocol!=='file:'&&location.host.includes('workers.dev')?path:API_ORIGIN+path}
 async function apiFetch(path,opts={}){return wrapStandardJsonResponse(await fetch(apiUrl(path),{credentials:'include',...opts,headers:{'Content-Type':'application/json',...(opts.headers||{})}}))}
 function wrapStandardJsonResponse(response){
@@ -3154,12 +3172,12 @@ function bedTransferValidationSummary(fromBed,toBed,context={}){
   if(!toBed)errors.push('to_bed_required');
   if(fromBed&&toBed&&fromBed===toBed)errors.push('from_bed_must_differ_from_to_bed');
   if(context.fromBedHasActiveTenant===false)errors.push('from_bed_no_active_tenant');
-  if(context.toBedAvailable===false)review.push('to_bed_occupied_or_needs_review');
-  if(context.depositFound===false)review.push('deposit_review_required');
-  if(context.rentPeriodFound===false)review.push('rent_period_review_required');
-  if(context.ttlockFound===false)review.push('ttlock_review_required');
-  if(context.pendingTransfer===true)review.push('pending_transfer_exists');
-  if(context.rentDifferenceFils&&Number(context.rentDifferenceFils)!==0)review.push('rent_difference_review');
+  if(context.toBedAvailable===false)review.push('New bed review');
+  if(context.depositFound===false)review.push('Deposit review');
+  if(context.rentPeriodFound===false)review.push('Rent period review');
+  if(context.ttlockFound===false)review.push('TTLock review');
+  if(context.pendingTransfer===true)review.push('Pending transfer review');
+  if(context.rentDifferenceFils&&Number(context.rentDifferenceFils)!==0)review.push('Rent difference review');
   return {ok:errors.length===0,errors,review,status:errors.length?'blocked':(review.length?'recorded_with_notes':'validated')};
 }
 function bedTransferReviewContext(){
@@ -3196,7 +3214,7 @@ function updateBedTransferReviewPanel(){
   set('transferDepositReview',ctx.depositFound?`${fmtMoney(depositHeld())} AED carried`:'deposit_review_required / 押金需核对');
   set('transferPeriodReview',ctx.rentPeriodFound?`${state.current?.start_md||state.current?.start||'-'} → ${state.current?.end||'-'}`:'rent_period_review_required');
   set('transferArrearsReview',ctx.arrearsCount?`${ctx.arrearsCount} open / ${fmtMoney(ctx.arrearsAed)} AED carry-over`:'no open arrears found');
-  set('transferOldTtlockReview',ctx.ttlockFound?`old ref kept: ${state.current?.tenant_card_id||'-'}`:'ttlock_review_required');
+  set('transferOldTtlockReview',ctx.ttlockFound?`old ref kept: ${sanitizeBedTransferDisplay(state.current?.tenant_card_id||'-')}`:'ttlock_review_required');
   set('transferNewBedReview',ctx.toBed?(ctx.toBedAvailable===false?'occupied / needs_review':'available or pending verification'):'待填写新床位');
   set('transferRentDiffReview',ctx.fromRent&&ctx.toRent?`${fmtMoney(toRentMinusFrom(ctx))} AED review`:'rent config review');
   set('transferAuditReview',`${summary.status}: from/to/operator/reason`);
@@ -3351,6 +3369,33 @@ function depositReturnStatus(held,totalDeduction){
 }
 function renderSummary(){
   const type=$('entryType').value, pay=$('payType').value;
+  if(type==='TF'){
+    const fromBed=$('transferFromBed').value||$('bed').value||'-';
+    const toBed=$('bedTo').value||'-';
+    const feeMode=$('feePaid').value==='N'?'waived':'charged';
+    const feeText=feeMode==='waived'?'Waived / 已豁免':'50.00 AED';
+    const review=bedTransferValidationSummary(
+      transferValue('transferFromBed')||transferValue('bed'),
+      transferValue('bedTo'),
+      bedTransferReviewContext()
+    );
+    const reviewText=review.review.length?review.review.map(bedTransferReviewLabel).join(' / '):'No blocking review flags';
+    const accounting=feeMode==='waived'?'No income / 不产生收入':'Bed transfer fee income / 换床费收入';
+    const items=[
+      ['Event / 事件','Bed Transfer / 换床'],
+      ['Transfer / 换床',`#${fromBed} -> #${toBed}`],
+      ['Fee / 费用',feeText],
+      ['Transfer Date / 换床日期',$('transferDate').value||'-'],
+      ['Reason / 原因',$('transferReason').value||'-'],
+      ['Note / 备注',sanitizeBedTransferDisplay($('remark').value||'-','[hidden]')],
+      ['Review flags / 需核对项',reviewText],
+      ['Accounting effect / 会计影响',accounting],
+      ['No mutation / 不改变','No occupancy, deposit, arrears, or TTLock mutation']
+    ];
+    if(feeMode==='waived')items.splice(3,0,['Waiver Reason / 豁免原因',$('transferWaiverReason').value||'-']);
+    $('entrySummary').innerHTML=items.map(([k,v])=>`<div data-bed-transfer-step8-summary="true"><span>${esc(k)}</span><b>${esc(v)}</b></div>`).join('');
+    return;
+  }
   const period=$('periodStart').value&&$('periodEnd').value?`${$('periodStart').value} → ${$('periodEnd').value}`:'无';
   const diff=Math.max(0,num($('due').value)-num($('paid').value||$('amount').value));
   const task=selectedTask();
@@ -3563,6 +3608,11 @@ async function submitBedTransferEvent(){
     old_ttlock_ref:e.old_ttlock_ref,
     old_lock_valid_from:e.old_lock_valid_from,
     old_lock_valid_until:e.old_lock_valid_until,
+    review_flags:bedTransferValidationSummary(
+      transferValue('transferFromBed')||transferValue('bed'),
+      transferValue('bedTo'),
+      bedTransferReviewContext()
+    ).review,
     transfer_fee:e.fee_paid==='Y'?50:0,
     qa_tag:'employee-ui-bed-transfer',
     idempotency_key:bedTransferEventIdempotencyKey(e)
@@ -3583,6 +3633,7 @@ async function submitBedTransferEvent(){
     return true;
   }catch(err){
     const msg=err?.message||String(err||'submit_failed');
+    setTimeout(()=>toast(`Bed transfer not saved / 换床记录未保存：${msg}`,6000),0);
     $('validationBox').innerHTML=`<div class="bad">换床申请未提交：${esc(msg)}</div>`;
     toast('换床申请未提交，请重试',6000);
     return false;
@@ -4731,6 +4782,8 @@ function renderBedTransferSystemContext(){
   const newRent=ctx.toRent?`${fmtMoney(ctx.toRent)} AED`:'Review required / 需核对';
   const rentDiff=ctx.rentDifferenceFils!=null?`${fmtMoney(ctx.rentDifferenceFils/100)} AED`:'Review required / 需核对';
   const feeMode=$('feePaid')?.value==='N'?'waived':'charged';
+  const occupantSafe=sanitizeBedTransferDisplay(occupant,'TTLock reference kept in audit / TTLock 账号后台留存');
+  const ttlockSafe=sanitizeBedTransferDisplay(ttlock,'TTLock reference kept in audit / TTLock 账号后台留存');
   const waiverReason=$('transferWaiverReason')?.value?.trim()||'Not provided / 未填写';
   const feeText=feeMode==='waived'?'Waived / 已豁免':'50.00 AED';
   const accountingEffect=feeMode==='waived'?'No income / 不计收入':'Bed Transfer Fee income / 换床费收入';
@@ -4751,6 +4804,45 @@ function renderBedTransferSystemContext(){
       <div class="priority-card"><span>New bed status<small>新床位状态</small></span><b>${esc(newBedStatus)}</b><div class="sub">Review before real write</div></div>
       <div class="priority-card rent-check"><span>New bed rent<small>新床位租金</small></span><b>${esc(newRent)}</b><div class="sub">From rent config when available</div></div>
       <div class="priority-card rent-check"><span>Rent difference review<small>租金差异核对</small></span><b>${esc(rentDiff)}</b><div class="sub">Review required before write</div></div>
+      <div class="priority-card warn"><span>Record status<small>记录状态</small></span><b>Recorded / 已记录</b><div class="sub">${esc(BED_TRANSFER_EVENT_LEDGER_MESSAGE)}</div></div>
+    </div>
+  </div>`;
+}
+function renderBedTransferSystemContext(){
+  const ctx=bedTransferReviewContext();
+  const current=state.current||{};
+  const fromBed=transferValue('transferFromBed')||transferValue('bed')||'Not selected / 未选择';
+  const toBed=transferValue('bedTo')||'Not selected / 未选择';
+  const occupant=sanitizeBedTransferDisplay($('tenantName')?.value||current.tenant||current.remark||'Not found / 未抓取','TTLock reference kept in audit / TTLock 账号后台留存');
+  const checkin=current.start_md||current.start||'Review required / 需核对';
+  const period=[current.start_md||current.start,current.end].filter(Boolean).join(' -> ')||'Review required / 需核对';
+  const deposit=depositHeld()?`${fmtMoney(depositHeld())} AED`:(current.deposit?`${fmtMoney(current.deposit)} AED`:'Review required / 需核对');
+  const arrears=ctx.arrearsAed!=null?`${fmtMoney(ctx.arrearsAed)} AED`:'Review required / 需核对';
+  const ttlock=sanitizeBedTransferDisplay($('tenantCardId')?.value||current.tenant_card_id||'Not found / 未抓取','TTLock reference kept in audit / TTLock 账号后台留存');
+  const newBedStatus=toBed&&toBed!=='Not selected / 未选择'?'Review required / 需核对':'Not selected / 未选择';
+  const newRent=ctx.toRent?`${fmtMoney(ctx.toRent)} AED`:'Review required / 需核对';
+  const rentDiff=ctx.rentDifferenceFils!=null?`${fmtMoney(ctx.rentDifferenceFils/100)} AED`:'Review required / 需核对';
+  const feeMode=$('feePaid')?.value==='N'?'waived':'charged';
+  const waiverReason=$('transferWaiverReason')?.value?.trim()||'Not provided / 未填写';
+  const feeText=feeMode==='waived'?'Waived / 已豁免':'50.00 AED';
+  const accountingEffect=feeMode==='waived'?'No income / 不计收入':'Bed Transfer Fee income / 换床费收入';
+  const box=$('bedContext');
+  box.className='ctx clean-context bed-transfer-context-live';
+  box.innerHTML=`<div class="context-board" data-bed-transfer-step3-context="true">
+    <div class="priority-grid">
+      <div class="priority-card bed-check strong"><span>From Bed<small>原床位</small></span><b>${esc(fromBed)}</b><div class="sub">Current bed before transfer</div></div>
+      <div class="priority-card bed-check strong"><span>To Bed<small>新床位</small></span><b>${esc(toBed)}</b><div class="sub">New bed after transfer</div></div>
+      <div class="priority-card fee-check strong"><span>Fee<small>费用</small></span><b>${esc(feeText)}</b><div class="sub">${esc(accountingEffect)}</div></div>
+      ${feeMode==='waived'?`<div class="priority-card warn"><span>Waiver Reason<small>豁免原因</small></span><b>${esc(waiverReason)}</b><div class="sub">Required for waived transfers</div></div>`:''}
+      <div class="priority-card"><span>Current occupant<small>当前住客</small></span><b>${esc(occupant)}</b><div class="sub">Must remain same customer</div></div>
+      <div class="priority-card date-check"><span>Original check-in date<small>原入住日期</small></span><b>${esc(checkin)}</b><div class="sub">Do not treat as new check-in</div></div>
+      <div class="priority-card"><span>Rent period<small>租金周期</small></span><b>${esc(period)}</b><div class="sub">Carry existing billing anchor</div></div>
+      <div class="priority-card deposit-check"><span>Deposit<small>押金</small></span><b>${esc(deposit)}</b><div class="sub">Carry as liability, not revenue</div></div>
+      <div class="priority-card arrears-check"><span>Current arrears<small>当前欠款</small></span><b>${esc(arrears)}</b><div class="sub">Carry unpaid balance</div></div>
+      <div class="priority-card"><span>TTLock record<small>TTLock 记录</small></span><b>${esc(ttlock)}</b><div class="sub">Preserve old lock reference in audit only</div></div>
+      <div class="priority-card"><span>New bed status<small>新床位状态</small></span><b>${esc(newBedStatus)}</b><div class="sub">Review flags do not block saving</div></div>
+      <div class="priority-card rent-check"><span>New bed rent<small>新床位租金</small></span><b>${esc(newRent)}</b><div class="sub">From rent config when available</div></div>
+      <div class="priority-card rent-check"><span>Rent difference review<small>租金差异核对</small></span><b>${esc(rentDiff)}</b><div class="sub">Recorded as review flag only</div></div>
       <div class="priority-card warn"><span>Record status<small>记录状态</small></span><b>Recorded / 已记录</b><div class="sub">${esc(BED_TRANSFER_EVENT_LEDGER_MESSAGE)}</div></div>
     </div>
   </div>`;

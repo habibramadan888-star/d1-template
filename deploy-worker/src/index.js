@@ -1135,6 +1135,7 @@ const BED_TRANSFER_EVENT_COLUMNS = [
   "customer_id","customer_code","customer_display_name","original_checkin_date","original_rent_period_start",
   "original_rent_period_end","original_deposit_amount_fils","current_rent_amount_fils","new_bed_rent_amount_fils",
   "rent_difference_fils","transfer_fee_fils","amount_fils","fee_mode","waiver_reason","category",
+  "review_flags",
   "carry_over_arrears_fils","old_ttlock_ref","new_ttlock_ref",
   "old_lock_valid_from","old_lock_valid_until","new_lock_valid_from","new_lock_valid_until","reason","note",
   "operator_employee","status","audit_id","trace_id","entry_event_id","qa_tag","created_at","updated_at"
@@ -3085,6 +3086,15 @@ async function bedTransferRequestHash(payload){
   return hscSha256(JSON.stringify(hscStableValue(payload)));
 }
 __name(bedTransferRequestHash,"bedTransferRequestHash");
+function bedTransferParseReviewFlags(value){
+  try{
+    const parsed=JSON.parse(cleanText(value||"[]",1000)||"[]");
+    return Array.isArray(parsed)?parsed.map((x)=>cleanText(x,80)).filter(Boolean):[];
+  }catch{
+    return [];
+  }
+}
+__name(bedTransferParseReviewFlags,"bedTransferParseReviewFlags");
 function bedTransferEventView(row){
   return {
     id:cleanText(row?.id||"",80),
@@ -3104,6 +3114,7 @@ function bedTransferEventView(row){
     fee_mode:cleanText(row?.fee_mode||((Number(row?.amount_fils ?? row?.transfer_fee_fils ?? 0)>0)?"charged":"waived"),20),
     waiver_reason:cleanText(row?.waiver_reason||"",240),
     category:cleanText(row?.category||"bed_transfer_fee",40),
+    review_flags:bedTransferParseReviewFlags(row?.review_flags),
     carry_over_arrears_fils:Number(row?.carry_over_arrears_fils||0),
     old_ttlock_ref:cleanText(row?.old_ttlock_ref||"",80),
     old_lock_valid_from:cleanDate(row?.old_lock_valid_from||""),
@@ -3152,7 +3163,10 @@ async function handleEmployeeBedTransferCreate(request,env,user){
   if(feeMode==="waived"&&!waiverReason)return badRequest("bed_transfer_waiver_reason_required");
   const amountFils=feeMode==="waived"?0:5000;
   const category="bed_transfer_fee";
-  const requestPayload={corp_id:user.corpid,actor:user.userid,from_bed:fromBed,to_bed:toBed,transfer_date:transferDate,fee_mode:feeMode,amount_fils:amountFils,waiver_reason:waiverReason,reason,note,category};
+  const reviewFlags=Array.isArray(body?.review_flags)
+    ? body.review_flags.map((x)=>cleanText(x,80)).filter(Boolean).slice(0,12)
+    : [];
+  const requestPayload={corp_id:user.corpid,actor:user.userid,from_bed:fromBed,to_bed:toBed,transfer_date:transferDate,fee_mode:feeMode,amount_fils:amountFils,waiver_reason:waiverReason,reason,note,category,review_flags:reviewFlags};
   const requestHash=await bedTransferRequestHash(requestPayload);
   const idemOptions={
     scope:`${user.corpid}:bed_transfer_events`,
@@ -3196,6 +3210,7 @@ async function handleEmployeeBedTransferCreate(request,env,user){
     fee_mode:feeMode,
     waiver_reason:waiverReason,
     category,
+    review_flags:JSON.stringify(reviewFlags),
     carry_over_arrears_fils:snapshot.carry_over_arrears_fils,
     old_ttlock_ref:snapshot.old_ttlock_ref,
     new_ttlock_ref:"",
@@ -3232,21 +3247,25 @@ async function handleEmployeeBedTransferCreate(request,env,user){
     fee_mode:feeMode,
     waiver_reason:waiverReason,
     category,
+    review_flags:reviewFlags,
     entry_event_id:authSafeId(entryEventId),
     message:feeMode==="waived"?"Bed transfer recorded. Fee waived / 换床记录已保存，费用已豁免。":"Bed transfer recorded. Fee: 50 AED / 换床记录已保存，已记录 50 AED 换床费。",
     idempotency_status:"NEW"
   };
   const responseBody=ok(responseData);
+  const bedTransferColumns=await empTableColumns(env,"bed_transfer_events").catch(()=>new Set(BED_TRANSFER_EVENT_COLUMNS));
+  const insertColumns=BED_TRANSFER_EVENT_COLUMNS.filter((key)=>bedTransferColumns.has(key));
+  if(!insertColumns.length)return errorResponse("bed_transfer_schema_missing",503,void 0,{missing_columns:["bed_transfer_events"]});
   await env.DB.batch([
-    env.DB.prepare(`INSERT INTO bed_transfer_events (${BED_TRANSFER_EVENT_COLUMNS.join(",")})
-      VALUES (${BED_TRANSFER_EVENT_COLUMNS.map(()=>"?").join(",")})`)
-      .bind(...BED_TRANSFER_EVENT_COLUMNS.map((key)=>eventValues[key])),
+    env.DB.prepare(`INSERT INTO bed_transfer_events (${insertColumns.join(",")})
+      VALUES (${insertColumns.map(()=>"?").join(",")})`)
+      .bind(...insertColumns.map((key)=>eventValues[key])),
     env.DB.prepare(`INSERT INTO entry_events
       (event_id, corpid, userid, ref_id, ref_type, event_type, field_name, old_value, new_value, operator_id, ts)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-      .bind(entryEventId,user.corpid,user.userid,transferId,"bed_transfer_event","bed_transfer","bed_transfer_fee","",JSON.stringify({status:"recorded",category,amount_fils:amountFils,fee_mode:feeMode,waiver_reason:waiverReason,from_bed:fromBed,to_bed:toBed,transfer_date:transferDate,reason,note}),user.userid,now)
+      .bind(entryEventId,user.corpid,user.userid,transferId,"bed_transfer_event","bed_transfer","bed_transfer_fee","",JSON.stringify({status:"recorded",category,amount_fils:amountFils,fee_mode:feeMode,waiver_reason:waiverReason,review_flags:reviewFlags,from_bed:fromBed,to_bed:toBed,transfer_date:transferDate,reason,note}),user.userid,now)
   ]);
-  await audit(env,user,"employee.bed_transfer.create",transferId,{from_bed:fromBed,to_bed:toBed,status:"recorded",category,amount_fils:amountFils,fee_mode:feeMode,waiver_reason:waiverReason,audit_id:auditId,trace_id:traceId,entry_event_id:entryEventId}).catch(()=>{});
+  await audit(env,user,"employee.bed_transfer.create",transferId,{from_bed:fromBed,to_bed:toBed,status:"recorded",category,amount_fils:amountFils,fee_mode:feeMode,waiver_reason:waiverReason,review_flags:reviewFlags,audit_id:auditId,trace_id:traceId,entry_event_id:entryEventId}).catch(()=>{});
   await arrearsDirectiveRecordIdempotency(env,{...idemOptions,resourceId:transferId,status:"RECORDED"},responseBody);
   return json(responseBody,201);
 }
