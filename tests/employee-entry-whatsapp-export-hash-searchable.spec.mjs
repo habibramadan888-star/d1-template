@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { buildWhatsappTextWithDrafts } from "./helpers/employee-entry-whatsapp-helper.mjs";
 
-test("Current Session WhatsApp export prefixes searchable beds with hash", async () => {
+test("Current Session WhatsApp export keeps searchable beds without hash", async () => {
   const text = await buildWhatsappTextWithDrafts([
     {
       type: "R",
@@ -24,9 +24,8 @@ test("Current Session WhatsApp export prefixes searchable beds with hash", async
     }
   ]);
 
-  assert.match(text, /#144 rent/);
-  assert.match(text, /#144->#145 bed_transfer/);
-  assert.doesNotMatch(text, /#\s+144/);
-  assert.doesNotMatch(text, /#144\s+->\s+#145/);
+  assert.match(text, /144 rent/);
+  assert.match(text, /144-145 144 145 bed_transfer/);
+  assert.doesNotMatch(text, /#144/);
+  assert.doesNotMatch(text, /#144->#145/);
 });
-

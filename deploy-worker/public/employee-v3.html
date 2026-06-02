@@ -4677,13 +4677,13 @@ function entryWhatsappPayment(e){
 }
 function entryWhatsappBedToken(value,fallback='item'){
   const raw=entryWhatsappSafe(value||fallback).replace(/^#+/,'');
-  return `#${raw||fallback}`;
+  return raw||fallback;
 }
 function entryWhatsappBed(e){
   if(e?.type==='TF'){
     const from=entryWhatsappBedToken(e.bed_from||e.from_bed||e.fromBed||e.room,'bed');
     const to=entryWhatsappBedToken(e.bed_to||e.to_bed||e.toBed||e.roomTo,'to');
-    return `${from}->${to}`;
+    return `${from}-${to} ${from} ${to}`;
   }
   return entryWhatsappBedToken(e?.room||e?.bed||e?.expense_category,'item');
 }

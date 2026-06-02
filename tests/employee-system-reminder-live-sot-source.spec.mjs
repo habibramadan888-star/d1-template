@@ -28,9 +28,9 @@ test("employee System reminders load from production SOT read-only API", async (
   assert.match(loader, /\/api\/employee\/system\/reminders\?limit=100/);
   assert.match(refresh, /loadEmployeeSystemReminders\(false\)/);
   assert.match(worker, /\/api\/employee\/system\/reminders/);
-  assert.match(handler, /empListMergedArrearTasksDetailed/);
+  assert.match(handler, /resolveCurrentReceivablesSot/);
+  assert.match(handler, /source_function:sot\.source_function/);
   assert.match(handler, /source_authority:\["existing_arrears_record","ttlock_expired_unpaid"\]/);
   assert.doesNotMatch(handler, /\.run\(/);
   assert.match(handler, /production_cutover:"PRODUCTION_NO_GO"/);
 });
-
