@@ -26,8 +26,8 @@ test("Current Session WhatsApp baseline includes compact header and all rows", a
 
   assert.match(text, /^Entry 06\/02 \| Abdul \| 2 records/m);
   assert.match(text, /Cash 820\.00 \| Bank 0\.00 \| Total 820\.00/);
-  assert.match(text, /1\. 144 rent 770\.00 cash 0605-0705/);
-  assert.match(text, /2\. 144->145 bed_transfer 50\.00 cash customer_request/);
+  assert.match(text, /1\. #144 rent 770\.00 cash 0605-0705/);
+  assert.match(text, /2\. #144->#145 bed_transfer 50\.00 cash customer_request/);
 });
 
 test("Waived Bed Transfer exports as waived zero AED", async () => {
@@ -43,5 +43,5 @@ test("Waived Bed Transfer exports as waived zero AED", async () => {
     }
   ]);
 
-  assert.match(text, /1\. 144->145 bed_transfer waived 0\.00 none internal_waiver/);
+  assert.match(text, /1\. #144->#145 bed_transfer waived 0\.00 none internal_waiver/);
 });

@@ -2787,6 +2787,16 @@ async function handleEmployeeSystemReminders(request,env,user){
   const url=new URL(request.url);
   const limit=Math.min(Math.max(Number(url.searchParams.get("limit")||100),1),500);
   const detailed=await empListMergedArrearTasksDetailed(env,user,{limit,ttlockTimeoutMs:8000});
+  const sourceBreakdown={
+    ttlock_overdue_count:detailed.ttlock_expired_unpaid_count||0,
+    existing_arrears_count:detailed.existing_arrears_count||0,
+    action_count:(detailed.mapped||[]).filter((row)=>{
+      const directive=String(row?.directive_status||"").toLowerCase();
+      const follow=String(row?.followup_status||"").toLowerCase();
+      return ["assigned","pending","viewed","needs_review","overdue"].includes(directive)||["needs_review","promise_overdue","pending_followup"].includes(follow);
+    }).length,
+    amount_fils:detailed.total_amount_fils||0
+  };
   return success({
     success:true,
     readonly:true,
@@ -2799,12 +2809,10 @@ async function handleEmployeeSystemReminders(request,env,user){
       ttlock_expired_unpaid_count:detailed.ttlock_expired_unpaid_count||0,
       promised_unpaid_count:detailed.promised_unpaid_count||detailed.employee_promised_count||0,
       config_missing_count:detailed.config_missing_count||0,
-      required_followup_count:(detailed.mapped||[]).filter((row)=>{
-        const directive=String(row?.directive_status||"").toLowerCase();
-        const follow=String(row?.followup_status||"").toLowerCase();
-        return ["assigned","pending","viewed","needs_review","overdue"].includes(directive)||["needs_review","promise_overdue","pending_followup"].includes(follow);
-      }).length
+      required_followup_count:sourceBreakdown.action_count,
+      action_count:sourceBreakdown.action_count
     },
+    source_breakdown:sourceBreakdown,
     sources:{
       existing_arrears_record:empSourceContract(detailed.source_status?.existing_arrears_record,detailed.existing_arrears_count||0),
       ttlock_expired_unpaid:empSourceContract(detailed.source_status?.ttlock_expired_unpaid,detailed.ttlock_expired_unpaid_count||0)
@@ -3586,19 +3594,104 @@ function ownerOverviewSameQuarterLastYearRange(today){
 }
 __name(ownerOverviewSameQuarterLastYearRange,"ownerOverviewSameQuarterLastYearRange");
 async function ownerOverviewFetchTransactions(env,user,range){
-  if(!await phase0TableExists(env,"transactions"))return [];
-  return phase0All(env,
-    "SELECT id, session_id, cat, amount, type, tag, room, room_to, bed_from, bed_to, note, linked_task_id, arrear_handling, deposit_collection, deposit_amt, deposit_held, deposit_deduction, period_start, period_end, due_date, ts, created_at FROM transactions WHERE corpid=? AND COALESCE(voided_at,'')='' AND COALESCE(status,'ACTIVE')<>'VOID' AND substr(COALESCE(ts,created_at,period_start,due_date,''),1,10) BETWEEN ? AND ? ORDER BY substr(COALESCE(ts,created_at,period_start,due_date,''),1,10) ASC LIMIT 5000",
-    [user.corpid,range.start,range.end]
-  );
+  const rows=[];
+  if(await phase0TableExists(env,"transactions")){
+    try{
+      rows.push(...await phase0All(env,
+        "SELECT id, session_id, cat, amount, type, tag, room, room_to, bed_from, bed_to, note, linked_task_id, arrear_handling, deposit_collection, deposit_amt, deposit_held, deposit_deduction, period_start, period_end, due_date, ts, created_at FROM transactions WHERE corpid=? AND COALESCE(voided_at,'')='' AND COALESCE(status,'ACTIVE')<>'VOID' AND substr(COALESCE(ts,created_at,period_start,due_date,''),1,10) BETWEEN ? AND ? ORDER BY substr(COALESCE(ts,created_at,period_start,due_date,''),1,10) ASC LIMIT 5000",
+        [user.corpid,range.start,range.end]
+      ));
+    }catch{}
+  }
+  const eventRows=await ownerOverviewFetchEntryEventTransactions(env,user,range).catch(()=>[]);
+  const seen=new Set(rows.map(r=>cleanText(r?.id||"",120)).filter(Boolean));
+  for(const row of eventRows){
+    const id=cleanText(row?.id||"",120);
+    if(id&&seen.has(id))continue;
+    if(id)seen.add(id);
+    rows.push(row);
+  }
+  return rows;
 }
 __name(ownerOverviewFetchTransactions,"ownerOverviewFetchTransactions");
+function ownerOverviewParseEntryEventPayload(raw){
+  try{
+    const parsed=JSON.parse(String(raw||"{}"));
+    return parsed&&typeof parsed==="object"?parsed:{};
+  }catch{
+    return {};
+  }
+}
+__name(ownerOverviewParseEntryEventPayload,"ownerOverviewParseEntryEventPayload");
+async function ownerOverviewFetchEntryEventTransactions(env,user,range){
+  if(!await phase0TableExists(env,"entry_events"))return [];
+  const events=await phase0All(env,
+    "SELECT event_id, ref_id, ref_type, event_type, field_name, new_value, operator_id, ts FROM entry_events WHERE corpid=? AND substr(COALESCE(ts,''),1,10) BETWEEN ? AND ? AND ref_type IN ('transaction','bed_transfer_event','handover_commit') ORDER BY substr(COALESCE(ts,''),1,10) ASC LIMIT 5000",
+    [user.corpid,range.start,range.end]
+  );
+  return events.map((event)=>{
+    const payload=ownerOverviewParseEntryEventPayload(event.new_value);
+    if(event.ref_type==="bed_transfer_event"||payload.event_type==="bed_transfer"){
+      const amount=Number(payload.amount??(Number(payload.amount_fils||0)/100));
+      const payment=String(payload.payment_method||payload.pay_type||"none").toLowerCase();
+      return {
+        id:cleanText(payload.id||event.ref_id||event.event_id,120),
+        session_id:cleanText(payload.session_id||"",120),
+        cat:["cash","bank"].includes(payment)?payment:"none",
+        amount:Number.isFinite(amount)?amount:0,
+        type:"TF",
+        tag:"transfer",
+        room:cleanText(payload.from_bed||payload.room||"",40),
+        room_to:cleanText(payload.to_bed||payload.room_to||"",40),
+        bed_from:cleanText(payload.from_bed||payload.bed_from||"",40),
+        bed_to:cleanText(payload.to_bed||payload.bed_to||"",40),
+        note:cleanText(payload.reason||payload.note||payload.waiver_reason||"",500),
+        ts:event.ts,
+        created_at:event.ts,
+        source_table:"entry_events"
+      };
+    }
+    return {
+      id:cleanText(payload.id||event.ref_id||event.event_id,120),
+      session_id:cleanText(payload.session_id||"",120),
+      cat:cleanText(payload.cat||(["B","bank"].includes(String(payload.pay_type||"").toUpperCase())?"bank":"cash"),20),
+      amount:ownerOverviewMoney(payload.amount||payload.paid||0),
+      type:cleanText(payload.type||payload.reason_code||"",20),
+      tag:cleanText(payload.tag||"",20),
+      room:cleanText(payload.room||payload.bed||"",40),
+      room_to:cleanText(payload.room_to||payload.roomTo||"",40),
+      bed_from:cleanText(payload.bed_from||"",40),
+      bed_to:cleanText(payload.bed_to||"",40),
+      note:cleanText(payload.note||payload.custom_reason||payload.reason||"",500),
+      linked_task_id:cleanText(payload.linked_task_id||"",80),
+      arrear_handling:cleanText(payload.arrear_handling||"",40),
+      deposit_collection:payload.deposit_collection,
+      deposit_amt:payload.deposit_amt,
+      deposit_held:payload.deposit_held,
+      deposit_deduction:payload.deposit_deduction,
+      period_start:cleanText(payload.period_start||payload.original_period_start||"",20),
+      period_end:cleanText(payload.period_end||payload.original_period_end||"",20),
+      due_date:cleanText(payload.due_date||"",20),
+      ts:event.ts,
+      created_at:event.ts,
+      source_table:"entry_events"
+    };
+  }).filter(row=>row.id&&Number.isFinite(Number(row.amount)));
+}
+__name(ownerOverviewFetchEntryEventTransactions,"ownerOverviewFetchEntryEventTransactions");
 async function ownerOverviewFetchArrears(env,user){
   if(!await phase0TableExists(env,"arrear_tasks"))return [];
-  return phase0All(env,
-    "SELECT task_id, customer_code, room_bed, room, bed_no, arrear_amount, actual_received, close_status, accounting_status, followup_status, directive_status, promise_date, promise_amount, promised_payment_date, promised_amount_fils, staff_note, followup_note, source_type, due_date, created_at, updated_at, userid FROM arrear_tasks WHERE corpid=? AND COALESCE(close_status,'')<>'closed' AND COALESCE(accounting_status,'')<>'voided' ORDER BY COALESCE(room_bed,room,bed_no,''), task_id LIMIT 1000",
-    [user.corpid]
-  );
+  try{
+    return phase0All(env,
+      "SELECT task_id, customer_code, room_bed, room, bed_no, arrear_amount, actual_received, close_status, accounting_status, followup_status, directive_status, promise_date, promise_amount, promised_payment_date, promised_amount_fils, staff_note, followup_note, source_type, due_date, created_at, updated_at, userid FROM arrear_tasks WHERE corpid=? AND COALESCE(close_status,'')<>'closed' AND COALESCE(accounting_status,'')<>'voided' ORDER BY COALESCE(room_bed,room,bed_no,''), task_id LIMIT 1000",
+      [user.corpid]
+    );
+  }catch{
+    return phase0All(env,
+      "SELECT task_id, room AS room_bed, room, arrear_amount, actual_received, close_status, followup_status, promise_date, staff_note, created_at, updated_at, userid FROM arrear_tasks WHERE corpid=? AND COALESCE(close_status,'')<>'closed' ORDER BY COALESCE(room,''), task_id LIMIT 1000",
+      [user.corpid]
+    ).catch(()=>[]);
+  }
 }
 __name(ownerOverviewFetchArrears,"ownerOverviewFetchArrears");
 function ownerOverviewMoney(value){
@@ -3743,6 +3836,7 @@ async function phase0OwnerOverviewComparativeSummary(env,user,url){
   const currentQuarter=ownerOverviewQuarterRange(today,0);
   const lastQuarter=ownerOverviewQuarterRange(today,-1);
   const sameQuarterLastYear=ownerOverviewSameQuarterLastYearRange(today);
+  const safeRows=(promise)=>promise.catch(()=>[]);
   const [
     monthRows,
     lastMonthRows,
@@ -3753,14 +3847,14 @@ async function phase0OwnerOverviewComparativeSummary(env,user,url){
     arrearRows,
     bedTransferReviews
   ]=await Promise.all([
-    ownerOverviewFetchTransactions(env,user,currentMonth),
-    ownerOverviewFetchTransactions(env,user,lastMonth),
-    ownerOverviewFetchTransactions(env,user,sameMonthLastYear),
-    ownerOverviewFetchTransactions(env,user,currentQuarter),
-    ownerOverviewFetchTransactions(env,user,lastQuarter),
-    ownerOverviewFetchTransactions(env,user,sameQuarterLastYear),
-    ownerOverviewFetchArrears(env,user),
-    ownerOverviewFetchBedTransferReviews(env,user)
+    safeRows(ownerOverviewFetchTransactions(env,user,currentMonth)),
+    safeRows(ownerOverviewFetchTransactions(env,user,lastMonth)),
+    safeRows(ownerOverviewFetchTransactions(env,user,sameMonthLastYear)),
+    safeRows(ownerOverviewFetchTransactions(env,user,currentQuarter)),
+    safeRows(ownerOverviewFetchTransactions(env,user,lastQuarter)),
+    safeRows(ownerOverviewFetchTransactions(env,user,sameQuarterLastYear)),
+    safeRows(ownerOverviewFetchArrears(env,user)),
+    safeRows(ownerOverviewFetchBedTransferReviews(env,user))
   ]);
   const month=ownerOverviewSummarizeTransactions(monthRows);
   const prevMonth=ownerOverviewSummarizeTransactions(lastMonthRows);
@@ -3837,7 +3931,7 @@ async function phase0OwnerOverviewComparativeSummary(env,user,url){
     },
     data_quality:{
       rows_checked:{current_month:month.rows_checked,last_month:prevMonth.rows_checked,same_month_last_year:sameLastYear.rows_checked,current_quarter:quarter.rows_checked,arrears:arrearRows.length},
-      no_data,
+      no_data:noData,
       warnings:noData.length?["Some comparison windows have no source rows; show no-data instead of fabricating trend."]:[]
     }
   });

@@ -4259,7 +4259,7 @@ async function loadEmployeeSystemReminders(render=true){
     const data=await r.json();
     const rows=Array.isArray(data.tasks)?data.tasks:(Array.isArray(data.all_tasks)?data.all_tasks:[]);
     state.systemReminderItems=rows.map(normalizeEmployeeSystemReminder).filter(x=>x.task_id&&employeeSystemReminderAmount(x)>=0);
-    state.systemReminderSummary=data.summary||{};
+    state.systemReminderSummary={...(data.summary||{}),source_breakdown:data.source_breakdown||data.summary?.source_breakdown||{}};
     state.systemReminderSources=data.sources||data.source_status||{};
     state.systemReminderStatus='success';
     if(render)renderTasks();
@@ -4400,14 +4400,19 @@ function renderTasks(){
   }
   const history=items.filter(isEmployeeSystemArrearsReminder);
   const due=items.filter(isEmployeeTtlockReminder);
-  const force=items.filter(x=>x.force).length;
+  const breakdown=state.systemReminderSummary?.source_breakdown||{};
+  const sourceBreakdown=state.systemReminderSources?.source_breakdown||breakdown;
+  const force=Number(breakdown.action_count??state.systemReminderSummary?.action_count??state.systemReminderSummary?.required_followup_count??items.filter(x=>x.force).length);
+  const ttlockCount=Number(sourceBreakdown.ttlock_overdue_count??state.systemReminderSummary?.ttlock_expired_unpaid_count??due.length);
+  const existingCount=Number(sourceBreakdown.existing_arrears_count??state.systemReminderSummary?.existing_arrears_count??history.length);
   const total=items.reduce((s,x)=>s+num(x.amount),0);
+  const sourceNote=force===ttlockCount&&existingCount===0&&force>0?'<div class="hint">当前待处理全部来自通通锁过期；没有系统已有欠款。</div>':'';
   const dashboard=`<div class="kpi-grid followup-dashboard">
-    <div class="kpi-card followup-metric bad"><span>强制跟进</span><small>REQUIRED</small><b>${force}</b></div>
-    <div class="kpi-card followup-metric warn"><span>通通锁过期</span><small>TTLOCK OVERDUE</small><b>${due.length}</b></div>
-    <div class="kpi-card followup-metric"><span>历史欠款</span><small>ARREARS</small><b>${history.length}</b></div>
+    <div class="kpi-card followup-metric bad"><span>待处理</span><small>ACTION ITEMS</small><b>${force}</b></div>
+    <div class="kpi-card followup-metric warn"><span>通通锁过期</span><small>TTLOCK OVERDUE</small><b>${ttlockCount}</b></div>
+    <div class="kpi-card followup-metric"><span>系统欠款</span><small>EXISTING ARREARS</small><b>${existingCount}</b></div>
     <div class="kpi-card followup-metric"><span>应收提醒</span><small>AMOUNT</small><b>${fmtMoney(total)}</b></div>
-  </div>`;
+  </div>${sourceNote}`;
   if(!items.length){
     $('taskList').innerHTML=dashboard+'<div class="hint">当前真实 SOT 没有通通锁过期未付或系统已有欠款。请点击刷新重新读取后端。</div>';
     return;
@@ -4670,13 +4675,17 @@ function entryWhatsappPayment(e){
   if(e?.type==='TF'&&(e?.fee_status==='waived'||e?.fee_mode==='waived'||Number(e?.amount||0)===0))return 'none';
   return pay||'cash';
 }
+function entryWhatsappBedToken(value,fallback='item'){
+  const raw=entryWhatsappSafe(value||fallback).replace(/^#+/,'');
+  return `#${raw||fallback}`;
+}
 function entryWhatsappBed(e){
   if(e?.type==='TF'){
-    const from=entryWhatsappSafe(e.bed_from||e.from_bed||e.fromBed||e.room||'bed');
-    const to=entryWhatsappSafe(e.bed_to||e.to_bed||e.toBed||e.roomTo||'to');
+    const from=entryWhatsappBedToken(e.bed_from||e.from_bed||e.fromBed||e.room,'bed');
+    const to=entryWhatsappBedToken(e.bed_to||e.to_bed||e.toBed||e.roomTo,'to');
     return `${from}->${to}`;
   }
-  return entryWhatsappSafe(e?.room||e?.bed||e?.expense_category||'item');
+  return entryWhatsappBedToken(e?.room||e?.bed||e?.expense_category,'item');
 }
 function entryWhatsappAmount(e){
   if(e?.type==='R')return num(e?.paid||e?.amount);
