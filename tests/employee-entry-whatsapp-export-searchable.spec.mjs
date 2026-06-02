@@ -22,7 +22,8 @@ test("Current Session WhatsApp export keeps bed numbers searchable", async () =>
   ]);
 
   assert.match(text, /\b144\b/);
-  assert.match(text, /144-145 144 145/);
+  assert.match(text, /【144】 144 rent/);
+  assert.match(text, /【144-145】 144 145/);
   assert.doesNotMatch(text, /#144/);
 });
 
@@ -39,6 +40,6 @@ test("Current Session WhatsApp export keeps backend transfer aliases searchable"
     }
   ]);
 
-  assert.match(text, /144-145 144 145 bed_transfer 50\.00 cash customer_request/);
+  assert.match(text, /【144-145】 144 145 bed_transfer 50\.00 cash customer_request/);
   assert.doesNotMatch(text, /bed->to/);
 });

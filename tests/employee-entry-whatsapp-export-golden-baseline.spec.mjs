@@ -25,7 +25,7 @@ test("Current Session WhatsApp export uses compact golden searchable baseline wi
   ]);
 
   assert.match(text, /^Entry 06\/02 \| Abdul \| 2 records/m);
-  assert.match(text, /1\. 144 rent 770\.00 cash 0605-0705/);
-  assert.match(text, /2\. 144-145 144 145 bed_transfer 50\.00 cash customer_request/);
+  assert.match(text, /1\. 【144】 144 rent 770\.00 cash 0605-0705/);
+  assert.match(text, /2\. 【144-145】 144 145 bed_transfer 50\.00 cash customer_request/);
   assert.doesNotMatch(text, /#144|Markdown|EID|trace|source_ref|\+971|debug/i);
 });

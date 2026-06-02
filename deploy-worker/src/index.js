@@ -2062,9 +2062,9 @@ async function empMaterializableTaskContract(sotTask,user){
 __name(empMaterializableTaskContract,"empMaterializableTaskContract");
 async function empResolveBossSotTaskMap(env,user,ids){
   const wanted=new Set(ids.map(x=>cleanText(x,160)).filter(Boolean));
-  const detailed=await empListMergedArrearTasksDetailed(env,user,{limit:500,ttlockTimeoutMs:12000});
+  const detailed=await resolveConsoleReceivablesSot(env,user,{limit:500,ttlockTimeoutMs:12000});
   const map=new Map();
-  for(const task of detailed.mapped||[]){
+  for(const task of detailed.all_rows||[]){
     const keys=[task?.task_id,task?.id,task?.source_ref].map(x=>cleanText(x,160)).filter(Boolean);
     for(const key of keys){
       if(wanted.has(key)&&!map.has(key))map.set(key,task);
@@ -2545,6 +2545,264 @@ async function empLoadTtlockExpiredUnpaidForArrears(env,user,opts={}){
   }
 }
 __name(empLoadTtlockExpiredUnpaidForArrears,"empLoadTtlockExpiredUnpaidForArrears");
+function consoleSotCardName(card){
+  return cleanText(card?.cardName||card?.identityCardName||card?.cardAlias||card?.name||"",160);
+}
+__name(consoleSotCardName,"consoleSotCardName");
+function consoleSotDateKey(ts){
+  const d=new Date(ts);
+  if(Number.isNaN(d.getTime()))return "";
+  try{
+    return new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Dubai",year:"numeric",month:"2-digit",day:"2-digit"}).format(d);
+  }catch{
+    return d.toISOString().slice(0,10);
+  }
+}
+__name(consoleSotDateKey,"consoleSotDateKey");
+function consoleSotDateKeyMs(key){
+  const m=String(key||"").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if(!m)return 0;
+  return Date.UTC(Number(m[1]),Number(m[2])-1,Number(m[3]));
+}
+__name(consoleSotDateKeyMs,"consoleSotDateKeyMs");
+function consoleSotStatus(card,now=Date.now()){
+  const name=consoleSotCardName(card);
+  if(empTtlockIsStaff(name))return {type:"staff",label:"staff"};
+  if(empTtlockIsVacant(name))return {type:"vacant",label:"vacant"};
+  const end=Number(card?.endDate||card?.end||0);
+  if(!Number.isFinite(end)||end<=0)return {type:"active",label:"permanent"};
+  const todayMs=consoleSotDateKeyMs(consoleSotDateKey(now));
+  const endDayMs=consoleSotDateKeyMs(consoleSotDateKey(end));
+  if(now>end){
+    const days=Math.max(0,Math.round((todayMs-endDayMs)/86400000));
+    return {type:"overdue",label:"overdue",days,end_ms:end,due_date:consoleSotDateKey(end)};
+  }
+  const rem=Math.round((endDayMs-todayMs)/86400000);
+  if(rem===0)return {type:"today",label:"due_today",days:0,end_ms:end,due_date:consoleSotDateKey(end)};
+  if(rem<=3)return {type:"soon",label:"due_soon",days:rem,end_ms:end,due_date:consoleSotDateKey(end)};
+  return {type:"active",label:"active",days:rem,end_ms:end,due_date:consoleSotDateKey(end)};
+}
+__name(consoleSotStatus,"consoleSotStatus");
+function consoleSotBed(lockRoom,card){
+  const name=consoleSotCardName(card);
+  return empTtlockBedNumber(name)||sotNormalizeBed(card?.bed||card?.room||lockRoom)||cleanText(lockRoom||"",80);
+}
+__name(consoleSotBed,"consoleSotBed");
+function consoleSotAmountFils(card,rentConfig,lockRoom,bed,cardName){
+  const raw=card?.amount??card?.rent??card?.remain??card?.arrears??card?.totalRent;
+  const rawNum=Number(raw);
+  if(Number.isFinite(rawNum)&&raw!==""&&rawNum>0)return {amount_fils:Math.round(rawNum*100),amount_source:"ttlock_card_field"};
+  const rent=empRentForTtlockCard(rentConfig,lockRoom,bed,cardName);
+  if(rent.amount>0)return {amount_fils:Math.round(rent.amount*100),amount_source:"bed_rent_mapping",rent_mapping_key:rent.key};
+  return {amount_fils:0,amount_source:"not_configured",rent_mapping_key:""};
+}
+__name(consoleSotAmountFils,"consoleSotAmountFils");
+function consoleSotTaskFromCard(lockRoom,card,info,rentConfig){
+  const cardName=consoleSotCardName(card);
+  const bed=consoleSotBed(lockRoom,card);
+  const amount=consoleSotAmountFils(card,rentConfig,lockRoom,bed,cardName);
+  const sourceRef=`console-current:${info.type}:${lockRoom}:${bed}:${info.end_ms||0}:${cardName}`.replace(/[^\w:.-]+/g,"-").slice(0,180);
+  const amountFils=Math.max(0,Math.round(Number(amount.amount_fils||0)));
+  const remain=Math.round(amountFils)/100;
+  return {
+    id:`ttlock-current-${sourceRef}`.replace(/[^\w.-]+/g,"-").slice(0,120),
+    task_id:`ttlock-current-${sourceRef}`.replace(/[^\w.-]+/g,"-").slice(0,120),
+    source:"ttlock",
+    source_type:"ttlock_expired_unpaid",
+    source_ref:sourceRef,
+    room_bed:bed,
+    bed,
+    room:bed,
+    customer_code:cardName||bed,
+    card_code:cardName||sourceRef,
+    package_code:"ttlock_current_view",
+    amount_fils:amountFils,
+    amount_source:amount.amount_source,
+    amount_authority_status:amount.amount_source,
+    accounting_status:"unverified",
+    remain,
+    due_date:info.due_date||"",
+    followup_status:"pending_followup",
+    note:`Owner console current ${info.type}`,
+    rent_mapping_key:amount.rent_mapping_key||"",
+    lock_room:cleanText(lockRoom||"",120),
+    overdue_days:info.type==="overdue"?Number(info.days||0):0,
+    console_status:info.type,
+    console_source:"owner_console_current_view"
+  };
+}
+__name(consoleSotTaskFromCard,"consoleSotTaskFromCard");
+function consoleSotSortRows(a,b){
+  const rank={overdue:0,today:1,soon:2,"":3};
+  const ar=rank[a?.console_status]??(a?.source_type==="existing_arrears_record"?3:4);
+  const br=rank[b?.console_status]??(b?.source_type==="existing_arrears_record"?3:4);
+  if(ar!==br)return ar-br;
+  return String(a?.room_bed||a?.bed||"").localeCompare(String(b?.room_bed||b?.bed||""),undefined,{numeric:true});
+}
+__name(consoleSotSortRows,"consoleSotSortRows");
+function consoleSotRowsFromLockCards(roomsData,rentConfig){
+  const rows=[];
+  const byStatus={overdue:[],today:[],soon:[]};
+  const missingRent=[];
+  let total_cards=0;
+  let staff_count=0;
+  let vacant_count=0;
+  let occupied_count=0;
+  for(const [lockRoom,cards] of Object.entries(roomsData||{})){
+    for(const card of cards||[]){
+      const info=consoleSotStatus(card);
+      if(info.type==="staff"){staff_count++;continue;}
+      total_cards++;
+      if(info.type==="vacant"){vacant_count++;continue;}
+      occupied_count++;
+      if(!["overdue","today","soon"].includes(info.type))continue;
+      const row=consoleSotTaskFromCard(lockRoom,card,info,rentConfig);
+      rows.push(row);
+      byStatus[info.type].push(row);
+      if(row.amount_source==="not_configured")missingRent.push({room_bed:row.room_bed,lockRoom,cardName:row.customer_code,due_date:row.due_date,reason:"RENT_MAPPING_NOT_CONFIGURED"});
+    }
+  }
+  rows.sort(consoleSotSortRows);
+  return {rows,byStatus,missingRent,total_cards,staff_count,vacant_count,occupied_count};
+}
+__name(consoleSotRowsFromLockCards,"consoleSotRowsFromLockCards");
+async function empLoadExistingArrearsRowsForConsoleSot(env,user,opts={}){
+  const limit=Math.min(Math.max(Number(opts.limit||500),1),500);
+  const tasks=[];
+  const source_status={existing_arrears_record:empSourceStatus(false,"not_loaded")};
+  let dedupeDroppedCount=0;
+  if(await empTableExists(env,"arrear_tasks")){
+    try{
+      const taskRows=await env.DB.prepare("SELECT * FROM arrear_tasks WHERE corpid=? ORDER BY COALESCE(updated_at,created_at) DESC LIMIT ?").bind(user.corpid,limit).all();
+      tasks.push(...(taskRows.results||[]).filter(t=>empCloseStatusIsOpen(t.close_status)&&empTaskRemaining(t)>0&&!/ttlock/i.test(String(t?.source_type||t?.source||""))));
+      source_status.existing_arrears_record=empSourceStatus(true,"",{table:"arrear_tasks",count:tasks.length});
+    }catch(e){
+      source_status.existing_arrears_record=empSourceStatus(false,empReadErrorCode(e),{table:"arrear_tasks"});
+    }
+  }else{
+    source_status.existing_arrears_record=empSourceStatus(true,"",{table:"arrear_tasks",missing:true,count:0});
+  }
+  const seenIds=new Set(tasks.map(t=>cleanText(t.task_id,100)).filter(Boolean));
+  const seenKeys=new Set(tasks.map(t=>[cleanText(t.bed||"",160),cleanText(t.entry_id||t.original_entry_id||"",80),empTaskRemaining(t).toFixed(2)].join("|")));
+  if(await empTableExists(env,"arrears")){
+    try{
+      const legacy=await env.DB.prepare("SELECT * FROM arrears WHERE corpid=? AND cleared=0 AND COALESCE(voided_at,'')='' ORDER BY created_at DESC LIMIT ?").bind(user.corpid,limit).all();
+      let legacyAdded=0;
+      for(const row of legacy.results||[]){
+        const mapped=empLegacyArrearToTask(row);
+        const mappedId=cleanText(mapped.task_id,100);
+        const mappedKey=[cleanText(mapped.bed||"",160),cleanText(mapped.entry_id||mapped.original_entry_id||"",80),empTaskRemaining(mapped).toFixed(2)].join("|");
+        if((mappedId&&seenIds.has(mappedId))||seenKeys.has(mappedKey)){dedupeDroppedCount++;continue;}
+        if(empTaskRemaining(mapped)>0){
+          tasks.push(mapped);
+          legacyAdded++;
+          if(mappedId)seenIds.add(mappedId);
+          seenKeys.add(mappedKey);
+        }
+      }
+      source_status.existing_arrears_record=empSourceStatus(true,"",{table:"arrear_tasks+arrears",count:tasks.length,legacy_added:legacyAdded});
+    }catch(e){
+      if(!tasks.length)source_status.existing_arrears_record=empSourceStatus(false,empReadErrorCode(e),{table:"arrears"});
+      else source_status.existing_arrears_record={...source_status.existing_arrears_record,legacy_error:empReadErrorCode(e)};
+    }
+  }
+  const rows=[];
+  const seenMapped=new Set();
+  for(const row of tasks.map(empTaskToBossArrear)){
+    if(cleanMoney(row?.remain||0)<=0)continue;
+    const key=empBossArrearDedupeKey(row);
+    if(seenMapped.has(key)){dedupeDroppedCount++;continue;}
+    seenMapped.add(key);
+    rows.push(row);
+  }
+  rows.sort(consoleSotSortRows);
+  return {rows,source_status,dedupe_dropped_count:dedupeDroppedCount};
+}
+__name(empLoadExistingArrearsRowsForConsoleSot,"empLoadExistingArrearsRowsForConsoleSot");
+async function resolveConsoleReceivablesSot(env,user,opts={}){
+  const limit=Math.min(Math.max(Number(opts.limit||500),1),500);
+  const started=Date.now();
+  const timeoutMs=Math.min(Math.max(Number(opts.ttlockTimeoutMs||8000),1000),12000);
+  const [lockResult,rentConfig,existing]=await Promise.all([
+    empWithTimeout(loadLockCards(env),timeoutMs,"ttlock_api").catch(e=>({error:String(e?.message||e),roomsData:{},locksCount:0,status:0})),
+    empRentConfigReadOnly(env,user.corpid).catch(()=>({})),
+    empLoadExistingArrearsRowsForConsoleSot(env,user,{limit})
+  ]);
+  let ttlockRows=[];
+  let byStatus={overdue:[],today:[],soon:[]};
+  let ttlockMissingRent=[];
+  let ttlockMeta={total_cards:0,staff_count:0,vacant_count:0,occupied_count:0};
+  const ttlockOk=!lockResult?.error;
+  if(ttlockOk){
+    const mapped=consoleSotRowsFromLockCards(lockResult?.roomsData||{},rentConfig);
+    ttlockRows=mapped.rows;
+    byStatus=mapped.byStatus;
+    ttlockMissingRent=mapped.missingRent;
+    ttlockMeta={total_cards:mapped.total_cards,staff_count:mapped.staff_count,vacant_count:mapped.vacant_count,occupied_count:mapped.occupied_count};
+  }
+  const existingRows=existing.rows||[];
+  const allRows=[...ttlockRows,...existingRows].sort(consoleSotSortRows).slice(0,limit);
+  const amountFils=allRows.reduce((sum,row)=>sum+Math.max(0,Math.round(Number(row?.amount_fils||cleanMoney(row?.remain||0)*100)||0)),0);
+  const overdueCount=byStatus.overdue.length;
+  const dueTodayCount=byStatus.today.length;
+  const dueSoonCount=byStatus.soon.length;
+  const sourceBreakdown={
+    overdue_count:overdueCount,
+    due_today_count:dueTodayCount,
+    due_soon_count:dueSoonCount,
+    ttlock_overdue_count:overdueCount,
+    ttlock_due_today_count:dueTodayCount,
+    ttlock_due_soon_count:dueSoonCount,
+    ttlock_expired_unpaid_count:ttlockRows.length,
+    existing_arrears_count:existingRows.length,
+    action_count:ttlockRows.length+existingRows.length,
+    amount_fils:amountFils,
+    outstanding_amount_fils:amountFils
+  };
+  return {
+    ttlock_expired_unpaid:ttlockRows.slice(0,limit),
+    existing_arrears:existingRows.slice(0,limit),
+    overdue:byStatus.overdue,
+    due_today:byStatus.today,
+    due_soon:byStatus.soon,
+    all_rows:allRows,
+    source_breakdown:sourceBreakdown,
+    summary:{
+      overdue_count:overdueCount,
+      due_today_count:dueTodayCount,
+      due_soon_count:dueSoonCount,
+      ttlock_count:ttlockRows.length,
+      ttlock_expired_unpaid_count:ttlockRows.length,
+      existing_arrears_count:existingRows.length,
+      action_count:ttlockRows.length+existingRows.length,
+      total_count:ttlockRows.length+existingRows.length,
+      outstanding_amount_fils:amountFils,
+      total_amount_fils:amountFils,
+      config_missing_count:ttlockMissingRent.length,
+      dedupe_dropped_count:Number(existing.dedupe_dropped_count||0),
+      console_total_cards:ttlockMeta.total_cards,
+      console_occupied_count:ttlockMeta.occupied_count,
+      console_vacant_count:ttlockMeta.vacant_count,
+      console_staff_count:ttlockMeta.staff_count,
+      duration_ms:Date.now()-started
+    },
+    sources:{
+      existing_arrears_record:empSourceContract(existing.source_status?.existing_arrears_record,existingRows.length),
+      ttlock_expired_unpaid:empSourceContract(ttlockOk?empSourceStatus(true,"",{endpoint:"/api/lock/cards",source_function:"cp_getStatus_cp_computeMetrics",count:ttlockRows.length,locks_count:Number(lockResult?.locksCount||0)}):empSourceStatus(false,empTtlockReadErrorCode(lockResult),{endpoint:"/api/lock/cards",source_function:"cp_getStatus_cp_computeMetrics"}),ttlockRows.length)
+    },
+    source_status:{
+      existing_arrears_record:existing.source_status?.existing_arrears_record,
+      ttlock_expired_unpaid:ttlockOk?empSourceStatus(true,"",{endpoint:"/api/lock/cards",data_source:"live_api",source_function:"cp_getStatus_cp_computeMetrics",count:ttlockRows.length,locks_count:Number(lockResult?.locksCount||0)}):empSourceStatus(false,empTtlockReadErrorCode(lockResult),{endpoint:"/api/lock/cards",source_function:"cp_getStatus_cp_computeMetrics"})
+    },
+    ttlock_missing_rent:ttlockMissingRent,
+    generated_at:empNow(),
+    source:"owner_console_current_view",
+    source_function:"cp_getStatus_cp_computeMetrics",
+    readonly:true,
+    production_cutover:"PRODUCTION_NO_GO"
+  };
+}
+__name(resolveConsoleReceivablesSot,"resolveConsoleReceivablesSot");
 async function empListMergedArrearTasksDetailed(env,user,opts={}){
   const limit=Math.min(Math.max(Number(opts.limit||100),1),500);
   const started=Date.now();
@@ -2646,42 +2904,7 @@ async function empListMergedArrearTasks(env,user,opts={}){
 }
 __name(empListMergedArrearTasks,"empListMergedArrearTasks");
 async function resolveCurrentReceivablesSot(env,user,opts={}){
-  const detailed=await empListMergedArrearTasksDetailed(env,user,opts);
-  const ttlockRows=(detailed.mapped||[]).filter(row=>row.source_type==="ttlock_expired_unpaid");
-  const existingRows=(detailed.mapped||[]).filter(row=>row.source_type==="existing_arrears_record");
-  return {
-    ttlock_expired_unpaid:ttlockRows,
-    existing_arrears:existingRows,
-    all_rows:detailed.mapped||[],
-    source_breakdown:{
-      ttlock_overdue_count:ttlockRows.length,
-      existing_arrears_count:existingRows.length,
-      action_count:ttlockRows.length+existingRows.length,
-      amount_fils:detailed.total_amount_fils||0
-    },
-    summary:{
-      ttlock_count:ttlockRows.length,
-      ttlock_expired_unpaid_count:ttlockRows.length,
-      existing_arrears_count:existingRows.length,
-      action_count:ttlockRows.length+existingRows.length,
-      total_count:ttlockRows.length+existingRows.length,
-      outstanding_amount_fils:detailed.total_amount_fils||0,
-      total_amount_fils:detailed.total_amount_fils||0,
-      config_missing_count:detailed.config_missing_count||0,
-      dedupe_dropped_count:detailed.dedupe_dropped_count||0
-    },
-    sources:{
-      existing_arrears_record:empSourceContract(detailed.source_status?.existing_arrears_record,existingRows.length),
-      ttlock_expired_unpaid:empSourceContract(detailed.source_status?.ttlock_expired_unpaid,ttlockRows.length)
-    },
-    source_status:detailed.source_status,
-    ttlock_missing_rent:detailed.ttlock_missing_rent||[],
-    generated_at:empNow(),
-    source:"owner_console_unresolved_missing_plus_existing_arrears",
-    source_function:"owner_console_unresolved_missing_continuity_filter",
-    readonly:true,
-    production_cutover:"PRODUCTION_NO_GO"
-  };
+  return resolveConsoleReceivablesSot(env,user,opts);
 }
 __name(resolveCurrentReceivablesSot,"resolveCurrentReceivablesSot");
 async function handleBossArrears(request,env,user){
@@ -2719,6 +2942,11 @@ async function handleBossArrearsFollowupTasks(request,env,user){
     summary:{
       total_count:sot.summary?.total_count||fullTasks.length,
       total_amount_fils:sot.summary?.total_amount_fils||0,
+      outstanding_amount_fils:sot.summary?.outstanding_amount_fils||sot.summary?.total_amount_fils||0,
+      overdue_count:sot.summary?.overdue_count||0,
+      due_today_count:sot.summary?.due_today_count||0,
+      due_soon_count:sot.summary?.due_soon_count||0,
+      action_count:sot.summary?.action_count||fullTasks.length,
       existing_arrears_count:sot.summary?.existing_arrears_count||existingTasks.length,
       ttlock_expired_unpaid_count:sot.summary?.ttlock_expired_unpaid_count||ttlockTasks.length,
       promised_unpaid_count:promisedUnpaidCount,
@@ -3094,10 +3322,17 @@ async function handleEmployeeSystemReminders(request,env,user){
   const limit=Math.min(Math.max(Number(url.searchParams.get("limit")||100),1),500);
   const sot=await resolveCurrentReceivablesSot(env,user,{limit,ttlockTimeoutMs:8000});
   const sourceBreakdown={
+    overdue_count:sot.source_breakdown?.overdue_count||0,
+    due_today_count:sot.source_breakdown?.due_today_count||0,
+    due_soon_count:sot.source_breakdown?.due_soon_count||0,
     ttlock_overdue_count:sot.source_breakdown?.ttlock_overdue_count||0,
+    ttlock_due_today_count:sot.source_breakdown?.ttlock_due_today_count||0,
+    ttlock_due_soon_count:sot.source_breakdown?.ttlock_due_soon_count||0,
+    ttlock_expired_unpaid_count:sot.source_breakdown?.ttlock_expired_unpaid_count||0,
     existing_arrears_count:sot.source_breakdown?.existing_arrears_count||0,
     action_count:sot.source_breakdown?.action_count||0,
-    amount_fils:sot.source_breakdown?.amount_fils||0
+    amount_fils:sot.source_breakdown?.amount_fils||0,
+    outstanding_amount_fils:sot.source_breakdown?.outstanding_amount_fils||0
   };
   return success({
     success:true,
@@ -3112,7 +3347,10 @@ async function handleEmployeeSystemReminders(request,env,user){
       promised_unpaid_count:0,
       config_missing_count:sot.summary?.config_missing_count||0,
       required_followup_count:sourceBreakdown.action_count,
-      action_count:sourceBreakdown.action_count
+      action_count:sourceBreakdown.action_count,
+      overdue_count:sourceBreakdown.overdue_count,
+      due_today_count:sourceBreakdown.due_today_count,
+      due_soon_count:sourceBreakdown.due_soon_count
     },
     source_breakdown:sourceBreakdown,
     sources:{
@@ -4168,6 +4406,14 @@ async function phase0OwnerOverviewComparativeSummary(env,user,url){
   const sameQuarterLastYearSummary=ownerOverviewSummarizeTransactions(sameQuarterLastYearRows);
   const arrearRows=currentSot?.all_rows||[];
   const arrears=ownerOverviewArrearsSummary(arrearRows,today);
+  const consoleSummary=currentSot?.summary||{};
+  const consoleBreakdown=currentSot?.source_breakdown||{};
+  if(currentSot){
+    arrears.open_count=Number(consoleSummary.action_count??consoleSummary.total_count??arrears.open_count);
+    arrears.outstanding_amount=ownerOverviewMoney(Number(consoleSummary.outstanding_amount_fils??consoleSummary.total_amount_fils??0)/100);
+    arrears.source_counts.ttlock_expired_unpaid=Number(consoleSummary.ttlock_expired_unpaid_count??consoleBreakdown.ttlock_expired_unpaid_count??arrears.source_counts.ttlock_expired_unpaid);
+    arrears.source_counts.existing_arrears_record=Number(consoleSummary.existing_arrears_count??consoleBreakdown.existing_arrears_count??arrears.source_counts.existing_arrears_record);
+  }
   const noData=[];
   if(!monthRows.length)noData.push("current_month_transactions");
   if(!lastMonthRows.length)noData.push("last_month_transactions");
@@ -4235,7 +4481,11 @@ async function phase0OwnerOverviewComparativeSummary(env,user,url){
       generated_at:currentSot.generated_at
     }:null,
     risk_watch:{
-      overdue_count:arrears.overdue_count,
+      overdue_count:Number(consoleSummary.overdue_count??consoleBreakdown.overdue_count??arrears.overdue_count),
+      due_today_count:Number(consoleSummary.due_today_count??consoleBreakdown.due_today_count??0),
+      due_soon_count:Number(consoleSummary.due_soon_count??consoleBreakdown.due_soon_count??0),
+      action_count:Number(consoleSummary.action_count??consoleBreakdown.action_count??arrears.open_count),
+      outstanding_amount_fils:Number(consoleSummary.outstanding_amount_fils??consoleBreakdown.outstanding_amount_fils??0),
       overdue_amount:arrears.overdue_amount,
       broken_promise_count:arrears.broken_promise_count,
       partial_payment_count:arrears.partial_payment_count,
@@ -4285,6 +4535,10 @@ async function handlePhase0ReadOnlyApi(request,env,user){
     if(path==="/api/owner/properties")return phase0Properties(env,user,url);
     if(path==="/api/owner/totals")return phase0DashboardTotals(env,user);
     if(path==="/api/owner/bed-transfers")return handleOwnerBedTransfers(request,env,user);
+    if(path==="/api/owner/console-receivables-sot"||path==="/api/owner/current-receivables-sot"){
+      const limit=Math.min(Math.max(Number(url.searchParams.get("limit")||500),1),500);
+      return success(await resolveConsoleReceivablesSot(env,user,{limit,ttlockTimeoutMs:8000}));
+    }
     if(path==="/api/owner/overview/comparative-summary")return phase0OwnerOverviewComparativeSummary(env,user,url);
     if(path==="/api/owner/history")return phase0Entries(env,user,url);
     if(path==="/api/owner/arrears")return phase0Receivables(env,user,url);
@@ -5095,10 +5349,10 @@ async function handleRequest(request, env, ctx) {
     if ((path === "/api/arrears/followup/tasks" || path === "/api/boss/arrears/followup-tasks") && method === "GET") {
       return handleBossArrearsFollowupTasks(request, env, user);
     }
-    if (path === "/api/owner/current-receivables-sot" && method === "GET") {
+    if ((path === "/api/owner/current-receivables-sot" || path === "/api/owner/console-receivables-sot") && method === "GET") {
       if (!canReadOwnerData(user)) return forbidden();
       const limit=Math.min(Math.max(Number(url.searchParams.get("limit")||500),1),500);
-      return success(await resolveCurrentReceivablesSot(env,user,{limit,ttlockTimeoutMs:8000}));
+      return success(await resolveConsoleReceivablesSot(env,user,{limit,ttlockTimeoutMs:8000}));
     }
     if (path === "/api/boss/arrears/directives" && method === "POST") {
       return handleBossArrearsDirectives(request, env, user);

@@ -40,8 +40,9 @@ test("System reminder renderer preserves all existing reminder families", async 
   const renderTasks = extractFunction(html, "renderTasks");
 
   assert.match(renderTasks, /System Reminders/);
-  assert.match(renderTasks, /TTLOCK OVERDUE/);
-  assert.match(renderTasks, /ARREARS/);
+  assert.match(renderTasks, /OVERDUE/);
+  assert.match(renderTasks, /DUE TODAY/);
+  assert.match(renderTasks, /DUE SOON/);
   assert.match(renderTasks, /AMOUNT/);
   assert.match(renderTasks, /isEmployeeTtlockReminder/);
   assert.match(renderTasks, /isEmployeeSystemArrearsReminder/);

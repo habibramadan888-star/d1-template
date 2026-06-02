@@ -4402,17 +4402,26 @@ function renderTasks(){
   const due=items.filter(isEmployeeTtlockReminder);
   const breakdown=state.systemReminderSummary?.source_breakdown||{};
   const sourceBreakdown=state.systemReminderSources?.source_breakdown||breakdown;
-  const force=Number(breakdown.action_count??state.systemReminderSummary?.action_count??state.systemReminderSummary?.required_followup_count??items.filter(x=>x.force).length);
-  const ttlockCount=Number(sourceBreakdown.ttlock_overdue_count??state.systemReminderSummary?.ttlock_expired_unpaid_count??due.length);
+  const overdueCount=Number(sourceBreakdown.overdue_count??sourceBreakdown.ttlock_overdue_count??state.systemReminderSummary?.overdue_count??0);
+  const dueTodayCount=Number(sourceBreakdown.due_today_count??sourceBreakdown.ttlock_due_today_count??state.systemReminderSummary?.due_today_count??0);
+  const dueSoonCount=Number(sourceBreakdown.due_soon_count??sourceBreakdown.ttlock_due_soon_count??state.systemReminderSummary?.due_soon_count??0);
+  const actionCount=Number(sourceBreakdown.action_count??state.systemReminderSummary?.action_count??state.systemReminderSummary?.required_followup_count??items.filter(x=>x.force).length);
+  const force=actionCount;
+  const ttlockCount=overdueCount+dueTodayCount+dueSoonCount;
   const existingCount=Number(sourceBreakdown.existing_arrears_count??state.systemReminderSummary?.existing_arrears_count??history.length);
-  const total=items.reduce((s,x)=>s+num(x.amount),0);
+  const total=Number(sourceBreakdown.amount_fils??sourceBreakdown.outstanding_amount_fils??0)>0?Number(sourceBreakdown.amount_fils??sourceBreakdown.outstanding_amount_fils)/100:items.reduce((s,x)=>s+num(x.amount),0);
   const sourceNote=force===ttlockCount&&existingCount===0&&force>0?'<div class="hint">当前待处理全部来自通通锁过期；没有系统已有欠款。</div>':'';
-  const dashboard=`<div class="kpi-grid followup-dashboard">
+  let dashboard=`<div class="kpi-grid followup-dashboard">
     <div class="kpi-card followup-metric bad"><span>待处理</span><small>ACTION ITEMS</small><b>${force}</b></div>
     <div class="kpi-card followup-metric warn"><span>通通锁过期</span><small>TTLOCK OVERDUE</small><b>${ttlockCount}</b></div>
     <div class="kpi-card followup-metric"><span>系统欠款</span><small>EXISTING ARREARS</small><b>${existingCount}</b></div>
     <div class="kpi-card followup-metric"><span>应收提醒</span><small>AMOUNT</small><b>${fmtMoney(total)}</b></div>
   </div>${sourceNote}`;
+  dashboard=dashboard.replace(/<div class="kpi-card followup-metric bad">[\s\S]*?<small>ACTION ITEMS<\/small>[\s\S]*?<\/div>\s*<div class="kpi-card followup-metric warn">[\s\S]*?<small>TTLOCK OVERDUE<\/small>[\s\S]*?<\/div>\s*<div class="kpi-card followup-metric">[\s\S]*?<small>EXISTING ARREARS<\/small>[\s\S]*?<\/div>/,
+    `<div class="kpi-card followup-metric bad"><span>欠款中</span><small>OVERDUE</small><b>${overdueCount}</b></div>
+    <div class="kpi-card followup-metric warn"><span>今天到期</span><small>DUE TODAY</small><b>${dueTodayCount}</b></div>
+    <div class="kpi-card followup-metric"><span>3天内到期</span><small>DUE SOON</small><b>${dueSoonCount}</b></div>`);
+  dashboard=dashboard.replace('当前待处理全部来自通通锁过期；没有系统已有欠款。','当前待处理全部来自控制台通通锁 SOT。');
   if(!items.length){
     $('taskList').innerHTML=dashboard+'<div class="hint">当前真实 SOT 没有通通锁过期未付或系统已有欠款。请点击刷新重新读取后端。</div>';
     return;
@@ -4683,9 +4692,10 @@ function entryWhatsappBed(e){
   if(e?.type==='TF'){
     const from=entryWhatsappBedToken(e.bed_from||e.from_bed||e.fromBed||e.room,'bed');
     const to=entryWhatsappBedToken(e.bed_to||e.to_bed||e.toBed||e.roomTo,'to');
-    return `${from}-${to} ${from} ${to}`;
+    return {anchor:`【${from}-${to}】`,inline:`${from} ${to}`};
   }
-  return entryWhatsappBedToken(e?.room||e?.bed||e?.expense_category,'item');
+  const bed=entryWhatsappBedToken(e?.room||e?.bed||e?.expense_category,'item');
+  return {anchor:`【${bed}】`,inline:bed};
 }
 function entryWhatsappAmount(e){
   if(e?.type==='R')return num(e?.paid||e?.amount);
@@ -4704,13 +4714,13 @@ function entryWhatsappLine(e,i){
   if(type==='bed_transfer'){
     const waived=e?.fee_status==='waived'||e?.fee_mode==='waived'||e?.fee_paid==='N'||entryWhatsappAmount(e)===0;
     const reason=entryWhatsappSafe(e?.waiver_reason||e?.fee_waiver_reason||e?.transfer_reason||e?.reason||e?.note||e?.remark||'bed_transfer');
-    return `${i+1}. ${bed} bed_transfer ${waived?'waived ':''}${amount} ${pay} ${reason}`.trim();
+    return `${i+1}. ${bed.anchor} ${bed.inline} bed_transfer ${waived?'waived ':''}${amount} ${pay} ${reason}`.trim();
   }
   const start=e?.period_start||e?.startDate||e?.start_date;
   const end=e?.period_end||e?.endDate||e?.end_date;
   const period=start&&end?` ${entryWhatsappShortDate(start)}-${entryWhatsappShortDate(end)}`:'';
   const reason=entryWhatsappSafe(e?.reason_code||e?.custom_reason||e?.note||e?.remark||e?.expense_desc||'');
-  return `${i+1}. ${bed} ${type} ${amount} ${pay}${period}${reason?' '+reason:''}`.trim();
+  return `${i+1}. ${bed.anchor} ${bed.inline} ${type} ${amount} ${pay}${period}${reason?' '+reason:''}`.trim();
 }
 function buildEntrySessionWhatsAppText(){
   const s=sessionStats();

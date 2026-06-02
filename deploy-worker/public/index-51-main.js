@@ -4649,6 +4649,9 @@ function ownerOverviewArrearsCloud(){
 function ownerOverviewRiskCloud(){
   return ownerOverviewCloudData().risk_watch||{};
 }
+function ownerOverviewConsoleSotCloud(){
+  return ownerOverviewCloudData().current_receivables_sot||{};
+}
 function ownerOverviewFlowCloud(){
   return ownerOverviewCloudData().occupancy_flow||{};
 }
@@ -4804,19 +4807,26 @@ function renderOwnerOverview(){
   const month=ownerOverviewCurrentMonth();
   const cloudArrears=ownerOverviewArrearsCloud();
   const cloudRisk=ownerOverviewRiskCloud();
+  const consoleSot=ownerOverviewConsoleSotCloud();
+  const consoleSummary=consoleSot.summary||{};
+  const hasConsoleSot=!!consoleSot.summary;
   const flow=ownerOverviewFlowCloud();
-  const outstandingAmount=Number.isFinite(Number(cloudArrears.outstanding_amount))?Number(cloudArrears.outstanding_amount):openArrears.reduce((sum,a)=>sum+(Number(a.remain)||0),0);
-  const outstandingCount=Number.isFinite(Number(cloudArrears.open_count))?Number(cloudArrears.open_count):openArrears.length;
-  const todayTodo=Number(cloudRisk.overdue_count||0)+Number(cloudRisk.broken_promise_count||0)+Number(cloudRisk.needs_review_count||0)||openArrears.length+overdue.length;
+  const outstandingAmount=hasConsoleSot?Number(consoleSummary.outstanding_amount_fils||consoleSummary.total_amount_fils||0)/100:(Number.isFinite(Number(cloudArrears.outstanding_amount))?Number(cloudArrears.outstanding_amount):openArrears.reduce((sum,a)=>sum+(Number(a.remain)||0),0));
+  const outstandingCount=hasConsoleSot?Number(consoleSummary.action_count??consoleSummary.total_count??0):(Number.isFinite(Number(cloudArrears.open_count))?Number(cloudArrears.open_count):openArrears.length);
+  const todayTodo=hasConsoleSot?Number(consoleSummary.action_count??0):(Number(cloudRisk.overdue_count||0)+Number(cloudRisk.broken_promise_count||0)+Number(cloudRisk.needs_review_count||0)||openArrears.length+overdue.length);
+  const consoleRiskNote=`欠款中 ${Number(consoleSummary.overdue_count||0)} / 今天 ${Number(consoleSummary.due_today_count||0)} / 3天内 ${Number(consoleSummary.due_soon_count||0)}`;
   const monthReceived=Number(month.gross_received||0);
   const netChange=Number(flow.new_tenants||0)-Number(flow.checkouts||0);
-  const kpi=(label,en,value,color='var(--color-primary)',note='')=>`
+  const kpi=(label,en,value,color='var(--color-primary)',note='')=>{
+    if(en==='TODAY ACTIONS'&&hasConsoleSot)note=consoleRiskNote;
+    return `
     <div class="owner-overview-card hl-card">
       <strong>${esc(label)}</strong>
       <span>${esc(en)}</span>
       <b style="color:${color}">${esc(value)}</b>
       ${note?`<span>${esc(note)}</span>`:''}
     </div>`;
+  };
   const latestHtml=latest.length?latest.map(s=>`
     <div class="detail-row owner-mobile-row">
       <div class="room">${esc((s.date||'').slice(0,10)||'-')}</div>
