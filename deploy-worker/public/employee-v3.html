@@ -2735,7 +2735,7 @@ function readSessionId(userid){
   try{return localStorage.getItem(employeeStorageKey('empv3:sessionId',userid))||''}
   catch{return ''}
 }
-const state={lockCards:[],current:null,depositBalance:null,rentConfig:{},rentConfigLoaded:false,drafts:[],tasks:[],employeeDirectives:[],followupItems:[],systemReminderItems:[],systemReminderStatus:'idle',systemReminderSummary:null,systemReminderSources:null,systemReminderLimit:100,sessionId:'',user:null,ttlockStatus:'idle',ttlockLoadedAt:0,ttlockError:''};
+const state={lockCards:[],current:null,depositBalance:null,rentConfig:{},rentConfigLoaded:false,drafts:[],tasks:[],employeeDirectives:[],followupItems:[],systemReminderItems:[],systemReminderStatus:'idle',systemReminderSummary:null,systemReminderSources:null,systemReminderLimit:100,sessionId:'',user:null,ttlockStatus:'idle',ttlockLoadedAt:0,ttlockError:'',ttlockDataSource:''};
 const BED_TRANSFER_WRITE_ENABLED=true;
 const BED_TRANSFER_EVENT_LEDGER_MESSAGE='Bed transfer records save event anchors only. This does not directly change bed occupancy, deposit, arrears, or TTLock. 换床记录只保存信息锚点，不会直接改变床位、押金、欠款或通通锁。';
 const BED_TRANSFER_SUBMITTED_MESSAGE='Bed transfer recorded / 换床记录已保存';
@@ -3155,7 +3155,7 @@ function renderEntryTtlockStatus(){
   const status=state.ttlockStatus||'idle';
   const messages={
     loading:'Loading TTLock cards / 正在加载通通锁...',
-    success:`TTLock loaded / 通通锁已加载：${count} cards${loadedAt?' · '+loadedAt:''}`,
+    success:`${state.ttlockDataSource==='materialized_cache'?'Using TTLock cache / 使用通通锁缓存':'TTLock loaded / 通通锁已加载'}：${count} cards${loadedAt?' · '+loadedAt:''}`,
     error:`TTLock load failed / 通通锁加载失败：${esc(state.ttlockError||'retry required')}`,
     idle:'TTLock required before formal entry / 正式录入前必须先加载通通锁'
   };
@@ -3201,14 +3201,16 @@ async function loadLockFinal(){
     state.lockCards=list.map(normalizeCard).filter(x=>x.bed);
     if(!state.lockCards.length)throw new Error('no_cards');
     state.ttlockStatus='success';
+    state.ttlockDataSource=String(data.data_source||data.source||'live_api');
     state.ttlockLoadedAt=Date.now();
-    toast('TTLock loaded / 通通锁已加载 '+state.lockCards.length+' cards');
+    toast((state.ttlockDataSource==='materialized_cache'?'Using TTLock cache / 使用通通锁缓存 ':'TTLock loaded / 通通锁已加载 ')+state.lockCards.length+' cards');
     lookupBed();
     renderEntryTtlockStatus();
     return true
   }catch(e){
     state.lockCards=[];
     state.ttlockStatus='error';
+    state.ttlockDataSource='';
     state.ttlockError=String(e?.message||e||'load_failed');
     renderEntryTtlockStatus();
     toast('TTLock load failed. Retry before formal entry. / 通通锁加载失败，请重试后再录入',6000);

@@ -1591,9 +1591,9 @@ async function handleEmployeeMigrate(request,env,user){
 }
 __name(handleEmployeeMigrate,"handleEmployeeMigrate");
 async function handleEmployeeLockCards(request,env,user){
-  const result=await loadLockCards(env);
-  if(result.error)return errorResponse(result.error,result.status||500,result.error);
-  await audit(env,user,"employee.lock.cards.load","",{locksCount:result.locksCount}).catch(()=>{});
+  const result=await empLoadLockCardsWithCacheFallback(env,user,{timeoutMs:8000,limit:500});
+  if(result.error)return errorResponse(result.error,result.status||503,result.error);
+  await audit(env,user,"employee.lock.cards.load","",{locksCount:result.locksCount,data_source:result.data_source||"live_api",fallback:!!result.fallback}).catch(()=>{});
   return success(result);
 }
 __name(handleEmployeeLockCards,"handleEmployeeLockCards");
@@ -1954,6 +1954,77 @@ function empTaskToBossArrear(t){
   };
 }
 __name(empTaskToBossArrear,"empTaskToBossArrear");
+async function empCachedTtlockTaskRows(env,user,limit=500){
+  if(!env?.DB||!await empTableExists(env,"arrear_tasks"))return [];
+  const rows=await env.DB.prepare(
+    `SELECT * FROM arrear_tasks
+      WHERE corpid=?
+        AND lower(COALESCE(source_type,source,'')) LIKE '%ttlock%'
+        AND COALESCE(close_status,'') NOT IN ('PAID','CLEARED','CLOSED','VOID','WRITTEN_OFF','WAIVED','closed','paid','cleared')
+      ORDER BY COALESCE(updated_at,created_at) DESC
+      LIMIT ?`
+  ).bind(user.corpid,Math.min(Math.max(Number(limit||500),1),500)).all();
+  return (rows.results||[]).filter(t=>empCloseStatusIsOpen(t.close_status)&&empTaskRemaining(t)>0);
+}
+__name(empCachedTtlockTaskRows,"empCachedTtlockTaskRows");
+function empCachedTtlockRoomsDataFromTasks(rows){
+  const roomsData={};
+  for(const task of rows||[]){
+    const bed=cleanText(task?.bed||task?.room_bed||"",80);
+    if(!bed)continue;
+    const due=cleanDate(task?.promise_date||task?.original_period_end||String(task?.created_at||"").slice(0,10));
+    const endMs=due?Date.parse(`${due}T23:59:59Z`):0;
+    const cardName=cleanText(task?.tenant_name||task?.tenant_card_id||task?.source_ref||`TTLock ${bed}`,120);
+    const cardId=cleanText(task?.tenant_card_id||task?.source_ref||task?.task_id||bed,120);
+    if(!roomsData[bed])roomsData[bed]=[];
+    roomsData[bed].push({
+      room:bed,
+      cardName,
+      identityCardName:cardName,
+      tenant_card_id:cardId,
+      cardId,
+      cardNumber:cardId,
+      remark:cardName,
+      endDate:Number.isFinite(endMs)?endMs:0,
+      startDate:0,
+      source:"cached_materialized_ttlock",
+      source_type:"ttlock_expired_unpaid",
+      task_id:cleanText(task?.task_id||"",100)
+    });
+  }
+  return roomsData;
+}
+__name(empCachedTtlockRoomsDataFromTasks,"empCachedTtlockRoomsDataFromTasks");
+async function empLoadLockCardsWithCacheFallback(env,user,opts={}){
+  try{
+    const live=await empWithTimeout(loadLockCards(env),opts.timeoutMs||8000,"ttlock_api");
+    if(!live?.error)return {...live,data_source:"live_api",fallback:false};
+    const cached=await empCachedTtlockTaskRows(env,user,opts.limit||500);
+    if(cached.length)return {
+      roomsData:empCachedTtlockRoomsDataFromTasks(cached),
+      locksCount:cached.length,
+      loadedAt:empNow(),
+      data_source:"materialized_cache",
+      fallback:true,
+      fallback_reason:live.error,
+      source_status:empSourceStatus(true,"",{data_source:"materialized_cache",fallback_reason:live.error,count:cached.length})
+    };
+    return live;
+  }catch(e){
+    const cached=await empCachedTtlockTaskRows(env,user,opts.limit||500).catch(()=>[]);
+    if(cached.length)return {
+      roomsData:empCachedTtlockRoomsDataFromTasks(cached),
+      locksCount:cached.length,
+      loadedAt:empNow(),
+      data_source:"materialized_cache",
+      fallback:true,
+      fallback_reason:empTtlockReadErrorCode(e),
+      source_status:empSourceStatus(true,"",{data_source:"materialized_cache",fallback_reason:empTtlockReadErrorCode(e),count:cached.length})
+    };
+    return {error:empTtlockReadErrorCode(e),status:503,roomsData:{},locksCount:0};
+  }
+}
+__name(empLoadLockCardsWithCacheFallback,"empLoadLockCardsWithCacheFallback");
 function bossArrearsListLimit(request){
   try{
     const raw=Number(new URL(request.url).searchParams.get("limit")||20);
@@ -2667,6 +2738,33 @@ function consoleSotRowsFromLockCards(roomsData,rentConfig){
   return {rows,byStatus,missingRent,total_cards,staff_count,vacant_count,occupied_count};
 }
 __name(consoleSotRowsFromLockCards,"consoleSotRowsFromLockCards");
+async function empCachedTtlockRowsForConsoleSot(env,user,opts={}){
+  const limit=Math.min(Math.max(Number(opts.limit||500),1),500);
+  const tasks=await empCachedTtlockTaskRows(env,user,limit).catch(()=>[]);
+  const rows=tasks.map(empTaskToBossArrear).filter(row=>cleanMoney(row?.remain||0)>0);
+  const today=empTodayDubai();
+  const byStatus={overdue:[],today:[],soon:[]};
+  for(const row of rows){
+    const due=cleanDate(row?.due_date||"");
+    if(due&&due<today){
+      row.console_status="overdue";
+      row.overdue_days=Math.max(1,empDaysBetween(due,today));
+      byStatus.overdue.push(row);
+    }else if(due===today){
+      row.console_status="today";
+      byStatus.today.push(row);
+    }else if(due&&empDaysBetween(today,due)<=3){
+      row.console_status="soon";
+      byStatus.soon.push(row);
+    }else{
+      row.console_status="";
+    }
+    row.console_source="materialized_cache";
+  }
+  rows.sort(consoleSotSortRows);
+  return {rows:rows.slice(0,limit),byStatus,missingRent:[],source_status:empSourceStatus(true,"",{data_source:"materialized_cache",source_function:"materialized_ttlock_arrear_tasks",count:rows.length})};
+}
+__name(empCachedTtlockRowsForConsoleSot,"empCachedTtlockRowsForConsoleSot");
 async function empLoadExistingArrearsRowsForConsoleSot(env,user,opts={}){
   const limit=Math.min(Math.max(Number(opts.limit||500),1),500);
   const tasks=[];
@@ -2740,6 +2838,13 @@ async function resolveConsoleReceivablesSot(env,user,opts={}){
     byStatus=mapped.byStatus;
     ttlockMissingRent=mapped.missingRent;
     ttlockMeta={total_cards:mapped.total_cards,staff_count:mapped.staff_count,vacant_count:mapped.vacant_count,occupied_count:mapped.occupied_count};
+  }else{
+    const cached=await empCachedTtlockRowsForConsoleSot(env,user,{limit});
+    ttlockRows=cached.rows||[];
+    byStatus=cached.byStatus||byStatus;
+    ttlockMissingRent=cached.missingRent||[];
+    ttlockMeta={total_cards:ttlockRows.length,staff_count:0,vacant_count:0,occupied_count:ttlockRows.length};
+    lockResult.cacheFallbackStatus=cached.source_status;
   }
   const existingRows=existing.rows||[];
   const allRows=[...ttlockRows,...existingRows].sort(consoleSotSortRows).slice(0,limit);
@@ -2789,11 +2894,11 @@ async function resolveConsoleReceivablesSot(env,user,opts={}){
     },
     sources:{
       existing_arrears_record:empSourceContract(existing.source_status?.existing_arrears_record,existingRows.length),
-      ttlock_expired_unpaid:empSourceContract(ttlockOk?empSourceStatus(true,"",{endpoint:"/api/lock/cards",source_function:"cp_getStatus_cp_computeMetrics",count:ttlockRows.length,locks_count:Number(lockResult?.locksCount||0)}):empSourceStatus(false,empTtlockReadErrorCode(lockResult),{endpoint:"/api/lock/cards",source_function:"cp_getStatus_cp_computeMetrics"}),ttlockRows.length)
+      ttlock_expired_unpaid:empSourceContract(ttlockOk?empSourceStatus(true,"",{endpoint:"/api/lock/cards",source_function:"cp_getStatus_cp_computeMetrics",count:ttlockRows.length,locks_count:Number(lockResult?.locksCount||0)}):(lockResult.cacheFallbackStatus||empSourceStatus(false,empTtlockReadErrorCode(lockResult),{endpoint:"/api/lock/cards",source_function:"cp_getStatus_cp_computeMetrics"})),ttlockRows.length)
     },
     source_status:{
       existing_arrears_record:existing.source_status?.existing_arrears_record,
-      ttlock_expired_unpaid:ttlockOk?empSourceStatus(true,"",{endpoint:"/api/lock/cards",data_source:"live_api",source_function:"cp_getStatus_cp_computeMetrics",count:ttlockRows.length,locks_count:Number(lockResult?.locksCount||0)}):empSourceStatus(false,empTtlockReadErrorCode(lockResult),{endpoint:"/api/lock/cards",source_function:"cp_getStatus_cp_computeMetrics"})
+      ttlock_expired_unpaid:ttlockOk?empSourceStatus(true,"",{endpoint:"/api/lock/cards",data_source:"live_api",source_function:"cp_getStatus_cp_computeMetrics",count:ttlockRows.length,locks_count:Number(lockResult?.locksCount||0)}):(lockResult.cacheFallbackStatus||empSourceStatus(false,empTtlockReadErrorCode(lockResult),{endpoint:"/api/lock/cards",source_function:"cp_getStatus_cp_computeMetrics"}))
     },
     ttlock_missing_rent:ttlockMissingRent,
     generated_at:empNow(),
