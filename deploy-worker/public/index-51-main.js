@@ -2886,6 +2886,106 @@ function renderAnalysisChips(){
    Bug7 新租客误报矛盾  Bug8 换入未付落vacant  Bug9 dueDate错误归月
 ══════════════════════════════════════════════════════════════════ */
 
+var _analysisLoadedOpenPeriods={};
+function analysisLoadedPeriodInfo(dateValue){
+  const p=getClientCreditBillingPeriod(new Date(`${String(dateValue||'').slice(0,10)}T12:00:00`));
+  const y=p.start.getFullYear();
+  const m=pad(p.start.getMonth()+1);
+  const endDisplay=new Date(p.end.getFullYear(),p.end.getMonth(),2,0,0,0);
+  return{key:`${y}-${m}`,label:`${y}年${Number(m)}月账期`,startStr:fmtD(p.start),endStr:fmtD(endDisplay),current:new Date()>=p.start&&new Date()<p.end};
+}
+function analysisSessionGross(s){
+  const t=totals((s?.entries||[]).map(normalizeEntry));
+  return Math.round((Number(t.cashIn||0)+Number(t.bankIn||0))*100)/100;
+}
+function analysisRemoveAnchors(anchorIds){
+  const ids=new Set(anchorIds||[]);
+  if(!ids.size)return;
+  state.analysisSessions=normalizeLedgerSessions(state.analysisSessions).filter(s=>{
+    const keep=!ids.has(s.anchorId);
+    if(!keep)LS.del(`anchor:${s.anchorId}`);
+    return keep;
+  });
+  saveAnalysis();
+  renderFilterControls();
+  renderAnalysis();
+}
+function analysisLoadedGroups(){
+  const filt=new Set(filtered().map(s=>s.anchorId));
+  const groups=new Map();
+  normalizeLedgerSessions(state.analysisSessions).forEach(s=>{
+    const d=(s.date||'').slice(0,10)||'unknown';
+    const info=analysisLoadedPeriodInfo(d);
+    if(!groups.has(info.key))groups.set(info.key,{info,sessions:[],dates:new Map(),entries:0,gross:0,filtered:0});
+    const g=groups.get(info.key);
+    const gross=analysisSessionGross(s);
+    g.sessions.push(s);
+    g.entries+=(s.entries||[]).length;
+    g.gross+=gross;
+    if(filt.has(s.anchorId))g.filtered++;
+    if(!g.dates.has(d))g.dates.set(d,{date:d,sessions:[],entries:0,gross:0});
+    const day=g.dates.get(d);
+    day.sessions.push(s);
+    day.entries+=(s.entries||[]).length;
+    day.gross+=gross;
+  });
+  return [...groups.values()].sort((a,b)=>{
+    if(a.info.current!==b.info.current)return a.info.current?-1:1;
+    return b.info.key.localeCompare(a.info.key);
+  });
+}
+function renderAnalysisChips(){
+  state.analysisSessions=normalizeLedgerSessions(state.analysisSessions);
+  const wrap=document.getElementById('analysisChips');
+  if(!state.analysisSessions.length){wrap.innerHTML='';return;}
+  const filt=filtered();
+  const groups=analysisLoadedGroups();
+  groups.forEach((g,idx)=>{if(_analysisLoadedOpenPeriods[g.info.key]===undefined)_analysisLoadedOpenPeriods[g.info.key]=idx===0;});
+  wrap.className='analysis-loaded-groups';
+  wrap.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px">
+    <div style="font-size:11px;color:var(--text3);font-family:JetBrains Mono,monospace">已加载 ${filt.length}/${state.analysisSessions.length} 票 · ${groups.length} 个账期</div>
+    <button class="btn btn-ghost" id="btnClearAna" style="padding:5px 10px;font-size:11px"><svg class="ico"><use href="#i-trash"/></svg>清空全部</button>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:8px">${groups.map(g=>{
+    const open=!!_analysisLoadedOpenPeriods[g.info.key];
+    const dates=[...g.dates.values()].sort((a,b)=>b.date.localeCompare(a.date));
+    return `<section data-analysis-period="${esc(g.info.key)}" style="border:1px solid var(--border);border-radius:12px;background:var(--surface2);overflow:hidden">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 10px;flex-wrap:wrap">
+        <button type="button" data-analysis-period-toggle="${esc(g.info.key)}" style="border:0;background:transparent;color:inherit;cursor:pointer;text-align:left;display:flex;gap:8px;align-items:center;min-width:0;flex:1">
+          <span style="font-size:12px;color:var(--accent);font-weight:900">${open?'▾':'▸'}</span>
+          <span style="min-width:0">
+            <span style="display:block;font-size:13px;font-weight:900;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(g.info.label)}${g.info.current?' · 当前账期':''}</span>
+            <span style="display:block;font-size:10px;color:var(--text3);margin-top:2px">${esc(g.info.startStr)} → ${esc(g.info.endStr)} · ${g.sessions.length}票 · ${g.entries}交易 · 总收入 ${fmtMoney(g.gross)} AED</span>
+          </span>
+        </button>
+        <button class="btn btn-ghost" data-analysis-period-remove="${esc(g.info.key)}" style="font-size:10px;padding:5px 8px">移除本账期</button>
+      </div>
+      <div style="display:${open?'block':'none'};border-top:1px solid var(--border);padding:8px 10px">
+        ${dates.map(day=>`<div style="border:1px solid rgba(148,163,184,0.16);border-radius:9px;margin-bottom:7px;overflow:hidden;background:rgba(255,255,255,0.035)">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 8px;flex-wrap:wrap">
+            <div style="font-size:12px;font-weight:800;color:var(--text)">${esc(day.date)} <span style="font-size:10px;color:var(--text3);font-weight:500">· ${day.sessions.length}票 · ${day.entries}交易 · ${fmtMoney(day.gross)} AED</span></div>
+            <button class="btn btn-ghost" data-analysis-date-remove="${esc(day.date)}" style="font-size:10px;padding:4px 8px">移除当天</button>
+          </div>
+          <div style="padding:0 8px 7px;display:flex;flex-direction:column;gap:5px">
+            ${day.sessions.map(s=>`<div data-analysis-anchor="${esc(s.anchorId)}" style="display:grid;grid-template-columns:minmax(78px,0.75fr) minmax(110px,1.6fr) 64px 82px 42px;gap:7px;align-items:center;font-size:11px;color:var(--text2);border-top:1px solid rgba(148,163,184,0.12);padding-top:5px">
+              <span class="mono">${esc((s.date||'').slice(0,10))}</span>
+              <span class="mono" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(s.anchorId||s.id||'')}</span>
+              <span class="mono">${(s.entries||[]).length}交易</span>
+              <span class="mono" style="text-align:right">${fmtMoney(analysisSessionGross(s))}</span>
+              <button type="button" data-analysis-session-remove="${esc(s.anchorId)}" title="移除单票流水" style="border:0;background:transparent;color:var(--red);font-size:16px;cursor:pointer;line-height:1">×</button>
+            </div>`).join('')}
+          </div>
+        </div>`).join('')}
+      </div>
+    </section>`;
+  }).join('')}</div>`;
+  wrap.querySelectorAll('[data-analysis-period-toggle]').forEach(btn=>btn.onclick=()=>{const key=btn.dataset.analysisPeriodToggle;_analysisLoadedOpenPeriods[key]=!_analysisLoadedOpenPeriods[key];renderAnalysisChips();});
+  wrap.querySelectorAll('[data-analysis-period-remove]').forEach(btn=>btn.onclick=()=>{const key=btn.dataset.analysisPeriodRemove;const g=groups.find(x=>x.info.key===key);if(!g)return;if(!confirm(`移除 ${g.info.label} 的 ${g.sessions.length} 票流水？`))return;analysisRemoveAnchors(g.sessions.map(s=>s.anchorId));});
+  wrap.querySelectorAll('[data-analysis-date-remove]').forEach(btn=>btn.onclick=()=>{const date=btn.dataset.analysisDateRemove;const sessions=state.analysisSessions.filter(s=>(s.date||'').slice(0,10)===date);if(!sessions.length)return;if(!confirm(`移除 ${date} 的 ${sessions.length} 票流水？`))return;analysisRemoveAnchors(sessions.map(s=>s.anchorId));});
+  wrap.querySelectorAll('[data-analysis-session-remove]').forEach(btn=>btn.onclick=()=>analysisRemoveAnchors([btn.dataset.analysisSessionRemove]));
+  document.getElementById('btnClearAna').onclick=()=>{if(!confirm('清空所有分析数据？'))return;state.analysisSessions.forEach(s=>LS.del(`anchor:${s.anchorId}`));state.analysisSessions=[];saveAnalysis();renderFilterControls();renderAnalysis();};
+}
+
 const RC_KEY='apt:rentRef';
 const RC_ROOM_KEY='apt:rentRefRoom'; // 新：按床位精确设置
 let _rcCloudSaveTimer=null;

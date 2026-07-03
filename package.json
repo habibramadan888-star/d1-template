@@ -139,6 +139,7 @@
     "test:owner-client-credit-ui": "node --test tests/owner-client-credit-ui.spec.mjs",
     "test:owner-client-credit-billing-cycle": "node --test tests/owner-client-credit-billing-cycle.spec.mjs",
     "test:owner-client-credit-receivables-debt-details": "node --test tests/owner-client-credit-receivables-debt-details.spec.mjs",
+    "test:owner-analytics-loaded-sessions-grouping": "node --test tests/owner-analytics-loaded-sessions-grouping.spec.mjs",
     "test:owner-rent-continuity-missing-ledger-handling": "node --test tests/owner-rent-continuity-missing-ledger-handling.spec.mjs",
     "test:owner-rent-continuity-payment-timeline": "node --test tests/owner-rent-continuity-payment-timeline.spec.mjs",
     "test:owner-real-screenshot-regression": "node --test tests/owner-real-screenshot-regression.spec.mjs",
