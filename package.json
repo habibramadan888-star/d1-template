@@ -414,6 +414,7 @@
     "test:ledger-session-comparison-uses-fixed-parser": "node --test tests/ledger-session-comparison-uses-fixed-parser.spec.mjs",
     "test:ledger-period-summary-uses-fixed-parser": "node --test tests/ledger-period-summary-uses-fixed-parser.spec.mjs",
     "test:ledger-refund-expense-parsing": "node --test tests/ledger-refund-expense-parsing.spec.mjs",
+    "test:owner-analytics-balance-total": "node --test tests/owner-analytics-balance-total.spec.mjs",
     "test:handover-atomic-design": "node --test tests/handover-atomic.design.spec.mjs",
     "test:handover-atomic": "node --test tests/handover-atomic-rehearsal.spec.mjs",
     "rehearse:handover-atomic": "node scripts/rehearse-handover-atomic-commit.mjs",

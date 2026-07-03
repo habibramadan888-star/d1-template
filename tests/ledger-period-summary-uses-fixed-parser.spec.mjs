@@ -12,5 +12,8 @@ test("period summary and session table use normalized ledger sessions", async ()
 
   assert.match(block, /sessions=normalizeLedgerSessions\(sessions\);/);
   assert.match(block, /const sumT=totals\(sessions\.flatMap/);
+  assert.match(block, /balanceTotal:balanceTotalFromTotals\(t\)/);
+  assert.match(block, /结余总计/);
+  assert.match(block, /repeat\(7,1fr\)/);
   assert.doesNotMatch(block, /4360|6520|4160/);
 });

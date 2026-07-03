@@ -686,6 +686,10 @@ function totals(entries){
     cashBal:r2(ci-ro-eo),total:r2(ci+bi)}; // 总收入=现金+银行（不扣退款/支出），现金结余=现金-退款-支出
 }
 
+function balanceTotalFromTotals(t){
+  return Math.round((Number(t?.cashBal||0)+Number(t?.bankIn||0))*100)/100;
+}
+
 function ledgerSessionRawText(s){
   return String(s?.export_text||s?.exportText||s?.raw_text||s?.rawText||s?.txt||'');
 }
@@ -2850,6 +2854,7 @@ function computeAna(sessions){
     const d=(s.date||'').slice(0,10);
     return{date:d,
       cashBal:r2(st.cashBal), bankIn:r2(st.bankIn),
+      balanceTotal:r2(st.cashBal+st.bankIn),
       refundOut:r2(st.refundOut), expOut:r2(st.expOut),
       totalIn:r2(st.cashIn+st.bankIn),
       newCount:s.entries.map(normalizeEntry).filter(e=>e.tag==='New').length,
@@ -4498,9 +4503,10 @@ function renderAnalysis(){
   const financeBody='<div class="chart-wrap" style="height:200px"><canvas id="cFinTrend"></canvas></div>';
   const peopleBody='<div class="chart-wrap" style="height:180px"><canvas id="cPeople"></canvas></div>';
   const txBody=`<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px"><select class="sel" id="txCF" style="padding:7px 10px;font-size:12px;width:auto"><option value="all">全部</option><option value="cash">C 现金</option><option value="bank">B 银行</option><option value="refund">R 退款</option><option value="expense">E 支出</option><option value="tag:New">N 新入住</option><option value="tag:Transfer">T 换床位</option><option value="tag:Old">O 老租客</option><option value="ptype:discount">折扣</option><option value="ptype:installment">分期</option></select><div class="search-wrap"><svg class="ico"><use href="#i-search"/></svg><input class="inp" id="txS" placeholder="床位/备注" style="padding:7px 10px 7px 28px;font-size:12px;width:150px"></div><span id="txCounter" style="font-size:11px;color:var(--text3)"></span></div><div class="table-wrap" id="txWrap"></div>`;
+  const balanceTotal=balanceTotalFromTotals(a.totals);
   wrap.innerHTML=`
   <div class="card" style="margin-top:14px"><div class="card-head"><div><div class="card-title">${esc(pl)}</div><div class="card-sub">${a.n} 个会话 · ${a.all.length} 笔交易</div></div><div style="text-align:right"><div class="card-sub">期间总收入</div><div style="font-size:26px;font-weight:800;color:#1a9e3f;font-family:JetBrains Mono,monospace;letter-spacing:0">${fmtMoney(a.totals.total)} <span style="font-size:12px;color:var(--text3)">AED</span></div></div></div>
-  <div class="card-body"><div class="ana-kpi-grid">${[['现金收入',a.totals.cashIn,'#c8902a'],['银行收入',a.totals.bankIn,'#1a8a4a'],['押金退款',a.totals.refundOut,'#e06c00'],['其他支出',a.totals.expOut,'#d93025'],['现金结余',a.totals.cashIn-a.totals.refundOut-a.totals.expOut,'#5b7fa6']].map(([l,v,c])=>`<div class="ana-kpi"><div class="ana-kpi-lbl">${l}</div><div class="ana-kpi-val" style="color:${c}">${fmtMoney(v)}</div></div>`).join('')}</div>
+  <div class="card-body"><div class="ana-kpi-grid">${[['现金收入',a.totals.cashIn,'#c8902a'],['银行收入',a.totals.bankIn,'#1a8a4a'],['押金退款',a.totals.refundOut,'#e06c00'],['其他支出',a.totals.expOut,'#d93025'],['现金结余',a.totals.cashIn-a.totals.refundOut-a.totals.expOut,'#5b7fa6'],['结余总计',balanceTotal,'#0f766e']].map(([l,v,c])=>`<div class="ana-kpi"><div class="ana-kpi-lbl">${l}</div><div class="ana-kpi-val" style="color:${c}">${fmtMoney(v)}</div></div>`).join('')}</div>
   <div class="hint" style="text-align:left;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">平均每次交接 <b style="color:var(--accent)">${fmtMoney(a.avg)} AED</b></div></div></div>
   ${anaPanelHtml('session','逐会话对比','排查核账专用 · 默认收起','<div id="anaSessionBreakdown"></div>')}
   ${anaPanelHtml('finance','财务趋势','每次交接 · 默认收起',financeBody)}
@@ -5689,7 +5695,7 @@ function buildSessionTable(sessions){
   // 每个会话独立计算小计
   const sd=sessions.map(s=>{
     const t=totals(s.entries||[]);
-    return{...s,_t:{cashIn:r2(t.cashIn),bankIn:r2(t.bankIn),refundOut:r2(t.refundOut),expOut:r2(t.expOut),net:r2(t.total),cashBal:r2(t.cashBal)}};
+    return{...s,_t:{cashIn:r2(t.cashIn),bankIn:r2(t.bankIn),refundOut:r2(t.refundOut),expOut:r2(t.expOut),net:r2(t.total),cashBal:r2(t.cashBal),balanceTotal:balanceTotalFromTotals(t)}};
   }).sort((a,b)=>(a.date||'').localeCompare(b.date||''));
   // 异常检测：≥5个会话时才启用（N<5误报率高）
   const nets=sd.map(s=>s._t.net);
@@ -5707,13 +5713,14 @@ function buildSessionTable(sessions){
     const cnt=(s.entries||[]).length;
     const a=s._anomaly;
     return `<div style="border-bottom:1px solid var(--border);${a?'background:rgba(224,108,0,0.04)':''}">
-    <div class="ana-session-grid" onclick="anaToggle(${jsArg(s.id)})" style="display:grid;grid-template-columns:80px repeat(6,1fr) 28px;gap:0 6px;align-items:center;padding:10px 14px;cursor:pointer;user-select:none" title="${a?'⚠ 此会话总收入与其他差异较大，建议展开核查':'点击展开查看全部条目'}">
+    <div class="ana-session-grid" onclick="anaToggle(${jsArg(s.id)})" style="display:grid;grid-template-columns:80px repeat(7,1fr) 28px;gap:0 6px;align-items:center;padding:10px 14px;cursor:pointer;user-select:none" title="${a?'⚠ 此会话总收入与其他差异较大，建议展开核查':'点击展开查看全部条目'}">
         <div><div style="font-size:11px;font-weight:600;color:${a?'#e06c00':'var(--text)'};font-family:JetBrains Mono,monospace">${esc(d)}</div><div style="font-size:9px;color:var(--text3);margin-top:2px">${cnt}笔${a?' ⚠️':''}</div></div>
         <div style="text-align:right"><div style="font-size:9px;color:var(--text3)">现金</div><div style="font-size:12px;font-weight:600;color:#c8902a;font-family:JetBrains Mono,monospace">${fmtMoney(s._t.cashIn)}</div></div>
         <div style="text-align:right"><div style="font-size:9px;color:var(--text3)">银行</div><div style="font-size:12px;font-weight:600;color:#1a8a4a;font-family:JetBrains Mono,monospace">${fmtMoney(s._t.bankIn)}</div></div>
         <div style="text-align:right"><div style="font-size:9px;color:var(--text3)">退款</div><div style="font-size:12px;font-weight:600;color:#e06c00;font-family:JetBrains Mono,monospace">${fmtMoney(s._t.refundOut)}</div></div>
         <div style="text-align:right"><div style="font-size:9px;color:var(--text3)">支出</div><div style="font-size:12px;font-weight:600;color:#d93025;font-family:JetBrains Mono,monospace">${fmtMoney(s._t.expOut)}</div></div>
         <div style="text-align:right;border-left:1px solid var(--border);padding-left:6px"><div style="font-size:9px;color:var(--text3)">💰现金结余</div><div style="font-size:13px;font-weight:800;color:#1a73e8;font-family:JetBrains Mono,monospace">${fmtMoney(s._t.cashBal)}</div></div>
+        <div style="text-align:right"><div style="font-size:9px;color:var(--text3)">结余总计</div><div style="font-size:13px;font-weight:800;color:#0f766e;font-family:JetBrains Mono,monospace">${fmtMoney(s._t.balanceTotal)}</div></div>
         <div style="text-align:right"><div style="font-size:9px;color:var(--text3)">总收入</div><div style="font-size:13px;font-weight:700;color:${a?'#e06c00':'#1a9e3f'};font-family:JetBrains Mono,monospace">${fmtMoney(s._t.net)}</div></div>
         <div style="display:flex;justify-content:flex-end"><svg style="width:13px;height:13px;color:var(--text3);transform:${open?'rotate(180deg)':'none'};transition:transform 0.2s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg></div>
       </div>
@@ -5725,24 +5732,26 @@ function buildSessionTable(sessions){
       <div><div class="card-title">📋 逐会话对比 <span style="font-size:11px;font-weight:400;color:var(--text3)">排查核账专用</span></div>
       <div class="card-sub">${hasAnom?'⚠ 检测到总收入偏差会话（橙色行），建议优先展开核查':'数字均衡，无明显异常'} · 💰现金结余 = 实际拿到手的现金</div></div>
     </div>
-    <div class="ana-session-grid ana-session-head" style="display:grid;grid-template-columns:80px repeat(6,1fr) 28px;gap:0 6px;padding:5px 14px;background:var(--surface2);border-top:1px solid var(--border);border-bottom:1px solid var(--border)">
+    <div class="ana-session-grid ana-session-head" style="display:grid;grid-template-columns:80px repeat(7,1fr) 28px;gap:0 6px;padding:5px 14px;background:var(--surface2);border-top:1px solid var(--border);border-bottom:1px solid var(--border)">
       <div style="font-size:9px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.06em">日期</div>
       <div style="text-align:right;font-size:9px;font-weight:600;color:#c8902a;text-transform:uppercase;letter-spacing:0.06em">现金</div>
       <div style="text-align:right;font-size:9px;font-weight:600;color:#1a8a4a;text-transform:uppercase;letter-spacing:0.06em">银行</div>
       <div style="text-align:right;font-size:9px;font-weight:600;color:#e06c00;text-transform:uppercase;letter-spacing:0.06em">退款</div>
       <div style="text-align:right;font-size:9px;font-weight:600;color:#d93025;text-transform:uppercase;letter-spacing:0.06em">支出</div>
       <div style="text-align:right;font-size:9px;font-weight:700;color:#1a73e8;text-transform:uppercase;letter-spacing:0.06em;border-left:1px solid var(--border);padding-left:6px">💰现金结余</div>
+      <div style="text-align:right;font-size:9px;font-weight:700;color:#0f766e;text-transform:uppercase;letter-spacing:0.06em">结余总计</div>
       <div style="text-align:right;font-size:9px;font-weight:600;color:#1a9e3f;text-transform:uppercase;letter-spacing:0.06em">总收入</div>
       <div></div>
     </div>
     ${rows}
-    <div class="ana-session-grid ana-session-total" style="display:grid;grid-template-columns:80px repeat(6,1fr) 28px;gap:0 6px;padding:10px 14px;background:var(--surface2);border-top:2px solid var(--border2)">
+    <div class="ana-session-grid ana-session-total" style="display:grid;grid-template-columns:80px repeat(7,1fr) 28px;gap:0 6px;padding:10px 14px;background:var(--surface2);border-top:2px solid var(--border2)">
       <div style="font-size:10px;font-weight:700;color:var(--text2)">合计</div>
       <div style="text-align:right;font-size:12px;font-weight:700;color:#c8902a;font-family:JetBrains Mono,monospace">${fmtMoney(r2(sumT.cashIn))}</div>
       <div style="text-align:right;font-size:12px;font-weight:700;color:#1a8a4a;font-family:JetBrains Mono,monospace">${fmtMoney(r2(sumT.bankIn))}</div>
       <div style="text-align:right;font-size:12px;font-weight:700;color:#e06c00;font-family:JetBrains Mono,monospace">${fmtMoney(r2(sumT.refundOut))}</div>
       <div style="text-align:right;font-size:12px;font-weight:700;color:#d93025;font-family:JetBrains Mono,monospace">${fmtMoney(r2(sumT.expOut))}</div>
       <div style="text-align:right;font-size:13px;font-weight:800;color:#1a73e8;font-family:JetBrains Mono,monospace;border-left:1px solid var(--border);padding-left:6px">${fmtMoney(r2(sumT.cashBal))}</div>
+      <div style="text-align:right;font-size:13px;font-weight:800;color:#0f766e;font-family:JetBrains Mono,monospace">${fmtMoney(r2(balanceTotalFromTotals(sumT)))}</div>
       <div style="text-align:right;font-size:13px;font-weight:800;color:#1a9e3f;font-family:JetBrains Mono,monospace">${fmtMoney(r2(sumT.total))}</div>
       <div></div>
     </div>
