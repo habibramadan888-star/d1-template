@@ -192,6 +192,18 @@ function routeFromMe(me){
   if(!target){setStatus("此账号暂不能进入系统","error");return}
   location.replace(target);
 }
+async function checkExistingSession(){
+  setStatus("Checking session...");
+  try{
+    const me=await fetchMe();
+    if(me){routeFromMe(me);return true}
+    setStatus("");
+    return false;
+  }catch{
+    setStatus("Session check unavailable. You can still sign in.","warn");
+    return false;
+  }
+}
 function selectPortal(portal){
   selectedPortal=portal;
   portalButtons.forEach(btn=>btn.classList.toggle("active",btn.dataset.portal===portal));
@@ -262,6 +274,7 @@ form.addEventListener("submit",signIn);
 logoutButton.addEventListener("click",logout);
 const initialPortal=new URLSearchParams(location.search).get("portal");
 if(["employee","owner","admin"].includes(initialPortal))selectPortal(initialPortal);
+checkExistingSession();
 </script>
 </body>
 </html>

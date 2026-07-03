@@ -55,3 +55,13 @@ test("session remains device-cookie based and does not bind auth checks to IP", 
   assert.doesNotMatch(requireAuth, /clientIp\(request\)/);
   assert.doesNotMatch(requireAuth, /ip=\?/);
 });
+
+test("root portal restores a valid cookie session before showing manual login", async () => {
+  const portal = await readFile("deploy-worker/public/portal.html", "utf8");
+
+  assert.match(portal, /async function checkExistingSession\(\)/);
+  assert.match(portal, /const me=await fetchMe\(\)/);
+  assert.match(portal, /if\(me\)\{routeFromMe\(me\);return true\}/);
+  assert.match(portal, /checkExistingSession\(\);/);
+  assert.match(portal, /credentials:"include"/);
+});
