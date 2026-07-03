@@ -2749,7 +2749,7 @@ function sanitizeBedTransferDisplay(value,fallback='Kept in audit / 后台留存
   return isTtlockAccountPhone(raw)?fallback:raw.replace(/\+971\d{7,12}/g,'[hidden]');
 }
 function bedTransferReviewLabel(code){
-  return {
+  const payload={
     to_bed_occupied_or_needs_review:'New bed review',
     deposit_review_required:'Deposit review',
     rent_period_review_required:'Rent period review',
@@ -3391,6 +3391,72 @@ function entryDirection(e){
   if(['R','D','AP','TFF'].includes(e.type))return 'in';
   return 'none';
 }
+const EMPLOYEE_ENTRY_ANCHOR_CONTRACT={
+  R:['event_type','bed','expected_rent','paid_amount','payment_method','rent_period_start','rent_period_end','arrears_amount','arrears_due_date','arrears_note','short_paid','raw_display_line','operator','created_at','ttlock_context'],
+  AP:['event_type','bed','paid_amount','payment_method','original_arrears_ref','remaining_arrears_after_payment','note','operator','created_at'],
+  D:['event_type','bed','deposit_amount','payment_method','linked_tenant','note','operator','created_at'],
+  DR:['event_type','bed','refund_amount','payment_method','refund_reason','checkout_ref','note','operator','created_at'],
+  CO:['event_type','bed','checkout_date','deposit_refund','outstanding_arrears','final_note','ttlock_context','operator','created_at'],
+  E:['event_type','expense_amount','expense_category','target_bed','reason','note','payment_method','operator','created_at'],
+  TF:['event_type','from_bed','to_bed','transfer_date','fee_amount','fee_status','waiver_reason','transfer_reason','old_tenant_context','old_ttlock_context','note','operator','created_at']
+};
+function entryEventType(type){
+  return {R:'rent',AP:'arrears_payment',D:'deposit_in',DR:'deposit_out',CO:'checkout',E:'expense',TF:'bed_transfer',TFF:'bed_transfer_fee'}[type]||String(type||'entry').toLowerCase();
+}
+function paymentMethodLabel(pay){
+  if(pay==='B'||String(pay||'').toLowerCase()==='bank')return 'bank';
+  if(pay==='C'||String(pay||'').toLowerCase()==='cash')return 'cash';
+  if(String(pay||'').toLowerCase()==='none')return 'none';
+  return String(pay||'other').toLowerCase();
+}
+function buildEntryRawDisplayLine(e){
+  const type=entryEventType(e.type);
+  if(e.type==='R'){
+    const parts=[e.room,'rent','paid',fmtMoney(e.paid||e.amount),'expected',fmtMoney(e.period_due||e.due),'method',paymentMethodLabel(e.pay_type)];
+    if(e.short_paid)parts.push('short_paid',fmtMoney(e.arrears_amount),'due',e.arrears_due_date||'-','note',e.arrears_note||'-');
+    return parts.join(' ');
+  }
+  if(e.type==='TF')return `${e.bed_from||e.room}->${e.bed_to||e.roomTo} bed_transfer ${fmtMoney(e.amount)} ${paymentMethodLabel(e.pay_type)} ${e.transfer_reason||e.fee_waiver_reason||''}`.trim();
+  return `${e.room||e.expense_category||''} ${type} ${fmtMoney(e.amount)} ${paymentMethodLabel(e.pay_type)} ${e.note||e.expense_desc||''}`.trim();
+}
+function applyEntryAnchors(e){
+  const type=e.type;
+  const tail=type==='R'?Math.max(0,num(e.period_due||e.due)-num(e.paid||e.amount)):0;
+  const method=paymentMethodLabel(e.pay_type||e.payment_method);
+  const base={event_type:entryEventType(type),payment_method:method,operator:e.operator_name||operatorName(),operator_id:e.operator_id||operatorId(),created_at:e.created_at||nowIso()};
+  Object.assign(e,base);
+  if(type==='R'){
+    Object.assign(e,{
+      bed:e.room,
+      expected_rent:num(e.period_due||e.due),
+      paid_amount:num(e.paid||e.amount),
+      rent_period_start:e.period_start||'',
+      rent_period_end:e.period_end||'',
+      deposit_included_amount:num(e.deposit_included_amount||0),
+      arrears_amount:tail,
+      arrears_due_date:tail>0?(e.arrear_promise_date||e.promise_date||''):'',
+      arrears_note:tail>0?(e.arrear_reason_detail||e.custom_reason||e.note||''):'',
+      arrears_status:tail>0?'open':'',
+      short_paid:tail>0
+    });
+  }else if(type==='AP'){
+    Object.assign(e,{bed:e.room,paid_amount:num(e.amount),original_arrears_ref:e.linked_task_id||'',remaining_arrears_after_payment:num(e.remaining_arrears_after_payment||0)});
+  }else if(type==='D'){
+    Object.assign(e,{bed:e.room,deposit_amount:num(e.amount),linked_tenant:e.tenant_card_id||e.tenant_name||''});
+  }else if(type==='DR'){
+    Object.assign(e,{bed:e.room,refund_amount:num(e.amount),refund_reason:e.ded_note||e.note||'',checkout_ref:e.checkout_date||''});
+  }else if(type==='CO'){
+    Object.assign(e,{bed:e.room,checkout_date:e.checkout_date||'',deposit_refund:num(e.deposit_amt||0),outstanding_arrears:num(e.carry_over_arrears||0),final_note:e.note||e.ded_note||''});
+  }else if(type==='E'){
+    Object.assign(e,{expense_amount:num(e.amount),target_bed:e.room||'',reason:e.expense_category||e.reason_code||'',note:e.expense_desc||e.note||''});
+  }else if(type==='TF'){
+    Object.assign(e,{from_bed:e.bed_from||'',to_bed:e.bed_to||'',fee_amount:num(e.amount),fee_status:e.fee_mode==='waived'?'waived':'paid',waiver_reason:e.fee_waiver_reason||'',transfer_reason:e.transfer_reason||'',old_tenant_context:e.tenant_name||'',old_ttlock_context:e.old_ttlock_ref||e.tenant_card_id||''});
+  }
+  e.ttlock_context=e.old_ttlock_ref||e.tenant_card_id||'';
+  e.raw_display_line=buildEntryRawDisplayLine(e);
+  e.anchor_contract_version='employee_entry_anchor_v1';
+  return e;
+}
 function sessionStats(){
   const rows=state.drafts;
   const cashIn=rows.filter(e=>e.pay_type==='C'&&entryDirection(e)==='in').reduce((s,e)=>s+num(e.amount),0);
@@ -3735,6 +3801,7 @@ function entryPayload(){
     promise_date:tail>0?$('arrearPromiseDate').value:'',promise_amount:tail>0?tail:0,
     note:noteText,remark:noteText,operator_id:operatorId(),operator_name:operatorName(),src:'EMP',status:'ACTIVE',created_at:nowIso(),ts:nowIso()
   };
+  return applyEntryAnchors(payload);
 }
 function bedTransferEventIdempotencyKey(e){
   const basis=[
@@ -3855,9 +3922,10 @@ async function submitBedTransferEvent(){
 function exportLine(e){
   const name=e.tenant_name||'-', cid=e.tenant_card_id||'-', period=e.period_start&&e.period_end?` ${e.period_start}->${e.period_end}`:'';
   if(e.type==='R'){
-    const tail=Math.max(0,num(e.period_due)-num(e.paid));
-    const tailText=tail>0?` TAIL${fmtMoney(tail)} PROMISE:${e.arrear_promise_date||'-'} REASON:${e.arrear_reason_detail||e.custom_reason||'-'}`:'';
-    return `#${e.room} ${name} R ${e.tag} ${fmtMoney(e.amount)} AED ${e.entry_clr==='Y'?'CLR':'short paid'}${tailText}${num(e.excess)>0?' EXCESS'+fmtMoney(e.excess)+' '+(e.excess_to||'-'):''}\n  card ${cid}${period} LP${fmtMoney(e.list_price)} DUE${fmtMoney(e.period_due)} PAID${fmtMoney(e.paid)} EID ${e.id}`;
+    const tail=Math.max(0,num(e.arrears_amount||e.period_due)-num(e.arrears_amount?0:e.paid));
+    const shortPaid=num(e.arrears_amount)>0?num(e.arrears_amount):Math.max(0,num(e.period_due)-num(e.paid));
+    const tailText=shortPaid>0?` SHORT_PAID ${fmtMoney(shortPaid)} PROMISE:${e.arrears_due_date||e.arrear_promise_date||'-'} NOTE:${e.arrears_note||e.arrear_reason_detail||e.custom_reason||'-'} STATUS:${e.arrears_status||'open'}`:'';
+    return `#${e.room} ${name} R ${e.tag} paid ${fmtMoney(e.paid||e.amount)} AED expected ${fmtMoney(e.expected_rent||e.period_due||e.due)} ${e.entry_clr==='Y'?'CLR':'short paid'}${tailText}${num(e.excess)>0?' EXCESS'+fmtMoney(e.excess)+' '+(e.excess_to||'-'):''}\n  card ${cid}${period} LP${fmtMoney(e.list_price)} DUE${fmtMoney(e.period_due)} PAID${fmtMoney(e.paid)} RAW ${entryWhatsappSafe(e.raw_display_line||'')} EID ${e.id}`;
   }
   if(e.type==='D')return `#${e.room} ${name} D ${e.tag} ${fmtMoney(e.amount)} AED\n  card ${cid} EID ${e.id}`;
   if(e.type==='DR')return `#${e.room} ${name} DR ${fmtMoney(e.amount)} AED ${e.pay_type}\n  card ${cid} EID ${e.id}`;
@@ -4795,7 +4863,7 @@ function buildExport(){
   const opened=drafts.filter(e=>e.type==='R'&&e.entry_clr!=='Y'&&num(e.period_due)>num(e.paid));
   if(opened.length){
     lines.push('', '==== ARREARS OPENED ====');
-    opened.forEach(e=>lines.push(`TASK auto  #${e.room} ${e.tenant_name||'-'} ${e.tenant_card_id||'-'}  owes ${fmtMoney(num(e.period_due)-num(e.paid))}  ${e.reason_code||'SHORT_PAID'}  ${e.period_start}->${e.period_end}`));
+    opened.forEach(e=>lines.push(`TASK auto  #${e.room} ${e.tenant_name||'-'} ${e.tenant_card_id||'-'}  expected ${fmtMoney(e.expected_rent||e.period_due)} paid ${fmtMoney(e.paid||e.amount)} owes ${fmtMoney(num(e.arrears_amount)||num(e.period_due)-num(e.paid))}  ${e.reason_code||'SHORT_PAID'} due ${e.arrears_due_date||e.arrear_promise_date||'-'} note ${e.arrears_note||e.arrear_reason_detail||e.custom_reason||'-'}  ${e.period_start}->${e.period_end}`));
   }
   const cashIn=drafts.filter(e=>e.pay_type==='C'&&!['E','DR'].includes(e.type)).reduce((s,e)=>s+num(e.amount),0);
   const bankIn=drafts.filter(e=>e.pay_type==='B'&&!['E','DR'].includes(e.type)).reduce((s,e)=>s+num(e.amount),0);
@@ -4869,6 +4937,40 @@ function entryWhatsappLine(e,i){
   const period=start&&end?` ${entryWhatsappShortDate(start)}-${entryWhatsappShortDate(end)}`:'';
   const reason=entryWhatsappSafe(e?.reason_code||e?.custom_reason||e?.note||e?.remark||e?.expense_desc||'');
   return `${i+1}. ${bed.anchor} ${bed.inline} ${type} ${amount} ${pay}${period}${reason?' '+reason:''}`.trim();
+}
+function entryWhatsappBed(e){
+  if(e?.type==='TF'){
+    const from=entryWhatsappBedToken(e.bed_from||e.from_bed||e.fromBed||e.room,'bed');
+    const to=entryWhatsappBedToken(e.bed_to||e.to_bed||e.toBed||e.roomTo,'to');
+    return {anchor:`#${from}->#${to}`,inline:`${from}->${to}`};
+  }
+  const bed=entryWhatsappBedToken(e?.room||e?.bed||e?.expense_category,'item');
+  return {anchor:`#${bed}`,inline:bed};
+}
+function entryWhatsappLine(e,i){
+  const type=entryWhatsappType(e);
+  const bed=entryWhatsappBed(e);
+  const pay=entryWhatsappPayment(e);
+  const amount=fmtMoney(entryWhatsappAmount(e));
+  if(type==='bed_transfer'){
+    const waived=e?.fee_status==='waived'||e?.fee_mode==='waived'||e?.fee_paid==='N'||entryWhatsappAmount(e)===0;
+    const reason=entryWhatsappSafe(e?.waiver_reason||e?.fee_waiver_reason||e?.transfer_reason||e?.reason||e?.note||e?.remark||'bed_transfer');
+    return `${i+1}. ${bed.anchor} bed_transfer ${waived?'waived ':''}${amount} ${pay} ${reason}`.trim();
+  }
+  const start=e?.period_start||e?.startDate||e?.start_date;
+  const end=e?.period_end||e?.endDate||e?.end_date;
+  const period=start&&end?` ${entryWhatsappShortDate(start)}-${entryWhatsappShortDate(end)}`:'';
+  if(type==='rent'){
+    const expected=num(e?.expected_rent||e?.period_due||e?.due);
+    const paid=num(e?.paid_amount||e?.paid||e?.amount);
+    const shortPaid=num(e?.arrears_amount)||Math.max(0,expected-paid);
+    const due=e?.arrears_due_date||e?.arrear_promise_date||e?.promise_date||'';
+    const note=entryWhatsappSafe(e?.arrears_note||e?.arrear_reason_detail||e?.custom_reason||e?.note||'');
+    const shortText=shortPaid>0?` expected ${fmtMoney(expected)} short_paid ${fmtMoney(shortPaid)} due ${due||'-'}${note?' note '+note:''}`:` expected ${fmtMoney(expected)}`;
+    return `${i+1}. ${bed.anchor} rent ${fmtMoney(paid)} ${pay}${shortText}${period}`.trim();
+  }
+  const reason=entryWhatsappSafe(e?.reason_code||e?.custom_reason||e?.note||e?.remark||e?.expense_desc||'');
+  return `${i+1}. ${bed.anchor} ${type} ${amount} ${pay}${period}${reason?' '+reason:''}`.trim();
 }
 function buildEntrySessionWhatsAppText(){
   const s=sessionStats();
