@@ -5950,6 +5950,51 @@ function calcPeriodRenewals(period){
     hasDefault:items.some(i=>!i.hasConfig)};
 }
 
+function ccTtlockStatus(){
+  const loaded=!!(roomsData&&Object.keys(roomsData).length);
+  const rooms=loaded?Object.keys(roomsData).length:0;
+  const cards=loaded?Object.values(roomsData).reduce((s,list)=>s+(Array.isArray(list)?list.length:0),0):0;
+  const sync=document.getElementById('lastUpdate')?.textContent||'';
+  return{loaded,rooms,cards,sync};
+}
+async function ccEnsureClientData(force=false){
+  if(force||!(roomsData&&Object.keys(roomsData).length)){
+    try{if(typeof cp_loadAll==='function')await cp_loadAll();}catch(e){console.warn('[client-credit ttlock load]',e);}
+  }
+  if(force||(!(state.arrears||[]).length&&!state.arrearsLoading)){
+    try{await loadArrearsForOwner({showLoading:false,limit:100});}catch(e){console.warn('[client-credit arrears load]',e);}
+  }
+}
+function ccDebtRows(){
+  const cfg=rc_getRoomCfg();
+  const latestPayments=rc_buildBedPaymentContinuityIndex(rc_allLedgerSessions());
+  return (state.arrears||[]).filter(a=>!a.cleared&&Number(a.remain||a.amount||a.arrear_amount||0)>0).map(a=>{
+    const bed=rc_normBedKey(a.room||a.bed||a.room_bed||a.bed_no||a.customerCode||'');
+    const lockCard=bed?rc_currentOccupiedCards().find(c=>rc_normBedKey(c.bed)===bed):null;
+    const latest=(latestPayments[bed]?.rows||[])[0]||null;
+    const monthly=Number(a.ref||a.monthlyRent||a.monthly_rent||cfg[bed]||cfg[a.room]||0);
+    const remain=Number(a.remain||a.amount||a.arrear_amount||0);
+    const paid=Number(a.paid||a.actualReceived||a.actual_received||0);
+    return{
+      id:a.id||a.taskId||bed,
+      bed,
+      name:a.customerName||a.tenantName||a.cardName||lockCard?.cardName||'待核对',
+      monthly,
+      paid,
+      remain,
+      dueDate:a.dueDate||a.due_date||a.promiseDate||'本账期',
+      lastPayment:latest?`${rc_fmtShortDate(latest.date)} · ${fmtMoney(latest.amount)} AED`:'暂无',
+      ttlockEnd:lockCard?.endDate?rc_fmtShortDate(lockCard.endDate):'待核对',
+      reason:a.note||a.reason||a.sourceLabel||a.sourceType||'未缴清欠款'
+    };
+  });
+}
+function ccOutstandingDebtSummary(){
+  const rows=ccDebtRows();
+  const total=Math.round(rows.reduce((s,r)=>s+Number(r.remain||0),0)*100)/100;
+  return{rows,total,count:rows.length};
+}
+
 function renderBillingWidget(targetId){
   const el=document.getElementById(targetId);if(!el)return;
   const p=targetId==='billingWidget2'?getClientCreditBillingPeriod():getBillingPeriod();
@@ -5968,7 +6013,8 @@ function renderBillingWidget(targetId){
   const [cashD,bankD]=[r2(cash),r2(bank)];  // 用于显示的已截断值
 
   // 未清欠款
-  const outstanding=r2(state.arrears.filter(a=>!a.cleared).reduce((s,a)=>s+(Number(a.remain)||0),0));
+  const debt=ccOutstandingDebtSummary();
+  const outstanding=r2(debt.total);
 
   // 期内到期续租（通通锁）
   const ren=calcPeriodRenewals(p);
@@ -5981,12 +6027,21 @@ function renderBillingWidget(targetId){
   const collectedPct=forecastTotal>0?Math.round(collected/forecastTotal*100):0;
   const renewPct=forecastTotal>0&&hasRen?Math.round(ren.total/forecastTotal*100):0;
   const tp=Math.round(p.timePct*100);
+  const tt=ccTtlockStatus();
+  const ttlockStatusHtml=targetId==='billingWidget2'?`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 10px;padding:8px 10px;border-radius:9px;background:${tt.loaded?'rgba(26,138,74,0.07)':'rgba(224,108,0,0.08)'};border:1px solid ${tt.loaded?'rgba(26,138,74,0.22)':'rgba(224,108,0,0.25)'};font-size:11px;color:var(--text2)">
+    <span><b style="color:${tt.loaded?'var(--green)':'var(--orange)'}">TTLock ${tt.loaded?'已加载':'未加载'}</b> · ${tt.cards} cards · ${tt.rooms} rooms${tt.sync?' · '+esc(tt.sync):''}</span>
+    <button class="btn btn-ghost" style="font-size:11px;padding:5px 9px" onclick="ccRecomputeClientCredit()">重新计算</button>
+  </div>`:'';
 
   // ── 续租明细列表 + 通通锁状态提示（合并在同一区域）──
   let renewListHtml='';
   if(ren===null){
     // 通通锁未加载
-    renewListHtml=`<div style="margin-top:10px;padding:8px 12px;border-radius:8px;background:var(--surface2);border:1px solid var(--border);font-size:11px;color:var(--text3);text-align:center">📡 在<b style="color:var(--text2)">控制面板</b>加载通通锁后，可自动计算期内到期床位和续租预估金额</div>`;
+    const missing=[
+      !(roomsData&&Object.keys(roomsData).length)?'缺 TTLock cards':'',
+      !p?.start||!p?.end?'缺 billing period':''
+    ].filter(Boolean).join(' · ')||'缺 bed mapping / monthly rent map';
+    renewListHtml=`<div style="margin-top:10px;padding:8px 12px;border-radius:8px;background:var(--surface2);border:1px solid var(--border);font-size:11px;color:var(--text3);text-align:center">无法计算期内待续租：${esc(missing)}</div>`;
   }else if(ren.count===0){
     renewListHtml=`<div style="margin-top:10px;padding:8px 12px;border-radius:8px;background:rgba(26,138,74,0.06);border:1px solid rgba(26,138,74,0.2);font-size:11px;color:var(--text3);text-align:center">✓ 本期内无卡到期，收款已稳定</div>`;
   }else{
@@ -6020,11 +6075,11 @@ function renderBillingWidget(targetId){
     <div style="font-size:9px;color:${ren.hasDefault?'var(--text3)':'var(--green)'};margin-top:2px">${ren.hasDefault?'☆含默认700价格':'✓ 按配置租金计算'}</div>
   </div>`:'';
 
-  const card3=`<div style="background:${outstanding>0?'rgba(224,108,0,0.06)':'rgba(26,138,74,0.04)'};border:1px solid ${outstanding>0?'rgba(224,108,0,0.2)':'rgba(26,138,74,0.15)'};border-radius:10px;padding:11px">
+  const card3=`<button type="button" onclick="ccOpenDebtDetailModal()" style="text-align:left;width:100%;cursor:pointer;background:${outstanding>0?'rgba(224,108,0,0.06)':'rgba(26,138,74,0.04)'};border:1px solid ${outstanding>0?'rgba(224,108,0,0.2)':'rgba(26,138,74,0.15)'};border-radius:10px;padding:11px">
     <div style="font-size:9px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:5px">⏳ 未清欠款</div>
     <div style="font-size:${hasRen?'17':'20'}px;font-weight:800;color:${outstanding>0?'var(--orange)':'var(--green)'};font-family:JetBrains Mono,monospace;line-height:1">${fmtAED(outstanding)}</div>
-    <div style="font-size:9px;color:var(--text3);margin-top:4px">${state.arrears.filter(a=>!a.cleared).length} 笔待清</div>
-  </div>`;
+    <div style="font-size:9px;color:var(--text3);margin-top:4px">${debt.count} 笔待清 · 点击查看明细</div>
+  </button>`;
 
   const cardGrid=`<div class="billing-kpi-grid ${hasRen?'triple':'double'}" style="display:grid;grid-template-columns:${hasRen?'1fr 1fr 1fr':'1fr 1fr'};gap:8px;margin-bottom:12px">${card1}${card2}${card3}</div>`;
 
@@ -6071,6 +6126,7 @@ function renderBillingWidget(targetId){
       <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text3);margin-bottom:4px;font-family:JetBrains Mono,monospace"><span>${esc(p.startStr)}</span><span>时间进度 ${tp}%</span><span>${esc(p.endStr)}</span></div>
       <div style="height:4px;background:var(--surface3);border-radius:2px;overflow:hidden"><div style="height:100%;width:${tp}%;background:linear-gradient(90deg,var(--blue),#6366f1);border-radius:2px"></div></div>
     </div>
+    ${ttlockStatusHtml}
     ${cardGrid}
     ${progressHtml}
     ${renewListHtml}
@@ -6100,6 +6156,68 @@ function showRenewalDetails(targetId){
   }).join('');
   showModal('期内到期明细',`${ren.count} 个床位 · ${ren.paidCount} 个已收齐 · 待收 ${fmtMoney(ren.total)} AED`,
     `<div class="table-wrap" style="max-height:60vh"><table class="tx-table"><thead><tr><th>床位</th><th>租客/卡片</th><th>到期</th><th>状态</th><th class="right">金额</th></tr></thead><tbody>${rows}</tbody></table></div>`);
+}
+
+function ccOpenDebtDetailModal(){
+  const p=getClientCreditBillingPeriod();
+  const debt=ccOutstandingDebtSummary();
+  let overlay=document.getElementById('ccDebtDetailOverlay');
+  if(!overlay){
+    overlay=document.createElement('div');
+    overlay.id='ccDebtDetailOverlay';
+    overlay.onclick=e=>{if(e.target===overlay)ccCloseDebtDetailModal();};
+    document.body.appendChild(overlay);
+  }
+  window._ccDebtRows=debt.rows;
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,0.38);backdrop-filter:blur(8px);z-index:340;display:flex;align-items:center;justify-content:center;padding:16px';
+  overlay.innerHTML=`<div style="background:rgba(255,255,255,0.88);border:1px solid rgba(255,255,255,0.6);border-radius:18px;max-width:860px;width:100%;max-height:88vh;overflow:hidden;box-shadow:0 18px 60px rgba(15,23,42,0.22);display:flex;flex-direction:column">
+    <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;padding:18px 20px;border-bottom:1px solid rgba(148,163,184,0.22)">
+      <div>
+        <div style="font-size:18px;font-weight:900;color:#172033">未缴清欠款明细</div>
+        <div style="font-size:12px;color:#64748b;margin-top:5px">总欠款 ${fmtMoney(debt.total)} AED · ${debt.count} 个床位 · ${esc(p.startStr)} → ${esc(p.endStr)}</div>
+      </div>
+      <button onclick="ccCloseDebtDetailModal()" style="border:0;background:transparent;font-size:24px;line-height:1;color:#64748b;cursor:pointer">×</button>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;padding:12px 20px;border-bottom:1px solid rgba(148,163,184,0.16)">
+      <input id="ccDebtSearch" class="inp hl-input" placeholder="搜索床位号" oninput="ccRenderDebtDetailRows()" style="flex:1;min-width:160px">
+      <select id="ccDebtSort" class="sel hl-select" onchange="ccRenderDebtDetailRows()" style="width:150px"><option value="bed">按床位</option><option value="amount">按金额</option></select>
+    </div>
+    <div id="ccDebtDetailRows" style="overflow:auto;padding:12px 20px"></div>
+    <div style="padding:12px 20px;border-top:1px solid rgba(148,163,184,0.16);display:flex;justify-content:flex-end"><button class="btn btn-primary" onclick="ccCloseDebtDetailModal()">关闭</button></div>
+  </div>`;
+  if(window._ccDebtEscHandler)document.removeEventListener('keydown',window._ccDebtEscHandler);
+  window._ccDebtEscHandler=e=>{if(e.key==='Escape')ccCloseDebtDetailModal();};
+  document.addEventListener('keydown',window._ccDebtEscHandler);
+  ccRenderDebtDetailRows();
+}
+function ccRenderDebtDetailRows(){
+  const el=document.getElementById('ccDebtDetailRows');if(!el)return;
+  const q=(document.getElementById('ccDebtSearch')?.value||'').trim().toLowerCase();
+  const sort=document.getElementById('ccDebtSort')?.value||'bed';
+  let rows=[...(window._ccDebtRows||[])];
+  if(q)rows=rows.filter(r=>String(r.bed||'').toLowerCase().includes(q)||String(r.name||'').toLowerCase().includes(q));
+  rows.sort((a,b)=>sort==='amount'?(Number(b.remain||0)-Number(a.remain||0)):String(a.bed||'').localeCompare(String(b.bed||''),undefined,{numeric:true}));
+  if(!rows.length){el.innerHTML='<div style="text-align:center;color:#64748b;padding:24px">暂无欠款明细</div>';return;}
+  el.innerHTML=`<div class="table-wrap" style="max-height:58vh"><table class="tx-table"><thead><tr><th>床位</th><th>客户/卡片</th><th class="right">月租</th><th class="right">已收</th><th class="right">未缴</th><th>应缴日期/账期</th><th>最近收款</th><th>TTLock</th><th>来源</th></tr></thead><tbody>${rows.map(r=>`<tr onclick="ccOpenDebtEvidence(${jsArg(r.bed)})" style="cursor:pointer">
+    <td class="mono" style="font-weight:800">${esc(r.bed||'待核对')}</td>
+    <td>${esc(r.name||'待核对')}</td>
+    <td class="mono right">${fmtMoney(r.monthly||0)}</td>
+    <td class="mono right">${fmtMoney(r.paid||0)}</td>
+    <td class="mono right" style="color:#e06c00;font-weight:800">${fmtMoney(r.remain||0)}</td>
+    <td>${esc(r.dueDate||'本账期')}</td>
+    <td>${esc(r.lastPayment||'暂无')}</td>
+    <td>${esc(r.ttlockEnd||'待核对')}</td>
+    <td>${esc(r.reason||'未缴清欠款')}</td>
+  </tr>`).join('')}</tbody></table></div>`;
+}
+function ccOpenDebtEvidence(bed){
+  _rcPaymentContinuityIndex=rc_buildBedPaymentContinuityIndex(rc_allLedgerSessions());
+  rc_openPaymentContinuityModal(bed);
+}
+function ccCloseDebtDetailModal(){
+  const overlay=document.getElementById('ccDebtDetailOverlay');
+  if(overlay)overlay.style.display='none';
+  if(window._ccDebtEscHandler){document.removeEventListener('keydown',window._ccDebtEscHandler);window._ccDebtEscHandler=null;}
 }
 
 /* ── CUSTOMER CREDIT SYSTEM ── */
@@ -6442,9 +6560,18 @@ function ccShowLoading(){
     <div style="font-size:12px;color:var(--text3);line-height:1.6">正在读取本账期收入、期内待续租和未来欠款，请稍候。</div>
   </div></div>`;
 }
+async function ccRecomputeClientCredit(){
+  ccShowLoading();
+  await ccEnsureClientData(true);
+  _ccCache=null;
+  ccRender(true);
+}
 function ccOpenView(){
   ccShowLoading();
-  requestAnimationFrame(()=>ccRender(true));
+  requestAnimationFrame(async()=>{
+    await ccEnsureClientData(false);
+    ccRender(true);
+  });
 }
 
 function ccRender(forceRebuild=false){
@@ -6796,6 +6923,7 @@ const INLINE_ACTIONS=new Set([
   'updateInstallRemain','enterDepositForArrear','enterPaymentForArrear','dismissArrear','rc_removeRoom','rc_applyApt','rc_bulkFill',
   'rc_setAll','rc_addRoom','rc_saveCfgFromUI','rc_toggleCfg','rc_loadLock','rc_check','rc_updateTypeUI','rc_closeResolveModal',
   'rc_openPaymentContinuityModal','rc_closePaymentContinuityModal',
+  'ccRecomputeClientCredit','ccOpenDebtDetailModal','ccRenderDebtDetailRows','ccOpenDebtEvidence','ccCloseDebtDetailModal',
   'rc_submitResolution','rc_selectApt','rc_applySelected','rc_selectEmpty','rc_clearSelection','rc_toggleCfgGroup','wmSetFilter',
   'wmLoadLock','wmSyncFromContinuity','wmCopyAll','wmCopyOne','wmCreateOne','rc_openResolveModal','rc_clearResolution',
   'toggleAnaPanel','showRenewalDetails','toggleClientContinuity','anaToggle','ccDelPayment','ccShowAddPayment','ccToggle',

@@ -51,6 +51,7 @@ test("client page opens with loading state and forced recompute", async () => {
   assert.match(js, /function ccShowLoading\(\)/);
   assert.match(js, /正在计算客户信用档案/);
   assert.match(js, /function ccOpenView\(\)/);
-  assert.match(js, /requestAnimationFrame\(\(\)=>ccRender\(true\)\)/);
+  assert.match(js, /await ccEnsureClientData\(false\)/);
+  assert.match(js, /ccRender\(true\)/);
   assert.match(js, /if\(v==='clients'\)\{ccOpenView\(\);\}/);
 });
