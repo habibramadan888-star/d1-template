@@ -522,6 +522,73 @@ function applySpokenContinuation(entry,line,sessionDate){
   return false;
 }
 
+function isExplicitMoneyRowLine(line){
+  const l=String(line||'').trim();
+  if(!l)return false;
+  return /^#?\S+\s+[\d,]+(?:\.\d+)?\s+(?:O|N|T|Old|New|Transfer)\b/i.test(l)
+    || /^#?\S+\s+(?:O|N|T|Old|New|Transfer)\s+[\d,]+(?:\.\d+)?\b/i.test(l)
+    || /^#?\S+\s+bed_transfer\s+[\d,]+(?:\.\d+)?\b/i.test(l)
+    || /^#?\S+\s+[\d,]+(?:\.\d+)?(?:\s|$)/i.test(l);
+}
+
+function isSectionHeaderLine(line){
+  const l=String(line||'').trim();
+  return l.includes('🏦')||l.includes('💵')||l.includes('💸')||l.includes('📤')||l.includes('🧾')
+    || (/银行转账|现金收款|押金退款|其他支出/.test(l)&&l.includes('笔'))
+    || /BANK\s+TRANSFER\b/i.test(l)
+    || /^(DEPOSI?TE?|DEPOSIT)\s+RETURN(?:ED)?\b/i.test(l)
+    || /^CASH\b/i.test(l)
+    || /^USED\b/i.test(l)
+    || /^EXPENSE/i.test(l);
+}
+
+function splitRoomTransferToken(token){
+  const cleaned=String(token||'').replace(/^#+/,'').trim();
+  const parts=cleaned.split(/(?:->|→)/);
+  return {room:parts[0]||cleaned,roomTo:parts[1]||undefined};
+}
+
+function parseDeclaredMoney(line){
+  const m=String(line||'').match(/([\d,]+(?:\.\d{1,2})?)\s*(?:AED)?/i);
+  return m?Math.round(parseFloat(m[1].replace(/,/g,''))*100)/100:null;
+}
+
+function parseDeclaredTotals(lines){
+  const declared={};
+  for(const raw of lines||[]){
+    const l=String(raw||'').trim();
+    if(l.includes('笔'))continue;
+    const amount=parseDeclaredMoney(l);
+    if(amount==null)continue;
+    if(/现金结余|cash\s*handover/i.test(l))declared.cash_handover=amount;
+    else if(/银行收款|银行收入|bank\s*(?:transfer|received|income|in)/i.test(l))declared.bank_receipts=amount;
+    else if(/押金退款|dep\.?\s*refund|deposit\s*refund/i.test(l))declared.deposit_refund=amount;
+    else if(/其他支出|expenses?|expense/i.test(l))declared.expenses=amount;
+    else if(/总收入|总金额|gross\s*(?:received|income|in)|total\s*(?:received|income|in)/i.test(l))declared.gross_income=amount;
+  }
+  return declared;
+}
+
+function reconcileDeclaredTotals(declared,parsed){
+  const warnings=[];
+  const r2=n=>Math.round(Number(n||0)*100)/100;
+  const has=v=>v!==undefined&&v!==null&&!Number.isNaN(Number(v));
+  const add=(code,field,declaredValue,parsedValue)=>{
+    if(!has(declaredValue))return;
+    const delta=r2(parsedValue)-r2(declaredValue);
+    if(Math.abs(delta)>=0.01)warnings.push({code,field,declared:r2(declaredValue),parsed:r2(parsedValue),difference:r2(delta)});
+  };
+  add('DECLARED_BANK_MISMATCH','bank_receipts',declared?.bank_receipts,parsed?.bankIn);
+  add('DECLARED_DEPOSIT_REFUND_MISMATCH','deposit_refund',declared?.deposit_refund,parsed?.refundOut);
+  add('DECLARED_EXPENSE_MISMATCH','expenses',declared?.expenses,parsed?.expOut);
+  add('DECLARED_GROSS_MISMATCH','gross_income',declared?.gross_income,parsed?.total);
+  add('DECLARED_CASH_HANDOVER_MISMATCH','cash_handover',declared?.cash_handover,parsed?.cashBal);
+  if(has(declared?.gross_income)&&has(declared?.bank_receipts)){
+    add('CASH_RECONCILIATION_MISMATCH','cash_receipts',r2(declared.gross_income-declared.bank_receipts),parsed?.cashIn);
+  }
+  return {ok:warnings.length===0,warnings};
+}
+
 function parseTXT(text){
   if(!text||!text.trim()) return null;
   const lines=text.split(/\r?\n/);
@@ -543,12 +610,13 @@ function parseTXT(text){
     for(let i=0;i<cs.length;i++){h=((h<<5)-h+cs.charCodeAt(i))|0;}
     s.anchorId='LGC-'+s.date+'-'+Math.abs(h).toString(36).toUpperCase().slice(0,6);
   }
+  s.declaredTotals=parseDeclaredTotals(lines);
   let cat=null;
   let lastEntry=null;
   for(const raw of lines){
     const l=raw.trim();
     if(!l||l.startsWith('##')) continue;
-    if(lastEntry&&applySpokenContinuation(lastEntry,l,s.date)) continue;
+    if(!isExplicitMoneyRowLine(l)&&!isSectionHeaderLine(l)&&lastEntry&&applySpokenContinuation(lastEntry,l,s.date)) continue;
     // ── 分隔线重置类别（防止上一分类"污染"下一段）──
     if(/^[─━—–\-]{5,}$/.test(l)){cat=null;continue;}
     // ── 汇总标签行跳过（必须在类别检测之前！否则"押金退款 300 AED"会误设 cat='refund'）──
@@ -574,8 +642,8 @@ function parseTXT(text){
     }
     const compact=l.match(/^(\S+)\s+(O|N|T|Old|New|Transfer)\s+([\d,]+\.?\d*)\s*(.*)$/i);
     if(compact){
-      const roomParts=compact[1].replace(/^#+/,'').split(/[→>]+/);
-      lastEntry={id:newId(),cat,room:roomParts[0],roomTo:roomParts[1]||undefined,
+      const roomParts=splitRoomTransferToken(compact[1]);
+      lastEntry={id:newId(),cat,room:roomParts.room,roomTo:roomParts.roomTo,
         amount:parseFloat(compact[3].replace(/,/g,'')),tag:normTag(compact[2]),
         note:(compact[4]||'').replace(/^\s*无\s*$/,'').trim()};
       s.entries.push(lastEntry);
@@ -583,10 +651,19 @@ function parseTXT(text){
     }
     const amountFirst=l.match(/^(\S+)\s+([\d,]+\.?\d*)\s+(O|N|T|Old|New|Transfer)\b\s*(.*)$/i);
     if(amountFirst){
-      const roomParts=amountFirst[1].replace(/^#+/,'').split(/[→>]+/);
-      lastEntry={id:newId(),cat,room:roomParts[0],roomTo:roomParts[1]||undefined,
+      const roomParts=splitRoomTransferToken(amountFirst[1]);
+      lastEntry={id:newId(),cat,room:roomParts.room,roomTo:roomParts.roomTo,
         amount:parseFloat(amountFirst[2].replace(/,/g,'')),tag:normTag(amountFirst[3]),
         note:(amountFirst[4]||'').replace(/^\s*无\s*$/,'').trim()};
+      s.entries.push(lastEntry);
+      continue;
+    }
+    const transferEvent=l.match(/^(\S+)\s+bed_transfer\s+([\d,]+\.?\d*)\s*(.*)$/i);
+    if(transferEvent){
+      const roomParts=splitRoomTransferToken(transferEvent[1]);
+      lastEntry={id:newId(),cat,room:roomParts.room,roomTo:roomParts.roomTo,
+        amount:parseFloat(transferEvent[2].replace(/,/g,'')),tag:'Transfer',
+        note:(transferEvent[3]||'').trim()};
       s.entries.push(lastEntry);
       continue;
     }
@@ -594,6 +671,8 @@ function parseTXT(text){
     if(m){lastEntry={id:newId(),cat,room:m[1].replace(/^#+/,''),amount:parseFloat(m[2].replace(/,/g,'')),tag:normTag(m[3]),note:(m[4]||'').replace(/^\s*无\s*$/,'').trim()};s.entries.push(lastEntry);}
     else{const m2=l.match(/^(\S+)\s+([\d,]+\.?\d*)\s*(.*)$/);if(m2){let note=(m2[3]||'').trim();let tag='Old';const tm=note.match(/^(O|N|T|Old|New|Transfer)\b\s*(.*)$/i);if(tm){tag=normTag(tm[1]);note=(tm[2]||'').trim();}lastEntry={id:newId(),cat,room:m2[1].replace(/^#+/,''),amount:parseFloat(m2[2].replace(/,/g,'')),tag,note};s.entries.push(lastEntry);}}
   }
+  s.parsedTotals=totals(s.entries);
+  s.reconciliation=reconcileDeclaredTotals(s.declaredTotals,s.parsedTotals);
   return s;
 }
 function totals(entries){

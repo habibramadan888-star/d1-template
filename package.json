@@ -408,6 +408,8 @@
     "test:backend-totals-staging-switch": "node --test tests/backend-totals-staging-switch-rehearsal.spec.mjs",
     "rehearse:backend-totals": "node scripts/rehearse-backend-totals-authority.mjs",
     "rehearse:backend-totals-staging-switch": "node scripts/rehearse-backend-totals-staging-switch.mjs",
+    "test:ledger-parser-balance-continuation": "node --test tests/ledger-parser-balance-continuation.spec.mjs",
+    "test:ledger-parser-declared-reconciliation": "node --test tests/ledger-parser-declared-reconciliation.spec.mjs",
     "test:handover-atomic-design": "node --test tests/handover-atomic.design.spec.mjs",
     "test:handover-atomic": "node --test tests/handover-atomic-rehearsal.spec.mjs",
     "rehearse:handover-atomic": "node scripts/rehearse-handover-atomic-commit.mjs",
