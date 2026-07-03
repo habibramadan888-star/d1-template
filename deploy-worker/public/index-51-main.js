@@ -5287,6 +5287,199 @@ function toggleHistImportGroup(periodKey){
   if(label)label.textContent=_histImportOpenGroups[periodKey]?'收起':'展开';
 }
 
+const HISTORY_IMPORT_ITEM_TIMEOUT_MS=30000;
+let _historyImportJob=null;
+
+function ensureHistoryImportProgressStyle(){
+  if(document.getElementById('historyImportProgressStyle'))return;
+  const style=document.createElement('style');
+  style.id='historyImportProgressStyle';
+  style.textContent=`
+  .hist-import-progress-bg{position:fixed;inset:0;z-index:5000;display:flex;align-items:center;justify-content:center;padding:18px;background:rgba(15,23,42,.24);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
+  .hist-import-progress-modal{width:min(720px,100%);max-height:min(82vh,720px);display:flex;flex-direction:column;overflow:hidden;border:1px solid rgba(255,255,255,.58);border-radius:26px;background:linear-gradient(135deg,rgba(255,255,255,.78),rgba(232,246,239,.68));box-shadow:0 28px 80px rgba(15,23,42,.24);-webkit-backdrop-filter:blur(28px) saturate(170%);backdrop-filter:blur(28px) saturate(170%)}
+  .hist-import-progress-head{padding:20px 22px 16px;border-bottom:1px solid rgba(148,163,184,.22)}
+  .hist-import-progress-title{font-size:18px;font-weight:900;letter-spacing:-.02em;color:var(--text)}
+  .hist-import-progress-sub{margin-top:5px;font-size:13px;color:var(--text2)}
+  .hist-import-progress-bar{height:9px;border-radius:999px;background:rgba(15,23,42,.08);overflow:hidden;margin-top:16px}
+  .hist-import-progress-bar span{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,#1a9e3f,#66c287);transition:width .22s ease}
+  .hist-import-current{margin-top:12px;padding:10px 12px;border:1px solid rgba(26,158,63,.16);border-radius:15px;background:rgba(255,255,255,.48);font-size:12px;color:var(--text2)}
+  .hist-import-progress-list{padding:14px 16px;overflow:auto;display:grid;gap:8px}
+  .hist-import-progress-row{display:grid;grid-template-columns:minmax(84px,108px) minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px 12px;border:1px solid rgba(148,163,184,.18);border-radius:15px;background:rgba(255,255,255,.52);font-size:12px}
+  .hist-import-progress-date{font-weight:800;color:var(--text);white-space:nowrap}
+  .hist-import-progress-anchor{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text2);font-family:var(--mono)}
+  .hist-import-progress-status{white-space:nowrap;font-weight:800;border-radius:999px;padding:4px 8px;background:rgba(148,163,184,.13);color:var(--text2)}
+  .hist-import-progress-status.loading{background:rgba(26,158,63,.13);color:#08742a}
+  .hist-import-progress-status.done{background:rgba(16,185,129,.15);color:#047857}
+  .hist-import-progress-status.fail{background:rgba(239,68,68,.12);color:#b91c1c}
+  .hist-import-progress-status.skipped{background:rgba(245,158,11,.13);color:#92400e}
+  .hist-import-progress-reason{grid-column:2/4;margin-top:-5px;color:var(--red);font-size:11px}
+  .hist-import-progress-foot{padding:14px 16px;border-top:1px solid rgba(148,163,184,.22);display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;background:rgba(255,255,255,.38)}
+  .hist-import-progress-summary{font-size:12px;color:var(--text2);font-weight:700}
+  .hist-import-progress-actions{display:flex;gap:8px;flex-wrap:wrap}
+  @media(max-width:639px){.hist-import-progress-bg{align-items:flex-end;padding:12px}.hist-import-progress-modal{max-height:88vh;border-radius:24px}.hist-import-progress-head{padding:16px}.hist-import-progress-row{grid-template-columns:88px minmax(0,1fr);gap:7px}.hist-import-progress-status{grid-column:1/3;justify-self:start}.hist-import-progress-reason{grid-column:1/3}.hist-import-progress-foot{align-items:stretch}.hist-import-progress-actions{width:100%;display:grid;grid-template-columns:1fr 1fr}.hist-import-progress-actions .btn{width:100%}}
+  `;
+  document.head.appendChild(style);
+}
+
+function historyImportStatusText(status){
+  return {waiting:'等待中',loading:'加载中',done:'已完成',fail:'失败',skipped:'跳过',syncing:'同步中'}[status]||status;
+}
+
+function historyImportItemLabel(item){
+  const s=item.session||{};
+  return `${(s.date||'').slice(0,10)||'未归档日期'} · ${s.anchorId||s.anchor_id||s.id||'无锚点'}`;
+}
+
+function renderHistoryImportProgress(job){
+  if(!job)return;
+  ensureHistoryImportProgressStyle();
+  let overlay=document.getElementById('historyImportProgress');
+  if(!overlay){
+    overlay=document.createElement('div');
+    overlay.id='historyImportProgress';
+    overlay.className='hist-import-progress-bg';
+    document.body.appendChild(overlay);
+  }
+  const total=job.items.length;
+  const done=job.items.filter(i=>['done','fail','skipped'].includes(i.status)).length;
+  const success=job.items.filter(i=>i.status==='done').length;
+  const failed=job.items.filter(i=>i.status==='fail').length;
+  const skipped=job.items.filter(i=>i.status==='skipped').length;
+  const pct=total?Math.round(done*100/total):0;
+  const active=job.items.find(i=>i.status==='loading');
+  const current=active?historyImportItemLabel(active):(job.done?'全部处理完成':'等待开始');
+  const rows=job.items.map(item=>`
+    <div class="hist-import-progress-row">
+      <div class="hist-import-progress-date">${esc((item.session.date||'').slice(0,10)||'--')}</div>
+      <div class="hist-import-progress-anchor">${esc(item.session.anchorId||item.session.anchor_id||item.session.id||'--')}</div>
+      <div class="hist-import-progress-status ${esc(item.status)}">${historyImportStatusText(item.status)}</div>
+      ${item.reason?`<div class="hist-import-progress-reason">${esc(item.reason)}</div>`:''}
+    </div>`).join('');
+  overlay.innerHTML=`<div class="hist-import-progress-modal" role="dialog" aria-modal="true" aria-labelledby="historyImportProgressTitle">
+    <div class="hist-import-progress-head">
+      <div class="hist-import-progress-title" id="historyImportProgressTitle">${job.done?'导入完成':'正在导入历史流水'}</div>
+      <div class="hist-import-progress-sub">已完成 ${done} / 总数 ${total}</div>
+      <div class="hist-import-progress-bar" aria-label="导入进度"><span style="width:${pct}%"></span></div>
+      <div class="hist-import-current">当前处理项：${esc(current)}</div>
+    </div>
+    <div class="hist-import-progress-list">${rows}</div>
+    <div class="hist-import-progress-foot">
+      <div class="hist-import-progress-summary">${job.done?`导入完成：成功 ${success} 条，失败 ${failed} 条，跳过 ${skipped} 条`:`正在逐条处理，失败不会阻断后续流水。`}</div>
+      <div class="hist-import-progress-actions">
+        ${!job.done?'<button class="btn btn-ghost" id="btnCancelHistoryImport" type="button">取消导入</button>':''}
+        ${job.done&&failed?'<button class="btn btn-primary" id="btnRetryHistoryImportFailed" type="button">重试失败项</button>':''}
+        ${job.done?'<button class="btn btn-ghost" id="btnCloseHistoryImportProgress" type="button">关闭</button>':''}
+      </div>
+    </div>
+  </div>`;
+  const cancel=document.getElementById('btnCancelHistoryImport');
+  if(cancel)cancel.onclick=()=>{
+    job.cancelled=true;
+    if(job.currentController)job.currentController.abort(new DOMException('User cancelled','AbortError'));
+    job.items.filter(i=>i.status==='waiting').forEach(i=>{i.status='skipped';i.reason='用户取消';});
+    renderHistoryImportProgress(job);
+  };
+  const close=document.getElementById('btnCloseHistoryImportProgress');
+  if(close)close.onclick=()=>overlay.remove();
+  const retry=document.getElementById('btnRetryHistoryImportFailed');
+  if(retry)retry.onclick=()=>importHistorySessions(job.items.filter(i=>i.status==='fail').map(i=>i.session),{retry:true});
+}
+
+async function loadHistoryImportEntries(cs,job){
+  const normalizedCs=normalizeLedgerSession(cs);
+  if(normalizedCs.entries&&normalizedCs.entries.length)return normalizedCs.entries;
+  if(cs._cloud){
+    const controller=new AbortController();
+    job.currentController=controller;
+    const timer=setTimeout(()=>controller.abort(new DOMException('History detail timed out','TimeoutError')),HISTORY_IMPORT_ITEM_TIMEOUT_MS);
+    try{
+      const r=await apiFetch(`/api/session_detail?id=${encodeURIComponent(cs.id)}`,{signal:controller.signal});
+      if(r.status===401){showAuthExpired();job.cancelled=true;throw new Error('登录已过期');}
+      if(r.status===403)throw new Error('老板账户才能导入历史详情');
+      if(!r.ok)throw new Error(`历史详情加载失败：${r.status}`);
+      const rows=await r.json();
+      if(!Array.isArray(rows))throw new Error('历史详情格式异常');
+      return rows.map(tx=>({
+        id:tx.id,cat:tx.cat,room:tx.room,amount:tx.amount,
+        due:tx.due||0,paid:tx.paid||0,deficit:tx.deficit||0,
+        tag:normTag(tx.tag),note:tx.note||'',
+        roomTo:tx.room_to||undefined,startDate:tx.start_date||undefined,
+        depDue:tx.dep_due||0,depPaid:tx.dep_paid||0,depDef:tx.dep_def||0,
+        dueDate:tx.due_date||undefined,depDate:tx.dep_date||undefined,
+        payType:tx.pay_type||undefined,discountReason:tx.discount_reason||undefined,
+        depositCollection:tx.deposit_collection===1
+      }));
+    }finally{
+      clearTimeout(timer);
+      if(job.currentController===controller)job.currentController=null;
+    }
+  }
+  const loc=state.saved.find(s=>s.id===cs.id);
+  return loc?(normalizeLedgerSession(loc).entries||[]):[];
+}
+
+async function importHistorySessions(selected,{retry=false}={}){
+  const btn=document.getElementById('btnFromHistory');
+  const originalHtml=btn?btn.innerHTML:'';
+  const job={items:selected.map(session=>({session,status:'waiting',reason:''})),done:false,cancelled:false,currentController:null};
+  _historyImportJob=job;
+  renderHistoryImportProgress(job);
+  let added=0,dup=0,fail=0,addedSessions=[];
+  try{
+    if(btn){btn.disabled=true;btn.style.opacity='0.72';btn.textContent=`导入中 0/${selected.length}`;}
+    for(let idx=0;idx<job.items.length;idx++){
+      const item=job.items[idx];
+      if(job.cancelled){if(item.status==='waiting'){item.status='skipped';item.reason='用户取消';}continue;}
+      item.status='loading';item.reason='';renderHistoryImportProgress(job);
+      if(btn)btn.textContent=`导入中 ${idx}/${job.items.length}`;
+      await new Promise(resolve=>setTimeout(resolve,0));
+      try{
+        const cs=item.session;
+        const normalizedCs=normalizeLedgerSession(cs);
+        const entries=await loadHistoryImportEntries(cs,job);
+        if(!entries.length){item.status='fail';item.reason='没有可导入的流水明细';fail++;continue;}
+        const s=normalizeLedgerSession({id:cs.id,date:cs.date||'',anchorId:cs.anchorId||mkAnchor(cs.id,(cs.date||'').slice(0,10)),entries,export_text:ledgerSessionRawText(normalizedCs)});
+        const aid=stableAnchor(s);
+        const entry={...s,anchorId:aid};
+        if(!isDuplicate(entry)){
+          state.analysisSessions.push(entry);
+          LS.set(`anchor:${aid}`,JSON.stringify(entry));
+          added++;
+          addedSessions.push(entry);
+          item.status='done';
+        }else{
+          dup++;
+          item.status='skipped';
+          item.reason='重复流水已跳过';
+        }
+      }catch(e){
+        item.status=job.cancelled?'skipped':'fail';
+        item.reason=job.cancelled?'用户取消':(isAbortLikeError(e)?'加载超时或已取消':(e.message||'读取失败'));
+        if(item.status==='fail')fail++;
+        console.warn('history import item failed:',item.session?.id,e);
+      }finally{
+        if(btn)btn.textContent=`导入中 ${Math.min(idx+1,job.items.length)}/${job.items.length}`;
+        renderHistoryImportProgress(job);
+      }
+    }
+    if(added>0)saveAnalysis();
+    let sync={ok:0,fail:0};
+    if(added>0){
+      renderImportSyncStatus('warn','本地已保存，正在同步云端...',`准备同步 ${added} 份流水。`);
+      sync=await syncImportedSessionsToCloud(addedSessions);
+      renderImportSyncStatus(sync.fail?'err':'ok',sync.fail?'本地已保存，但云端同步失败':'本地和云端都已保存成功',importSyncDetail(added,dup,sync));
+    }
+    if(!added&&fail)renderImportSyncStatus('err','历史导入失败',`${fail} 份历史详情无法读取，请确认登录的是老板账户并稍后重试。`);
+    toast(`导入 ${added} 份，同步云端 ${sync.ok} 份${sync.fail?`，同步失败 ${sync.fail} 份`:''}${dup>0?`，${dup}份重复跳过`:''}${fail>0?`，读取失败 ${fail} 份`:''}${job.cancelled?'，已取消剩余项':''}`,(sync.fail||fail&&!added)?'err':'ok');
+    renderFilterControls();renderAnalysis();
+  }finally{
+    job.done=true;
+    renderHistoryImportProgress(job);
+    if(btn){btn.disabled=false;btn.style.opacity='';btn.innerHTML=originalHtml;syncHistSelectionUI();}
+    if(retry)toast('失败项重试已完成');
+  }
+}
+
 async function fromHistory(){
   if(!Array.isArray(window._histSessions)) await updateHistCount();
   const sessions=window._histSessions||[];
@@ -5294,56 +5487,7 @@ async function fromHistory(){
   if(!checked.length){toast('请先勾选要导入的会话','err');return;}
   const selected=sessions.filter(s=>checked.includes(s.id));
   if(!selected.length){toast('未找到选中的历史会话，请刷新历史列表','err');return;}
-  const btn=document.getElementById('btnFromHistory');
-  if(btn){btn.disabled=true;btn.style.opacity='0.65';}
-  toast(`正在导入 ${selected.length} 份会话...`);
-  let added=0,dup=0,fail=0,addedSessions=[];
-  try{
-  for(const cs of selected){
-    const normalizedCs=normalizeLedgerSession(cs);
-    let entries=[];
-    if(normalizedCs.entries&&normalizedCs.entries.length){
-      entries=normalizedCs.entries;
-    }else if(cs._cloud){
-      try{
-        const r=await apiFetch(`/api/session_detail?id=${encodeURIComponent(cs.id)}`);
-        if(r.status===401){showAuthExpired();return;}
-        if(r.status===403){toast('老板账户才能导入历史详情','err');fail++;continue;}
-        if(!r.ok){console.warn('session_detail failed:',cs.id,r.status);fail++;continue;}
-        const rows=await r.json();
-        if(!Array.isArray(rows)){fail++;continue;}
-        entries=rows.map(tx=>({
-          id:tx.id,cat:tx.cat,room:tx.room,amount:tx.amount,
-          due:tx.due||0,paid:tx.paid||0,deficit:tx.deficit||0,
-          tag:normTag(tx.tag),note:tx.note||'',
-          roomTo:tx.room_to||undefined,startDate:tx.start_date||undefined,
-          depDue:tx.dep_due||0,depPaid:tx.dep_paid||0,depDef:tx.dep_def||0,
-          dueDate:tx.due_date||undefined,depDate:tx.dep_date||undefined,
-          payType:tx.pay_type||undefined,discountReason:tx.discount_reason||undefined,
-          depositCollection:tx.deposit_collection===1
-        }));
-      }catch(e){console.warn('session_detail failed:',cs.id,e);fail++;continue;}
-    }else{
-      const loc=state.saved.find(s=>s.id===cs.id);
-      if(loc)entries=normalizeLedgerSession(loc).entries||[];
-    }
-    if(!entries.length){fail++;continue;}
-    const s=normalizeLedgerSession({id:cs.id,date:cs.date||'',anchorId:cs.anchorId||mkAnchor(cs.id,(cs.date||'').slice(0,10)),entries,export_text:ledgerSessionRawText(normalizedCs)});
-    const aid=stableAnchor(s);
-    const entry={...s,anchorId:aid};
-    if(!isDuplicate(entry)){state.analysisSessions.push(entry);LS.set(`anchor:${aid}`,JSON.stringify(entry));added++;addedSessions.push(entry);}
-    else dup++;
-  }
-  if(added>0)saveAnalysis();
-  if(added>0)renderImportSyncStatus('warn','本地已保存，正在同步云端...',`准备同步 ${added} 份流水。`);
-  const sync=await syncImportedSessionsToCloud(addedSessions);
-  if(added>0)renderImportSyncStatus(sync.fail?'err':'ok',sync.fail?'本地已保存，但云端同步失败':'本地和云端都已保存成功',importSyncDetail(added,dup,sync));
-  if(!added&&fail)renderImportSyncStatus('err','历史导入失败',`${fail} 份历史详情无法读取，请确认登录的是老板账户并稍后重试。`);
-  toast(`导入 ${added} 份，同步云端 ${sync.ok} 份${sync.fail?`，同步失败 ${sync.fail} 份`:''}${dup>0?`，${dup}份重复跳过`:''}${fail>0?`，读取失败 ${fail} 份`:''}`,(sync.fail||fail&&!added)?'err':'ok');
-  renderFilterControls();renderAnalysis();
-  }finally{
-    if(btn){btn.disabled=false;btn.style.opacity='';}
-  }
+  await importHistorySessions(selected);
 }
 
 /* ── BILLING PERIOD ANALYSIS ── */
