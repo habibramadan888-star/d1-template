@@ -32,6 +32,7 @@ const ARREARS_OVERVIEW_PAGE_SIZE=5;
 const ARREARS_FETCH_TIMEOUT_MS=10000;
 const ARREARS_SLOW_LOADING_MS=3000;
 const HISTORY_FETCH_TIMEOUT_MS=4500;
+const OWNER_CORE_HISTORY_AUTOLOAD_LIMIT=40;
 
 /* ── CLOUD AUTH ── */
 /* window.authToken 已移除：Token 存于 httpOnly Cookie，JS 不可读取 */
@@ -173,6 +174,7 @@ function showOwnerAppShell(appRole){
   const db=document.getElementById('btnDashboard');
   if(db)db.style.display=canReadOwner?'':'none';
   applyReadonlyAdminUi();
+  if(canReadOwner)setTimeout(()=>ensureOwnerCoreReadData({force:false,reason:'owner_app_open'}).catch(e=>console.warn('[owner core autoload]',e)),80);
 }
 function denyReadonlyAdminWrite(){
   if(role!=='readonly_admin')return false;
@@ -5989,6 +5991,181 @@ function ccDebtRows(){
     };
   });
 }
+var _ownerCoreReadDataLoading=false;
+var _ownerCoreReadDataStatus={history:'idle',ttlock:'idle',rent:'idle',computed:'idle',lastLoadedAt:0,errors:[]};
+function ownerCoreDataStatusLabel(){
+  const s=_ownerCoreReadDataStatus||{};
+  const parts=[
+    s.history==='loading'?'正在加载历史流水':s.history==='ready'?'历史流水已加载':s.history==='missing'?'缺历史流水':'历史流水待加载',
+    s.ttlock==='loading'?'正在加载 TTLock':s.ttlock==='ready'?'TTLock 已加载':s.ttlock==='missing'?'缺 TTLock cards':'TTLock 待加载',
+    s.rent==='ready'?'月租映射已加载':'缺月租映射',
+    s.computed==='loading'?'正在计算客户信用':s.computed==='ready'?'客户信用已计算':'客户信用待计算'
+  ];
+  return parts.join(' · ');
+}
+async function ownerHydrateHistoryForClientCredit(force=false){
+  _ownerCoreReadDataStatus.history='loading';
+  const oldLimit=state.historyLimit;
+  if(force||Number(state.historyLimit||0)<OWNER_CORE_HISTORY_AUTOLOAD_LIMIT)state.historyLimit=OWNER_CORE_HISTORY_AUTOLOAD_LIMIT;
+  try{await updateHistCount();}
+  finally{state.historyLimit=oldLimit;}
+  const list=Array.isArray(window._histSessions)?window._histSessions:[];
+  if(!list.length){_ownerCoreReadDataStatus.history='missing';return 0;}
+  let added=0;
+  const job={timings:{historyFetchMs:0,normalizeMs:0,appendMs:0,recomputeMs:0,totalMs:0},cancelled:false,currentController:null};
+  for(const cs of list.slice(0,OWNER_CORE_HISTORY_AUTOLOAD_LIMIT)){
+    try{
+      const normalized=normalizeLedgerSession(cs);
+      let entries=normalized.entries||[];
+      if((force||!entries.length)&&typeof loadHistoryImportEntries==='function')entries=await loadHistoryImportEntries(cs,job);
+      const session=normalizeLedgerSession({
+        id:cs.id,
+        date:cs.date||'',
+        anchorId:cs.anchorId||cs.anchor_id||mkAnchor(cs.id,(cs.date||'').slice(0,10)),
+        entries,
+        export_text:ledgerSessionRawText(normalized)
+      });
+      if(session.entries&&session.entries.length&&!isDuplicate(session)){
+        state.analysisSessions.push(session);
+        added++;
+      }
+    }catch(e){
+      console.warn('[owner core history hydrate]',cs?.id||cs?.anchorId,e);
+      _ownerCoreReadDataStatus.errors.push(`history:${cs?.id||cs?.anchorId||'unknown'}`);
+    }
+  }
+  if(added)saveAnalysis();
+  _ownerCoreReadDataStatus.history=rc_allLedgerSessions().length?'ready':'missing';
+  return added;
+}
+async function ensureOwnerCoreReadData({force=false,reason=''}={}){
+  if(_ownerCoreReadDataLoading)return false;
+  _ownerCoreReadDataLoading=true;
+  _ownerCoreReadDataStatus={history:'loading',ttlock:'loading',rent:'idle',computed:'loading',lastLoadedAt:_ownerCoreReadDataStatus.lastLoadedAt||0,errors:[]};
+  try{
+    await ownerHydrateHistoryForClientCredit(force);
+    if(force||!(roomsData&&Object.keys(roomsData).length)){
+      try{if(typeof cp_loadAll==='function')await cp_loadAll();}catch(e){console.warn('[owner core ttlock load]',e);_ownerCoreReadDataStatus.errors.push('ttlock');}
+    }
+    _ownerCoreReadDataStatus.ttlock=(roomsData&&Object.keys(roomsData).length)?'ready':'missing';
+    _ownerCoreReadDataStatus.rent=Object.keys(rc_getRoomCfg()||{}).length?'ready':'missing';
+    _ownerCoreReadDataStatus.computed='ready';
+    _ownerCoreReadDataStatus.lastLoadedAt=Date.now();
+    console.info('[owner core read data]',{reason,history:rc_allLedgerSessions().length,ttlock:_ownerCoreReadDataStatus.ttlock,rent:_ownerCoreReadDataStatus.rent});
+    return true;
+  }finally{
+    _ownerCoreReadDataLoading=false;
+  }
+}
+async function ccEnsureClientData(force=false){
+  await ensureOwnerCoreReadData({force,reason:force?'client_recompute':'client_open'});
+}
+function ccEntryText(e){return String(e?.rawLine||e?.raw||e?.note||'').trim();}
+function ccParseMoneyToken(v){return parseMoney(String(v||'').replace(/,/g,''));}
+function ccExplicitHistoricalArrearsAmount(e){
+  const txt=ccEntryText(e);
+  const note=txt.toLowerCase();
+  const deficit=parseMoney(e?.deficit||0);
+  if(deficit>0)return deficit;
+  const direct=txt.match(/(?:欠租|欠款|差额|short|deficit)\s*[:：]?\s*([\d,]+(?:\.\d+)?)/i);
+  if(direct)return ccParseMoneyToken(direct[1]);
+  const balanceAfter=txt.match(/(?:^|\b)balance(?!\s*(?:paid|from\s+rent))\s*[:：]?\s*([\d,]+(?:\.\d+)?)/i);
+  if(balanceAfter)return ccParseMoneyToken(balanceAfter[1]);
+  const balanceBefore=txt.match(/([\d,]+(?:\.\d+)?)\s*(?:aed\s*)?balance(?!\s*(?:paid|from\s+rent))/i);
+  if(balanceBefore)return ccParseMoneyToken(balanceBefore[1]);
+  const due=parseMoney(e?.due||0);
+  const paid=rc_entryRentPaid(e);
+  if(normTag(e?.tag)==='New'&&due>0&&paid<due)return Math.round((due-paid)*100)/100;
+  if(/欠租|欠款|差额|balance/i.test(note)&&due>0&&paid<due)return Math.round((due-paid)*100)/100;
+  return 0;
+}
+function ccHistoricalArrearsRepaymentAmount(e){
+  const txt=ccEntryText(e);
+  if(!/(补交|补缴|补清|还款|还欠|结清|paid\s+balance|balance\s+paid|was\s+balance\s+from\s+rent)/i.test(txt))return 0;
+  return rc_entryRentPaid(e);
+}
+function ccBuildHistoricalArrearsLedger(){
+  const cfg=rc_getRoomCfg();
+  const lockCards=rc_currentOccupiedCards();
+  const debts=[];
+  const openByBed={};
+  const sessions=rc_allLedgerSessions().sort((a,b)=>String(a.date||'').localeCompare(String(b.date||'')));
+  const applyRepayment=(bed,amount,source)=>{
+    let left=Math.round(Number(amount||0)*100)/100;
+    const open=openByBed[bed]||[];
+    for(const debt of open){
+      if(left<=0)break;
+      const pay=Math.min(debt.remaining,left);
+      if(pay<=0)continue;
+      debt.repaid=Math.round((debt.repaid+pay)*100)/100;
+      debt.remaining=Math.round((debt.remaining-pay)*100)/100;
+      debt.repayments.push({...source,amount:pay});
+      left=Math.round((left-pay)*100)/100;
+    }
+    openByBed[bed]=open.filter(d=>d.remaining>0.004);
+  };
+  sessions.forEach(s=>{
+    const date=(s.date||'').slice(0,10);
+    (s.entries||[]).forEach(raw=>{
+      const e=normalizeEntry(raw);
+      if(!(e.cat==='cash'||e.cat==='bank'))return;
+      if(normTag(e.tag)==='Transfer')return;
+      const bed=rc_normBedKey(e.room);
+      if(!bed)return;
+      const repayment=ccHistoricalArrearsRepaymentAmount(e);
+      if(repayment>0)applyRepayment(bed,repayment,{date,amount:repayment,note:ccEntryText(e),anchor:s.anchorId||s.id||''});
+      const arrearsAmount=ccExplicitHistoricalArrearsAmount(e);
+      if(!(arrearsAmount>0))return;
+      const paid=rc_entryRentPaid(e);
+      const due=parseMoney(e.due||0)||Math.round((paid+arrearsAmount)*100)/100;
+      const lockCard=lockCards.find(c=>rc_normBedKey(c.bed)===bed)||null;
+      const debt={
+        id:`${s.anchorId||s.id||date}-${bed}-${debts.length}`,
+        bed,
+        name:lockCard?.cardName||'待核对',
+        monthly:Number(cfg[bed]||0),
+        originalDate:date,
+        expectedAmount:due,
+        paidAmount:paid,
+        arrearsAmount,
+        repaid:0,
+        remaining:arrearsAmount,
+        rawLine:ccEntryText(e)||`${bed} ${fmtMoney(paid)}`,
+        anchor:s.anchorId||s.id||'',
+        latestPayment:null,
+        ttlockEnd:lockCard?.endDate?rc_fmtShortDate(lockCard.endDate):'待核对',
+        status:'未结清',
+        repayments:[]
+      };
+      debts.push(debt);
+      (openByBed[bed]||(openByBed[bed]=[])).push(debt);
+    });
+  });
+  debts.forEach(d=>{
+    d.latestPayment=d.repayments.length?d.repayments[d.repayments.length-1]:null;
+    d.status=d.remaining>0.004?'未结清':'已补清';
+  });
+  return{all:debts,open:debts.filter(d=>d.remaining>0.004)};
+}
+function ccDebtRows(){
+  return ccBuildHistoricalArrearsLedger().open.map(d=>({
+    id:d.id,
+    bed:d.bed,
+    name:d.name,
+    monthly:d.monthly,
+    paid:d.paidAmount,
+    remain:d.remaining,
+    originalDate:d.originalDate,
+    arrearsAmount:d.arrearsAmount,
+    repaid:d.repaid,
+    rawLine:d.rawLine,
+    lastPayment:d.latestPayment?`${rc_fmtShortDate(d.latestPayment.date)} · ${fmtMoney(d.latestPayment.amount)} AED`:'暂无补款',
+    ttlockEnd:d.ttlockEnd,
+    reason:'历史尾款/欠款未结清',
+    status:d.status,
+    repayments:d.repayments
+  }));
+}
 function ccOutstandingDebtSummary(){
   const rows=ccDebtRows();
   const total=Math.round(rows.reduce((s,r)=>s+Number(r.remain||0),0)*100)/100;
@@ -6030,7 +6207,7 @@ function renderBillingWidget(targetId){
   const tt=ccTtlockStatus();
   const ttlockStatusHtml=targetId==='billingWidget2'?`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 10px;padding:8px 10px;border-radius:9px;background:${tt.loaded?'rgba(26,138,74,0.07)':'rgba(224,108,0,0.08)'};border:1px solid ${tt.loaded?'rgba(26,138,74,0.22)':'rgba(224,108,0,0.25)'};font-size:11px;color:var(--text2)">
     <span><b style="color:${tt.loaded?'var(--green)':'var(--orange)'}">TTLock ${tt.loaded?'已加载':'未加载'}</b> · ${tt.cards} cards · ${tt.rooms} rooms${tt.sync?' · '+esc(tt.sync):''}</span>
-    <button class="btn btn-ghost" style="font-size:11px;padding:5px 9px" onclick="ccRecomputeClientCredit()">重新计算</button>
+    <button class="btn btn-ghost" style="font-size:11px;padding:5px 9px" onclick="ccRecomputeClientCredit()">重新加载核心数据</button>
   </div>`:'';
 
   // ── 续租明细列表 + 通通锁状态提示（合并在同一区域）──
@@ -6078,7 +6255,7 @@ function renderBillingWidget(targetId){
   const card3=`<button type="button" onclick="ccOpenDebtDetailModal()" style="text-align:left;width:100%;cursor:pointer;background:${outstanding>0?'rgba(224,108,0,0.06)':'rgba(26,138,74,0.04)'};border:1px solid ${outstanding>0?'rgba(224,108,0,0.2)':'rgba(26,138,74,0.15)'};border-radius:10px;padding:11px">
     <div style="font-size:9px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:5px">⏳ 未清欠款</div>
     <div style="font-size:${hasRen?'17':'20'}px;font-weight:800;color:${outstanding>0?'var(--orange)':'var(--green)'};font-family:JetBrains Mono,monospace;line-height:1">${fmtAED(outstanding)}</div>
-    <div style="font-size:9px;color:var(--text3);margin-top:4px">${debt.count} 笔待清 · 点击查看明细</div>
+    <div style="font-size:9px;color:var(--text3);margin-top:4px">${debt.count} 笔历史尾款 · 点击查看明细</div>
   </button>`;
 
   const cardGrid=`<div class="billing-kpi-grid ${hasRen?'triple':'double'}" style="display:grid;grid-template-columns:${hasRen?'1fr 1fr 1fr':'1fr 1fr'};gap:8px;margin-bottom:12px">${card1}${card2}${card3}</div>`;
@@ -6221,6 +6398,58 @@ function ccCloseDebtDetailModal(){
 }
 
 /* ── CUSTOMER CREDIT SYSTEM ── */
+function ccOpenDebtDetailModal(){
+  const p=getClientCreditBillingPeriod();
+  const debt=ccOutstandingDebtSummary();
+  let overlay=document.getElementById('ccDebtDetailOverlay');
+  if(!overlay){
+    overlay=document.createElement('div');
+    overlay.id='ccDebtDetailOverlay';
+    overlay.onclick=e=>{if(e.target===overlay)ccCloseDebtDetailModal();};
+    document.body.appendChild(overlay);
+  }
+  window._ccDebtRows=debt.rows;
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,0.38);backdrop-filter:blur(8px);z-index:340;display:flex;align-items:center;justify-content:center;padding:16px';
+  overlay.innerHTML=`<div style="background:rgba(255,255,255,0.9);border:1px solid rgba(255,255,255,0.65);border-radius:18px;max-width:940px;width:100%;max-height:88vh;overflow:hidden;box-shadow:0 18px 60px rgba(15,23,42,0.22);display:flex;flex-direction:column">
+    <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;padding:18px 20px;border-bottom:1px solid rgba(148,163,184,0.22)">
+      <div>
+        <div style="font-size:18px;font-weight:900;color:#172033">历史尾款/欠款未结清明细</div>
+        <div style="font-size:12px;color:#64748b;margin-top:5px">未清总额 ${fmtMoney(debt.total)} AED · ${debt.count} 个床位 · ${esc(p.startStr)} → ${esc(p.endStr)}</div>
+      </div>
+      <button onclick="ccCloseDebtDetailModal()" style="border:0;background:transparent;font-size:24px;line-height:1;color:#64748b;cursor:pointer">×</button>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;padding:12px 20px;border-bottom:1px solid rgba(148,163,184,0.16)">
+      <input id="ccDebtSearch" class="inp hl-input" placeholder="搜索床位号" oninput="ccRenderDebtDetailRows()" style="flex:1;min-width:160px">
+      <select id="ccDebtSort" class="sel hl-select" onchange="ccRenderDebtDetailRows()" style="width:150px"><option value="bed">按床位</option><option value="amount">按金额</option></select>
+    </div>
+    <div id="ccDebtDetailRows" style="overflow:auto;padding:12px 20px"></div>
+    <div style="padding:12px 20px;border-top:1px solid rgba(148,163,184,0.16);display:flex;justify-content:flex-end"><button class="btn btn-primary" onclick="ccCloseDebtDetailModal()">关闭</button></div>
+  </div>`;
+  if(window._ccDebtEscHandler)document.removeEventListener('keydown',window._ccDebtEscHandler);
+  window._ccDebtEscHandler=e=>{if(e.key==='Escape')ccCloseDebtDetailModal();};
+  document.addEventListener('keydown',window._ccDebtEscHandler);
+  ccRenderDebtDetailRows();
+}
+function ccRenderDebtDetailRows(){
+  const el=document.getElementById('ccDebtDetailRows');if(!el)return;
+  const q=(document.getElementById('ccDebtSearch')?.value||'').trim().toLowerCase();
+  const sort=document.getElementById('ccDebtSort')?.value||'bed';
+  let rows=[...(window._ccDebtRows||[])];
+  if(q)rows=rows.filter(r=>String(r.bed||'').toLowerCase().includes(q)||String(r.name||'').toLowerCase().includes(q)||String(r.rawLine||'').toLowerCase().includes(q));
+  rows.sort((a,b)=>sort==='amount'?(Number(b.remain||0)-Number(a.remain||0)):String(a.bed||'').localeCompare(String(b.bed||''),undefined,{numeric:true}));
+  if(!rows.length){el.innerHTML='<div style="text-align:center;color:#64748b;padding:24px">暂无历史尾款/欠款未清明细</div>';return;}
+  el.innerHTML=`<div class="table-wrap" style="max-height:58vh"><table class="tx-table"><thead><tr><th>床位</th><th>客户/卡片</th><th>原欠款日期</th><th class="right">原欠款</th><th class="right">已补</th><th class="right">剩余未清</th><th>原始流水行</th><th>最近补款</th><th>状态</th></tr></thead><tbody>${rows.map(r=>`<tr onclick="ccOpenDebtEvidence(${jsArg(r.bed)})" style="cursor:pointer">
+    <td class="mono" style="font-weight:800">${esc(r.bed||'待核对')}</td>
+    <td>${esc(r.name||'待核对')}</td>
+    <td>${esc(r.originalDate||'待核对')}</td>
+    <td class="mono right">${fmtMoney(r.arrearsAmount||0)}</td>
+    <td class="mono right">${fmtMoney(r.repaid||0)}</td>
+    <td class="mono right" style="color:#e06c00;font-weight:800">${fmtMoney(r.remain||0)}</td>
+    <td style="max-width:240px;white-space:normal;color:#64748b">${esc(r.rawLine||'')}</td>
+    <td>${esc(r.lastPayment||'暂无补款')}</td>
+    <td>${esc(r.status||'未结清')}</td>
+  </tr>`).join('')}</tbody></table></div>`;
+}
 const CC_GRADES={
   excellent:{label:'优质客户',color:'#1a8a4a',bg:'rgba(26,138,74,0.1)',border:'rgba(26,138,74,0.3)'},
   good:     {label:'良好客户',color:'#1a73e8',bg:'rgba(26,115,232,0.1)',border:'rgba(26,115,232,0.3)'},
@@ -6558,6 +6787,14 @@ function ccShowLoading(){
   if(bw)bw.innerHTML=`<div class="card billing-widget"><div class="card-body" style="padding:16px">
     <div style="font-size:15px;font-weight:800;color:var(--accent);margin-bottom:6px">正在计算客户信用档案</div>
     <div style="font-size:12px;color:var(--text3);line-height:1.6">正在读取本账期收入、期内待续租和未来欠款，请稍候。</div>
+  </div></div>`;
+}
+function ccShowLoading(){
+  const bw=document.getElementById('billingWidget2');
+  if(bw)bw.innerHTML=`<div class="card billing-widget"><div class="card-body" style="padding:16px">
+    <div style="font-size:15px;font-weight:800;color:var(--accent);margin-bottom:6px">正在计算客户信用</div>
+    <div style="font-size:12px;color:var(--text3);line-height:1.6">${esc(ownerCoreDataStatusLabel())}</div>
+    <div style="font-size:11px;color:var(--text3);line-height:1.6;margin-top:4px">正在加载历史流水 / 正在加载 TTLock / 正在计算客户信用</div>
   </div></div>`;
 }
 async function ccRecomputeClientCredit(){
