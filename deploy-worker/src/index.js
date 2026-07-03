@@ -5518,10 +5518,11 @@ async function handleRequest(request, env, ctx) {
       const entryIds = new Set(entries.map((e) => e.id));
       const arrears = Array.isArray(sa) ? sa.slice(0, MAX_SESSION_ENTRIES).map((a) => sanitizeArrear(a, sessionId, entryIds)).filter(Boolean) : [];
       const batch = [];
+      const exportText = cleanText(session.export_text || session.exportText || session.raw_text || session.rawText || "", 20000);
       batch.push(env.DB.prepare(
         `INSERT OR REPLACE INTO sessions
-           (id, corpid, anchor_id, date, entries_count, created_by, operator_id, operator_name, handover_status, exported_at, source)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime("now"), ?)`
+           (id, corpid, anchor_id, date, entries_count, created_by, operator_id, operator_name, handover_status, exported_at, export_text, source)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime("now"), ?, ?)`
       ).bind(
         sessionId,
         user.corpid,
@@ -5532,6 +5533,7 @@ async function handleRequest(request, env, ctx) {
         user.userid,
         cleanText(user.employee_name || user.userid, 120),
         "COMPLETED",
+        exportText,
         "BOSS"
       ));
       for (const e of entries) {

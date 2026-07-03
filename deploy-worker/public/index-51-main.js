@@ -593,6 +593,7 @@ function parseTXT(text){
   if(!text||!text.trim()) return null;
   const lines=text.split(/\r?\n/);
   const s={id:newId(),date:'',entries:[],anchorId:null,exportTime:null,isLegacy:false};
+  s.export_text=String(text||'');
   for(const l of lines){
     const t=l.trim();
     if(t.startsWith('##ANCHOR:')) s.anchorId=t.slice(9).trim();
@@ -685,6 +686,57 @@ function totals(entries){
     cashBal:r2(ci-ro-eo),total:r2(ci+bi)}; // 总收入=现金+银行（不扣退款/支出），现金结余=现金-退款-支出
 }
 
+function ledgerSessionRawText(s){
+  return String(s?.export_text||s?.exportText||s?.raw_text||s?.rawText||s?.txt||'');
+}
+
+function normalizeLedgerSession(session){
+  const original=session||{};
+  const raw=ledgerSessionRawText(original);
+  if(raw.trim()){
+    try{
+      const parsed=parseTXT(raw);
+      if(parsed&&Array.isArray(parsed.entries)&&parsed.entries.length){
+        const entries=parsed.entries;
+        const anchorId=original.anchorId||original.anchor_id||parsed.anchorId||stableAnchor({...parsed,entries});
+        return{
+          ...original,
+          ...parsed,
+          id:original.id||parsed.id,
+          date:original.date||parsed.date,
+          anchorId,
+          anchor_id:original.anchor_id||anchorId,
+          entries,
+          entriesCount:entries.length,
+          entries_count:original.entries_count||entries.length,
+          createdBy:original.createdBy||original.created_by||'',
+          created_by:original.created_by||original.createdBy||'',
+          export_text:raw,
+          _cloud:!!original._cloud,
+          _reparsedFromRaw:true
+        };
+      }
+    }catch(e){
+      console.warn('ledger raw reparse failed',e);
+    }
+  }
+  const entries=Array.isArray(original.entries)?original.entries:[];
+  const anchorId=original.anchorId||original.anchor_id||'';
+  return{
+    ...original,
+    anchorId,
+    anchor_id:original.anchor_id||anchorId,
+    entries,
+    entriesCount:Number(original.entriesCount||original.entries_count||entries.length||0),
+    createdBy:original.createdBy||original.created_by||'',
+    created_by:original.created_by||original.createdBy||''
+  };
+}
+
+function normalizeLedgerSessions(sessions){
+  return Array.isArray(sessions)?sessions.map(normalizeLedgerSession):[];
+}
+
 /* ── STATE ── */
 const state={
   view:'overview',session:{id:newId(),date:fmtDT(new Date()),entries:[]},saved:[],
@@ -719,6 +771,7 @@ function toast(msg,type='ok'){
 /* ── PERSISTENCE ── */
 function saveCur(){LS.set('current-session',JSON.stringify(state.session));}
 function saveAnalysis(){
+  state.analysisSessions=normalizeLedgerSessions(state.analysisSessions);
   _ccCache=null; // 分析流水变更后，客户信用评分必须重建
   LS.set('analysis:index',JSON.stringify(state.analysisSessions.map(s=>s.anchorId)));
   state.analysisSessions.forEach(s=>LS.set(`anchor:${s.anchorId}`,JSON.stringify(s)));
@@ -730,7 +783,7 @@ function loadAnalysis(){
     // 加载时自动去重：按内容指纹去重，只保留每份流水第一次出现的
     const seen=new Set();
     const deduped=[];
-    raw.forEach(s=>{
+    normalizeLedgerSessions(raw).forEach(s=>{
       const fp=contentFP(s);
       if(!seen.has(fp)){seen.add(fp);deduped.push(s);}
       else{LS.del(`anchor:${s.anchorId}`);}// 删除多余的
@@ -2538,6 +2591,7 @@ async function exportSession(){
   const final={...state.session,date:fmtDT(new Date())};
   if(!final.anchorId)final.anchorId=mkAnchor(final.id,final.date.slice(0,10));
   const{txt,anchorId}=genTXT(final);final.anchorId=anchorId;
+  final.export_text=txt;
   // 本地备份
   LS.set(`session:${final.id}`,JSON.stringify(final));
   state.saved=[final,...state.saved.filter(s=>s.id!==final.id)].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
@@ -2586,8 +2640,9 @@ async function renderHistory(){
 
   // 查看单个会话详情
   if(state.historyViewing){
-    const s=state.historyViewing;
-    if(s._cloud&&(!s.entries||!s.entries.length)){
+    let s=normalizeLedgerSession(state.historyViewing);
+    state.historyViewing=s;
+    if(s._cloud&&(!s.entries||!s.entries.length)&&!ledgerSessionRawText(s)){
       wrap.innerHTML='<div style="text-align:center;padding:40px;color:var(--text3)">加载中...</div>';
       try{
         const r=await apiFetchWithTimeout(`/api/session_detail?id=${encodeURIComponent(s.id)}`);
@@ -2596,7 +2651,7 @@ async function renderHistory(){
         if(!r.ok){wrap.innerHTML=`<div class="card" style="padding:24px;text-align:center;color:var(--red)">历史详情加载失败：${r.status}</div>`;return;}
         const rows=await r.json();
         if(!Array.isArray(rows)){wrap.innerHTML='<div class="card" style="padding:24px;text-align:center;color:var(--red)">历史详情格式异常</div>';return;}
-        s.entries=rows.map(tx=>({
+        s=normalizeLedgerSession({...s,entries:rows.map(tx=>({
           id:tx.id,cat:tx.cat,room:tx.room,amount:tx.amount,
           due:tx.due,paid:tx.paid,deficit:tx.deficit,tag:normTag(tx.tag),note:tx.note,
           roomTo:tx.room_to||undefined,startDate:tx.start_date||undefined,
@@ -2604,7 +2659,8 @@ async function renderHistory(){
           dueDate:tx.due_date||undefined,depDate:tx.dep_date||undefined,
           payType:tx.pay_type||undefined,discountReason:tx.discount_reason||undefined,
           depositCollection:tx.deposit_collection===1
-        }));
+        }))});
+        state.historyViewing=s;
       }catch(e){console.warn('session_detail failed:',e);wrap.innerHTML=`<div class="card" style="padding:24px;text-align:center;color:var(--red)">历史详情加载失败：${esc(e.message||'网络错误')}</div>`;return;}
     }
     const{txt}=genTXT(s);
@@ -2644,10 +2700,10 @@ async function renderHistory(){
   }
   const cloudIds=new Set(cloud.map(s=>s.id));
   const localOnly=state.saved.filter(s=>!cloudIds.has(s.id));
-  const all=[
-    ...cloud.map(s=>({id:s.id,date:s.date,anchorId:s.anchor_id,entries:[],entriesCount:s.entries_count,_cloud:true,createdBy:s.created_by||''})),
+  const all=normalizeLedgerSessions([
+    ...cloud.map(s=>({id:s.id,date:s.date,anchorId:s.anchor_id,entries:[],entriesCount:s.entries_count,export_text:s.export_text||'',_cloud:true,createdBy:s.created_by||''})),
     ...localOnly
-  ].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  ]).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   const hasMoreCloud=cloud.length>=limit;
 
   const monthKey=s=>{
@@ -2764,12 +2820,14 @@ function renderFilterControls(){
   else{wrap.innerHTML=`<div style="color:var(--text3);font-size:12px;padding:8px 0">使用全部已导入的数据</div>${hint}`;}
 }
 function filtered(){
-  if(state.dateMode==='all')return state.analysisSessions;
-  return state.analysisSessions.filter(s=>{const d=(s.date||'').slice(0,10);if(state.dateMode==='month')return d.startsWith(state.month);if(state.from&&d<state.from)return false;if(state.to&&d>state.to)return false;return true;});
+  const sessions=normalizeLedgerSessions(state.analysisSessions);
+  if(state.dateMode==='all')return sessions;
+  return sessions.filter(s=>{const d=(s.date||'').slice(0,10);if(state.dateMode==='month')return d.startsWith(state.month);if(state.from&&d<state.from)return false;if(state.to&&d>state.to)return false;return true;});
 }
 function computeAna(sessions){
+  sessions=normalizeLedgerSessions(sessions);
   if(!sessions.length)return null;
-  const all=sessions.flatMap(s=>s.entries.map(e=>({...normalizeEntry(e),sd:s.date})));
+  const all=sessions.flatMap(s=>(s.entries||[]).map(e=>({...normalizeEntry(e),sd:s.date})));
   const t=totals(all);
   const byD={};sessions.forEach(s=>{const d=(s.date||'').slice(0,10);if(!byD[d])byD[d]={date:d,cash:0,bank:0,expense:0,refund:0,n:0};byD[d].n+=1;s.entries.forEach(e=>{if(byD[d][e.cat]!==undefined)byD[d][e.cat]+=Number(e.amount||0);});});
   const trend=Object.values(byD).sort((a,b)=>a.date.localeCompare(b.date));
@@ -2800,6 +2858,7 @@ function computeAna(sessions){
   return{totals:t,trend,sessionTrend,discounts,newOnes,transfers,departures,installments,expDetail,all,n:sessions.length,avg:t.total/sessions.length};
 }
 function renderAnalysisChips(){
+  state.analysisSessions=normalizeLedgerSessions(state.analysisSessions);
   const filt=filtered();const wrap=document.getElementById('analysisChips');
   if(!state.analysisSessions.length){wrap.innerHTML='';return;}
   wrap.className='chips-bar';
@@ -4960,6 +5019,7 @@ function renderOwnerOverview(){
 // 内容指纹：日期 + 笔数 + 各类总额（四舍五入到分）
 // 只要是同一份流水，无论从哪条路径导入，指纹必然相同
 function contentFP(s){
+  s=normalizeLedgerSession(s);
   const t=totals(s.entries);
   const d=(s.date||'').slice(0,10);
   return `${d}|${s.entries.length}|${Math.round(t.cashIn*100)}|${Math.round(t.bankIn*100)}|${Math.round(t.refundOut*100)}|${Math.round(t.expOut*100)}`;
@@ -4984,6 +5044,7 @@ function isDuplicate(s){
 async function syncImportedSessionsToCloud(sessions){
   if(denyReadonlyAdminWrite())return{ok:0,fail:sessions?.length||0,errors:['readonly_admin_denied']};
   if(!sessions||!sessions.length)return{ok:0,fail:0,errors:[]};
+  sessions=normalizeLedgerSessions(sessions);
   let ok=0,fail=0;const errors=[];
   for(const s of sessions){
     try{
@@ -5074,10 +5135,10 @@ async function updateHistCount(){
   }
   const cloudIds=new Set(cloud.map(s=>s.id));
   const localExtra=state.saved.filter(s=>!cloudIds.has(s.id));
-  window._histSessions=[
-    ...cloud.map(s=>({id:s.id,date:s.date,anchorId:s.anchor_id,entriesCount:s.entries_count,createdBy:s.created_by||'',_cloud:true})),
-    ...localExtra.map(s=>({id:s.id,date:s.date,anchorId:s.anchorId,entriesCount:(s.entries||[]).length,createdBy:'',_cloud:false}))
-  ];
+  window._histSessions=normalizeLedgerSessions([
+    ...cloud.map(s=>({id:s.id,date:s.date,anchorId:s.anchor_id,entries:[],entriesCount:s.entries_count,export_text:s.export_text||'',createdBy:s.created_by||'',_cloud:true})),
+    ...localExtra.map(s=>({id:s.id,date:s.date,anchorId:s.anchorId,entries:s.entries||[],entriesCount:(s.entries||[]).length,export_text:s.export_text||'',createdBy:'',_cloud:false}))
+  ]);
   const total=window._histSessions.length;
   const hc=document.getElementById('histCount');if(hc) hc.textContent=total;
   const hc2=document.getElementById('histCount2');if(hc2) hc2.textContent=total;
@@ -5238,8 +5299,11 @@ async function fromHistory(){
   let added=0,dup=0,fail=0,addedSessions=[];
   try{
   for(const cs of selected){
+    const normalizedCs=normalizeLedgerSession(cs);
     let entries=[];
-    if(cs._cloud){
+    if(normalizedCs.entries&&normalizedCs.entries.length){
+      entries=normalizedCs.entries;
+    }else if(cs._cloud){
       try{
         const r=await apiFetch(`/api/session_detail?id=${encodeURIComponent(cs.id)}`);
         if(r.status===401){showAuthExpired();return;}
@@ -5260,10 +5324,10 @@ async function fromHistory(){
       }catch(e){console.warn('session_detail failed:',cs.id,e);fail++;continue;}
     }else{
       const loc=state.saved.find(s=>s.id===cs.id);
-      if(loc)entries=loc.entries||[];
+      if(loc)entries=normalizeLedgerSession(loc).entries||[];
     }
     if(!entries.length){fail++;continue;}
-    const s={id:cs.id,date:cs.date||'',anchorId:cs.anchorId||mkAnchor(cs.id,(cs.date||'').slice(0,10)),entries};
+    const s=normalizeLedgerSession({id:cs.id,date:cs.date||'',anchorId:cs.anchorId||mkAnchor(cs.id,(cs.date||'').slice(0,10)),entries,export_text:ledgerSessionRawText(normalizedCs)});
     const aid=stableAnchor(s);
     const entry={...s,anchorId:aid};
     if(!isDuplicate(entry)){state.analysisSessions.push(entry);LS.set(`anchor:${aid}`,JSON.stringify(entry));added++;addedSessions.push(entry);}
@@ -5619,6 +5683,7 @@ function anaToggle(id){_anaOpenSess=_anaOpenSess===id?null:id;buildSessionTable(
 function buildSessionTable(sessions){
   const el=document.getElementById('anaSessionBreakdown');
   if(!el)return;
+  sessions=normalizeLedgerSessions(sessions);
   if(!sessions||!sessions.length){el.innerHTML='';return;}
   const r2=n=>Math.round(n*100)/100;
   // 每个会话独立计算小计
@@ -5684,6 +5749,7 @@ function buildSessionTable(sessions){
   </div>`;
 }
 function anaSessDetail(s){
+  s=normalizeLedgerSession(s);
   const entries=s.entries||[];
   if(!entries.length)return'<div style="padding:12px 16px;color:var(--text3);font-size:12px;text-align:center;border-top:1px solid var(--border)">无条目</div>';
   const r2=n=>Math.round(n*100)/100;
