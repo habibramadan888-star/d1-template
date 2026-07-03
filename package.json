@@ -137,6 +137,7 @@
     "test:owner-regression-smoke": "node --test tests/owner-regression-full-smoke.spec.mjs",
     "test:owner-nav-all-modules": "node --test tests/owner-nav-all-modules.spec.mjs",
     "test:owner-client-credit-ui": "node --test tests/owner-client-credit-ui.spec.mjs",
+    "test:owner-rent-continuity-missing-ledger-handling": "node --test tests/owner-rent-continuity-missing-ledger-handling.spec.mjs",
     "test:owner-real-screenshot-regression": "node --test tests/owner-real-screenshot-regression.spec.mjs",
     "test:visual-shell-alignment": "node --test tests/owner-employee-visual-shell-alignment.spec.mjs",
     "test:owner-header-match": "node --test tests/owner-header-match-employee.spec.mjs",

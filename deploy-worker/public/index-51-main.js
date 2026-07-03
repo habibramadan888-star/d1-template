@@ -3520,8 +3520,10 @@ function rc_entryRentPaid(e){
    处理状态: collected(已补收) / error(数据错误) / waived(已豁免) / pending(跟进中)
    ═══════════════════════════════════════════════════════════════════ */
 const RC_RESOLVE_LS='apt:rc_resolutions';
+var _rcLastResolvableIssueMap={};
 function rc_getResolutions(){try{return JSON.parse(LS.get(RC_RESOLVE_LS)||'{}');}catch{return{};}}
 function rc_saveResolutions(m){LS.set(RC_RESOLVE_LS,JSON.stringify(m));}
+function rc_isResolvableIssue(card){return card?.status==='missing'||card?.status==='noCoverage';}
 /* Key = bed | card.end(ms) | gapAmount*100 — 金额变化时自动作废旧记录 */
 function rc_resolveKey(card){
   const amt=Math.round(((card.gapAmount||0)+(card.shortAmount||0))*100);
@@ -3533,8 +3535,25 @@ const RC_RES_TYPES={
   waived:   {label:'已豁免',  icon:'🤝',color:'#7c4dff',bg:'rgba(124,77,255,0.13)'},
   pending:  {label:'跟进中',  icon:'⏳',color:'#e06c00',bg:'rgba(224,108,0,0.13)'},
 };
+Object.assign(RC_RES_TYPES,{
+  collected:{label:'已补录流水',icon:'✓',color:'#1a8a4a',bg:'rgba(26,138,74,0.13)'},
+  waived:{label:'已确认无需流水',icon:'✓',color:'#7c4dff',bg:'rgba(124,77,255,0.13)'},
+  error:{label:'数据错误',icon:'!',color:'#1a73e8',bg:'rgba(26,115,232,0.13)'},
+  pending:{label:'跟进中',icon:'…',color:'#e06c00',bg:'rgba(224,108,0,0.13)'}
+});
 function rc_openResolveModal(rkey,bed,cardName,amount){
   const existing=rc_getResolutions()[rkey]||{};
+  const issue=_rcLastResolvableIssueMap[rkey]||{};
+  const isNoCoverage=issue.status==='noCoverage';
+  const modalTitle=isNoCoverage?'处理缺流水问题':'处理收款问题';
+  const evidenceRows=[
+    ['床位号',bed||issue.bed||'—'],
+    ['通通锁卡片名称',cardName||issue.cardName||'—'],
+    ['月租',`${fmtMoney(issue.ref||0)} AED`],
+    ['TTLock 卡片有效期',rc_fmtShortDate(issue.endDate||issue.end)],
+    ['系统是否找到付款流水',issue.coverage?'是':'否'],
+    ['缺流水原因说明',issue.msg||'未找到可计算覆盖日期的有效租金流水']
+  ].map(([label,value])=>`<div style="display:grid;grid-template-columns:128px 1fr;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)"><span style="font-size:11px;color:var(--text3)">${label}</span><b style="font-size:12px;color:var(--text)">${esc(value)}</b></div>`).join('');
   const typeOpts=Object.entries(RC_RES_TYPES).map(([k,v])=>{
     const checked=(existing.type===k)||((!existing.type)&&k==='collected');
     return `<label style="display:flex;align-items:center;gap:8px;padding:9px 11px;border:1px solid var(--border);border-radius:8px;cursor:pointer;transition:all 0.15s;background:${checked?v.bg:'var(--surface2)'}">
@@ -3557,6 +3576,8 @@ function rc_openResolveModal(rkey,bed,cardName,amount){
         <button onclick="rc_closeResolveModal()" style="background:transparent;border:none;cursor:pointer;font-size:22px;color:var(--text3);line-height:1;padding:0 4px">×</button>
       </div>
       <div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;font-family:JetBrains Mono,monospace;margin-bottom:8px">处理类型</div>
+      <div style="font-size:16px;font-weight:800;color:var(--text);margin:0 0 10px">${modalTitle}</div>
+      <div style="margin-bottom:14px;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:10px">${evidenceRows}</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:14px" id="rcTypeGrid">${typeOpts}</div>
       <div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;font-family:JetBrains Mono,monospace;margin-bottom:6px">备注说明 <span style="color:#d93025">★ 必填</span></div>
       <textarea id="rcRNote" class="ta" placeholder="请说明原因及处理方案，例如：已与租客确认，5月1日付150为定金，5月6日已结清余款600，合计750 AED全额收清…" style="min-height:96px;font-size:12px">${esc(existing.note||'')}</textarea>
@@ -4165,15 +4186,16 @@ function rc_cardContinuityRender(data,container){
   /* ── 读取处理记录，为每张漏收卡片注入 resolved 状态 ── */
   const resolutions=rc_getResolutions();
   const enriched=cards.map(c=>{
-    if(c.status!=='missing')return{...c,resolved:null,rkey:''};
+    if(!rc_isResolvableIssue(c))return{...c,resolved:null,rkey:''};
     const rkey=rc_resolveKey(c);
     const resolved=resolutions[rkey]||null;
     return{...c,resolved,rkey};
   });
 
   const counts=enriched.reduce((m,c)=>{m[c.status]=(m[c.status]||0)+1;return m;},{});
-  const unresolvedMissing=enriched.filter(c=>c.status==='missing'&&!c.resolved);
-  const resolvedMissing  =enriched.filter(c=>c.status==='missing'&&!!c.resolved);
+  _rcLastResolvableIssueMap=Object.fromEntries(enriched.filter(c=>c.rkey).map(c=>[c.rkey,c]));
+  const unresolvedMissing=enriched.filter(c=>rc_isResolvableIssue(c)&&!c.resolved);
+  const resolvedMissing  =enriched.filter(c=>rc_isResolvableIssue(c)&&!!c.resolved);
   const yel=alerts.yellow.length,ok=counts.ok||0,known=counts.knownArrears||0;
   const redTotal=unresolvedMissing.reduce((s,c)=>s+(c.gapAmount||0),0);
 
@@ -4192,12 +4214,12 @@ function rc_cardContinuityRender(data,container){
   const statusMeta={missing:['漏收异常','#d93025'],noCoverage:['缺流水','#e06c00'],noDate:['无截止日','#e06c00'],knownArrears:['已知欠款','#8a94a6'],ok:['正常','#1a8a4a']};
 
   /* ── 主表格（不含已处理的漏收项） ── */
-  const mainCards=enriched.filter(c=>!(c.status==='missing'&&c.resolved));
+  const mainCards=enriched.filter(c=>!(rc_isResolvableIssue(c)&&c.resolved));
   const mainRows=mainCards.map(c=>{
     const meta=statusMeta[c.status]||['待确认','#8a94a6'];
     const col=meta[1],statusLabel=meta[0];
-    const isMissing=c.status==='missing';
-    const actionBtn=isMissing
+    const isResolvable=rc_isResolvableIssue(c);
+    const actionBtn=isResolvable
       ?`<button onclick="rc_openResolveModal(${jsArg(c.rkey)},${jsArg(c.bed)},${jsArg(c.cardName)},${c.gapAmount||c.shortAmount||0})" style="font-size:10px;padding:4px 9px;border-radius:6px;background:#d9302518;border:1px solid #d9302535;color:#d93025;cursor:pointer;font-weight:700;white-space:nowrap">处理 ▸</button>`
       :'';
     return `<tr style="background:${col}08">
