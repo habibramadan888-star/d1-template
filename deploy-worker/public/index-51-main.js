@@ -5288,7 +5288,7 @@ function toggleHistImportGroup(periodKey){
 }
 
 const HISTORY_IMPORT_ITEM_TIMEOUT_MS=30000;
-const HISTORY_IMPORT_STAGE_MIN_MS=120;
+const HISTORY_IMPORT_STAGE_MIN_MS=0;
 const HISTORY_IMPORT_FINALIZE_WATCHDOG_MS=30000;
 let _historyImportJob=null;
 
@@ -5363,10 +5363,21 @@ function finalizeHistoryImportIfComplete(job){
   return false;
 }
 
+function historyImportTimingEnabled(){
+  try{
+    return location.hostname==="localhost"||location.hostname==="127.0.0.1"||location.search.includes("historyImportSmoke=1")||LS.get("history-import-timing")==="1";
+  }catch{return false;}
+}
+
+function historyImportLog(job,label,extra={}){
+  if(!job?.timingEnabled)return;
+  console.info("[history-import]",label,{...extra,totalMs:Math.round(performance.now()-job.startedAt)});
+}
+
 function historyImportPaint(ms=HISTORY_IMPORT_STAGE_MIN_MS){
   return new Promise(resolve=>{
     const frame=typeof requestAnimationFrame==="function"?requestAnimationFrame:(cb)=>setTimeout(cb,16);
-    frame(()=>setTimeout(resolve,ms));
+    frame(()=>ms>0?setTimeout(resolve,ms):resolve());
   });
 }
 
@@ -5468,8 +5479,12 @@ function renderHistoryImportProgress(job){
 }
 
 async function loadHistoryImportEntries(cs,job){
+  const started=performance.now();
   const normalizedCs=normalizeLedgerSession(cs);
-  if(normalizedCs.entries&&normalizedCs.entries.length)return normalizedCs.entries;
+  if(normalizedCs.entries&&normalizedCs.entries.length){
+    job.timings.historyFetchMs+=performance.now()-started;
+    return normalizedCs.entries;
+  }
   if(cs._cloud){
     const controller=new AbortController();
     job.currentController=controller;
@@ -5481,6 +5496,7 @@ async function loadHistoryImportEntries(cs,job){
       if(!r.ok)throw new Error(`历史详情加载失败：${r.status}`);
       const rows=await r.json();
       if(!Array.isArray(rows))throw new Error('历史详情格式异常');
+      job.timings.historyFetchMs+=performance.now()-started;
       return rows.map(tx=>({
         id:tx.id,cat:tx.cat,room:tx.room,amount:tx.amount,
         due:tx.due||0,paid:tx.paid||0,deficit:tx.deficit||0,
@@ -5497,16 +5513,19 @@ async function loadHistoryImportEntries(cs,job){
     }
   }
   const loc=state.saved.find(s=>s.id===cs.id);
-  return loc?(normalizeLedgerSession(loc).entries||[]):[];
+  const entries=loc?(normalizeLedgerSession(loc).entries||[]):[];
+  job.timings.historyFetchMs+=performance.now()-started;
+  return entries;
 }
 
 async function importHistorySessions(selected,{retry=false}={}){
   const btn=document.getElementById('btnFromHistory');
   const originalHtml=btn?btn.innerHTML:'';
-  const job={items:selected.map(session=>({session,status:'waiting',reason:''})),done:false,cancelled:false,currentController:null};
+  const job={items:selected.map(session=>({session,status:'waiting',reason:''})),done:false,cancelled:false,currentController:null,startedAt:performance.now(),timingEnabled:historyImportTimingEnabled(),timings:{historyFetchMs:0,normalizeMs:0,appendMs:0,recomputeMs:0,totalMs:0}};
   _historyImportJob=job;
   job.finalizeWatchdog=setInterval(()=>{if(finalizeHistoryImportIfComplete(job))renderHistoryImportProgress(job);},HISTORY_IMPORT_FINALIZE_WATCHDOG_MS);
   renderHistoryImportProgress(job);
+  historyImportLog(job,'start',{count:selected.length});
   let added=0,dup=0,fail=0,addedSessions=[];
   try{
     if(btn){btn.disabled=true;btn.style.opacity='0.72';btn.textContent=`导入中 0/${selected.length}`;}
@@ -5521,16 +5540,17 @@ async function importHistorySessions(selected,{retry=false}={}){
         const entries=await loadHistoryImportEntries(cs,job);
         if(!entries.length){await setHistoryImportItemStatus(job,item,'fail','没有可导入的流水明细');fail++;continue;}
         await setHistoryImportItemStatus(job,item,'parsing');
+        const normalizeStarted=performance.now();
         const s=normalizeLedgerSession({id:cs.id,date:cs.date||'',anchorId:cs.anchorId||mkAnchor(cs.id,(cs.date||'').slice(0,10)),entries,export_text:ledgerSessionRawText(normalizedCs)});
         const aid=stableAnchor(s);
         const entry={...s,anchorId:aid};
+        job.timings.normalizeMs+=performance.now()-normalizeStarted;
         if(!isDuplicate(entry)){
           await setHistoryImportItemStatus(job,item,'updating');
+          const appendStarted=performance.now();
           state.analysisSessions.push(entry);
           LS.set(`anchor:${aid}`,JSON.stringify(entry));
-          saveAnalysis();
-          renderFilterControls();
-          renderAnalysis();
+          job.timings.appendMs+=performance.now()-appendStarted;
           added++;
           addedSessions.push(entry);
           await setHistoryImportItemStatus(job,item,'done');
@@ -5547,7 +5567,16 @@ async function importHistorySessions(selected,{retry=false}={}){
       }finally{
         if(btn)btn.textContent=`导入中 ${Math.min(idx+1,job.items.length)}/${job.items.length}`;
         renderHistoryImportProgress(job);
+        historyImportLog(job,'item',{index:idx+1,status:item.status,elapsed:historyImportElapsed(item)});
       }
+    }
+    if(added>0){
+      const recomputeStarted=performance.now();
+      saveAnalysis();
+      renderFilterControls();
+      renderAnalysis();
+      job.timings.recomputeMs+=performance.now()-recomputeStarted;
+      historyImportLog(job,'recompute',{added});
     }
     let sync={ok:0,fail:0};
     if(added>0){
@@ -5562,6 +5591,8 @@ async function importHistorySessions(selected,{retry=false}={}){
     finalizeHistoryImportIfComplete(job);
     if(job.finalizeWatchdog)clearInterval(job.finalizeWatchdog);
     job.done=true;
+    job.timings.totalMs=performance.now()-job.startedAt;
+    historyImportLog(job,'done',{added,dup,fail,historyFetchMs:Math.round(job.timings.historyFetchMs),normalizeMs:Math.round(job.timings.normalizeMs),appendMs:Math.round(job.timings.appendMs),recomputeMs:Math.round(job.timings.recomputeMs),totalMs:Math.round(job.timings.totalMs)});
     renderHistoryImportProgress(job);
     if(btn){btn.disabled=false;btn.style.opacity='';btn.innerHTML=originalHtml;syncHistSelectionUI();}
     if(retry)toast('失败项重试已完成');

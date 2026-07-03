@@ -47,8 +47,9 @@ test("history import uses real sequential states before marking done", async () 
 
   assert.match(block, /for\(let idx=0;idx<job\.items\.length;idx\+\+\)/);
   assert.doesNotMatch(block, /Promise\.all/);
-  assert.match(source, /const HISTORY_IMPORT_STAGE_MIN_MS=120/);
+  assert.match(source, /const HISTORY_IMPORT_STAGE_MIN_MS=0/);
   assert.match(source, /requestAnimationFrame/);
+  assert.match(source, /ms>0\?setTimeout\(resolve,ms\):resolve\(\)/);
   assert.match(source, /async function setHistoryImportItemStatus\(job,item,status,reason=""\)/);
   assert.match(block, /await setHistoryImportItemStatus\(job,item,'loading'\)/);
   assert.match(block, /loadHistoryImportEntries\(cs,job\)/);
@@ -56,9 +57,30 @@ test("history import uses real sequential states before marking done", async () 
   assert.match(block, /normalizeLedgerSession/);
   assert.match(block, /await setHistoryImportItemStatus\(job,item,'updating'\)/);
   assert.match(block, /state\.analysisSessions\.push\(entry\)/);
-  assert.match(block, /renderAnalysis\(\)/);
   assert.match(block, /await setHistoryImportItemStatus\(job,item,'done'\)/);
-  assert.ok(block.indexOf("await setHistoryImportItemStatus(job,item,'done')") > block.indexOf("renderAnalysis()"));
+  assert.match(block, /const recomputeStarted=performance\.now\(\)/);
+  assert.match(block, /saveAnalysis\(\);\s*renderFilterControls\(\);\s*renderAnalysis\(\);/);
+  assert.ok(block.indexOf("const recomputeStarted=performance.now()") > block.lastIndexOf("await setHistoryImportItemStatus(job,item,'done')"));
+});
+
+test("history import avoids per-row full recompute and records timing in smoke mode", async () => {
+  const source = await readOwnerMain();
+  const block = importBlock(source);
+
+  assert.match(source, /function historyImportTimingEnabled\(\)/);
+  assert.match(source, /function historyImportLog\(job,label,extra=\{\}\)/);
+  assert.match(source, /historyFetchMs:0,normalizeMs:0,appendMs:0,recomputeMs:0,totalMs:0/);
+  assert.match(block, /job\.timings\.historyFetchMs/);
+  assert.match(block, /job\.timings\.normalizeMs/);
+  assert.match(block, /job\.timings\.appendMs/);
+  assert.match(block, /job\.timings\.recomputeMs/);
+  assert.match(block, /job\.timings\.totalMs/);
+
+  const loopStart = block.indexOf("for(let idx=0;idx<job.items.length;idx++)");
+  const recomputeStart = block.indexOf("const recomputeStarted=performance.now()");
+  const loopBlock = block.slice(loopStart, recomputeStart);
+  assert.doesNotMatch(loopBlock, /renderAnalysis\(\)/);
+  assert.doesNotMatch(loopBlock, /saveAnalysis\(\)/);
 });
 
 test("history import supports timeout, cancellation summary, and retry", async () => {
