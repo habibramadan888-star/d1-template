@@ -1600,7 +1600,7 @@ __name(handleEmployeeLockCards,"handleEmployeeLockCards");
 async function handleEmployeeEntry(request,env,user){
   const timingEnabled=request.headers.get("X-Employee-Entry-Timing")==="1";
   const timing={started_at:Date.now(),d1_write_ms:0,total_ms:0};
-  await empEnsureSchema(env);
+  if(!await empTableExists(env,"sessions")||!await empTableExists(env,"transactions"))return errorResponse("employee_entry_schema_not_ready",503,"employee_entry_schema_not_ready");
   let body;
   try{body=await request.json();}catch{return badRequest("invalid_json");}
   const entry=body?.entry||{};
@@ -1769,7 +1769,7 @@ async function handleEmployeeEntry(request,env,user){
     handover_status:cleanText(session.handover_status||"EXPORTING",40),
     exported_at:cleanText(session.exported_at||now,40),
     export_text:cleanText(session.export_text||"",20000),
-    source:"EMP"
+    source:cleanText(session.source||"employee_entry",40)||"employee_entry"
   },EMP_SESSION_COLUMNS);
   const inserted=await empInsertDynamic(env,"transactions",{
     id:entryId,corpid:user.corpid,userid:user.userid,session_id:sessionId,cat:cleanText(entry.cat||"cash",20),
@@ -5706,7 +5706,8 @@ async function handleRequest(request, env, ctx) {
     }
     if (path === "/api/delete_session" && method === "POST") {
       if (!requireManager(user)) return forbidden();
-      await empEnsureSchema(env);
+      const deleteStartedAt=Date.now();
+      if(!await empTableExists(env,"sessions"))return errorResponse("history_schema_not_ready",503,"history_schema_not_ready");
       let body;
       try {
         body = await request.json();
@@ -5720,9 +5721,11 @@ async function handleRequest(request, env, ctx) {
       const voidSource = cleanText(body?.void_source || "api.delete_session", 80);
       const requestId = cleanText(body?.request_id || body?.idempotency_key || crypto.randomUUID(), 100);
       const existing = await env.DB.prepare(
-        "SELECT id, voided_at FROM sessions WHERE id=? AND corpid=? LIMIT 1"
+        "SELECT id, anchor_id, voided_at FROM sessions WHERE id=? AND corpid=? LIMIT 1"
       ).bind(id, user.corpid).first();
       if (!existing) return errorResponse("not_found", 404, "not_found");
+      const expectedAnchor=cleanText(body?.anchor||body?.anchor_id||"",120);
+      if(expectedAnchor&&existing.anchor_id&&expectedAnchor!==existing.anchor_id)return badRequest("anchor_mismatch");
       const now=empNow();
       if (existing.voided_at) {
         await audit(env, user, "session.void.already_voided", id, { request_id: requestId });
@@ -5801,7 +5804,7 @@ async function handleRequest(request, env, ctx) {
         ts:now
       });
       await audit(env, user, "session.void", id, { request_id: requestId, reason: voidReason, source: voidSource });
-      return success({ success: true, sessionId: id, voided: true, voided_at: now });
+      return success({ success: true, sessionId: id, anchor_id: existing.anchor_id||"", voided: true, voided_at: now, elapsed_ms: Date.now()-deleteStartedAt, affected_session_count: 1 });
     }
     if (path === "/api/clear_arrear" && method === "POST") {
       if (!requireManager(user)) return forbidden();

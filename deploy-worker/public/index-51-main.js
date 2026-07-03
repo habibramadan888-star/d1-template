@@ -2714,7 +2714,7 @@ async function renderHistory(){
   const cloudIds=new Set(cloud.map(s=>s.id));
   const localOnly=state.saved.filter(s=>!cloudIds.has(s.id));
   const all=normalizeLedgerSessions([
-    ...cloud.map(s=>({id:s.id,date:s.date,anchorId:s.anchor_id,entries:[],entriesCount:s.entries_count,export_text:s.export_text||'',_cloud:true,createdBy:s.created_by||''})),
+    ...cloud.map(s=>({id:s.id,date:s.date,anchorId:s.anchor_id,entries:[],entriesCount:s.entries_count,export_text:s.export_text||'',_cloud:true,createdBy:(s.source==='employee_entry'||s.source==='EMP')?'staff':(s.created_by||''),operatorName:s.operator_name||'',operatorId:s.operator_id||'',source:s.source||'',cash_handover:s.cash_handover,bank_transfer_total:s.bank_transfer_total,gross_received:s.gross_received})),
     ...localOnly
   ]).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   const hasMoreCloud=cloud.length>=limit;
@@ -2741,9 +2741,17 @@ async function renderHistory(){
   if(!all.length){wrap.innerHTML=`<div class="empty-state card" style="padding:44px"><div class="empty-ico">📄</div><div class="empty-title">还没有保存过会话</div><div class="empty-text">录入记录后点击"导出交接"即可保存</div></div>`;return;}
 
   const cardHtml=s=>{
-    const has=s.entries&&s.entries.length>0;
-    const t=has?totals(s.entries):null;
+    const hasEntries=s.entries&&s.entries.length>0;
+    const has=hasEntries||Number(s.cash_handover||0)||Number(s.bank_transfer_total||0)||Number(s.gross_received||0);
+    const t=hasEntries?totals(s.entries):{
+      cashIn:Number(s.cash_handover||0),
+      bankIn:Number(s.bank_transfer_total||0),
+      expOut:0,
+      refundOut:0,
+      total:Number(s.gross_received||0)
+    };
     const cnt=has?s.entries.length:(s.entriesCount||0);
+    const uploader=s.source==='employee_entry'||s.source==='EMP'||s.createdBy==='staff'||(s.createdBy&&s.createdBy!=='manager')?`员工上传 ${esc(s.operatorName||s.createdBy||s.operatorId||'')}`:(s.createdBy==='manager'?'老板上传':'');
     return `<div class="hist-card" data-id="${s.id}">
       <div class="hist-date">${esc((s.date||'').slice(0,10))}</div>
       <div class="hist-anchor">${esc(s.anchorId||'—')}</div>
@@ -2805,13 +2813,17 @@ async function renderHistory(){
         if(!ok) return;
         toast('删除中...');
         try{
-          const r=await apiFetch('/api/delete_session',{method:'POST',body:JSON.stringify({id})});
+          a.disabled=true;
+          a.textContent='删除中';
+          const deleteStartedAt=performance.now();
+          const r=await apiFetch('/api/delete_session',{method:'POST',body:JSON.stringify({id,anchor:s.anchorId||''})});
           if(!r.ok) throw new Error('HTTP '+r.status);
-        }catch(e){toast('云端删除失败：'+e.message,'err');return;}
+          console.info('owner history delete elapsed ms',Math.round(performance.now()-deleteStartedAt));
+        }catch(e){a.disabled=false;toast('云端删除失败：'+e.message,'err');return;}
         LS.del(`session:${id}`);
         state.saved=state.saved.filter(x=>x.id!==id);
         toast('已删除');
-        renderHistory();
+        card.remove();
       }else if(a.dataset.act==='view'){state.historyViewing=s;renderHistory();}
     });
   });

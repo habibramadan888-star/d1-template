@@ -2896,7 +2896,7 @@ function currentSessionPayload(){
     handover_status:hasLocalOnly()?'EXPORTING':'COMPLETED',
     exported_at:nowIso(),
     export_text:$('exportText')?.textContent||'',
-    source:'EMP',
+    source:'employee_entry',
     entries:state.drafts
   };
 }

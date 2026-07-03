@@ -22,6 +22,18 @@ test("owner history detail maps employee transaction anchors", async () => {
   }
 });
 
+test("owner history list renders employee uploaded session summaries", async () => {
+  const main = await readFile(ownerMainPath, "utf8");
+
+  assert.match(main, /source:s\.source\|\|''/);
+  assert.match(main, /cash_handover:s\.cash_handover/);
+  assert.match(main, /bank_transfer_total:s\.bank_transfer_total/);
+  assert.match(main, /gross_received:s\.gross_received/);
+  assert.match(main, /createdBy:\(s\.source==='employee_entry'\|\|s\.source==='EMP'\)\?'staff'/);
+  assert.match(main, /const hasEntries=s\.entries&&s\.entries\.length>0/);
+  assert.match(main, /const has=hasEntries\|\|Number\(s\.cash_handover\|\|0\)/);
+});
+
 test("owner session detail reads structured transaction rows from cloud", async () => {
   const worker = await readFile(workerPath, "utf8");
 
