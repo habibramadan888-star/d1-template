@@ -24,7 +24,7 @@ test("history first load is limited to recent records", async () => {
 test("worker history route is read-only and does not run schema mutation on GET", async () => {
   const worker = await readFile("deploy-worker/src/index.js", "utf8");
   const route =
-    worker.match(/if \(path === "\/api\/history"\) \{[\s\S]*?return json\(results\);\s*\}/)?.[0] ||
+    worker.match(/if \(path === "\/api\/history"\) \{[\s\S]*?return success\(results\);\s*\}/)?.[0] ||
     "";
 
   assert.match(route, /empTableExists\(env,"sessions"\)/);

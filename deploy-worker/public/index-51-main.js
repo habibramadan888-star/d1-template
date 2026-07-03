@@ -2660,6 +2660,13 @@ async function renderHistory(){
         s=normalizeLedgerSession({...s,entries:rows.map(tx=>({
           id:tx.id,cat:tx.cat,room:tx.room,amount:tx.amount,
           due:tx.due,paid:tx.paid,deficit:tx.deficit,tag:normTag(tx.tag),note:tx.note,
+          type:tx.type||tx.reason_code||'',event_type:tx.type||tx.reason_code||'',source:'employee_entry',
+          expected_amount:tx.period_due||tx.due||0,expected_rent:tx.period_due||tx.due||0,
+          payment_method:tx.pay_type||tx.cat||'',operator:tx.operator_name||tx.operator_id||'',operator_id:tx.operator_id||'',operator_name:tx.operator_name||'',
+          raw_display_line:tx.note||tx.arrear_reason_detail||tx.custom_reason||'',linked_task_id:tx.linked_task_id||'',arrears_ref:tx.linked_task_id||'',
+          original_arrears_id:tx.linked_task_id||'',original_arrears_amount:tx.period_due||tx.due||0,already_paid_amount:Math.max(0,(Number(tx.period_due||tx.due||0)-Number(tx.amount||0))),payment_amount:tx.amount||0,remaining_arrears:Math.max(0,(Number(tx.period_due||tx.due||0)-Number(tx.amount||0))),
+          short_paid:(tx.type==='R'||tx.reason_code==='R')&&Number(tx.period_due||tx.due||0)>Number(tx.paid||tx.amount||0),
+          arrears_amount:Math.max(0,Number(tx.period_due||tx.due||0)-Number(tx.paid||tx.amount||0)),arrears_due_date:tx.arrear_promise_date||'',arrears_note:tx.arrear_reason_detail||tx.custom_reason||'',
           roomTo:tx.room_to||undefined,startDate:tx.start_date||undefined,
           depDue:tx.dep_due,depPaid:tx.dep_paid,depDef:tx.dep_def,
           dueDate:tx.due_date||undefined,depDate:tx.dep_date||undefined,

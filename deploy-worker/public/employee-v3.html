@@ -3242,8 +3242,11 @@ function ensureBedTransferStep2Mount(){
 function taskRemain(t){return Math.max(0,num(t.arrear_amount)-num(t.actual_received))}
 function populateTaskSelect(){
   const sel=$('linkedTaskId');
-  const open=state.tasks.filter(t=>!['PAID','CLEARED','CLOSED','VOID','已结清','结清','作废','WRITTEN_OFF','WAIVED'].includes(String(t.close_status||''))&&taskRemain(t)>0);
-  sel.innerHTML='<option value="">请选择要偿还的欠款</option>'+open.map(t=>`<option value="${esc(t.task_id)}">#${esc(t.bed||'')} ${esc(t.tenant_name||'-')} · ${fmtMoney(taskRemain(t))} AED · ${esc(t.original_period_start||'-')}→${esc(t.original_period_end||'-')}</option>`).join('');
+  const bed=$('bed').value.trim().replace(/^#/,'');
+  const open=bed?openTasksForBed():[];
+  sel.innerHTML='<option value="">请选择要偿还的欠款</option>'+open.map(t=>`<option value="${esc(t.task_id)}">#${esc(t.bed||'')} ${esc(t.tenant_name||'-')} · 剩余 ${fmtMoney(taskRemain(t))} AED · 原欠款 ${fmtMoney(num(t.arrear_amount))}</option>`).join('');
+  if($('linkedTaskId').value&&!open.some(t=>t.task_id===$('linkedTaskId').value))$('linkedTaskId').value='';
+  renderTaskInfo();
 }
 function selectedTask(){
   return state.tasks.find(t=>t.task_id===$('linkedTaskId').value)||null;
@@ -3363,7 +3366,17 @@ function toRentMinusFrom(ctx){
 }
 function renderTaskInfo(){
   const t=selectedTask();
-  $('apTaskInfo').innerHTML=t?`关联欠款：<strong>#${esc(t.bed||'')}</strong> ${esc(t.tenant_name||'-')}，剩余 <strong>${fmtMoney(taskRemain(t))} AED</strong>，账期 ${esc(t.original_period_start||'-')} → ${esc(t.original_period_end||'-')}，状态 ${esc(t.followup_status||'待跟进')}`:'请选择一条欠款任务；系统会把本次收款自动回写到该任务。';
+  const bed=$('bed').value.trim().replace(/^#/,'');
+  if(t){
+    const original=num(t.arrear_amount);
+    const already=num(t.actual_received);
+    const payment=num($('amount').value);
+    const remaining=Math.max(0,original-already-payment);
+    $('apTaskInfo').innerHTML=`关联欠款：<strong>#${esc(t.bed||'')}</strong> ${esc(t.tenant_name||'-')}，原欠款 <strong>${fmtMoney(original)} AED</strong>，已还 <strong>${fmtMoney(already)} AED</strong>，本次 <strong>${fmtMoney(payment)} AED</strong>，剩余 <strong>${fmtMoney(remaining)} AED</strong>，${remaining<=0?'结清':'部分还款'}`;
+    return;
+  }
+  const open=bed?openTasksForBed():[];
+  $('apTaskInfo').innerHTML=bed&&open.length===0?'该床位暂无未清欠款':'输入床位后选择该床位的云端未清欠款；还欠款不使用本期账期。';
 }
 function applyLinkedTask(){
   const task=state.tasks.find(t=>t.task_id===$('linkedTaskId').value);
@@ -3371,14 +3384,14 @@ function applyLinkedTask(){
   $('bed').value=task.bed||'';
   $('tenantName').value=task.tenant_name||'';
   $('tenantCardId').value=task.tenant_card_id||'';
-  $('periodStart').value=task.original_period_start||'';
-  $('periodEnd').value=task.original_period_end||'';
   const remain=taskRemain(task);
   $('amount').value=fmtMoney(remain);
   $('due').value=fmtMoney(remain);
   $('paid').value=fmtMoney(remain);
-  $('periodDue').value=fmtMoney(num(task.arrear_amount));
-  $('reasonCode').value='SHORT_PAID';
+  $('periodStart').value='';
+  $('periodEnd').value='';
+  $('periodDue').value=fmtMoney(remain);
+  $('reasonCode').value='ARREARS_PAYMENT';
   renderTaskInfo();
   syncForm();
 }
@@ -3393,7 +3406,7 @@ function entryDirection(e){
 }
 const EMPLOYEE_ENTRY_ANCHOR_CONTRACT={
   R:['event_type','bed','expected_rent','paid_amount','payment_method','rent_period_start','rent_period_end','arrears_amount','arrears_due_date','arrears_note','short_paid','raw_display_line','operator','created_at','ttlock_context'],
-  AP:['event_type','bed','paid_amount','payment_method','original_arrears_ref','remaining_arrears_after_payment','note','operator','created_at'],
+  AP:['event_type','bed','arrears_ref','original_arrears_id','original_arrears_amount','already_paid_amount','payment_amount','remaining_arrears','settlement_status','payment_method','note','operator','created_at'],
   D:['event_type','bed','deposit_amount','payment_method','linked_tenant','note','operator','created_at'],
   DR:['event_type','bed','refund_amount','payment_method','refund_reason','checkout_ref','note','operator','created_at'],
   CO:['event_type','bed','checkout_date','deposit_refund','outstanding_arrears','final_note','ttlock_context','operator','created_at'],
@@ -3415,6 +3428,10 @@ function buildEntryRawDisplayLine(e){
     const parts=[e.room,'rent','paid',fmtMoney(e.paid||e.amount),'expected',fmtMoney(e.period_due||e.due),'method',paymentMethodLabel(e.pay_type)];
     if(e.short_paid)parts.push('short_paid',fmtMoney(e.arrears_amount),'due',e.arrears_due_date||'-','note',e.arrears_note||'-');
     return parts.join(' ');
+  }
+  if(e.type==='AP'){
+    const ref=e.arrears_ref||e.original_arrears_id||e.linked_task_id||'-';
+    return `${e.room} arrears_payment ${fmtMoney(e.payment_amount||e.amount)} ${paymentMethodLabel(e.pay_type)} ref ${ref} original ${fmtMoney(e.original_arrears_amount)} already ${fmtMoney(e.already_paid_amount)} remaining ${fmtMoney(e.remaining_arrears)} ${e.settlement_status||''} ${e.note||''}`.trim();
   }
   if(e.type==='TF')return `${e.bed_from||e.room}->${e.bed_to||e.roomTo} bed_transfer ${fmtMoney(e.amount)} ${paymentMethodLabel(e.pay_type)} ${e.transfer_reason||e.fee_waiver_reason||''}`.trim();
   return `${e.room||e.expense_category||''} ${type} ${fmtMoney(e.amount)} ${paymentMethodLabel(e.pay_type)} ${e.note||e.expense_desc||''}`.trim();
@@ -3440,7 +3457,26 @@ function applyEntryAnchors(e){
       short_paid:tail>0
     });
   }else if(type==='AP'){
-    Object.assign(e,{bed:e.room,paid_amount:num(e.amount),original_arrears_ref:e.linked_task_id||'',remaining_arrears_after_payment:num(e.remaining_arrears_after_payment||0)});
+    const t=typeof selectedTask==='function'?selectedTask():null;
+    const original=num(e.original_arrears_amount||t?.arrear_amount||e.period_due||e.due||0);
+    const already=num(e.already_paid_amount||t?.actual_received||0);
+    const payment=num(e.payment_amount||e.amount||0);
+    const remaining=Math.max(0,original-already-payment);
+    const status=remaining<=0?'settled':'partial';
+    const ref=e.arrears_ref||e.original_arrears_id||e.linked_task_id||'';
+    Object.assign(e,{
+      bed:e.room,
+      arrears_ref:ref,
+      original_arrears_id:ref,
+      original_arrears_ref:ref,
+      original_arrears_amount:original,
+      already_paid_amount:already,
+      payment_amount:payment,
+      paid_amount:payment,
+      remaining_arrears:remaining,
+      remaining_arrears_after_payment:remaining,
+      settlement_status:status
+    });
   }else if(type==='D'){
     Object.assign(e,{bed:e.room,deposit_amount:num(e.amount),linked_tenant:e.tenant_card_id||e.tenant_name||''});
   }else if(type==='DR'){
@@ -3654,7 +3690,7 @@ function renderSummary(){
 function syncForm(){
   ensureBedTransferStep2Mount();
   const type=$('entryType').value, c=state.current||{};
-  const hasPeriod=['R','AP','TFF'].includes(type);
+  const hasPeriod=['R','TFF'].includes(type);
   const rent=rentForBed();
   if(type==='R')$('listPrice').value=rent?fmtMoney(rent):'';
   if(type==='TF'){
@@ -3662,7 +3698,7 @@ function syncForm(){
     if(!$('transferDate').value)$('transferDate').value=today();
   }
   updateEventChips();
-  $('objectHint').textContent=type==='E'?'支出不需要床位时可以只选择类别；如果是指定房间维修，可在备注写床位。':(type==='TF'?'换床需要填写原床位和新床位，系统会保留换床前后锚点。':'收租/收押金/退押金/还欠款：填写床位号，系统自动抓取租客上下文。');
+  $('objectHint').textContent=type==='E'?'支出不需要床位时可以只选择类别；如果是指定房间维修，可在备注写床位。':(type==='TF'?'换床需要填写原床位和新床位，系统会保留换床前后锚点。':(type==='AP'?'还欠款只针对云端未清欠款，不使用本期账期。请输入床位后选择要偿还的欠款。':'收租/收押金/退押金：填写床位号，系统自动抓取租客上下文。'));
   if($('btnSaveEntry'))$('btnSaveEntry').innerHTML=type==='TF'?'保存换床记录<span class="label-en">RECORD TRANSFER</span>':'加入本票<span class="label-en">ADD TO SESSION</span>';
   visible(['periodStep'],hasPeriod);visible(['apFields'],type==='AP');visible(['checkoutFields'],type==='CO');visible(['transferFields'],type==='TF');visible(['expenseFields'],type==='E');visible(['paymentStep'],!['E','CO'].includes(type));visible(['genericBedFieldWrap'],type!=='TF');
   updatePaymentButtons();
@@ -3672,6 +3708,7 @@ function syncForm(){
   visible(['transferWaiverReasonWrap'],type==='TF'&&$('feePaid').value==='N');
   $('bankRefWrap').classList.add('hidden');
   if(type==='AP'&&!state.tasks.length)loadTasks(false);
+  if(type==='AP')populateTaskSelect();
   $('periodStart').readOnly=true;$('periodEnd').readOnly=true;$('periodDays').readOnly=$('cycle').value!=='CUST';
   if(type==='R'&&!$('periodStart').value)$('periodStart').value=c.end||nextAnchor(today());
   if(type==='R'&&$('cycle').value==='1M'){$('periodStart').value=c.end||nextAnchor(today());$('periodEnd').value=addMonths($('periodStart').value,1);}
@@ -3693,7 +3730,14 @@ function syncForm(){
   const lp=rent;
   let periodDue=num($('periodDue').value);
   if(type==='AP'){
-    periodDue=num($('periodDue').value);
+    const task=selectedTask();
+    const remain=task?taskRemain(task):num($('due').value);
+    if(task&&!num($('amount').value))$('amount').value=fmtMoney(remain);
+    if(task){
+      $('due').value=fmtMoney(remain);
+      $('periodDue').value=fmtMoney(remain);
+    }
+    periodDue=remain;
   }else if(hasPeriod&&(!periodDue||document.activeElement===$('cycle')||document.activeElement===$('periodStart')||document.activeElement===$('periodEnd')||type==='R'||type==='TFF')){
     periodDue=$('cycle').value==='15D'?400:($('cycle').value==='CUST'?num($('periodDays').value)*40:(type==='TFF'?50:lp));
     $('periodDue').value=periodDue?fmtMoney(periodDue):'';
@@ -3701,7 +3745,8 @@ function syncForm(){
   if(type==='R'||type==='TFF')$('due').value=$('periodDue').value||'';
   else if(hasPeriod&&!$('due').value)$('due').value=$('periodDue').value||$('amount').value;
   const amt=num($('amount').value), due=num($('due').value);
-  if(['R','AP','TFF'].includes(type))$('paid').value=fmtMoney(Math.min(amt,due||amt));
+  if(['R','TFF'].includes(type))$('paid').value=fmtMoney(Math.min(amt,due||amt));
+  else if(type==='AP')$('paid').value=fmtMoney(amt);
   else if(['TF','CO'].includes(type)&&amt===0)$('paid').value='0.00';
   else if(amt)$('paid').value=fmtMoney(amt);
   $('entryClr').value=due&&amt<due?'N':'Y';
@@ -3731,7 +3776,7 @@ function validate(){
   if(type==='R'&&$('cycle').value==='1M'&&!rentForBed())errors.push('该床位没有老板端月租配置，不能提交整月收租。请先到老板端设置租金。');
   if(type==='R'&&$('cycle').value==='CUST'&&num($('periodDays').value)<=0)errors.push('自定义天数必须填写大于 0 的天数，系统按每天 40 AED 计算。');
   if(type==='R'&&$('cycle').value==='CUST'&&num($('periodDays').value)>0&&!Number.isInteger(num($('periodDays').value)))errors.push('自定义天数必须是整数天。金额不等于 40 的整数倍时，应作为尾款或异常处理，不能改成小数天。');
-  if(['R','AP','TFF'].includes(type)&&(!$('periodStart').value||!$('periodEnd').value))errors.push('账期事件必须有开始和截止日期。');
+  if(['R','TFF'].includes(type)&&(!$('periodStart').value||!$('periodEnd').value))errors.push('账期事件必须有开始和截止日期。');
   if(type==='R'&&!num($('periodDue').value))errors.push('收租必须确认 period_due，作为账期应收锚点。');
   if(type==='R'&&$('periodEnd').value&&$('periodStart').value&&$('periodEnd').value<$('periodStart').value)errors.push('period_end 不能早于 period_start。');
   const tail=rentShortfall();
@@ -3762,6 +3807,13 @@ function validate(){
   if(type==='TF'&&$('feePaid').value==='Y'&&amt!==50)errors.push('换床收取费用时，系统固定按 50 AED 计入，员工不能手动改金额。');
   if(type==='E'&&!$('expenseDesc').value.trim())errors.push('支出必须填写说明。');
   if(type==='AP'&&!$('linkedTaskId').value)errors.push('还欠款必须选择一条欠款任务，不能自由录入。');
+  if(type==='AP'){
+    const task=selectedTask();
+    if(task){
+      const remain=taskRemain(task);
+      if(amt>remain+0.01)errors.push('本次还款不能超过该欠款剩余金额。');
+    }
+  }
   if($('reasonCode').value==='OTHER'&&!$('remark').value.trim())errors.push('RC=OTHER 时备注不能为空。');
   if($('reasonCode').value==='DISCOUNT'&&!$('customReason').value.trim())errors.push('折扣必须填写原因，方便老板端复核。');
   if(type==='TF'&&$('feePaid').value==='N'&&!$('transferWaiverReason').value.trim())errors.push('Waiver Reason is required when Bed Transfer fee is waived / 免收换床费必须填写豁免原因。');
@@ -3774,6 +3826,10 @@ function validate(){
 function entryPayload(){
   const type=$('entryType').value, amt=num($('amount').value), due=num($('due').value), paid=num($('paid').value)||Math.min(amt,due||amt);
   const pay=$('payType').value;
+  const apTask=type==='AP'?selectedTask():null;
+  const apOriginal=apTask?num(apTask.arrear_amount):0;
+  const apAlready=apTask?num(apTask.actual_received):0;
+  const apRemaining=Math.max(0,apOriginal-apAlready-amt);
   const co=checkoutCalc();
   const dedReasons=[];
   if(co.overDed>0)dedReasons.push('OVERDAY');
@@ -3796,7 +3852,9 @@ function entryPayload(){
     transfer_date:$('transferDate').value,transfer_reason:$('transferReason').value,transfer_validation_status:type==='TF'?bedTransferValidationSummary(transferValue('transferFromBed')||transferValue('bed'),transferValue('bedTo'),bedTransferReviewContext()).status:'',
     carry_over_arrears:openTasksForBed().reduce((s,t)=>s+taskRemain(t),0),deposit_carried:depositHeld(),old_ttlock_ref:state.current?.tenant_card_id||'',old_lock_valid_from:state.current?.start||state.current?.start_md||'',old_lock_valid_until:state.current?.end||'',rent_difference:toRentMinusFrom(bedTransferReviewContext()),
     expense_category:$('expenseCategory').value,expense_desc:$('expenseDesc').value.trim(),
-    linked_task_id:$('linkedTaskId').value,original_period_start:$('periodStart').value,original_period_end:$('periodEnd').value,
+    linked_task_id:$('linkedTaskId').value,original_period_start:type==='AP'?'':$('periodStart').value,original_period_end:type==='AP'?'':$('periodEnd').value,
+    arrears_ref:type==='AP'?$('linkedTaskId').value:'',original_arrears_id:type==='AP'?$('linkedTaskId').value:'',original_arrears_amount:type==='AP'?apOriginal:0,
+    already_paid_amount:type==='AP'?apAlready:0,payment_amount:type==='AP'?amt:0,remaining_arrears:type==='AP'?apRemaining:0,settlement_status:type==='AP'?(apRemaining<=0?'settled':'partial'):'',
     arrear_handling:tail>0?$('arrearHandling').value:'',arrear_promise_date:tail>0?$('arrearPromiseDate').value:'',arrear_reason_detail:tail>0?tailReason:'',
     promise_date:tail>0?$('arrearPromiseDate').value:'',promise_amount:tail>0?tail:0,
     note:noteText,remark:noteText,operator_id:operatorId(),operator_name:operatorName(),src:'EMP',status:'ACTIVE',created_at:nowIso(),ts:nowIso()
@@ -3930,7 +3988,7 @@ function exportLine(e){
   if(e.type==='D')return `#${e.room} ${name} D ${e.tag} ${fmtMoney(e.amount)} AED\n  card ${cid} EID ${e.id}`;
   if(e.type==='DR')return `#${e.room} ${name} DR ${fmtMoney(e.amount)} AED ${e.pay_type}\n  card ${cid} EID ${e.id}`;
   if(e.type==='CO')return `#${e.room} ${name} left ${e.checkout_date||'-'} CO\n  card ${cid}\n  deposit held ${fmtMoney(e.deposit_held)} deducted ${fmtMoney(e.deposit_deduction)} return ${fmtMoney(e.deposit_amt)} DED ${e.ded_reason||'-'} ${e.ded_days||0}D rate ${fmtMoney(e.ded_rate||40)} early ${e.early_days||0}D note ${e.ded_note||'-'} EID ${e.id}`;
-  if(e.type==='AP')return `#${e.room} ${name} AP ${fmtMoney(e.amount)} AED ${e.pay_type} closes TASK ${e.linked_task_id||'-'}\n  card ${cid}${period} EID ${e.id}`;
+  if(e.type==='AP')return `#${e.room} ${name} arrears_payment ${fmtMoney(e.payment_amount||e.amount)} AED ${e.pay_type} ref ${e.arrears_ref||e.original_arrears_id||e.linked_task_id||'-'} original ${fmtMoney(e.original_arrears_amount)} already ${fmtMoney(e.already_paid_amount)} remaining ${fmtMoney(e.remaining_arrears)} ${e.settlement_status||''}\n  card ${cid} note ${e.note||'-'} RAW ${entryWhatsappSafe(e.raw_display_line||'')} EID ${e.id}`;
   if(e.type==='TF')return `#${e.bed_from} -> #${e.bed_to} ${name} TF ${e.fee_paid==='Y'?'FEE50 '+e.pay_type:'FEE0 waived '+(e.fee_waiver_reason||'-')}\n  transfer ${e.transfer_date||'-'} reason ${e.transfer_reason||'-'} deposit carried ${fmtMoney(e.deposit_carried||0)} arrears carried ${fmtMoney(e.carry_over_arrears||0)} old_ttlock ${e.old_ttlock_ref||cid||'-'} EID ${e.id}`;
   if(e.type==='TFF')return `#${e.room} ${name} TFF ${fmtMoney(e.amount)} AED ${e.pay_type}\n  card ${cid} EID ${e.id}`;
   return `#${e.room||e.expense_category} ${fmtMoney(e.amount)} AED ${e.pay_type} ${e.expense_desc||e.note||''}\n  EID ${e.id}`;
@@ -4890,7 +4948,7 @@ function entryWhatsappSafe(value){
     .slice(0,90);
 }
 function entryWhatsappType(e){
-  return ({R:'rent',AP:'arrears',D:'deposit_in',DR:'deposit_out',CO:'checkout',E:'expense',TF:'bed_transfer',TFF:'bed_transfer'}[e?.type]||String(e?.type||'entry').toLowerCase());
+  return ({R:'rent',AP:'arrears_payment',D:'deposit_in',DR:'deposit_out',CO:'checkout',E:'expense',TF:'bed_transfer',TFF:'bed_transfer'}[e?.type]||String(e?.type||'entry').toLowerCase());
 }
 function entryWhatsappPayment(e){
   const pay=String(e?.payment_method||e?.pay_type||'').toLowerCase();
@@ -4969,6 +5027,16 @@ function entryWhatsappLine(e,i){
     const shortText=shortPaid>0?` expected ${fmtMoney(expected)} short_paid ${fmtMoney(shortPaid)} due ${due||'-'}${note?' note '+note:''}`:` expected ${fmtMoney(expected)}`;
     return `${i+1}. ${bed.anchor} rent ${fmtMoney(paid)} ${pay}${shortText}${period}`.trim();
   }
+  if(type==='arrears_payment'){
+    const ref=entryWhatsappSafe(e?.arrears_ref||e?.original_arrears_id||e?.linked_task_id||'-');
+    const original=fmtMoney(num(e?.original_arrears_amount||e?.period_due||e?.due));
+    const already=fmtMoney(num(e?.already_paid_amount||0));
+    const payment=fmtMoney(num(e?.payment_amount||e?.amount));
+    const remaining=fmtMoney(num(e?.remaining_arrears||e?.remaining_arrears_after_payment||0));
+    const status=entryWhatsappSafe(e?.settlement_status||'partial');
+    const note=entryWhatsappSafe(e?.note||e?.remark||'');
+    return `${i+1}. ${bed.anchor} arrears_payment ${payment} ${pay} ref ${ref} original ${original} already ${already} remaining ${remaining} ${status}${note?' note '+note:''}`.trim();
+  }
   const reason=entryWhatsappSafe(e?.reason_code||e?.custom_reason||e?.note||e?.remark||e?.expense_desc||'');
   return `${i+1}. ${bed.anchor} ${type} ${amount} ${pay}${period}${reason?' '+reason:''}`.trim();
 }
@@ -4989,6 +5057,12 @@ function showEntryWhatsappFallback(text,url){
     body.innerHTML=`<div class="preview-detail-card entry-session-whatsapp-fallback"><div class="preview-detail-top"><b>WhatsApp Export</b><button class="btn" type="button" onclick="window.open('${esc(url)}','_blank','noopener,noreferrer')">Open WhatsApp</button></div><div class="small">Text copied. If WhatsApp did not open, copy manually below.</div><pre>${esc(text)}</pre></div>`;
     $('previewModal').classList.add('show');
   }
+}
+function employeeUploadTimingEnabled(){
+  return localStorage.getItem('empv3:uploadTiming')==='1'||location.search.includes('uploadTiming=1');
+}
+function employeeUploadTimingLog(label,data){
+  if(employeeUploadTimingEnabled())console.log('[employee-entry-upload]',label,data||{});
 }
 async function exportEntrySessionWhatsApp(){
   refreshSessionViews();
@@ -5060,6 +5134,8 @@ function closePreviewModal(){
   $('previewModal').classList.remove('show');
 }
 async function commitSessionAndExport(){
+  const uploadT0=performance.now();
+  const uploadTiming={payload_build_ms:0,validation_ms:0,api_request_ms:0,response_parse_ms:0,total_ms:0};
   if(!state.user){applyEmployeeUser(null);toast('请先登录员工账号',6000);return}
   buildExport();
   if(!state.drafts.length){showStatus('当前本票没有流水，不能导出交接。','warn');toast('当前本票没有流水，不能导出交接',6000);return}
@@ -5071,6 +5147,7 @@ async function commitSessionAndExport(){
     return;
   }
   const btns=[$('btnExportSession'),$('btnBuildExport')].filter(Boolean);
+  const setUploadPhase=(cn,en)=>{btns.forEach(b=>{b.innerHTML=`${cn}<span class="label-en">${en}</span>`;});showStatus(`${cn} / ${en}`);};
   if(btns.some(b=>b.dataset.busy==='1'))return;
   const oldLabels=btns.map(b=>[b,b.innerHTML]);
   btns.forEach(b=>{b.dataset.busy='1';b.disabled=true;b.classList.add('disabled');b.innerHTML='正在导出<span class="label-en">EXPORTING</span>'});
@@ -5090,15 +5167,25 @@ async function commitSessionAndExport(){
   const completedExportText=($('exportText')?.textContent||'').replace(/Sync pending/g,'All synced');
   const failed=[];
   const uploadList=[...pending].reverse();
+  const validationStart=performance.now();
+  uploadList.forEach(e=>applyEntryAnchors(e));
+  uploadTiming.validation_ms=Math.round(performance.now()-validationStart);
   for(let i=0;i<uploadList.length;i++){
     const e=uploadList[i];
     const isFinal=i===uploadList.length-1;
     const sessionForEntry={...session,handover_status:isFinal?'COMPLETED':'EXPORTING',export_text:isFinal?completedExportText:session.export_text};
     try{
-      const r=await apiFetch('/api/employee/entry',{method:'POST',body:JSON.stringify({entry:e,session:sessionForEntry})});
+      setUploadPhase(`正在上传 ${i+1}/${uploadList.length}`,'UPLOADING');
+      const apiStart=performance.now();
+      const r=await apiFetch('/api/employee/entry',{method:'POST',headers:employeeUploadTimingEnabled()?{'X-Employee-Entry-Timing':'1'}:{},body:JSON.stringify({entry:e,session:sessionForEntry,timing_debug:employeeUploadTimingEnabled()})});
+      uploadTiming.api_request_ms+=Math.round(performance.now()-apiStart);
+      setUploadPhase(`正在确认 ${i+1}/${uploadList.length}`,'CONFIRMING');
+      const parseStart=performance.now();
       const raw=await r.text();
       let data=null;
       try{data=raw?unwrapStandardResponse(JSON.parse(raw)):null}catch{}
+      uploadTiming.response_parse_ms+=Math.round(performance.now()-parseStart);
+      if(data?.timing)employeeUploadTimingLog('server',data.timing);
       if(!r.ok||data?.success===false)throw new Error(data?.error||data?.message||raw||('HTTP '+r.status));
       e.sync_status='SYNCED';
       e.cloud_entry_id=data?.entry_id||e.cloud_entry_id||'';
@@ -5113,7 +5200,7 @@ async function commitSessionAndExport(){
       break;
     }
   }
-  if(!failed.length)await loadTasks(false);
+  if(!failed.length&&uploadList.some(e=>['R','AP'].includes(e.type)))setTimeout(()=>loadTasks(false),0);
   renderContext();
   refreshSessionViews();
   buildExport();
@@ -5123,6 +5210,9 @@ async function commitSessionAndExport(){
     $('validationBox').innerHTML=`<div class="bad">导出未完成：${esc(failed[0].sync_error)}</div><div class="warn">已上传成功的流水保留在云端；失败流水保留本地，修复后再次点击导出交接。</div>`;
     toast('导出未完成：部分流水未上传，本地已保留。',6000);
   }else{
+    setUploadPhase('上传完成','DONE');
+    uploadTiming.total_ms=Math.round(performance.now()-uploadT0);
+    employeeUploadTimingLog('client',uploadTiming);
     const localOk=saveDrafts();
     showStatus(localOk?'交接导出完成：云端已完成，本地也已保存。':'云端已完成，但本地保存失败，请不要关闭页面。',localOk?'ok':'warn');
     toast(localOk?'交接导出完成：云端已完成，本地也已保存。':'云端已完成，但本地保存失败，请不要关闭页面。',6000);
@@ -5161,7 +5251,7 @@ document.querySelectorAll('.event-chip').forEach(btn=>btn.addEventListener('clic
 document.querySelectorAll('.pay-option').forEach(btn=>btn.addEventListener('click',e=>{e.preventDefault();setPaymentType(btn.dataset.pay);}));
 ['entryType','cycle','payType','amount','reasonCode','feePaid','transferWaiverReason','customReason','tenantName','bankRef','periodDays','depositDeduction','checkoutDate','noNoticeDeduction','otherDeduction','dedNote','excessTo','bedTo','transferDate','transferReason','expenseCategory','expenseDesc','remark','arrearHandling','arrearPromiseDate','arrearReasonDetail'].forEach(id=>$(id).addEventListener('input',syncForm));
 $('linkedTaskId').addEventListener('change',applyLinkedTask);
-$('bed').addEventListener('input',()=>{if($('entryType').value==='TF')$('transferFromBed').value=$('bed').value.trim().replace(/^#/,'');lookupBed();});
+$('bed').addEventListener('input',()=>{if($('entryType').value==='TF')$('transferFromBed').value=$('bed').value.trim().replace(/^#/,'');lookupBed();if($('entryType').value==='AP'){populateTaskSelect();syncForm();}});
 $('transferFromBed').addEventListener('input',()=>{if($('entryType').value==='TF'){$('bed').value=$('transferFromBed').value.trim().replace(/^#/,'');lookupBed();syncForm();}});
 $('transferFromBed').addEventListener('change',()=>{if($('entryType').value==='TF'){$('bed').value=$('transferFromBed').value.trim().replace(/^#/,'');lookupBed();syncForm();}});
 $('tenantCardId').addEventListener('change',e=>{state.depositBalance=null;if(e.target.value.trim())loadDepositBalance(e.target.value.trim());else renderContext();});$('btnLoadLock').onclick=loadLock;$('btnSaveEntry').onclick=saveEntry;$('btnReset').onclick=()=>{resetForm();showStatus('表单已清空。');toast('表单已清空')};$('btnRefreshTasks').onclick=refreshFollowup;$('btnBuildExport').onclick=commitSessionAndExport;$('btnCopyExport').onclick=async()=>{try{await navigator.clipboard.writeText($('exportText').textContent);showStatus('导出文本已复制。');toast('已复制')}catch{showStatus('复制失败，请手动选择导出文本。','warn');toast('复制失败，请手动选择文本',6000)}};$('btnClearLocal').onclick=()=>{if(hasLocalOnly()){showStatus('仍有云端未确认记录，不能清空。','warn');toast('仍有云端未确认记录，不能清空',6000);return}if(confirm('清空本机草稿？')){state.drafts=[];saveDrafts();buildExport();refreshSessionViews();showStatus('本机草稿已清空。');toast('已清空')}};$('btnNewSessionTop').onclick=newSession;$('btnPreviewSession').onclick=previewSession;$('btnWhatsAppSession').onclick=exportEntrySessionWhatsApp;$('btnExportSession').onclick=commitSessionAndExport;$('operatorId').value=localStorage.getItem('empv3:operator')||'';$('operatorId').onchange=e=>{setOperator(e.target.value.trim());refreshSessionViews();showStatus('员工编号已更新。')};

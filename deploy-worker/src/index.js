@@ -1598,6 +1598,8 @@ async function handleEmployeeLockCards(request,env,user){
 }
 __name(handleEmployeeLockCards,"handleEmployeeLockCards");
 async function handleEmployeeEntry(request,env,user){
+  const timingEnabled=request.headers.get("X-Employee-Entry-Timing")==="1";
+  const timing={started_at:Date.now(),d1_write_ms:0,total_ms:0};
   await empEnsureSchema(env);
   let body;
   try{body=await request.json();}catch{return badRequest("invalid_json");}
@@ -1749,6 +1751,7 @@ async function handleEmployeeEntry(request,env,user){
   if(seedLegacyDeposit)depositBalance=depositHeldInput;
   if(type==="DR"&&tenantCardId&&amount>depositBalance+0.01)return badRequest("deposit_insufficient");
   if(type==="CO"&&depositDeduction>depositBalance+0.01)return badRequest("deposit_deduction_exceeds_balance");
+  const d1WriteStart=Date.now();
   await empInsertDynamic(env,"sessions",{
     id:sessionId,
     corpid:user.corpid,
@@ -1856,11 +1859,14 @@ async function handleEmployeeEntry(request,env,user){
   };
   await empEvent(env,user,{ref_id:entryId,ref_type:"transaction",event_type:"create",field_name:"*",new_value:JSON.stringify(finalEntryForAudit),operator_id:authOperatorId,ts:now});
   await audit(env,user,"employee.entry.create",entryId,{room,amount}).catch(()=>{});
+  timing.d1_write_ms=Date.now()-d1WriteStart;
+  timing.total_ms=Date.now()-timing.started_at;
   return success({
     success:true,
     entry_id:entryId,
     session_id:sessionId,
     inserted,
+    timing:timingEnabled?timing:void 0,
     arrear_task:arrearTask,
     deposit_ledger:depositLedger,
     ...(liveRouteAdapterDraft?{adapter_live_route_rehearsal:eeaLiveRouteSummary(liveRouteAdapterDraft,liveRouteGate,{legacyWriteContinued:true})}: {})
