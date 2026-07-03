@@ -696,10 +696,16 @@ function ledgerSessionRawText(s){
   return String(s?.export_text||s?.exportText||s?.raw_text||s?.rawText||s?.txt||'');
 }
 
+function isEmployeeLedgerSession(s){
+  const source=String(s?.source||s?.src||'').toLowerCase();
+  const anchor=String(s?.anchorId||s?.anchor_id||'').toUpperCase();
+  return source==='employee_entry'||source==='emp'||anchor.startsWith('EMP')||anchor.startsWith('EMPV3');
+}
+
 function normalizeLedgerSession(session){
   const original=session||{};
   const raw=ledgerSessionRawText(original);
-  if(raw.trim()){
+  if(raw.trim()&&!isEmployeeLedgerSession(original)){
     try{
       const parsed=parseTXT(raw);
       if(parsed&&Array.isArray(parsed.entries)&&parsed.entries.length){
@@ -2757,7 +2763,7 @@ async function renderHistory(){
       refundOut:0,
       total:Number(s.gross_received||0)
     };
-    const cnt=has?s.entries.length:(s.entriesCount||0);
+    const cnt=hasEntries?s.entries.length:(s.entriesCount||0);
     const uploader=s.source==='employee_entry'||s.source==='EMP'||s.createdBy==='staff'||(s.createdBy&&s.createdBy!=='manager')?`员工上传 ${esc(s.operatorName||s.createdBy||s.operatorId||'')}`:(s.createdBy==='manager'?'老板上传':'');
     const mismatch=Number(s.entriesCount||0)&&hasEntries&&Number(s.entriesCount||0)!==s.entries.length;
     const deleted=s._voided;

@@ -1873,6 +1873,118 @@ async function handleEmployeeEntry(request,env,user){
   });
 }
 __name(handleEmployeeEntry,"handleEmployeeEntry");
+function isEmployeeEntrySession(row){
+  const source=String(row?.source||"").trim().toLowerCase();
+  const anchor=String(row?.anchor_id||row?.anchorId||"").trim().toUpperCase();
+  return source==="employee_entry"||source==="emp"||anchor.startsWith("EMP")||anchor.startsWith("EMPV3");
+}
+__name(isEmployeeEntrySession,"isEmployeeEntrySession");
+function parseEmployeeExportAmount(raw){
+  const m=String(raw||"").match(/([\d,]+(?:\.\d+)?)/);
+  return m?Math.round(Number(m[1].replace(/,/g,""))*100)/100:0;
+}
+__name(parseEmployeeExportAmount,"parseEmployeeExportAmount");
+function employeeExportNote(line,key){
+  const re=new RegExp(`${key}:([^\\n]+?)(?:\\s+[A-Z_]+:|\\s+STATUS:|\\s+TASK\\s|$)`,"i");
+  const m=String(line||"").match(re);
+  return cleanText(m?.[1]||"",240);
+}
+__name(employeeExportNote,"employeeExportNote");
+function parseEmployeeEntryExportRows(session){
+  const text=String(session?.export_text||"");
+  if(!text.trim())return [];
+  const rows=[];
+  const seen=new Set();
+  let section="";
+  const add=row=>{
+    const key=[row.type,row.room,row.room_to||"",row.amount,row.linked_task_id||""].join("|");
+    if(seen.has(key))return;
+    seen.add(key);
+    rows.push({
+      id:row.id||`employee-export-${rows.length+1}`,
+      session_id:session.id,
+      corpid:session.corpid,
+      userid:session.created_by||session.operator_id||"",
+      cat:"cash",
+      tag:"Old",
+      status:"ACTIVE",
+      voided_at:"",
+      created_at:session.created_at||session.exported_at||"",
+      ts:session.exported_at||session.created_at||"",
+      operator_id:session.operator_id||session.created_by||"",
+      operator_name:session.operator_name||"",
+      source:"employee_entry_export_text",
+      ...row
+    });
+  };
+  for(const raw of text.split(/\r?\n/)){
+    const line=raw.trim();
+    if(!line)continue;
+    const sec=line.match(/^====\s+(.+?)\s+====$/);
+    if(sec){section=sec[1].toUpperCase();continue;}
+    if(!line.startsWith("#"))continue;
+    if(section==="CASH RECEIVED"&&/\sTF\s/i.test(line)){
+      const m=line.match(/^#(\S+)\s*(?:->|→)\s*#?(\S+).*?\sTF\s+FEE\s*([\d,]+(?:\.\d+)?)/i);
+      if(m)add({
+        type:"TF",
+        reason_code:"TF",
+        room:cleanText(m[1],40),
+        room_to:cleanText(m[2],40),
+        bed_from:cleanText(m[1],40),
+        bed_to:cleanText(m[2],40),
+        amount:parseEmployeeExportAmount(m[3]),
+        due:parseEmployeeExportAmount(m[3]),
+        paid:parseEmployeeExportAmount(m[3]),
+        period_due:parseEmployeeExportAmount(m[3]),
+        pay_type:/\sB(?:\s|$)/i.test(line)?"B":"C",
+        note:cleanText(line,500)
+      });
+      continue;
+    }
+    if(section==="CASH RECEIVED"&&/\sR\s/i.test(line)){
+      const m=line.match(/^#(\S+).*?\sR\s+\S+\s+paid\s+([\d,]+(?:\.\d+)?)\s+AED\s+expected\s+([\d,]+(?:\.\d+)?)/i);
+      if(m){
+        const amount=parseEmployeeExportAmount(m[2]);
+        const due=parseEmployeeExportAmount(m[3]);
+        add({
+          type:"R",
+          reason_code:/short\s+paid/i.test(line)?"SHORT_PAID":"R",
+          room:cleanText(m[1],40),
+          amount,
+          due,
+          paid:amount,
+          period_due:due,
+          deficit:Math.max(0,due-amount),
+          pay_type:/\sB(?:\s|$)/i.test(line)?"B":"C",
+          arrear_promise_date:employeeExportNote(line,"PROMISE"),
+          arrear_reason_detail:employeeExportNote(line,"NOTE"),
+          note:employeeExportNote(line,"NOTE")||cleanText(line,500)
+        });
+      }
+      continue;
+    }
+    if(section==="ARREAR REPAID"&&/\sAP\s/i.test(line)){
+      const m=line.match(/^#(\S+).*?\sAP\s+([\d,]+(?:\.\d+)?)\s+AED\b.*?(?:TASK\s+(\S+))?/i);
+      if(m){
+        const amount=parseEmployeeExportAmount(m[2]);
+        add({
+          type:"AP",
+          reason_code:"AP",
+          room:cleanText(m[1],40),
+          amount,
+          due:amount,
+          paid:amount,
+          period_due:amount,
+          pay_type:/\sB(?:\s|$)/i.test(line)?"B":"C",
+          linked_task_id:cleanText(m[3]||"",80),
+          note:cleanText(line,500)
+        });
+      }
+    }
+  }
+  return rows;
+}
+__name(parseEmployeeEntryExportRows,"parseEmployeeEntryExportRows");
 function empCloseStatusIsOpen(status){
   const raw=cleanText(status,40);
   const upper=raw.toUpperCase();
@@ -5843,11 +5955,16 @@ async function handleRequest(request, env, ctx) {
       if (!sid) return badRequest("bad_request");
       if(!await empTableExists(env,"transactions"))return success([]);
       const includeVoided = url.searchParams.get("include_voided") === "1";
+      const sessionRow=await env.DB.prepare("SELECT * FROM sessions WHERE id=? AND corpid=? LIMIT 1").bind(sid,user.corpid).first();
       const { results } = await env.DB.prepare(
         includeVoided
           ? "SELECT * FROM transactions WHERE session_id=? AND corpid=? ORDER BY created_at ASC"
           : "SELECT * FROM transactions WHERE session_id=? AND corpid=? AND COALESCE(voided_at,'')='' AND COALESCE(status,'ACTIVE')<>'VOID' ORDER BY created_at ASC"
       ).bind(sid, user.corpid).all();
+      if(sessionRow&&isEmployeeEntrySession(sessionRow)){
+        const exportRows=parseEmployeeEntryExportRows(sessionRow);
+        if(exportRows.length)return success(exportRows);
+      }
       return success(results);
     }
     return errorResponse("not_found", 404, "not_found");

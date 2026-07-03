@@ -1,0 +1,112 @@
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import test from "node:test";
+import vm from "node:vm";
+import { loadLedgerHarness, readOwnerMain } from "./helpers/ledger-history-test-utils.mjs";
+
+const employeeExportText = `HOMELINK LEDGER
+Property HL-009  Staff 阿布杜 / abdul  2026-07-03  Session S20260703-amv7l
+
+==== CASH RECEIVED ====
+#146 146 D100 0901 R O paid 700.00 AED expected 770.00 short paid SHORT_PAID 70.00 PROMISE:2026-07-05 NOTE:222 STATUS:open
+#144 144 D200 0101 R O paid 700.00 AED expected 770.00 short paid SHORT_PAID 70.00 PROMISE:2026-07-11 NOTE:111 STATUS:open
+#112 -> #111 manager TF FEE50 C
+
+==== ARREAR REPAID ====
+#144 144 D200 0101 AP 70.00 AED C closes TASK task-mr5bepkg-e7425634
+
+==== TRANSFER ====
+#112 -> #111 manager TF FEE50 C
+
+==== HANDOVER ANCHORS ====
+Cash handover: 1,520.00
+Bank transfer total: 0.00 (0 txns)
+Gross received: 1,520.00
+
+==== SUMMARY ====
+Entries: 4
+Exported 2026-07-03T23:32:52+04:00
+All synced`;
+
+test("employee entry history summary does not reparse export footer as money", async () => {
+  const { normalizeLedgerSession } = await loadLedgerHarness();
+
+  const normalized = normalizeLedgerSession({
+    id: "S20260703-amv7l",
+    date: "2026-07-03",
+    anchorId: "EMPV3-20260703-abdul-amv7l",
+    anchor_id: "EMPV3-20260703-abdul-amv7l",
+    source: "EMP",
+    entries: [],
+    entriesCount: 4,
+    entries_count: 4,
+    cash_handover: 1520,
+    gross_received: 1520,
+    export_text: employeeExportText,
+    _cloud: true
+  });
+
+  assert.equal(normalized._reparsedFromRaw, undefined);
+  assert.equal(normalized.entries.length, 0);
+  assert.equal(normalized.entriesCount, 4);
+  assert.equal(normalized.cash_handover, 1520);
+  assert.equal(normalized.gross_received, 1520);
+});
+
+test("owner history card uses stored entries_count when employee summary has no detail rows yet", async () => {
+  const main = await readOwnerMain();
+
+  assert.match(main, /function isEmployeeLedgerSession\(s\)/);
+  assert.match(main, /raw\.trim\(\)&&!isEmployeeLedgerSession\(original\)/);
+  assert.match(main, /const cnt=hasEntries\?s\.entries\.length:\(s\.entriesCount\|\|0\)/);
+});
+
+test("owner session detail has employee export decoder fallback for R AP and TF rows", async () => {
+  const worker = await readFile("deploy-worker/src/index.js", "utf8");
+
+  assert.match(worker, /function parseEmployeeEntryExportRows\(session\)/);
+  assert.match(worker, /section==="CASH RECEIVED"&&\/\\sTF\\s\/i\.test\(line\)/);
+  assert.match(worker, /section==="CASH RECEIVED"&&\/\\sR\\s\/i\.test\(line\)/);
+  assert.match(worker, /section==="ARREAR REPAID"&&\/\\sAP\\s\/i\.test\(line\)/);
+  assert.match(worker, /if\(sessionRow&&isEmployeeEntrySession\(sessionRow\)\)/);
+  assert.match(worker, /if\(exportRows\.length\)return success\(exportRows\)/);
+});
+
+test("employee export detail decoder returns the four expected owner detail rows", async () => {
+  const worker = await readFile("deploy-worker/src/index.js", "utf8");
+  const start = worker.indexOf("function isEmployeeEntrySession");
+  const end = worker.indexOf("function empCloseStatusIsOpen", start);
+  assert.ok(start > 0 && end > start);
+  const sandbox = {};
+  vm.createContext(sandbox);
+  vm.runInContext(
+    `
+    function __name(fn){ return fn; }
+    function cleanText(value,max=10000){ return String(value ?? '').slice(0,max); }
+    ${worker.slice(start, end)}
+    globalThis.parseEmployeeEntryExportRows = parseEmployeeEntryExportRows;
+    `,
+    sandbox
+  );
+
+  const rows = sandbox.parseEmployeeEntryExportRows({
+    id: "S20260703-amv7l",
+    corpid: "homelink",
+    anchor_id: "EMPV3-20260703-abdul-amv7l",
+    operator_id: "abdul",
+    operator_name: "阿布杜",
+    source: "EMP",
+    export_text: employeeExportText
+  });
+
+  assert.equal(rows.length, 4);
+  assert.equal(
+    JSON.stringify(rows.map((row) => [row.type, row.room, row.room_to || "", row.amount])),
+    JSON.stringify([
+      ["R", "146", "", 700],
+      ["R", "144", "", 700],
+      ["TF", "112", "111", 50],
+      ["AP", "144", "", 70]
+    ])
+  );
+});

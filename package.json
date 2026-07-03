@@ -335,6 +335,7 @@
     "test:owner-history-read-employee-anchors": "node --test tests/owner-history-read-employee-anchors.spec.mjs",
     "test:owner-history-deleted-trace": "node --test tests/owner-history-deleted-trace.spec.mjs",
     "test:owner-history-session-restore-guard": "node --test tests/owner-history-session-restore-guard.spec.mjs",
+    "test:owner-history-employee-entry-decoder": "node --test tests/owner-history-employee-entry-decoder.spec.mjs",
     "test:employee-entry-session-whatsapp-export": "node --test tests/employee-entry-session-whatsapp-export.spec.mjs",
     "test:employee-entry-whatsapp-export-hash-searchable": "node --test tests/employee-entry-whatsapp-export-hash-searchable.spec.mjs",
     "test:employee-entry-whatsapp-export-golden-baseline": "node --test tests/employee-entry-whatsapp-export-golden-baseline.spec.mjs",
