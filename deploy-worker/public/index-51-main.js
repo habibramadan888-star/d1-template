@@ -5288,6 +5288,7 @@ function toggleHistImportGroup(periodKey){
 }
 
 const HISTORY_IMPORT_ITEM_TIMEOUT_MS=30000;
+const HISTORY_IMPORT_STAGE_MIN_MS=120;
 let _historyImportJob=null;
 
 function ensureHistoryImportProgressStyle(){
@@ -5333,10 +5334,35 @@ function historyImportItemLabel(item){
   return `${(s.date||'').slice(0,10)||'未归档日期'} · ${s.anchorId||s.anchor_id||s.id||'无锚点'}`;
 }
 
+function historyImportCurrentText(item){
+  if(!item)return '等待开始';
+  const action={loading:'正在加载',parsing:'正在解析',updating:'正在更新汇总',syncing:'正在同步',waiting:'等待处理'}[item.status]||historyImportStatusText(item.status);
+  return `${action} ${historyImportItemLabel(item)}`;
+}
+
 function historyImportElapsed(item){
   if(!item.startedAt)return '';
   const end=item.finishedAt||Date.now();
-  return `${((end-item.startedAt)/1000).toFixed(1)}s`;
+  const elapsed=Math.max(0.1,(end-item.startedAt)/1000);
+  return `${elapsed.toFixed(1)}s`;
+}
+
+function historyImportPaint(ms=HISTORY_IMPORT_STAGE_MIN_MS){
+  return new Promise(resolve=>{
+    const frame=typeof requestAnimationFrame==="function"?requestAnimationFrame:(cb)=>setTimeout(cb,16);
+    frame(()=>setTimeout(resolve,ms));
+  });
+}
+
+async function setHistoryImportItemStatus(job,item,status,reason=""){
+  if(job?.closed)return;
+  if(!item.startedAt)item.startedAt=Date.now();
+  item.status=status;
+  item.reason=reason;
+  if(status==="done"||status==="fail"||status==="skipped")item.finishedAt=Date.now();
+  else item.finishedAt=0;
+  renderHistoryImportProgress(job);
+  await historyImportPaint();
 }
 
 function isHistoryImportActive(job){
@@ -5376,7 +5402,8 @@ function renderHistoryImportProgress(job){
   const skipped=job.items.filter(i=>i.status==='skipped').length;
   const pct=total?Math.round(done*100/total):0;
   const active=job.items.find(i=>['loading','parsing','updating','syncing'].includes(i.status));
-  const current=active?`${historyImportStatusText(active.status)} ${historyImportItemLabel(active)}`:(job.cancelled?'已取消':(job.done?'全部处理完成':'等待开始'));
+  const nextWaiting=job.items.find(i=>i.status==='waiting');
+  const current=active?historyImportCurrentText(active):(job.cancelled?'已取消':(job.done?'全部处理完成':historyImportCurrentText(nextWaiting)));
   const rows=job.items.map(item=>`
     <div class="hist-import-progress-row">
       <div class="hist-import-progress-date">${esc((item.session.date||'').slice(0,10)||'--')}</div>
@@ -5465,22 +5492,19 @@ async function importHistorySessions(selected,{retry=false}={}){
     for(let idx=0;idx<job.items.length;idx++){
       const item=job.items[idx];
       if(job.cancelled){if(item.status==='waiting'){item.status='skipped';item.reason='用户取消';}continue;}
-      item.status='loading';item.reason='';item.startedAt=Date.now();item.finishedAt=0;renderHistoryImportProgress(job);
+      await setHistoryImportItemStatus(job,item,'loading');
       if(btn)btn.textContent=`导入中 ${idx}/${job.items.length}`;
-      await new Promise(resolve=>setTimeout(resolve,0));
       try{
         const cs=item.session;
         const normalizedCs=normalizeLedgerSession(cs);
         const entries=await loadHistoryImportEntries(cs,job);
-        if(!entries.length){item.status='fail';item.reason='没有可导入的流水明细';fail++;continue;}
-        item.status='parsing';renderHistoryImportProgress(job);
-        await new Promise(resolve=>setTimeout(resolve,0));
+        if(!entries.length){await setHistoryImportItemStatus(job,item,'fail','没有可导入的流水明细');fail++;continue;}
+        await setHistoryImportItemStatus(job,item,'parsing');
         const s=normalizeLedgerSession({id:cs.id,date:cs.date||'',anchorId:cs.anchorId||mkAnchor(cs.id,(cs.date||'').slice(0,10)),entries,export_text:ledgerSessionRawText(normalizedCs)});
         const aid=stableAnchor(s);
         const entry={...s,anchorId:aid};
         if(!isDuplicate(entry)){
-          item.status='updating';renderHistoryImportProgress(job);
-          await new Promise(resolve=>setTimeout(resolve,0));
+          await setHistoryImportItemStatus(job,item,'updating');
           state.analysisSessions.push(entry);
           LS.set(`anchor:${aid}`,JSON.stringify(entry));
           saveAnalysis();
@@ -5488,19 +5512,18 @@ async function importHistorySessions(selected,{retry=false}={}){
           renderAnalysis();
           added++;
           addedSessions.push(entry);
-          item.status='done';
+          await setHistoryImportItemStatus(job,item,'done');
         }else{
           dup++;
-          item.status='skipped';
-          item.reason='重复流水已跳过';
+          await setHistoryImportItemStatus(job,item,'skipped','重复流水已跳过');
         }
       }catch(e){
-        item.status=job.cancelled?'skipped':'fail';
-        item.reason=job.cancelled?'用户取消':(isAbortLikeError(e)?'timeout 30s':(e.message||'读取失败'));
-        if(item.status==='fail')fail++;
+        const status=job.cancelled?'skipped':'fail';
+        const reason=job.cancelled?'用户取消':(isAbortLikeError(e)?'timeout 30s':(e.message||'读取失败'));
+        await setHistoryImportItemStatus(job,item,status,reason);
+        if(status==='fail')fail++;
         console.warn('history import item failed:',item.session?.id,e);
       }finally{
-        item.finishedAt=Date.now();
         if(btn)btn.textContent=`导入中 ${Math.min(idx+1,job.items.length)}/${job.items.length}`;
         renderHistoryImportProgress(job);
       }

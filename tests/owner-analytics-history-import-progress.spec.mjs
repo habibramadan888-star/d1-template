@@ -31,15 +31,18 @@ test("history import uses real sequential states before marking done", async () 
 
   assert.match(block, /for\(let idx=0;idx<job\.items\.length;idx\+\+\)/);
   assert.doesNotMatch(block, /Promise\.all/);
-  assert.match(block, /item\.status='loading'/);
+  assert.match(source, /const HISTORY_IMPORT_STAGE_MIN_MS=120/);
+  assert.match(source, /requestAnimationFrame/);
+  assert.match(source, /async function setHistoryImportItemStatus\(job,item,status,reason=""\)/);
+  assert.match(block, /await setHistoryImportItemStatus\(job,item,'loading'\)/);
   assert.match(block, /loadHistoryImportEntries\(cs,job\)/);
-  assert.match(block, /item\.status='parsing'/);
+  assert.match(block, /await setHistoryImportItemStatus\(job,item,'parsing'\)/);
   assert.match(block, /normalizeLedgerSession/);
-  assert.match(block, /item\.status='updating'/);
+  assert.match(block, /await setHistoryImportItemStatus\(job,item,'updating'\)/);
   assert.match(block, /state\.analysisSessions\.push\(entry\)/);
   assert.match(block, /renderAnalysis\(\)/);
-  assert.match(block, /item\.status='done'/);
-  assert.ok(block.indexOf("item.status='done'") > block.indexOf("renderAnalysis()"));
+  assert.match(block, /await setHistoryImportItemStatus\(job,item,'done'\)/);
+  assert.ok(block.indexOf("await setHistoryImportItemStatus(job,item,'done')") > block.indexOf("renderAnalysis()"));
 });
 
 test("history import supports timeout, cancellation summary, and retry", async () => {
@@ -48,6 +51,11 @@ test("history import supports timeout, cancellation summary, and retry", async (
   assert.match(source, /const HISTORY_IMPORT_ITEM_TIMEOUT_MS=30000/);
   assert.match(source, /History detail timed out/);
   assert.match(source, /timeout 30s/);
+  assert.match(source, /Math\.max\(0\.1,\(end-item\.startedAt\)\/1000\)/);
+  assert.match(source, /historyImportCurrentText/);
+  assert.match(source, /正在加载/);
+  assert.match(source, /正在解析/);
+  assert.match(source, /正在更新汇总/);
   assert.match(source, /function cancelHistoryImport\(job\)/);
   assert.match(source, /job\.cancelled=true/);
   assert.match(source, /status='skipped'/);
