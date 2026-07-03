@@ -5297,7 +5297,9 @@ function ensureHistoryImportProgressStyle(){
   style.textContent=`
   .hist-import-progress-bg{position:fixed;inset:0;z-index:5000;display:flex;align-items:center;justify-content:center;padding:18px;background:rgba(15,23,42,.24);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
   .hist-import-progress-modal{width:min(720px,100%);max-height:min(82vh,720px);display:flex;flex-direction:column;overflow:hidden;border:1px solid rgba(255,255,255,.58);border-radius:26px;background:linear-gradient(135deg,rgba(255,255,255,.78),rgba(232,246,239,.68));box-shadow:0 28px 80px rgba(15,23,42,.24);-webkit-backdrop-filter:blur(28px) saturate(170%);backdrop-filter:blur(28px) saturate(170%)}
-  .hist-import-progress-head{padding:20px 22px 16px;border-bottom:1px solid rgba(148,163,184,.22)}
+  .hist-import-progress-head{padding:20px 22px 16px;border-bottom:1px solid rgba(148,163,184,.22);position:relative}
+  .hist-import-progress-close{position:absolute;top:14px;right:14px;width:34px;height:34px;border:1px solid rgba(148,163,184,.26);border-radius:999px;background:rgba(255,255,255,.58);color:var(--text2);font-size:20px;line-height:1;cursor:pointer;box-shadow:0 8px 24px rgba(15,23,42,.10)}
+  .hist-import-progress-close:hover{background:rgba(255,255,255,.82);color:var(--text)}
   .hist-import-progress-title{font-size:18px;font-weight:900;letter-spacing:-.02em;color:var(--text)}
   .hist-import-progress-sub{margin-top:5px;font-size:13px;color:var(--text2)}
   .hist-import-progress-bar{height:9px;border-radius:999px;background:rgba(15,23,42,.08);overflow:hidden;margin-top:16px}
@@ -5309,6 +5311,7 @@ function ensureHistoryImportProgressStyle(){
   .hist-import-progress-anchor{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text2);font-family:var(--mono)}
   .hist-import-progress-status{white-space:nowrap;font-weight:800;border-radius:999px;padding:4px 8px;background:rgba(148,163,184,.13);color:var(--text2)}
   .hist-import-progress-status.loading{background:rgba(26,158,63,.13);color:#08742a}
+  .hist-import-progress-status.parsing,.hist-import-progress-status.updating{background:rgba(59,130,246,.12);color:#1d4ed8}
   .hist-import-progress-status.done{background:rgba(16,185,129,.15);color:#047857}
   .hist-import-progress-status.fail{background:rgba(239,68,68,.12);color:#b91c1c}
   .hist-import-progress-status.skipped{background:rgba(245,158,11,.13);color:#92400e}
@@ -5322,7 +5325,7 @@ function ensureHistoryImportProgressStyle(){
 }
 
 function historyImportStatusText(status){
-  return {waiting:'等待中',loading:'加载中',done:'已完成',fail:'失败',skipped:'跳过',syncing:'同步中'}[status]||status;
+  return {waiting:'等待中',loading:'加载中',parsing:'解析中',updating:'更新汇总中',done:'已完成',fail:'失败',skipped:'已取消',syncing:'同步中'}[status]||status;
 }
 
 function historyImportItemLabel(item){
@@ -5330,8 +5333,34 @@ function historyImportItemLabel(item){
   return `${(s.date||'').slice(0,10)||'未归档日期'} · ${s.anchorId||s.anchor_id||s.id||'无锚点'}`;
 }
 
+function historyImportElapsed(item){
+  if(!item.startedAt)return '';
+  const end=item.finishedAt||Date.now();
+  return `${((end-item.startedAt)/1000).toFixed(1)}s`;
+}
+
+function isHistoryImportActive(job){
+  return !!job&&!job.done&&!job.cancelled;
+}
+
+function cancelHistoryImport(job){
+  if(!job||job.cancelled)return;
+  job.cancelled=true;
+  if(job.currentController)job.currentController.abort(new DOMException('User cancelled','AbortError'));
+  job.items.filter(i=>i.status==='waiting').forEach(i=>{i.status='skipped';i.reason='用户取消';i.finishedAt=Date.now();});
+}
+
+function closeHistoryImportProgress(job,{confirmActive=false}={}){
+  if(confirmActive&&isHistoryImportActive(job)&&!confirm('导入正在进行，确定取消并关闭吗？'))return false;
+  if(isHistoryImportActive(job))cancelHistoryImport(job);
+  if(job)job.closed=true;
+  if(job?._escHandler)document.removeEventListener('keydown',job._escHandler);
+  document.getElementById('historyImportProgress')?.remove();
+  return true;
+}
+
 function renderHistoryImportProgress(job){
-  if(!job)return;
+  if(!job||job.closed)return;
   ensureHistoryImportProgressStyle();
   let overlay=document.getElementById('historyImportProgress');
   if(!overlay){
@@ -5346,41 +5375,47 @@ function renderHistoryImportProgress(job){
   const failed=job.items.filter(i=>i.status==='fail').length;
   const skipped=job.items.filter(i=>i.status==='skipped').length;
   const pct=total?Math.round(done*100/total):0;
-  const active=job.items.find(i=>i.status==='loading');
-  const current=active?historyImportItemLabel(active):(job.done?'全部处理完成':'等待开始');
+  const active=job.items.find(i=>['loading','parsing','updating','syncing'].includes(i.status));
+  const current=active?`${historyImportStatusText(active.status)} ${historyImportItemLabel(active)}`:(job.cancelled?'已取消':(job.done?'全部处理完成':'等待开始'));
   const rows=job.items.map(item=>`
     <div class="hist-import-progress-row">
       <div class="hist-import-progress-date">${esc((item.session.date||'').slice(0,10)||'--')}</div>
       <div class="hist-import-progress-anchor">${esc(item.session.anchorId||item.session.anchor_id||item.session.id||'--')}</div>
-      <div class="hist-import-progress-status ${esc(item.status)}">${historyImportStatusText(item.status)}</div>
+      <div class="hist-import-progress-status ${esc(item.status)}">${historyImportStatusText(item.status)}${item.finishedAt||item.startedAt?` · ${esc(historyImportElapsed(item))}`:''}</div>
       ${item.reason?`<div class="hist-import-progress-reason">${esc(item.reason)}</div>`:''}
     </div>`).join('');
   overlay.innerHTML=`<div class="hist-import-progress-modal" role="dialog" aria-modal="true" aria-labelledby="historyImportProgressTitle">
     <div class="hist-import-progress-head">
-      <div class="hist-import-progress-title" id="historyImportProgressTitle">${job.done?'导入完成':'正在导入历史流水'}</div>
+      <button class="hist-import-progress-close" id="btnCloseHistoryImportX" type="button" aria-label="关闭">×</button>
+      <div class="hist-import-progress-title" id="historyImportProgressTitle">${job.cancelled?'导入已取消':job.done?'导入完成':'正在导入历史流水'}</div>
       <div class="hist-import-progress-sub">已完成 ${done} / 总数 ${total}</div>
       <div class="hist-import-progress-bar" aria-label="导入进度"><span style="width:${pct}%"></span></div>
       <div class="hist-import-current">当前处理项：${esc(current)}</div>
     </div>
     <div class="hist-import-progress-list">${rows}</div>
     <div class="hist-import-progress-foot">
-      <div class="hist-import-progress-summary">${job.done?`导入完成：成功 ${success} 条，失败 ${failed} 条，跳过 ${skipped} 条`:`正在逐条处理，失败不会阻断后续流水。`}</div>
+      <div class="hist-import-progress-summary">${job.cancelled?`已取消：完成 ${success} 条，取消 ${skipped} 条，失败 ${failed} 条`:job.done?`导入完成：成功 ${success} 条，失败 ${failed} 条`:`正在逐条处理，失败不会阻断后续流水。`}</div>
       <div class="hist-import-progress-actions">
-        ${!job.done?'<button class="btn btn-ghost" id="btnCancelHistoryImport" type="button">取消导入</button>':''}
+        ${(!job.done&&!job.cancelled)?'<button class="btn btn-ghost" id="btnCancelHistoryImport" type="button">取消导入</button>':''}
         ${job.done&&failed?'<button class="btn btn-primary" id="btnRetryHistoryImportFailed" type="button">重试失败项</button>':''}
-        ${job.done?'<button class="btn btn-ghost" id="btnCloseHistoryImportProgress" type="button">关闭</button>':''}
+        ${(job.done||job.cancelled)?'<button class="btn btn-ghost" id="btnCloseHistoryImportProgress" type="button">关闭</button>':''}
       </div>
     </div>
   </div>`;
+  overlay.onclick=e=>{if(e.target===overlay)closeHistoryImportProgress(job,{confirmActive:true});};
+  if(!job._escHandler){
+    job._escHandler=e=>{if(e.key==='Escape')closeHistoryImportProgress(job,{confirmActive:true});};
+    document.addEventListener('keydown',job._escHandler);
+  }
+  const closeX=document.getElementById('btnCloseHistoryImportX');
+  if(closeX)closeX.onclick=()=>closeHistoryImportProgress(job,{confirmActive:true});
   const cancel=document.getElementById('btnCancelHistoryImport');
   if(cancel)cancel.onclick=()=>{
-    job.cancelled=true;
-    if(job.currentController)job.currentController.abort(new DOMException('User cancelled','AbortError'));
-    job.items.filter(i=>i.status==='waiting').forEach(i=>{i.status='skipped';i.reason='用户取消';});
+    cancelHistoryImport(job);
     renderHistoryImportProgress(job);
   };
   const close=document.getElementById('btnCloseHistoryImportProgress');
-  if(close)close.onclick=()=>overlay.remove();
+  if(close)close.onclick=()=>closeHistoryImportProgress(job);
   const retry=document.getElementById('btnRetryHistoryImportFailed');
   if(retry)retry.onclick=()=>importHistorySessions(job.items.filter(i=>i.status==='fail').map(i=>i.session),{retry:true});
 }
@@ -5430,7 +5465,7 @@ async function importHistorySessions(selected,{retry=false}={}){
     for(let idx=0;idx<job.items.length;idx++){
       const item=job.items[idx];
       if(job.cancelled){if(item.status==='waiting'){item.status='skipped';item.reason='用户取消';}continue;}
-      item.status='loading';item.reason='';renderHistoryImportProgress(job);
+      item.status='loading';item.reason='';item.startedAt=Date.now();item.finishedAt=0;renderHistoryImportProgress(job);
       if(btn)btn.textContent=`导入中 ${idx}/${job.items.length}`;
       await new Promise(resolve=>setTimeout(resolve,0));
       try{
@@ -5438,12 +5473,19 @@ async function importHistorySessions(selected,{retry=false}={}){
         const normalizedCs=normalizeLedgerSession(cs);
         const entries=await loadHistoryImportEntries(cs,job);
         if(!entries.length){item.status='fail';item.reason='没有可导入的流水明细';fail++;continue;}
+        item.status='parsing';renderHistoryImportProgress(job);
+        await new Promise(resolve=>setTimeout(resolve,0));
         const s=normalizeLedgerSession({id:cs.id,date:cs.date||'',anchorId:cs.anchorId||mkAnchor(cs.id,(cs.date||'').slice(0,10)),entries,export_text:ledgerSessionRawText(normalizedCs)});
         const aid=stableAnchor(s);
         const entry={...s,anchorId:aid};
         if(!isDuplicate(entry)){
+          item.status='updating';renderHistoryImportProgress(job);
+          await new Promise(resolve=>setTimeout(resolve,0));
           state.analysisSessions.push(entry);
           LS.set(`anchor:${aid}`,JSON.stringify(entry));
+          saveAnalysis();
+          renderFilterControls();
+          renderAnalysis();
           added++;
           addedSessions.push(entry);
           item.status='done';
@@ -5454,15 +5496,15 @@ async function importHistorySessions(selected,{retry=false}={}){
         }
       }catch(e){
         item.status=job.cancelled?'skipped':'fail';
-        item.reason=job.cancelled?'用户取消':(isAbortLikeError(e)?'加载超时或已取消':(e.message||'读取失败'));
+        item.reason=job.cancelled?'用户取消':(isAbortLikeError(e)?'timeout 30s':(e.message||'读取失败'));
         if(item.status==='fail')fail++;
         console.warn('history import item failed:',item.session?.id,e);
       }finally{
+        item.finishedAt=Date.now();
         if(btn)btn.textContent=`导入中 ${Math.min(idx+1,job.items.length)}/${job.items.length}`;
         renderHistoryImportProgress(job);
       }
     }
-    if(added>0)saveAnalysis();
     let sync={ok:0,fail:0};
     if(added>0){
       renderImportSyncStatus('warn','本地已保存，正在同步云端...',`准备同步 ${added} 份流水。`);

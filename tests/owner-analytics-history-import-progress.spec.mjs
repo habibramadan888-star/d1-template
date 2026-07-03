@@ -2,43 +2,56 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readOwnerMain } from "./helpers/ledger-history-test-utils.mjs";
 
-test("history import uses a glass progress modal with per-item states", async () => {
-  const source = await readOwnerMain();
-
-  assert.match(source, /hist-import-progress-bg/);
-  assert.match(source, /backdrop-filter:blur\(12px\)/);
-  assert.match(source, /正在导入历史流水/);
-  assert.match(source, /已完成 \$\{done\} \/ 总数 \$\{total\}/);
-  assert.match(source, /等待中/);
-  assert.match(source, /加载中/);
-  assert.match(source, /已完成/);
-  assert.match(source, /失败/);
-  assert.match(source, /跳过/);
-  assert.match(source, /取消导入/);
-  assert.match(source, /重试失败项/);
-});
-
-test("history import processes selected sessions sequentially without Promise.all", async () => {
-  const source = await readOwnerMain();
+function importBlock(source) {
   const start = source.indexOf("async function importHistorySessions");
   const end = source.indexOf("async function fromHistory", start);
   assert.notEqual(start, -1);
   assert.notEqual(end, -1);
+  return source.slice(start, end);
+}
 
-  const block = source.slice(start, end);
-  assert.match(block, /for\(let idx=0;idx<job\.items\.length;idx\+\+\)/);
-  assert.match(block, /loadHistoryImportEntries\(cs,job\)/);
-  assert.doesNotMatch(block, /Promise\.all/);
-  assert.match(block, /item\.status='fail'/);
-  assert.match(block, /continue/);
+test("history import modal has safe exit controls in every state", async () => {
+  const source = await readOwnerMain();
+
+  assert.match(source, /hist-import-progress-bg/);
+  assert.match(source, /hist-import-progress-modal/);
+  assert.match(source, /hist-import-progress-close/);
+  assert.match(source, /btnCloseHistoryImportX/);
+  assert.match(source, /btnCancelHistoryImport/);
+  assert.match(source, /btnCloseHistoryImportProgress/);
+  assert.match(source, /btnRetryHistoryImportFailed/);
+  assert.match(source, /Escape/);
+  assert.match(source, /e\.target===overlay/);
+  assert.match(source, /confirm\('导入正在进行，确定取消并关闭吗？'\)/);
 });
 
-test("history import has item timeout, cancellation, retry, and button progress copy", async () => {
+test("history import uses real sequential states before marking done", async () => {
+  const source = await readOwnerMain();
+  const block = importBlock(source);
+
+  assert.match(block, /for\(let idx=0;idx<job\.items\.length;idx\+\+\)/);
+  assert.doesNotMatch(block, /Promise\.all/);
+  assert.match(block, /item\.status='loading'/);
+  assert.match(block, /loadHistoryImportEntries\(cs,job\)/);
+  assert.match(block, /item\.status='parsing'/);
+  assert.match(block, /normalizeLedgerSession/);
+  assert.match(block, /item\.status='updating'/);
+  assert.match(block, /state\.analysisSessions\.push\(entry\)/);
+  assert.match(block, /renderAnalysis\(\)/);
+  assert.match(block, /item\.status='done'/);
+  assert.ok(block.indexOf("item.status='done'") > block.indexOf("renderAnalysis()"));
+});
+
+test("history import supports timeout, cancellation summary, and retry", async () => {
   const source = await readOwnerMain();
 
   assert.match(source, /const HISTORY_IMPORT_ITEM_TIMEOUT_MS=30000/);
-  assert.match(source, /controller\.abort\(new DOMException\('History detail timed out','TimeoutError'\)\)/);
+  assert.match(source, /History detail timed out/);
+  assert.match(source, /timeout 30s/);
+  assert.match(source, /function cancelHistoryImport\(job\)/);
   assert.match(source, /job\.cancelled=true/);
-  assert.match(source, /btn\.textContent=`导入中 \$\{Math\.min\(idx\+1,job\.items\.length\)\}\/\$\{job\.items\.length\}`/);
+  assert.match(source, /status='skipped'/);
+  assert.match(source, /导入已取消/);
+  assert.match(source, /已取消：完成 \$\{success\} 条，取消 \$\{skipped\} 条，失败 \$\{failed\} 条/);
   assert.match(source, /importHistorySessions\(job\.items\.filter\(i=>i\.status==='fail'\)\.map\(i=>i\.session\),\{retry:true\}\)/);
 });
