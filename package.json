@@ -124,6 +124,7 @@
     "test:feature-flag-matrix": "node --test tests/feature-flag-production-lock-matrix.spec.mjs",
     "test:unified-login": "node --test tests/unified-login-role-routing.spec.mjs",
     "test:unified-login-session-handoff": "node --test tests/unified-login-session-handoff.spec.mjs",
+    "test:auth-72h-session": "node --test tests/auth-72h-session.spec.mjs",
     "test:unified-login-auth-guard": "node --test tests/unified-login-auth-guard.spec.mjs",
     "test:unified-login-owner-ux": "node --test tests/unified-login-owner-ux.spec.mjs",
     "test:unified-login-single-entry": "node --test tests/unified-login-single-entry.spec.mjs",

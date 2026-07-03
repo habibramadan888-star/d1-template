@@ -10,7 +10,8 @@ import { requestIdMiddleware } from "../../dist/lib/lib/request-id.js";
 
 // src/lib/jwt.js
 var ALGO = { name: "HMAC", hash: "SHA-256" };
-var DEFAULT_TTL_SECONDS = 8 * 60 * 60;
+var SESSION_TTL_SECONDS = 72 * 60 * 60;
+var DEFAULT_TTL_SECONDS = SESSION_TTL_SECONDS;
 var READONLY_ADMIN_ROLES = /* @__PURE__ */ new Set(["admin_readonly", "readonly_admin"]);
 function normalizeRoleValue(role) {
   return String(role || "").trim().toLowerCase();
@@ -219,19 +220,19 @@ function getBearerToken(request) {
   return match ? match[1].trim() : null;
 }
 __name(getBearerToken, "getBearerToken");
-function makeSessionCookie(token, maxAge = 8 * 60 * 60) {
+function makeSessionCookie(token, maxAge = SESSION_TTL_SECONDS) {
   return [
     `${SESSION_COOKIE}=${token}`,
     `Max-Age=${maxAge}`,
     "Path=/",
     "HttpOnly",
     "Secure",
-    "SameSite=Strict"
+    "SameSite=Lax"
   ].join("; ");
 }
 __name(makeSessionCookie, "makeSessionCookie");
 function clearSessionCookie() {
-  return `${SESSION_COOKIE}=; Max-Age=0; Path=/; HttpOnly; Secure; SameSite=Strict`;
+  return `${SESSION_COOKIE}=; Max-Age=0; Path=/; HttpOnly; Secure; SameSite=Lax`;
 }
 __name(clearSessionCookie, "clearSessionCookie");
 async function requireAuth(request, env, requiredRole = null) {
@@ -474,7 +475,7 @@ function authFailureResponse(auth) {
   const status = auth.status || 401;
   const code = status === 403 ? ErrorCodes.FORBIDDEN : ErrorCodes.UNAUTHORIZED;
   const message = status === 403 ? "Forbidden" : auth.error || "unauthenticated";
-  return json(fail(code, message), status);
+  return json(fail(code, message), status, status === 401 ? { "Set-Cookie": clearSessionCookie() } : {});
 }
 __name(authFailureResponse, "authFailureResponse");
 function json(data, status = 200, extraHeaders = {}) {
@@ -557,7 +558,7 @@ async function ensureSessionTable(env) {
   ).run();
 }
 __name(ensureSessionTable, "ensureSessionTable");
-async function createSession(request, env, user, ttlSeconds = 8 * 60 * 60) {
+async function createSession(request, env, user, ttlSeconds = SESSION_TTL_SECONDS) {
   const sid = crypto.randomUUID();
   const now = Math.floor(Date.now() / 1e3);
   await ensureSessionTable(env);
@@ -705,7 +706,7 @@ async function handleEmployeePinLogin(request,env){
   if(!row||!(await verifyPassword(pin,row.pin_hash,salt)))return unauthorized("invalid_employee_pin");
   await clearRateLimit(request,env);
   const corpid=env.CORPID||"homelink";
-  const employeeTtl=30*60;
+  const employeeTtl=SESSION_TTL_SECONDS;
   const sid=await createSession(request,env,{role:row.role||"staff",userid:row.employee_id,corpid},employeeTtl);
   const token=await signJWT({role:row.role||"staff",userid:row.employee_id,employee_name:row.employee_name,corpid,sid},env.JWT_SECRET,employeeTtl);
   return new Response(JSON.stringify({success:true,role:row.role||"staff",userid:row.employee_id,employee_name:row.employee_name}),{
@@ -5109,13 +5110,8 @@ function redirectToPath(request, pathname) {
 }
 __name(redirectToPath, "redirectToPath");
 async function readRouteClaim(request, env) {
-  const token = getBearerToken(request) || getCookie(request);
-  if (!token) return null;
-  try {
-    return await verifyJWT(token, env.JWT_SECRET);
-  } catch {
-    return null;
-  }
+  const auth = await requireAuth(request, env);
+  return auth.error ? null : auth.payload;
 }
 __name(readRouteClaim, "readRouteClaim");
 async function fetchStaticAsset(request, env, pathname) {
