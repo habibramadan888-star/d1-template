@@ -5289,6 +5289,7 @@ function toggleHistImportGroup(periodKey){
 
 const HISTORY_IMPORT_ITEM_TIMEOUT_MS=30000;
 const HISTORY_IMPORT_STAGE_MIN_MS=120;
+const HISTORY_IMPORT_FINALIZE_WATCHDOG_MS=30000;
 let _historyImportJob=null;
 
 function ensureHistoryImportProgressStyle(){
@@ -5347,6 +5348,21 @@ function historyImportElapsed(item){
   return `${elapsed.toFixed(1)}s`;
 }
 
+function historyImportTerminalItems(job){
+  return job?.items?.filter(i=>['done','fail','skipped'].includes(i.status))||[];
+}
+
+function finalizeHistoryImportIfComplete(job){
+  if(!job||job.done||job.cancelled)return false;
+  const total=job.items.length;
+  if(total>0&&historyImportTerminalItems(job).length===total){
+    job.done=true;
+    job.finalizedAt=Date.now();
+    return true;
+  }
+  return false;
+}
+
 function historyImportPaint(ms=HISTORY_IMPORT_STAGE_MIN_MS){
   return new Promise(resolve=>{
     const frame=typeof requestAnimationFrame==="function"?requestAnimationFrame:(cb)=>setTimeout(cb,16);
@@ -5361,6 +5377,7 @@ async function setHistoryImportItemStatus(job,item,status,reason=""){
   item.reason=reason;
   if(status==="done"||status==="fail"||status==="skipped")item.finishedAt=Date.now();
   else item.finishedAt=0;
+  finalizeHistoryImportIfComplete(job);
   renderHistoryImportProgress(job);
   await historyImportPaint();
 }
@@ -5372,6 +5389,7 @@ function isHistoryImportActive(job){
 function cancelHistoryImport(job){
   if(!job||job.cancelled)return;
   job.cancelled=true;
+  if(job.finalizeWatchdog)clearInterval(job.finalizeWatchdog);
   if(job.currentController)job.currentController.abort(new DOMException('User cancelled','AbortError'));
   job.items.filter(i=>i.status==='waiting').forEach(i=>{i.status='skipped';i.reason='用户取消';i.finishedAt=Date.now();});
 }
@@ -5380,6 +5398,7 @@ function closeHistoryImportProgress(job,{confirmActive=false}={}){
   if(confirmActive&&isHistoryImportActive(job)&&!confirm('导入正在进行，确定取消并关闭吗？'))return false;
   if(isHistoryImportActive(job))cancelHistoryImport(job);
   if(job)job.closed=true;
+  if(job?.finalizeWatchdog)clearInterval(job.finalizeWatchdog);
   if(job?._escHandler)document.removeEventListener('keydown',job._escHandler);
   document.getElementById('historyImportProgress')?.remove();
   return true;
@@ -5387,6 +5406,7 @@ function closeHistoryImportProgress(job,{confirmActive=false}={}){
 
 function renderHistoryImportProgress(job){
   if(!job||job.closed)return;
+  finalizeHistoryImportIfComplete(job);
   ensureHistoryImportProgressStyle();
   let overlay=document.getElementById('historyImportProgress');
   if(!overlay){
@@ -5396,14 +5416,14 @@ function renderHistoryImportProgress(job){
     document.body.appendChild(overlay);
   }
   const total=job.items.length;
-  const done=job.items.filter(i=>['done','fail','skipped'].includes(i.status)).length;
+  const done=historyImportTerminalItems(job).length;
   const success=job.items.filter(i=>i.status==='done').length;
   const failed=job.items.filter(i=>i.status==='fail').length;
   const skipped=job.items.filter(i=>i.status==='skipped').length;
   const pct=total?Math.round(done*100/total):0;
   const active=job.items.find(i=>['loading','parsing','updating','syncing'].includes(i.status));
   const nextWaiting=job.items.find(i=>i.status==='waiting');
-  const current=active?historyImportCurrentText(active):(job.cancelled?'已取消':(job.done?'全部处理完成':historyImportCurrentText(nextWaiting)));
+  const current=active?historyImportCurrentText(active):(job.cancelled?'已取消':(job.done||done===total?'全部处理完成':historyImportCurrentText(nextWaiting)));
   const rows=job.items.map(item=>`
     <div class="hist-import-progress-row">
       <div class="hist-import-progress-date">${esc((item.session.date||'').slice(0,10)||'--')}</div>
@@ -5414,7 +5434,7 @@ function renderHistoryImportProgress(job){
   overlay.innerHTML=`<div class="hist-import-progress-modal" role="dialog" aria-modal="true" aria-labelledby="historyImportProgressTitle">
     <div class="hist-import-progress-head">
       <button class="hist-import-progress-close" id="btnCloseHistoryImportX" type="button" aria-label="关闭">×</button>
-      <div class="hist-import-progress-title" id="historyImportProgressTitle">${job.cancelled?'导入已取消':job.done?'导入完成':'正在导入历史流水'}</div>
+      <div class="hist-import-progress-title" id="historyImportProgressTitle">${job.cancelled?'导入已取消':job.done?`导入完成：成功 ${success} 条，失败 ${failed} 条`:'正在导入历史流水'}</div>
       <div class="hist-import-progress-sub">已完成 ${done} / 总数 ${total}</div>
       <div class="hist-import-progress-bar" aria-label="导入进度"><span style="width:${pct}%"></span></div>
       <div class="hist-import-current">当前处理项：${esc(current)}</div>
@@ -5485,6 +5505,7 @@ async function importHistorySessions(selected,{retry=false}={}){
   const originalHtml=btn?btn.innerHTML:'';
   const job={items:selected.map(session=>({session,status:'waiting',reason:''})),done:false,cancelled:false,currentController:null};
   _historyImportJob=job;
+  job.finalizeWatchdog=setInterval(()=>{if(finalizeHistoryImportIfComplete(job))renderHistoryImportProgress(job);},HISTORY_IMPORT_FINALIZE_WATCHDOG_MS);
   renderHistoryImportProgress(job);
   let added=0,dup=0,fail=0,addedSessions=[];
   try{
@@ -5538,6 +5559,8 @@ async function importHistorySessions(selected,{retry=false}={}){
     toast(`导入 ${added} 份，同步云端 ${sync.ok} 份${sync.fail?`，同步失败 ${sync.fail} 份`:''}${dup>0?`，${dup}份重复跳过`:''}${fail>0?`，读取失败 ${fail} 份`:''}${job.cancelled?'，已取消剩余项':''}`,(sync.fail||fail&&!added)?'err':'ok');
     renderFilterControls();renderAnalysis();
   }finally{
+    finalizeHistoryImportIfComplete(job);
+    if(job.finalizeWatchdog)clearInterval(job.finalizeWatchdog);
     job.done=true;
     renderHistoryImportProgress(job);
     if(btn){btn.disabled=false;btn.style.opacity='';btn.innerHTML=originalHtml;syncHistSelectionUI();}

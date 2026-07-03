@@ -20,9 +20,25 @@ test("history import modal has safe exit controls in every state", async () => {
   assert.match(source, /btnCancelHistoryImport/);
   assert.match(source, /btnCloseHistoryImportProgress/);
   assert.match(source, /btnRetryHistoryImportFailed/);
+  assert.match(source, /\$\{\(!job\.done&&!job\.cancelled\)\?'<button class="btn btn-ghost" id="btnCancelHistoryImport"/);
+  assert.match(source, /\$\{\(job\.done\|\|job\.cancelled\)\?'<button class="btn btn-ghost" id="btnCloseHistoryImportProgress"/);
   assert.match(source, /Escape/);
   assert.match(source, /e\.target===overlay/);
   assert.match(source, /confirm\('导入正在进行，确定取消并关闭吗？'\)/);
+});
+
+test("history import modal finalizes when every row reaches terminal state", async () => {
+  const source = await readOwnerMain();
+
+  assert.match(source, /function historyImportTerminalItems\(job\)/);
+  assert.match(source, /function finalizeHistoryImportIfComplete\(job\)/);
+  assert.match(source, /historyImportTerminalItems\(job\)\.length===total/);
+  assert.match(source, /job\.done=true/);
+  assert.match(source, /job\.finalizedAt=Date\.now\(\)/);
+  assert.match(source, /const HISTORY_IMPORT_FINALIZE_WATCHDOG_MS=30000/);
+  assert.match(source, /setInterval\(\(\)=>\{if\(finalizeHistoryImportIfComplete\(job\)\)renderHistoryImportProgress\(job\);\},HISTORY_IMPORT_FINALIZE_WATCHDOG_MS\)/);
+  assert.match(source, /job\.done\|\|done===total\?'全部处理完成'/);
+  assert.match(source, /job\.done\?`导入完成：成功 \$\{success\} 条，失败 \$\{failed\} 条`/);
 });
 
 test("history import uses real sequential states before marking done", async () => {
