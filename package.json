@@ -300,6 +300,7 @@
     "test:bed-transfer-live-render-path": "node --test tests/bed-transfer-live-render-path.spec.mjs",
     "test:bed-transfer-event-selection-normalization": "node --test tests/bed-transfer-event-selection-normalization.spec.mjs",
     "test:bed-transfer-step2-form-render": "node --test tests/bed-transfer-step2-form-render.spec.mjs",
+    "test:bed-transfer-input-clearing": "node --test tests/bed-transfer-input-clearing.spec.mjs",
     "test:bed-transfer-step3-context-render": "node --test tests/bed-transfer-step3-context-render.spec.mjs",
     "test:bed-transfer-save-gated-ui": "node --test tests/bed-transfer-save-gated-ui.spec.mjs",
     "test:bed-transfer-employee-save-api": "node --test tests/bed-transfer-employee-save-api.spec.mjs",

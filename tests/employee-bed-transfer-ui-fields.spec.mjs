@@ -54,7 +54,7 @@ test("Bed Transfer event-ledger write is wired in the UI", async () => {
   assert.match(html, /Bed transfer recorded \/ 换床记录已保存/);
   assert.match(html, /recorded_with_notes/);
   assert.doesNotMatch(html, /SUBMIT FOR REVIEW/);
-  assert.match(html, /state\.drafts\.some\(e=>e\.type==='TF'\)/);
+  assert.match(html, /state\.drafts\.some\(e=>e\.type==='TF'/);
 });
 
 test("production cutover remains blocked", async () => {
