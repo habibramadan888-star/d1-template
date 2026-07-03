@@ -749,7 +749,7 @@ const state={
   activeCat:'cash',formTag:'Old',formPayType:null,
   analysisSessions:[],
   dateMode:'all',month:(()=>{const d=new Date();return `${d.getFullYear()}-${pad(d.getMonth()+1)}`;})(),
-  from:'',to:'',txCatFilter:'all',txSearch:'',historyViewing:null,historyLimit:HISTORY_PAGE_SIZE,
+  from:'',to:'',txCatFilter:'all',txSearch:'',historyViewing:null,historyLimit:HISTORY_PAGE_SIZE,showDeletedHistory:false,
   arrears:[], // [{id,room,roomTo?,totalRent,paid,remain,dueDate,sessionId,cleared}]
   arrearFilter:'all',
   arrearsLimit:ARREARS_PAGE_SIZE,arrearsLoading:false,arrearsLoadSeq:0,
@@ -2648,10 +2648,11 @@ async function renderHistory(){
   if(state.historyViewing){
     let s=normalizeLedgerSession(state.historyViewing);
     state.historyViewing=s;
-    if(s._cloud&&(!s.entries||!s.entries.length)&&!ledgerSessionRawText(s)){
+    if(s._cloud&&(!s.entries||!s.entries.length)&&(!ledgerSessionRawText(s)||s._voided||Number(s.entriesCount||s.entries_count||0))){
       wrap.innerHTML='<div style="text-align:center;padding:40px;color:var(--text3)">加载中...</div>';
       try{
-        const r=await apiFetchWithTimeout(`/api/session_detail?id=${encodeURIComponent(s.id)}`);
+        const detailUrl=`/api/session_detail?id=${encodeURIComponent(s.id)}${s._voided?'&include_voided=1':''}`;
+        const r=await apiFetchWithTimeout(detailUrl);
         if(r.status===401){showAuthExpired();wrap.innerHTML='<div class="card" style="padding:24px;text-align:center;color:var(--red)">登录已过期，请重新登录后查看历史</div>';return;}
         if(r.status===403){wrap.innerHTML='<div class="card" style="padding:24px;text-align:center;color:var(--red)">老板账户才能查看历史详情</div>';return;}
         if(!r.ok){wrap.innerHTML=`<div class="card" style="padding:24px;text-align:center;color:var(--red)">历史详情加载失败：${r.status}</div>`;return;}
@@ -2678,8 +2679,11 @@ async function renderHistory(){
     }
     const{txt}=genTXT(s);
     const cnt=s.entries?s.entries.length:0;
+    const expectedCount=Number(s.entriesCount||s.entries_count||0);
+    const countWarning=expectedCount&&expectedCount!==cnt?`<div class="card-sub" style="margin-top:8px;color:var(--red);font-weight:800">记录数与交易行数量不一致，需单独核对。已存记录数 ${expectedCount}，交易行 ${cnt}。</div>`:'';
+    const deletedMeta=s._voided?`<div class="card-sub" style="margin-top:8px;color:var(--red);line-height:1.6">已删除/已作废记录 · 删除人：${esc(s.voidedBy||s.voided_by||'未知')} · 时间：${esc(s.voidedAt||s.voided_at||'未知')}</div>`:'';
     wrap.innerHTML=`<button class="btn btn-ghost" id="btnHistBack" style="margin-bottom:14px"><svg class="ico"><use href="#i-back"/></svg>返回历史</button>
-    <div class="card"><div class="card-head"><div>${s.anchorId?`<div class="card-sub" style="color:var(--accent);margin-bottom:3px">🔐 ${esc(s.anchorId)}</div>`:''}<div class="card-title">${esc((s.date||'').slice(0,10))}</div><div class="card-sub">${cnt} 笔记录</div></div><div style="display:flex;gap:7px"><button class="btn btn-ghost" id="btnHistCopy"><svg class="ico"><use href="#i-copy"/></svg>复制</button><button class="btn btn-primary" id="btnHistDl"><svg class="ico"><use href="#i-download"/></svg>下载</button></div></div><div class="card-body"><pre style="background:var(--surface2);padding:14px;border-radius:8px;max-height:60vh;overflow:auto;line-height:1.7;font-size:12px;color:var(--text2);border:1px solid var(--border)">${esc(txt)}</pre></div></div>`;
+    <div class="card"><div class="card-head"><div>${s.anchorId?`<div class="card-sub" style="color:var(--accent);margin-bottom:3px">🔐 ${esc(s.anchorId)}</div>`:''}<div class="card-title">${esc((s.date||'').slice(0,10))}</div><div class="card-sub">${cnt} 笔记录</div>${deletedMeta}${countWarning}</div><div style="display:flex;gap:7px"><button class="btn btn-ghost" id="btnHistCopy"><svg class="ico"><use href="#i-copy"/></svg>复制</button><button class="btn btn-primary" id="btnHistDl"><svg class="ico"><use href="#i-download"/></svg>下载</button></div></div><div class="card-body"><pre style="background:var(--surface2);padding:14px;border-radius:8px;max-height:60vh;overflow:auto;line-height:1.7;font-size:12px;color:var(--text2);border:1px solid var(--border)">${esc(txt)}</pre></div></div>`;
     document.getElementById('btnHistBack').onclick=()=>{state.historyViewing=null;renderHistory();};
     document.getElementById('btnHistCopy').onclick=async()=>{try{await navigator.clipboard.writeText(txt);toast('已复制');}catch{toast('复制失败','err');}};
     document.getElementById('btnHistDl').onclick=()=>{const blob=new Blob([txt],{type:'text/plain;charset=utf-8'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`财务交接_${(s.date||'').split(' ')[0].replace(/-/g,'')}.txt`;a.click();URL.revokeObjectURL(url);};
@@ -2696,7 +2700,8 @@ async function renderHistory(){
   </div>`;
   let cloud=[];
   try{
-    const r=await apiFetchWithTimeout(`/api/history?limit=${encodeURIComponent(limit)}`);
+    const historyUrl=`/api/history?limit=${encodeURIComponent(limit)}${state.showDeletedHistory?'&include_voided=1':''}`;
+    const r=await apiFetchWithTimeout(historyUrl);
     if(r.status===401){showAuthExpired();wrap.innerHTML='<div class="card" style="padding:24px;text-align:center;color:var(--red)">登录已过期，请重新登录后查看历史</div>';return;}
     if(r.ok)cloud=await r.json();
     else{wrap.innerHTML=`<div class="card" style="padding:24px;text-align:center;color:var(--red)">历史记录加载失败：${r.status}</div>`;return;}
@@ -2712,9 +2717,11 @@ async function renderHistory(){
     return;
   }
   const cloudIds=new Set(cloud.map(s=>s.id));
-  const localOnly=state.saved.filter(s=>!cloudIds.has(s.id));
+  const localOnly=state.showDeletedHistory?[]:state.saved.filter(s=>!cloudIds.has(s.id));
+  const isVoidedHistorySession=s=>!!(s.voided_at||s.voidedAt||String(s.handover_status||'').toUpperCase()==='VOID');
+  const visibleCloud=state.showDeletedHistory?cloud.filter(isVoidedHistorySession):cloud;
   const all=normalizeLedgerSessions([
-    ...cloud.map(s=>({id:s.id,date:s.date,anchorId:s.anchor_id,entries:[],entriesCount:s.entries_count,export_text:s.export_text||'',_cloud:true,createdBy:(s.source==='employee_entry'||s.source==='EMP')?'staff':(s.created_by||''),operatorName:s.operator_name||'',operatorId:s.operator_id||'',source:s.source||'',cash_handover:s.cash_handover,bank_transfer_total:s.bank_transfer_total,gross_received:s.gross_received})),
+    ...visibleCloud.map(s=>({id:s.id,date:s.date,anchorId:s.anchor_id,entries:[],entriesCount:s.entries_count,export_text:s.export_text||'',_cloud:true,_voided:isVoidedHistorySession(s),createdBy:(s.source==='employee_entry'||s.source==='EMP')?'staff':(s.created_by||''),operatorName:s.operator_name||'',operatorId:s.operator_id||'',source:s.source||'',cash_handover:s.cash_handover,bank_transfer_total:s.bank_transfer_total,gross_received:s.gross_received,voidedAt:s.voided_at||'',voidedBy:s.voided_by||'',voidReason:s.void_reason||'',voidSource:s.void_source||'',handover_status:s.handover_status||''})),
     ...localOnly
   ]).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   const hasMoreCloud=cloud.length>=limit;
@@ -2737,8 +2744,8 @@ async function renderHistory(){
      return b.localeCompare(a);
   });
 
-  document.getElementById('historyCount').textContent=`流水档案 · 已加载最近 ${all.length} 条 · ${groups.length} 个月 · 新 → 旧`;
-  if(!all.length){wrap.innerHTML=`<div class="empty-state card" style="padding:44px"><div class="empty-ico">📄</div><div class="empty-title">还没有保存过会话</div><div class="empty-text">录入记录后点击"导出交接"即可保存</div></div>`;return;}
+  document.getElementById('historyCount').textContent=state.showDeletedHistory?`已删除/已作废记录 · ${all.length} 条 · 只读`:`流水档案 · 已加载最近 ${all.length} 条 · ${groups.length} 个月 · 新 → 旧`;
+  if(!all.length){wrap.innerHTML=`<div class="hist-toolbar"><span>${state.showDeletedHistory?'当前没有已删除/已作废记录':'按月份归类，优先显示最近记录'}</span><button class="btn btn-ghost" id="btnHistoryDeletedToggle" type="button">${state.showDeletedHistory?'返回正常历史':'已删除/已作废记录'}</button></div><div class="empty-state card" style="padding:44px"><div class="empty-ico">📄</div><div class="empty-title">${state.showDeletedHistory?'没有已删除/已作废记录':'还没有保存过会话'}</div><div class="empty-text">${state.showDeletedHistory?'这里仅用于只读追踪，不提供批量恢复。':'录入记录后点击"导出交接"即可保存'}</div></div>`;document.getElementById('btnHistoryDeletedToggle').onclick=()=>{state.showDeletedHistory=!state.showDeletedHistory;state.historyViewing=null;renderHistory();};return;}
 
   const cardHtml=s=>{
     const hasEntries=s.entries&&s.entries.length>0;
@@ -2752,10 +2759,14 @@ async function renderHistory(){
     };
     const cnt=has?s.entries.length:(s.entriesCount||0);
     const uploader=s.source==='employee_entry'||s.source==='EMP'||s.createdBy==='staff'||(s.createdBy&&s.createdBy!=='manager')?`员工上传 ${esc(s.operatorName||s.createdBy||s.operatorId||'')}`:(s.createdBy==='manager'?'老板上传':'');
+    const mismatch=Number(s.entriesCount||0)&&hasEntries&&Number(s.entriesCount||0)!==s.entries.length;
+    const deleted=s._voided;
     return `<div class="hist-card" data-id="${s.id}">
       <div class="hist-date">${esc((s.date||'').slice(0,10))}</div>
       <div class="hist-anchor">${esc(s.anchorId||'—')}</div>
-      <div style="font-size:11px;color:var(--text3);margin-top:2px">${s.createdBy==='manager'?'老板上传':s.createdBy==='staff'?'员工上传':''}</div>
+      <div style="font-size:11px;color:${deleted?'var(--red)':'var(--text3)'};margin-top:2px">${deleted?`已删除/已作废 · ${esc(s.voidedBy||'未知')}`:(s.createdBy==='manager'?'老板上传':s.createdBy==='staff'?'员工上传':'')}</div>
+      ${deleted?`<div style="font-size:11px;color:var(--text3);margin-top:2px;line-height:1.5">session ${esc(s.id||'')} · ${esc(s.voidedAt||'')}</div>`:''}
+      ${mismatch?`<div style="font-size:11px;color:var(--red);font-weight:800;margin-top:6px">记录数与交易行数量不一致，需单独核对。</div>`:''}
       ${has?`
         <div class="hist-stat"><span style="color:var(--text2)">现金收入</span><span class="mono" style="color:#c8902a">${fmtMoney(t.cashIn)}</span></div>
         <div class="hist-stat"><span style="color:var(--text2)">银行收入</span><span class="mono" style="color:#1a8a4a">${fmtMoney(t.bankIn)}</span></div>
@@ -2764,11 +2775,11 @@ async function renderHistory(){
       `:`<div class="hist-stat" style="justify-content:center;color:var(--text3);font-size:11px">${cnt}笔 · 点击查看详情</div>`}
       <div class="hist-actions">
         <button class="btn btn-ghost" data-act="view"><svg class="ico"><use href="#i-eye"/></svg>查看</button>
-        ${isOwnerWriteRole()?`<button class="btn btn-danger" data-act="del"><svg class="ico"><use href="#i-trash"/></svg></button>`:''}
+        ${isOwnerWriteRole()&&!deleted?`<button class="btn btn-danger" data-act="del"><svg class="ico"><use href="#i-trash"/></svg></button>`:''}
       </div>
     </div>`;
   };
-  wrap.innerHTML=`<div class="hist-toolbar"><span>按月份归类，优先显示最近记录</span><span class="hist-order">RECENT · FIRST</span></div>`+
+  wrap.innerHTML=`<div class="hist-toolbar"><span>${state.showDeletedHistory?'已删除/已作废记录 · 只读追踪':'按月份归类，优先显示最近记录'}</span><button class="btn btn-ghost" id="btnHistoryDeletedToggle" type="button">${state.showDeletedHistory?'返回正常历史':'已删除/已作废记录'}</button><span class="hist-order">${state.showDeletedHistory?'VOIDED · READ ONLY':'RECENT · FIRST'}</span></div>`+
     groups.map(([key,items],idx)=>{
       const totalEntries=items.reduce((sum,s)=>sum+(s.entries?s.entries.length:(s.entriesCount||0)),0);
       const from=(items[0]?.date||'').slice(0,10)||'--';
@@ -2791,6 +2802,8 @@ async function renderHistory(){
     }).join('')+
     (hasMoreCloud?`<button class="btn btn-primary btn-block" id="btnHistoryLoadMore" type="button" style="margin-top:14px">加载更多历史</button>`:'');
 
+  const deletedToggle=document.getElementById('btnHistoryDeletedToggle');
+  if(deletedToggle)deletedToggle.onclick=()=>{state.showDeletedHistory=!state.showDeletedHistory;state.historyViewing=null;renderHistory();};
   wrap.querySelectorAll('[data-month-toggle]').forEach(btn=>{
     btn.addEventListener('click',()=>{
       const body=document.getElementById(btn.dataset.monthToggle);
