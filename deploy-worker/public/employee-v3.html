@@ -3413,6 +3413,7 @@ const EMPLOYEE_ENTRY_ANCHOR_CONTRACT={
   E:['event_type','expense_amount','expense_category','target_bed','reason','note','payment_method','operator','created_at'],
   TF:['event_type','from_bed','to_bed','transfer_date','fee_amount','fee_status','waiver_reason','transfer_reason','old_tenant_context','old_ttlock_context','note','operator','created_at']
 };
+const entryAnchorContract=EMPLOYEE_ENTRY_ANCHOR_CONTRACT;
 function entryEventType(type){
   return {R:'rent',AP:'arrears_payment',D:'deposit_in',DR:'deposit_out',CO:'checkout',E:'expense',TF:'bed_transfer',TFF:'bed_transfer_fee'}[type]||String(type||'entry').toLowerCase();
 }
@@ -3436,12 +3437,20 @@ function buildEntryRawDisplayLine(e){
   if(e.type==='TF')return `${e.bed_from||e.room}->${e.bed_to||e.roomTo} bed_transfer ${fmtMoney(e.amount)} ${paymentMethodLabel(e.pay_type)} ${e.transfer_reason||e.fee_waiver_reason||''}`.trim();
   return `${e.room||e.expense_category||''} ${type} ${fmtMoney(e.amount)} ${paymentMethodLabel(e.pay_type)} ${e.note||e.expense_desc||''}`.trim();
 }
+function validateEntryAnchor(e){
+  const type=e?.type||Object.entries({R:'rent',AP:'arrears_payment',D:'deposit_in',DR:'deposit_out',CO:'checkout',E:'expense',TF:'bed_transfer'}).find(([,v])=>v===e?.event_type)?.[0]||'';
+  const required=entryAnchorContract[type]||[];
+  const missing=required.filter(field=>!(field in (e||{})));
+  return {ok:missing.length===0,missing};
+}
 function applyEntryAnchors(e){
   const type=e.type;
   const tail=type==='R'?Math.max(0,num(e.period_due||e.due)-num(e.paid||e.amount)):0;
   const method=paymentMethodLabel(e.pay_type||e.payment_method);
-  const base={event_type:entryEventType(type),payment_method:method,operator:e.operator_name||operatorName(),operator_id:e.operator_id||operatorId(),created_at:e.created_at||nowIso()};
+  const base={event_type:entryEventType(type),source:e.source||'employee_entry',payment_method:method,operator:e.operator_name||operatorName(),operator_id:e.operator_id||operatorId(),employee:e.employee||e.operator_name||operatorName(),created_at:e.created_at||nowIso()};
   Object.assign(e,base);
+  e.event_id=e.event_id||e.anchor_id||e.id||`entry-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
+  e.anchor_id=e.anchor_id||e.event_id;
   if(type==='R'){
     Object.assign(e,{
       bed:e.room,
@@ -3478,20 +3487,30 @@ function applyEntryAnchors(e){
       settlement_status:status
     });
   }else if(type==='D'){
-    Object.assign(e,{bed:e.room,deposit_amount:num(e.amount),linked_tenant:e.tenant_card_id||e.tenant_name||''});
+    Object.assign(e,{bed:e.room,deposit_amount:num(e.amount),linked_tenant:e.tenant_card_id||e.tenant_name||'',note:e.note||''});
   }else if(type==='DR'){
-    Object.assign(e,{bed:e.room,refund_amount:num(e.amount),refund_reason:e.ded_note||e.note||'',checkout_ref:e.checkout_date||''});
+    Object.assign(e,{bed:e.room,refund_amount:num(e.amount),refund_reason:e.ded_note||e.note||'',checkout_ref:e.checkout_date||'',note:e.note||''});
   }else if(type==='CO'){
     Object.assign(e,{bed:e.room,checkout_date:e.checkout_date||'',deposit_refund:num(e.deposit_amt||0),outstanding_arrears:num(e.carry_over_arrears||0),final_note:e.note||e.ded_note||''});
   }else if(type==='E'){
-    Object.assign(e,{expense_amount:num(e.amount),target_bed:e.room||'',reason:e.expense_category||e.reason_code||'',note:e.expense_desc||e.note||''});
+    Object.assign(e,{expense_amount:num(e.amount),expense_category:e.expense_category||e.reason_code||'',target_bed:e.room||'',reason:e.expense_category||e.reason_code||'',note:e.expense_desc||e.note||''});
   }else if(type==='TF'){
-    Object.assign(e,{from_bed:e.bed_from||'',to_bed:e.bed_to||'',fee_amount:num(e.amount),fee_status:e.fee_mode==='waived'?'waived':'paid',waiver_reason:e.fee_waiver_reason||'',transfer_reason:e.transfer_reason||'',old_tenant_context:e.tenant_name||'',old_ttlock_context:e.old_ttlock_ref||e.tenant_card_id||''});
+    Object.assign(e,{from_bed:e.bed_from||'',to_bed:e.bed_to||'',transfer_date:e.transfer_date||e.date||today(),fee_amount:num(e.amount),fee_status:e.fee_mode==='waived'?'waived':'paid',waiver_reason:e.fee_waiver_reason||'',transfer_reason:e.transfer_reason||'',old_tenant_context:e.tenant_name||'',old_ttlock_context:e.old_ttlock_ref||e.tenant_card_id||'',note:e.note||''});
   }
   e.ttlock_context=e.old_ttlock_ref||e.tenant_card_id||'';
   e.raw_display_line=buildEntryRawDisplayLine(e);
   e.anchor_contract_version='employee_entry_anchor_v1';
+  const validation=validateEntryAnchor(e);
+  e.validation_status=validation.ok?'valid':'missing_required_fields';
+  e.validation_missing_fields=validation.missing;
   return e;
+}
+function normalizeEntryAnchor(e){
+  const copy={...(e||{})};
+  return applyEntryAnchors(copy);
+}
+function renderEntryAnchorForOwner(e){
+  return buildEntryRawDisplayLine(normalizeEntryAnchor(e));
 }
 function sessionStats(){
   const rows=state.drafts;
@@ -5039,6 +5058,9 @@ function entryWhatsappLine(e,i){
   }
   const reason=entryWhatsappSafe(e?.reason_code||e?.custom_reason||e?.note||e?.remark||e?.expense_desc||'');
   return `${i+1}. ${bed.anchor} ${type} ${amount} ${pay}${period}${reason?' '+reason:''}`.trim();
+}
+function renderEntryAnchorForWhatsapp(e,i=0){
+  return entryWhatsappLine(e,i);
 }
 function buildEntrySessionWhatsAppText(){
   const s=sessionStats();

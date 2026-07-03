@@ -64,6 +64,10 @@ test("owner history card uses stored entries_count when employee summary has no 
 test("owner session detail has employee export decoder fallback for R AP and TF rows", async () => {
   const worker = await readFile("deploy-worker/src/index.js", "utf8");
 
+  assert.match(worker, /const entryAnchorContract=/);
+  assert.match(worker, /function normalizeEntryAnchor\(row\)/);
+  assert.match(worker, /function validateEntryAnchor\(row\)/);
+  assert.match(worker, /function renderEntryAnchorForOwner\(row\)/);
   assert.match(worker, /function parseEmployeeEntryExportRows\(session\)/);
   assert.match(worker, /section==="CASH RECEIVED"&&\/\\sTF\\s\/i\.test\(line\)/);
   assert.match(worker, /section==="CASH RECEIVED"&&\/\\sR\\s\/i\.test\(line\)/);
@@ -74,7 +78,7 @@ test("owner session detail has employee export decoder fallback for R AP and TF 
 
 test("employee export detail decoder returns the four expected owner detail rows", async () => {
   const worker = await readFile("deploy-worker/src/index.js", "utf8");
-  const start = worker.indexOf("function isEmployeeEntrySession");
+  const start = worker.indexOf("const entryAnchorContract");
   const end = worker.indexOf("function empCloseStatusIsOpen", start);
   assert.ok(start > 0 && end > start);
   const sandbox = {};
@@ -100,6 +104,15 @@ test("employee export detail decoder returns the four expected owner detail rows
   });
 
   assert.equal(rows.length, 4);
+  assert.equal(
+    JSON.stringify(rows.map((row) => [row.source, row.event_type, row.validation_status])),
+    JSON.stringify([
+      ["employee_entry", "rent", "valid"],
+      ["employee_entry", "rent", "valid"],
+      ["employee_entry", "bed_transfer", "valid"],
+      ["employee_entry", "arrears_payment", "valid"]
+    ])
+  );
   assert.equal(
     JSON.stringify(rows.map((row) => [row.type, row.room, row.room_to || "", row.amount])),
     JSON.stringify([
