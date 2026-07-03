@@ -369,6 +369,7 @@
     "test:arrears-whatsapp-no-duplicate": "node --test tests/arrears-whatsapp-no-duplicate.spec.mjs",
     "test:readonly-admin-arrears-batch-ui": "node --test tests/readonly-admin-arrears-batch-ui.spec.mjs",
     "test:owner-history-performance": "node --test tests/owner-history-performance.spec.mjs tests/owner-history-load-performance.spec.mjs",
+    "test:owner-analytics-history-selector": "node --test tests/owner-analytics-history-selector-calendar-month.spec.mjs",
     "test:owner-mobile-density": "node --test tests/owner-mobile-density.spec.mjs",
     "test:auth-single-entry": "node --test tests/auth-single-entry-routing.spec.mjs",
     "test:logout-routing": "node --test tests/logout-lock-icon-routing.spec.mjs",

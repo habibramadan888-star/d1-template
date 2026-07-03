@@ -5129,7 +5129,8 @@ async function updateHistCount(){
   if(listEl) listEl.innerHTML='<div style="text-align:center;padding:20px;color:var(--text3);font-size:13px">加载中...</div>';
   let cloud=[];
   try{
-    const r=await apiFetch(`/api/history?limit=${HISTORY_PAGE_SIZE}`);
+    const limit=Math.max(state.historyLimit||HISTORY_PAGE_SIZE,HISTORY_PAGE_SIZE);
+    const r=await apiFetch(`/api/history?limit=${encodeURIComponent(limit)}`);
     if(r.status===401){showAuthExpired();if(listEl)listEl.innerHTML='<div style="text-align:center;padding:20px;color:var(--red);font-size:13px">登录已过期</div>';return;}
     if(r.status===403){if(listEl)listEl.innerHTML='<div style="text-align:center;padding:20px;color:var(--red);font-size:13px">老板账户才能导入历史</div>';toast('老板账户才能导入历史','err');return;}
     if(!r.ok){if(listEl)listEl.innerHTML=`<div style="text-align:center;padding:20px;color:var(--red);font-size:13px">历史加载失败：${r.status}</div>`;return;}
@@ -5240,23 +5241,17 @@ function clearHistSelection(){
 
 const _histImportOpenGroups={};
 function getImportBillingPeriodInfo(dateValue){
-  const d=new Date(dateValue||'');
-  if(Number.isNaN(d.getTime()))return{key:'unknown',label:'未归档账期',startStr:'--',endStr:'--'};
-  const y=d.getFullYear(),m=d.getMonth();
-  const cutoff=new Date(y,m,2,0,0,0,0);
-  let start,end;
-  if(d<cutoff){
-    start=new Date(y,m-1,2,0,0,0,0);
-    end=cutoff;
-  }else{
-    start=cutoff;
-    end=new Date(y,m+1,2,0,0,0,0);
-  }
+  const d=String(dateValue||'').slice(0,10);
+  const m=d.match(/^(\d{4})-(\d{2})/);
+  if(!m)return{key:'unknown',label:'未归档日期',startStr:'--',endStr:'--'};
+  const year=Number(m[1]),month=Number(m[2]);
+  const start=new Date(year,month-1,1);
+  const end=new Date(year,month,0);
   return{
-    key:`${start.getFullYear()}-${pad(start.getMonth()+1)}`,
-    label:`${start.getFullYear()}年${start.getMonth()+1}月账期`,
+    key:`${m[1]}-${m[2]}`,
+    label:`${m[1]}年${m[2]}月`,
     startStr:fmtD(start),
-    endStr:fmtD(new Date(end.getTime()-1))
+    endStr:fmtD(end)
   };
 }
 
