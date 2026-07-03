@@ -3521,6 +3521,7 @@ function rc_entryRentPaid(e){
    ═══════════════════════════════════════════════════════════════════ */
 const RC_RESOLVE_LS='apt:rc_resolutions';
 var _rcLastResolvableIssueMap={};
+var _rcPaymentContinuityIndex={};
 function rc_getResolutions(){try{return JSON.parse(LS.get(RC_RESOLVE_LS)||'{}');}catch{return{};}}
 function rc_saveResolutions(m){LS.set(RC_RESOLVE_LS,JSON.stringify(m));}
 function rc_isResolvableIssue(card){return card?.status==='missing'||card?.status==='noCoverage';}
@@ -4194,6 +4195,7 @@ function rc_cardContinuityRender(data,container){
 
   const counts=enriched.reduce((m,c)=>{m[c.status]=(m[c.status]||0)+1;return m;},{});
   _rcLastResolvableIssueMap=Object.fromEntries(enriched.filter(c=>c.rkey).map(c=>[c.rkey,c]));
+  _rcPaymentContinuityIndex=rc_buildBedPaymentContinuityIndex(sessions);
   const unresolvedMissing=enriched.filter(c=>rc_isResolvableIssue(c)&&!c.resolved);
   const resolvedMissing  =enriched.filter(c=>rc_isResolvableIssue(c)&&!!c.resolved);
   const yel=alerts.yellow.length,ok=counts.ok||0,known=counts.knownArrears||0;
@@ -4226,6 +4228,7 @@ function rc_cardContinuityRender(data,container){
       <td class="mono" style="font-weight:800;color:var(--text);padding:7px 8px">${esc(c.bed)}</td>
       <td style="font-size:11px;color:var(--text2);padding:7px 8px">${esc(c.cardName)}<span style="font-size:10px;color:var(--text3);margin-left:5px">门锁 ${esc(c.lockRoom)} · ${rc_fmtShortDate(c.endDate)}</span></td>
       <td class="mono right" style="padding:7px 8px">${fmtMoney(c.ref)}</td>
+      <td style="padding:7px 8px;min-width:170px">${rc_renderPaymentContinuity(c)}</td>
       <td class="mono" style="padding:7px 8px">${rc_fmtShortDate(c.lastPaidDate)}</td>
       <td class="mono" style="padding:7px 8px">${rc_fmtShortDate(c.coverageDate)}</td>
       <td class="mono right" style="font-weight:700;color:${col};padding:7px 8px">${c.gapDays||0}</td>
@@ -4286,7 +4289,7 @@ function rc_cardContinuityRender(data,container){
     ${issueHtml('🟠 无法计算覆盖日期',alerts.yellow,'#e06c00',false)}
     <div class="table-wrap" style="margin-top:12px;max-height:460px">
       <table class="tx-table">
-        <thead><tr><th>床位</th><th>通通锁卡片</th><th class="right">月租</th><th>收款日</th><th>覆盖至</th><th class="right">缺口天</th><th class="right">差额</th><th>状态</th><th>原因</th><th>操作</th></tr></thead>
+        <thead><tr><th>床位</th><th>通通锁卡片</th><th class="right">月租</th><th>付款连续性</th><th>收款日</th><th>覆盖至</th><th class="right">缺口天</th><th class="right">差额</th><th>状态</th><th>原因</th><th>操作</th></tr></thead>
         <tbody>${mainRows}</tbody>
       </table>
     </div>
@@ -4323,6 +4326,175 @@ function rc_rentMonthsPaid(rentPaid,monthly){
 function rc_bestCoverageForCard(card,monthly,defaultPrice){
   const rows=rc_cardPaymentCandidates(card,monthly,defaultPrice);
   return rows[0]||null;
+}
+
+function rc_paymentContinuityMonthKey(value){
+  const d=value instanceof Date?value:new Date(value);
+  if(!Number.isFinite(d.getTime()))return '';
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+}
+function rc_paymentContinuityAddMonths(key,delta){
+  const m=String(key||'').match(/^(\d{4})-(\d{2})$/);
+  if(!m)return '';
+  const d=new Date(Number(m[1]),Number(m[2])-1+delta,1);
+  return rc_paymentContinuityMonthKey(d);
+}
+function rc_paymentContinuityMonthLabel(key){
+  const m=String(key||'').match(/^(\d{4})-(\d{2})$/);
+  return m?`${Number(m[2])}月`:'无数据';
+}
+function rc_paymentContinuityBaseMonth(card){
+  if(card?.endDate)return rc_paymentContinuityMonthKey(card.endDate);
+  if(card?.end)return rc_paymentContinuityMonthKey(new Date(card.end));
+  if(card?.lastPaidDate)return rc_paymentContinuityMonthKey(card.lastPaidDate);
+  const sessions=rc_allLedgerSessions();
+  const latest=sessions.map(s=>s.date).filter(Boolean).sort().pop();
+  return latest?rc_paymentContinuityMonthKey(latest):rc_paymentContinuityMonthKey(new Date());
+}
+function rc_paymentContinuityMonthKeys(card,count=3){
+  const base=rc_paymentContinuityBaseMonth(card);
+  return Array.from({length:count},(_,i)=>rc_paymentContinuityAddMonths(base,-i)).filter(Boolean);
+}
+function rc_buildBedPaymentContinuityIndex(sessions){
+  const out={};
+  (sessions||[]).forEach(s=>{
+    const date=s.date||s.sessionDate||s.created_at||'';
+    const monthKey=rc_paymentContinuityMonthKey(date);
+    if(!monthKey)return;
+    (s.entries||[]).forEach(r=>{
+      const e=normalizeEntry(r);
+      if(!(e.cat==='cash'||e.cat==='bank'))return;
+      if(normTag(e.tag)==='Transfer')return;
+      const bed=rc_normBedKey(e.room);
+      if(!bed)return;
+      const amount=rc_entryRentPaid(e);
+      if(amount<=0)return;
+      const note=String(e.note||r.note||'').trim();
+      const item={
+        bed,
+        monthKey,
+        date,
+        amount,
+        method:e.cat,
+        type:normTag(e.tag)||'',
+        note,
+        hasDeposit:/含押|deposit/i.test(note),
+        isBalance:/balance|尾款|补|補|补交|balance from rent/i.test(note),
+        raw:e,
+        session:s
+      };
+      out[bed] ||= {bed,months:{},rows:[]};
+      out[bed].rows.push(item);
+      (out[bed].months[monthKey] ||= []).push(item);
+    });
+  });
+  Object.values(out).forEach(b=>{
+    b.rows.sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+    Object.values(b.months).forEach(rows=>rows.sort((a,b)=>String(a.date).localeCompare(String(b.date))));
+  });
+  return out;
+}
+function rc_paymentContinuitySummary(card,key){
+  const bed=rc_normBedKey(card?.bed);
+  const rows=(_rcPaymentContinuityIndex[bed]?.months?.[key]||[]);
+  const monthLabel=rc_paymentContinuityMonthLabel(key);
+  const monthly=Number(card?.ref||0);
+  if(!rows.length){
+    return {tone:'red',icon:'❌',label:`${monthLabel} 缺失`,title:'未找到该月付款流水',rows,total:0,latest:null,hasBalance:false,hasDeposit:false,reason:'缺流水 / 断档'};
+  }
+  const total=Math.round(rows.reduce((s,r)=>s+Number(r.amount||0),0)*100)/100;
+  const latest=rows.slice().sort((a,b)=>String(b.date).localeCompare(String(a.date)))[0]||rows[0];
+  const hasBalance=rows.some(r=>r.isBalance);
+  const hasDeposit=rows.some(r=>r.hasDeposit);
+  const short=monthly&&total<monthly-Math.max(30,monthly*0.08);
+  const tone=(hasBalance||short)?'yellow':'green';
+  const icon=tone==='green'?'✅':'⚠️';
+  const day=latest?.date?new Date(latest.date).getDate():'';
+  const dayText=day?`${day}号`:'已收';
+  const suffix=hasBalance?'尾款':short?'不足':'';
+  const reason=hasBalance?'尾款 / balance，需要看合计':short?'金额不足 / 需要关注':'正常付款 / 金额足额';
+  return {
+    tone,icon,rows,total,latest,hasBalance,hasDeposit,short,reason,
+    label:`${monthLabel} ${dayText}${suffix}`,
+    title:`${monthLabel}：${fmtMoney(total)} AED；${reason}`
+  };
+}
+function rc_renderPaymentContinuity(card){
+  const keys=rc_paymentContinuityMonthKeys(card,3);
+  const chips=keys.map(key=>{
+    const s=rc_paymentContinuitySummary(card,key);
+    const colors={
+      green:['#1a8a4a','rgba(26,138,74,0.12)'],
+      yellow:['#e06c00','rgba(224,108,0,0.12)'],
+      red:['#d93025','rgba(217,48,37,0.12)'],
+      gray:['#8a94a6','rgba(138,148,166,0.12)']
+    }[s.tone]||['#8a94a6','rgba(138,148,166,0.12)'];
+    return `<span class="rc-pay-chip rc-pay-chip-${s.tone}" title="${esc(s.title)}" style="display:inline-flex;align-items:center;gap:4px;padding:3px 7px;border-radius:999px;border:1px solid ${colors[0]}35;background:${colors[1]};color:${colors[0]};font-size:10px;font-weight:800;white-space:nowrap">${esc(s.label)} ${s.icon}</span>`;
+  }).join('');
+  return `<button type="button" class="rc-payment-continuity" onclick="event.stopPropagation();rc_openPaymentContinuityModal(${jsArg(card.bed)})" title="点击查看付款连续性证据链" style="display:flex;flex-wrap:wrap;gap:4px;max-width:260px;background:transparent;border:0;padding:0;text-align:left;cursor:pointer">${chips}</button>`;
+}
+function rc_openPaymentContinuityModal(bed){
+  const key=rc_normBedKey(bed);
+  const card=(_wmLastContinuityData?.cards||[]).find(c=>rc_normBedKey(c.bed)===key)||{bed:key};
+  const keys=rc_paymentContinuityMonthKeys(card,6);
+  const cardName=card.cardName||'未识别';
+  const periodRows=keys.map(k=>{
+    const s=rc_paymentContinuitySummary(card,k);
+    const detail=s.rows.length?s.rows.map(r=>{
+      const tag=r.type||'O/N';
+      const dep=r.hasDeposit?'含押金':'不含押金';
+      const balance=r.isBalance?'尾款/balance':'非尾款';
+      const cover=r.isBalance?'覆盖期待人工核对；尾款补交日期不作为覆盖截止日':'覆盖期待人工核对';
+      const ttlock=card.endDate?`TTLock 截止 ${rc_fmtShortDate(card.endDate)}`:'TTLock 有效期待核对';
+      return `<div style="padding:7px 0;border-top:1px dashed var(--border);font-size:11px;line-height:1.7;color:var(--text2)">
+        <b class="mono" style="color:var(--text)">${rc_fmtShortDate(r.date)}</b>
+        <span class="mono" style="font-weight:800;color:var(--text)">${fmtMoney(r.amount)} AED</span>
+        <span>${esc(tag)}</span>
+        <span>${dep}</span>
+        <span>${balance}</span>
+        <div>${cover}</div>
+        <div>${ttlock}</div>
+        ${r.note?`<div>备注：${esc(r.note)}</div>`:''}
+      </div>`;
+    }).join(''):`<div style="font-size:11px;color:#d93025;padding-top:7px">未找到付款流水；缺流水 / 断档，需处理或核对。</div>`;
+    const badgeColor=s.tone==='green'?'#1a8a4a':s.tone==='yellow'?'#e06c00':'#d93025';
+    const balanceHint=s.hasBalance?`<div style="margin-top:6px;font-size:11px;color:#e06c00;background:rgba(224,108,0,0.08);border-radius:7px;padding:6px">尾款场景：本月合计 ${fmtMoney(s.total)} AED。尾款补交日期不作为租金覆盖截止日。</div>`:'';
+    return `<div style="border:1px solid var(--border);border-radius:10px;padding:10px;background:var(--surface2);margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;gap:8px;align-items:center">
+        <b style="font-size:13px;color:var(--text)">${rc_paymentContinuityMonthLabel(k)}</b>
+        <span style="font-size:11px;font-weight:800;color:${badgeColor}">${esc(s.reason)}</span>
+      </div>
+      <div style="font-size:12px;color:var(--text);margin-top:4px">合计：<b class="mono">${fmtMoney(s.total)} AED</b></div>
+      ${balanceHint}
+      ${detail}
+    </div>`;
+  }).join('');
+  let overlay=document.getElementById('rcPaymentContinuityOverlay');
+  if(!overlay){
+    overlay=document.createElement('div');
+    overlay.id='rcPaymentContinuityOverlay';
+    overlay.onclick=e=>{if(e.target===overlay)rc_closePaymentContinuityModal();};
+    document.body.appendChild(overlay);
+  }
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.38);backdrop-filter:blur(5px);z-index:320;display:flex;align-items:center;justify-content:center;padding:16px';
+  overlay.innerHTML=`<div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;max-width:620px;width:100%;max-height:88vh;overflow:auto;padding:20px;box-shadow:0 8px 42px rgba(0,0,0,0.2)">
+    <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:14px">
+      <div>
+        <div style="font-size:16px;font-weight:900;color:var(--text)">付款连续性详情</div>
+        <div style="font-size:12px;color:var(--text3);margin-top:4px">床位 ${esc(key)} · ${esc(cardName)} · 当前 TTLock 有效期 ${rc_fmtShortDate(card.endDate||card.end)}</div>
+      </div>
+      <button onclick="rc_closePaymentContinuityModal()" style="background:transparent;border:0;color:var(--text3);font-size:22px;line-height:1;cursor:pointer">×</button>
+    </div>
+    <div style="font-size:12px;color:var(--text2);line-height:1.7;background:rgba(26,115,232,0.07);border:1px solid rgba(26,115,232,0.18);border-radius:10px;padding:10px;margin-bottom:12px">
+      最近 3-6 个账期按已加载历史流水聚合；尾款会合并显示，不把补交日期直接当成覆盖截止日。
+    </div>
+    ${periodRows}
+    <div style="display:flex;justify-content:flex-end;margin-top:12px"><button class="btn btn-primary" onclick="rc_closePaymentContinuityModal()">关闭</button></div>
+  </div>`;
+}
+function rc_closePaymentContinuityModal(){
+  const overlay=document.getElementById('rcPaymentContinuityOverlay');
+  if(overlay)overlay.style.display='none';
 }
 
 /* v48: rc_cardContinuityRun
@@ -6585,6 +6757,7 @@ const INLINE_ACTIONS=new Set([
   'submitCode','openPanel','logout','showSettings','switchImportTab','calcDeficit','calcDepDeficit','ccRender','ccShowAddCustomer',
   'updateInstallRemain','enterDepositForArrear','enterPaymentForArrear','dismissArrear','rc_removeRoom','rc_applyApt','rc_bulkFill',
   'rc_setAll','rc_addRoom','rc_saveCfgFromUI','rc_toggleCfg','rc_loadLock','rc_check','rc_updateTypeUI','rc_closeResolveModal',
+  'rc_openPaymentContinuityModal','rc_closePaymentContinuityModal',
   'rc_submitResolution','rc_selectApt','rc_applySelected','rc_selectEmpty','rc_clearSelection','rc_toggleCfgGroup','wmSetFilter',
   'wmLoadLock','wmSyncFromContinuity','wmCopyAll','wmCopyOne','wmCreateOne','rc_openResolveModal','rc_clearResolution',
   'toggleAnaPanel','showRenewalDetails','toggleClientContinuity','anaToggle','ccDelPayment','ccShowAddPayment','ccToggle',
