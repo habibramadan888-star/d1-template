@@ -292,6 +292,7 @@
     "test:employee-nav-entry-followup-system": "node --test tests/employee-nav-entry-followup-system.spec.mjs",
     "test:employee-followup-only-boss-assigned": "node --test tests/employee-followup-only-boss-assigned.spec.mjs",
     "test:employee-system-page-reminders": "node --test tests/employee-system-page-reminders.spec.mjs",
+    "test:employee-system-entry-lifecycle": "node --test tests/employee-system-entry-lifecycle.spec.mjs",
     "test:employee-nav-split-route": "node --test tests/employee-nav-split-route.spec.mjs",
     "test:employee-followup-system-data-boundary": "node --test tests/employee-followup-system-data-boundary.spec.mjs",
     "test:employee-bed-transfer-ui-fields": "node --test tests/employee-bed-transfer-ui-fields.spec.mjs",

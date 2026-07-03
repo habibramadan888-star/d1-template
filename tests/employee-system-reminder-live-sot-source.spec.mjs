@@ -25,7 +25,8 @@ test("employee System reminders load from production SOT read-only API", async (
   const refresh = extractFunction(html, "refreshFollowup");
   const handler = extractFunction(worker, "handleEmployeeSystemReminders");
 
-  assert.match(loader, /\/api\/employee\/system\/reminders\?limit=100/);
+  assert.match(loader, /\/api\/employee\/system\/reminders\?limit=/);
+  assert.match(loader, /encodeURIComponent\(limit\)/);
   assert.match(refresh, /loadEmployeeSystemReminders\(false\)/);
   assert.match(worker, /\/api\/employee\/system\/reminders/);
   assert.match(handler, /resolveCurrentReceivablesSot/);

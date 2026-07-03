@@ -2735,7 +2735,7 @@ function readSessionId(userid){
   try{return localStorage.getItem(employeeStorageKey('empv3:sessionId',userid))||''}
   catch{return ''}
 }
-const state={lockCards:[],current:null,depositBalance:null,rentConfig:{},rentConfigLoaded:false,drafts:[],tasks:[],employeeDirectives:[],followupItems:[],systemReminderItems:[],systemReminderStatus:'idle',systemReminderSummary:null,systemReminderSources:null,sessionId:'',user:null};
+const state={lockCards:[],current:null,depositBalance:null,rentConfig:{},rentConfigLoaded:false,drafts:[],tasks:[],employeeDirectives:[],followupItems:[],systemReminderItems:[],systemReminderStatus:'idle',systemReminderSummary:null,systemReminderSources:null,systemReminderLimit:100,sessionId:'',user:null,ttlockStatus:'idle',ttlockLoadedAt:0,ttlockError:''};
 const BED_TRANSFER_WRITE_ENABLED=true;
 const BED_TRANSFER_EVENT_LEDGER_MESSAGE='Bed transfer records save event anchors only. This does not directly change bed occupancy, deposit, arrears, or TTLock. 换床记录只保存信息锚点，不会直接改变床位、押金、欠款或通通锁。';
 const BED_TRANSFER_SUBMITTED_MESSAGE='Bed transfer recorded / 换床记录已保存';
@@ -2920,6 +2920,7 @@ function applyEmployeeUser(user){
     loadRentConfig();
     loadTasks(false);
     loadEmployeeArrearsDirectives(false);
+    if(!$('view-entry')?.classList.contains('hidden'))ensureEntryTtlockReady({auto:true});
   }else{
     state.drafts=[];
     state.sessionId='';
@@ -3132,9 +3133,92 @@ function renderContextLegacyGrid(){
     ['匹配床位','MATCHED BED',c?.bed||$('bed').value||'未抓取',''],['CID','TTLOCK CID',$('tenantCardId')?.value||c?.tenant_card_id||'未抓取',''],['租客','TENANT',$('tenantName')?.value||c?.tenant||'未抓取',''],['系统月租','LIST PRICE',rentForBed()?fmtMoney(rentForBed()):'未配置',''],['卡片押金','CARD DEPOSIT',c?.deposit?fmtMoney(c.deposit):'未抓取',''],['台账押金','LEDGER DEPOSIT',ledger,''],['入住','CHECK-IN',c?.start||'未抓取',''],['当前截止','CURRENT END',c?.end||'未抓取',''],['通通锁备注','TTLOCK REMARK',c?.remark||c?.cardText||'未抓取','wide']
   ].map(([zh,en,v,cls])=>`<div class="${cls||''}"><span>${zh}<small>${en}</small></span><b>${esc(v)}</b></div>`).join('');
 }
+function ttlockCacheReady(){
+  return Array.isArray(state.lockCards)&&state.lockCards.length>0;
+}
+function ensureTtlockStatusMount(){
+  if($('ttlockEntryStatus'))return;
+  const head=$('btnLoadLock')?.closest('.head');
+  if(!head)return;
+  const el=document.createElement('div');
+  el.id='ttlockEntryStatus';
+  el.className='hint ttlock-entry-status';
+  el.setAttribute('data-ttlock-entry-status','true');
+  head.insertAdjacentElement('afterend',el);
+}
+function renderEntryTtlockStatus(){
+  ensureTtlockStatusMount();
+  const el=$('ttlockEntryStatus');
+  if(!el)return;
+  const count=state.lockCards?.length||0;
+  const loadedAt=state.ttlockLoadedAt?new Date(state.ttlockLoadedAt).toLocaleString():'';
+  const status=state.ttlockStatus||'idle';
+  const messages={
+    loading:'Loading TTLock cards / 正在加载通通锁...',
+    success:`TTLock loaded / 通通锁已加载：${count} cards${loadedAt?' · '+loadedAt:''}`,
+    error:`TTLock load failed / 通通锁加载失败：${esc(state.ttlockError||'retry required')}`,
+    idle:'TTLock required before formal entry / 正式录入前必须先加载通通锁'
+  };
+  el.innerHTML=`<div class="ttlock-status-line ${esc(status)}">${messages[status]||messages.idle}</div>`;
+  const btn=$('btnLoadLock');
+  if(btn){
+    btn.disabled=status==='loading';
+    btn.classList.toggle('disabled',status==='loading');
+    if(status==='loading')btn.innerHTML='Loading TTLock<span class="label-en">加载中</span>';
+    else if(ttlockCacheReady())btn.innerHTML='Refresh TTLock<span class="label-en">重新抓取</span>';
+  }
+  const save=$('btnSaveEntry');
+  if(save){
+    const blocked=!ttlockCacheReady();
+    save.disabled=blocked;
+    save.classList.toggle('disabled',blocked);
+    save.title=blocked?'Load TTLock before formal entry / 请先加载通通锁':'';
+  }
+}
+async function ensureEntryTtlockReady(opts={}){
+  if(ttlockCacheReady()){renderEntryTtlockStatus();return true}
+  if(state.ttlockStatus==='loading'){renderEntryTtlockStatus();return false}
+  if(opts.auto){
+    if(!state.user){renderEntryTtlockStatus();return false}
+    loadLock();
+    return false
+  }
+  const message='Load TTLock first. Formal entry is blocked until valid TTLock data is available. / 请先抓取通通锁，未加载不能正式录入。';
+  showStatus(message,'warn');
+  toast(message,6000);
+  renderEntryTtlockStatus();
+  return false;
+}
+async function loadLockFinal(){
+  state.ttlockStatus='loading';
+  state.ttlockError='';
+  renderEntryTtlockStatus();
+  try{
+    const r=await apiFetch('/api/employee/lock/cards');
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    const data=await r.json();
+    const list=data.roomsData?Object.entries(data.roomsData).flatMap(([room,cards])=>(cards||[]).map(card=>({...card,room}))):[];
+    state.lockCards=list.map(normalizeCard).filter(x=>x.bed);
+    if(!state.lockCards.length)throw new Error('no_cards');
+    state.ttlockStatus='success';
+    state.ttlockLoadedAt=Date.now();
+    toast('TTLock loaded / 通通锁已加载 '+state.lockCards.length+' cards');
+    lookupBed();
+    renderEntryTtlockStatus();
+    return true
+  }catch(e){
+    state.lockCards=[];
+    state.ttlockStatus='error';
+    state.ttlockError=String(e?.message||e||'load_failed');
+    renderEntryTtlockStatus();
+    toast('TTLock load failed. Retry before formal entry. / 通通锁加载失败，请重试后再录入',6000);
+    return false
+  }
+}
 async function loadLock(){
   try{const r=await apiFetch('/api/employee/lock/cards');if(!r.ok)throw new Error('HTTP '+r.status);const data=await r.json();const list=data.roomsData?Object.entries(data.roomsData).flatMap(([room,cards])=>(cards||[]).map(card=>({...card,room}))):[];state.lockCards=list.map(normalizeCard).filter(x=>x.bed);toast('已抓取通通锁 '+state.lockCards.length+' 条');lookupBed();return true}catch(e){toast('抓取失败，可继续手动录入');return false}
 }
+loadLock=loadLockFinal;
 loadTasks(false);
 function visible(ids,show){ids.forEach(id=>$(id).classList.toggle('hidden',!show))}
 function normalizeEntryTypeValue(type){
@@ -3369,9 +3453,30 @@ function renderSessionPreview(){
   }).join('');
   document.querySelectorAll('[data-undo]').forEach(btn=>btn.onclick=()=>undoDraft(btn.dataset.undo));
 }
+function entrySessionUploaded(){
+  return state.drafts.length>0&&!hasLocalOnly();
+}
+function updateEntrySessionActionState(){
+  const uploaded=entrySessionUploaded();
+  const hasRows=state.drafts.length>0;
+  const whats=$('btnWhatsAppSession');
+  if(whats){
+    whats.disabled=!uploaded;
+    whats.classList.toggle('disabled',!uploaded);
+    whats.title=uploaded?'':'Upload this session to cloud before WhatsApp export / 请先确认本票并上传云端';
+  }
+  const exportBtn=$('btnExportSession');
+  if(exportBtn&&!exportBtn.dataset.busy){
+    exportBtn.innerHTML='确认本票并上传云端<span class="label-en">UPLOAD SESSION</span>';
+    exportBtn.disabled=!hasRows;
+    exportBtn.classList.toggle('disabled',!hasRows);
+  }
+}
 function refreshSessionViews(){
   renderSessionKpis();
   renderSessionPreview();
+  updateEntrySessionActionState();
+  renderEntryTtlockStatus();
 }
 function setEntryType(type){
   type=normalizeEntryTypeValue(type);
@@ -3687,6 +3792,7 @@ async function submitBedTransferEvent(){
     toast('换床申请失败：页面数据异常',6000);
     return false;
   }
+  if(!(await ensureEntryTtlockReady({auto:false})))return;
   const btn=$('btnSaveEntry');
   const old=btn?.innerHTML;
   if(e.fee_mode==='waived'&&!e.fee_waiver_reason){
@@ -3791,6 +3897,12 @@ async function saveEntry(){
   $('validationBox').innerHTML=localOk?'<div>已加入本票流水。本笔暂存本地，点击“导出交接”后整票统一上传云端并生成交接文本。</div>':'<div class="warn">已加入页面本票，但本地保存失败，请先不要关闭页面。</div>';
   toast(localOk?'已加入本票流水；整票上云请点导出交接':'已加入页面本票，本地保存失败');
 }
+const saveEntryWithoutTtlockGate=saveEntry;
+async function saveEntryWithTtlockGate(){
+  if(state.user&&!(await ensureEntryTtlockReady({auto:false})))return;
+  return saveEntryWithoutTtlockGate();
+}
+saveEntry=saveEntryWithTtlockGate;
 function resetForm(){['bed','transferFromBed','bedTo','transferDate','transferReason','amount','due','paid','tenantName','tenantCardId','periodStart','periodEnd','periodDays','periodDue','listPrice','customReason','bankRef','checkoutDate','depositDeduction','depositReturnAmount','overdayDeduction','noNoticeDeduction','otherDeduction','dedNote','expenseDesc','remark','excessTo','arrearAmount','arrearPromiseDate','arrearReasonDetail'].forEach(id=>$(id).value='');$('arrearHandling').value='ARREAR';state.current=null;state.depositBalance=null;renderContext();syncForm();refreshSessionViews()}
 function hasLocalOnly(){return state.drafts.some(e=>e.sync_status!=='SYNCED')}
 function newSession(){
@@ -3804,6 +3916,19 @@ function newSession(){
   buildExport();
   toast('已开始新会话');
 }
+function newSessionFinal(){
+  if(hasLocalOnly()&&!confirm('Current session has local entries not uploaded. Discard this ticket and start a new session? / 当前本票尚未上传云端，是否放弃当前本票并新建会话？'))return;
+  if(!hasLocalOnly()&&state.drafts.length&&!confirm('Start a new session and clear the uploaded local ticket? / 开始新会话并清空本机本票？'))return;
+  state.drafts=[];
+  state.sessionId='';
+  saveDrafts();
+  try{localStorage.removeItem(employeeStorageKey('empv3:sessionId'))}catch{}
+  resetForm();
+  buildExport();
+  refreshSessionViews();
+  toast('New session started / 已开始新会话');
+}
+newSession=newSessionFinal;
 async function loadTasks(render=true){
   try{
     const r=await apiFetch('/api/arrear_tasks');
@@ -4250,11 +4375,12 @@ function normalizeEmployeeSystemReminder(row){
     raw:row
   };
 }
-async function loadEmployeeSystemReminders(render=true){
+async function loadEmployeeSystemReminders(render=true,limit=100){
+  state.systemReminderLimit=limit;
   state.systemReminderStatus='loading';
   if(render)$('taskList').innerHTML='<div class="hint">Loading real system reminders / 正在读取真实系统提醒...</div>';
   try{
-    const r=await apiFetch('/api/employee/system/reminders?limit=100');
+    const r=await apiFetch('/api/employee/system/reminders?limit='+encodeURIComponent(limit));
     if(!r.ok)throw new Error('HTTP '+r.status);
     const data=await r.json();
     const rows=Array.isArray(data.tasks)?data.tasks:(Array.isArray(data.all_tasks)?data.all_tasks:[]);
@@ -4429,7 +4555,27 @@ function renderTasks(){
   $('taskList').innerHTML='<div class="boss-directive-title step-title employee-system-reminders-title"><span>1</span><div class="boss-directive-heading">System Reminders / 系统提醒<small>SYSTEM REMINDERS</small></div></div>'+dashboard+`<div class="followup-list">${items.map(followupCard).join('')}</div>`;
   bindFollowupActions();
 }
+function ensureSystemReminderListCount(){
+  const root=$('taskList');
+  if(!root||root.querySelector('[data-system-reminder-list-count]'))return;
+  const items=state.followupItems||[];
+  const breakdown=state.systemReminderSummary?.source_breakdown||{};
+  const sourceBreakdown=state.systemReminderSources?.source_breakdown||breakdown;
+  const overdueCount=Number(sourceBreakdown.overdue_count??sourceBreakdown.ttlock_overdue_count??state.systemReminderSummary?.overdue_count??0);
+  const dueTodayCount=Number(sourceBreakdown.due_today_count??sourceBreakdown.ttlock_due_today_count??state.systemReminderSummary?.due_today_count??0);
+  const dueSoonCount=Number(sourceBreakdown.due_soon_count??sourceBreakdown.ttlock_due_soon_count??state.systemReminderSummary?.due_soon_count??0);
+  const existingCount=Number(sourceBreakdown.existing_arrears_count??state.systemReminderSummary?.existing_arrears_count??0);
+  const totalFromSot=Number(sourceBreakdown.total_count??sourceBreakdown.required_count??sourceBreakdown.action_count??state.systemReminderSummary?.total_count??0);
+  const expectedTotal=Math.max(items.length,totalFromSot,overdueCount+dueTodayCount+dueSoonCount,existingCount);
+  const needsMore=expectedTotal>items.length;
+  const html=`<div class="hint system-reminder-list-count" data-system-reminder-list-count="true">Shown / 已显示 ${items.length} / Total / 总数 ${expectedTotal||items.length}${needsMore?' <button class="mini-btn" data-load-system-reminders-more="true">Load more / 加载更多</button>':''}</div>`;
+  const dashboard=root.querySelector('.followup-dashboard');
+  if(dashboard)dashboard.insertAdjacentHTML('afterend',html);
+  else root.insertAdjacentHTML('afterbegin',html);
+}
 function bindFollowupActions(){
+  ensureSystemReminderListCount();
+  document.querySelectorAll('[data-load-system-reminders-more]').forEach(btn=>btn.onclick=()=>loadEmployeeSystemReminders(true,Math.max(200,(state.systemReminderLimit||100)*2)));
   document.querySelectorAll('[data-save-follow]').forEach(btn=>btn.onclick=()=>saveFollowup(btn.dataset.saveFollow));
   document.querySelectorAll('[data-fill-rent]').forEach(btn=>btn.onclick=()=>prefillRentFromFollowup(btn.dataset.fillRent));
   document.querySelectorAll('[data-toggle-followup-details]').forEach(btn=>{
@@ -4743,6 +4889,12 @@ function showEntryWhatsappFallback(text,url){
 async function exportEntrySessionWhatsApp(){
   refreshSessionViews();
   if(!state.drafts.length){toast('Current Session has no entries to export',6000);showStatus('Current Session has no entries to export.','warn');return '';}
+  if(hasLocalOnly()){
+    const message='Upload this session to cloud first, then WhatsApp export is enabled. / 请先点击“确认本票并上传云端”，成功后才能 WhatsApp 导出。';
+    toast(message,6000);
+    showStatus(message,'warn');
+    return '';
+  }
   const text=buildEntrySessionWhatsAppText();
   const url='https://wa.me/?text='+encodeURIComponent(text);
   let copied=false;
@@ -4825,6 +4977,7 @@ async function commitSessionAndExport(){
     showStatus(localOk?'交接已完成：云端已完成，本地也已保存。':'云端已完成，但本地保存失败，请不要关闭页面。',localOk?'ok':'warn');
     toast(localOk?'交接已完成：云端已完成，本地也已保存。':'云端已完成，但本地保存失败，请不要关闭页面。',6000);
     oldLabels.forEach(([b,html])=>{b.dataset.busy='0';b.disabled=false;b.classList.remove('disabled');b.innerHTML=html});
+    updateEntrySessionActionState();
     return;
   }
   showStatus(`正在导出交接：上传 ${pending.length} 笔流水...`);
@@ -4861,6 +5014,7 @@ async function commitSessionAndExport(){
   refreshSessionViews();
   buildExport();
   oldLabels.forEach(([b,html])=>{b.dataset.busy='0';b.disabled=false;b.classList.remove('disabled');b.innerHTML=html});
+  updateEntrySessionActionState();
   if(failed.length){
     $('validationBox').innerHTML=`<div class="bad">导出未完成：${esc(failed[0].sync_error)}</div><div class="warn">已上传成功的流水保留在云端；失败流水保留本地，修复后再次点击导出交接。</div>`;
     toast('导出未完成：部分流水未上传，本地已保留。',6000);
@@ -4891,6 +5045,7 @@ function showEmployeeView(view,opts={}){
   }
   if(next==='arrears')loadEmployeeArrearsDirectives(true);
   if(next==='system')loadEmployeeSystemReminders(true);
+  if(next==='entry')ensureEntryTtlockReady({auto:true});
 }
 document.querySelectorAll('.tab').forEach(btn=>btn.onclick=()=>showEmployeeView(btn.dataset.view,{pushHash:true}));
 window.addEventListener('hashchange',()=>showEmployeeView(location.hash,{pushHash:false}));
@@ -5202,6 +5357,8 @@ async function checkEmployeeSession(){
   }
 }
 applyBilingualUI();
+renderEntryTtlockStatus();
+updateEntrySessionActionState();
 renderContext();syncForm();refreshSessionViews();
 checkEmployeeSession();
 loadRentConfig();
