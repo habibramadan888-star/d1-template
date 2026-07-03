@@ -5826,6 +5826,32 @@ function getBillingPeriod(){
     elapsedDays:ela,remainingDays:remaining,
     timePct:Math.min(1,Math.max(0,(now-start)/(end-start))),isHandoverDay:now>=cutoff&&now<new Date(y,m,3,0,0,0)};
 }
+function getClientCreditBillingPeriod(dateValue=new Date()){
+  const now=dateValue instanceof Date?new Date(dateValue):new Date(dateValue);
+  const safeNow=Number.isFinite(now.getTime())?now:new Date();
+  const y=safeNow.getFullYear(),m=safeNow.getMonth();
+  const currentStart=new Date(y,m,3,0,0,0);
+  const start=safeNow<currentStart?new Date(y,m-1,3,0,0,0):currentStart;
+  const end=new Date(start.getFullYear(),start.getMonth()+1,3,0,0,0);
+  const endDisplay=new Date(end.getFullYear(),end.getMonth(),2,0,0,0);
+  const dayMs=86400000;
+  const tot=Math.max(1,Math.ceil((end-start)/dayMs));
+  const ela=Math.min(tot,Math.max(1,Math.floor((safeNow-start)/dayMs)+1));
+  const remaining=Math.max(0,Math.ceil((end-safeNow)/dayMs));
+  const fmd=d=>`${d.getMonth()+1}月${d.getDate()}日`;
+  return{
+    label:`${start.getFullYear()}年${start.getMonth()+1}月账期`,
+    start,
+    end,
+    startStr:fmd(start),
+    endStr:fmd(endDisplay),
+    totalDays:tot,
+    elapsedDays:ela,
+    remainingDays:remaining,
+    timePct:Math.min(1,Math.max(0,(safeNow-start)/(end-start))),
+    isHandoverDay:safeNow.getDate()===2
+  };
+}
 /* 期内到期续租预测（从通通锁卡片计算） */
 /* Bug2 Fix: 会话去重，防止 state.saved + state.analysisSessions 同一份数据重复计算 */
 function dedupSessions(sessions){
@@ -5926,7 +5952,7 @@ function calcPeriodRenewals(period){
 
 function renderBillingWidget(targetId){
   const el=document.getElementById(targetId);if(!el)return;
-  const p=getBillingPeriod();
+  const p=targetId==='billingWidget2'?getClientCreditBillingPeriod():getBillingPeriod();
   const r2=n=>Math.round(n*100)/100;
 
   // Bug2: 去重后合并会话
@@ -6409,6 +6435,18 @@ function ccBuildCache(){
   }
 }
 
+function ccShowLoading(){
+  const bw=document.getElementById('billingWidget2');
+  if(bw)bw.innerHTML=`<div class="card billing-widget"><div class="card-body" style="padding:16px">
+    <div style="font-size:15px;font-weight:800;color:var(--accent);margin-bottom:6px">正在计算客户信用档案</div>
+    <div style="font-size:12px;color:var(--text3);line-height:1.6">正在读取本账期收入、期内待续租和未来欠款，请稍候。</div>
+  </div></div>`;
+}
+function ccOpenView(){
+  ccShowLoading();
+  requestAnimationFrame(()=>ccRender(true));
+}
+
 function ccRender(forceRebuild=false){
   const hasLock=roomsData&&Object.keys(roomsData).length>0;
   // ── 只在完整刷新时重渲染 widget（搜索/筛选不触发）──
@@ -6658,7 +6696,7 @@ function switchView(v){
   if(v==='overview'){renderOwnerOverview();updateHistCount();}
   if(v==='history')renderHistory();
   if(v==='analysis'){const bw=document.getElementById('billingWidget');if(bw)bw.innerHTML='';renderFilterControls();renderAnalysis();updateHistCount();}
-  if(v==='clients'){ccRender();}
+  if(v==='clients'){ccOpenView();}
   if(v==='wifi'){wmRenderPage();}
 }
 
