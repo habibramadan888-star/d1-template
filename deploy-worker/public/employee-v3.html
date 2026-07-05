@@ -2480,11 +2480,11 @@ label .label-en{
   <div class="login-card">
     <div class="login-brand">
       <div class="badge"><div>HOME<small>LINK.</small></div></div>
-      <div class="login-title">员工登录<small>STAFF SIGN IN</small></div>
+      <div class="login-title">Staff Sign In<small>员工登录</small></div>
     </div>
     <div class="field"><label>员工编号 EMPLOYEE ID</label><input id="loginEmployeeId" placeholder="abdul" autocomplete="username"></div>
     <div class="field"><label>员工密码 PIN</label><input id="loginPin" type="password" inputmode="numeric" placeholder="例如 8888" autocomplete="current-password"></div>
-    <button class="btn primary" id="btnEmployeeLogin">登录<span class="label-en">SIGN IN</span></button>
+    <button class="btn primary" id="btnEmployeeLogin"><span class="employee-btn-main">Sign In</span><span class="label-en">登录</span></button>
     <div class="hint" id="loginHint" style="margin-top:16px">请使用个人员工编号和密码登录。所有流水、跟进、导出都会记录操作人。</div>
   </div>
 </div>
@@ -2504,7 +2504,7 @@ label .label-en{
         </button>
         <div class="employee-user-menu" id="employeeUserMenu" hidden>
           <div class="employee-user-meta" id="employeeUserMeta">未登录</div>
-          <button class="employee-logout" id="btnEmployeeLogout" type="button">退出登录<span class="label-en">LOGOUT</span></button>
+          <button class="employee-logout" id="btnEmployeeLogout" type="button"><span class="employee-btn-main">Logout</span><span class="label-en">退出登录</span></button>
         </div>
       </div>
     </div>
@@ -2524,7 +2524,7 @@ label .label-en{
       </div>
     </div>
     <div class="card">
-      <div class="head"><div class="title">Add Entry<span class="label-en">事件录入</span></div><button class="btn" id="btnLoadLock">Load Cards / 加载卡片</button></div>
+      <div class="head"><div class="title">Add Entry<span class="label-en">事件录入</span></div><button class="btn" id="btnLoadLock"><span class="employee-btn-main">Load Cards</span><span class="label-en">加载卡片</span></button></div>
       <div class="body">
         <div class="step">
           <div class="step-title"><span>1</span><div>Step 1 · Select Event Type<small>第一步：选择事件类型</small></div></div>
@@ -2662,13 +2662,13 @@ label .label-en{
           <div class="small" style="margin-top:10px">提交前请核对：对象、金额、账期、付款方式和异常原因。提交后会同步到云端并保留操作人和时间。</div>
         </div>
         <div id="validationBox" class="hint"></div>
-        <div class="row"><button class="btn primary" id="btnSaveEntry">加入本票</button><button class="btn" id="btnReset">清空</button></div>
+        <div class="row"><button class="btn primary" id="btnSaveEntry"><span class="employee-btn-main">Add to Session</span><span class="label-en">加入本票</span></button><button class="btn" id="btnReset"><span class="employee-btn-main">Reset</span><span class="label-en">清空</span></button></div>
       </div>
     </div>
     <div class="card">
       <div class="head">
         <div><div class="title">本次会话</div><div class="small" id="sessionMeta">0 条记录</div></div>
-        <div class="row" style="flex:0 0 auto"><button class="btn" id="btnPreviewSession">预览<span class="label-en">PREVIEW</span></button><button class="btn" id="btnWhatsAppSession">WhatsApp 导出<span class="label-en">WHATSAPP EXPORT</span></button><button class="btn primary" id="btnExportSession">导出交接<span class="label-en">EXPORT HANDOVER</span></button></div>
+        <div class="row" style="flex:0 0 auto"><button class="btn" id="btnPreviewSession"><span class="employee-btn-main">Preview</span><span class="label-en">预览</span></button><button class="btn" id="btnWhatsAppSession"><span class="employee-btn-main">WhatsApp Export</span><span class="label-en">WhatsApp 导出</span></button><button class="btn primary" id="btnExportSession"><span class="employee-btn-main">Upload Session</span><span class="label-en">确认本票并上传云端</span></button></div>
       </div>
       <div class="body"><div class="preview-list" id="sessionPreview"></div></div>
     </div>
@@ -2708,8 +2708,8 @@ label .label-en{
 <div class="preview-modal" id="previewModal">
   <div class="preview-panel">
     <div class="preview-panel-head">
-      <div class="preview-panel-title">本票流水预览<small>CURRENT SESSION PREVIEW</small></div>
-      <button class="btn" id="btnClosePreview">关闭</button>
+      <div class="preview-panel-title">Current Session Preview<small>本票流水预览</small></div>
+      <button class="btn" id="btnClosePreview"><span class="employee-btn-main">Close</span><span class="label-en">关闭</span></button>
     </div>
     <div class="preview-panel-body" id="previewModalBody"></div>
   </div>
@@ -2968,7 +2968,7 @@ async function employeeLogin(){
   const pin=$('loginPin').value.trim();
   if(!employee_id||!pin){$('loginHint').innerHTML='<span class="bad">请填写员工编号和密码。</span>';return}
   const old=btn.innerHTML;
-  btn.disabled=true;btn.classList.add('disabled');btn.innerHTML='正在登录<span class="label-en">SIGNING IN</span>';
+  btn.disabled=true;btn.classList.add('disabled');btn.innerHTML=renderEmployeeButtonLabel('Signing In','正在登录');
   try{
     const r=await apiFetch('/auth/employee-login',{method:'POST',body:JSON.stringify({employee_id,pin})});
     const data=await r.json().catch(()=>null);
@@ -3175,8 +3175,8 @@ function renderEntryTtlockStatus(){
   if(btn){
     btn.disabled=status==='loading';
     btn.classList.toggle('disabled',status==='loading');
-    if(status==='loading')btn.innerHTML='Loading Access Cards<span class="label-en">加载中</span>';
-    else if(ttlockCacheReady())btn.innerHTML='Reload Cards<span class="label-en">重新抓取</span>';
+    if(status==='loading')btn.innerHTML=renderEmployeeButtonLabel('Loading Access Cards','加载中');
+    else if(ttlockCacheReady())btn.innerHTML=renderEmployeeButtonLabel('Reload Cards','重新读取卡片');
   }
   const save=$('btnSaveEntry');
   if(save){
@@ -3601,7 +3601,7 @@ function updateEntrySessionActionState(){
   }
   const exportBtn=$('btnExportSession');
   if(exportBtn&&!exportBtn.dataset.busy){
-    exportBtn.innerHTML='确认本票并上传云端<span class="label-en">UPLOAD SESSION</span>';
+    exportBtn.innerHTML=renderEmployeeButtonLabel('Upload Session','确认本票并上传云端');
     exportBtn.disabled=!hasRows;
     exportBtn.classList.toggle('disabled',!hasRows);
   }
@@ -3729,7 +3729,7 @@ function syncForm(){
   }
   updateEventChips();
   $('objectHint').textContent=type==='E'?'支出不需要床位时可以只选择类别；如果是指定房间维修，可在备注写床位。':(type==='TF'?'换床需要填写原床位和新床位，系统会保留换床前后锚点。':(type==='AP'?'还欠款只针对云端未清欠款，不使用本期账期。请输入床位后选择要偿还的欠款。':'收租/收押金/退押金：填写床位号，系统自动抓取租客上下文。'));
-  if($('btnSaveEntry'))$('btnSaveEntry').innerHTML=type==='TF'?'保存换床记录<span class="label-en">RECORD TRANSFER</span>':'加入本票<span class="label-en">ADD TO SESSION</span>';
+  if($('btnSaveEntry'))$('btnSaveEntry').innerHTML=type==='TF'?renderEmployeeButtonLabel('Record Transfer','保存换床记录'):renderEmployeeButtonLabel('Add to Session','加入本票');
   visible(['periodStep'],hasPeriod);visible(['apFields'],type==='AP');visible(['checkoutFields'],type==='CO');visible(['transferFields'],type==='TF');visible(['expenseFields'],type==='E');visible(['paymentStep'],!['E','CO'].includes(type));visible(['genericBedFieldWrap'],type!=='TF');
   updatePaymentButtons();
   visible(['exceptionStep'],needsException());
@@ -4247,7 +4247,7 @@ function employeeDirectiveCard(d){
       <div class="directive-followup-actions">
         <label><span class="employee-directive-field-label">Promise Date / 承诺日期</span><input id="directivePromise_${id}" data-directive-edit="${esc(id)}" type="date" value="${esc(d.promised_payment_date||'')}" min="${today()}" aria-label="Promise Date / 承诺日期"></label>
         <label><span class="employee-directive-field-label">Note / 备注</span><textarea id="directiveNote_${id}" data-directive-edit="${esc(id)}" placeholder="Note / 备注">${esc(employeeDirectiveEditableNote(d.followup_note))}</textarea></label>
-        <button class="mini-btn" data-save-directive-follow="${esc(d.task_id)}">Save Follow-up / \u4fdd\u5b58\u8ddf\u8fdb</button>
+        <button class="mini-btn" data-save-directive-follow="${esc(d.task_id)}">${renderEmployeeButtonLabel('Save Follow-up','保存跟进')}</button>
       </div>
     </div>
   </div>`;
@@ -4409,7 +4409,7 @@ function updateEmployeeDirectivePersistedState(taskId){
       btn.classList.add('disabled');
       btn.setAttribute('aria-disabled','true');
     }else{
-      btn.textContent='Save Follow-up / \u4fdd\u5b58\u8ddf\u8fdb';
+      btn.innerHTML=renderEmployeeButtonLabel('Save Follow-up','保存跟进');
       btn.disabled=false;
       btn.classList.remove('disabled');
       btn.removeAttribute('aria-disabled');
@@ -4713,8 +4713,8 @@ function followupCard(item){
         </select>
         <input id="promise_${id}" type="date" value="${esc(item.promise_date||'')}" min="${today()}" aria-label="Promise Date / \u627f\u8bfa\u65e5\u671f">
         <input id="note_${id}" value="${esc(item.staff_note||'')}" placeholder="Note / \u5907\u6ce8">
-        <button class="mini-btn" data-save-follow="${esc(item.task_id)}">Save Follow-up / \u4fdd\u5b58\u8ddf\u8fdb</button>
-        <button class="mini-btn" data-fill-rent="${esc(item.task_id)}">Go Collect Rent / \u53bb\u6536\u79df</button>
+        <button class="mini-btn" data-save-follow="${esc(item.task_id)}">${renderEmployeeButtonLabel('Save Follow-up','保存跟进')}</button>
+        <button class="mini-btn" data-fill-rent="${esc(item.task_id)}">${renderEmployeeButtonLabel('Go Collect Rent','去收租')}</button>
       </div>
     </div>
   </div>`;
@@ -5235,7 +5235,7 @@ function previewSession(){
   const s=sessionStats();
   const body=$('previewModalBody');
   if(!state.drafts.length){
-    body.innerHTML='<div class="preview-empty"><div><b>当前本票没有流水</b><br><span>先完成单笔录入，再打开预览核对。</span></div></div>';
+    body.innerHTML='<div class="preview-empty"><div><b>No Records</b><br><span>Finish one entry first, then open Preview to check it.<br><small>当前本票没有流水 · 先完成单笔录入，再打开预览核对。</small></span></div></div>';
   }else{
     body.innerHTML=`<div class="preview-anchor-row">
       <div class="preview-anchor"><span>Cash Handover / 现金结余</span><b>${fmtMoney(s.cashBalance)}</b></div>
@@ -5255,7 +5255,7 @@ async function commitSessionAndExport(){
   const uploadTiming={payload_build_ms:0,validation_ms:0,api_request_ms:0,response_parse_ms:0,total_ms:0};
   if(!state.user){applyEmployeeUser(null);toast('请先登录员工账号',6000);return}
   buildExport();
-  if(!state.drafts.length){showStatus('当前本票没有流水，不能导出交接。','warn');toast('当前本票没有流水，不能导出交接',6000);return}
+  if(!state.drafts.length){showStatus('Current Session has no entries. Upload is not available. / 当前本票没有流水，不能上传。','warn');toast('Current Session has no entries / 当前本票没有流水',6000);return}
   if(state.drafts.some(e=>e.type==='TF'&&e.sync_status!=='SYNCED')){
     const message='Bed Transfer records are saved separately and cannot be included in handover export. 请使用换床表单单独保存记录。';
     $('validationBox').innerHTML=`<div class="warn">${esc(message)}</div>`;
@@ -5264,10 +5264,10 @@ async function commitSessionAndExport(){
     return;
   }
   const btns=[$('btnExportSession'),$('btnBuildExport')].filter(Boolean);
-  const setUploadPhase=(cn,en)=>{btns.forEach(b=>{b.innerHTML=`${cn}<span class="label-en">${en}</span>`;});showStatus(`${cn} / ${en}`);};
+  const setUploadPhase=(cn,en)=>{btns.forEach(b=>{b.innerHTML=renderEmployeeButtonLabel(en,cn);});showStatus(`${en} / ${cn}`);};
   if(btns.some(b=>b.dataset.busy==='1'))return;
   const oldLabels=btns.map(b=>[b,b.innerHTML]);
-  btns.forEach(b=>{b.dataset.busy='1';b.disabled=true;b.classList.add('disabled');b.innerHTML='正在导出<span class="label-en">EXPORTING</span>'});
+  btns.forEach(b=>{b.dataset.busy='1';b.disabled=true;b.classList.add('disabled');b.innerHTML=renderEmployeeButtonLabel('Exporting','正在导出')});
   const pending=state.drafts.filter(e=>e.sync_status!=='SYNCED');
   if(!pending.length){
     const localOk=saveDrafts();
@@ -5391,9 +5391,9 @@ function applyBilingualUILegacy(){
   }
   document.querySelector('.card .head .title').innerHTML='Current Session Summary<span class="label-en">本票流水汇总</span>';
   const entryTitle=document.querySelector('#view-entry>.card:nth-child(2) .head .title');if(entryTitle)entryTitle.innerHTML='Add Entry<span class="label-en">事件录入</span>';
-  $('btnLoadLock').innerHTML='Load Cards<span class="label-en">加载卡片</span>';
-  $('btnSaveEntry').innerHTML='Add to Session<span class="label-en">加入本票</span>';
-  $('btnReset').innerHTML='Reset<span class="label-en">清空</span>';
+  $('btnLoadLock').innerHTML=renderEmployeeButtonLabel('Load Cards','加载卡片');
+  $('btnSaveEntry').innerHTML=renderEmployeeButtonLabel('Add to Session','加入本票');
+  $('btnReset').innerHTML=renderEmployeeButtonLabel('Reset','清空');
   const steps=[
     ['Step 1 · Select Event Type','第一步：选择事件类型'],
     ['Step 2 · Confirm Target','第二步：确定对象'],
@@ -5473,10 +5473,10 @@ function applyBilingualUI(){
   const topTitle=document.querySelector('#view-entry>.card:first-child .head .title');if(topTitle)topTitle.innerHTML='Current Session Summary<span class="label-en">本票流水汇总</span>';
   const entryTitle=document.querySelector('#view-entry>.card:nth-child(2) .head .title');if(entryTitle)entryTitle.innerHTML='Add Entry<span class="label-en">事件录入</span>';
   const previewTitle=document.querySelector('#view-entry>.card:nth-child(3) .head .title');if(previewTitle)previewTitle.innerHTML='Current Session<span class="label-en">本次会话</span>';
-  $('btnNewSessionTop').innerHTML='New Session<span class="label-en">新会话</span>';
-  $('btnLoadLock').innerHTML='Load Cards<span class="label-en">加载卡片</span>';
-  $('btnSaveEntry').innerHTML='Add to Session<span class="label-en">加入本票</span>';
-  $('btnReset').innerHTML='Reset<span class="label-en">清空</span>';
+  $('btnNewSessionTop').innerHTML=renderEmployeeButtonLabel('New Session','新会话');
+  $('btnLoadLock').innerHTML=renderEmployeeButtonLabel('Load Cards','加载卡片');
+  $('btnSaveEntry').innerHTML=renderEmployeeButtonLabel('Add to Session','加入本票');
+  $('btnReset').innerHTML=renderEmployeeButtonLabel('Reset','清空');
   const steps=[
     ['Step 1 · Select Event Type','第一步：选择事件类型'],
     ['Step 2 · Confirm Target','第二步：确定对象'],
@@ -5670,6 +5670,12 @@ async function checkEmployeeSession(){
 function employeeUiPair(en,cn){
   return `${esc(en)}<span class="label-en">${esc(cn)}</span>`;
 }
+function renderEmployeeLabel(en,cn){
+  return `${esc(en)}<span class="label-en">${esc(cn||'')}</span>`;
+}
+function renderEmployeeButtonLabel(en,cn){
+  return `<span class="employee-btn-main">${esc(en)}</span><span class="label-en">${esc(cn||'')}</span>`;
+}
 function employeeEnsureEnglishFirstStyle(){
   if(document.getElementById('employeeEnglishFirstHierarchyStyle'))return;
   const style=document.createElement('style');
@@ -5688,7 +5694,16 @@ function employeeEnsureEnglishFirstStyle(){
     #view-entry .kpi-card small:first-of-type{display:block!important;margin-top:4px!important;color:#7b8797!important;font-size:10px!important;font-weight:560!important;letter-spacing:.04em!important;text-transform:none!important}
     #view-entry .event-chip>span{font-size:17px!important;color:inherit!important}
     #view-entry .kpi-card span{color:#283447!important;font-size:13px!important;font-weight:760!important}
-    #view-entry .btn .label-en{display:block!important;margin-top:2px!important;color:inherit!important;opacity:.72!important;font-size:10px!important;font-weight:560!important;text-transform:none!important;letter-spacing:.02em!important}
+    #view-entry .btn .employee-btn-main,
+    #view-arrears .btn .employee-btn-main,
+    #view-system .btn .employee-btn-main,
+    #view-arrears .mini-btn .employee-btn-main,
+    #view-system .mini-btn .employee-btn-main{display:block!important;font-size:14px!important;font-weight:820!important;line-height:1.1!important;color:inherit!important}
+    #view-entry .btn .label-en,
+    #view-arrears .btn .label-en,
+    #view-system .btn .label-en,
+    #view-arrears .mini-btn .label-en,
+    #view-system .mini-btn .label-en{display:block!important;margin-top:2px!important;color:inherit!important;opacity:.72!important;font-size:10px!important;font-weight:560!important;text-transform:none!important;letter-spacing:.02em!important}
     .employee-tabs .tab .en{font-size:17px!important;font-weight:860!important;letter-spacing:.01em!important;text-transform:none!important;color:inherit!important}
     .employee-tabs .tab .tab-cn{font-size:10px!important;font-weight:560!important;letter-spacing:.04em!important;color:#7b8797!important}
     .employee-tabs .tab.active .tab-cn{color:rgba(255,255,255,.72)!important}
@@ -5748,13 +5763,13 @@ function applyBilingualUI(){
   const previewTitle=document.querySelector('#view-entry>.card:nth-child(3) .head .title');if(previewTitle)previewTitle.innerHTML=employeeUiPair('Current Session','\u672c\u6b21\u4f1a\u8bdd');
   const followTitle=document.querySelector('#view-arrears .head .title');if(followTitle)followTitle.innerHTML=employeeUiPair('Follow-up','\u8ddf\u8fdb');
   const systemTitle=document.querySelector('#view-system .head .title');if(systemTitle)systemTitle.innerHTML=employeeUiPair('System','\u7cfb\u7edf');
-  $('btnNewSessionTop').innerHTML='New Session<span class="label-en">\u65b0\u4f1a\u8bdd</span>';
-  $('btnLoadLock').innerHTML='Reload Cards<span class="label-en">\u91cd\u65b0\u8bfb\u53d6\u5361\u7247</span>';
-  $('btnSaveEntry').innerHTML='Add to Session<span class="label-en">\u52a0\u5165\u672c\u7968</span>';
-  $('btnReset').innerHTML='Reset<span class="label-en">\u6e05\u7a7a</span>';
-  $('btnPreviewSession').innerHTML='Preview<span class="label-en">\u9884\u89c8</span>';
-  $('btnWhatsAppSession').innerHTML='WhatsApp Export<span class="label-en">WhatsApp \u5bfc\u51fa</span>';
-  $('btnExportSession').innerHTML='Confirm Session Upload<span class="label-en">\u786e\u8ba4\u672c\u7968\u5e76\u4e0a\u4f20\u4e91\u7aef</span>';
+  $('btnNewSessionTop').innerHTML=renderEmployeeButtonLabel('New Session','\u65b0\u4f1a\u8bdd');
+  $('btnLoadLock').innerHTML=renderEmployeeButtonLabel('Reload Cards','\u91cd\u65b0\u8bfb\u53d6\u5361\u7247');
+  $('btnSaveEntry').innerHTML=renderEmployeeButtonLabel('Add to Session','\u52a0\u5165\u672c\u7968');
+  $('btnReset').innerHTML=renderEmployeeButtonLabel('Reset','\u6e05\u7a7a');
+  $('btnPreviewSession').innerHTML=renderEmployeeButtonLabel('Preview','\u9884\u89c8');
+  $('btnWhatsAppSession').innerHTML=renderEmployeeButtonLabel('WhatsApp Export','WhatsApp \u5bfc\u51fa');
+  $('btnExportSession').innerHTML=renderEmployeeButtonLabel('Upload Session','\u786e\u8ba4\u672c\u7968\u5e76\u4e0a\u4f20\u4e91\u7aef');
   const steps=[
     ['Step 1 · Select Event Type','\u7b2c\u4e00\u6b65\uff1a\u9009\u62e9\u4e8b\u4ef6\u7c7b\u578b'],
     ['Step 2 · Confirm Target','\u7b2c\u4e8c\u6b65\uff1a\u786e\u5b9a\u5bf9\u8c61'],

@@ -52,8 +52,8 @@ test("employee primary action labels remain English-first in System cards", asyn
   const html = await readFile(htmlPath, "utf8");
   const card = extractFunction(html, "followupCard");
 
-  assert.match(card, /Save Follow-up \/ \\u4fdd\\u5b58\\u8ddf\\u8fdb/);
-  assert.match(card, /Go Collect Rent \/ \\u53bb\\u6536\\u79df/);
+  assert.match(card, /renderEmployeeButtonLabel\('Save Follow-up','保存跟进'\)/);
+  assert.match(card, /renderEmployeeButtonLabel\('Go Collect Rent','去收租'\)/);
   assert.match(card, /Expand Details \/ \\u5c55\\u5f00\\u8be6\\u60c5/);
   assert.match(card, /Status \/ \\u72b6\\u6001/);
 });
@@ -69,8 +69,8 @@ test("employee Entry hierarchy renders English as the primary label", async () =
     "employeeUiPair('Add Entry'",
     "['Step 1 · Select Event Type'",
     "['Cash Handover'",
-    "'Confirm Session Upload<span",
-    "'Reload Cards<span"
+    "renderEmployeeButtonLabel('Upload Session'",
+    "renderEmployeeButtonLabel('Reload Cards'"
   ]) {
     assert.match(html, new RegExp(copy.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
@@ -106,6 +106,38 @@ test("employee Entry visible text audit covers screenshot problem areas", async 
     "现金结余 CASH HANDOVER",
     "已选事件<span class=\"label-en\">SELECTED EVENT",
     "<span>收租</span><small>RENT</small>"
+  ]) {
+    assert.doesNotMatch(html, new RegExp(badCopy.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  }
+});
+
+test("employee buttons use English-first helper and do not render Chinese-first upload", async () => {
+  const html = await readFile(htmlPath, "utf8");
+
+  for (const copy of [
+    "function renderEmployeeButtonLabel(en,cn)",
+    "renderEmployeeButtonLabel('Upload Session'",
+    "renderEmployeeButtonLabel('Preview'",
+    "renderEmployeeButtonLabel('WhatsApp Export'",
+    "renderEmployeeButtonLabel('Reset'",
+    "renderEmployeeButtonLabel('Add to Session'",
+    "renderEmployeeButtonLabel('New Session'",
+    "renderEmployeeButtonLabel('Reload Cards'",
+    "renderEmployeeButtonLabel('Save Follow-up'",
+    "renderEmployeeButtonLabel('Go Collect Rent'",
+    '<span class="employee-btn-main">Upload Session</span><span class="label-en">确认本票并上传云端</span>'
+  ]) {
+    assert.match(html, new RegExp(copy.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  }
+
+  for (const badCopy of [
+    "确认本票并上传云端<span class=\"label-en\">UPLOAD SESSION</span>",
+    "导出交接<span class=\"label-en\">EXPORT HANDOVER</span>",
+    "预览<span class=\"label-en\">PREVIEW</span>",
+    "清空<span class=\"label-en\">RESET</span>",
+    "正在登录<span class=\"label-en\">SIGNING IN</span>",
+    "Save Follow-up /",
+    "Go Collect Rent /"
   ]) {
     assert.doesNotMatch(html, new RegExp(badCopy.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
