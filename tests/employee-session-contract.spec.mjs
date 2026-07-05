@@ -13,8 +13,10 @@ test("employee session upload uses owner-visible employee_entry source", async (
   assert.match(worker, /source:cleanText\(session\.source\|\|"employee_entry",40\)\|\|"employee_entry"/);
   assert.match(worker, /id:sessionId/);
   assert.match(worker, /corpid:user\.corpid/);
-  assert.match(worker, /entries_count:Array\.isArray\(session\.entries\)\?session\.entries\.length:1/);
-  assert.match(worker, /export_text:cleanText\(session\.export_text\|\|"",20000\)/);
+  assert.match(worker, /const sessionAnchorEntries=Array\.isArray\(session\.entries\)\?session\.entries\.map\(row=>normalizeEntryAnchor\(row\)\):\[\]/);
+  assert.match(worker, /entries_count:sessionAnchorEntries\.length\|\|1/);
+  assert.match(worker, /export_text:cleanText\(sessionExportText,50000\)/);
+  assert.match(worker, /entries_json:cleanText\(sessionEntriesJson,50000\)/);
 });
 
 test("employee upload route does not run runtime DDL schema migration", async () => {

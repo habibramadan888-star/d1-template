@@ -2900,6 +2900,7 @@ function currentSessionId(){
 function currentSessionPayload(){
   const id=currentSessionId();
   const s=sessionStats();
+  const entries=state.drafts.map(normalizeEntryAnchor);
   return {
     id,
     date:today(),
@@ -2914,7 +2915,8 @@ function currentSessionPayload(){
     exported_at:nowIso(),
     export_text:$('exportText')?.textContent||'',
     source:'employee_entry',
-    entries:state.drafts
+    entries,
+    entries_json:JSON.stringify({anchor_contract_version:'employee_entry_anchor_v1',entries})
   };
 }
 function applyEmployeeUser(user){
@@ -3528,6 +3530,21 @@ function normalizeEntryAnchor(e){
 }
 function renderEntryAnchorForOwner(e){
   return buildEntryRawDisplayLine(normalizeEntryAnchor(e));
+}
+function buildEntryAnchorExportBlock(entries=state.drafts){
+  const normalized=(entries||[]).map(normalizeEntryAnchor);
+  if(!normalized.length)return '';
+  return [
+    '==== ENTRY ANCHORS JSON ====',
+    JSON.stringify({
+      anchor_contract_version:'employee_entry_anchor_v1',
+      session_id:currentSessionId(),
+      anchor_id:'EMPV3-'+today().replaceAll('-','')+'-'+operatorId()+'-'+currentSessionId().slice(-5),
+      source:'employee_entry',
+      entries:normalized
+    }),
+    '==== END ENTRY ANCHORS JSON ===='
+  ].join('\n');
 }
 function sessionStats(){
   const rows=state.drafts;
@@ -5054,6 +5071,8 @@ function buildExport(){
   const bankCount=drafts.filter(e=>e.pay_type==='B'&&!['E','DR'].includes(e.type)&&num(e.amount)>0).length;
   lines.push('','==== HANDOVER ANCHORS ====',`Cash handover: ${fmtMoney(cashIn-cashOut)}`,`Bank transfer total: ${fmtMoney(bankIn)} (${bankCount} txns)`,`Gross received: ${fmtMoney(cashIn+bankIn)}`);
   lines.push('','==== SUMMARY ====',`Rent income: ${fmtMoney(rentIn)}`,`Deposit received: ${fmtMoney(depositIn)}`,`Arrears repaid: ${fmtMoney(arrearsIn)}`,`Transfer fee: ${fmtMoney(feeIn)}`,`Cash received: ${fmtMoney(cashIn)}`,`Cash out: ${fmtMoney(cashOut)}`,`Net cash: ${fmtMoney(cashIn-cashOut)}`,`Bank received: ${fmtMoney(bankIn)}`,`Bank out: ${fmtMoney(bankOut)}`,`Arrears opened: ${opened.length} total ${fmtMoney(opened.reduce((s,e)=>s+Math.max(0,num(e.period_due)-num(e.paid)),0))}`,`Entries: ${drafts.length}`,`Exported ${nowIso()}`,hasLocalOnly()?'Sync pending':'All synced');
+  const anchorBlock=buildEntryAnchorExportBlock(drafts);
+  if(anchorBlock)lines.push('',anchorBlock);
   $('exportText').textContent=lines.join('\n');
   refreshSessionViews();
   showStatus(`导出文本已生成：本票 ${drafts.length} 笔，现金结余 ${fmtMoney(cashIn-cashOut)}，银行 ${fmtMoney(bankIn)}，收款总计 ${fmtMoney(cashIn+bankIn)}。`);

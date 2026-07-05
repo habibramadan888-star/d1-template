@@ -9,14 +9,19 @@ test("owner history detail maps employee transaction anchors", async () => {
   const main = await readFile(ownerMainPath, "utf8");
 
   for (const field of [
-    "source:'employee_entry'",
-    "event_type:tx.type||tx.reason_code",
-    "expected_rent:tx.period_due||tx.due",
-    "raw_display_line:tx.note||tx.arrear_reason_detail",
+    "source:tx.source||'employee_entry'",
+    "const eventType=tx.event_type||tx.type||tx.reason_code||''",
+    "expected_rent:tx.expected_rent??expected",
+    "raw_display_line:tx.raw_display_line||tx.note||tx.arrear_reason_detail",
     "linked_task_id:tx.linked_task_id",
+    "deposit_amount:tx.deposit_amount",
+    "refund_amount:tx.refund_amount",
+    "checkout_date:tx.checkout_date",
+    "expense_amount:tx.expense_amount",
+    "fee_amount:tx.fee_amount",
     "short_paid:",
     "arrears_amount:",
-    "arrears_due_date:tx.arrear_promise_date"
+    "arrears_due_date:tx.arrears_due_date||tx.arrear_promise_date"
   ]) {
     assert.match(main, new RegExp(field.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
@@ -39,5 +44,7 @@ test("owner session detail reads structured transaction rows from cloud", async 
 
   assert.match(worker, /if \(path === "\/api\/session_detail" && method === "GET"\)/);
   assert.match(worker, /SELECT \* FROM transactions WHERE session_id=\?/);
+  assert.match(worker, /const anchorRows=extractEmployeeEntryAnchorsFromSession\(sessionRow\)/);
+  assert.match(worker, /if\(anchorRows\.length\)return success\(anchorRows\)/);
   assert.match(worker, /ORDER BY created_at ASC/);
 });

@@ -1122,6 +1122,7 @@ const EMP_SESSION_COLUMNS = [
   "id","corpid","anchor_id","date","entries_count","created_by","created_at",
   "operator_id","operator_name","cash_handover","bank_transfer_total","bank_transfer_count",
   "gross_received","handover_status","exported_at","export_text","source",
+  "entries_json","summary_json",
   "voided_at","voided_by","void_reason","void_source"
 ];
 const EMP_EVENT_COLUMNS = [
@@ -1752,12 +1753,22 @@ async function handleEmployeeEntry(request,env,user){
   if(type==="DR"&&tenantCardId&&amount>depositBalance+0.01)return badRequest("deposit_insufficient");
   if(type==="CO"&&depositDeduction>depositBalance+0.01)return badRequest("deposit_deduction_exceeds_balance");
   const d1WriteStart=Date.now();
+  const sessionAnchorEntries=Array.isArray(session.entries)?session.entries.map(row=>normalizeEntryAnchor(row)):[];
+  const sessionEntriesJson=JSON.stringify({anchor_contract_version:"employee_entry_anchor_v1",entries:sessionAnchorEntries});
+  const sessionSummaryJson=JSON.stringify({
+    cash_handover:Number(String(session.cash_handover||0).replace(/,/g,"")),
+    bank_transfer_total:Number(String(session.bank_transfer_total||0).replace(/,/g,"")),
+    bank_transfer_count:Number(session.bank_transfer_count||0),
+    gross_received:Number(String(session.gross_received||0).replace(/,/g,"")),
+    balance_total:entryAnchorMoney(Number(String(session.cash_handover||0).replace(/,/g,""))+Number(String(session.bank_transfer_total||0).replace(/,/g,"")))
+  });
+  const sessionExportText=employeeEntryExportTextWithAnchors(session.export_text||"",sessionAnchorEntries,{...session,id:sessionId});
   await empInsertDynamic(env,"sessions",{
     id:sessionId,
     corpid:user.corpid,
     anchor_id:cleanText(session.anchorId||session.anchor_id||("EMP-"+now.slice(0,10).replaceAll("-","")),80),
     date:cleanDate(session.date||now),
-    entries_count:Array.isArray(session.entries)?session.entries.length:1,
+    entries_count:sessionAnchorEntries.length||1,
     created_by:user.userid,
     created_at:now,
     operator_id:authOperatorId,
@@ -1768,8 +1779,10 @@ async function handleEmployeeEntry(request,env,user){
     gross_received:Number(String(session.gross_received||0).replace(/,/g,"")),
     handover_status:cleanText(session.handover_status||"EXPORTING",40),
     exported_at:cleanText(session.exported_at||now,40),
-    export_text:cleanText(session.export_text||"",20000),
-    source:cleanText(session.source||"employee_entry",40)||"employee_entry"
+    export_text:cleanText(sessionExportText,50000),
+    source:cleanText(session.source||"employee_entry",40)||"employee_entry",
+    entries_json:cleanText(sessionEntriesJson,50000),
+    summary_json:cleanText(sessionSummaryJson,5000)
   },EMP_SESSION_COLUMNS);
   const inserted=await empInsertDynamic(env,"transactions",{
     id:entryId,corpid:user.corpid,userid:user.userid,session_id:sessionId,cat:cleanText(entry.cat||"cash",20),
@@ -1882,6 +1895,13 @@ const entryAnchorContract={
   E:["event_type","expense_amount","expense_category","target_bed","reason","note","payment_method","operator","created_at"],
   TF:["event_type","from_bed","to_bed","transfer_date","fee_amount","fee_status","waiver_reason","transfer_reason","old_tenant_context","old_ttlock_context","note","operator","created_at"]
 };
+function entryAnchorType(row){
+  const raw=String(row?.type||"").trim().toUpperCase();
+  if(entryAnchorContract[raw])return raw;
+  const event=String(row?.event_type||"").trim().toLowerCase();
+  return {rent:"R",arrears_payment:"AP",deposit_in:"D",deposit_out:"DR",checkout:"CO",expense:"E",bed_transfer:"TF",bed_transfer_fee:"TFF"}[event]||raw;
+}
+__name(entryAnchorType,"entryAnchorType");
 function entryAnchorEventType(type){
   return {R:"rent",AP:"arrears_payment",D:"deposit_in",DR:"deposit_out",CO:"checkout",E:"expense",TF:"bed_transfer",TFF:"bed_transfer_fee"}[type]||String(type||"entry").toLowerCase();
 }
@@ -1899,21 +1919,26 @@ function entryAnchorMoney(value){
 }
 __name(entryAnchorMoney,"entryAnchorMoney");
 function validateEntryAnchor(row){
-  const type=row?.type||Object.entries({R:"rent",AP:"arrears_payment",D:"deposit_in",DR:"deposit_out",CO:"checkout",E:"expense",TF:"bed_transfer"}).find(([,v])=>v===row?.event_type)?.[0]||"";
+  const type=entryAnchorType(row);
   const required=entryAnchorContract[type]||[];
   const missing=required.filter(field=>!(field in (row||{})));
   return {ok:missing.length===0,missing};
 }
 __name(validateEntryAnchor,"validateEntryAnchor");
 function renderEntryAnchorForOwner(row){
-  const eventType=entryAnchorEventType(row?.type);
-  if(row?.type==="R"){
+  const type=entryAnchorType(row);
+  const eventType=entryAnchorEventType(type);
+  if(type==="R"){
     const parts=[row.room||row.bed,"rent","paid",entryAnchorMoney(row.paid_amount||row.paid||row.amount).toFixed(2),"expected",entryAnchorMoney(row.expected_rent||row.period_due||row.due).toFixed(2)];
     if(row.short_paid||entryAnchorMoney(row.arrears_amount)>0)parts.push("short_paid",entryAnchorMoney(row.arrears_amount).toFixed(2),"due",row.arrears_due_date||row.arrear_promise_date||"-","note",row.arrears_note||row.arrear_reason_detail||"-");
     return parts.join(" ");
   }
-  if(row?.type==="AP")return `${row.room||row.bed} arrears_payment ${entryAnchorMoney(row.payment_amount||row.amount).toFixed(2)} ref ${row.arrears_ref||row.original_arrears_id||row.linked_task_id||"-"} remaining ${entryAnchorMoney(row.remaining_arrears||row.remaining_arrears_after_payment).toFixed(2)}`.trim();
-  if(row?.type==="TF")return `${row.bed_from||row.from_bed||row.room}->${row.bed_to||row.to_bed||row.room_to} bed_transfer ${entryAnchorMoney(row.fee_amount||row.amount).toFixed(2)} ${row.fee_status||"paid"}`.trim();
+  if(type==="AP")return `${row.room||row.bed} arrears_payment ${entryAnchorMoney(row.payment_amount||row.amount).toFixed(2)} ref ${row.arrears_ref||row.original_arrears_id||row.linked_task_id||"-"} remaining ${entryAnchorMoney(row.remaining_arrears||row.remaining_arrears_after_payment).toFixed(2)}`.trim();
+  if(type==="D")return `${row.room||row.bed} deposit_in ${entryAnchorMoney(row.deposit_amount||row.amount).toFixed(2)} ${row.payment_method||""} ${row.note||""}`.trim();
+  if(type==="DR")return `${row.room||row.bed} deposit_out ${entryAnchorMoney(row.refund_amount||row.amount).toFixed(2)} ${row.payment_method||""} reason ${row.refund_reason||row.reason||"-"} note ${row.note||"-"}`.trim();
+  if(type==="CO")return `${row.room||row.bed} checkout ${row.checkout_date||"-"} deposit_refund ${entryAnchorMoney(row.deposit_refund||row.deposit_amt||0).toFixed(2)} outstanding ${entryAnchorMoney(row.outstanding_arrears||0).toFixed(2)} note ${row.final_note||row.note||"-"}`.trim();
+  if(type==="E")return `${row.target_bed||row.room||row.expense_category||""} expense ${entryAnchorMoney(row.expense_amount||row.amount).toFixed(2)} ${row.expense_category||""} ${row.reason||row.expense_desc||row.note||""}`.trim();
+  if(type==="TF")return `${row.bed_from||row.from_bed||row.room}->${row.bed_to||row.to_bed||row.room_to} bed_transfer ${entryAnchorMoney(row.fee_amount||row.amount).toFixed(2)} ${row.fee_status||"paid"} reason ${row.transfer_reason||row.reason||"-"}`.trim();
   return `${row?.room||row?.bed||row?.expense_category||""} ${eventType} ${entryAnchorMoney(row?.amount).toFixed(2)}`.trim();
 }
 __name(renderEntryAnchorForOwner,"renderEntryAnchorForOwner");
@@ -1923,7 +1948,8 @@ function renderEntryAnchorForWhatsapp(row){
 __name(renderEntryAnchorForWhatsapp,"renderEntryAnchorForWhatsapp");
 function normalizeEntryAnchor(row){
   const anchor={...(row||{})};
-  const type=anchor.type;
+  const type=entryAnchorType(anchor);
+  anchor.type=type||anchor.type;
   anchor.event_type=anchor.event_type||entryAnchorEventType(type);
   anchor.source=anchor.source||"employee_entry";
   anchor.payment_method=entryAnchorPaymentMethod(anchor.payment_method||anchor.pay_type);
@@ -1946,6 +1972,14 @@ function normalizeEntryAnchor(row){
     Object.assign(anchor,{bed:anchor.bed||anchor.room,arrears_ref:ref,original_arrears_id:ref,original_arrears_amount:original,already_paid_amount:already,payment_amount:payment,remaining_arrears:remaining,settlement_status:anchor.settlement_status||(remaining<=0?"settled":"partial")});
   }else if(type==="TF"){
     Object.assign(anchor,{from_bed:anchor.from_bed||anchor.bed_from||anchor.room||"",to_bed:anchor.to_bed||anchor.bed_to||anchor.room_to||"",transfer_date:anchor.transfer_date||anchor.date||"",fee_amount:entryAnchorMoney(anchor.fee_amount||anchor.amount),fee_status:anchor.fee_status||"paid",waiver_reason:anchor.waiver_reason||anchor.fee_waiver_reason||"",transfer_reason:anchor.transfer_reason||anchor.reason_code||"",old_tenant_context:anchor.old_tenant_context||"",old_ttlock_context:anchor.old_ttlock_context||"",note:anchor.note||""});
+  }else if(type==="D"){
+    Object.assign(anchor,{bed:anchor.bed||anchor.room||"",deposit_amount:entryAnchorMoney(anchor.deposit_amount||anchor.amount),linked_tenant:anchor.linked_tenant||anchor.tenant_card_id||anchor.tenant_name||"",note:anchor.note||""});
+  }else if(type==="DR"){
+    Object.assign(anchor,{bed:anchor.bed||anchor.room||"",refund_amount:entryAnchorMoney(anchor.refund_amount||anchor.amount),refund_reason:anchor.refund_reason||anchor.ded_reason||anchor.ded_note||anchor.reason||anchor.note||"",checkout_ref:anchor.checkout_ref||anchor.checkout_date||"",note:anchor.note||""});
+  }else if(type==="CO"){
+    Object.assign(anchor,{bed:anchor.bed||anchor.room||"",checkout_date:anchor.checkout_date||"",deposit_refund:entryAnchorMoney(anchor.deposit_refund||anchor.deposit_amt||anchor.deposit_deduction||0),outstanding_arrears:entryAnchorMoney(anchor.outstanding_arrears||anchor.carry_over_arrears||anchor.deficit||0),final_note:anchor.final_note||anchor.note||anchor.ded_note||""});
+  }else if(type==="E"){
+    Object.assign(anchor,{expense_amount:entryAnchorMoney(anchor.expense_amount||anchor.amount),expense_category:anchor.expense_category||anchor.reason_code||"",target_bed:anchor.target_bed||anchor.room||"",reason:anchor.reason||anchor.expense_desc||anchor.custom_reason||"",note:anchor.note||anchor.expense_desc||""});
   }
   anchor.ttlock_context=anchor.ttlock_context||anchor.old_ttlock_context||"";
   anchor.raw_display_line=anchor.raw_display_line||renderEntryAnchorForOwner(anchor);
@@ -1956,6 +1990,52 @@ function normalizeEntryAnchor(row){
   return anchor;
 }
 __name(normalizeEntryAnchor,"normalizeEntryAnchor");
+function parseEmployeeEntryAnchorJson(value){
+  const raw=String(value||"").trim();
+  if(!raw)return [];
+  try{
+    const parsed=JSON.parse(raw);
+    if(Array.isArray(parsed))return parsed;
+    if(Array.isArray(parsed?.entries))return parsed.entries;
+    if(Array.isArray(parsed?.anchors))return parsed.anchors;
+  }catch{}
+  return [];
+}
+__name(parseEmployeeEntryAnchorJson,"parseEmployeeEntryAnchorJson");
+function extractEmployeeEntryAnchorsFromSession(session){
+  const direct=parseEmployeeEntryAnchorJson(session?.entries_json);
+  const text=String(session?.export_text||"");
+  const block=text.match(/==== ENTRY ANCHORS JSON ====\s*([\s\S]*?)\s*==== END ENTRY ANCHORS JSON ====/i);
+  const fromBlock=block?parseEmployeeEntryAnchorJson(block[1]):[];
+  const rows=(direct.length?direct:fromBlock).map(row=>normalizeEntryAnchor({
+    session_id:session?.id||row?.session_id||"",
+    corpid:session?.corpid||row?.corpid||"",
+    userid:session?.created_by||session?.operator_id||row?.userid||"",
+    operator_id:session?.operator_id||row?.operator_id||"",
+    operator_name:session?.operator_name||row?.operator_name||"",
+    created_at:session?.created_at||session?.exported_at||row?.created_at||"",
+    ts:session?.exported_at||session?.created_at||row?.ts||"",
+    source:"employee_entry",
+    source_detail:direct.length?"employee_entry_entries_json":"employee_entry_export_anchor_json",
+    ...row
+  }));
+  return rows;
+}
+__name(extractEmployeeEntryAnchorsFromSession,"extractEmployeeEntryAnchorsFromSession");
+function employeeEntryExportTextWithAnchors(exportText,entries,session){
+  const base=String(exportText||"").replace(/\n*==== ENTRY ANCHORS JSON ====\s*[\s\S]*?\s*==== END ENTRY ANCHORS JSON ====\s*$/i,"").trimEnd();
+  const normalized=Array.isArray(entries)?entries.map(row=>normalizeEntryAnchor(row)):[];
+  if(!normalized.length)return base;
+  const payload={
+    anchor_contract_version:"employee_entry_anchor_v1",
+    session_id:session?.id||session?.session_id||"",
+    anchor_id:session?.anchorId||session?.anchor_id||"",
+    source:"employee_entry",
+    entries:normalized
+  };
+  return `${base}\n\n==== ENTRY ANCHORS JSON ====\n${JSON.stringify(payload)}\n==== END ENTRY ANCHORS JSON ====`;
+}
+__name(employeeEntryExportTextWithAnchors,"employeeEntryExportTextWithAnchors");
 function isEmployeeEntrySession(row){
   const source=String(row?.source||"").trim().toLowerCase();
   const anchor=String(row?.anchor_id||row?.anchorId||"").trim().toUpperCase();
@@ -6046,6 +6126,8 @@ async function handleRequest(request, env, ctx) {
           : "SELECT * FROM transactions WHERE session_id=? AND corpid=? AND COALESCE(voided_at,'')='' AND COALESCE(status,'ACTIVE')<>'VOID' ORDER BY created_at ASC"
       ).bind(sid, user.corpid).all();
       if(sessionRow&&isEmployeeEntrySession(sessionRow)){
+        const anchorRows=extractEmployeeEntryAnchorsFromSession(sessionRow);
+        if(anchorRows.length)return success(anchorRows);
         const exportRows=parseEmployeeEntryExportRows(sessionRow);
         if(exportRows.length)return success(exportRows);
       }

@@ -2664,22 +2664,71 @@ async function renderHistory(){
         if(!r.ok){wrap.innerHTML=`<div class="card" style="padding:24px;text-align:center;color:var(--red)">历史详情加载失败：${r.status}</div>`;return;}
         const rows=await r.json();
         if(!Array.isArray(rows)){wrap.innerHTML='<div class="card" style="padding:24px;text-align:center;color:var(--red)">历史详情格式异常</div>';return;}
-        s=normalizeLedgerSession({...s,entries:rows.map(tx=>({
-          id:tx.id,cat:tx.cat,room:tx.room,amount:tx.amount,
-          due:tx.due,paid:tx.paid,deficit:tx.deficit,tag:normTag(tx.tag),note:tx.note,
-          type:tx.type||tx.reason_code||'',event_type:tx.type||tx.reason_code||'',source:'employee_entry',
-          expected_amount:tx.period_due||tx.due||0,expected_rent:tx.period_due||tx.due||0,
-          payment_method:tx.pay_type||tx.cat||'',operator:tx.operator_name||tx.operator_id||'',operator_id:tx.operator_id||'',operator_name:tx.operator_name||'',
-          raw_display_line:tx.note||tx.arrear_reason_detail||tx.custom_reason||'',linked_task_id:tx.linked_task_id||'',arrears_ref:tx.linked_task_id||'',
-          original_arrears_id:tx.linked_task_id||'',original_arrears_amount:tx.period_due||tx.due||0,already_paid_amount:Math.max(0,(Number(tx.period_due||tx.due||0)-Number(tx.amount||0))),payment_amount:tx.amount||0,remaining_arrears:Math.max(0,(Number(tx.period_due||tx.due||0)-Number(tx.amount||0))),
-          short_paid:(tx.type==='R'||tx.reason_code==='R')&&Number(tx.period_due||tx.due||0)>Number(tx.paid||tx.amount||0),
-          arrears_amount:Math.max(0,Number(tx.period_due||tx.due||0)-Number(tx.paid||tx.amount||0)),arrears_due_date:tx.arrear_promise_date||'',arrears_note:tx.arrear_reason_detail||tx.custom_reason||'',
-          roomTo:tx.room_to||undefined,startDate:tx.start_date||undefined,
-          depDue:tx.dep_due,depPaid:tx.dep_paid,depDef:tx.dep_def,
-          dueDate:tx.due_date||undefined,depDate:tx.dep_date||undefined,
-          payType:tx.pay_type||undefined,discountReason:tx.discount_reason||undefined,
-          depositCollection:tx.deposit_collection===1
-        }))});
+        s=normalizeLedgerSession({...s,entries:rows.map(tx=>{
+          const eventType=tx.event_type||tx.type||tx.reason_code||'';
+          const canonicalType=tx.type||tx.reason_code||({
+            rent:'R',arrears_payment:'AP',deposit_in:'D',deposit_out:'DR',checkout:'CO',expense:'E',bed_transfer:'TF'
+          }[eventType]||eventType);
+          const amount=Number(tx.amount??tx.paid_amount??tx.payment_amount??tx.deposit_amount??tx.refund_amount??tx.expense_amount??tx.fee_amount??0);
+          const expected=Number(tx.expected_rent??tx.expected_amount??tx.period_due??tx.due??0);
+          return {
+            ...tx,
+            id:tx.id||tx.event_id||tx.anchor_id,
+            cat:tx.cat||((tx.payment_method==='bank'||tx.pay_type==='B')?'bank':(eventType==='expense'?'expense':(eventType==='deposit_out'?'refund':'cash'))),
+            room:tx.room||tx.bed||tx.from_bed||tx.target_bed||tx.expense_category||'',
+            room_to:tx.room_to||tx.to_bed||tx.roomTo||'',
+            roomTo:tx.room_to||tx.to_bed||tx.roomTo||undefined,
+            amount,
+            due:tx.due??expected,
+            paid:tx.paid??tx.paid_amount??tx.payment_amount??amount,
+            deficit:tx.deficit??tx.arrears_amount??Math.max(0,expected-amount),
+            tag:normTag(tx.tag||(eventType==='bed_transfer'?'Transfer':'Old')),
+            note:tx.note||tx.arrears_note||tx.final_note||tx.refund_reason||tx.reason||tx.expense_desc||tx.raw_display_line||'',
+            type:canonicalType,
+            event_type:eventType,
+            source:tx.source||'employee_entry',
+            expected_amount:expected,
+            expected_rent:tx.expected_rent??expected,
+            payment_method:tx.payment_method||tx.pay_type||tx.cat||'',
+            operator:tx.operator||tx.operator_name||tx.operator_id||'',
+            operator_id:tx.operator_id||'',
+            operator_name:tx.operator_name||tx.operator||'',
+            raw_display_line:tx.raw_display_line||tx.note||tx.arrear_reason_detail||tx.custom_reason||'',
+            linked_task_id:tx.linked_task_id||tx.arrears_ref||tx.original_arrears_id||'',
+            arrears_ref:tx.arrears_ref||tx.linked_task_id||tx.original_arrears_id||'',
+            original_arrears_id:tx.original_arrears_id||tx.arrears_ref||tx.linked_task_id||'',
+            original_arrears_amount:tx.original_arrears_amount??expected,
+            already_paid_amount:tx.already_paid_amount??Math.max(0,expected-amount),
+            payment_amount:tx.payment_amount??amount,
+            remaining_arrears:tx.remaining_arrears??Math.max(0,expected-amount),
+            deposit_amount:tx.deposit_amount,
+            refund_amount:tx.refund_amount,
+            checkout_date:tx.checkout_date,
+            deposit_refund:tx.deposit_refund,
+            outstanding_arrears:tx.outstanding_arrears,
+            final_note:tx.final_note,
+            expense_amount:tx.expense_amount,
+            expense_category:tx.expense_category,
+            target_bed:tx.target_bed,
+            fee_amount:tx.fee_amount,
+            fee_status:tx.fee_status,
+            waiver_reason:tx.waiver_reason,
+            transfer_reason:tx.transfer_reason,
+            from_bed:tx.from_bed,
+            to_bed:tx.to_bed,
+            short_paid:tx.short_paid??(canonicalType==='R'&&expected>Number(tx.paid??amount)),
+            arrears_amount:tx.arrears_amount??Math.max(0,expected-Number(tx.paid??amount)),
+            arrears_due_date:tx.arrears_due_date||tx.arrear_promise_date||'',
+            arrears_note:tx.arrears_note||tx.arrear_reason_detail||tx.custom_reason||'',
+            startDate:tx.start_date||tx.period_start||tx.rent_period_start||undefined,
+            depDue:tx.dep_due,depPaid:tx.dep_paid,depDef:tx.dep_def,
+            dueDate:tx.due_date||tx.arrears_due_date||undefined,
+            depDate:tx.dep_date||undefined,
+            payType:tx.pay_type||tx.payment_method||undefined,
+            discountReason:tx.discount_reason||undefined,
+            depositCollection:tx.deposit_collection===1||eventType==='deposit_in'
+          };
+        })});
         state.historyViewing=s;
       }catch(e){console.warn('session_detail failed:',e);wrap.innerHTML=`<div class="card" style="padding:24px;text-align:center;color:var(--red)">历史详情加载失败：${esc(e.message||'网络错误')}</div>`;return;}
     }
