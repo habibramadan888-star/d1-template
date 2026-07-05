@@ -2518,40 +2518,40 @@ label .label-en{
 <main class="wrap">
   <section id="view-entry">
     <div class="card">
-      <div class="head"><div><div class="title">本票流水汇总</div><div class="small" id="sessionClock">CURRENT SESSION</div></div><button class="btn" id="btnNewSessionTop">新会话</button></div>
+      <div class="head"><div><div class="title">Current Session Summary<span class="label-en">本票流水汇总</span></div><div class="small" id="sessionClock">CURRENT SESSION</div></div><button class="btn" id="btnNewSessionTop">New Session<span class="label-en">新会话</span></button></div>
       <div class="body">
         <div class="kpi-grid" id="sessionKpis"></div>
       </div>
     </div>
     <div class="card">
-      <div class="head"><div class="title">事件录入</div><button class="btn" id="btnLoadLock">Load Cards / 加载卡片</button></div>
+      <div class="head"><div class="title">Add Entry<span class="label-en">事件录入</span></div><button class="btn" id="btnLoadLock">Load Cards / 加载卡片</button></div>
       <div class="body">
         <div class="step">
-          <div class="step-title"><span>1</span><div>第一步：选择事件类型<small>STEP 1 · SELECT EVENT TYPE</small></div></div>
+          <div class="step-title"><span>1</span><div>Step 1 · Select Event Type<small>第一步：选择事件类型</small></div></div>
           <div class="event-grid" id="eventChips">
-            <button class="event-chip" data-type="R"><span>收租</span><small>RENT</small></button>
-            <button class="event-chip" data-type="AP"><span>还欠款</span><small>ARREARS PAYMENT</small></button>
-            <button class="event-chip" data-type="D"><span>收押金</span><small>DEPOSIT IN</small></button>
-            <button class="event-chip" data-type="DR"><span>退押金</span><small>DEPOSIT OUT</small></button>
-            <button class="event-chip" data-type="CO"><span>退房</span><small>CHECKOUT</small></button>
-            <button class="event-chip" data-type="E"><span>支出</span><small>EXPENSE</small></button>
-            <button class="event-chip" data-type="TF"><span>换床</span><small>BED TRANSFER</small></button>
+            <button class="event-chip" data-type="R"><span>Rent</span><small>收租</small></button>
+            <button class="event-chip" data-type="AP"><span>Arrears Payment</span><small>还欠款</small></button>
+            <button class="event-chip" data-type="D"><span>Deposit In</span><small>收押金</small></button>
+            <button class="event-chip" data-type="DR"><span>Deposit Out</span><small>退押金</small></button>
+            <button class="event-chip" data-type="CO"><span>Checkout</span><small>退房</small></button>
+            <button class="event-chip" data-type="E"><span>Expense</span><small>支出</small></button>
+            <button class="event-chip" data-type="TF"><span>Bed Transfer</span><small>换床</small></button>
           </div>
         </div>
         <div class="step">
-          <div class="step-title"><span>2</span><div>第二步：确定对象<small>STEP 2 · CONFIRM TARGET</small></div></div>
+          <div class="step-title"><span>2</span><div>Step 2 · Confirm Target<small>第二步：确定对象</small></div></div>
         <div class="grid">
           <div class="field hidden" id="entryTypeWrap"><label>事件类型 type</label><select id="entryType">
             <option value="R">R 收租</option><option value="D">D 收押金</option><option value="DR">DR 退押金</option><option value="CO">CO 退房</option><option value="AP">AP 还欠款</option><option value="E">E 支出</option><option value="TF">TF 换床</option>
           </select></div>
-          <div class="field" id="selectedEventWrap"><label>已选事件<span class="label-en">SELECTED EVENT</span></label><div id="selectedEventDisplay" class="readonly-pill">收租 RENT</div></div>
+          <div class="field" id="selectedEventWrap"><label>Selected Event<span class="label-en">已选事件</span></label><div id="selectedEventDisplay" class="readonly-pill">Rent / 收租</div></div>
           <div class="field" id="genericBedFieldWrap"><label>床位 BED</label><input id="bed" placeholder="431" autocomplete="off"></div>
         </div>
         <div class="small" id="objectHint">收租/收押金/退押金/还欠款：填写床位号；换床：填写原床位后再填新床位；支出：选择支出类别。</div>
         <div id="bedTransferStep2Mount" data-bed-transfer-step2="true"></div>
         </div>
         <div class="step">
-          <div class="step-title"><span>3</span>第三步：系统展示上下文，员工核对</div>
+          <div class="step-title"><span>3</span><div>Step 3 · Verify System Context<small>第三步：系统展示上下文，员工核对</small></div></div>
         <div class="ctx" id="bedContext"></div>
         <div class="context-note" id="contextNotice"></div>
         <div class="grid">
@@ -2560,14 +2560,14 @@ label .label-en{
         </div>
         </div>
         <div class="step" id="paymentStep">
-          <div class="step-title"><span>4</span>第四步：付款方式</div>
+          <div class="step-title"><span>4</span><div>Step 4 · Payment Method<small>第四步：付款方式</small></div></div>
         <div class="grid" id="paymentFields">
           <div class="field"><label>付款方式 PY</label><select id="payType" class="hidden"><option value="C">现金 C</option><option value="B">银行 B</option></select><div class="pay-toggle"><button type="button" class="pay-option active" data-pay="C">现金<span>CASH</span></button><button type="button" class="pay-option" data-pay="B">银行<span>BANK</span></button></div></div>
           <div class="field hidden" id="bankRefWrap"><label>银行参考 bank_ref</label><input id="bankRef" placeholder="系统保留字段，员工无需填写"></div>
         </div>
         </div>
         <div class="step">
-          <div class="step-title"><span>5</span>第五步：填写金额，系统对比应收和实收</div>
+          <div class="step-title"><span>5</span><div>Step 5 · Enter Amount<small>第五步：填写金额，系统对比应收和实收</small></div></div>
         <div class="grid">
           <div class="field"><label>实收/支出金额 AMT</label><input id="amount" inputmode="decimal" placeholder="0.00"></div>
           <div class="field"><label>系统月租 LP（老板端配置）</label><input id="listPrice" inputmode="decimal" placeholder="系统自动读取" readonly></div>
@@ -2575,7 +2575,7 @@ label .label-en{
         </div>
 
         <div class="step" id="periodStep">
-          <div class="step-title"><span>6</span>第六步：确认账期</div>
+          <div class="step-title"><span>6</span><div>Step 6 · Confirm Period<small>第六步：确认账期</small></div></div>
         <div id="periodFields">
           <div class="grid3">
             <div class="field"><label>账期类型 cycle</label><select id="cycle"><option value="1M">整月 1M</option><option value="15D">15天 15D</option><option value="CUST">自定义天数 CUSTOM</option></select></div>
@@ -2637,7 +2637,7 @@ label .label-en{
           <div class="field"><label>系统结清 entry_clr</label><select id="entryClr" disabled><option value="Y">Y 已够本期</option><option value="N">N 不足</option><option value="P">P 部分</option></select></div>
         </div>
         <div class="step diffbox hidden" id="exceptionStep">
-          <div class="step-title"><span>7</span>第七步：处理异常或差额</div>
+          <div class="step-title"><span>7</span><div>Step 7 · Handle Exception<small>第七步：处理异常或差额</small></div></div>
         <div class="field hidden" id="excessWrap"><label>超收处理 excess_to</label><select id="excessTo"><option value="">请选择超收处理</option><option value="RETURNED">找零/零头已退还</option><option value="MANAGER">转老板处理，不作为本期收入</option></select></div>
         <div class="arrear-plan hidden" id="arrearPlan">
           <div class="plan-head">
@@ -2657,7 +2657,7 @@ label .label-en{
         <div class="field"><label>备注 RMK</label><textarea id="remark" placeholder="必要时说明承诺日期、折扣原因、免收原因、退房扣款原因等"></textarea></div>
         </div>
         <div class="step">
-          <div class="step-title"><span>8</span>第八步：摘要确认 + 提交</div>
+          <div class="step-title"><span>8</span><div>Step 8 · Review & Submit<small>第八步：摘要确认 + 提交</small></div></div>
           <div class="summary" id="entrySummary"></div>
           <div class="small" style="margin-top:10px">提交前请核对：对象、金额、账期、付款方式和异常原因。提交后会同步到云端并保留操作人和时间。</div>
         </div>
@@ -3626,7 +3626,7 @@ function setEntryType(type){
 }
 function updateEventChips(){
   document.querySelectorAll('.event-chip').forEach(btn=>btn.classList.toggle('active',btn.dataset.type===$('entryType').value));
-  const map={R:'收租 RENT',AP:'还欠款 ARREARS PAYMENT',D:'收押金 DEPOSIT IN',DR:'退押金 DEPOSIT OUT',CO:'退房 CHECKOUT',E:'支出 EXPENSE',TF:'换床 BED TRANSFER'};
+  const map={R:'Rent / 收租',AP:'Arrears Payment / 还欠款',D:'Deposit In / 收押金',DR:'Deposit Out / 退押金',CO:'Checkout / 退房',E:'Expense / 支出',TF:'Bed Transfer / 换床'};
   if($('selectedEventDisplay'))$('selectedEventDisplay').textContent=map[$('entryType').value]||$('entryType').value;
   if($('selectedEventDisplay'))$('selectedEventDisplay').dataset.normalizedEvent=normalizedBusinessEvent();
 }
@@ -5238,7 +5238,7 @@ function previewSession(){
     body.innerHTML='<div class="preview-empty"><div><b>当前本票没有流水</b><br><span>先完成单笔录入，再打开预览核对。</span></div></div>';
   }else{
     body.innerHTML=`<div class="preview-anchor-row">
-      <div class="preview-anchor"><span>现金结余 CASH HANDOVER</span><b>${fmtMoney(s.cashBalance)}</b></div>
+      <div class="preview-anchor"><span>Cash Handover / 现金结余</span><b>${fmtMoney(s.cashBalance)}</b></div>
       <div class="preview-anchor"><span>银行转账 BANK TRANSFER</span><b>${fmtMoney(s.bankIn)} · ${s.bankCount}笔</b></div>
       <div class="preview-anchor"><span>收款总计 GROSS RECEIVED</span><b>${fmtMoney(s.grossReceived)}</b></div>
     </div>${state.drafts.map((e,i)=>previewCard(e,i)).join('')}`;
@@ -5389,23 +5389,23 @@ function applyBilingualUILegacy(){
     const actions=document.querySelector('#btnSaveEntry')?.closest('.row');
     if(actions)actions.insertAdjacentHTML('beforebegin','<div id="validationBox" class="hint"></div>');
   }
-  document.querySelector('.card .head .title').innerHTML='本票流水汇总<span class="label-en">CURRENT SESSION SUMMARY</span>';
-  const entryTitle=document.querySelector('#view-entry>.card:nth-child(2) .head .title');if(entryTitle)entryTitle.innerHTML='事件录入<span class="label-en">ADD ENTRY</span>';
+  document.querySelector('.card .head .title').innerHTML='Current Session Summary<span class="label-en">本票流水汇总</span>';
+  const entryTitle=document.querySelector('#view-entry>.card:nth-child(2) .head .title');if(entryTitle)entryTitle.innerHTML='Add Entry<span class="label-en">事件录入</span>';
   $('btnLoadLock').innerHTML='Load Cards<span class="label-en">加载卡片</span>';
-  $('btnSaveEntry').innerHTML='加入本票<span class="label-en">ADD TO SESSION</span>';
-  $('btnReset').innerHTML='清空<span class="label-en">RESET</span>';
+  $('btnSaveEntry').innerHTML='Add to Session<span class="label-en">加入本票</span>';
+  $('btnReset').innerHTML='Reset<span class="label-en">清空</span>';
   const steps=[
-    ['第一步：选择事件类型','STEP 1 · SELECT EVENT TYPE'],
-    ['第二步：确定对象','STEP 2 · CONFIRM TARGET'],
-    ['第三步：核对系统资料','STEP 3 · VERIFY SYSTEM CONTEXT'],
-    ['第四步：付款方式','STEP 4 · PAYMENT METHOD'],
-    ['第五步：填写金额','STEP 5 · ENTER AMOUNT'],
-    ['第六步：确认账期','STEP 6 · CONFIRM PERIOD'],
-    ['第七步：处理异常或差额','STEP 7 · HANDLE EXCEPTION'],
-    ['第八步：摘要确认 + 提交','STEP 8 · REVIEW & SUBMIT']
+    ['Step 1 · Select Event Type','第一步：选择事件类型'],
+    ['Step 2 · Confirm Target','第二步：确定对象'],
+    ['Step 3 · Verify System Context','第三步：核对系统资料'],
+    ['Step 4 · Payment Method','第四步：付款方式'],
+    ['Step 5 · Enter Amount','第五步：填写金额'],
+    ['Step 6 · Confirm Period','第六步：确认账期'],
+    ['Step 7 · Handle Exception','第七步：处理异常或差额'],
+    ['Step 8 · Review & Submit','第八步：摘要确认 + 提交']
   ];
   document.querySelectorAll('.step-title').forEach((el,i)=>{const n=el.querySelector('span')?.outerHTML||'';const s=steps[i];if(s)el.innerHTML=`${n}<div>${s[0]}<small>${s[1]}</small></div>`});
-  const eventNames={R:['收租','RENT'],AP:['还欠款','ARREARS PAYMENT'],D:['收押金','DEPOSIT IN'],DR:['退押金','DEPOSIT OUT'],CO:['退房','CHECKOUT'],E:['支出','EXPENSE'],TF:['换床','BED TRANSFER']};
+  const eventNames={R:['Rent','收租'],AP:['Arrears Payment','还欠款'],D:['Deposit In','收押金'],DR:['Deposit Out','退押金'],CO:['Checkout','退房'],E:['Expense','支出'],TF:['Bed Transfer','换床']};
   document.querySelectorAll('.event-chip').forEach(btn=>{const v=btn.dataset.type,n=eventNames[v];if(n)btn.innerHTML=`<span>${n[0]}</span><small>${n[1]}</small>`});
   $('entryType').innerHTML=[
     ['R','收租','RENT'],['D','收押金','DEPOSIT IN'],['DR','退押金','DEPOSIT OUT'],['CO','退房','CHECKOUT'],['AP','还欠款','ARREARS PAYMENT'],['E','支出','EXPENSE'],['TF','换床','BED TRANSFER']
@@ -5448,9 +5448,9 @@ function renderSessionKpis(){
   const grid=$('sessionKpis');
   grid.className='kpi-grid session-kpi-grid';
   const anchors=[
-    ['现金结余','CASH HANDOVER',s.cashBalance,'anchor','应面对面交接现金'],
-    ['银行转账总计','BANK TRANSFER',s.bankIn,'anchor bank',`${s.bankCount} 笔银行入账`],
-    ['收款总计','GROSS RECEIVED',s.grossReceived,'anchor total','现金总收入 + 银行总收入']
+    ['Cash Handover','现金结余',s.cashBalance,'anchor','Cash to hand over face to face'],
+    ['Bank Transfer','银行转账总计',s.bankIn,'anchor bank',`${s.bankCount} bank records`],
+    ['Gross Received','收款总计',s.grossReceived,'anchor total','Cash received + bank received']
   ];
   const details=[
     ['租金收入','RENT',s.rentIn,'','本期租金入账'],
@@ -5470,25 +5470,25 @@ function applyBilingualUI(){
     const actions=document.querySelector('#btnSaveEntry')?.closest('.row');
     if(actions)actions.insertAdjacentHTML('beforebegin','<div id="validationBox" class="hint"></div>');
   }
-  const topTitle=document.querySelector('#view-entry>.card:first-child .head .title');if(topTitle)topTitle.innerHTML='本票流水汇总<span class="label-en">CURRENT SESSION SUMMARY</span>';
-  const entryTitle=document.querySelector('#view-entry>.card:nth-child(2) .head .title');if(entryTitle)entryTitle.innerHTML='事件录入<span class="label-en">ADD ENTRY</span>';
-  const previewTitle=document.querySelector('#view-entry>.card:nth-child(3) .head .title');if(previewTitle)previewTitle.innerHTML='本次会话<span class="label-en">CURRENT SESSION</span>';
-  $('btnNewSessionTop').innerHTML='新会话<span class="label-en">NEW SESSION</span>';
+  const topTitle=document.querySelector('#view-entry>.card:first-child .head .title');if(topTitle)topTitle.innerHTML='Current Session Summary<span class="label-en">本票流水汇总</span>';
+  const entryTitle=document.querySelector('#view-entry>.card:nth-child(2) .head .title');if(entryTitle)entryTitle.innerHTML='Add Entry<span class="label-en">事件录入</span>';
+  const previewTitle=document.querySelector('#view-entry>.card:nth-child(3) .head .title');if(previewTitle)previewTitle.innerHTML='Current Session<span class="label-en">本次会话</span>';
+  $('btnNewSessionTop').innerHTML='New Session<span class="label-en">新会话</span>';
   $('btnLoadLock').innerHTML='Load Cards<span class="label-en">加载卡片</span>';
-  $('btnSaveEntry').innerHTML='加入本票<span class="label-en">ADD TO SESSION</span>';
-  $('btnReset').innerHTML='清空<span class="label-en">RESET</span>';
+  $('btnSaveEntry').innerHTML='Add to Session<span class="label-en">加入本票</span>';
+  $('btnReset').innerHTML='Reset<span class="label-en">清空</span>';
   const steps=[
-    ['第一步：选择事件类型','STEP 1 · SELECT EVENT TYPE'],
-    ['第二步：确定对象','STEP 2 · CONFIRM TARGET'],
-    ['第三步：核对系统资料','STEP 3 · VERIFY SYSTEM CONTEXT'],
-    ['第四步：付款方式','STEP 4 · PAYMENT METHOD'],
-    ['第五步：填写金额','STEP 5 · ENTER AMOUNT'],
-    ['第六步：确认账期','STEP 6 · CONFIRM PERIOD'],
-    ['第七步：处理异常或差额','STEP 7 · HANDLE EXCEPTION'],
-    ['第八步：摘要确认 + 提交','STEP 8 · REVIEW & SUBMIT']
+    ['Step 1 · Select Event Type','第一步：选择事件类型'],
+    ['Step 2 · Confirm Target','第二步：确定对象'],
+    ['Step 3 · Verify System Context','第三步：核对系统资料'],
+    ['Step 4 · Payment Method','第四步：付款方式'],
+    ['Step 5 · Enter Amount','第五步：填写金额'],
+    ['Step 6 · Confirm Period','第六步：确认账期'],
+    ['Step 7 · Handle Exception','第七步：处理异常或差额'],
+    ['Step 8 · Review & Submit','第八步：摘要确认 + 提交']
   ];
   document.querySelectorAll('.step-title').forEach((el,i)=>{const n=el.querySelector('span')?.outerHTML||'';const s=steps[i];if(s)el.innerHTML=`${n}<div>${esc(s[0])}<small>${esc(s[1])}</small></div>`});
-  const eventNames={R:['收租','RENT'],AP:['还欠款','ARREARS PAYMENT'],D:['收押金','DEPOSIT IN'],DR:['退押金','DEPOSIT OUT'],CO:['退房','CHECKOUT'],E:['支出','EXPENSE'],TF:['换床','BED TRANSFER']};
+  const eventNames={R:['Rent','收租'],AP:['Arrears Payment','还欠款'],D:['Deposit In','收押金'],DR:['Deposit Out','退押金'],CO:['Checkout','退房'],E:['Expense','支出'],TF:['Bed Transfer','换床']};
   document.querySelectorAll('.event-chip').forEach(btn=>{const v=btn.dataset.type,n=eventNames[v];if(n)btn.innerHTML=`<span>${esc(n[0])}</span><small>${esc(n[1])}</small>`});
   $('entryType').innerHTML=[
     ['R','收租','RENT'],['D','收押金','DEPOSIT IN'],['DR','退押金','DEPOSIT OUT'],['CO','退房','CHECKOUT'],['AP','还欠款','ARREARS PAYMENT'],['E','支出','EXPENSE'],['TF','换床','BED TRANSFER']
@@ -5666,6 +5666,117 @@ async function checkEmployeeSession(){
     console.warn('[UnifiedLogin] employee session handoff failed:',e);
     redirectToUnifiedLogin('employee_session_check_failed');
   }
+}
+function employeeUiPair(en,cn){
+  return `${esc(en)}<span class="label-en">${esc(cn)}</span>`;
+}
+function employeeEnsureEnglishFirstStyle(){
+  if(document.getElementById('employeeEnglishFirstHierarchyStyle'))return;
+  const style=document.createElement('style');
+  style.id='employeeEnglishFirstHierarchyStyle';
+  style.textContent=`
+    #view-entry .title,
+    #view-arrears .title,
+    #view-system .title{color:#111827;font-weight:860!important;letter-spacing:-.01em}
+    #view-entry .title .label-en,
+    #view-arrears .title .label-en,
+    #view-system .title .label-en,
+    #view-entry .step-title small,
+    #view-entry label .label-en,
+    #view-entry .event-chip small,
+    #view-entry .kpi-section-label small,
+    #view-entry .kpi-card small:first-of-type{display:block!important;margin-top:4px!important;color:#7b8797!important;font-size:10px!important;font-weight:560!important;letter-spacing:.04em!important;text-transform:none!important}
+    #view-entry .event-chip>span{font-size:17px!important;color:inherit!important}
+    #view-entry .kpi-card span{color:#283447!important;font-size:13px!important;font-weight:760!important}
+    #view-entry .btn .label-en{display:block!important;margin-top:2px!important;color:inherit!important;opacity:.72!important;font-size:10px!important;font-weight:560!important;text-transform:none!important;letter-spacing:.02em!important}
+  `;
+  document.head.appendChild(style);
+}
+function updateEventChips(){
+  const names={
+    R:['Rent','\u6536\u79df'],
+    AP:['Arrears Payment','\u8fd8\u6b20\u6b3e'],
+    D:['Deposit In','\u6536\u62bc\u91d1'],
+    DR:['Deposit Out','\u9000\u62bc\u91d1'],
+    CO:['Checkout','\u9000\u623f'],
+    E:['Expense','\u652f\u51fa'],
+    TF:['Bed Transfer','\u6362\u5e8a']
+  };
+  document.querySelectorAll('.event-chip').forEach(btn=>{
+    btn.classList.toggle('active',btn.dataset.type===$('entryType').value);
+    const n=names[btn.dataset.type];
+    if(n)btn.innerHTML=`<span>${esc(n[0])}</span><small>${esc(n[1])}</small>`;
+  });
+  const current=names[$('entryType').value];
+  if($('selectedEventDisplay'))$('selectedEventDisplay').textContent=current?`${current[0]} / ${current[1]}`:$('entryType').value;
+  if($('selectedEventDisplay'))$('selectedEventDisplay').dataset.normalizedEvent=normalizedBusinessEvent();
+}
+function renderSessionKpis(){
+  const s=sessionStats();
+  $('sessionClock').textContent=`${today()} · ${operatorId()} · ${s.rows.length} records`;
+  const grid=$('sessionKpis');
+  grid.className='kpi-grid session-kpi-grid';
+  const anchors=[
+    ['Cash Handover','\u73b0\u91d1\u7ed3\u4f59',s.cashBalance,'anchor','Cash to hand over face to face'],
+    ['Bank Transfer','\u94f6\u884c\u8f6c\u8d26\u603b\u8ba1',s.bankIn,'anchor bank',`${s.bankCount} bank records`],
+    ['Gross Received','\u6536\u6b3e\u603b\u8ba1',s.grossReceived,'anchor total','Cash received + bank received']
+  ];
+  const details=[
+    ['Rent','\u79df\u91d1\u6536\u5165',s.rentIn,'','Rent income in this session'],
+    ['Deposit In','\u62bc\u91d1\u6536\u53d6',s.depositIn,'blue','Deposit liability anchor'],
+    ['Arrears Payment','\u6b20\u6b3e\u56de\u6536',s.arrearsIn,'orange','Historical arrears collected'],
+    ['Bed Transfer Fee','\u6362\u5e8a\u8d39',s.transferFee,'','Service fee income'],
+    ['Deposit Refund','\u62bc\u91d1\u9000\u6b3e',s.depRefund,'orange','Cash outflow'],
+    ['Expenses','\u5176\u4ed6\u652f\u51fa',s.expenses,'red','Cash outflow']
+  ];
+  const card=([en,cn,v,cls,note])=>`<div class="kpi-card ${esc(cls)}"><span>${esc(en)}</span><small>${esc(cn)}</small><b class="entry-session-money" data-entry-summary-money="true">${fmtDisplayMoney(v)}</b><small>${esc(note)}</small></div>`;
+  grid.innerHTML=`<div class="kpi-section-label">Handover Core<small>\u4ea4\u63a5\u6838\u5fc3</small></div><div class="handover-anchors">${anchors.map(card).join('')}</div><div class="kpi-section-label">Detail Breakdown<small>\u6d41\u6c34\u660e\u7ec6</small></div><div class="handover-details">${details.map(card).join('')}</div>`;
+}
+function applyBilingualUI(){
+  employeeEnsureEnglishFirstStyle();
+  const label=(id,en,cn)=>{const el=$(id);const l=el?.closest('.field')?.querySelector('label');if(l)l.innerHTML=employeeUiPair(en,cn)};
+  document.querySelectorAll('.body>.context-note:not(#contextNotice):not(#apTaskInfo)').forEach(el=>el.remove());
+  if(!$('validationBox')){
+    const actions=document.querySelector('#btnSaveEntry')?.closest('.row');
+    if(actions)actions.insertAdjacentHTML('beforebegin','<div id="validationBox" class="hint"></div>');
+  }
+  const topTitle=document.querySelector('#view-entry>.card:first-child .head .title');if(topTitle)topTitle.innerHTML=employeeUiPair('Current Session Summary','\u672c\u7968\u6d41\u6c34\u6c47\u603b');
+  const entryTitle=document.querySelector('#view-entry>.card:nth-child(2) .head .title');if(entryTitle)entryTitle.innerHTML=employeeUiPair('Add Entry','\u4e8b\u4ef6\u5f55\u5165');
+  const previewTitle=document.querySelector('#view-entry>.card:nth-child(3) .head .title');if(previewTitle)previewTitle.innerHTML=employeeUiPair('Current Session','\u672c\u6b21\u4f1a\u8bdd');
+  const followTitle=document.querySelector('#view-arrears .head .title');if(followTitle)followTitle.innerHTML=employeeUiPair('Follow-up','\u8ddf\u8fdb');
+  const systemTitle=document.querySelector('#view-system .head .title');if(systemTitle)systemTitle.innerHTML=employeeUiPair('System','\u7cfb\u7edf');
+  $('btnNewSessionTop').innerHTML='New Session<span class="label-en">\u65b0\u4f1a\u8bdd</span>';
+  $('btnLoadLock').innerHTML='Reload Cards<span class="label-en">\u91cd\u65b0\u8bfb\u53d6\u5361\u7247</span>';
+  $('btnSaveEntry').innerHTML='Add to Session<span class="label-en">\u52a0\u5165\u672c\u7968</span>';
+  $('btnReset').innerHTML='Reset<span class="label-en">\u6e05\u7a7a</span>';
+  $('btnPreviewSession').innerHTML='Preview<span class="label-en">\u9884\u89c8</span>';
+  $('btnWhatsAppSession').innerHTML='WhatsApp Export<span class="label-en">WhatsApp \u5bfc\u51fa</span>';
+  $('btnExportSession').innerHTML='Confirm Session Upload<span class="label-en">\u786e\u8ba4\u672c\u7968\u5e76\u4e0a\u4f20\u4e91\u7aef</span>';
+  const steps=[
+    ['Step 1 · Select Event Type','\u7b2c\u4e00\u6b65\uff1a\u9009\u62e9\u4e8b\u4ef6\u7c7b\u578b'],
+    ['Step 2 · Confirm Target','\u7b2c\u4e8c\u6b65\uff1a\u786e\u5b9a\u5bf9\u8c61'],
+    ['Step 3 · Verify System Context','\u7b2c\u4e09\u6b65\uff1a\u6838\u5bf9\u7cfb\u7edf\u8d44\u6599'],
+    ['Step 4 · Payment Method','\u7b2c\u56db\u6b65\uff1a\u4ed8\u6b3e\u65b9\u5f0f'],
+    ['Step 5 · Enter Amount','\u7b2c\u4e94\u6b65\uff1a\u586b\u5199\u91d1\u989d'],
+    ['Step 6 · Confirm Period','\u7b2c\u516d\u6b65\uff1a\u786e\u8ba4\u8d26\u671f'],
+    ['Step 7 · Handle Exception','\u7b2c\u4e03\u6b65\uff1a\u5904\u7406\u5f02\u5e38\u6216\u5dee\u989d'],
+    ['Step 8 · Review & Submit','\u7b2c\u516b\u6b65\uff1a\u6458\u8981\u786e\u8ba4\u4e0e\u63d0\u4ea4']
+  ];
+  document.querySelectorAll('#view-entry .step-title').forEach((el,i)=>{const n=el.querySelector('span')?.outerHTML||'';const s=steps[i];if(s)el.innerHTML=`${n}<div>${esc(s[0])}<small>${esc(s[1])}</small></div>`});
+  updateEventChips();
+  $('entryType').innerHTML=[
+    ['R','Rent','\u6536\u79df'],['D','Deposit In','\u6536\u62bc\u91d1'],['DR','Deposit Out','\u9000\u62bc\u91d1'],['CO','Checkout','\u9000\u623f'],['AP','Arrears Payment','\u8fd8\u6b20\u6b3e'],['E','Expense','\u652f\u51fa'],['TF','Bed Transfer','\u6362\u5e8a']
+  ].map(([v,en,cn])=>`<option value="${v}">${esc(en)} / ${esc(cn)}</option>`).join('');
+  $('payType').innerHTML='<option value="C">Cash / \u73b0\u91d1</option><option value="B">Bank / \u94f6\u884c</option>';
+  label('selectedEventDisplay','Selected Event','\u5df2\u9009\u4e8b\u4ef6');label('entryType','Event Type','\u4e8b\u4ef6\u7c7b\u578b');label('bed','Bed','\u5e8a\u4f4d');label('tenantName','Access Card Remark Snapshot','\u95e8\u7981\u5361\u5907\u6ce8\u5feb\u7167');label('tenantCardId','Access Card CID','\u95e8\u7981\u5361\u5361\u53f7');
+  label('payType','Payment Method','\u4ed8\u6b3e\u65b9\u5f0f');label('bankRef','Bank Ref','\u94f6\u884c\u53c2\u8003');label('amount','Amount','\u5b9e\u6536\u6216\u652f\u51fa\u91d1\u989d');label('listPrice','List Price','\u7cfb\u7edf\u6708\u79df');
+  label('cycle','Cycle','\u8d26\u671f\u7c7b\u578b');label('periodStart','Period Start','\u8d26\u671f\u5f00\u59cb');label('periodEnd','Period End','\u8d26\u671f\u622a\u6b62');label('periodDays','Period Days','\u8d26\u671f\u5929\u6570');
+  label('periodDue','Period Due','\u8d26\u671f\u5e94\u6536');label('due','Entry Due','\u672c\u6761\u5e94\u6536');label('linkedTaskId','Arrears Task','\u6b20\u6b3e\u4efb\u52a1');
+  label('checkoutDate','Checkout Date','\u5b9e\u9645\u79bb\u5f00\u65e5\u671f');label('overdayDeduction','Overday Deduction','\u8d85\u671f\u6263\u6b3e');label('noNoticeDeduction','No Notice Deduction','\u672a\u63d0\u524d\u544a\u77e5\u6263\u6b3e');
+  label('otherDeduction','Other Deduction','\u5176\u4ed6\u6263\u6b3e');label('depositDeduction','Deposit Deduction','\u62bc\u91d1\u6263\u6b3e\u5408\u8ba1');label('depositReturnAmount','Deposit Refund','\u5e94\u9000\u62bc\u91d1');
+  label('dedNote','Deduction Note','\u6263\u6b3e\u8bf4\u660e');label('transferFromBed','From Bed','\u539f\u5e8a\u4f4d');label('bedTo','To Bed','\u65b0\u5e8a\u4f4d');label('transferDate','Transfer Date','\u6362\u5e8a\u65e5\u671f');label('transferReason','Transfer Reason','\u6362\u5e8a\u539f\u56e0');label('feePaid','Fee Option','\u8d39\u7528\u9009\u9879');label('transferWaiverReason','Waiver Reason','\u8c41\u514d\u539f\u56e0');
+  label('expenseCategory','Expense Category','\u652f\u51fa\u7c7b\u522b');label('expenseDesc','Expense Description','\u652f\u51fa\u8bf4\u660e');label('paid','System Paid','\u7cfb\u7edf\u8ba1\u5165');label('entryClr','System Clear','\u7cfb\u7edf\u7ed3\u6e05');
+  label('excessTo','Excess Handling','\u8d85\u6536\u5904\u7406');label('arrearAmount','Tail Balance','\u5c3e\u6b3e\u91d1\u989d');label('arrearPromiseDate','Promise Date','\u627f\u8bfa\u652f\u4ed8\u65e5\u671f');label('arrearHandling','Handling','\u5904\u7406\u65b9\u5f0f');label('arrearReasonDetail','Tail Reason','\u5c3e\u6b3e\u539f\u56e0');label('reasonCode','Reason Code','\u539f\u56e0\u4ee3\u7801');label('customReason','Exception Reason','\u5f02\u5e38\u539f\u56e0');label('remark','Remark','\u5907\u6ce8');
 }
 applyBilingualUI();
 renderEntryTtlockStatus();

@@ -58,8 +58,25 @@ test("employee primary action labels remain English-first in System cards", asyn
   assert.match(card, /Status \/ \\u72b6\\u6001/);
 });
 
+test("employee Entry hierarchy renders English as the primary label", async () => {
+  const html = await readFile(htmlPath, "utf8");
+
+  for (const copy of [
+    "employeeUiPair('Current Session Summary'",
+    "employeeUiPair('Add Entry'",
+    "['Step 1 · Select Event Type'",
+    "['Cash Handover'",
+    "'Confirm Session Upload<span",
+    "'Reload Cards<span"
+  ]) {
+    assert.match(html, new RegExp(copy.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  }
+
+  assert.doesNotMatch(html, /Current Session Summary<\/span>/);
+  assert.doesNotMatch(html, /Add Entry<\/span>/);
+});
+
 test("production cutover remains blocked", async () => {
   const gate = await readFile("scripts/gate-commercial-launch-readiness.mjs", "utf8");
   assert.match(gate, /PRODUCTION_NO_GO/);
 });
-
