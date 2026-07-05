@@ -42,20 +42,20 @@ function cp_fmtEndDate(ts){
 }
 
 async function cp_loadAll(){
-  document.getElementById('roomList').innerHTML='<div class="state-box"><div class="state-icon">⏳</div>正在连接通通锁...</div>';
+  document.getElementById('roomList').innerHTML='<div class="state-box"><div class="state-icon">⏳</div>Connecting Access Cards / 正在连接门禁卡...</div>';
   document.getElementById('alertStrip').innerHTML='';
   document.getElementById('chartSection').style.display='none';
   try{
     const lr=await apiFetch('/api/lock/cards',{method:'GET'});
     const ld=await lr.json();
     if(lr.status===401){showAuthExpired();return;}
-    if(!lr.ok){document.getElementById('roomList').innerHTML=`<div class="state-box"><div class="state-icon">❌</div>通通锁加载失败：${esc(ld.error||lr.status)}</div>`;return;}
+    if(!lr.ok){document.getElementById('roomList').innerHTML=`<div class="state-box"><div class="state-icon">❌</div>Card Data Load Failed / 门禁卡加载失败：${esc(ld.error||lr.status)}</div>`;return;}
     roomsData=ld.roomsData||{};
 
     cp_computeMetrics();
     cp_buildChart();
     cp_render();
-    _ccCache=null; // 通通锁数据更新，使客户评分缓存失效
+    _ccCache=null; // 门禁卡数据更新，使客户评分缓存失效
     document.getElementById('lastUpdate').textContent='最后更新 · '+new Date().toLocaleTimeString('zh-CN');
   }catch(e){
     console.error(e);

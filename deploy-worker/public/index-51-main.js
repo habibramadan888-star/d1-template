@@ -1234,7 +1234,7 @@ async function loadHistoricalArrearsForOwner(opts={}){
 function arrearSourceLabel(a){
   return {
     existing_arrears_record:'系统已有欠款',
-    ttlock_expired_unpaid:'通通锁到期未付'
+    ttlock_expired_unpaid:'门禁卡到期未付'
   }[normalizeArrearsSourceType(a?.sourceType)]||'不显示';
 }
 function arrearDirectiveStatus(a){
@@ -1746,7 +1746,7 @@ function ownerArrearsSourceNotice(){
   const existing=status.existing_arrears_record;
   const ttlock=status.ttlock_expired_unpaid;
   if(existing&&(existing.ok===false||existing.status==='error'))notices.push('系统已有欠款暂不可用');
-  if(ttlock&&(ttlock.ok===false||ttlock.status==='error'))notices.push('通通锁数据暂不可用');
+  if(ttlock&&(ttlock.ok===false||ttlock.status==='error'))notices.push('门禁卡数据暂不可用');
   if(!notices.length)return '';
   return `<div class="empty-text" data-owner-arrears-source-warning="true" style="margin:8px 0 0;text-align:center">${notices.map(esc).join(' · ')}；已显示可读取的数据。</div>`;
 }
@@ -1777,7 +1777,7 @@ function renderOwnerOverviewArrearsPanel(){
   if(!rows.length||status==='empty'){
     panel.innerHTML=`<div class="empty-state hl-empty-state" data-owner-overview-arrears-empty="true">
       <div class="empty-title">暂无未结清欠款</div>
-      <div class="empty-text">这里只显示系统已有欠款记录，以及通通锁到期未付且已匹配床位租金的任务。</div>
+      <div class="empty-text">这里只显示系统已有欠款记录，以及门禁卡到期未付且已匹配床位租金的任务。</div>
       ${ownerArrearsSourceNotice()}
       <button class="btn btn-ghost" type="button" onclick="retryOwnerOverviewArrears()">重新读取</button>
     </div>`;
@@ -1802,7 +1802,7 @@ function renderOwnerOverviewArrearsPanel(){
       <span>总额 ${fmtMoney(Number(summary.total_amount_fils||0)/100)} AED</span>
       <span>需跟进 ${Number(summary.total_count||totalCount||0)}</span>
       <span>系统欠款 ${Number(summary.existing_arrears_count||0)}</span>
-      <span>通通锁 ${Number(summary.ttlock_expired_unpaid_count||0)}</span>
+      <span>门禁卡 ${Number(summary.ttlock_expired_unpaid_count||0)}</span>
       <span>承诺未回 ${Number(summary.promised_unpaid_count||summary.employee_promised_count||0)}</span>
       <span data-owner-arrears-preview-count="true">${esc(displayText)}</span>
     </div>
@@ -1953,7 +1953,7 @@ function renderArrearsPanel(){
   const active=visible.filter(isAllowedArrearsSource).filter(isArrearTaskOpen);
   if(!active.length){
     panel.innerHTML=isOwnerShellRole()
-      ? `<div class="empty-state card" style="padding:44px"><div class="empty-ico">📌</div><div class="empty-title">暂无未结清欠款</div><div class="empty-text">这里只显示系统已有欠款记录，以及通通锁到期未付且已配置床位租金的卡片。</div></div>`
+      ? `<div class="empty-state card" style="padding:44px"><div class="empty-ico">📌</div><div class="empty-title">暂无未结清欠款</div><div class="empty-text">这里只显示系统已有欠款记录，以及门禁卡到期未付且已配置床位租金的卡片。</div></div>`
       : '';
     return;
   }
@@ -2010,7 +2010,7 @@ function renderArrearsPanel(){
 function renderOwnerArrearsControls(){
   const sourceOptions=[
     ['all','全部'],
-    ['ttlock_expired_unpaid','通通锁已过期'],
+    ['ttlock_expired_unpaid','门禁卡已过期'],
     ['existing_arrears_record','系统已有欠款']
   ];
   return `<div class="owner-arrears-controls" data-owner-arrears-actions="true">
@@ -2050,7 +2050,7 @@ function renderOwnerOverviewArrearsPanel(){
   if(!rows.length||status==='empty'){
     panel.innerHTML=`<div class="empty-state hl-empty-state" data-owner-overview-arrears-empty="true">
       <div class="empty-title">暂无未结清欠款</div>
-      <div class="empty-text">这里只显示系统已有欠款，以及通通锁到期未付且已匹配床位租金的任务。</div>
+      <div class="empty-text">这里只显示系统已有欠款，以及门禁卡到期未付且已匹配床位租金的任务。</div>
       ${ownerArrearsSourceNotice()}
       <button class="btn btn-ghost" type="button" onclick="retryOwnerOverviewArrears()">重新读取</button>
     </div>`;
@@ -2074,7 +2074,7 @@ function renderOwnerOverviewArrearsPanel(){
       <span>总额 ${fmtMoney(Number(summary.total_amount_fils||0)/100)} AED</span>
       <span>需跟进 ${Number(summary.total_count||totalCount||0)}</span>
       <span>系统欠款 ${Number(summary.existing_arrears_count||0)}</span>
-      <span>通通锁 ${Number(summary.ttlock_expired_unpaid_count||0)}</span>
+      <span>门禁卡 ${Number(summary.ttlock_expired_unpaid_count||0)}</span>
       <span data-owner-arrears-preview-count="true">${esc(displayText)}</span>
     </div>
     ${ownerArrearsSourceNotice()}
@@ -2093,7 +2093,7 @@ function renderArrearsPanel(){
   const active=ownerArrearsActiveRows();
   if(!active.length){
     panel.innerHTML=isOwnerShellRole()
-      ? `<div class="empty-state card" style="padding:44px"><div class="empty-ico">📋</div><div class="empty-title">暂无未结清欠款</div><div class="empty-text">这里只显示系统已有欠款，以及通通锁到期未付且已配置床位租金的卡片。</div></div>`
+      ? `<div class="empty-state card" style="padding:44px"><div class="empty-ico">📋</div><div class="empty-title">暂无未结清欠款</div><div class="empty-text">这里只显示系统已有欠款，以及门禁卡到期未付且已配置床位租金的卡片。</div></div>`
       : '';
     return;
   }
@@ -2112,7 +2112,7 @@ function renderArrearsPanel(){
     </div>
     <div class="owner-arrears-summary" data-owner-arrears-kpis="true">
       <span>全部 ${active.length}</span>
-      <span>通通锁 ${active.filter(a=>normalizeArrearsSourceType(a?.sourceType)==='ttlock_expired_unpaid').length}</span>
+      <span>门禁卡 ${active.filter(a=>normalizeArrearsSourceType(a?.sourceType)==='ttlock_expired_unpaid').length}</span>
       <span>系统欠款 ${active.filter(a=>normalizeArrearsSourceType(a?.sourceType)==='existing_arrears_record').length}</span>
     </div>
     ${renderOwnerArrearsControls()}
@@ -2916,7 +2916,7 @@ function renderAnalysisChips(){
 }
 /* ══════════════════════════════════════════════════════════════════
    租金连续性检查模块 v4（全量 Bug 修复版）
-   锚点：通通锁（占用真相）+ 会话流水（收款事实）+ 参考租金（金额基准）
+   锚点：门禁卡（占用真相）+ 会话流水（收款事实）+ 参考租金（金额基准）
 
    已修复：
    Bug1 手续费混入租金  Bug2 历史月用锁状态  Bug3 null误报漏收
@@ -3103,7 +3103,7 @@ function rc_refRent(name,cfg){
   return(a&&p&&cfg[a])?(Number(cfg[a][p])||null):null;
 }
 
-/* 通通锁占用判断 */
+/* 门禁卡占用判断 */
 function rc_isOccupied(room){
   const cards=roomsData?roomsData[room]:null;
   if(!cards)return null;
@@ -3221,7 +3221,7 @@ function rc_run(){
         prevSt='missing';return;
       }
 
-      /* ④ Bug2 Fix：历史月只靠 prevSt 推断占用；通通锁仅覆盖最后一月 */
+      /* ④ Bug2 Fix：历史月只靠 prevSt 推断占用；门禁卡仅覆盖最后一月 */
       let occupied;
       if(prevSt==='ok'||prevSt==='anomaly'||prevSt==='missing'){
         occupied=true;
@@ -3242,7 +3242,7 @@ function rc_run(){
       if(occupied===null&&totalPaid===0){
         if(isLast&&lockOccupied===true){
           monthRows.push({month,st:'missing'});
-          alerts.red.push({room,month,msg:'通通锁有人，最近月无收款'});
+          alerts.red.push({room,month,msg:'门禁卡有人，最近月无收款'});
           prevSt='missing';
         }else{
           monthRows.push({month,st:'blind'});
@@ -3264,10 +3264,10 @@ function rc_run(){
           monthRows.push({month,st,paid:totalPaid,note,annotation:ann});
           prevSt=st;
         }else{
-          // 真正矛盾：通通锁显示空床（lockOccupied===false），但有收款
+          // 真正矛盾：门禁卡显示空床（lockOccupied===false），但有收款
           monthRows.push({month,st:'contradict',paid:totalPaid});
           alerts.yellow.push({room,month,
-            msg:`通通锁显示空床但有收款 ${fmtMoney(totalPaid)}，请核查`});
+            msg:`门禁卡显示空床但有收款 ${fmtMoney(totalPaid)}，请核查`});
           prevSt='ok';
         }
         return;
@@ -3276,7 +3276,7 @@ function rc_run(){
       /* ⑧ 确认有人无收款 → 漏收 */
       if(occupied===true&&totalPaid===0){
         monthRows.push({month,st:'missing'});
-        const src=(inLock&&isLast)?'通通锁有人':'上月有收款记录';
+        const src=(inLock&&isLast)?'门禁卡有人':'上月有收款记录';
         alerts.red.push({room,month,msg:`${src}，本月无收款`});
         prevSt='missing';return;
       }
@@ -3431,7 +3431,7 @@ function rc_renderCfg(container){
     <div style="font-size:10px;color:var(--text3);padding:6px;background:rgba(26,115,232,0.06);border-radius:5px;margin-bottom:10px">💡 批量操作仅修改界面预览，需点击下方「保存设置」才生效 · 绿点表示已配置</div>
     <!-- 床位列表 -->
     <div id="rc_cfgRows" style="max-height:380px;overflow-y:auto;padding-right:4px">
-      ${rooms.length>0?bodyHtml:'<div style="color:var(--text3);font-size:12px;padding:8px 0;text-align:center">暂无床位数据，请先加载通通锁或导入历史会话</div>'}
+      ${rooms.length>0?bodyHtml:'<div style="color:var(--text3);font-size:12px;padding:8px 0;text-align:center">暂无床位数据，Load Cards first / 请先加载卡片，或导入历史会话</div>'}
     </div>
     <!-- 底部按钮 -->
     <div style="display:flex;gap:8px;margin-top:10px">
@@ -3504,7 +3504,7 @@ function rc_removeApt(a){}
 
 /* ── 结果渲染 ──────────────────────────────────────────────────── */
 function rc_renderResults(data,container){
-  if(!data){container.innerHTML='<div style="color:var(--text3);text-align:center;padding:20px;font-size:13px">请先导入历史会话并加载通通锁数据后运行检查</div>';return;}
+  if(!data){container.innerHTML='<div style="color:var(--text3);text-align:center;padding:20px;font-size:13px">Import history sessions and load card data / 请先导入历史会话并加载卡片数据后运行检查</div>';return;}
   const{months,results,alerts,lastMonth}=data;
   if(!months.length){container.innerHTML='<div style="color:var(--text3);text-align:center;padding:20px;font-size:13px">分析数据为空，请先导入历史会话</div>';return;}
 
@@ -3530,7 +3530,7 @@ function rc_renderResults(data,container){
     const rref=refRent?`<span style="font-size:10px;color:var(--text3)"> ${fmtMoney(refRent)}</span>`:'';
     return `<tr>
       <td style="font-size:12px;font-weight:600;padding:4px 6px 4px 0;white-space:nowrap">${esc(room)}${rref}</td>
-      <td title="${inLock?(lockOccupied?'通通锁有人':'通通锁空床'):'不在锁里'}"
+      <td title="${inLock?(lockOccupied?'门禁卡有人':'门禁卡空床'):'不在锁里'}"
         style="text-align:center;font-size:11px;color:${lcol};padding:4px 6px;cursor:default">${lbl}</td>
       ${tds}
     </tr>`;
@@ -3594,10 +3594,10 @@ async function rc_initPanel(){
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;padding-top:4px">
       <button class="btn btn-ghost" onclick="rc_toggleCfg()" style="font-size:12px">📋 参考租金设置</button>
       <button class="btn btn-ghost" id="rc_loadBtn" onclick="rc_loadLock()" style="font-size:12px">
-        ${loaded?'🔄 刷新通通锁':'📡 加载通通锁'}</button>
+        ${loaded?'🔄 Reload Cards / 重新读取卡片':'📡 Load Cards / 加载卡片'}</button>
       <button class="btn btn-primary" onclick="rc_check()" style="font-size:12px">▶ 运行检查</button>
       <span style="font-size:11px;color:var(--text3);align-self:center" id="rc_status">
-        ${loaded?Object.keys(roomsData).length+'个床位':'通通锁未加载'} &nbsp;·&nbsp; 分析数据 ${sc} 个会话
+        ${loaded?Object.keys(roomsData).length+'个床位':'门禁卡未加载'} &nbsp;·&nbsp; 分析数据 ${sc} 个会话
       </span>
     </div>
     <div id="rc_cfgPanel" style="display:none;padding:12px;background:var(--surface2);border-radius:10px;margin-bottom:12px"></div>
@@ -3613,7 +3613,7 @@ async function rc_loadLock(){
   const btn=document.getElementById('rc_loadBtn');
   const st=document.getElementById('rc_status');
   if(btn){btn.textContent='⏳ 加载中...';btn.disabled=true;}
-  if(st)st.textContent='正在连接通通锁...';
+  if(st)st.textContent='Connecting Access Cards / 正在连接门禁卡...';
   try{
     await cp_loadAll();
   }catch(e){
@@ -3621,7 +3621,7 @@ async function rc_loadLock(){
   }finally{
     // Bug10 Fix：无论成功失败，按钮必须解除禁用
     const n=Object.keys(roomsData||{}).length;
-    if(btn){btn.textContent=n>0?'🔄 刷新通通锁':'❌ 加载失败，重试';btn.disabled=false;}
+    if(btn){btn.textContent=n>0?'🔄 Reload Cards / 重新读取卡片':'❌ 加载失败，重试';btn.disabled=false;}
     if(st)st.textContent=n>0
       ?`${n}个床位 · 分析数据 ${state.analysisSessions.length} 个会话`
       :'加载失败，请检查网络';
@@ -3689,9 +3689,9 @@ function rc_openResolveModal(rkey,bed,cardName,amount){
   const modalTitle=isNoCoverage?'处理缺流水问题':'处理收款问题';
   const evidenceRows=[
     ['床位号',bed||issue.bed||'—'],
-    ['通通锁卡片名称',cardName||issue.cardName||'—'],
+    ['门禁卡名称',cardName||issue.cardName||'—'],
     ['月租',`${fmtMoney(issue.ref||0)} AED`],
-    ['TTLock 卡片有效期',rc_fmtShortDate(issue.endDate||issue.end)],
+    ['Access Card 卡片有效期',rc_fmtShortDate(issue.endDate||issue.end)],
     ['系统是否找到付款流水',issue.coverage?'是':'否'],
     ['缺流水原因说明',issue.msg||'未找到可计算覆盖日期的有效租金流水']
   ].map(([label,value])=>`<div style="display:grid;grid-template-columns:128px 1fr;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)"><span style="font-size:11px;color:var(--text3)">${label}</span><b style="font-size:12px;color:var(--text)">${esc(value)}</b></div>`).join('');
@@ -3760,7 +3760,7 @@ function rc_closeResolveModal(){const o=document.getElementById('rcResolveOverla
 function rc_check(){
   const grid=document.getElementById('rc_grid');if(!grid)return;
   if(!roomsData||!Object.keys(roomsData).length){
-    grid.innerHTML='<div style="color:var(--red);text-align:center;padding:16px;font-size:13px">⚠ 请先加载通通锁卡片数据</div>';
+    grid.innerHTML='<div style="color:var(--red);text-align:center;padding:16px;font-size:13px">⚠ Load card data first / 请先加载卡片数据</div>';
     return;
   }
   const{sessions}=rc_periodSessions();
@@ -3847,7 +3847,7 @@ function rc_renderCfg(container){
     </div>
     <div style="font-size:10px;color:var(--text3);padding:7px;background:rgba(26,115,232,0.06);border-radius:6px;margin-bottom:10px">先输入租金，再勾选床位并应用；可分批设置不同价格，最后点击“保存设置”才会生效。</div>
     <div id="rc_cfgRows" style="max-height:380px;overflow-y:auto;padding-right:4px">
-      ${rooms.length>0?bodyHtml:'<div style="color:var(--text3);font-size:12px;padding:8px 0;text-align:center">暂无床位数据，请先加载通通锁或导入历史会话</div>'}
+      ${rooms.length>0?bodyHtml:'<div style="color:var(--text3);font-size:12px;padding:8px 0;text-align:center">暂无床位数据，Load Cards first / 请先加载卡片，或导入历史会话</div>'}
     </div>
     <div style="display:flex;gap:8px;margin-top:10px">
       <button class="btn btn-ghost" onclick="rc_addRoom()" style="font-size:12px;flex:1">+ 添加床位</button>
@@ -3911,7 +3911,7 @@ function rc_saveCfgFromUI(){
 }
 
 /* v40: 参考租金设置闭环
-   1. 通通锁卡片里出现过的所有床位都显示，空床也显示。
+   1. 门禁卡里出现过的所有床位都显示，空床也显示。
    2. 用户手动输入当前批次价格，不预设快捷金额。
    3. 勾选床位后点“确认本批”，才保存这一批床位的价格。 */
 var _rcCfgOpenGroups=_rcCfgOpenGroups||{};
@@ -3972,7 +3972,7 @@ function rc_renderCfg(container){
       const rowBorder=isSet?'rgba(26,138,74,0.18)':'rgba(224,108,0,0.2)';
       const statusBg=isSet?'rgba(26,138,74,0.12)':'rgba(224,108,0,0.12)';
       const statusColor=isSet?'#1a8a4a':'#e06c00';
-      const tag=b.vacant?'空床':b.staff?'员工':'通通锁';
+      const tag=b.vacant?'空床':b.staff?'员工':'门禁卡';
       const tagColor=b.vacant?'#8a94a6':b.staff?'#7c4dff':'#1a73e8';
       return `<label class="rc-bed-row" style="display:grid;grid-template-columns:24px minmax(64px,1fr) 82px minmax(120px,1.4fr);gap:8px;align-items:center;padding:7px 8px;margin:3px 0;border:1px solid ${rowBorder};border-radius:7px;background:${rowBg};cursor:pointer">
         <input type="checkbox" class="rc-bed-check" data-room="${esc(b.room)}" data-group="${esc(g)}" style="width:16px;height:16px">
@@ -4000,7 +4000,7 @@ function rc_renderCfg(container){
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:10px">
       <div>
         <div style="font-size:13px;font-weight:800;color:var(--text)">参考租金设置</div>
-        <div style="font-size:11px;color:var(--text3);margin-top:3px">显示通通锁全部床位，空床也包含 · 已设置 <b style="color:${configured?'var(--green)':'var(--text3)'}">${configured}</b>/${beds.length} (${pct}%)</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:3px">显示门禁卡全部床位，空床也包含 · 已设置 <b style="color:${configured?'var(--green)':'var(--text3)'}">${configured}</b>/${beds.length} (${pct}%)</div>
       </div>
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
         <input id="rc_batchVal" type="number" placeholder="AED" style="width:76px;padding:6px 8px;border:1px solid var(--border);border-radius:7px;font-size:12px;text-align:right">
@@ -4011,7 +4011,7 @@ function rc_renderCfg(container){
     </div>
     <div style="font-size:10px;color:var(--text3);padding:7px;background:rgba(26,115,232,0.06);border-radius:6px;margin-bottom:10px">手动输入本批租金，再勾选对应床位，最后点“确认本批”。绿色表示已完成设置，橙色表示还未设置。</div>
     <div id="rc_cfgRows" style="max-height:410px;overflow-y:auto;padding-right:4px">
-      ${beds.length?rows:'<div style="color:var(--text3);font-size:12px;padding:14px 0;text-align:center">暂无床位数据，请先刷新通通锁卡片</div>'}
+      ${beds.length?rows:'<div style="color:var(--text3);font-size:12px;padding:14px 0;text-align:center">No bed data. Reload cards first. / 暂无床位数据，请先重新读取卡片</div>'}
     </div>`;
 }
 function rc_setBatchValue(v){
@@ -4215,7 +4215,7 @@ function wmCreateAccountFromCard(card,accounts){
 }
 async function wmSyncFromContinuity(){
   const cards=wmCardsFromContinuity(_wmLastContinuityData);
-  if(!cards.length){toast('请先刷新通通锁数据','err');return;}
+  if(!cards.length){toast('Reload card data first / 请先重新读取卡片数据','err');return;}
   const accounts=wmGetAccounts();let created=0,updated=0;
   cards.forEach(c=>{const existed=!!accounts[c.bed];wmCreateAccountFromCard(c,accounts);existed?updated++:created++;});
   try{await wmSaveAccounts(accounts);}catch(e){toast('WiFi 账户保存失败','err');return;}
@@ -4224,7 +4224,7 @@ async function wmSyncFromContinuity(){
 }
 async function wmCreateOne(bed){
   const card=wmCardsFromContinuity(_wmLastContinuityData).find(c=>String(c.bed)===String(bed));
-  if(!card){toast('未找到该床位的通通锁卡片','err');return;}
+  if(!card){toast('未找到该床位的门禁卡','err');return;}
   const accounts=wmGetAccounts();wmCreateAccountFromCard(card,accounts);
   try{await wmSaveAccounts(accounts);}catch(e){toast('WiFi 账户保存失败','err');return;}
   toast(`WiFi 账户已准备：${bed}`);wmRerender();
@@ -4247,9 +4247,9 @@ function wmRerender(){
 }
 async function wmLoadLock(){
   try{
-    toast('正在刷新通通锁数据...');
+    toast('Reloading card data... / 正在重新读取卡片数据...');
     await cp_loadAll();
-    toast('通通锁数据已刷新');
+    toast('Card Data Reloaded / 卡片数据已刷新');
   }catch(e){toast('刷新失败：'+e.message,'err');}
   wmRenderPage();
 }
@@ -4274,11 +4274,11 @@ function wmRenderModule(data){
     <div class="card-head" style="align-items:flex-start">
       <div>
         <div style="font-size:13px;font-weight:800;color:var(--text)">📶 WiFi 网络管理模块 <span style="font-size:11px;color:var(--accent);font-weight:700">Beta</span></div>
-        <div style="font-size:10px;color:var(--text3);margin-top:2px">从通通锁床位生成网络账号 · 后续接入 MikroTik RB750Gr3 执行断网/恢复</div>
+        <div style="font-size:10px;color:var(--text3);margin-top:2px">从门禁卡床位生成网络账号 · 后续接入 MikroTik RB750Gr3 执行断网/恢复</div>
       </div>
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end">
         <span class="mono" style="font-size:10px;color:var(--text3)">账号 ${ready}/${total} · 待处理 ${action}</span>
-        <button class="btn btn-ghost" onclick="wmLoadLock()" style="font-size:11px;padding:5px 10px">刷新通通锁</button>
+        <button class="btn btn-ghost" onclick="wmLoadLock()" style="font-size:11px;padding:5px 10px">Reload Cards / 重新读取卡片</button>
       </div>
     </div>
     <div class="card-body">
@@ -4288,7 +4288,7 @@ function wmRenderModule(data){
         ${filterBtn('action','只看待处理')}${filterBtn('all','全部床位')}
         <span style="font-size:11px;color:var(--text3);align-self:center">当前为模块化接入：不自动断网，只生成建议和操作入口。</span>
       </div>
-      ${!cards.length?'<div style="padding:24px;text-align:center;color:var(--text3);background:var(--surface2);border:1px solid var(--border);border-radius:10px;margin-bottom:10px">暂无通通锁床位数据，请先点击“刷新通通锁”。</div>':''}
+      ${!cards.length?'<div style="padding:24px;text-align:center;color:var(--text3);background:var(--surface2);border:1px solid var(--border);border-radius:10px;margin-bottom:10px">暂无门禁卡床位数据，请先点击“Reload Cards / 重新读取卡片”。</div>':''}
       <div class="table-wrap" style="max-height:320px;background:var(--surface)">
         <table class="tx-table">
           <thead><tr><th>床位</th><th>租客/卡片</th><th>WiFi账号</th><th>网络状态</th><th>财务信号</th><th>操作</th></tr></thead>
@@ -4319,10 +4319,10 @@ const STATUS_LABEL_WIFI_MAP={
   default:{label:'待确认',color:'#8a94a6',bg:'#8a94a610'}
 };
 function rc_cardContinuityRender(data,container){
-  if(!data){container.innerHTML='<div style="color:var(--text3);text-align:center;padding:20px;font-size:13px">请先导入流水并加载通通锁数据后运行检查</div>';return;}
+  if(!data){container.innerHTML='<div style="color:var(--text3);text-align:center;padding:20px;font-size:13px">Import ledger records and load card data / 请先导入流水并加载卡片数据后运行检查</div>';return;}
   _wmLastContinuityData=data;
   const{period,cards,alerts,sessions,gapLimit}=data;
-  if(!cards.length){container.innerHTML='<div style="color:var(--text3);text-align:center;padding:20px;font-size:13px">通通锁暂无可检查的在住卡片</div>';return;}
+  if(!cards.length){container.innerHTML='<div style="color:var(--text3);text-align:center;padding:20px;font-size:13px">门禁卡暂无可检查的在住卡片</div>';return;}
 
   /* ── 读取处理记录，为每张漏收卡片注入 resolved 状态 ── */
   const resolutions=rc_getResolutions();
@@ -4412,7 +4412,7 @@ function rc_cardContinuityRender(data,container){
   container.innerHTML=`
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
       <button class="btn btn-ghost" onclick="rc_toggleCfg()" style="font-size:12px">📋 参考租金设置</button>
-      <button class="btn btn-ghost" id="rc_loadBtn" onclick="rc_loadLock()" style="font-size:12px">🔄 刷新通通锁</button>
+      <button class="btn btn-ghost" id="rc_loadBtn" onclick="rc_loadLock()" style="font-size:12px">🔄 Reload Cards / 重新读取卡片</button>
       <button class="btn btn-primary" onclick="rc_check()" style="font-size:12px">▶ 重新检查</button>
       <span style="font-size:11px;color:var(--text3);align-self:center">Coverage Gap · 阈值 > ${gapLimit}天 · ${sessions.length} 会话 · ${cards.length} 卡片</span>
     </div>
@@ -4429,14 +4429,14 @@ function rc_cardContinuityRender(data,container){
     ${issueHtml('🟠 无法计算覆盖日期',alerts.yellow,'#e06c00',false)}
     <div class="table-wrap" style="margin-top:12px;max-height:460px">
       <table class="tx-table">
-        <thead><tr><th>床位</th><th>通通锁卡片</th><th class="right">月租</th><th>付款连续性</th><th>收款日</th><th>覆盖至</th><th class="right">缺口天</th><th class="right">差额</th><th>状态</th><th>原因</th><th>操作</th></tr></thead>
+        <thead><tr><th>床位</th><th>Access Card<br><small>门禁卡</small></th><th class="right">月租</th><th>付款连续性</th><th>收款日</th><th>覆盖至</th><th class="right">缺口天</th><th class="right">差额</th><th>状态</th><th>原因</th><th>操作</th></tr></thead>
         <tbody>${mainRows}</tbody>
       </table>
     </div>
     ${resolvedSection}`;
 }
 
-/* v45: 通通锁续期锚点版覆盖缺口检测
+/* v45: 门禁卡续期锚点版覆盖缺口检测
    D200/D100 后面的 MMDD 是入住日/每月续期日；提前交租要覆盖到下一期锚点。 */
 function rc_cardCycleAnchor(cardName){
   const s=String(cardName||'').trim();
@@ -4585,7 +4585,7 @@ function rc_openPaymentContinuityModal(bed){
       const dep=r.hasDeposit?'含押金':'不含押金';
       const balance=r.isBalance?'尾款/balance':'非尾款';
       const cover=r.isBalance?'覆盖期待人工核对；尾款补交日期不作为覆盖截止日':'覆盖期待人工核对';
-      const ttlock=card.endDate?`TTLock 截止 ${rc_fmtShortDate(card.endDate)}`:'TTLock 有效期待核对';
+      const ttlock=card.endDate?`Access Card 截止 ${rc_fmtShortDate(card.endDate)}`:'Access Card 有效期待核对';
       return `<div style="padding:7px 0;border-top:1px dashed var(--border);font-size:11px;line-height:1.7;color:var(--text2)">
         <b class="mono" style="color:var(--text)">${rc_fmtShortDate(r.date)}</b>
         <span class="mono" style="font-weight:800;color:var(--text)">${fmtMoney(r.amount)} AED</span>
@@ -4621,7 +4621,7 @@ function rc_openPaymentContinuityModal(bed){
     <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:14px">
       <div>
         <div style="font-size:16px;font-weight:900;color:var(--text)">付款连续性详情</div>
-        <div style="font-size:12px;color:var(--text3);margin-top:4px">床位 ${esc(key)} · ${esc(cardName)} · 当前 TTLock 有效期 ${rc_fmtShortDate(card.endDate||card.end)}</div>
+        <div style="font-size:12px;color:var(--text3);margin-top:4px">床位 ${esc(key)} · ${esc(cardName)} · 当前 Access Card 有效期 ${rc_fmtShortDate(card.endDate||card.end)}</div>
       </div>
       <button onclick="rc_closePaymentContinuityModal()" style="background:transparent;border:0;color:var(--text3);font-size:22px;line-height:1;cursor:pointer">×</button>
     </div>
@@ -4656,9 +4656,9 @@ function rc_cardContinuityRun(){
     /* v48: rentPaid 已是周期内所有分期付款的合计，shortAmount 才能正确为0 */
     const shortAmount=cov?Math.max(0,Math.round((monthly-(cov.rentPaid||0))*100)/100):0;
     const anchoredShort=!!(cov&&cov.cycleAnchored&&shortAmount>1);
-    let gapDays=0,gapAmount=0,status='ok',msg='租金覆盖日期与通通锁卡片截止日一致';
+    let gapDays=0,gapAmount=0,status='ok',msg='租金覆盖日期与门禁卡截止日一致';
     if(!card.end){
-      status='noDate';msg='通通锁卡片没有截止日期，无法做覆盖缺口检测';
+      status='noDate';msg='门禁卡没有截止日期，无法做覆盖缺口检测';
     }else if(!cov){
       status=hasArrears?'knownArrears':'noCoverage';
       msg=hasArrears?'该床位已有未结清欠款记录，不进入漏收清单':'没有找到可计算覆盖日期的有效租金流水';
@@ -4999,7 +4999,7 @@ function renderOwnerOverviewComparativePanel(){
           const anchor=[t.transfer_date||'-',t.operator_employee||'-',feeLabel,t.reason||'-',t.note||'-'].map(x=>esc(x)).join(' · ');
           return `<div class="hist-stat"><span>#${esc(t.from_bed||'-')} → #${esc(t.to_bed||'-')}</span><b>${esc(t.status==='pending_review'?'recorded':t.status||'recorded')}</b></div><div class="hist-anchor">${anchor}${waiver} · entry ${esc(t.entry_event_id||'-')} · audit ${esc(t.audit_id||'-')}</div>`;
         }).join(''):'<div class="hist-anchor">No bed transfer records yet.</div>'}
-        <div class="hist-anchor">Record only: no occupancy, deposit, arrears, or TTLock mutation.</div>
+        <div class="hist-anchor">Record only: no occupancy, deposit, arrears, or Access Card mutation.</div>
       </div>
       <div class="hist-card" data-owner-overview-arrears-collection="true"><div class="hist-title">Arrears & Collection</div>
         <div class="hist-stat"><span>Open tasks</span><b>${Number(arrears.open_count||0)}</b></div>
@@ -5225,7 +5225,7 @@ function renderOwnerOverviewComparativePanel(){
           const anchor=[t.transfer_date||'-',t.operator_employee||'-',feeLabel,t.reason||'-',t.note||'-'].map(x=>esc(x)).join(' · ');
           return `<div class="hist-stat"><span>${esc(t.from_bed||'-')} → ${esc(t.to_bed||'-')}</span><b>${esc(t.status==='pending_review'?'已记录':t.status||'已记录')}</b></div><div class="hist-anchor">${anchor}${waiver} · entry ${esc(t.entry_event_id||'-')}</div>`;
         }).join(''):'<div class="hist-anchor">暂无换床记录。</div>'}
-        <div class="hist-anchor">只读锚点：不改变入住、押金、欠款或通通锁。</div>
+        <div class="hist-anchor">只读锚点：不改变入住、押金、欠款或门禁卡。</div>
       </div>
       <div class="hist-card" data-owner-overview-arrears-collection="true"><div class="hist-title">欠款与回收</div>
         <div class="hist-stat"><span>未结清任务</span><b>${Number(arrears.open_count||0)}</b></div>
@@ -5992,7 +5992,7 @@ function getClientCreditBillingPeriod(dateValue=new Date()){
     isHandoverDay:safeNow.getDate()===2
   };
 }
-/* 期内到期续租预测（从通通锁卡片计算） */
+/* 期内到期续租预测（从门禁卡计算） */
 /* Bug2 Fix: 会话去重，防止 state.saved + state.analysisSessions 同一份数据重复计算 */
 function dedupSessions(sessions){
   const seen=new Set();
@@ -6135,7 +6135,7 @@ function ownerCoreDataStatusLabel(){
   const s=_ownerCoreReadDataStatus||{};
   const parts=[
     s.history==='loading'?'正在加载历史流水':s.history==='ready'?'历史流水已加载':s.history==='missing'?'缺历史流水':'历史流水待加载',
-    s.ttlock==='loading'?'正在加载 TTLock':s.ttlock==='ready'?'TTLock 已加载':s.ttlock==='missing'?'缺 TTLock cards':'TTLock 待加载',
+    s.ttlock==='loading'?'正在加载 Access Card':s.ttlock==='ready'?'Card Data Loaded / 卡片数据已加载':s.ttlock==='missing'?'Missing Access Cards / 缺门禁卡':'Card Data Pending / 卡片数据待加载',
     s.rent==='ready'?'月租映射已加载':'缺月租映射',
     s.computed==='loading'?'正在计算客户信用':s.computed==='ready'?'客户信用已计算':'客户信用待计算'
   ];
@@ -6331,7 +6331,7 @@ function renderBillingWidget(targetId){
   const debt=ccOutstandingDebtSummary();
   const outstanding=r2(debt.total);
 
-  // 期内到期续租（通通锁）
+  // 期内到期续租（门禁卡）
   const ren=calcPeriodRenewals(p);
   const hasRen=ren&&ren.count>0;
   window._renewalSnapshots=window._renewalSnapshots||{};
@@ -6344,16 +6344,16 @@ function renderBillingWidget(targetId){
   const tp=Math.round(p.timePct*100);
   const tt=ccTtlockStatus();
   const ttlockStatusHtml=targetId==='billingWidget2'?`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 10px;padding:8px 10px;border-radius:9px;background:${tt.loaded?'rgba(26,138,74,0.07)':'rgba(224,108,0,0.08)'};border:1px solid ${tt.loaded?'rgba(26,138,74,0.22)':'rgba(224,108,0,0.25)'};font-size:11px;color:var(--text2)">
-    <span><b style="color:${tt.loaded?'var(--green)':'var(--orange)'}">TTLock ${tt.loaded?'已加载':'未加载'}</b> · ${tt.cards} cards · ${tt.rooms} rooms${tt.sync?' · '+esc(tt.sync):''}</span>
+    <span><b style="color:${tt.loaded?'var(--green)':'var(--orange)'}">Access Card ${tt.loaded?'已加载':'未加载'}</b> · ${tt.cards} cards · ${tt.rooms} rooms${tt.sync?' · '+esc(tt.sync):''}</span>
     <button class="btn btn-ghost" style="font-size:11px;padding:5px 9px" onclick="ccRecomputeClientCredit()">重新加载核心数据</button>
   </div>`:'';
 
-  // ── 续租明细列表 + 通通锁状态提示（合并在同一区域）──
+  // ── 续租明细列表 + 门禁卡状态提示（合并在同一区域）──
   let renewListHtml='';
   if(ren===null){
-    // 通通锁未加载
+    // 门禁卡未加载
     const missing=[
-      !(roomsData&&Object.keys(roomsData).length)?'缺 TTLock cards':'',
+      !(roomsData&&Object.keys(roomsData).length)?'Missing Access Cards / 缺门禁卡':'',
       !p?.start||!p?.end?'缺 billing period':''
     ].filter(Boolean).join(' · ')||'缺 bed mapping / monthly rent map';
     renewListHtml=`<div style="margin-top:10px;padding:8px 12px;border-radius:8px;background:var(--surface2);border:1px solid var(--border);font-size:11px;color:var(--text3);text-align:center">无法计算期内待续租：${esc(missing)}</div>`;
@@ -6513,7 +6513,7 @@ function ccRenderDebtDetailRows(){
   if(q)rows=rows.filter(r=>String(r.bed||'').toLowerCase().includes(q)||String(r.name||'').toLowerCase().includes(q));
   rows.sort((a,b)=>sort==='amount'?(Number(b.remain||0)-Number(a.remain||0)):String(a.bed||'').localeCompare(String(b.bed||''),undefined,{numeric:true}));
   if(!rows.length){el.innerHTML='<div style="text-align:center;color:#64748b;padding:24px">暂无欠款明细</div>';return;}
-  el.innerHTML=`<div class="table-wrap" style="max-height:58vh"><table class="tx-table"><thead><tr><th>床位</th><th>客户/卡片</th><th class="right">月租</th><th class="right">已收</th><th class="right">未缴</th><th>应缴日期/账期</th><th>最近收款</th><th>TTLock</th><th>来源</th></tr></thead><tbody>${rows.map(r=>`<tr onclick="ccOpenDebtEvidence(${jsArg(r.bed)})" style="cursor:pointer">
+  el.innerHTML=`<div class="table-wrap" style="max-height:58vh"><table class="tx-table"><thead><tr><th>床位</th><th>客户/卡片</th><th class="right">月租</th><th class="right">已收</th><th class="right">未缴</th><th>应缴日期/账期</th><th>最近收款</th><th>Access Card<br><small>门禁卡</small></th><th>来源</th></tr></thead><tbody>${rows.map(r=>`<tr onclick="ccOpenDebtEvidence(${jsArg(r.bed)})" style="cursor:pointer">
     <td class="mono" style="font-weight:800">${esc(r.bed||'待核对')}</td>
     <td>${esc(r.name||'待核对')}</td>
     <td class="mono right">${fmtMoney(r.monthly||0)}</td>
@@ -6635,7 +6635,7 @@ function renderClientContinuityPanel(){
     <div class="card-head" onclick="toggleClientContinuity()" style="cursor:pointer">
       <div>
         <div class="card-title">租金连续性检查</div>
-        <div class="card-sub">按通通锁卡片床位核对当期流水，发现漏收和金额异常</div>
+        <div class="card-sub">按门禁卡床位核对当期流水，发现漏收和金额异常</div>
       </div>
       <button class="btn btn-ghost" style="font-size:11px;padding:6px 10px">${_clientContinuityOpen?'收起':'展开'}</button>
     </div>
@@ -6864,7 +6864,7 @@ function ccBuildCache(){
         if(!tenancyMap[bed]||ts>tenancyMap[bed])tenancyMap[bed]=ts;
       });
     });
-    // ── Step2: 从通通锁构建在住租客列表 ──
+    // ── Step2: 从门禁卡构建在住租客列表 ──
     const hasLock=roomsData&&Object.keys(roomsData).length>0;
     const tenants=[];
     if(hasLock){
@@ -6932,7 +6932,7 @@ function ccShowLoading(){
   if(bw)bw.innerHTML=`<div class="card billing-widget"><div class="card-body" style="padding:16px">
     <div style="font-size:15px;font-weight:800;color:var(--accent);margin-bottom:6px">正在计算客户信用</div>
     <div style="font-size:12px;color:var(--text3);line-height:1.6">${esc(ownerCoreDataStatusLabel())}</div>
-    <div style="font-size:11px;color:var(--text3);line-height:1.6;margin-top:4px">正在加载历史流水 / 正在加载 TTLock / 正在计算客户信用</div>
+    <div style="font-size:11px;color:var(--text3);line-height:1.6;margin-top:4px">正在加载历史流水 / 正在加载 Access Card / 正在计算客户信用</div>
   </div></div>`;
 }
 async function ccRecomputeClientCredit(){
@@ -6958,7 +6958,7 @@ function ccRender(forceRebuild=false){
     if(_clientContinuityOpen)rc_initPanel();
     if(!hasLock){
       const el=document.getElementById('ccCards');
-      if(el)el.innerHTML=`<div style="text-align:center;padding:32px 16px;color:var(--text3);font-size:13px;border:1px dashed var(--border);border-radius:12px">请先点击「刷新」，或前往控制面板加载通通锁，系统将自动评分所有在住租客</div>`;
+      if(el)el.innerHTML=`<div style="text-align:center;padding:32px 16px;color:var(--text3);font-size:13px;border:1px dashed var(--border);border-radius:12px">Click Refresh or load card data in Console / 请先点击「刷新」，或前往控制面板加载卡片</div>`;
       return;
     }
     // ── Bug1 Fix: ccBuildCache 抛异常时 _ccCache 仍为 null 会崩溃，加兜底 ──
@@ -6968,7 +6968,7 @@ function ccRender(forceRebuild=false){
     }
   }else if(!hasLock){
     const el=document.getElementById('ccCards');
-    if(el)el.innerHTML=`<div style="text-align:center;padding:32px 16px;color:var(--text3);font-size:13px;border:1px dashed var(--border);border-radius:12px">请先点击「刷新」加载通通锁</div>`;
+    if(el)el.innerHTML=`<div style="text-align:center;padding:32px 16px;color:var(--text3);font-size:13px;border:1px dashed var(--border);border-radius:12px">Click Refresh to load card data / 请先点击「刷新」加载卡片`;
     return;
   }
   const{tenants,sorted:allSorted}=_ccCache; // 直接用预排序结果
@@ -6994,7 +6994,7 @@ function ccRender(forceRebuild=false){
   if(search)list=list.filter(t=>t.bed.toLowerCase().includes(search)||t.cardName.toLowerCase().includes(search)||t.lockRoom.toLowerCase().includes(search));
   if(filter!=='all')list=list.filter(t=>t.sc.grade===filter);
   const cards=document.getElementById('ccCards');if(!cards)return;
-  if(!tenants.length){cards.innerHTML=`<div style="text-align:center;padding:32px;color:var(--text3);font-size:13px;border:1px dashed var(--border);border-radius:12px">通通锁暂无在住卡片</div>`;return;}
+  if(!tenants.length){cards.innerHTML=`<div style="text-align:center;padding:32px;color:var(--text3);font-size:13px;border:1px dashed var(--border);border-radius:12px">门禁卡暂无在住卡片</div>`;return;}
   if(!list.length){cards.innerHTML='<div style="text-align:center;padding:20px;color:var(--text3);font-size:13px">没有匹配的租客</div>';return;}
   cards.innerHTML=list.map(t=>ccAutoCardHtml(t)).join('');
 }
