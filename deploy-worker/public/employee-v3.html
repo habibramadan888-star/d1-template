@@ -781,7 +781,13 @@ label .label-en{
   cursor:pointer;
   box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 10px 24px rgba(15,23,42,.06);
 }
-.pay-option span{
+.pay-option .employee-btn-main{
+  display:block;
+  font-size:18px;
+  font-weight:820;
+  line-height:1.1;
+}
+.pay-option .label-en{
   display:block;
   margin-top:3px;
   color:#8b96a7;
@@ -794,7 +800,7 @@ label .label-en{
   background:linear-gradient(180deg,#20bf6b 0%,#079447 100%);
   box-shadow:0 18px 34px rgba(9,166,79,.22),inset 0 1px 0 rgba(255,255,255,.22);
 }
-.pay-option.active span{color:rgba(255,255,255,.76)}
+.pay-option.active .label-en{color:rgba(255,255,255,.76)}
 .arrear-plan{
   padding:18px;
   border-radius:22px;
@@ -2562,7 +2568,7 @@ label .label-en{
         <div class="step" id="paymentStep">
           <div class="step-title"><span>4</span><div>Step 4 · Payment Method<small>第四步：付款方式</small></div></div>
         <div class="grid" id="paymentFields">
-          <div class="field"><label>付款方式 PY</label><select id="payType" class="hidden"><option value="C">现金 C</option><option value="B">银行 B</option></select><div class="pay-toggle"><button type="button" class="pay-option active" data-pay="C">现金<span>CASH</span></button><button type="button" class="pay-option" data-pay="B">银行<span>BANK</span></button></div></div>
+          <div class="field"><label>付款方式 PY</label><select id="payType" class="hidden"><option value="C">Cash / 现金</option><option value="B">Bank / 银行</option></select><div class="pay-toggle"><button type="button" class="pay-option active" data-pay="C"><span class="employee-btn-main">Cash</span><span class="label-en">现金</span></button><button type="button" class="pay-option" data-pay="B"><span class="employee-btn-main">Bank</span><span class="label-en">银行</span></button></div></div>
           <div class="field hidden" id="bankRefWrap"><label>银行参考 bank_ref</label><input id="bankRef" placeholder="系统保留字段，员工无需填写"></div>
         </div>
         </div>
@@ -5786,6 +5792,8 @@ function applyBilingualUI(){
     ['R','Rent','\u6536\u79df'],['D','Deposit In','\u6536\u62bc\u91d1'],['DR','Deposit Out','\u9000\u62bc\u91d1'],['CO','Checkout','\u9000\u623f'],['AP','Arrears Payment','\u8fd8\u6b20\u6b3e'],['E','Expense','\u652f\u51fa'],['TF','Bed Transfer','\u6362\u5e8a']
   ].map(([v,en,cn])=>`<option value="${v}">${esc(en)} / ${esc(cn)}</option>`).join('');
   $('payType').innerHTML='<option value="C">Cash / \u73b0\u91d1</option><option value="B">Bank / \u94f6\u884c</option>';
+  const cashPay=document.querySelector('.pay-option[data-pay="C"]');if(cashPay)cashPay.innerHTML=renderEmployeeButtonLabel('Cash','\u73b0\u91d1');
+  const bankPay=document.querySelector('.pay-option[data-pay="B"]');if(bankPay)bankPay.innerHTML=renderEmployeeButtonLabel('Bank','\u94f6\u884c');
   label('selectedEventDisplay','Selected Event','\u5df2\u9009\u4e8b\u4ef6');label('entryType','Event Type','\u4e8b\u4ef6\u7c7b\u578b');label('bed','Bed','\u5e8a\u4f4d');label('tenantName','Access Card Remark Snapshot','\u95e8\u7981\u5361\u5907\u6ce8\u5feb\u7167');label('tenantCardId','Access Card CID','\u95e8\u7981\u5361\u5361\u53f7');
   label('payType','Payment Method','\u4ed8\u6b3e\u65b9\u5f0f');label('bankRef','Bank Ref','\u94f6\u884c\u53c2\u8003');label('amount','Amount','\u5b9e\u6536\u6216\u652f\u51fa\u91d1\u989d');label('listPrice','List Price','\u7cfb\u7edf\u6708\u79df');
   label('cycle','Cycle','\u8d26\u671f\u7c7b\u578b');label('periodStart','Period Start','\u8d26\u671f\u5f00\u59cb');label('periodEnd','Period End','\u8d26\u671f\u622a\u6b62');label('periodDays','Period Days','\u8d26\u671f\u5929\u6570');

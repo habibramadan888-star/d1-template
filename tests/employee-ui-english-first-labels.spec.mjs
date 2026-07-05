@@ -125,6 +125,8 @@ test("employee buttons use English-first helper and do not render Chinese-first 
     "renderEmployeeButtonLabel('Reload Cards'",
     "renderEmployeeButtonLabel('Save Follow-up'",
     "renderEmployeeButtonLabel('Go Collect Rent'",
+    "renderEmployeeButtonLabel('Cash'",
+    "renderEmployeeButtonLabel('Bank'",
     '<span class="employee-btn-main">Upload Session</span><span class="label-en">确认本票并上传云端</span>'
   ]) {
     assert.match(html, new RegExp(copy.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
@@ -137,10 +139,28 @@ test("employee buttons use English-first helper and do not render Chinese-first 
     "清空<span class=\"label-en\">RESET</span>",
     "正在登录<span class=\"label-en\">SIGNING IN</span>",
     "Save Follow-up /",
-    "Go Collect Rent /"
+    "Go Collect Rent /",
+    "现金<span>CASH</span>",
+    "银行<span>BANK</span>"
   ]) {
     assert.doesNotMatch(html, new RegExp(badCopy.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
+});
+
+test("employee payment method buttons are English-first", async () => {
+  const html = await readFile(htmlPath, "utf8");
+
+  for (const copy of [
+    '<button type="button" class="pay-option active" data-pay="C"><span class="employee-btn-main">Cash</span><span class="label-en">现金</span></button>',
+    '<button type="button" class="pay-option" data-pay="B"><span class="employee-btn-main">Bank</span><span class="label-en">银行</span></button>',
+    "cashPay.innerHTML=renderEmployeeButtonLabel('Cash'",
+    "bankPay.innerHTML=renderEmployeeButtonLabel('Bank'"
+  ]) {
+    assert.match(html, new RegExp(copy.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  }
+
+  assert.doesNotMatch(html, /<button[^>]+data-pay="C"[^>]*>\s*现金\s*<span>\s*CASH\s*<\/span>/);
+  assert.doesNotMatch(html, /<button[^>]+data-pay="B"[^>]*>\s*银行\s*<span>\s*BANK\s*<\/span>/);
 });
 
 test("production cutover remains blocked", async () => {
