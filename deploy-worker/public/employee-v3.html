@@ -5353,6 +5353,127 @@ async function exportEntrySessionWhatsApp(){
   toast(copied?'WhatsApp text copied':'WhatsApp text ready',6000);
   return text;
 }
+function entryStatementAmount(value){
+  const n=num(value);
+  return Number.isFinite(n)?n.toLocaleString('en-US',{maximumFractionDigits:2}):'0';
+}
+function entryStatementTime(value){
+  const raw=String(value||'');
+  const iso=raw.match(/T(\d{2}):(\d{2})/);
+  if(iso)return `${iso[1]}${iso[2]}`;
+  const hm=raw.match(/\b(\d{1,2}):(\d{2})\b/);
+  if(hm)return `${hm[1].padStart(2,'0')}${hm[2]}`;
+  const compact=raw.match(/\b(\d{4})\b/);
+  if(compact)return compact[1];
+  const d=new Date();
+  return `${String(d.getHours()).padStart(2,'0')}${String(d.getMinutes()).padStart(2,'0')}`;
+}
+function entryStatementDate(value=today()){
+  const raw=String(value||today()).slice(0,10);
+  const m=raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m?`${m[2]}${m[3]}`:entryWhatsappSafe(raw).replace(/\D/g,'').slice(-4);
+}
+function entryStatementBed(value,fallback='item'){
+  const raw=entryWhatsappBedToken(value||fallback).replace(/[#\[\]]/g,'');
+  return `[${raw||fallback}]`;
+}
+function entryStatementPay(e){
+  const pay=entryWhatsappPayment(e);
+  return pay==='bank'?'bank':pay==='none'?'':pay||'cash';
+}
+function entryStatementNote(value){
+  return entryWhatsappSafe(value).replace(/\b(expected|method|raw enum|raw|source)\b/ig,'').trim();
+}
+function entryStatementType(e){
+  return entryWhatsappType(e);
+}
+function entryStatementLine(e){
+  const type=entryStatementType(e);
+  const pay=entryStatementPay(e);
+  const time=entryStatementTime(e?.created_at||e?.ts||e?.time||e?.exported_at);
+  if(type==='rent'){
+    const expected=num(e?.expected_rent||e?.period_due||e?.due);
+    const paid=num(e?.paid_amount||e?.paid||e?.amount);
+    const shortPaid=num(e?.arrears_amount)||Math.max(0,expected-paid);
+    const note=entryStatementNote(e?.arrears_note||e?.arrear_reason_detail||e?.custom_reason||e?.note||'');
+    const due=entryStatementDate(e?.arrears_due_date||e?.arrear_promise_date||e?.promise_date||'');
+    const short=shortPaid>0?` short ${entryStatementAmount(shortPaid)} due ${due}${note?' '+note:''}`:'';
+    return `${entryStatementBed(e?.room||e?.bed)} paid ${entryStatementAmount(paid)} ${pay} ${time}${short}`.trim();
+  }
+  if(type==='arrears_payment'){
+    const note=entryStatementNote(e?.note||e?.remark||e?.arrears_note||e?.custom_reason||'');
+    return `${entryStatementBed(e?.room||e?.bed)} arrears paid ${entryStatementAmount(e?.payment_amount||e?.amount)} ${pay} ${time}${note?' '+note:''}`.trim();
+  }
+  if(type==='deposit_in'){
+    return `${entryStatementBed(e?.room||e?.bed)} deposit ${entryStatementAmount(e?.deposit_amount||e?.amount)} ${pay} ${time}`.trim();
+  }
+  if(type==='bed_transfer'){
+    const from=e?.bed_from||e?.from_bed||e?.fromBed||e?.room;
+    const to=e?.bed_to||e?.to_bed||e?.toBed||e?.roomTo;
+    const waived=e?.fee_status==='waived'||e?.fee_mode==='waived'||e?.fee_paid==='N'||entryWhatsappAmount(e)===0;
+    const reason=entryStatementNote(e?.waiver_reason||e?.fee_waiver_reason||e?.transfer_reason||e?.reason||e?.note||'');
+    const fee=waived?'waived':`${entryStatementAmount(e?.fee_amount||e?.amount)} ${pay}`;
+    return `${entryStatementBed(from)}\n${entryStatementBed(to)}\ntransfer ${fee} ${time}${reason?' '+reason:''}`.trim();
+  }
+  if(type==='expense'||type==='deposit_out'||type==='checkout'){
+    const bed=e?.room||e?.bed||e?.target_bed||e?.expense_category||'item';
+    const reason=entryStatementNote(e?.expense_desc||e?.expense_category||e?.reason||e?.note||e?.ded_note||'');
+    return `${entryStatementBed(bed)} expense ${entryStatementAmount(e?.expense_amount||e?.refund_amount||e?.amount)} ${pay||'cash'} ${time}${reason?' '+reason:''}`.trim();
+  }
+  const reason=entryStatementNote(e?.reason_code||e?.custom_reason||e?.note||e?.remark||e?.expense_desc||'');
+  return `${entryStatementBed(e?.room||e?.bed||e?.expense_category)} ${type} ${entryStatementAmount(entryWhatsappAmount(e))} ${pay} ${time}${reason?' '+reason:''}`.trim();
+}
+function entryStatementSection(lines,emoji,title){
+  if(!lines.length)return '';
+  return [`${emoji} ▬▬▬▬▬▬▬▬▬▬▬ ${emoji}`,title,...lines].join('\n');
+}
+function renderEntryAnchorForWhatsapp(e,i=0){
+  return entryStatementLine(typeof normalizeEntryAnchor==='function'?normalizeEntryAnchor(e):e,i);
+}
+function buildEntrySessionWhatsAppText(){
+  const rows=state.drafts.map(e=>typeof normalizeEntryAnchor==='function'?normalizeEntryAnchor(e):e);
+  const stats=sessionStats();
+  const rentCash=rows.filter(e=>entryStatementType(e)==='rent'&&entryStatementPay(e)==='cash');
+  const rentBank=rows.filter(e=>entryStatementType(e)==='rent'&&entryStatementPay(e)==='bank');
+  const arrears=rows.filter(e=>entryStatementType(e)==='arrears_payment');
+  const deposits=rows.filter(e=>entryStatementType(e)==='deposit_in');
+  const transfers=rows.filter(e=>entryStatementType(e)==='bed_transfer');
+  const expenses=rows.filter(e=>['expense','deposit_out','checkout'].includes(entryStatementType(e)));
+  const sum=(list,selector)=>list.reduce((total,row)=>total+num(selector?selector(row):row.amount),0);
+  const cashReceived=sum(rentCash,row=>row.paid_amount||row.paid||row.amount);
+  const arrearsTotal=sum(arrears,row=>row.payment_amount||row.amount);
+  const depositTotal=sum(deposits,row=>row.deposit_amount||row.amount);
+  const transferTotal=sum(transfers,row=>row.fee_status==='waived'||row.fee_mode==='waived'||row.fee_paid==='N'?0:(row.fee_amount||row.amount));
+  const expenseTotal=sum(expenses,row=>row.expense_amount||row.refund_amount||row.amount);
+  const sections=[
+    entryStatementSection([
+      `Cash Handover ${entryStatementAmount(stats.cashBalance)}`,
+      `Bank ${entryStatementAmount(stats.bankIn)}`,
+      `Gross Received ${entryStatementAmount(stats.grossReceived)}`
+    ],'💼','Core Summary'),
+    entryStatementSection([
+      `Cash Received ${entryStatementAmount(cashReceived)}`,
+      `Arrears ${entryStatementAmount(arrearsTotal)}`,
+      `Deposit ${entryStatementAmount(depositTotal)}`,
+      `Transfer ${entryStatementAmount(transferTotal)}`,
+      `Expense ${entryStatementAmount(expenseTotal)}`
+    ],'📊','Breakdown'),
+    entryStatementSection(rentCash.map(entryStatementLine),'💵','Cash Details'),
+    entryStatementSection(rentBank.map(entryStatementLine),'🏦','Bank Details'),
+    entryStatementSection(arrears.map(entryStatementLine),'🧾','Arrears Details'),
+    entryStatementSection(deposits.map(entryStatementLine),'🏷️','Deposit Details'),
+    entryStatementSection(transfers.map(entryStatementLine),'🔄','Transfer Details'),
+    entryStatementSection(expenses.map(entryStatementLine),'📤','Expense Details')
+  ].filter(Boolean);
+  return [
+    'Statement',
+    `Date ${entryStatementDate(today())} Time ${entryStatementTime()}`,
+    `Employee ${entryWhatsappSafe(operatorName()||operatorId())}`,
+    '',
+    '',
+    sections.join('\n\n\n')
+  ].join('\n').trim();
+}
 function previewField(label,value){
   return `<div class="preview-field"><span>${esc(label)}</span><b>${esc(value||'-')}</b></div>`;
 }
