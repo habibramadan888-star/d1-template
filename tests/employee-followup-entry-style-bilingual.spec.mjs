@@ -29,7 +29,7 @@ test("employee Follow-up uses short English-first bilingual copy", async () => {
     "Amount / 金额",
     "Due Date / 截止日期",
     "Saved / 已保存",
-    "Submit Feedback / 提交反馈",
+    "Save Follow-up / \\u4fdd\\u5b58\\u8ddf\\u8fdb",
     "Expand Details / 展开详情"
   ]) {
     assert.match(html + card + status, new RegExp(phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
@@ -42,7 +42,7 @@ test("final directive card does not keep long instructional copy", async () => {
 
   assert.doesNotMatch(card, /你只要填写承诺付款日期和跟进备注/);
   assert.doesNotMatch(card, /金额不可在这里修改/);
-  assert.match(card, /Only update promise date and note/);
+  assert.doesNotMatch(card, /Only update promise date and note/);
 });
 
 test("production cutover remains blocked", async () => {

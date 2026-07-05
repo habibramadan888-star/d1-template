@@ -291,6 +291,7 @@
     "test:employee-system-reminder-count-fix": "node --test tests/employee-system-reminder-count-fix.spec.mjs",
     "test:employee-system-reminder-row-badges": "node --test tests/employee-system-reminder-row-badges.spec.mjs",
     "test:employee-system-reminder-grouping": "node --test tests/employee-system-reminder-grouping.spec.mjs",
+    "test:employee-ui-english-first-labels": "node --test tests/employee-ui-english-first-labels.spec.mjs",
     "test:employee-nav-entry-followup-system": "node --test tests/employee-nav-entry-followup-system.spec.mjs",
     "test:employee-followup-only-boss-assigned": "node --test tests/employee-followup-only-boss-assigned.spec.mjs",
     "test:employee-system-page-reminders": "node --test tests/employee-system-page-reminders.spec.mjs",

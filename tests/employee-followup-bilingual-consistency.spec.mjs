@@ -11,10 +11,10 @@ test("employee Follow-up keeps consistent concise bilingual action copy", async 
     "System Reminders / 系统提醒",
     "Refresh / 刷新",
     "Expand Details / 展开详情",
-    "Collapse Details / 收起详情",
+    "Collapse Details / \\u6536\\u8d77\\u8be6\\u60c5",
     "Promise Date / 承诺日期",
     "Note / 备注",
-    "Submit Feedback / 提交反馈",
+    "Save Follow-up / \\u4fdd\\u5b58\\u8ddf\\u8fdb",
     "Logout",
   ]) {
     assert.match(html, new RegExp(phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));

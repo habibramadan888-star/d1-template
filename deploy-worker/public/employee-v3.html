@@ -4247,7 +4247,7 @@ function employeeDirectiveCard(d){
       <div class="directive-followup-actions">
         <label><span class="employee-directive-field-label">Promise Date / 承诺日期</span><input id="directivePromise_${id}" data-directive-edit="${esc(id)}" type="date" value="${esc(d.promised_payment_date||'')}" min="${today()}" aria-label="Promise Date / 承诺日期"></label>
         <label><span class="employee-directive-field-label">Note / 备注</span><textarea id="directiveNote_${id}" data-directive-edit="${esc(id)}" placeholder="Note / 备注">${esc(employeeDirectiveEditableNote(d.followup_note))}</textarea></label>
-        <button class="mini-btn" data-save-directive-follow="${esc(d.task_id)}">Save / 保存</button>
+        <button class="mini-btn" data-save-directive-follow="${esc(d.task_id)}">Save Follow-up / \u4fdd\u5b58\u8ddf\u8fdb</button>
       </div>
     </div>
   </div>`;
@@ -4398,18 +4398,18 @@ function updateEmployeeDirectivePersistedState(taskId){
   if(tag){
     tag.classList.toggle('bad',dirty);
     tag.dataset.directiveDirty=dirty?'true':'false';
-    tag.textContent=dirty?'Unsaved Changes / 当前修改未提交':(hasPersisted?'Saved / 已保存':employeeDirectiveStatusLabel(item.directive_status));
+    tag.textContent=dirty?'Unsaved Changes / \u5f53\u524d\u4fee\u6539\u672a\u63d0\u4ea4':(hasPersisted?'Saved / \u5df2\u4fdd\u5b58':employeeDirectiveStatusLabel(item.directive_status));
   }
   if(btn){
     btn.dataset.directiveDirty=dirty?'true':'false';
     btn.dataset.directivePersisted=hasPersisted?'true':'false';
     if(hasPersisted&&!dirty){
-      btn.textContent='Saved / 已保存';
+      btn.textContent='Saved / \u5df2\u4fdd\u5b58';
       btn.disabled=true;
       btn.classList.add('disabled');
       btn.setAttribute('aria-disabled','true');
     }else{
-      btn.textContent='Save / 保存';
+      btn.textContent='Save Follow-up / \u4fdd\u5b58\u8ddf\u8fdb';
       btn.disabled=false;
       btn.classList.remove('disabled');
       btn.removeAttribute('aria-disabled');
@@ -4434,7 +4434,7 @@ function bindEmployeeDirectiveActions(){
       const open=details.hidden;
       details.hidden=!open;
       btn.setAttribute('aria-expanded',open?'true':'false');
-      btn.textContent=open?'Collapse Details / 收起详情':'Expand Details / 展开详情';
+      btn.textContent=open?'Collapse Details / \u6536\u8d77\u8be6\u60c5':'Expand Details / \u5c55\u5f00\u8be6\u60c5';
       if(card)card.dataset.directiveCardCollapsed=open?'false':'true';
     };
   });
@@ -4658,17 +4658,34 @@ function followupTitle(item){
   if(remark&&bed&&new RegExp(`(^|\\D)${bed}(\\D|$)`).test(remark))return remark;
   return [bed,remark].filter(Boolean).join(' · ')||'-';
 }
+const EMPLOYEE_FOLLOWUP_STATUS_OPTIONS=[
+  {value:'\u5f85\u8ddf\u8fdb',en:'Pending Follow-up',cn:'\u5f85\u8ddf\u8fdb',aliases:['pending_followup','pending','none','\u5f85\u8ddf\u8fdb']},
+  {value:'\u5df2\u8054\u7cfb',en:'Contacted',cn:'\u5df2\u8054\u7cfb',aliases:['contacted','called','\u5df2\u8054\u7cfb']},
+  {value:'\u627f\u8bfa\u4ed8\u6b3e',en:'Promise to Pay',cn:'\u627f\u8bfa\u4ed8\u6b3e',aliases:['promise_to_pay','promised','promise','\u627f\u8bfa\u4ed8\u6b3e']},
+  {value:'\u65e0\u6cd5\u8054\u7cfb',en:'Unable to Contact',cn:'\u65e0\u6cd5\u8054\u7cfb',aliases:['unable_to_contact','unreachable','no_answer','\u65e0\u6cd5\u8054\u7cfb']},
+  {value:'\u8f6c\u8001\u677f\u5904\u7406',en:'Escalate to Owner',cn:'\u8f6c\u8001\u677f\u5904\u7406',aliases:['escalate_to_owner','owner_review','needs_review','\u8f6c\u8001\u677f\u5904\u7406']}
+];
+function employeeFollowupStatusMeta(status){
+  const raw=String(status||'').trim();
+  const lower=raw.toLowerCase();
+  return EMPLOYEE_FOLLOWUP_STATUS_OPTIONS.find(item=>item.value===raw||item.aliases.includes(lower)||item.aliases.includes(raw))||{value:raw,en:'System Status',cn:'\u7cfb\u7edf\u72b6\u6001',aliases:[],system:true};
+}
+function employeeFollowupStatusLabel(status){
+  const meta=employeeFollowupStatusMeta(status);
+  return `${meta.en} / ${meta.cn}`;
+}
 function followupCard(item){
   const id=safeDomId(item.task_id);
   const force=item.force;
   const cls=item.boss_directive?'directive':(force?'force':(item.source==='history'||item.source==='history_unmatched'?'history':'overdue'));
   const source=isEmployeeTtlockReminder(item)?'TTLock overdue / \u901a\u901a\u9501\u8fc7\u671f':'System arrears / \u7cfb\u7edf\u5df2\u6709\u6b20\u6b3e';
   const rentNote=item.amount>0?`${fmtMoney(item.amount)} AED`:'Amount to confirm / \u91d1\u989d\u5f85\u786e\u8ba4';
-  const editableStatuses=['\u5f85\u8ddf\u8fdb','\u5df2\u8054\u7cfb','\u627f\u8bfa\u4ed8\u6b3e','\u65e0\u6cd5\u8054\u7cfb','\u8f6c\u8001\u677f\u5904\u7406'];
   const currentStatus=String(item.followup_status||'\u5f85\u8ddf\u8fdb');
+  const currentStatusMeta=employeeFollowupStatusMeta(currentStatus);
+  const currentStatusValue=currentStatusMeta.system?currentStatus:currentStatusMeta.value;
   const statusOptions=[
-    ...(!editableStatuses.includes(currentStatus)?[`<option value="${esc(currentStatus)}" selected disabled>${esc(currentStatus)} / system status</option>`]:[]),
-    ...editableStatuses.map(s=>`<option value="${s}" ${s===currentStatus?'selected':''}>${s}</option>`)
+    ...(currentStatusMeta.system?[`<option value="${esc(currentStatus)}" selected disabled>${esc(employeeFollowupStatusLabel(currentStatus))}</option>`]:[]),
+    ...EMPLOYEE_FOLLOWUP_STATUS_OPTIONS.map(s=>`<option value="${esc(s.value)}" ${s.value===currentStatusValue?'selected':''}>${esc(s.en)} / ${esc(s.cn)}</option>`)
   ].join('');
   const bucketLabel=employeeReminderBucketLabel(item);
   const bucketClass=employeeReminderBucketClass(item);
@@ -4689,7 +4706,7 @@ function followupCard(item){
       <button class="mini-btn" data-toggle-followup-details="${esc(id)}" aria-expanded="false">Expand Details / \u5c55\u5f00\u8be6\u60c5</button>
     </div>
     <div class="followup-details" id="followupDetails_${id}" hidden>
-      <div class="followup-note">Status / \u72b6\u6001\uFF1A${esc(currentStatus)}<br>Due / \u622a\u6b62\uFF1A${esc(item.due_date||'To confirm / \u5f85\u786e\u8ba4')}</div>
+      <div class="followup-note">Status / \u72b6\u6001\uFF1A${esc(employeeFollowupStatusLabel(currentStatus))}<br>Due / \u622a\u6b62\uFF1A${esc(item.due_date||'To confirm / \u5f85\u786e\u8ba4')}</div>
       <div class="followup-actions">
         <select id="followStatus_${id}" aria-label="Status / \u72b6\u6001">
           ${statusOptions}
