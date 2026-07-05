@@ -62,6 +62,9 @@ test("employee Entry hierarchy renders English as the primary label", async () =
   const html = await readFile(htmlPath, "utf8");
 
   for (const copy of [
+    '<span class="en">Entry</span><span class="tab-cn"',
+    '<span class="en">Follow-up</span><span class="tab-cn"',
+    '<span class="en">System</span><span class="tab-cn"',
     "employeeUiPair('Current Session Summary'",
     "employeeUiPair('Add Entry'",
     "['Step 1 · Select Event Type'",
@@ -74,6 +77,38 @@ test("employee Entry hierarchy renders English as the primary label", async () =
 
   assert.doesNotMatch(html, /Current Session Summary<\/span>/);
   assert.doesNotMatch(html, /Add Entry<\/span>/);
+  assert.doesNotMatch(html, /<span class="tab-cn">[^<]+<\/span><span class="en">/);
+});
+
+test("employee Entry visible text audit covers screenshot problem areas", async () => {
+  const html = await readFile(htmlPath, "utf8");
+
+  for (const copy of [
+    "Bed Check",
+    "Historical Arrears",
+    "Date Anchors",
+    "System Rent",
+    "Blocked:",
+    "Bed is required",
+    "Amount must be greater than 0",
+    "No Records",
+    "Select a type, fill the form, then add to session",
+    "Expected / Included",
+    "Rent Period",
+    "Arrears Task"
+  ]) {
+    assert.match(html, new RegExp(copy.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  }
+
+  for (const badCopy of [
+    "阻断：必须填写床位",
+    "阻断：AMT 必须大于 0",
+    "现金结余 CASH HANDOVER",
+    "已选事件<span class=\"label-en\">SELECTED EVENT",
+    "<span>收租</span><small>RENT</small>"
+  ]) {
+    assert.doesNotMatch(html, new RegExp(badCopy.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  }
 });
 
 test("production cutover remains blocked", async () => {

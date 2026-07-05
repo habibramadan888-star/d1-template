@@ -2510,9 +2510,9 @@ label .label-en{
     </div>
   </div>
   <div class="tabs employee-tabs" data-entry-parity-tabs="true">
-    <button class="tab active" data-view="entry"><span class="tab-cn">录入</span><span class="en">ENTRY</span></button>
-    <button class="tab" data-view="arrears"><span class="tab-cn">跟进</span><span class="en">FOLLOW-UP</span></button>
-    <button class="tab" data-view="system"><span class="tab-cn">系统</span><span class="en">SYSTEM</span></button>
+    <button class="tab active" data-view="entry"><span class="en">Entry</span><span class="tab-cn">录入</span></button>
+    <button class="tab" data-view="arrears"><span class="en">Follow-up</span><span class="tab-cn">跟进</span></button>
+    <button class="tab" data-view="system"><span class="en">System</span><span class="tab-cn">系统</span></button>
   </div>
 </div>
 <main class="wrap">
@@ -5689,6 +5689,9 @@ function employeeEnsureEnglishFirstStyle(){
     #view-entry .event-chip>span{font-size:17px!important;color:inherit!important}
     #view-entry .kpi-card span{color:#283447!important;font-size:13px!important;font-weight:760!important}
     #view-entry .btn .label-en{display:block!important;margin-top:2px!important;color:inherit!important;opacity:.72!important;font-size:10px!important;font-weight:560!important;text-transform:none!important;letter-spacing:.02em!important}
+    .employee-tabs .tab .en{font-size:17px!important;font-weight:860!important;letter-spacing:.01em!important;text-transform:none!important;color:inherit!important}
+    .employee-tabs .tab .tab-cn{font-size:10px!important;font-weight:560!important;letter-spacing:.04em!important;color:#7b8797!important}
+    .employee-tabs .tab.active .tab-cn{color:rgba(255,255,255,.72)!important}
   `;
   document.head.appendChild(style);
 }
@@ -5778,6 +5781,149 @@ function applyBilingualUI(){
   label('expenseCategory','Expense Category','\u652f\u51fa\u7c7b\u522b');label('expenseDesc','Expense Description','\u652f\u51fa\u8bf4\u660e');label('paid','System Paid','\u7cfb\u7edf\u8ba1\u5165');label('entryClr','System Clear','\u7cfb\u7edf\u7ed3\u6e05');
   label('excessTo','Excess Handling','\u8d85\u6536\u5904\u7406');label('arrearAmount','Tail Balance','\u5c3e\u6b3e\u91d1\u989d');label('arrearPromiseDate','Promise Date','\u627f\u8bfa\u652f\u4ed8\u65e5\u671f');label('arrearHandling','Handling','\u5904\u7406\u65b9\u5f0f');label('arrearReasonDetail','Tail Reason','\u5c3e\u6b3e\u539f\u56e0');label('reasonCode','Reason Code','\u539f\u56e0\u4ee3\u7801');label('customReason','Exception Reason','\u5f02\u5e38\u539f\u56e0');label('remark','Remark','\u5907\u6ce8');
 }
+function employeeContextTitle(en,cn){return `<span>${esc(en)}<small>${esc(cn)}</small></span>`}
+function employeeEnglishFirstMessage(message){
+  const text=String(message||'');
+  const rules=[
+    [/bed|床位/i,'Bed is required','必须填写床位'],
+    [/AMT|金额|大于 0/i,'Amount must be greater than 0','金额必须大于 0'],
+    [/月租配置|rent config|List Price/i,'This bed has no owner rent configuration','该床位没有老板端月租配置'],
+    [/CID|卡号/i,'Access Card CID is required','必须填写门禁卡 CID'],
+    [/押金|deposit/i,'Deposit information must be verified','押金信息必须核对'],
+    [/period_due|账期应收/i,'Period due must be confirmed','必须确认账期应收'],
+    [/period_end|period_start|账期/i,'Rent period must be valid','账期必须有效'],
+    [/尾款|short|promise/i,'Tail balance information is required','尾款信息必须填写'],
+    [/换床|transfer|from_bed|to_bed/i,'Bed transfer information is required','换床信息必须填写'],
+    [/支出|expense/i,'Expense description is required','支出必须填写说明'],
+    [/还款|还欠款|arrears/i,'Arrears payment task is required','还欠款必须选择欠款任务'],
+    [/Waiver Reason/i,'Waiver Reason is required','免收换床费必须填写豁免原因']
+  ];
+  const hit=rules.find(([rx])=>rx.test(text));
+  if(hit)return `${hit[1]} / ${hit[2]}`;
+  if(/[\u4e00-\u9fff]/.test(text))return `Please review this item / ${text}`;
+  return text;
+}
+function employeeRenderValidation(result){
+  const errors=(result?.errors||[]).map(employeeEnglishFirstMessage);
+  const warns=(result?.warns||[]).map(employeeEnglishFirstMessage);
+  $('validationBox').innerHTML=[
+    ...errors.map(x=>`<div class="bad">Blocked: ${esc(x)}</div>`),
+    ...warns.map(x=>`<div class="warn">Reminder: ${esc(x)}</div>`),
+    (!errors.length&&!warns.length?'<div>Validation passed. Add this entry to the current session. / 校验通过，可以加入本票。</div>':'')
+  ].join('');
+}
+const employeeLegacyValidate=validate;
+validate=function(){
+  const result=employeeLegacyValidate();
+  employeeRenderValidation(result);
+  return result;
+};
+renderSessionPreview=function(){
+  const rows=state.drafts;
+  $('sessionMeta').textContent=`${today()} ${new Date().toTimeString().slice(0,8)} · ${rows.length} records`;
+  if(!rows.length){
+    $('sessionPreview').innerHTML='<div class="preview-empty"><div><b>No Records</b><br><span>Select a type, fill the form, then add to session<br><small>暂无记录 · 选择类别，填写信息后添加</small></span></div></div>';
+    return;
+  }
+  $('sessionPreview').innerHTML=rows.map((e,i)=>{
+    const dir=entryDirection(e);
+    const sign=dir==='out'?'-':(dir==='in'?'+':'');
+    const cls=dir==='out'?'red':'';
+    const subject=e.type==='TF'?`#${esc(e.bed_from||e.room||'')} -> #${esc(e.bed_to||'')}`:(e.type==='E'?esc(e.expense_category||'Expense'):`#${esc(e.room||'')}`);
+    const detail=[eventLabel(e.type),e.tenant_name||'',e.pay_type==='B'?'Bank / 银行':'Cash / 现金',e.period_start&&e.period_end?`${e.period_start} -> ${e.period_end}`:''].filter(Boolean).join(' · ');
+    const status=e.sync_status==='SYNCED'?'<span class="status-pill">Synced / 已同步</span>':'<span class="status-pill local">Local / 本地</span>';
+    const undo=canUndo(e)?`<button class="mini-btn danger" data-undo="${esc(e.id)}">Undo / 撤销</button>`:'';
+    return `<div class="preview-entry"><div><b>${rows.length-i}. ${subject}</b> ${status}<div class="small">${esc(detail)}</div><div class="small">Entry ID ${esc(e.id)} · ${esc(e.created_at||'')}</div><div class="small">${esc(e.note||e.expense_desc||'')}</div><div class="preview-tools">${undo}</div></div><div class="amt ${cls}">${sign}${fmtMoney(e.amount)}</div></div>`;
+  }).join('');
+  document.querySelectorAll('[data-undo]').forEach(btn=>btn.onclick=()=>undoDraft(btn.dataset.undo));
+};
+renderSummary=function(){
+  const type=$('entryType').value, pay=$('payType').value;
+  if(type==='TF'){
+    const fromBed=$('transferFromBed').value||$('bed').value||'-';
+    const toBed=$('bedTo').value||'-';
+    const feeMode=$('feePaid').value==='N'?'waived':'charged';
+    const feeText=feeMode==='waived'?'Waived / 已豁免':'50.00 AED';
+    const review=bedTransferValidationSummary(transferValue('transferFromBed')||transferValue('bed'),transferValue('bedTo'),bedTransferReviewContext());
+    const reviewText=review.review.length?review.review.map(bedTransferReviewLabel).join(' / '):'No blocking review flags';
+    const accounting=feeMode==='waived'?'No income / 不产生收入':'Bed transfer fee income / 换床费收入';
+    const items=[
+      ['Event','事件','Bed Transfer / 换床'],
+      ['Transfer','换床',`#${fromBed} -> #${toBed}`],
+      ['Fee','费用',feeText],
+      ['Transfer Date','换床日期',$('transferDate').value||'-'],
+      ['Reason','原因',$('transferReason').value||'-'],
+      ['Note','备注',sanitizeBedTransferDisplay($('remark').value||'-','[hidden]')],
+      ['Review Flags','需核对项',reviewText],
+      ['Accounting Effect','会计影响',accounting],
+      ['No Mutation','不改变','No occupancy, deposit, arrears, or Access Card mutation']
+    ];
+    if(feeMode==='waived')items.splice(3,0,['Waiver Reason','豁免原因',$('transferWaiverReason').value||'-']);
+    $('entrySummary').innerHTML=items.map(([en,cn,v])=>`<div data-bed-transfer-step8-summary="true"><span>${esc(en)}<small>${esc(cn)}</small></span><b>${esc(v)}</b></div>`).join('');
+    return;
+  }
+  const period=$('periodStart').value&&$('periodEnd').value?`${$('periodStart').value} -> ${$('periodEnd').value}`:'None / 无';
+  const diff=Math.max(0,num($('due').value)-num($('paid').value||$('amount').value));
+  const task=selectedTask();
+  const items=[
+    ['Event','事件',eventLabel(type)],
+    ['Target','对象',type==='TF'?`#${$('bed').value||'-'} -> #${$('bedTo').value||'-'}`:(type==='E'?$('expenseCategory').value:`#${$('bed').value||'-'}`)],
+    ['Remark / CID','备注 / CID',`${$('tenantName').value||'-'} / ${$('tenantCardId').value||'-'}`],
+    ['Amount','金额',`${fmtMoney(num($('amount').value))} AED`],
+    ['Expected / Included','应收 / 计入',`${fmtMoney(num($('due').value))} / ${fmtMoney(num($('paid').value||$('amount').value))}`],
+    ['Rent Period','账期',period],
+    ['Payment','付款',type==='E'?'Expense / 支出':(pay==='B'?'Bank / 银行':'Cash / 现金')],
+    ['Difference','差额',diff?`${fmtMoney(diff)} AED`:'None / 无'],
+    ['Deposit Balance','押金余额',depositHeld()?`${fmtMoney(depositHeld())} AED`:'None / 无'],
+    ['Arrears Task','欠款任务',task?`${task.task_id} / Remaining ${fmtMoney(taskRemain(task))}`:'None / 无']
+  ];
+  const tail=rentShortfall();
+  if(tail>0){
+    items.push(['Tail Balance Task','尾款任务',`${fmtMoney(tail)} AED / ${$('arrearPromiseDate').value||'Date missing / 未填日期'}`]);
+    items.push(['Tail Balance Reason','尾款原因',$('arrearReasonDetail').value.trim()||'Missing / 未填写']);
+  }
+  if(type==='R'&&num($('amount').value)>num($('due').value))items.push(['Excess Handling','超收处理',$('excessTo').value||'Not selected / 未选择']);
+  if(type==='CO'){const co=checkoutCalc();items.push(['Checkout Deduction','退房扣款',`${fmtMoney(co.total)} / Overdue ${co.overDays} days / Early ${co.earlyDays} days`]);}
+  $('entrySummary').innerHTML=items.map(([en,cn,v])=>`<div><span>${esc(en)}<small>${esc(cn)}</small></span><b>${esc(v)}</b></div>`).join('');
+};
+renderContext=function(){
+  if($('entryType')?.value==='TF'){
+    renderBedTransferSystemContext();
+    return;
+  }
+  const c=state.current;
+  const ledger=state.depositBalance!=null?fmtMoney(state.depositBalance):'Not created / 未建立';
+  const rent=rentForBed()?fmtMoney(rentForBed()):'Not configured / 未配置';
+  const inputBed=$('bed').value.trim().replace(/^#/,'');
+  const remark=c?.remark||c?.cardText||'Not loaded / 未读取';
+  const remarkBed=c?.bed||'Not loaded / 未读取';
+  const cid=$('tenantCardId')?.value||c?.tenant_card_id||'Not loaded / 未读取';
+  const checkin=c?.start_md||'Not loaded / 未读取';
+  const currentEnd=c?.end||'Not loaded / 未读取';
+  const parseState=c?(c.remark_parse_ok?'Complete / 完整':'Missing / 缺少 '+(c.remark_parse_missing||[]).join(', ')):'Not loaded / 未读取';
+  const mismatch=inputBed&&c?.bed&&String(inputBed)!==String(c.bed);
+  const matchStatus=mismatch?`Mismatch: input ${inputBed} / remark ${c.bed}`:(inputBed||remarkBed);
+  const matchClass=mismatch?'warn':'';
+  const open=openTasksForBed();
+  const arrearTotal=open.reduce((s,t)=>s+taskRemain(t),0);
+  const arrearText=open.length?`${open.length} tasks / ${fmtMoney(arrearTotal)} AED`:'No open arrears / 无未清欠款';
+  const depositText=c?.deposit?fmtMoney(c.deposit):'Not loaded / 未读取';
+  const box=$('bedContext');
+  box.className='ctx clean-context';
+  box.innerHTML=`<div class="context-board">
+    <div class="priority-grid">
+      <div class="priority-card bed-check strong ${matchClass}">${employeeContextTitle('Bed Check','床位校对')}<b>${esc(matchStatus)}</b><div class="sub">Input ${esc(inputBed||'empty')} · remark ${esc(remarkBed)}</div></div>
+      <div class="priority-card arrears-check ${open.length?'warn':'strong'}">${employeeContextTitle('Historical Arrears','历史欠款')}<b>${esc(arrearText)}</b><div class="sub">${open.length?'Confirm old balance first / 优先确认旧欠款':'No open task found / 未发现未清任务'}</div></div>
+      <div class="priority-card date-check">${employeeContextTitle('Date Anchors','日期锚点')}<b>${esc(checkin)} -> ${esc(currentEnd)}</b><div class="sub">Check-in date and card end date / 入住日与卡片截止日</div></div>
+      <div class="priority-card deposit-check">${employeeContextTitle('Deposit','押金')}<b>${esc(depositText)}</b><div class="sub">Ledger deposit ${esc(ledger)}</div></div>
+      <div class="priority-card rent-check">${employeeContextTitle('System Rent','系统月租')}<b>${esc(rent)}</b><div class="sub">Configured by owner / 老板端配置</div></div>
+    </div>
+    <div class="secondary-grid">
+      <div class="secondary-box"><h4>System Anchors<small>系统锚点</small></h4>${contextLine('Remark Parse','备注解析',parseState)}${contextLine('Access Card CID','门禁卡卡号',cid)}${contextLine('Access Card Remark','门禁卡备注',remark)}</div>
+      <div class="secondary-box"><h4>Check Guide<small>核对说明</small></h4>${contextLine('Priority','优先级','Bed -> Historical Arrears -> Date -> Deposit -> System Rent / 床位 -> 历史欠款 -> 日期 -> 押金 -> 月租')}${contextLine('Remark Snapshot','备注锚点',remark)}</div>
+    </div>
+  </div>`;
+};
 applyBilingualUI();
 renderEntryTtlockStatus();
 updateEntrySessionActionState();
