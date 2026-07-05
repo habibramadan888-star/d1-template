@@ -826,6 +826,53 @@ label .label-en{
 }
 .entry-evidence-collapse[open]>summary:after{content:"Collapse"}
 .entry-evidence-collapse .context-board{border-top:1px solid rgba(207,216,220,.75)}
+.employee-collapsible-step{
+  padding:0;
+  overflow:hidden;
+}
+.employee-collapsible-step .step-title{
+  margin:0;
+  padding:18px 20px 10px;
+  cursor:pointer;
+}
+.employee-collapsible-step-summary{
+  margin:0 20px 18px;
+  border:1px solid rgba(207,216,220,.82);
+  border-radius:18px;
+  background:rgba(255,255,255,.74);
+  padding:12px 14px;
+  color:#435168;
+  font-size:13px;
+  line-height:1.55;
+}
+.employee-collapsible-step-summary b{
+  color:#142033;
+  font-weight:950;
+}
+.employee-collapsible-step-summary .warn,
+.employee-collapsible-step-summary .bad{
+  display:block;
+  margin-top:6px;
+}
+.employee-collapsible-step-body{
+  padding:0 20px 20px;
+}
+.employee-collapsible-step.collapsed .employee-collapsible-step-body{
+  display:none;
+}
+.employee-collapsible-step .step-title:after{
+  content:"Collapse";
+  margin-left:auto;
+  border:1px solid #cfe5d9;
+  color:#0f8e4d;
+  border-radius:999px;
+  padding:5px 10px;
+  font-size:12px;
+  background:#f7fcf9;
+}
+.employee-collapsible-step.collapsed .step-title:after{
+  content:"Expand";
+}
 .pay-option .label-en{
   display:block;
   margin-top:3px;
@@ -6271,7 +6318,113 @@ renderContext=function(){
     </div>
   </div>`;
 };
+function employeeFindEntryStep(number){
+  return Array.from(document.querySelectorAll('#view-entry .step')).find(step=>{
+    const marker=step.querySelector('.step-title>span');
+    return marker&&marker.textContent.trim()===String(number);
+  });
+}
+function employeeEnsureCollapsibleStep(number,titleEn,titleZh){
+  const step=employeeFindEntryStep(number);
+  if(!step)return null;
+  step.classList.add('employee-collapsible-step');
+  step.dataset.employeeCollapsedStep=String(number);
+  const title=step.querySelector('.step-title');
+  if(title){
+    const marker=title.querySelector('span')?.outerHTML||`<span>${number}</span>`;
+    title.innerHTML=`${marker}<div>${esc(titleEn)}<small>${esc(titleZh)}</small></div>`;
+    title.onclick=()=>employeeToggleCollapsedStep(number);
+  }
+  let summary=step.querySelector(':scope > .employee-collapsible-step-summary');
+  if(!summary){
+    summary=document.createElement('div');
+    summary.className='employee-collapsible-step-summary';
+    title?.insertAdjacentElement('afterend',summary);
+  }
+  let body=step.querySelector(':scope > .employee-collapsible-step-body');
+  if(!body){
+    body=document.createElement('div');
+    body.className='employee-collapsible-step-body';
+    const movable=Array.from(step.children).filter(child=>child!==title&&child!==summary);
+    movable.forEach(child=>body.appendChild(child));
+    step.appendChild(body);
+  }
+  if(step.dataset.employeeCollapsedInitialized!=='1'){
+    step.classList.add('collapsed');
+    step.dataset.employeeCollapsedInitialized='1';
+  }
+  return step;
+}
+function employeeToggleCollapsedStep(number){
+  const step=employeeFindEntryStep(number);
+  if(!step)return;
+  step.classList.toggle('collapsed');
+}
+function employeeStep3SummaryHtml(){
+  const c=state.current||{};
+  const inputBed=$('bed')?.value?.trim()?.replace(/^#/,'')||'empty';
+  const matched=c?.bed||'not loaded';
+  const bedMismatch=inputBed&&inputBed!=='empty'&&c?.bed&&String(inputBed)!==String(c.bed);
+  const open=openTasksForBed();
+  const arrearTotal=open.reduce((s,t)=>s+taskRemain(t),0);
+  const deposit=c?.deposit?`${fmtMoney(c.deposit)} AED`:'not loaded';
+  const rent=rentForBed()?`${fmtMoney(rentForBed())} AED`:'not configured';
+  return [
+    `<b>Bed Check</b>: ${esc(bedMismatch?`mismatch ${inputBed} / ${matched}`:`${inputBed} / ${matched}`)}`,
+    `<b>Arrears</b>: ${esc(open.length?`${open.length} tasks / ${fmtMoney(arrearTotal)} AED`:'none')}`,
+    `<b>Deposit</b>: ${esc(deposit)}`,
+    `<b>System Rent</b>: ${esc(rent)}`
+  ].join(' · ');
+}
+function employeeStep8SummaryHtml(validationResult=null){
+  const type=$('entryType')?.value||'';
+  const event=entryEventType(type).replaceAll('_',' ');
+  const target=type==='TF'?`#${transferValue('transferFromBed')||transferValue('bed')||'-'} -> #${transferValue('bedTo')||'-'}`:(type==='E'?($('expenseCategory')?.value||'expense'):`#${$('bed')?.value||'-'}`);
+  const amount=`${fmtMoney(num($('amount')?.value))} AED`;
+  const errors=validationResult?.errors||[];
+  const warns=validationResult?.warns||[];
+  const status=errors.length?'Blocked':(warns.length?'Review warning':'Ready');
+  const issue=errors[0]||warns[0]||'Validation passed';
+  const cls=errors.length?'bad':(warns.length?'warn':'');
+  return [
+    `<b>Event</b>: ${esc(event)}`,
+    `<b>Target</b>: ${esc(target)}`,
+    `<b>Amount</b>: ${esc(amount)}`,
+    `<b>Status</b>: ${esc(status)}`,
+    `<span class="${cls}">${esc(employeeEnglishFirstMessage(issue))}</span>`
+  ].join(' · ');
+}
+function employeeUpdateCollapsedStepSummaries(validationResult=null){
+  const step3=employeeEnsureCollapsibleStep(3,'Verify System Context','核对系统资料');
+  const step8=employeeEnsureCollapsibleStep(8,'Review & Submit','预览确认与提交');
+  const s3=step3?.querySelector(':scope > .employee-collapsible-step-summary');
+  const s8=step8?.querySelector(':scope > .employee-collapsible-step-summary');
+  if(s3)s3.innerHTML=employeeStep3SummaryHtml();
+  if(s8)s8.innerHTML=employeeStep8SummaryHtml(validationResult);
+}
+const employeeCollapsedLegacyValidate=validate;
+validate=function(){
+  const result=employeeCollapsedLegacyValidate();
+  employeeUpdateCollapsedStepSummaries(result);
+  return result;
+};
+const employeeCollapsedLegacyRenderSummary=renderSummary;
+renderSummary=function(){
+  employeeCollapsedLegacyRenderSummary();
+  employeeUpdateCollapsedStepSummaries();
+};
+const employeeCollapsedLegacyRenderContext=renderContext;
+renderContext=function(){
+  employeeCollapsedLegacyRenderContext();
+  employeeUpdateCollapsedStepSummaries();
+};
+const employeeCollapsedLegacySyncForm=syncForm;
+syncForm=function(){
+  employeeCollapsedLegacySyncForm();
+  employeeUpdateCollapsedStepSummaries();
+};
 applyBilingualUI();
+employeeUpdateCollapsedStepSummaries();
 renderEntryTtlockStatus();
 updateEntrySessionActionState();
 renderContext();syncForm();refreshSessionViews();
