@@ -787,6 +787,45 @@ label .label-en{
   font-weight:820;
   line-height:1.1;
 }
+.entry-evidence-collapse{
+  border:1px solid rgba(207,216,220,.9);
+  border-radius:22px;
+  background:rgba(255,255,255,.78);
+  box-shadow:0 12px 30px rgba(20,32,51,.06);
+  margin:0 0 14px;
+  overflow:hidden;
+}
+.entry-evidence-collapse>summary{
+  list-style:none;
+  cursor:pointer;
+  padding:16px 18px;
+  font-size:15px;
+  font-weight:950;
+  color:#142033;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+}
+.entry-evidence-collapse>summary::-webkit-details-marker{display:none}
+.entry-evidence-collapse>summary small{
+  display:block;
+  margin-top:3px;
+  font-size:11px;
+  color:#7b8797;
+  font-weight:800;
+}
+.entry-evidence-collapse>summary:after{
+  content:"Expand";
+  font-size:12px;
+  color:#0f8e4d;
+  border:1px solid #cfe5d9;
+  border-radius:999px;
+  padding:5px 10px;
+  background:#f7fcf9;
+}
+.entry-evidence-collapse[open]>summary:after{content:"Collapse"}
+.entry-evidence-collapse .context-board{border-top:1px solid rgba(207,216,220,.75)}
 .pay-option .label-en{
   display:block;
   margin-top:3px;
@@ -2896,6 +2935,42 @@ function currentSessionId(){
     try{localStorage.setItem(employeeStorageKey('empv3:sessionId'),state.sessionId)}catch{}
   }
   return state.sessionId;
+}
+function startRepeatableUploadSessionId(){
+  const id=uid('S');
+  state.sessionId=id;
+  try{localStorage.setItem(employeeStorageKey('empv3:sessionId'),id)}catch{}
+  return id;
+}
+function cloneEntryForUpload(entry,sessionId,attemptId,index){
+  const copy={...(entry||{})};
+  const entryId=uid('ent')+'-'+String(index+1).padStart(2,'0');
+  copy.id=entryId;
+  copy.event_id=entryId;
+  copy.anchor_id=entryId;
+  copy.session_id=sessionId;
+  copy.source='employee_entry';
+  copy.sync_status='LOCAL';
+  copy.sync_error='';
+  copy.cloud_entry_id='';
+  copy.upload_attempt_id=attemptId;
+  copy.idempotency_key=`${attemptId}-${entryId}`;
+  copy.original_local_entry_id=entry?.id||entry?.event_id||entry?.anchor_id||'';
+  return normalizeEntryAnchor(copy);
+}
+function prepareRepeatableUploadRows(rows,sessionId=startRepeatableUploadSessionId(),attemptId=uid('upload')){
+  return (rows||[]).map((entry,index)=>cloneEntryForUpload(entry,sessionId,attemptId,index));
+}
+function validateUploadAnchorBatch(rows){
+  const errors=[];
+  (rows||[]).forEach((entry,index)=>{
+    const normalized=normalizeEntryAnchor(entry);
+    if(normalized.validation_status!=='valid'){
+      const missing=(normalized.validation_missing_fields||[]).join(', ')||'required fields';
+      errors.push(`Entry ${index+1} ${normalized.event_type||normalized.type||'entry'} missing: ${missing}`);
+    }
+  });
+  return {ok:errors.length===0,errors};
 }
 function currentSessionPayload(){
   const id=currentSessionId();
@@ -5360,6 +5435,151 @@ async function commitSessionAndExport(){
     toast(localOk?'交接导出完成：云端已完成，本地也已保存。':'云端已完成，但本地保存失败，请不要关闭页面。',6000);
   }
 }
+async function copyEntryWhatsappText(text,button,textarea){
+  let copied=false;
+  try{
+    if(navigator.clipboard?.writeText){
+      await navigator.clipboard.writeText(text);
+      copied=true;
+    }
+  }catch{}
+  if(!copied&&textarea){
+    textarea.hidden=false;
+    textarea.focus();
+    textarea.select();
+    try{copied=document.execCommand?.('copy')===true}catch{}
+  }
+  if(button){
+    button.innerHTML=copied?renderEmployeeButtonLabel('Copied','已复制'):renderEmployeeButtonLabel('Select Text','手动复制');
+    window.setTimeout(()=>{button.innerHTML=renderEmployeeButtonLabel('Copy WhatsApp Text','复制 WhatsApp 文本')},2200);
+  }
+  showStatus(copied?'Copied / 已复制':'Clipboard unavailable. Select and copy the text manually. / 剪贴板不可用，请手动复制。',copied?'ok':'warn');
+  return copied;
+}
+function showEntryWhatsappFallback(text,url){
+  const body=$('previewModalBody');
+  if(!body)return;
+  body.innerHTML=`<div class="preview-detail-card entry-session-whatsapp-fallback">
+    <div class="preview-detail-top"><b>WhatsApp Export</b><button class="btn" id="btnEntryWhatsappOpen" type="button">${renderEmployeeButtonLabel('Open WhatsApp','打开 WhatsApp')}</button></div>
+    <div class="small">If WhatsApp does not open, copy the confirmed session text below. / 如果 WhatsApp 无法打开，请复制下方已确认本票文本。</div>
+    <div class="row"><button class="btn primary" id="btnEntryWhatsappCopy" type="button">${renderEmployeeButtonLabel('Copy WhatsApp Text','复制 WhatsApp 文本')}</button></div>
+    <textarea id="entryWhatsappFallbackText" style="width:100%;min-height:220px;border:1px solid #d8e1dd;border-radius:16px;padding:12px;font-family:ui-monospace,Consolas,monospace;white-space:pre-wrap">${esc(text)}</textarea>
+  </div>`;
+  const openBtn=$('btnEntryWhatsappOpen');
+  if(openBtn)openBtn.onclick=()=>window.open(url,'_blank','noopener,noreferrer');
+  const copyBtn=$('btnEntryWhatsappCopy');
+  const textarea=$('entryWhatsappFallbackText');
+  if(copyBtn)copyBtn.onclick=()=>copyEntryWhatsappText(text,copyBtn,textarea);
+  if(!navigator.clipboard?.writeText&&textarea){textarea.focus();textarea.select();}
+  $('previewModal').classList.add('show');
+}
+async function commitSessionAndExport(){
+  const uploadT0=performance.now();
+  const uploadTiming={payload_build_ms:0,validation_ms:0,api_request_ms:0,response_parse_ms:0,total_ms:0};
+  if(!state.user){applyEmployeeUser(null);toast('Please sign in first / 请先登录',6000);return}
+  if(!state.drafts.length){
+    showStatus('Current Session has no entries. Upload is not available. / 当前本票没有流水，不能上传。','warn');
+    toast('Current Session has no entries / 当前本票没有流水',6000);
+    return;
+  }
+  const btns=[$('btnExportSession'),$('btnBuildExport')].filter(Boolean);
+  if(btns.some(b=>b.dataset.busy==='1'))return;
+  const oldLabels=btns.map(b=>[b,b.innerHTML]);
+  const setUploadPhase=(cn,en)=>{
+    btns.forEach(b=>{b.innerHTML=renderEmployeeButtonLabel(en,cn);});
+    showStatus(`${en} / ${cn}`);
+  };
+  btns.forEach(b=>{b.dataset.busy='1';b.disabled=true;b.classList.add('disabled');b.innerHTML=renderEmployeeButtonLabel('Validating','正在校验')});
+  const originalDrafts=state.drafts.map(e=>({...e}));
+  const originalSessionId=state.sessionId;
+  const payloadStart=performance.now();
+  const uploadSessionId=startRepeatableUploadSessionId();
+  const uploadList=prepareRepeatableUploadRows(originalDrafts,uploadSessionId);
+  state.drafts=uploadList;
+  buildExport();
+  uploadTiming.payload_build_ms=Math.round(performance.now()-payloadStart);
+  const validationStart=performance.now();
+  const validation=validateUploadAnchorBatch(uploadList);
+  uploadTiming.validation_ms=Math.round(performance.now()-validationStart);
+  if(!validation.ok){
+    state.drafts=originalDrafts;
+    state.sessionId=originalSessionId;
+    saveDrafts();
+    buildExport();
+    oldLabels.forEach(([b,html])=>{b.dataset.busy='0';b.disabled=false;b.classList.remove('disabled');b.innerHTML=html});
+    const message='Upload rejected. Fix required fields first: '+validation.errors.join('; ');
+    $('validationBox').innerHTML=`<div class="bad">${esc(message)}</div>`;
+    showStatus(message,'bad');
+    toast('Upload rejected: missing anchor fields',6000);
+    updateEntrySessionActionState();
+    return;
+  }
+  const canonicalEntries=uploadList.map(normalizeEntryAnchor);
+  const session=currentSessionPayload();
+  const completedExportText=($('exportText')?.textContent||'').replace(/Sync pending/g,'All synced');
+  const sessionEntriesJson=JSON.stringify({anchor_contract_version:'employee_entry_anchor_v1',entries:canonicalEntries});
+  const failed=[];
+  showStatus(`Uploading confirmed session: ${uploadList.length} entries...`);
+  toast(`Uploading confirmed session: ${uploadList.length} entries...`,6000);
+  for(let i=0;i<uploadList.length;i++){
+    const e=uploadList[i];
+    const isFinal=i===uploadList.length-1;
+    const sessionForEntry={
+      ...session,
+      handover_status:isFinal?'COMPLETED':'EXPORTING',
+      export_text:isFinal?completedExportText:session.export_text,
+      entries:canonicalEntries,
+      entries_json:sessionEntriesJson
+    };
+    try{
+      setUploadPhase(`Uploading ${i+1}/${uploadList.length}`,'Uploading');
+      const apiStart=performance.now();
+      const r=await apiFetch('/api/employee/entry',{method:'POST',headers:employeeUploadTimingEnabled()?{'X-Employee-Entry-Timing':'1'}:{},body:JSON.stringify({entry:e,session:sessionForEntry,timing_debug:employeeUploadTimingEnabled()})});
+      uploadTiming.api_request_ms+=Math.round(performance.now()-apiStart);
+      setUploadPhase(`Confirming ${i+1}/${uploadList.length}`,'Confirming');
+      const parseStart=performance.now();
+      const raw=await r.text();
+      let data=null;
+      try{data=raw?unwrapStandardResponse(JSON.parse(raw)):null}catch{}
+      uploadTiming.response_parse_ms+=Math.round(performance.now()-parseStart);
+      if(data?.timing)employeeUploadTimingLog('server',data.timing);
+      if(!r.ok||data?.success===false)throw new Error(data?.error||data?.message||raw||('HTTP '+r.status));
+      e.sync_status='SYNCED';
+      e.cloud_entry_id=data?.entry_id||e.cloud_entry_id||'';
+      e.sync_error='';
+      if(data?.arrear_task)e.cloud_task_id=data.arrear_task.task_id||e.cloud_task_id||'';
+    }catch(err){
+      e.sync_status='LOCAL';
+      e.sync_error=String(err?.message||err||'cloud_submit_failed');
+      failed.push(e);
+      break;
+    }
+  }
+  oldLabels.forEach(([b,html])=>{b.dataset.busy='0';b.disabled=false;b.classList.remove('disabled');b.innerHTML=html});
+  if(failed.length){
+    state.drafts=originalDrafts;
+    state.sessionId=originalSessionId;
+    saveDrafts();
+    buildExport();
+    $('validationBox').innerHTML=`<div class="bad">Session upload failed: ${esc(failed[0].sync_error)}</div><div class="warn">No local entries were locked. Fix the issue and upload the full session again. / 本地流水未锁死，修复后可整票重新上传。</div>`;
+    toast('Session upload failed. You can upload the full session again.',6000);
+    updateEntrySessionActionState();
+    return;
+  }
+  state.drafts=uploadList.map(e=>({...e,sync_status:'SYNCED',sync_error:''}));
+  state.sessionId=uploadSessionId;
+  saveDrafts();
+  buildExport();
+  refreshSessionViews();
+  renderContext();
+  if(uploadList.some(e=>['R','AP'].includes(e.type)))setTimeout(()=>loadTasks(false),0);
+  uploadTiming.total_ms=Math.round(performance.now()-uploadT0);
+  employeeUploadTimingLog('client',uploadTiming);
+  setUploadPhase('Upload complete','Done');
+  showStatus('Session uploaded to cloud. WhatsApp export is now available. / 本票已上传云端，现在可以导出 WhatsApp。','ok');
+  toast('Session uploaded to cloud / 本票已上传云端',6000);
+  updateEntrySessionActionState();
+}
 function normalizeEmployeeView(view){
   const raw=String(view||'').replace(/^#/,'').trim().toLowerCase();
   if(raw==='followup'||raw==='arrears'||raw==='export')return 'arrears';
@@ -5656,6 +5876,91 @@ function renderContext(){
       <div class="secondary-box"><h4>核对说明<small>CHECK GUIDE</small></h4>${contextLine('优先级','PRIORITY','床位 → 历史欠款 → 日期 → 押金 → 月租')}${contextLine('备注锚点','REMARK SNAPSHOT',remark)}</div>
     </div>
   </div>`;
+}
+function employeeEvidenceShell(titleEn,titleZh,bodyHtml){
+  return `<details class="entry-evidence-collapse" data-entry-evidence-default-collapsed="true">
+    <summary><span>${esc(titleEn)}<small>${esc(titleZh)}</small></span></summary>
+    ${bodyHtml}
+  </details>`;
+}
+function renderBedTransferSystemContext(){
+  const ctx=bedTransferReviewContext();
+  const current=state.current||{};
+  const fromBed=transferValue('transferFromBed')||transferValue('bed')||'Not selected / 未选择';
+  const toBed=transferValue('bedTo')||'Not selected / 未选择';
+  const occupant=sanitizeBedTransferDisplay($('tenantName')?.value||current.tenant||current.remark||'Not found / 未抓取','Access Card reference kept in audit / Access Card 账号后台留存');
+  const checkin=current.start_md||current.start||'Review required / 需核对';
+  const period=[current.start_md||current.start,current.end].filter(Boolean).join(' -> ')||'Review required / 需核对';
+  const deposit=depositHeld()?`${fmtMoney(depositHeld())} AED`:(current.deposit?`${fmtMoney(current.deposit)} AED`:'Review required / 需核对');
+  const arrears=ctx.arrearsAed!=null?`${fmtMoney(ctx.arrearsAed)} AED`:'Review required / 需核对';
+  const cardRef=sanitizeBedTransferDisplay($('tenantCardId')?.value||current.tenant_card_id||'Not found / 未抓取','Access Card reference kept in audit / Access Card 账号后台留存');
+  const newBedStatus=toBed&&toBed!=='Not selected / 未选择'?'Review required / 需核对':'Not selected / 未选择';
+  const newRent=ctx.toRent?`${fmtMoney(ctx.toRent)} AED`:'Review required / 需核对';
+  const rentDiff=ctx.rentDifferenceFils!=null?`${fmtMoney(ctx.rentDifferenceFils/100)} AED`:'Review required / 需核对';
+  const feeMode=$('feePaid')?.value==='N'?'waived':'charged';
+  const waiverReason=$('transferWaiverReason')?.value?.trim()||'Not provided / 未填写';
+  const feeText=feeMode==='waived'?'Waived / 已豁免':'50.00 AED';
+  const accountingEffect=feeMode==='waived'?'No income / 不产生收入':'Bed Transfer Fee income / 换床费收入';
+  const body=`<div class="context-board" data-bed-transfer-step3-context="true">
+    <div class="priority-grid">
+      <div class="priority-card bed-check strong"><span>From Bed<small>原床位</small></span><b>${esc(fromBed)}</b><div class="sub">Current bed before transfer</div></div>
+      <div class="priority-card bed-check strong"><span>To Bed<small>新床位</small></span><b>${esc(toBed)}</b><div class="sub">New bed after transfer</div></div>
+      <div class="priority-card fee-check strong"><span>Fee<small>费用</small></span><b>${esc(feeText)}</b><div class="sub">${esc(accountingEffect)}</div></div>
+      ${feeMode==='waived'?`<div class="priority-card warn"><span>Waiver Reason<small>豁免原因</small></span><b>${esc(waiverReason)}</b><div class="sub">Required for waived transfers</div></div>`:''}
+      <div class="priority-card"><span>Current Occupant<small>当前住客</small></span><b>${esc(occupant)}</b><div class="sub">Must remain same customer</div></div>
+      <div class="priority-card date-check"><span>Original Check-in Date<small>原入住日期</small></span><b>${esc(checkin)}</b><div class="sub">Do not treat as new check-in</div></div>
+      <div class="priority-card"><span>Rent Period<small>租金周期</small></span><b>${esc(period)}</b><div class="sub">Carry existing billing anchor</div></div>
+      <div class="priority-card deposit-check"><span>Deposit Context<small>押金</small></span><b>${esc(deposit)}</b><div class="sub">Carry as liability, not revenue</div></div>
+      <div class="priority-card arrears-check"><span>Historical Arrears Evidence<small>历史欠款证据</small></span><b>${esc(arrears)}</b><div class="sub">Carry unpaid balance</div></div>
+      <div class="priority-card"><span>Card Evidence<small>卡片证据</small></span><b>${esc(cardRef)}</b><div class="sub">Preserve old access card reference in audit only</div></div>
+      <div class="priority-card"><span>New Bed Status<small>新床位状态</small></span><b>${esc(newBedStatus)}</b><div class="sub">Review flags do not block saving</div></div>
+      <div class="priority-card rent-check"><span>System Rent Context<small>系统月租</small></span><b>${esc(newRent)}</b><div class="sub">From rent config when available</div></div>
+      <div class="priority-card rent-check"><span>Rent Difference Review<small>租金差异核对</small></span><b>${esc(rentDiff)}</b><div class="sub">Recorded as review flag only</div></div>
+      <div class="priority-card warn"><span>Record Status<small>记录状态</small></span><b>Recorded / 已记录</b><div class="sub">${esc(BED_TRANSFER_EVENT_LEDGER_MESSAGE)}</div></div>
+    </div>
+  </div>`;
+  const box=$('bedContext');
+  box.className='ctx clean-context bed-transfer-context-live';
+  box.innerHTML=employeeEvidenceShell('Bed Transfer Evidence','换床核对信息',body);
+}
+function renderContext(){
+  if($('entryType')?.value==='TF'){
+    renderBedTransferSystemContext();
+    return;
+  }
+  const c=state.current;
+  const ledger=state.depositBalance!=null?fmtMoney(state.depositBalance):'Not created / 未建立';
+  const rent=rentForBed()?fmtMoney(rentForBed()):'Not configured / 未配置';
+  const inputBed=$('bed').value.trim().replace(/^#/,'');
+  const remark=c?.remark||c?.cardText||'Not loaded / 未抓取';
+  const remarkBed=c?.bed||'Not loaded / 未抓取';
+  const cid=$('tenantCardId')?.value||c?.tenant_card_id||'Not loaded / 未抓取';
+  const checkin=c?.start_md||'Not loaded / 未抓取';
+  const currentEnd=c?.end||'Not loaded / 未抓取';
+  const parseState=c?(c.remark_parse_ok?'Complete / 完整':'Missing / 缺少 '+(c.remark_parse_missing||[]).join(', ')):'Not loaded / 未抓取';
+  const mismatch=inputBed&&c?.bed&&String(inputBed)!==String(c.bed);
+  const matchStatus=mismatch?`Mismatch: input ${inputBed} / card ${c.bed}`:(inputBed||remarkBed);
+  const matchClass=mismatch?'warn':'';
+  const open=openTasksForBed();
+  const arrearTotal=open.reduce((s,t)=>s+taskRemain(t),0);
+  const arrearText=open.length?`${open.length} tasks / ${fmtMoney(arrearTotal)} AED`:'No open arrears / 无未清欠款';
+  const depositText=c?.deposit?fmtMoney(c.deposit):'Not loaded / 未抓取';
+  const body=`<div class="context-board">
+    <div class="priority-grid">
+      <div class="priority-card bed-check strong ${matchClass}"><span>Bed Check<small>床位校对</small></span><b>${esc(matchStatus)}</b><div class="sub">Input ${esc(inputBed||'not entered')} / Card ${esc(remarkBed)}</div></div>
+      <div class="priority-card arrears-check ${open.length?'warn':'strong'}"><span>Historical Arrears Evidence<small>历史欠款证据</small></span><b>${esc(arrearText)}</b><div class="sub">${open.length?'Check whether this payment settles old arrears':'No open task found'}</div></div>
+      <div class="priority-card date-check"><span>Date Anchors<small>日期锚点</small></span><b>${esc(checkin)} -> ${esc(currentEnd)}</b><div class="sub">Check-in date and access card end date</div></div>
+      <div class="priority-card deposit-check"><span>Deposit Context<small>押金</small></span><b>${esc(depositText)}</b><div class="sub">Ledger deposit ${esc(ledger)}</div></div>
+      <div class="priority-card rent-check"><span>System Rent Context<small>系统月租</small></span><b>${esc(rent)}</b><div class="sub">Owner rent configuration</div></div>
+    </div>
+    <div class="secondary-grid">
+      <div class="secondary-box"><h4>System Anchors<small>系统锚点</small></h4>${contextLine('Remark Parse','备注解析',parseState)}${contextLine('Access Card CID','门禁卡卡号',cid)}${contextLine('Access Card Remark','门禁卡备注',remark)}</div>
+      <div class="secondary-box"><h4>Review Guide<small>核对说明</small></h4>${contextLine('Priority','优先级','Bed -> Historical Arrears -> Date Anchors -> Deposit -> System Rent')}${contextLine('Remark Snapshot','备注锚点',remark)}</div>
+    </div>
+  </div>`;
+  const box=$('bedContext');
+  box.className='ctx clean-context';
+  box.innerHTML=employeeEvidenceShell('Verify System Context','系统核对信息',body);
 }
 async function checkEmployeeSession(){
   try{

@@ -6,7 +6,7 @@ test("Current Session preview exposes WhatsApp Export action", async () => {
   const html = await readEmployeeHtml();
 
   assert.match(html, /id="btnWhatsAppSession"/);
-  assert.match(html, /WHATSAPP EXPORT/);
+  assert.match(html, /WhatsApp Export/);
   assert.match(html, /\$\('btnWhatsAppSession'\)\.onclick=exportEntrySessionWhatsApp/);
 });
 
