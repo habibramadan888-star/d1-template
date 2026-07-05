@@ -4493,10 +4493,33 @@ function employeeSystemReminderAmount(row){
   if(Number.isFinite(amount))return Math.max(0,amount-(Number.isFinite(received)?received:0));
   return 0;
 }
+function normalizeEmployeeReminderBucket(row){
+  const raw=String(row?.console_status||row?.summary_bucket||row?.sot_bucket||row?.bucket||row?.status_bucket||row?.consoleStatus||'').trim().toLowerCase();
+  if(['overdue','expired','ttlock_overdue'].includes(raw))return 'overdue';
+  if(['today','due_today','ttlock_due_today'].includes(raw))return 'due_today';
+  if(['soon','due_soon','ttlock_due_soon'].includes(raw))return 'due_soon';
+  if(Number(row?.overdue_days||0)>0)return 'overdue';
+  return '';
+}
+function employeeReminderBucketLabel(item){
+  const bucket=normalizeEmployeeReminderBucket(item);
+  const days=Number(item?.overdue_days||0);
+  if(bucket==='overdue')return days>0?`Overdue ${days}D / \u903e\u671f ${days} \u5929`:'Overdue / \u903e\u671f';
+  if(bucket==='due_today')return 'Due Today / \u4eca\u5929\u5230\u671f';
+  if(bucket==='due_soon')return 'Due Soon / 3\u5929\u5185\u5230\u671f';
+  return 'Not overdue / \u672a\u903e\u671f';
+}
+function employeeReminderBucketClass(item){
+  const bucket=normalizeEmployeeReminderBucket(item);
+  if(bucket==='overdue')return 'bad';
+  if(bucket==='due_today'||bucket==='due_soon')return 'warn';
+  return '';
+}
 function normalizeEmployeeSystemReminder(row){
   const sourceType=normalizeEmployeeReminderSourceType(row);
   const bed=String(row?.room_bed||row?.bed||row?.room||row?.bed_no||'').trim();
   const customer=String(row?.customer_code||row?.tenant_card_id||row?.tenant_name||'').trim();
+  const summaryBucket=normalizeEmployeeReminderBucket(row);
   return {
     source:sourceType==='ttlock_expired_unpaid'?'ttlock':'history',
     source_type:sourceType,
@@ -4512,6 +4535,8 @@ function normalizeEmployeeSystemReminder(row){
     period_end:row?.period_end||row?.original_period_end||'',
     due_date:row?.due_date||row?.promise_date||row?.original_period_end||'',
     overdue_days:Number(row?.overdue_days||0),
+    console_status:summaryBucket,
+    summary_bucket:summaryBucket,
     followup_status:row?.followup_status||'待跟进',
     promise_date:row?.promise_date||row?.promised_payment_date||'',
     staff_note:row?.staff_note||row?.followup_note||'',
@@ -4634,7 +4659,8 @@ function followupCard(item){
     ...(!editableStatuses.includes(currentStatus)?[`<option value="${esc(currentStatus)}" selected disabled>${esc(currentStatus)} / system status</option>`]:[]),
     ...editableStatuses.map(s=>`<option value="${s}" ${s===currentStatus?'selected':''}>${s}</option>`)
   ].join('');
-  const overdueText=item.overdue_days>0?`Overdue ${item.overdue_days}D / \u903e\u671f ${item.overdue_days} \u5929`:'Not overdue / \u672a\u903e\u671f';
+  const bucketLabel=employeeReminderBucketLabel(item);
+  const bucketClass=employeeReminderBucketClass(item);
   const title=followupTitle(item)||'Bed to confirm / \u5e8a\u4f4d\u5f85\u786e\u8ba4';
   return `<div class="followup-card step employee-card ${cls}" data-followup-id="${esc(item.task_id)}" data-followup-card-collapsed="true">
     <div class="followup-top">
@@ -4642,7 +4668,7 @@ function followupCard(item){
         <div class="followup-bed">${esc(title)}</div>
         <div class="followup-tags">
           <span class="followup-tag">${esc(source)}</span>
-          <span class="followup-tag ${item.overdue_days>0?'bad':''}">${esc(overdueText)}</span>
+          <span class="followup-tag ${esc(bucketClass)}">${esc(bucketLabel)}</span>
           ${force?'<span class="followup-tag bad">Required / \u5fc5\u987b\u8ddf\u8fdb</span>':''}
         </div>
       </div>
