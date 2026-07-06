@@ -44,3 +44,17 @@ test("checkout and deposit refund anchors preserve approval state", async () => 
   assert.match(html, /return applyEntryAnchors\(payload\)/);
 });
 
+test("deposit refund and checkout hide rent-only fields and render event-specific summaries", async () => {
+  const html = await readFile(employeePath, "utf8");
+
+  assert.match(html, /const isDepositOut=type==='DR'/);
+  assert.match(html, /const isCheckout=type==='CO'/);
+  assert.match(html, /const hideRentOnly=isAp\|\|isDepositOut\|\|isCheckout/);
+  assert.match(html, /\['listPrice','periodStart','periodEnd','periodDays','periodDue','due','paid','entryClr'\]/);
+  assert.match(html, /employeeApplyEventSpecificFieldLabels\(type\)/);
+  assert.match(html, /employeeRenderEventSpecificSummary\(\)/);
+  assert.match(html, /Deposit Out \/ \\u9000\\u62bc\\u91d1/);
+  assert.match(html, /Refund Amount \/ \\u9000\\u62bc\\u91d1\\u91d1\\u989d/);
+  assert.match(html, /Checkout \/ \\u9000\\u623f/);
+  assert.match(html, /Deposit Refund Amount \/ \\u5e94\\u9000\\u62bc\\u91d1/);
+});

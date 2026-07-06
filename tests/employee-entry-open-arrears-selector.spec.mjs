@@ -42,3 +42,15 @@ test("arrears payment anchor includes before and after remaining balances", asyn
   assert.match(html, /remaining_arrears_before_payment:Math\.max\(0,original-already\)/);
   assert.match(html, /settlement_status:type==='AP'\?\(apRemaining<=0\?'settled':'partial'\):''/);
 });
+
+test("arrears payment explains settled or voided cloud arrears when no open item exists", async () => {
+  const html = await readFile(htmlPath, "utf8");
+  const worker = await readFile("deploy-worker/src/index.js", "utf8");
+
+  assert.match(worker, /closed_tasks:closedTasks/);
+  assert.match(html, /closedTasks:\[\]/);
+  assert.match(html, /state\.closedTasks=data\.closed_tasks\|\|data\.closedTasks\|\|\[\]/);
+  assert.match(html, /function employeeClosedArrearsForBed\(bed\)/);
+  assert.match(html, /function employeeClosedArrearsMessage\(bed\)/);
+  assert.match(html, /Last arrears was settled or voided/);
+});

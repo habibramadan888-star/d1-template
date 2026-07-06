@@ -3022,7 +3022,7 @@ function readSessionId(userid){
   try{return localStorage.getItem(employeeStorageKey('empv3:sessionId',userid))||''}
   catch{return ''}
 }
-const state={lockCards:[],current:null,depositBalance:null,rentConfig:{},rentConfigLoaded:false,drafts:[],tasks:[],employeeDirectives:[],followupItems:[],systemReminderItems:[],systemReminderStatus:'idle',systemReminderSummary:null,systemReminderSources:null,systemReminderLimit:100,sessionId:'',user:null,ttlockStatus:'idle',ttlockLoadedAt:0,ttlockError:'',ttlockDataSource:''};
+const state={lockCards:[],current:null,depositBalance:null,rentConfig:{},rentConfigLoaded:false,drafts:[],tasks:[],closedTasks:[],employeeDirectives:[],followupItems:[],systemReminderItems:[],systemReminderStatus:'idle',systemReminderSummary:null,systemReminderSources:null,systemReminderLimit:100,sessionId:'',user:null,ttlockStatus:'idle',ttlockLoadedAt:0,ttlockError:'',ttlockDataSource:''};
 const BED_TRANSFER_WRITE_ENABLED=true;
 const BED_TRANSFER_EVENT_LEDGER_MESSAGE='Bed transfer records save event anchors only. This does not directly change bed occupancy, deposit, arrears, or Access Card. 换床记录只保存信息锚点，不会直接改变床位、押金、欠款或门禁卡。';
 const BED_TRANSFER_SUBMITTED_MESSAGE='Bed transfer recorded / 换床记录已保存';
@@ -3865,11 +3865,17 @@ function renderArrearsPaymentPanel(){
 }
 function employeeApplyArrearsPaymentLayout(type){
   const isAp=type==='AP';
+  const isDepositOut=type==='DR';
+  const isCheckout=type==='CO';
+  const hideRentOnly=isAp||isDepositOut||isCheckout;
   ['listPrice','periodStart','periodEnd','periodDays','periodDue','due','paid','entryClr'].forEach(id=>{
     const wrap=fieldWrap(id);
-    if(wrap)wrap.classList.toggle('hidden',isAp);
+    if(wrap)wrap.classList.toggle('hidden',hideRentOnly);
   });
-  if(isAp){
+  const amountWrap=fieldWrap('amount');
+  if(amountWrap)amountWrap.classList.toggle('hidden',isCheckout);
+  employeeApplyEventSpecificFieldLabels(type);
+  if(hideRentOnly){
     $('periodStep')?.classList.add('hidden');
     $('entryClr').value='Y';
     $('periodDue').value='';
@@ -3878,6 +3884,28 @@ function employeeApplyArrearsPaymentLayout(type){
     $('periodDays').value='';
   }
   renderArrearsPaymentPanel();
+}
+function employeeSetFieldLabel(id,en,zh){
+  const label=$(id)?.closest('.field')?.querySelector('label');
+  if(label)label.innerHTML=`${esc(en)}<span class="label-en">${esc(zh)}</span>`;
+}
+function employeeApplyEventSpecificFieldLabels(type){
+  if(type==='DR'){
+    employeeSetFieldLabel('amount','Refund Amount','\u9000\u62bc\u91d1\u91d1\u989d');
+    employeeSetFieldLabel('payType','Refund Method','\u9000\u6b3e\u65b9\u5f0f');
+    employeeSetFieldLabel('remark','Refund Reason / Note','\u9000\u6b3e\u539f\u56e0 / \u5907\u6ce8');
+  }else if(type==='CO'){
+    employeeSetFieldLabel('checkoutDate','Checkout Date','\u9000\u623f\u65e5\u671f');
+    employeeSetFieldLabel('depositReturnAmount','Deposit Refund Amount','\u5e94\u9000\u62bc\u91d1');
+    employeeSetFieldLabel('dedNote','Checkout Note','\u9000\u623f\u5907\u6ce8');
+  }else if(type==='AP'){
+    employeeSetFieldLabel('amount','Payment Amount','\u672c\u6b21\u8fd8\u6b3e\u91d1\u989d');
+    employeeSetFieldLabel('payType','Payment Method','\u4ed8\u6b3e\u65b9\u5f0f');
+  }else{
+    employeeSetFieldLabel('amount','Amount','\u5b9e\u6536\u6216\u652f\u51fa\u91d1\u989d');
+    employeeSetFieldLabel('payType','Payment Method','\u4ed8\u6b3e\u65b9\u5f0f');
+    employeeSetFieldLabel('remark','Remark','\u5907\u6ce8');
+  }
 }
 function eventLabel(type){
   return {R:'收租',AP:'还欠款',D:'收押金',DR:'退押金',CO:'退房',E:'支出',TF:'换床',TFF:'换床费'}[type]||type;
@@ -4615,6 +4643,7 @@ async function loadTasks(render=true){
     const r=await apiFetch('/api/arrear_tasks');
     const data=r.ok?await r.json():{tasks:[]};
     state.tasks=data.tasks||[];
+    state.closedTasks=data.closed_tasks||data.closedTasks||[];
     populateTaskSelect();
     if(render)renderTasks();
   }catch{
@@ -6974,6 +7003,24 @@ function employeeOpenArrearsForBed(bed){
     return !closed.has(status)&&taskRemain(t)>0&&((clean&&taskBed===clean)||(cid&&taskCid===cid));
   });
 }
+function employeeClosedArrearsForBed(bed){
+  const clean=String(bed||'').trim().replace(/^#/,'');
+  const cid=String($('tenantCardId')?.value||'').trim();
+  if(!clean&&!cid)return [];
+  return (state.closedTasks||[]).filter(t=>{
+    const taskBed=String(t.bed||t.room_bed||'').trim().replace(/^#/,'');
+    const taskCid=String(t.tenant_card_id||t.customer_code||'').trim();
+    return (clean&&taskBed===clean)||(cid&&taskCid===cid);
+  });
+}
+function employeeClosedArrearsMessage(bed){
+  const rows=employeeClosedArrearsForBed(bed);
+  if(!rows.length)return '';
+  const last=rows[0];
+  const ref=employeeTaskRef(last)||'-';
+  const status=String(last.close_status||last.status||last.followup_status||'settled/voided');
+  return `Last arrears was settled or voided. / \u6700\u8fd1\u6b20\u6b3e\u5df2\u7ed3\u6e05\u6216\u5df2\u4f5c\u5e9f\u3002<br><span class="open-arrears-selected-ref">last_arrears_ref: ${esc(ref)} · status: ${esc(status)}</span>`;
+}
 function employeeCheckoutRefundEventType(){
   const type=$('entryType')?.value||'';
   return type==='CO'?'checkout':(type==='DR'?'deposit_refund':'');
@@ -7105,8 +7152,9 @@ function employeeRenderOpenArrearsAlert(){
   }
   const rows=employeeOpenArrearsForBed(bed);
   if(!rows.length){
+    const closedMessage=employeeClosedArrearsMessage(bed);
     box.className='open-arrears-core-alert ok';
-    box.innerHTML=`<div class="open-arrears-title"><div><b>No Open Arrears</b><small>\u65e0\u672a\u6e05\u6b20\u6b3e</small></div><span class="open-arrears-badge">OK</span></div>`;
+    box.innerHTML=`<div class="open-arrears-title"><div><b>No Open Arrears</b><small>\u65e0\u672a\u6e05\u6b20\u6b3e</small></div><span class="open-arrears-badge">OK</span></div>${closedMessage?`<div class="small" style="margin-top:8px">${closedMessage}</div>`:''}`;
     return;
   }
   const blockedExit=type==='CO'||type==='DR';
@@ -7263,8 +7311,41 @@ validate=function(){
 const employeeCollapsedLegacyRenderSummary=renderSummary;
 renderSummary=function(){
   employeeCollapsedLegacyRenderSummary();
+  employeeRenderEventSpecificSummary();
   employeeUpdateCollapsedStepSummaries();
 };
+function employeeRenderEventSpecificSummary(){
+  const type=$('entryType')?.value||'';
+  if(!['DR','CO'].includes(type)||!$('entrySummary'))return;
+  const openArrearsTotal=openTasksForBed().reduce((s,t)=>s+taskRemain(t),0);
+  let items=[];
+  if(type==='DR'){
+    items=[
+      ['Event / \u4e8b\u4ef6','Deposit Out / \u9000\u62bc\u91d1'],
+      ['Bed / \u5e8a\u4f4d',`#${$('bed').value||'-'}`],
+      ['Deposit Balance / \u62bc\u91d1\u4f59\u989d',depositHeld()?`${fmtMoney(depositHeld())} AED`:'-'],
+      ['Refund Amount / \u9000\u62bc\u91d1\u91d1\u989d',`${fmtMoney(num($('amount').value))} AED`],
+      ['Refund Method / \u9000\u6b3e\u65b9\u5f0f',$('payType').value==='B'?'bank':'cash'],
+      ['Open Arrears Check / \u672a\u6e05\u6b20\u6b3e\u68c0\u67e5',openArrearsTotal>0?`Blocked: ${fmtMoney(openArrearsTotal)} AED`:'No Open Arrears'],
+      ['Note / \u5907\u6ce8',$('remark').value||'-']
+    ];
+  }else{
+    const co=checkoutCalc();
+    items=[
+      ['Event / \u4e8b\u4ef6','Checkout / \u9000\u623f'],
+      ['Bed / \u5e8a\u4f4d',`#${$('bed').value||'-'}`],
+      ['Checkout Type / \u9000\u623f\u7c7b\u578b',leftWithArrearsSelected()?'Left With Arrears':'Normal Checkout'],
+      ['Checkout Date / \u9000\u623f\u65e5\u671f',$('checkoutDate').value||'-'],
+      ['Deposit Balance / \u62bc\u91d1\u4f59\u989d',depositHeld()?`${fmtMoney(depositHeld())} AED`:'-'],
+      ['Deposit Refund Amount / \u5e94\u9000\u62bc\u91d1',`${fmtMoney(Math.max(0,depositHeld()-co.total))} AED`],
+      ['Outstanding Arrears / \u672a\u6e05\u6b20\u6b3e',openArrearsTotal>0?`${fmtMoney(openArrearsTotal)} AED`:'No Open Arrears'],
+      ['Belongings Held / \u7269\u54c1\u7559\u5b58',$('leftBelongingsHeld')?.value||'no'],
+      ['Owner Approval / \u8001\u677f\u5ba1\u6838',openArrearsTotal>0&&!leftWithArrearsSelected()?'Required':'Not required'],
+      ['Note / \u5907\u6ce8',$('dedNote').value||$('remark').value||'-']
+    ];
+  }
+  $('entrySummary').innerHTML=items.map(([k,v])=>`<div><span>${esc(k)}</span><b>${esc(v)}</b></div>`).join('');
+}
 const employeeCollapsedLegacyRenderContext=renderContext;
 renderContext=function(){
   employeeCollapsedLegacyRenderContext();

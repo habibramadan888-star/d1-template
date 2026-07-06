@@ -5341,18 +5341,18 @@ function ownerOverviewShowCloudArrearsPreview(){
   showOwnerOverviewPreviewModal('Cloud Arrears Collection','\u6b20\u6b3e\u4ee3\u6536',body,'Total',fmtMoney(collection.total_remaining||0));
 }
 function ownerOverviewShowOutstandingPreview(){
-  const rows=ownerArrearsActiveRows();
-  const body=rows.length?rows.map(row=>ownerOverviewPreviewRow(row.bed||row.room||'-',fmtMoney(row.remain||0),ownerOverviewPreviewArrearStatus(row),row.sourceLabel||row.sourceType||'')).join(''):ownerOverviewPreviewEmpty();
-  const total=rows.reduce((sum,row)=>sum+Number(row.remain||0),0);
+  const rows=ownerOverviewConsoleSotRows();
+  const body=rows.length?rows.map(row=>ownerOverviewPreviewRow(row.bed||row.room_bed||row.room||'-',fmtMoney(ownerOverviewReceivableAmount(row)),ownerOverviewPreviewArrearStatus(row),row.source_label||row.sourceLabel||row.source_type||row.sourceType||'')).join(''):ownerOverviewPreviewEmpty();
+  const total=rows.reduce((sum,row)=>sum+ownerOverviewReceivableAmount(row),0);
   showOwnerOverviewPreviewModal('Outstanding Collection','\u5f85\u6536\u5c3e\u6b3e',body,'Total',fmtMoney(total));
 }
 function ownerOverviewShowTodayActionsPreview(){
-  const rows=ownerArrearsActiveRows();
+  const rows=ownerOverviewConsoleSotRows();
   const groups=[['overdue','Overdue'],['due today','Due Today'],['due soon','Due Soon'],['required','Required']];
   const sections=groups.map(([key,label])=>{
     const items=rows.filter(row=>ownerOverviewPreviewArrearStatus(row)===key);
     if(!items.length)return '';
-    return `<div class="hist-card" style="margin:0 0 10px"><div class="hist-title">${esc(label)}</div><div class="detail-list">${items.map(row=>ownerOverviewPreviewRow(row.bed||row.room||'-',fmtMoney(row.remain||0),label,row.dueDate||row.due_date||'')).join('')}</div></div>`;
+    return `<div class="hist-card" style="margin:0 0 10px"><div class="hist-title">${esc(label)}</div><div class="detail-list">${items.map(row=>ownerOverviewPreviewRow(row.bed||row.room_bed||row.room||'-',fmtMoney(ownerOverviewReceivableAmount(row)),label,row.dueDate||row.due_date||row.valid_until||'')).join('')}</div></div>`;
   }).filter(Boolean).join('');
   showOwnerOverviewPreviewModal('Today Actions','\u4eca\u65e5\u5f85\u529e',sections||ownerOverviewPreviewEmpty(),'Total',String(rows.length));
 }
@@ -5367,6 +5367,17 @@ function ownerOverviewRiskCloud(){
 }
 function ownerOverviewConsoleSotCloud(){
   return ownerOverviewCloudData().current_receivables_sot||{};
+}
+function ownerOverviewConsoleSotRows(){
+  const sot=ownerOverviewConsoleSotCloud();
+  if(Array.isArray(sot.rows))return sot.rows;
+  if(Array.isArray(sot.all_rows))return sot.all_rows;
+  return [];
+}
+function ownerOverviewReceivableAmount(row){
+  const fils=Number(row?.amount_fils??row?.outstanding_amount_fils??row?.remaining_amount_fils);
+  if(Number.isFinite(fils)&&fils>0)return fils/100;
+  return Number(row?.remain??row?.remaining_arrears??row?.amount??0)||0;
 }
 function ownerOverviewFlowCloud(){
   return ownerOverviewCloudData().occupancy_flow||{};
@@ -5528,9 +5539,9 @@ function renderOwnerOverview(){
   const consoleSot=ownerOverviewConsoleSotCloud();
   const consoleSummary=consoleSot.summary||{};
   const hasConsoleSot=!!consoleSot.summary;
-  const outstandingAmount=hasConsoleSot?Number(consoleSummary.outstanding_amount_fils||consoleSummary.total_amount_fils||0)/100:(Number.isFinite(Number(cloudArrears.outstanding_amount))?Number(cloudArrears.outstanding_amount):openArrears.reduce((sum,a)=>sum+(Number(a.remain)||0),0));
-  const outstandingCount=hasConsoleSot?Number(consoleSummary.action_count??consoleSummary.total_count??0):(Number.isFinite(Number(cloudArrears.open_count))?Number(cloudArrears.open_count):openArrears.length);
-  const todayTodo=hasConsoleSot?Number(consoleSummary.action_count??0):(Number(cloudRisk.overdue_count||0)+Number(cloudRisk.broken_promise_count||0)+Number(cloudRisk.needs_review_count||0)||openArrears.length+overdue.length);
+  const outstandingAmount=hasConsoleSot?Number(consoleSummary.outstanding_amount_fils||consoleSummary.total_amount_fils||0)/100:0;
+  const outstandingCount=hasConsoleSot?Number(consoleSummary.action_count??consoleSummary.total_count??0):0;
+  const todayTodo=hasConsoleSot?Number(consoleSummary.action_count??0):0;
   const consoleRiskNote=`欠款中 ${Number(consoleSummary.overdue_count||0)} / 今天 ${Number(consoleSummary.due_today_count||0)} / 3天内 ${Number(consoleSummary.due_soon_count||0)}`;
   const periodReceived=Number(currentPeriod.gross_received||0);
   const cloudArrearsRemaining=Number(cloudArrearsCollection.total_remaining||0);

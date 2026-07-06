@@ -3486,7 +3486,16 @@ async function empCloseArrearEverywhere(env,user,id,now){
 __name(empCloseArrearEverywhere,"empCloseArrearEverywhere");
 async function handleArrearTasks(request,env,user){
   const tasks=await empListMergedArrearTasks(env,user);
-  return success({success:true,tasks});
+  let closedTasks=[];
+  if(await empTableExists(env,"arrear_tasks")){
+    try{
+      const rows=await env.DB.prepare("SELECT * FROM arrear_tasks WHERE corpid=? ORDER BY COALESCE(updated_at,created_at) DESC LIMIT 200").bind(user.corpid).all();
+      closedTasks=(rows.results||[]).filter(t=>!empCloseStatusIsOpen(t.close_status)||empTaskRemaining(t)<=0).slice(0,100);
+    }catch{
+      closedTasks=[];
+    }
+  }
+  return success({success:true,tasks,closed_tasks:closedTasks});
 }
 __name(handleArrearTasks,"handleArrearTasks");
 async function handleArrearTaskDirective(request,env,user){
@@ -5095,6 +5104,10 @@ async function phase0OwnerOverviewComparativeSummary(env,user,url){
     current_receivables_sot:currentSot?{
       summary:currentSot.summary,
       source_breakdown:currentSot.source_breakdown,
+      rows:(currentSot.all_rows||[]).slice(0,500),
+      overdue:currentSot.overdue||[],
+      due_today:currentSot.due_today||[],
+      due_soon:currentSot.due_soon||[],
       source:currentSot.source,
       source_function:currentSot.source_function,
       generated_at:currentSot.generated_at
