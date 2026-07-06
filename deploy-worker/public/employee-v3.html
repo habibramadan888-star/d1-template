@@ -2862,22 +2862,22 @@ label .label-en{
           <div class="field"><label>扣款说明 ded_note</label><input id="dedNote" placeholder="其他扣款必须说明"></div>
           <div class="left-with-arrears-panel hidden" id="leftWithArrearsFields" data-left-with-arrears-fields="true">
             <div class="panel-title">Left With Arrears<small>离店未清欠款</small></div>
+            <input id="leftFormerCustomerName" data-left-former-customer-name="true" type="hidden">
+            <input id="leftContactMethod" data-left-contact-method="true" type="hidden" value="whatsapp">
+            <input id="leftDepositBalance" data-left-deposit-balance="true" type="hidden">
+            <input id="leftGraceDays" data-left-grace-days="true" type="hidden" value="0">
+            <input id="leftPromisedReturnDate" data-left-promised-return-date="true" type="hidden">
+            <div class="context-note" id="leftWithArrearsSystemFields" data-left-with-arrears-system-fields="true">System fields will load after bed check.</div>
             <div class="grid3">
-              <div class="field"><label>Former Customer Name<span class="label-en">离店客户姓名</span></label><input id="leftFormerCustomerName" data-left-former-customer-name="true" placeholder="Card/customer name"></div>
-              <div class="field"><label>WhatsApp Phone<span class="label-en">客户 WhatsApp 号码</span></label><input id="leftWhatsappPhone" data-left-whatsapp-phone="true" placeholder="+971..."></div>
-              <div class="field"><label>Contact Method<span class="label-en">替代联系方式</span></label><select id="leftContactMethod" data-left-contact-method="true"><option value="whatsapp">WhatsApp</option><option value="phone">Phone / 电话</option><option value="wechat">WeChat / 微信</option><option value="other">Other / 其他</option></select></div>
-            </div>
-            <div class="grid3">
-              <div class="field"><label>Deposit Balance<span class="label-en">押金余额</span></label><input id="leftDepositBalance" data-left-deposit-balance="true" inputmode="decimal" placeholder="0.00"></div>
-              <div class="field"><label>Belongings Held<span class="label-en">物品留存</span></label><select id="leftBelongingsHeld" data-left-belongings-held="true"><option value="no">No / 否</option><option value="yes">Yes / 是</option></select></div>
-              <div class="field"><label>Grace Days<span class="label-en">承诺后宽限天数</span></label><input id="leftGraceDays" data-left-grace-days="true" inputmode="numeric" value="0"></div>
-            </div>
-            <div class="grid">
+              <div class="field"><label>WhatsApp Phone<span class="label-en">客户 WhatsApp 号码</span></label><input id="leftWhatsappPhone" data-left-whatsapp-phone="true" placeholder="Customer WhatsApp phone"></div>
+              <div class="field"><label>Confirmed Not Returning Date<span class="label-en">确认不再回来日期</span></label><input id="leftConfirmedNotReturningDate" data-left-confirmed-not-returning-date="true" type="date"></div>
               <div class="field"><label>Promised Payment Date<span class="label-en">承诺付款日期</span></label><input id="leftPromisedPaymentDate" data-left-promised-payment-date="true" type="date"></div>
-              <div class="field"><label>Promised Return Date<span class="label-en">承诺回来日期</span></label><input id="leftPromisedReturnDate" data-left-promised-return-date="true" type="date"></div>
+            </div>
+            <div class="grid3">
+              <div class="field"><label>Belongings Held<span class="label-en">物品留存</span></label><select id="leftBelongingsHeld" data-left-belongings-held="true"><option value="no">No / 否</option><option value="yes">Yes / 是</option></select></div>
+              <div class="field"><label>Note<span class="label-en">备注</span></label><input id="leftContactNote" data-left-contact-note="true" placeholder="Tracking note"></div>
             </div>
             <div class="field"><label>Belongings Note<span class="label-en">物品说明</span></label><textarea id="leftBelongingsNote" data-left-belongings-note="true" placeholder="Bags, documents, clothes, tools..."></textarea></div>
-            <div class="field"><label>Contact Note<span class="label-en">联系方式备注</span></label><textarea id="leftContactNote" data-left-contact-note="true" placeholder="Required if no WhatsApp phone"></textarea></div>
             <div class="context-note" id="leftWithArrearsSummary" data-left-with-arrears-summary="true">Open arrears details will appear after bed check.</div>
           </div>
         </div>
@@ -4427,9 +4427,9 @@ function entryPayload(){
     former_customer_ref:leftMode?($('tenantCardId').value.trim()||leftArrearsRef):'',former_customer_name:leftMode?($('leftFormerCustomerName').value.trim()||$('tenantName').value.trim()):'',card_name:leftMode?($('leftFormerCustomerName').value.trim()||$('tenantName').value.trim()):'',
     former_customer_phone:leftMode?$('leftWhatsappPhone').value.trim():'',whatsapp_phone:leftMode?$('leftWhatsappPhone').value.trim():'',contact_method:leftMode?$('leftContactMethod').value:'',contact_note:leftMode?$('leftContactNote').value.trim():'',
     arrears_amount:leftMode?openArrearsTotal:0,belongings_held:leftMode?leftBelongingsHeld:false,belongings_note:leftMode?$('leftBelongingsNote').value.trim():'',
-    promised_payment_date:leftMode?$('leftPromisedPaymentDate').value:'',promised_return_date:leftMode?$('leftPromisedReturnDate').value:'',promise_return_date:leftMode?$('leftPromisedReturnDate').value:'',
-    deposit_balance:leftMode?num($('leftDepositBalance').value):depositHeld(),left_date:leftMode?$('checkoutDate').value:'',checkout_attempt_date:leftMode?$('checkoutDate').value:'',
-    left_status:leftMode?'left_pending_return':'',final_status:leftMode?'left_pending_return':'',grace_days_after_promise:leftMode?num($('leftGraceDays').value):0,review_date:leftMode?leftWithArrearsReviewDate($('leftPromisedReturnDate').value,$('leftGraceDays').value):'',
+    promised_payment_date:leftMode?$('leftPromisedPaymentDate').value:'',promised_return_date:leftMode?($('leftPromisedReturnDate')?.value||''):'',promise_return_date:leftMode?($('leftPromisedReturnDate')?.value||''):'',
+    deposit_balance:leftMode?depositHeld():depositHeld(),left_date:leftMode?$('checkoutDate').value:'',checkout_attempt_date:leftMode?$('checkoutDate').value:'',
+    left_status:leftMode?'left_pending_return':'',final_status:leftMode?'left_pending_return':'',confirmed_not_returning_date:leftMode?($('leftConfirmedNotReturningDate')?.value||''):'',grace_days_after_promise:0,review_date:'',
     original_session_id:leftMode?(leftTask?.session_id||leftTask?.original_session_id||''):'',original_event_id:leftMode?(leftTask?.entry_id||leftTask?.original_entry_id||leftTask?.original_event_id||leftTask?.task_id||''):'',
     deposit_carried:depositHeld(),old_ttlock_ref:state.current?.tenant_card_id||'',old_lock_valid_from:state.current?.start||state.current?.start_md||'',old_lock_valid_until:state.current?.end||'',rent_difference:toRentMinusFrom(bedTransferReviewContext()),
     expense_category:$('expenseCategory').value,expense_desc:$('expenseDesc').value.trim(),
@@ -4612,7 +4612,7 @@ async function saveEntryWithTtlockGate(){
   return saveEntryWithoutTtlockGate();
 }
 saveEntry=saveEntryWithTtlockGate;
-function resetForm(){['bed','transferFromBed','bedTo','transferDate','transferReason','amount','due','paid','tenantName','tenantCardId','periodStart','periodEnd','periodDays','periodDue','listPrice','customReason','bankRef','checkoutDate','depositDeduction','depositReturnAmount','overdayDeduction','noNoticeDeduction','otherDeduction','dedNote','leftFormerCustomerName','leftWhatsappPhone','leftContactNote','leftDepositBalance','leftBelongingsNote','leftPromisedPaymentDate','leftPromisedReturnDate','leftGraceDays','expenseDesc','remark','excessTo','arrearAmount','arrearPromiseDate','arrearReasonDetail'].forEach(id=>$(id).value='');$('leftWithArrearsMode').value='normal';$('leftContactMethod').value='whatsapp';$('leftBelongingsHeld').value='no';$('arrearHandling').value='ARREAR';state.current=null;state.depositBalance=null;renderContext();syncForm();refreshSessionViews()}
+function resetForm(){['bed','transferFromBed','bedTo','transferDate','transferReason','amount','due','paid','tenantName','tenantCardId','periodStart','periodEnd','periodDays','periodDue','listPrice','customReason','bankRef','checkoutDate','depositDeduction','depositReturnAmount','overdayDeduction','noNoticeDeduction','otherDeduction','dedNote','leftFormerCustomerName','leftWhatsappPhone','leftContactNote','leftDepositBalance','leftBelongingsNote','leftPromisedPaymentDate','leftPromisedReturnDate','leftConfirmedNotReturningDate','leftGraceDays','expenseDesc','remark','excessTo','arrearAmount','arrearPromiseDate','arrearReasonDetail'].forEach(id=>$(id).value='');$('leftWithArrearsMode').value='normal';$('leftContactMethod').value='whatsapp';$('leftBelongingsHeld').value='no';$('arrearHandling').value='ARREAR';state.current=null;state.depositBalance=null;renderContext();syncForm();refreshSessionViews()}
 function hasLocalOnly(){return state.drafts.some(e=>e.sync_status!=='SYNCED')}
 function newSession(){
   if(hasLocalOnly()){toast('仍有云端未确认记录，不能开始新会话');return}
@@ -6249,7 +6249,7 @@ if(location.hash==='#export'){
 showEmployeeView(location.hash||'entry',{pushHash:false});
 document.querySelectorAll('.event-chip').forEach(btn=>btn.addEventListener('click',e=>{e.preventDefault();setEntryType(btn.dataset.type);}));
 document.querySelectorAll('.pay-option').forEach(btn=>btn.addEventListener('click',e=>{e.preventDefault();setPaymentType(btn.dataset.pay);}));
-['entryType','cycle','payType','amount','reasonCode','feePaid','transferWaiverReason','customReason','tenantName','bankRef','periodDays','depositDeduction','checkoutDate','noNoticeDeduction','otherDeduction','dedNote','leftWithArrearsMode','leftFormerCustomerName','leftWhatsappPhone','leftContactMethod','leftContactNote','leftDepositBalance','leftBelongingsHeld','leftBelongingsNote','leftPromisedPaymentDate','leftPromisedReturnDate','leftGraceDays','excessTo','bedTo','transferDate','transferReason','expenseCategory','expenseDesc','remark','arrearHandling','arrearPromiseDate','arrearReasonDetail'].forEach(id=>$(id).addEventListener('input',syncForm));
+['entryType','cycle','payType','amount','reasonCode','feePaid','transferWaiverReason','customReason','tenantName','bankRef','periodDays','depositDeduction','checkoutDate','noNoticeDeduction','otherDeduction','dedNote','leftWithArrearsMode','leftFormerCustomerName','leftWhatsappPhone','leftContactMethod','leftContactNote','leftDepositBalance','leftBelongingsHeld','leftBelongingsNote','leftPromisedPaymentDate','leftPromisedReturnDate','leftConfirmedNotReturningDate','leftGraceDays','excessTo','bedTo','transferDate','transferReason','expenseCategory','expenseDesc','remark','arrearHandling','arrearPromiseDate','arrearReasonDetail'].forEach(id=>$(id).addEventListener('input',syncForm));
 $('linkedTaskId').addEventListener('change',applyLinkedTask);
 $('bed').addEventListener('input',()=>{if($('entryType').value==='TF')$('transferFromBed').value=$('bed').value.trim().replace(/^#/,'');lookupBed();if($('entryType').value==='AP'){populateTaskSelect();syncForm();}});
 $('transferFromBed').addEventListener('input',()=>{if($('entryType').value==='TF'){$('bed').value=$('transferFromBed').value.trim().replace(/^#/,'');lookupBed();syncForm();}});
@@ -7109,10 +7109,32 @@ function leftWithArrearsReviewDate(returnDate,graceDays){
 function renderLeftWithArrearsFields(){
   const active=leftWithArrearsSelected();
   visible(['leftWithArrearsFields'],active);
+  ['overdayDeduction','noNoticeDeduction','otherDeduction','depositDeduction','depositReturnAmount','dedNote'].forEach(id=>{
+    const wrap=fieldWrap(id);
+    if(wrap)wrap.classList.toggle('hidden',active);
+  });
   if(!active)return;
   if($('tenantName')&&!$('leftFormerCustomerName').value)$('leftFormerCustomerName').value=$('tenantName').value||'';
-  if($('leftDepositBalance')&&!$('leftDepositBalance').value)$('leftDepositBalance').value=fmtMoney(depositHeld());
+  if($('leftDepositBalance'))$('leftDepositBalance').value=fmtMoney(depositHeld());
   const rows=leftWithArrearsRows();
+  const system=$('leftWithArrearsSystemFields');
+  if(system){
+    const task=leftWithArrearsPrimaryTask();
+    const meta=task?employeeArrearsMeta(task):null;
+    const customer=$('leftFormerCustomerName')?.value||$('tenantName')?.value||meta?.name||'Needs Review';
+    const coverage=state.current?.end||state.current?.end_md||state.current?.valid_until||'Needs Review';
+    const checkIn=state.current?.start||state.current?.start_md||state.current?.valid_from||'Needs Review';
+    const overdue=coverage&&coverage!=='Needs Review'?Math.max(0,daysBetween(coverage,today())):'Needs Review';
+    system.innerHTML=`<b>System-Read Fields</b><br>
+      Bed: #${esc(($('bed')?.value||'').trim().replace(/^#/,''))||'Needs Review'} ·
+      Customer: ${esc(customer)} ·
+      Coverage End: ${esc(coverage)} ·
+      Overdue Days: ${esc(String(overdue))} ·
+      Deposit Balance: ${fmtMoney(depositHeld())} AED ·
+      Open Arrears: ${fmtMoney(rows.reduce((s,t)=>s+taskRemain(t),0))} AED ·
+      Cloud Arrears Ref: ${esc(meta?.ref||'Needs Review')} ·
+      Check-in: ${esc(checkIn)}`;
+  }
   const summary=$('leftWithArrearsSummary');
   if(!summary)return;
   if(!rows.length){
@@ -7278,14 +7300,12 @@ validate=function(){
   if(leftMode){
     const rows=leftWithArrearsRows();
     const phone=($('leftWhatsappPhone')?.value||'').trim();
-    const contactMethod=($('leftContactMethod')?.value||'').trim();
-    const contactNote=($('leftContactNote')?.value||'').trim();
     const belongingsHeld=$('leftBelongingsHeld')?.value==='yes';
     const addError=msg=>{if(!result.errors.includes(msg))result.errors.push(msg);};
     if(!rows.length)addError('Left With Arrears requires an open Cloud Arrears item. / 离店未清欠款必须关联未清云端欠款。');
-    if(!phone&&(!contactMethod||contactMethod==='whatsapp'||!contactNote))addError('Blocked: WhatsApp phone is required for left customer arrears. / 阻断：离店未清欠款必须填写客户 WhatsApp 号码。');
+    if(!phone)addError('Blocked: WhatsApp phone is required for left customer arrears. / 阻断：离店未清欠款必须填写客户 WhatsApp 号码。');
     if(!($('leftPromisedPaymentDate')?.value||''))addError('Promised Payment Date is required. / 必须填写承诺付款日期。');
-    if(!($('leftPromisedReturnDate')?.value||''))addError('Promised Return Date is required. / 必须填写承诺回来日期。');
+    if(($('leftFinalStatus')?.value||$('leftStatus')?.value||'')==='abandoned_confirmed'&&!($('leftConfirmedNotReturningDate')?.value||''))addError('Confirmed Not Returning Date is required when abandoned is confirmed. / 确认不再回来时必须填写确认日期。');
     if(belongingsHeld&&!($('leftBelongingsNote')?.value||'').trim())addError('Belongings Note is required when belongings are held. / 物品留存时必须填写物品说明。');
   }
   const blocked=['CO','DR'].includes(type)&&openTasksForBed().length>0;

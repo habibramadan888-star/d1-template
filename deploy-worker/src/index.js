@@ -1884,14 +1884,10 @@ async function handleEmployeeEntry(request,env,user){
   }
   let arrearTask=null;
   if(type==="R"&&periodStart&&periodEnd&&periodDue>0){
-    const paidRow=await env.DB.prepare(`SELECT COALESCE(SUM(paid),0) AS total_paid FROM transactions
-      WHERE corpid=? AND room=? AND period_start=? AND period_end=? AND COALESCE(status,'ACTIVE')='ACTIVE'
-        AND COALESCE(type, reason_code, 'R')='R'`).bind(user.corpid,room,periodStart,periodEnd).first();
-    const totalPaid=Number(paidRow?.total_paid||0);
-    const remain=Math.max(0,periodDue-totalPaid);
     const existing=await env.DB.prepare(`SELECT task_id FROM arrear_tasks
       WHERE corpid=? AND bed=? AND original_period_start=? AND original_period_end=?
         AND COALESCE(close_status,'') NOT IN ('PAID','CLEARED','CLOSED','VOID','WAIVED','WRITTEN_OFF','已结清','结清','作废') LIMIT 1`).bind(user.corpid,room,periodStart,periodEnd).first();
+    const remain=currentShortfall;
     if(remain>0){
       if(existing?.task_id){
         await env.DB.prepare(`UPDATE arrear_tasks
@@ -1907,7 +1903,7 @@ async function handleEmployeeEntry(request,env,user){
             existing.task_id,
             user.corpid
           ).run();
-        arrearTask={task_id:existing.task_id,arrear_amount:remain,total_paid:totalPaid,period_due:periodDue,updated:true};
+        arrearTask={task_id:existing.task_id,arrear_amount:remain,period_due:periodDue,updated:true};
       }else{
         const taskId=empId("task");
         await empInsertDynamic(env,"arrear_tasks",{
@@ -1915,14 +1911,12 @@ async function handleEmployeeEntry(request,env,user){
           tenant_name:tenantName,tenant_card_id:tenantCardId,arrear_amount:remain,arrear_reason:cleanText(entry.reason_code||"SHORT_PAID",80),
           created_at:now,created_by:authOperatorId,followup_status:"待跟进",
           promise_date:arrearPromiseDate,promise_amount:remain,staff_note:arrearReasonDetail,
-          original_period_start:periodStart,original_period_end:periodEnd,updated_by:authOperatorId,updated_at:now
+          original_period_start:periodStart,original_period_end:periodEnd,updated_by:authOperatorId,updated_at:now,
+          source_type:"employee_entry_short_paid",source_ref:entryId,
+          source_fingerprint:[user.corpid,room,periodStart,periodEnd,entryId].join("|"),materialized_from:"employee_entry"
         },EMP_TASK_COLUMNS);
-        arrearTask={task_id:taskId,arrear_amount:remain,total_paid:totalPaid,period_due:periodDue};
+        arrearTask={task_id:taskId,arrear_amount:remain,period_due:periodDue};
       }
-    }else if(existing?.task_id){
-      await env.DB.prepare("UPDATE arrear_tasks SET close_status='PAID', followup_status='已结清', actual_received=?, updated_by=?, updated_at=? WHERE task_id=? AND corpid=?")
-        .bind(totalPaid,authOperatorId,now,existing.task_id,user.corpid).run();
-      arrearTask={task_id:existing.task_id,closed:true,total_paid:totalPaid,period_due:periodDue};
     }
   }
   if(type==="AP"){

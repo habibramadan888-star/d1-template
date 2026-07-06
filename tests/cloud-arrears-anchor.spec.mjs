@@ -15,6 +15,14 @@ test("rent short paid creates a cloud arrears anchor in arrear_tasks", async () 
   assert.match(source, /promise_date:arrearPromiseDate/);
   assert.match(source, /promise_amount:remain/);
   assert.match(source, /staff_note:arrearReasonDetail/);
+  assert.match(source, /source_type:"employee_entry_short_paid"/);
+  assert.match(source, /source_ref:entryId/);
+  const rentBlock = source.slice(
+    source.indexOf('if(type==="R"&&periodStart&&periodEnd&&periodDue>0)'),
+    source.indexOf('if(type==="AP")')
+  );
+  assert.doesNotMatch(rentBlock, /SUM\(paid\)/);
+  assert.doesNotMatch(rentBlock, /close_status='PAID'/);
 });
 
 test("arrears payment binds existing cloud arrears and reconciles remaining status", async () => {
