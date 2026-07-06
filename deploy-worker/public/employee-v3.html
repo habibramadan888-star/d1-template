@@ -2876,10 +2876,12 @@ label .label-en{
             <div class="context-note" id="leftWithArrearsSystemFields" data-left-with-arrears-system-fields="true">System fields will load after bed check.</div>
             <div class="grid3">
               <div class="field"><label>WhatsApp Phone<span class="label-en">客户 WhatsApp 号码</span></label><input id="leftWhatsappPhone" data-left-whatsapp-phone="true" placeholder="Customer WhatsApp phone"></div>
+              <div class="field"><label>Coverage End Date<span class="label-en">租期或卡片截止日期</span></label><input id="leftCoverageEndDate" data-left-coverage-end-date="true" type="date"></div>
               <div class="field"><label>Confirmed Not Returning Date<span class="label-en">确认不再回来日期</span></label><input id="leftConfirmedNotReturningDate" data-left-confirmed-not-returning-date="true" type="date"></div>
               <div class="field"><label>Promised Payment Date<span class="label-en">承诺付款日期</span></label><input id="leftPromisedPaymentDate" data-left-promised-payment-date="true" type="date"></div>
             </div>
             <div class="grid3">
+              <div class="field"><label>Left Arrears Amount<span class="label-en">离店欠款总金额</span></label><input id="leftArrearsAmount" data-left-arrears-amount="true" inputmode="decimal"></div>
               <div class="field"><label>Belongings Held<span class="label-en">物品留存</span></label><select id="leftBelongingsHeld" data-left-belongings-held="true"><option value="no">No / 否</option><option value="yes">Yes / 是</option></select></div>
               <div class="field"><label>Note<span class="label-en">备注</span></label><input id="leftContactNote" data-left-contact-note="true" placeholder="Tracking note"></div>
             </div>
@@ -4036,7 +4038,8 @@ function applyEntryAnchors(e){
     Object.assign(e,{bed:e.room,checkout_date:e.checkout_date||'',deposit_refund:0,outstanding_arrears:outstanding,owner_approval_required:outstanding>0&&!left,owner_approval_status:outstanding>0&&!left?(e.owner_approval_status||'pending_owner_approval'):(e.owner_approval_status||'not_required'),final_note:e.note||e.ded_note||'',
       checkout_mode:left?'left_with_arrears':(e.checkout_mode||'normal'),left_with_arrears:left,customer_left:left,former_customer_name:e.former_customer_name||e.card_name||e.tenant_name||'',card_name:e.card_name||e.former_customer_name||e.tenant_name||'',
       whatsapp_phone:e.whatsapp_phone||e.former_customer_phone||'',former_customer_phone:e.former_customer_phone||e.whatsapp_phone||'',contact_method:e.contact_method||'',contact_note:e.contact_note||'',
-      arrears_amount:num(e.arrears_amount||outstanding),cloud_arrears_ref:e.cloud_arrears_ref||'',belongings_held:!!e.belongings_held,belongings_note:e.belongings_note||'',
+      arrears_amount:num(e.arrears_amount||e.left_arrears_amount||outstanding),left_arrears_amount:num(e.left_arrears_amount||e.arrears_amount||outstanding),cloud_arrears_ref:e.cloud_arrears_ref||'',belongings_held:!!e.belongings_held,belongings_note:e.belongings_note||'',
+      coverage_end_date:e.coverage_end_date||e.card_end_date||e.rent_coverage_end||e.old_lock_valid_until||'',card_end_date:e.card_end_date||e.coverage_end_date||e.rent_coverage_end||e.old_lock_valid_until||'',rent_coverage_end:e.rent_coverage_end||e.coverage_end_date||e.card_end_date||e.old_lock_valid_until||'',
       promised_payment_date:e.promised_payment_date||'',promised_return_date:e.promised_return_date||e.promise_return_date||'',promise_return_date:e.promise_return_date||e.promised_return_date||'',
       deposit_balance:num(e.deposit_balance||e.deposit_held||0),left_date:e.left_date||e.checkout_date||'',checkout_attempt_date:e.checkout_attempt_date||e.checkout_date||'',
       left_status:e.left_status||'',final_status:e.final_status||'',grace_days_after_promise:num(e.grace_days_after_promise||0),review_date:e.review_date||'',original_session_id:e.original_session_id||'',original_event_id:e.original_event_id||''});
@@ -4451,7 +4454,8 @@ function entryPayload(){
     checkout_mode:leftMode?'left_with_arrears':'normal',left_with_arrears:leftMode,customer_left:leftMode,cloud_arrears_ref:leftArrearsRef,
     former_customer_ref:leftMode?($('tenantCardId').value.trim()||leftArrearsRef):'',former_customer_name:leftMode?($('leftFormerCustomerName').value.trim()||$('tenantName').value.trim()):'',card_name:leftMode?($('leftFormerCustomerName').value.trim()||$('tenantName').value.trim()):'',
     former_customer_phone:leftMode?$('leftWhatsappPhone').value.trim():'',whatsapp_phone:leftMode?$('leftWhatsappPhone').value.trim():'',contact_method:leftMode?$('leftContactMethod').value:'',contact_note:leftMode?$('leftContactNote').value.trim():'',
-    arrears_amount:leftMode?openArrearsTotal:0,belongings_held:leftMode?leftBelongingsHeld:false,belongings_note:leftMode?$('leftBelongingsNote').value.trim():'',
+    arrears_amount:leftMode?num($('leftArrearsAmount')?.value||openArrearsTotal):0,left_arrears_amount:leftMode?num($('leftArrearsAmount')?.value||openArrearsTotal):0,belongings_held:leftMode?leftBelongingsHeld:false,belongings_note:leftMode?$('leftBelongingsNote').value.trim():'',
+    coverage_end_date:leftMode?$('leftCoverageEndDate').value:'',rent_coverage_end:leftMode?$('leftCoverageEndDate').value:'',card_end_date:leftMode?$('leftCoverageEndDate').value:'',
     promised_payment_date:leftMode?$('leftPromisedPaymentDate').value:'',promised_return_date:leftMode?($('leftPromisedReturnDate')?.value||''):'',promise_return_date:leftMode?($('leftPromisedReturnDate')?.value||''):'',
     deposit_balance:leftMode?depositHeld():depositHeld(),left_date:leftMode?$('checkoutDate').value:'',checkout_attempt_date:leftMode?$('checkoutDate').value:'',
     left_status:leftMode?'left_pending_return':'',final_status:leftMode?'left_pending_return':'',confirmed_not_returning_date:leftMode?($('leftConfirmedNotReturningDate')?.value||''):'',grace_days_after_promise:0,review_date:'',
@@ -4637,7 +4641,7 @@ async function saveEntryWithTtlockGate(){
   return saveEntryWithoutTtlockGate();
 }
 saveEntry=saveEntryWithTtlockGate;
-function resetForm(){['bed','transferFromBed','bedTo','transferDate','transferReason','amount','due','paid','tenantName','tenantCardId','periodStart','periodEnd','periodDays','periodDue','listPrice','customReason','bankRef','checkoutDate','depositOutBalance','depositOutRefundDate','depositOutDifferenceReason','depositDeduction','depositReturnAmount','overdayDeduction','noNoticeDeduction','otherDeduction','dedNote','leftFormerCustomerName','leftWhatsappPhone','leftContactNote','leftDepositBalance','leftBelongingsNote','leftPromisedPaymentDate','leftPromisedReturnDate','leftConfirmedNotReturningDate','leftGraceDays','expenseDesc','remark','excessTo','arrearAmount','arrearPromiseDate','arrearReasonDetail'].forEach(id=>{if($(id))$(id).value=''});$('leftWithArrearsMode').value='normal';$('leftContactMethod').value='whatsapp';$('leftBelongingsHeld').value='no';$('arrearHandling').value='ARREAR';state.current=null;state.depositBalance=null;renderContext();syncForm();refreshSessionViews()}
+function resetForm(){['bed','transferFromBed','bedTo','transferDate','transferReason','amount','due','paid','tenantName','tenantCardId','periodStart','periodEnd','periodDays','periodDue','listPrice','customReason','bankRef','checkoutDate','depositOutBalance','depositOutRefundDate','depositOutDifferenceReason','depositDeduction','depositReturnAmount','overdayDeduction','noNoticeDeduction','otherDeduction','dedNote','leftFormerCustomerName','leftWhatsappPhone','leftContactNote','leftDepositBalance','leftCoverageEndDate','leftArrearsAmount','leftBelongingsNote','leftPromisedPaymentDate','leftPromisedReturnDate','leftConfirmedNotReturningDate','leftGraceDays','expenseDesc','remark','excessTo','arrearAmount','arrearPromiseDate','arrearReasonDetail'].forEach(id=>{if($(id))$(id).value=''});$('leftWithArrearsMode').value='normal';$('leftContactMethod').value='whatsapp';$('leftBelongingsHeld').value='no';$('arrearHandling').value='ARREAR';state.current=null;state.depositBalance=null;renderContext();syncForm();refreshSessionViews()}
 function hasLocalOnly(){return state.drafts.some(e=>e.sync_status!=='SYNCED')}
 function newSession(){
   if(hasLocalOnly()){toast('仍有云端未确认记录，不能开始新会话');return}
@@ -6136,6 +6140,32 @@ function showEntryWhatsappFallback(text,url){
   if(!navigator.clipboard?.writeText&&textarea){textarea.focus();textarea.select();}
   $('previewModal').classList.add('show');
 }
+function formatEmployeeUploadDryRunError(result,index){
+  const eventLabel=result?.event_type||result?.anchor_preview?.event_type||'entry';
+  const code=result?.error_code||result?.code||result?.error||'UNKNOWN_UPLOAD_VALIDATION_ERROR';
+  const missing=(result?.missing_fields||[]).filter(Boolean).join(', ');
+  const invalid=(result?.invalid_fields||[]).filter(Boolean).join(', ');
+  const parts=[
+    `Entry ${Number(result?.event_index ?? index)+1}`,
+    eventLabel,
+    code,
+    result?.message||''
+  ].filter(Boolean);
+  if(missing)parts.push(`Missing: ${missing}`);
+  if(invalid)parts.push(`Invalid: ${invalid}`);
+  return parts.join(' · ');
+}
+async function validateEmployeeUploadDryRun(entry,sessionForEntry,index){
+  const r=await apiFetch('/api/employee/entry/validate',{method:'POST',body:JSON.stringify({entry,session:sessionForEntry,event_index:index})});
+  const raw=await r.text();
+  let data=null;
+  try{data=raw?unwrapStandardResponse(JSON.parse(raw)):null}catch{}
+  if(!r.ok||data?.success===false||data?.ok===false){
+    const result=data||{};
+    throw new Error(formatEmployeeUploadDryRunError(result,index)||raw||('HTTP '+r.status));
+  }
+  return data;
+}
 async function commitSessionAndExport(){
   const uploadT0=performance.now();
   const uploadTiming={payload_build_ms:0,validation_ms:0,api_request_ms:0,response_parse_ms:0,total_ms:0};
@@ -6182,6 +6212,40 @@ async function commitSessionAndExport(){
   const completedExportText=($('exportText')?.textContent||'').replace(/Sync pending/g,'All synced');
   const sessionEntriesJson=JSON.stringify({anchor_contract_version:'employee_entry_anchor_v1',entries:canonicalEntries});
   const failed=[];
+  const dryRunFailed=[];
+  setUploadPhase(`Dry-run validating 0/${uploadList.length}`,'Validating');
+  for(let i=0;i<uploadList.length;i++){
+    const e=uploadList[i];
+    const isFinal=i===uploadList.length-1;
+    const sessionForEntry={
+      ...session,
+      handover_status:isFinal?'COMPLETED':'EXPORTING',
+      export_text:isFinal?completedExportText:session.export_text,
+      entries:canonicalEntries,
+      entries_json:sessionEntriesJson
+    };
+    try{
+      setUploadPhase(`Dry-run validating ${i+1}/${uploadList.length}`,'Validating');
+      await validateEmployeeUploadDryRun(e,sessionForEntry,i);
+    }catch(err){
+      e.sync_status='LOCAL';
+      e.sync_error=String(err?.message||err||'dry_run_validation_failed');
+      dryRunFailed.push(e);
+      break;
+    }
+  }
+  if(dryRunFailed.length){
+    state.drafts=originalDrafts;
+    state.sessionId=originalSessionId;
+    saveDrafts();
+    buildExport();
+    oldLabels.forEach(([b,html])=>{b.dataset.busy='0';b.disabled=false;b.classList.remove('disabled');b.innerHTML=html});
+    $('validationBox').innerHTML=`<div class="bad">Upload validation failed: ${esc(dryRunFailed[0].sync_error)}</div><div class="warn">No cloud data was written. Fix the listed field and upload again. / Dry-run 未写入云端，请修复后重新上传。</div>`;
+    showStatus(`Upload validation failed: ${dryRunFailed[0].sync_error}`,'bad');
+    toast('Upload validation failed before cloud write.',6000);
+    updateEntrySessionActionState();
+    return;
+  }
   showStatus(`Uploading confirmed session: ${uploadList.length} entries...`);
   toast(`Uploading confirmed session: ${uploadList.length} entries...`,6000);
   for(let i=0;i<uploadList.length;i++){
@@ -6274,7 +6338,7 @@ if(location.hash==='#export'){
 showEmployeeView(location.hash||'entry',{pushHash:false});
 document.querySelectorAll('.event-chip').forEach(btn=>btn.addEventListener('click',e=>{e.preventDefault();setEntryType(btn.dataset.type);}));
 document.querySelectorAll('.pay-option').forEach(btn=>btn.addEventListener('click',e=>{e.preventDefault();setPaymentType(btn.dataset.pay);}));
-['entryType','cycle','payType','amount','reasonCode','feePaid','transferWaiverReason','customReason','tenantName','bankRef','periodDays','depositOutRefundDate','depositOutDifferenceReason','depositDeduction','checkoutDate','noNoticeDeduction','otherDeduction','dedNote','leftWithArrearsMode','leftFormerCustomerName','leftWhatsappPhone','leftContactMethod','leftContactNote','leftDepositBalance','leftBelongingsHeld','leftBelongingsNote','leftPromisedPaymentDate','leftPromisedReturnDate','leftConfirmedNotReturningDate','leftGraceDays','excessTo','bedTo','transferDate','transferReason','expenseCategory','expenseDesc','remark','arrearHandling','arrearPromiseDate','arrearReasonDetail'].forEach(id=>$(id).addEventListener('input',syncForm));
+['entryType','cycle','payType','amount','reasonCode','feePaid','transferWaiverReason','customReason','tenantName','bankRef','periodDays','depositOutRefundDate','depositOutDifferenceReason','depositDeduction','checkoutDate','noNoticeDeduction','otherDeduction','dedNote','leftWithArrearsMode','leftFormerCustomerName','leftWhatsappPhone','leftContactMethod','leftContactNote','leftDepositBalance','leftCoverageEndDate','leftArrearsAmount','leftBelongingsHeld','leftBelongingsNote','leftPromisedPaymentDate','leftPromisedReturnDate','leftConfirmedNotReturningDate','leftGraceDays','excessTo','bedTo','transferDate','transferReason','expenseCategory','expenseDesc','remark','arrearHandling','arrearPromiseDate','arrearReasonDetail'].forEach(id=>$(id).addEventListener('input',syncForm));
 $('linkedTaskId').addEventListener('change',applyLinkedTask);
 $('bed').addEventListener('input',()=>{if($('entryType').value==='TF')$('transferFromBed').value=$('bed').value.trim().replace(/^#/,'');lookupBed();if($('entryType').value==='AP'){populateTaskSelect();syncForm();}});
 $('transferFromBed').addEventListener('input',()=>{if($('entryType').value==='TF'){$('bed').value=$('transferFromBed').value.trim().replace(/^#/,'');lookupBed();syncForm();}});
@@ -7142,6 +7206,10 @@ function renderLeftWithArrearsFields(){
   if($('tenantName')&&!$('leftFormerCustomerName').value)$('leftFormerCustomerName').value=$('tenantName').value||'';
   if($('leftDepositBalance'))$('leftDepositBalance').value=fmtMoney(depositHeld());
   const rows=leftWithArrearsRows();
+  const openLeftTotal=rows.reduce((s,t)=>s+taskRemain(t),0);
+  const coverageCandidate=state.current?.end||state.current?.valid_until||state.current?.end_md||'';
+  if($('leftCoverageEndDate')&&!$('leftCoverageEndDate').value&&/^\d{4}-\d{2}-\d{2}$/.test(coverageCandidate))$('leftCoverageEndDate').value=coverageCandidate;
+  if($('leftArrearsAmount')&&!$('leftArrearsAmount').value&&openLeftTotal>0)$('leftArrearsAmount').value=fmtMoney(openLeftTotal);
   const system=$('leftWithArrearsSystemFields');
   if(system){
     const task=leftWithArrearsPrimaryTask();
@@ -7329,6 +7397,8 @@ validate=function(){
     const addError=msg=>{if(!result.errors.includes(msg))result.errors.push(msg);};
     if(!rows.length)addError('Left With Arrears requires an open Cloud Arrears item. / 离店未清欠款必须关联未清云端欠款。');
     if(!phone)addError('Blocked: WhatsApp phone is required for left customer arrears. / 阻断：离店未清欠款必须填写客户 WhatsApp 号码。');
+    if(!($('leftCoverageEndDate')?.value||''))addError('Coverage End Date is required. / 必须填写租期或卡片截止日期。');
+    if(num($('leftArrearsAmount')?.value)<=0)addError('Left Arrears Amount is required. / 必须填写离店欠款总金额。');
     if(!($('leftPromisedPaymentDate')?.value||''))addError('Promised Payment Date is required. / 必须填写承诺付款日期。');
     if(!($('leftConfirmedNotReturningDate')?.value||''))addError('Confirmed Not Returning Date is required. / 确认不再回来日期必填。');
     if(($('leftFinalStatus')?.value||$('leftStatus')?.value||'')==='abandoned_confirmed'&&!($('leftConfirmedNotReturningDate')?.value||''))addError('Confirmed Not Returning Date is required when abandoned is confirmed. / 确认不再回来时必须填写确认日期。');

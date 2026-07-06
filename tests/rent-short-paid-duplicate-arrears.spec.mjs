@@ -37,11 +37,13 @@ test("duplicate rent rows do not close cloud arrears as paid", async () => {
 
 test("only arrears payment reconciliation can settle a cloud arrears task", async () => {
   const source = await readFile(workerPath, "utf8");
-  const apStart = source.indexOf('if(type==="AP")');
+  const writePathStart = source.indexOf("let arrearTask=null;");
+  assert.notEqual(writePathStart, -1, "write-path arrears task block should exist");
+  const apStart = source.indexOf('if(type==="AP"){\n    const taskId=cleanId(entry.linked_task_id);\n    if(taskId&&apTaskForPayment)', writePathStart);
   assert.notEqual(apStart, -1, "arrears payment reconciliation block should exist");
   const apBlock = source.slice(apStart, source.indexOf("let leftWithArrearsTask", apStart));
 
-  assert.match(apBlock, /empReconcileArrearTask\(env,user,taskId,authOperatorId,now\)/);
+  assert.match(apBlock, /empReconcileArrearTask\(env,user,taskId,authOperatorId,now(?:,room)?\)/);
   assert.match(source, /WHERE corpid=\? AND linked_task_id=\?[^`]+COALESCE\(type,''\)='AP'/s);
   assert.match(source, /closed\?"PAID":""/);
 });

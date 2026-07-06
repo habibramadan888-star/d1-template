@@ -1,0 +1,109 @@
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import test from "node:test";
+
+const workerPath = "deploy-worker/src/index.js";
+const employeePath = "deploy-worker/public/employee-v3.html";
+
+function functionBlock(source, name) {
+  const start = source.indexOf(`function ${name}`);
+  assert.ok(start >= 0, `${name} must exist`);
+  const marker = `__name(${name},`;
+  const end = source.indexOf(marker, start);
+  assert.ok(end > start, `${name} block must end with __name marker`);
+  return source.slice(start, end);
+}
+
+test("employee upload dry-run endpoint is routed and never writes D1", async () => {
+  const worker = await readFile(workerPath, "utf8");
+  const validateBlock = functionBlock(worker, "validateEmployeeEntryUploadPayload");
+  const validateHandler = functionBlock(worker, "handleEmployeeEntryValidate");
+
+  assert.match(worker, /path===\"\/api\/employee\/entry\/validate\"&&request\.method===\"POST\"/);
+  assert.match(worker, /return handleEmployeeEntryValidate\(request,env,user\)/);
+  assert.doesNotMatch(validateBlock, /\.run\(/, "dry-run validation must not run D1 writes");
+  assert.doesNotMatch(validateBlock, /empInsertDynamic\(/, "dry-run validation must not insert rows");
+  assert.doesNotMatch(validateBlock, /empEvent\(/, "dry-run validation must not write events");
+  assert.doesNotMatch(validateBlock, /audit\(/, "dry-run validation must not write audit logs");
+  assert.doesNotMatch(validateHandler, /\.run\(/, "dry-run handler must not run D1 writes");
+});
+
+test("real employee upload reuses dry-run validation before write path", async () => {
+  const worker = await readFile(workerPath, "utf8");
+  const uploadBlock = functionBlock(worker, "handleEmployeeEntry");
+  const validationIndex = uploadBlock.indexOf("validateEmployeeEntryUploadPayload(env,user,body");
+  const entryIndex = uploadBlock.indexOf("const entry=body?.entry||{}");
+  const writeIndex = uploadBlock.indexOf("empInsertDynamic(env,\"sessions\"");
+
+  assert.ok(validationIndex > 0, "real upload must call shared dry-run validator");
+  assert.ok(validationIndex < entryIndex, "validation must run before upload payload mutation");
+  assert.ok(validationIndex < writeIndex, "validation must run before session writes");
+  assert.match(uploadBlock, /if\(!validationResult\.ok\)return json\(\{success:false,\.\.\.validationResult\},422\)/);
+});
+
+test("arrears payment dry-run accepts projection-aware refs and returns exact AP errors", async () => {
+  const worker = await readFile(workerPath, "utf8");
+  const validateBlock = functionBlock(worker, "validateEmployeeEntryUploadPayload");
+  const readOnlyLookup = functionBlock(worker, "empFindOpenArrearTaskForPaymentReadOnly");
+
+  assert.match(validateBlock, /empFindOpenArrearTaskForPaymentReadOnly\(env,user,taskId,room\)/);
+  assert.match(readOnlyLookup, /empFindProjectionArrearsForPayment\(env,user,cleanTaskId,bed\)/);
+  assert.match(validateBlock, /LINKED_TASK_REQUIRED/);
+  assert.match(validateBlock, /LINKED_TASK_NOT_OPEN/);
+  assert.match(validateBlock, /ARREAR_PAYMENT_AMOUNT_INVALID/);
+  assert.match(validateBlock, /event_type:\"arrears_payment\"/);
+});
+
+test("deposit out dry-run enforces difference reason only when refund differs", async () => {
+  const worker = await readFile(workerPath, "utf8");
+  const validateBlock = functionBlock(worker, "validateEmployeeEntryUploadPayload");
+
+  assert.match(validateBlock, /const diff=Math\.round\(\(amount-depositBalance\)\*100\)\/100/);
+  assert.doesNotMatch(validateBlock, /const diff=cleanMoney\(amount-depositBalance\)/);
+  assert.match(validateBlock, /DEPOSIT_REFUND_DIFFERENCE_REASON_REQUIRED/);
+  assert.match(validateBlock, /missing_fields:\[\"difference_reason\"\]/);
+  assert.match(validateBlock, /actual_refund_amount:amount/);
+  assert.match(validateBlock, /refund_difference:diff/);
+});
+
+test("left with arrears dry-run returns required missing fields", async () => {
+  const worker = await readFile(workerPath, "utf8");
+  const validateBlock = functionBlock(worker, "validateEmployeeEntryUploadPayload");
+
+  assert.match(validateBlock, /LEFT_WITH_ARREARS_REQUIRED_FIELDS_MISSING/);
+  assert.match(validateBlock, /missing\.push\(\"whatsapp_phone\"\)/);
+  assert.match(validateBlock, /missing\.push\(\"coverage_end_date\"\)/);
+  assert.match(validateBlock, /missing\.push\(\"confirmed_not_returning_date\"\)/);
+  assert.match(validateBlock, /missing\.push\(\"promised_payment_date\"\)/);
+  assert.match(validateBlock, /missing\.push\(\"left_arrears_amount\"\)/);
+  assert.match(validateBlock, /missing\.push\(\"belongings_held\"\)/);
+  assert.match(validateBlock, /missing\.push\(\"belongings_note\"\)/);
+});
+
+test("employee UI runs dry-run validation before real upload and surfaces backend fields", async () => {
+  const html = await readFile(employeePath, "utf8");
+  const commitStart = html.lastIndexOf("async function commitSessionAndExport");
+  assert.ok(commitStart >= 0, "effective commitSessionAndExport function must exist");
+  const commitBlock = html.slice(commitStart);
+  const dryRunIndex = commitBlock.indexOf("validateEmployeeUploadDryRun(e,sessionForEntry,i)");
+  const realUploadIndex = commitBlock.indexOf("apiFetch('/api/employee/entry',{");
+
+  assert.match(html, /function formatEmployeeUploadDryRunError\(result,index\)/);
+  assert.match(html, /apiFetch\('\/api\/employee\/entry\/validate'/);
+  assert.ok(dryRunIndex > 0, "commit flow must call dry-run validation");
+  assert.ok(realUploadIndex > dryRunIndex, "real upload must happen only after dry-run validation");
+  assert.match(html, /Upload validation failed:/);
+  assert.match(html, /Missing: \$\{missing\}/);
+  assert.match(html, /Invalid: \$\{invalid\}/);
+});
+
+test("left with arrears UI exposes required visible fields and preserves anchors", async () => {
+  const html = await readFile(employeePath, "utf8");
+
+  assert.match(html, /id=\"leftCoverageEndDate\"/);
+  assert.match(html, /id=\"leftArrearsAmount\"/);
+  assert.match(html, /coverage_end_date:leftMode\?\$\(\'leftCoverageEndDate\'\)\.value:''/);
+  assert.match(html, /left_arrears_amount:leftMode\?num\(\$\(\'leftArrearsAmount\'\)\?\.value\|\|openArrearsTotal\):0/);
+  assert.match(html, /Coverage End Date is required/);
+  assert.match(html, /Left Arrears Amount is required/);
+});

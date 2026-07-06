@@ -1558,6 +1558,10 @@ function empLeftWithArrearsMetaFromEntry(entry,taskId){
     left_date:cleanDate(entry.left_date||entry.checkout_date||""),
     checkout_attempt_date:cleanDate(entry.checkout_attempt_date||entry.checkout_date||""),
     arrears_amount:cleanMoney(entry.arrears_amount||entry.outstanding_arrears||0),
+    left_arrears_amount:cleanMoney(entry.left_arrears_amount||entry.arrears_amount||entry.outstanding_arrears||0),
+    coverage_end_date:cleanDate(entry.coverage_end_date||entry.card_end_date||entry.rent_coverage_end||entry.old_lock_valid_until||""),
+    card_end_date:cleanDate(entry.card_end_date||entry.coverage_end_date||entry.rent_coverage_end||entry.old_lock_valid_until||""),
+    rent_coverage_end:cleanDate(entry.rent_coverage_end||entry.coverage_end_date||entry.card_end_date||entry.old_lock_valid_until||""),
     cloud_arrears_ref:cleanText(entry.cloud_arrears_ref||taskId||"",120),
     deposit_balance:cleanMoney(entry.deposit_balance||entry.deposit_held||0),
     belongings_held:entry.belongings_held===true||String(entry.belongings_held||"").toLowerCase()==="yes",
@@ -1696,12 +1700,257 @@ async function handleEmployeeLockCards(request,env,user){
   return success(result);
 }
 __name(handleEmployeeLockCards,"handleEmployeeLockCards");
+function employeeEntryValidationFailure(stage,errorCode,message,extra={}){
+  return {
+    ok:false,
+    stage,
+    event_index:Number(extra.event_index||0),
+    event_type:extra.event_type||"",
+    error_code:errorCode,
+    message:message||errorCode,
+    missing_fields:Array.isArray(extra.missing_fields)?extra.missing_fields:[],
+    invalid_fields:Array.isArray(extra.invalid_fields)?extra.invalid_fields:[],
+    anchor_preview:extra.anchor_preview||{}
+  };
+}
+__name(employeeEntryValidationFailure,"employeeEntryValidationFailure");
+async function empFindOpenArrearTaskForPaymentReadOnly(env,user,taskId,bed=""){
+  const cleanTaskId=cleanId(taskId);
+  if(!cleanTaskId)return null;
+  const existing=await env.DB.prepare(`SELECT * FROM arrear_tasks
+    WHERE task_id=? AND corpid=? LIMIT 1`).bind(cleanTaskId,user.corpid).first().catch(()=>null);
+  if(existing)return empCloseStatusIsOpen(existing.close_status)&&empTaskRemaining(existing)>0?existing:null;
+  const projected=await empFindProjectionArrearsForPayment(env,user,cleanTaskId,bed);
+  if(projected&&["open","partial"].includes(String(projected.status||"").toLowerCase())&&cleanMoney(projected.remaining_arrears||0)>0){
+    return {
+      ...projected,
+      task_id:cleanTaskId,
+      source:"cloud_arrears_projection",
+      materialized_from:projected.materialized_from||"sessions.entries_json",
+      arrear_amount:cleanMoney(projected.arrear_amount||projected.original_arrears_amount||0),
+      actual_received:cleanMoney(projected.actual_received||projected.already_paid_amount||0),
+      close_status:""
+    };
+  }
+  if(!await empTableExists(env,"arrears"))return null;
+  const legacy=await env.DB.prepare("SELECT * FROM arrears WHERE id=? AND corpid=? AND cleared=0 LIMIT 1")
+    .bind(cleanTaskId,user.corpid).first().catch(()=>null);
+  return legacy?empLegacyArrearToTask(legacy):null;
+}
+__name(empFindOpenArrearTaskForPaymentReadOnly,"empFindOpenArrearTaskForPaymentReadOnly");
+async function validateEmployeeEntryUploadPayload(env,user,body,opts={}){
+  const eventIndex=Number(opts.event_index ?? body?.event_index ?? 0)||0;
+  if(!await empTableExists(env,"sessions")||!await empTableExists(env,"transactions")){
+    return employeeEntryValidationFailure("schema","employee_entry_schema_not_ready","employee_entry_schema_not_ready",{event_index:eventIndex});
+  }
+  const entry=body?.entry||{};
+  const session=body?.session||{};
+  const type=cleanText(entry.type||entry.reason_code||"R",12).toUpperCase();
+  const normalized=normalizeEntryAnchor(entry);
+  const anchorPreview={
+    id:cleanText(normalized.id||normalized.event_id||normalized.anchor_id,80),
+    type,
+    event_type:normalized.event_type||entryAnchorEventType(type),
+    bed:normalized.bed||normalized.room||entry.room||"",
+    amount:entryAnchorMoney(normalized.amount||normalized.payment_amount||normalized.paid_amount||entry.amount)
+  };
+  if(normalized.validation_status!=="valid"){
+    return employeeEntryValidationFailure("anchor_validation","ANCHOR_CONTRACT_MISSING_FIELDS","Entry anchor is missing required fields.",{
+      event_index:eventIndex,event_type:normalized.event_type||entryAnchorEventType(type),
+      missing_fields:normalized.validation_missing_fields||[],
+      anchor_preview:anchorPreview
+    });
+  }
+  const sessionAnchorEntries=Array.isArray(session.entries)?session.entries.map(row=>normalizeEntryAnchor(row)):[];
+  for(let i=0;i<sessionAnchorEntries.length;i++){
+    const row=sessionAnchorEntries[i];
+    if(row.validation_status!=="valid"){
+      return employeeEntryValidationFailure("session_anchor_validation","SESSION_ANCHOR_CONTRACT_MISSING_FIELDS","Session contains an invalid anchor.",{
+        event_index:i,event_type:row.event_type||entryAnchorEventType(entryAnchorType(row)),
+        missing_fields:row.validation_missing_fields||[],
+        anchor_preview:{id:row.id||row.event_id||"",type:row.type||"",event_type:row.event_type||"",bed:row.bed||row.room||""}
+      });
+    }
+  }
+  const sessionEntriesJson=JSON.stringify({anchor_contract_version:"employee_entry_anchor_v1",entries:sessionAnchorEntries});
+  const sessionExportText=employeeEntryExportTextWithAnchors(session.export_text||"",sessionAnchorEntries,{...session,id:session.id||session.session_id||""});
+  const decoded=parseEmployeeEntryAnchorJson(sessionEntriesJson);
+  if(sessionAnchorEntries.length&&decoded.length!==sessionAnchorEntries.length){
+    return employeeEntryValidationFailure("owner_decoder_compat","OWNER_DECODER_CONTRACT_REJECTED","Structured entries_json could not be decoded.",{
+      event_index:eventIndex,event_type:normalized.event_type||entryAnchorEventType(type),anchor_preview:anchorPreview
+    });
+  }
+  const exportDecoded=sessionAnchorEntries.length?extractEmployeeEntryAnchorsFromSession({...session,id:session.id||session.session_id||"",entries_json:"",export_text:sessionExportText}):[];
+  if(sessionAnchorEntries.length&&exportDecoded.length!==sessionAnchorEntries.length){
+    return employeeEntryValidationFailure("export_text_build","EXPORT_TEXT_BUILD_FAILED","Structured anchor block could not be built into export_text.",{
+      event_index:eventIndex,event_type:normalized.event_type||entryAnchorEventType(type),anchor_preview:anchorPreview
+    });
+  }
+  let amount=Number(String(entry.amount||0).replace(/,/g,""));
+  const room=cleanText(entry.room||(type==="E"?entry.expense_category:""),40).replace(/^#+/,"");
+  const amountOptional=type==="CO"||type==="TF";
+  if(!room||!Number.isFinite(amount)||(!amountOptional&&amount<=0)){
+    return employeeEntryValidationFailure("basic_fields","ROOM_AMOUNT_REQUIRED","Room and amount are required.",{
+      event_index:eventIndex,event_type:normalized.event_type||entryAnchorEventType(type),
+      missing_fields:[!room?"room":"",(!Number.isFinite(amount)||(!amountOptional&&amount<=0))?"amount":""].filter(Boolean),
+      anchor_preview:anchorPreview
+    });
+  }
+  let due=Number(String(entry.due||0).replace(/,/g,""));
+  let paid=Number(String(entry.paid||0).replace(/,/g,""));
+  let periodDue=Number(String(entry.period_due||due||0).replace(/,/g,""));
+  const periodStart=cleanText(entry.period_start,20);
+  const periodEnd=cleanText(entry.period_end,20);
+  const tenantCardId=cleanText(entry.tenant_card_id,80);
+  let listPrice=Number(String(entry.list_price||0).replace(/,/g,""));
+  const cycle=cleanText(entry.cycle,20);
+  const periodDays=Number(entry.period_day_count||0);
+  const arrearHandling=cleanText(entry.arrear_handling,40);
+  const arrearPromiseDate=cleanDate(entry.arrear_promise_date||entry.promise_date||"");
+  const arrearReasonDetail=cleanText(entry.arrear_reason_detail||entry.custom_reason||entry.note,500);
+  let apTaskForPayment=null;
+  if(type==="R"){
+    const cleanPeriodStart=cleanDate(periodStart);
+    const cleanPeriodEnd=cleanDate(periodEnd);
+    if(!cleanPeriodStart||!cleanPeriodEnd)return employeeEntryValidationFailure("rent_validation","PERIOD_DATES_REQUIRED","Rent period dates are required.",{event_index:eventIndex,event_type:"rent",missing_fields:["period_start","period_end"],anchor_preview:anchorPreview});
+    if(cleanPeriodEnd<cleanPeriodStart)return employeeEntryValidationFailure("rent_validation","PERIOD_END_BEFORE_START","Rent period end cannot be before start.",{event_index:eventIndex,event_type:"rent",invalid_fields:["period_end"],anchor_preview:anchorPreview});
+    const rentConfig=await empRentConfigReadOnly(env,user.corpid);
+    const configuredRent=Number(rentConfig[room]||0);
+    if(cycle==="1M"){
+      if(!configuredRent)return employeeEntryValidationFailure("rent_validation","RENT_CONFIG_MISSING","Monthly rent config is missing.",{event_index:eventIndex,event_type:"rent",missing_fields:["rent_config"],anchor_preview:anchorPreview});
+      if(cleanPeriodEnd!==empAddMonths(cleanPeriodStart,1))return employeeEntryValidationFailure("rent_validation","PERIOD_END_INVALID_FOR_1M","Rent period end is invalid for 1M cycle.",{event_index:eventIndex,event_type:"rent",invalid_fields:["period_end"],anchor_preview:anchorPreview});
+      listPrice=configuredRent;
+      periodDue=configuredRent;
+      due=configuredRent;
+    }else if(cycle==="15D"){
+      if(periodDays&&periodDays!==15)return employeeEntryValidationFailure("rent_validation","PERIOD_DAYS_INVALID_FOR_15D","15D cycle must use 15 days.",{event_index:eventIndex,event_type:"rent",invalid_fields:["period_day_count"],anchor_preview:anchorPreview});
+      if(cleanPeriodEnd!==empAddDays(cleanPeriodStart,14))return employeeEntryValidationFailure("rent_validation","PERIOD_END_INVALID_FOR_15D","Rent period end is invalid for 15D cycle.",{event_index:eventIndex,event_type:"rent",invalid_fields:["period_end"],anchor_preview:anchorPreview});
+      listPrice=configuredRent||listPrice;
+      periodDue=400;
+      due=400;
+    }else if(cycle==="CUST"){
+      if(!periodDays||periodDays<=0)return employeeEntryValidationFailure("rent_validation","CUSTOM_DAYS_REQUIRED","Custom day count is required.",{event_index:eventIndex,event_type:"rent",missing_fields:["period_day_count"],anchor_preview:anchorPreview});
+      if(!Number.isInteger(periodDays))return employeeEntryValidationFailure("rent_validation","CUSTOM_DAYS_MUST_BE_INTEGER","Custom day count must be an integer.",{event_index:eventIndex,event_type:"rent",invalid_fields:["period_day_count"],anchor_preview:anchorPreview});
+      if(cleanPeriodEnd!==empAddDays(cleanPeriodStart,periodDays-1))return employeeEntryValidationFailure("rent_validation","PERIOD_END_INVALID_FOR_CUSTOM","Rent period end is invalid for custom cycle.",{event_index:eventIndex,event_type:"rent",invalid_fields:["period_end"],anchor_preview:anchorPreview});
+      listPrice=configuredRent||listPrice;
+      periodDue=Math.round(periodDays*40*100)/100;
+      due=periodDue;
+    }else if(cycle==="FIRST_PRO"||cycle==="LAST_PRO"){
+      listPrice=configuredRent||listPrice;
+      periodDue=Math.max(0,periodDays)*40;
+      due=periodDue;
+    }else if(cycle!=="CUST"&&configuredRent){
+      listPrice=configuredRent;
+      periodDue=configuredRent;
+      due=configuredRent;
+    }
+    if(amount>due&&!["RETURNED","MANAGER"].includes(cleanText(entry.excess_to,40))){
+      return employeeEntryValidationFailure("rent_validation","EXCESS_TO_REQUIRED","Overpaid rent requires an excess handling choice.",{event_index:eventIndex,event_type:"rent",missing_fields:["excess_to"],anchor_preview:anchorPreview});
+    }
+  }else if(type==="TF"){
+    const feePaid=cleanText(entry.fee_paid,5);
+    if(!["Y","N"].includes(feePaid))return employeeEntryValidationFailure("bed_transfer_validation","TRANSFER_FEE_CHOICE_REQUIRED","Bed transfer fee choice is required.",{event_index:eventIndex,event_type:"bed_transfer",missing_fields:["fee_paid"],anchor_preview:anchorPreview});
+    if(feePaid==="N"&&!cleanText(entry.fee_waiver_reason||entry.custom_reason||entry.note,240))return employeeEntryValidationFailure("bed_transfer_validation","BED_TRANSFER_WAIVER_REASON_REQUIRED","Waiver reason is required.",{event_index:eventIndex,event_type:"bed_transfer",missing_fields:["fee_waiver_reason"],anchor_preview:anchorPreview});
+    amount=feePaid==="N"?0:50;
+    due=amount;
+    paid=amount;
+    periodDue=0;
+    listPrice=0;
+  }else if(type==="AP"){
+    const taskId=cleanId(entry.linked_task_id||entry.arrears_ref||entry.original_arrears_id);
+    if(!taskId)return employeeEntryValidationFailure("arrears_payment_ref","LINKED_TASK_REQUIRED","Arrears Payment requires a selected cloud arrears ref.",{event_index:eventIndex,event_type:"arrears_payment",missing_fields:["linked_task_id","arrears_ref"],anchor_preview:anchorPreview});
+    apTaskForPayment=await empFindOpenArrearTaskForPaymentReadOnly(env,user,taskId,room);
+    if(!apTaskForPayment)return employeeEntryValidationFailure("arrears_payment_ref","LINKED_TASK_NOT_OPEN","Selected cloud arrears ref is not open or partial.",{event_index:eventIndex,event_type:"arrears_payment",invalid_fields:["linked_task_id"],anchor_preview:{...anchorPreview,arrears_ref:taskId}});
+    const remain=Math.max(0,Number(apTaskForPayment.arrear_amount||0)-Number(apTaskForPayment.actual_received||0));
+    if(amount<=0||amount>remain+0.01)return employeeEntryValidationFailure("arrears_payment_ref","ARREAR_PAYMENT_AMOUNT_INVALID","Arrears payment amount must be positive and no more than remaining arrears.",{event_index:eventIndex,event_type:"arrears_payment",invalid_fields:["amount"],anchor_preview:{...anchorPreview,arrears_ref:taskId,remaining_arrears:remain}});
+    due=amount;
+    periodDue=Number(String(entry.period_due||amount).replace(/,/g,""));
+  }
+  if(["R","TF","TFF"].includes(type))paid=Math.min(amount,due||amount);
+  if(type==="AP")paid=amount;
+  const currentShortfall=type==="R"&&periodDue>0 ? Math.max(0,periodDue-paid) : 0;
+  if(currentShortfall>0){
+    if(arrearHandling!=="ARREAR")return employeeEntryValidationFailure("rent_short_paid","ARREAR_TASK_REQUIRED_FOR_SHORTFALL","Short-paid rent must create an arrears task.",{event_index:eventIndex,event_type:"rent",missing_fields:["arrear_handling"],anchor_preview:anchorPreview});
+    if(!arrearPromiseDate)return employeeEntryValidationFailure("rent_short_paid","ARREAR_PROMISE_DATE_REQUIRED","Short-paid rent requires promised payment date.",{event_index:eventIndex,event_type:"rent",missing_fields:["arrear_promise_date"],anchor_preview:anchorPreview});
+    if(arrearPromiseDate<empTodayDubai())return employeeEntryValidationFailure("rent_short_paid","ARREAR_PROMISE_DATE_IN_PAST","Short-paid rent promise date cannot be in the past.",{event_index:eventIndex,event_type:"rent",invalid_fields:["arrear_promise_date"],anchor_preview:anchorPreview});
+    if(!arrearReasonDetail)return employeeEntryValidationFailure("rent_short_paid","ARREAR_REASON_REQUIRED","Short-paid rent requires reason/note.",{event_index:eventIndex,event_type:"rent",missing_fields:["arrear_reason_detail"],anchor_preview:anchorPreview});
+  }
+  const depositHeldInput=Number(String(entry.deposit_held||entry.deposit_balance||0).replace(/,/g,""));
+  const depositDeduction=Number(String(entry.deposit_deduction||0).replace(/,/g,""));
+  let depositBalance=tenantCardId?await empDepositBalance(env,user.corpid,tenantCardId):0;
+  if(tenantCardId&&["DR","CO"].includes(type)&&depositBalance<=0&&depositHeldInput>0)depositBalance=depositHeldInput;
+  if(!tenantCardId&&["DR","CO"].includes(type)&&depositHeldInput>0)depositBalance=depositHeldInput;
+  if(type==="DR"){
+    const diff=Math.round((amount-depositBalance)*100)/100;
+    const refundReason=cleanText(entry.refund_reason||entry.difference_reason||entry.ded_note||entry.note,500);
+    if(Math.abs(diff)>0.01&&!refundReason){
+      return employeeEntryValidationFailure("deposit_out_validation","DEPOSIT_REFUND_DIFFERENCE_REASON_REQUIRED","Difference Reason is required when actual refund differs from deposit balance.",{event_index:eventIndex,event_type:"deposit_out",missing_fields:["difference_reason"],anchor_preview:{...anchorPreview,deposit_balance:depositBalance,actual_refund_amount:amount,refund_difference:diff}});
+    }
+  }
+  if(["DR","CO"].includes(type)&&!(type==="CO"&&entry.left_with_arrears)){
+    const openArrears=room?await getOpenCloudArrearsForBed(env,user,room,{limit:2000}).catch(()=>[]):[];
+    if(openArrears.length){
+      return employeeEntryValidationFailure(type==="DR"?"deposit_out_validation":"checkout_validation",type==="DR"?"DEPOSIT_REFUND_OPEN_ARREARS_OWNER_APPROVAL_REQUIRED":"CHECKOUT_OPEN_ARREARS_OWNER_APPROVAL_REQUIRED","Open cloud arrears block direct deposit refund or checkout.",{event_index:eventIndex,event_type:type==="DR"?"deposit_out":"checkout",invalid_fields:["open_arrears"],anchor_preview:{...anchorPreview,open_arrears_count:openArrears.length}});
+    }
+  }
+  if(type==="CO"&&entry.left_with_arrears){
+    const missing=[];
+    if(!cleanText(entry.whatsapp_phone||entry.former_customer_phone,80))missing.push("whatsapp_phone");
+    if(!cleanDate(entry.coverage_end_date||entry.card_end_date||entry.rent_coverage_end||entry.old_lock_valid_until||""))missing.push("coverage_end_date");
+    if(!cleanDate(entry.confirmed_not_returning_date||""))missing.push("confirmed_not_returning_date");
+    if(!cleanDate(entry.promised_payment_date||entry.promise_date||""))missing.push("promised_payment_date");
+    if(cleanMoney(entry.left_arrears_amount||entry.arrears_amount||entry.outstanding_arrears||0)<=0)missing.push("left_arrears_amount");
+    if(typeof entry.belongings_held==="undefined"&&String(entry.belongings_held||"")==="")missing.push("belongings_held");
+    const held=entry.belongings_held===true||String(entry.belongings_held||"").toLowerCase()==="yes";
+    if(held&&!cleanText(entry.belongings_note,500))missing.push("belongings_note");
+    if(missing.length){
+      return employeeEntryValidationFailure("left_with_arrears_validation","LEFT_WITH_ARREARS_REQUIRED_FIELDS_MISSING","Left With Arrears is missing required fields.",{event_index:eventIndex,event_type:"checkout",missing_fields:missing,anchor_preview:anchorPreview});
+    }
+    const taskId=cleanId(entry.cloud_arrears_ref||entry.arrears_ref||"");
+    if(!taskId)return employeeEntryValidationFailure("left_with_arrears_validation","CLOUD_ARREARS_REF_REQUIRED","Left With Arrears requires a cloud arrears ref.",{event_index:eventIndex,event_type:"checkout",missing_fields:["cloud_arrears_ref"],anchor_preview:anchorPreview});
+    const openLeftTask=await empFindOpenArrearTaskForPaymentReadOnly(env,user,taskId,room);
+    if(!openLeftTask)return employeeEntryValidationFailure("left_with_arrears_validation","CLOUD_ARREARS_NOT_OPEN","Left With Arrears cloud arrears ref is not open.",{event_index:eventIndex,event_type:"checkout",invalid_fields:["cloud_arrears_ref"],anchor_preview:{...anchorPreview,cloud_arrears_ref:taskId}});
+  }
+  if(type==="CO"&&depositDeduction>depositBalance+0.01){
+    return employeeEntryValidationFailure("checkout_validation","DEPOSIT_DEDUCTION_EXCEEDS_BALANCE","Deposit deduction exceeds deposit balance.",{event_index:eventIndex,event_type:"checkout",invalid_fields:["deposit_deduction"],anchor_preview:{...anchorPreview,deposit_balance:depositBalance,deposit_deduction:depositDeduction}});
+  }
+  const summary={
+    cash_handover:Number(String(session.cash_handover||0).replace(/,/g,"")),
+    bank_transfer_total:Number(String(session.bank_transfer_total||0).replace(/,/g,"")),
+    bank_transfer_count:Number(session.bank_transfer_count||0),
+    gross_received:Number(String(session.gross_received||0).replace(/,/g,"")),
+    balance_total:entryAnchorMoney(Number(String(session.cash_handover||0).replace(/,/g,""))+Number(String(session.bank_transfer_total||0).replace(/,/g,"")))
+  };
+  return {
+    ok:true,
+    stage:"validated",
+    event_index:eventIndex,
+    event_type:normalized.event_type||entryAnchorEventType(type),
+    summary,
+    entries_count:sessionAnchorEntries.length||1,
+    export_text_preview:String(sessionExportText||"").slice(0,1000),
+    anchor_types:sessionAnchorEntries.map(row=>row.event_type||entryAnchorEventType(entryAnchorType(row))),
+    anchor_preview:anchorPreview,
+    normalized_entry:normalized
+  };
+}
+__name(validateEmployeeEntryUploadPayload,"validateEmployeeEntryUploadPayload");
+async function handleEmployeeEntryValidate(request,env,user){
+  let body;
+  try{body=await request.json();}catch{return errorResponse("invalid_json",400,"INVALID_JSON",employeeEntryValidationFailure("payload","INVALID_JSON","Invalid JSON payload."));}
+  const result=await validateEmployeeEntryUploadPayload(env,user,body,{event_index:body?.event_index});
+  if(!result.ok)return json({success:false,...result},422);
+  return success(result);
+}
+__name(handleEmployeeEntryValidate,"handleEmployeeEntryValidate");
 async function handleEmployeeEntry(request,env,user){
   const timingEnabled=request.headers.get("X-Employee-Entry-Timing")==="1";
   const timing={started_at:Date.now(),d1_write_ms:0,total_ms:0};
   if(!await empTableExists(env,"sessions")||!await empTableExists(env,"transactions"))return errorResponse("employee_entry_schema_not_ready",503,"employee_entry_schema_not_ready");
   let body;
   try{body=await request.json();}catch{return badRequest("invalid_json");}
+  const validationResult=await validateEmployeeEntryUploadPayload(env,user,body,{event_index:body?.event_index});
+  if(!validationResult.ok)return json({success:false,...validationResult},422);
   const entry=body?.entry||{};
   const session=body?.session||{};
   const liveRouteGate=eeaLiveRouteGate(env);
@@ -1849,7 +2098,7 @@ async function handleEmployeeEntry(request,env,user){
   const seedLegacyDeposit=tenantCardId&&["DR","CO"].includes(type)&&depositBalance<=0&&depositHeldInput>0;
   if(seedLegacyDeposit)depositBalance=depositHeldInput;
   if(type==="DR"){
-    const diff=cleanMoney(amount-depositBalance);
+    const diff=Math.round((amount-depositBalance)*100)/100;
     const refundReason=cleanText(entry.refund_reason||entry.difference_reason||entry.ded_note||entry.note,500);
     if(Math.abs(diff)>0.01&&!refundReason)return badRequest("deposit_refund_difference_reason_required");
   }
@@ -2101,7 +2350,7 @@ function normalizeEntryAnchor(row){
     Object.assign(anchor,{bed:anchor.bed||anchor.room||"",deposit_balance:depositBalance,actual_refund_amount:refundAmount,refund_amount:refundAmount,refund_difference:entryAnchorMoney(refundAmount-depositBalance),refund_method:entryAnchorPaymentMethod(anchor.refund_method||anchor.payment_method||anchor.pay_type),payment_method:entryAnchorPaymentMethod(anchor.payment_method||anchor.refund_method||anchor.pay_type),refund_date:cleanDate(anchor.refund_date||anchor.checkout_date||anchor.date||""),refund_reason:anchor.refund_reason||anchor.difference_reason||anchor.ded_reason||anchor.ded_note||anchor.reason||anchor.note||"",difference_reason:anchor.difference_reason||anchor.refund_reason||anchor.ded_note||anchor.note||"",checkout_ref:anchor.checkout_ref||anchor.checkout_date||"",open_arrears_amount:entryAnchorMoney(anchor.open_arrears_amount||anchor.outstanding_arrears||0),owner_approval_required:!!anchor.owner_approval_required,owner_approval_status:anchor.owner_approval_status||"not_required",note:anchor.note||""});
   }else if(type==="CO"){
     const left=!!anchor.left_with_arrears||anchor.checkout_mode==="left_with_arrears";
-    Object.assign(anchor,{bed:anchor.bed||anchor.room||"",checkout_date:anchor.checkout_date||"",deposit_refund:left?0:entryAnchorMoney(anchor.deposit_refund||0),outstanding_arrears:entryAnchorMoney(anchor.outstanding_arrears||anchor.carry_over_arrears||anchor.deficit||0),owner_approval_required:left?false:!!anchor.owner_approval_required,owner_approval_status:left?"not_required":anchor.owner_approval_status||"not_required",checkout_mode:left?"left_with_arrears":anchor.checkout_mode||"normal",left_with_arrears:left,customer_left:left,former_customer_name:anchor.former_customer_name||anchor.card_name||anchor.tenant_name||"",card_name:anchor.card_name||anchor.former_customer_name||anchor.tenant_name||"",whatsapp_phone:anchor.whatsapp_phone||anchor.former_customer_phone||"",former_customer_phone:anchor.former_customer_phone||anchor.whatsapp_phone||"",contact_method:anchor.contact_method||"",contact_note:anchor.contact_note||"",arrears_amount:entryAnchorMoney(anchor.arrears_amount||anchor.outstanding_arrears||0),cloud_arrears_ref:anchor.cloud_arrears_ref||anchor.arrears_ref||"",belongings_held:!!anchor.belongings_held,belongings_note:anchor.belongings_note||"",promised_payment_date:anchor.promised_payment_date||anchor.promise_date||"",promised_return_date:anchor.promised_return_date||anchor.promise_return_date||"",promise_return_date:anchor.promise_return_date||anchor.promised_return_date||"",deposit_balance:entryAnchorMoney(anchor.deposit_balance||anchor.deposit_held||0),left_date:anchor.left_date||anchor.checkout_date||"",checkout_attempt_date:anchor.checkout_attempt_date||anchor.checkout_date||"",left_status:anchor.left_status||"",final_status:anchor.final_status||"",grace_days_after_promise:Number(anchor.grace_days_after_promise||0)||0,review_date:anchor.review_date||"",confirmed_not_returning_date:anchor.confirmed_not_returning_date||"",confirmed_not_returning_by:anchor.confirmed_not_returning_by||"",confirmation_note:anchor.confirmation_note||"",original_session_id:anchor.original_session_id||anchor.session_id||"",original_event_id:anchor.original_event_id||anchor.event_id||anchor.id||"",final_note:anchor.final_note||anchor.note||anchor.ded_note||""});
+    Object.assign(anchor,{bed:anchor.bed||anchor.room||"",checkout_date:anchor.checkout_date||"",deposit_refund:left?0:entryAnchorMoney(anchor.deposit_refund||0),outstanding_arrears:entryAnchorMoney(anchor.outstanding_arrears||anchor.carry_over_arrears||anchor.deficit||0),owner_approval_required:left?false:!!anchor.owner_approval_required,owner_approval_status:left?"not_required":anchor.owner_approval_status||"not_required",checkout_mode:left?"left_with_arrears":anchor.checkout_mode||"normal",left_with_arrears:left,customer_left:left,former_customer_name:anchor.former_customer_name||anchor.card_name||anchor.tenant_name||"",card_name:anchor.card_name||anchor.former_customer_name||anchor.tenant_name||"",whatsapp_phone:anchor.whatsapp_phone||anchor.former_customer_phone||"",former_customer_phone:anchor.former_customer_phone||anchor.whatsapp_phone||"",contact_method:anchor.contact_method||"",contact_note:anchor.contact_note||"",arrears_amount:entryAnchorMoney(anchor.arrears_amount||anchor.left_arrears_amount||anchor.outstanding_arrears||0),left_arrears_amount:entryAnchorMoney(anchor.left_arrears_amount||anchor.arrears_amount||anchor.outstanding_arrears||0),cloud_arrears_ref:anchor.cloud_arrears_ref||anchor.arrears_ref||"",belongings_held:!!anchor.belongings_held,belongings_note:anchor.belongings_note||"",coverage_end_date:anchor.coverage_end_date||anchor.card_end_date||anchor.rent_coverage_end||anchor.old_lock_valid_until||"",card_end_date:anchor.card_end_date||anchor.coverage_end_date||anchor.rent_coverage_end||anchor.old_lock_valid_until||"",rent_coverage_end:anchor.rent_coverage_end||anchor.coverage_end_date||anchor.card_end_date||anchor.old_lock_valid_until||"",promised_payment_date:anchor.promised_payment_date||anchor.promise_date||"",promised_return_date:anchor.promised_return_date||anchor.promise_return_date||"",promise_return_date:anchor.promise_return_date||anchor.promised_return_date||"",deposit_balance:entryAnchorMoney(anchor.deposit_balance||anchor.deposit_held||0),left_date:anchor.left_date||anchor.checkout_date||"",checkout_attempt_date:anchor.checkout_attempt_date||anchor.checkout_date||"",left_status:anchor.left_status||"",final_status:anchor.final_status||"",grace_days_after_promise:Number(anchor.grace_days_after_promise||0)||0,review_date:anchor.review_date||"",confirmed_not_returning_date:anchor.confirmed_not_returning_date||"",confirmed_not_returning_by:anchor.confirmed_not_returning_by||"",confirmation_note:anchor.confirmation_note||"",original_session_id:anchor.original_session_id||anchor.session_id||"",original_event_id:anchor.original_event_id||anchor.event_id||anchor.id||"",final_note:anchor.final_note||anchor.note||anchor.ded_note||""});
   }else if(type==="E"){
     Object.assign(anchor,{expense_amount:entryAnchorMoney(anchor.expense_amount||anchor.amount),expense_category:anchor.expense_category||anchor.reason_code||"",target_bed:anchor.target_bed||anchor.room||"",reason:anchor.reason||anchor.expense_desc||anchor.custom_reason||"",note:anchor.note||anchor.expense_desc||""});
   }
@@ -4790,6 +5039,7 @@ async function handleEmployeeApi(request,env,user){
   if(path==="/api/employee/lock/cards"&&request.method==="GET")return handleEmployeeLockCards(request,env,user);
   if(path==="/api/employee/deposit"&&request.method==="GET")return handleEmployeeDeposit(request,env,user);
   if(path==="/api/employee/bed-transfers"&&request.method==="POST")return handleEmployeeBedTransferCreate(request,env,user);
+  if(path==="/api/employee/entry/validate"&&request.method==="POST")return handleEmployeeEntryValidate(request,env,user);
   if(path==="/api/employee/entry"&&request.method==="POST")return handleEmployeeEntry(request,env,user);
   if(path==="/api/arrear_tasks"&&request.method==="GET")return handleArrearTasks(request,env,user);
   if(path==="/api/arrear_tasks/directive"&&request.method==="POST")return handleArrearTaskDirective(request,env,user);
