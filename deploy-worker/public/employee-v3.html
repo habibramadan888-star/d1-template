@@ -3759,8 +3759,8 @@ const EMPLOYEE_ENTRY_ANCHOR_CONTRACT={
   R:['event_type','bed','expected_rent','paid_amount','payment_method','rent_period_start','rent_period_end','arrears_amount','arrears_due_date','arrears_note','short_paid','raw_display_line','operator','created_at','ttlock_context'],
   AP:['event_type','bed','arrears_ref','original_arrears_id','original_arrears_amount','already_paid_amount','payment_amount','remaining_arrears','settlement_status','payment_method','note','operator','created_at'],
   D:['event_type','bed','deposit_amount','payment_method','linked_tenant','note','operator','created_at'],
-  DR:['event_type','bed','refund_amount','payment_method','refund_reason','checkout_ref','note','operator','created_at'],
-  CO:['event_type','bed','checkout_date','deposit_refund','outstanding_arrears','final_note','ttlock_context','operator','created_at'],
+  DR:['event_type','bed','refund_amount','payment_method','refund_reason','checkout_ref','outstanding_arrears','owner_approval_required','owner_approval_status','note','operator','created_at'],
+  CO:['event_type','bed','checkout_date','deposit_refund','outstanding_arrears','owner_approval_required','owner_approval_status','final_note','ttlock_context','operator','created_at'],
   E:['event_type','expense_amount','expense_category','target_bed','reason','note','payment_method','operator','created_at'],
   TF:['event_type','from_bed','to_bed','transfer_date','fee_amount','fee_status','waiver_reason','transfer_reason','old_tenant_context','old_ttlock_context','note','operator','created_at']
 };
@@ -3841,9 +3841,11 @@ function applyEntryAnchors(e){
   }else if(type==='D'){
     Object.assign(e,{bed:e.room,deposit_amount:num(e.amount),linked_tenant:e.tenant_card_id||e.tenant_name||'',note:e.note||''});
   }else if(type==='DR'){
-    Object.assign(e,{bed:e.room,refund_amount:num(e.amount),refund_reason:e.ded_note||e.note||'',checkout_ref:e.checkout_date||'',note:e.note||''});
+    const outstanding=num(e.outstanding_arrears||e.carry_over_arrears||0);
+    Object.assign(e,{bed:e.room,refund_amount:num(e.amount),refund_reason:e.ded_note||e.note||'',checkout_ref:e.checkout_date||'',outstanding_arrears:outstanding,owner_approval_required:outstanding>0,owner_approval_status:outstanding>0?(e.owner_approval_status||'pending_owner_approval'):(e.owner_approval_status||'not_required'),note:e.note||''});
   }else if(type==='CO'){
-    Object.assign(e,{bed:e.room,checkout_date:e.checkout_date||'',deposit_refund:num(e.deposit_amt||0),outstanding_arrears:num(e.carry_over_arrears||0),final_note:e.note||e.ded_note||''});
+    const outstanding=num(e.outstanding_arrears||e.carry_over_arrears||0);
+    Object.assign(e,{bed:e.room,checkout_date:e.checkout_date||'',deposit_refund:num(e.deposit_amt||0),outstanding_arrears:outstanding,owner_approval_required:outstanding>0,owner_approval_status:outstanding>0?(e.owner_approval_status||'pending_owner_approval'):(e.owner_approval_status||'not_required'),final_note:e.note||e.ded_note||''});
   }else if(type==='E'){
     Object.assign(e,{expense_amount:num(e.amount),expense_category:e.expense_category||e.reason_code||'',target_bed:e.room||'',reason:e.expense_category||e.reason_code||'',note:e.expense_desc||e.note||''});
   }else if(type==='TF'){
@@ -4226,7 +4228,9 @@ function entryPayload(){
   const tailReason=$('arrearReasonDetail').value.trim();
   const noteText=$('remark').value.trim()||tailReason;
   const reasonCode=tail>0?'SHORT_PAID':($('reasonCode').value||type);
-  return {
+  const openArrearsTotal=openTasksForBed().reduce((s,t)=>s+taskRemain(t),0);
+  const ownerApprovalRequired=['CO','DR'].includes(type)&&openArrearsTotal>0;
+  const payload={
     id:uid('E'),entry_id:null,type,reason_code:reasonCode,cat:pay==='B'?'bank':(type==='E'||type==='DR'?'expense':'cash'),pay_type:pay,bank_ref:$('bankRef').value.trim(),
     room:$('bed').value.trim().replace(/^#/,''),roomTo:$('bedTo').value.trim().replace(/^#/,''),bed_from:($('transferFromBed').value.trim()||$('bed').value.trim()).replace(/^#/,''),bed_to:$('bedTo').value.trim().replace(/^#/,''),
     tenant_name:$('tenantName').value.trim(),tenant_card_id:$('tenantCardId').value.trim(),tag:type==='D'?'N':type==='TF'?'T':'O',
@@ -4237,7 +4241,8 @@ function entryPayload(){
     ded_reason:dedReasons.join('+'),ded_days:co.overDays,ded_rate:40,ded_note:$('dedNote').value.trim(),early_days:co.earlyDays,
     fee_paid:$('feePaid').value,fee_mode:$('feePaid').value==='N'?'waived':'charged',amount_fils:$('feePaid').value==='N'?0:5000,fee_waiver_reason:$('feePaid').value==='N'?$('transferWaiverReason').value.trim():'',
     transfer_date:$('transferDate').value,transfer_reason:$('transferReason').value,transfer_validation_status:type==='TF'?bedTransferValidationSummary(transferValue('transferFromBed')||transferValue('bed'),transferValue('bedTo'),bedTransferReviewContext()).status:'',
-    carry_over_arrears:openTasksForBed().reduce((s,t)=>s+taskRemain(t),0),deposit_carried:depositHeld(),old_ttlock_ref:state.current?.tenant_card_id||'',old_lock_valid_from:state.current?.start||state.current?.start_md||'',old_lock_valid_until:state.current?.end||'',rent_difference:toRentMinusFrom(bedTransferReviewContext()),
+    carry_over_arrears:openArrearsTotal,outstanding_arrears:['CO','DR'].includes(type)?openArrearsTotal:0,owner_approval_required:ownerApprovalRequired,owner_approval_status:ownerApprovalRequired?'pending_owner_approval':'not_required',
+    deposit_carried:depositHeld(),old_ttlock_ref:state.current?.tenant_card_id||'',old_lock_valid_from:state.current?.start||state.current?.start_md||'',old_lock_valid_until:state.current?.end||'',rent_difference:toRentMinusFrom(bedTransferReviewContext()),
     expense_category:$('expenseCategory').value,expense_desc:$('expenseDesc').value.trim(),
     linked_task_id:$('linkedTaskId').value,original_period_start:type==='AP'?'':$('periodStart').value,original_period_end:type==='AP'?'':$('periodEnd').value,
     arrears_ref:type==='AP'?$('linkedTaskId').value:'',original_arrears_id:type==='AP'?$('linkedTaskId').value:'',original_arrears_amount:type==='AP'?apOriginal:0,
@@ -6808,6 +6813,43 @@ function employeeOpenArrearsForBed(bed){
     return !closed.has(status)&&taskRemain(t)>0&&((clean&&taskBed===clean)||(cid&&taskCid===cid));
   });
 }
+function employeeCheckoutRefundEventType(){
+  const type=$('entryType')?.value||'';
+  return type==='CO'?'checkout':(type==='DR'?'deposit_refund':'');
+}
+function employeeCheckoutRefundBlockedByArrears(){
+  return !!employeeCheckoutRefundEventType()&&openTasksForBed().length>0;
+}
+function employeeOwnerApprovalNote(type,rows){
+  const label=type==='CO'?'Checkout':'Deposit refund';
+  const refs=rows.map(t=>employeeTaskRef(t)).filter(Boolean).join(', ');
+  const total=rows.reduce((sum,t)=>sum+taskRemain(t),0);
+  return `${label} owner approval requested. Open arrears ${fmtMoney(total)} AED. Refs: ${refs}`;
+}
+async function requestOwnerApprovalForOpenArrears(type,rows){
+  if(!rows.length){toast('No Open Arrears / \u65e0\u672a\u6e05\u6b20\u6b3e',5000);return}
+  const note=employeeOwnerApprovalNote(type,rows);
+  const buttons=document.querySelectorAll('[data-request-owner-approval]');
+  buttons.forEach(btn=>{btn.disabled=true;btn.classList.add('disabled');btn.innerHTML=renderEmployeeButtonLabel('Requesting','\u7533\u8bf7\u4e2d')});
+  try{
+    for(const task of rows){
+      const taskId=employeeTaskRef(task);
+      if(!taskId)throw new Error('missing_arrears_ref');
+      const r=await apiFetch('/api/arrear_tasks/update',{
+        method:'POST',
+        body:JSON.stringify({task_id:taskId,patch:{followup_status:'\u8f6c\u8001\u677f\u5904\u7406',followup_note:note}})
+      });
+      if(!r.ok)throw new Error('owner_approval_request_failed_'+r.status);
+    }
+    await loadTasks(false);
+    toast('Owner approval requested / \u5df2\u7533\u8bf7\u8001\u677f\u5ba1\u6838',6000);
+  }catch(e){
+    toast('Owner approval request failed / \u7533\u8bf7\u8001\u677f\u5ba1\u6838\u5931\u8d25: '+(e?.message||e),7000);
+  }finally{
+    buttons.forEach(btn=>{btn.disabled=false;btn.classList.remove('disabled');btn.innerHTML=renderEmployeeButtonLabel('Request Owner Approval','\u7533\u8bf7\u8001\u677f\u5ba1\u6838')});
+    syncForm();
+  }
+}
 function employeeArrearsMeta(t){
   const original=num(t.arrear_amount||t.amount||t.original_arrears_amount);
   const paid=num(t.actual_received||t.already_paid_amount||t.paid_amount);
@@ -6820,7 +6862,8 @@ function employeeArrearsMeta(t){
     date:String(t.original_date||t.created_at||t.date||t.source_date||t.period_start||'-').slice(0,10),
     type:t.event_type||t.source_type||t.source||'historical_arrears',
     note:t.arrears_note||t.staff_note||t.owner_note||t.note||t.raw_display_line||'-',
-    due:t.arrears_due_date||t.promise_date||t.promised_payment_date||t.due_date||'-'
+    due:t.arrears_due_date||t.promise_date||t.promised_payment_date||t.due_date||'-',
+    repayment:t.actual_received||t.already_paid_amount||t.last_followup_at?`Already paid ${fmtMoney(paid)} AED${t.last_followup_at?' / '+t.last_followup_at:''}`:'No repayment recorded'
   };
 }
 function employeeEnsureOpenArrearsMount(){
@@ -6855,11 +6898,12 @@ function employeeRenderOpenArrearsAlert(){
     box.innerHTML=`<div class="open-arrears-title"><div><b>No Open Arrears</b><small>\u65e0\u672a\u6e05\u6b20\u6b3e</small></div><span class="open-arrears-badge">OK</span></div>`;
     return;
   }
+  const blockedExit=type==='CO'||type==='DR';
   const list=rows.map(t=>{
     const m=employeeArrearsMeta(t);
     const select=type==='AP'?`<button type="button" class="mini-btn open-arrears-select" data-select-arrears-task="${esc(m.ref)}">${renderEmployeeButtonLabel('Select Arrears','\u9009\u62e9\u8fd8\u6b3e')}</button>`:'';
     return `<div class="open-arrears-item">
-      <div class="open-arrears-item-head"><b>#${esc(m.bed)} 路 ${esc(m.ref)}</b><span>Remaining ${fmtMoney(m.remaining)} AED</span></div>
+      <div class="open-arrears-item-head"><b>#${esc(m.bed)} · ${esc(m.ref)}</b><span>Remaining ${fmtMoney(m.remaining)} AED</span></div>
       <div class="open-arrears-grid">
         <div><b>Original Date / \u539f\u6b20\u6b3e\u65e5\u671f</b>${esc(m.date)}</div>
         <div><b>Original Type / \u539f\u59cb\u4e8b\u4ef6</b>${esc(m.type)}</div>
@@ -6867,12 +6911,20 @@ function employeeRenderOpenArrearsAlert(){
         <div><b>Already Paid / \u5df2\u8fd8\u91d1\u989d</b>${fmtMoney(m.paid)} AED</div>
         <div><b>Due Date / Promise Date</b>${esc(m.due)}</div>
         <div><b>Original Note / \u539f\u59cb\u5907\u6ce8</b>${esc(m.note)}</div>
+        <div><b>Repayment History / \u8fd8\u6b3e\u5386\u53f2</b>${esc(m.repayment)}</div>
       </div>
       ${select}
     </div>`;
   }).join('');
+  const actions=blockedExit?`<div class="row open-arrears-actions">
+    <button type="button" class="mini-btn" data-collect-arrears-first="true">${renderEmployeeButtonLabel('Collect Arrears First','\u5148\u6536\u6b20\u6b3e')}</button>
+    <button type="button" class="mini-btn" data-request-owner-approval="true">${renderEmployeeButtonLabel('Request Owner Approval','\u7533\u8bf7\u8001\u677f\u5ba1\u6838')}</button>
+    <button type="button" class="mini-btn danger" data-cancel-arrears-block="true">${renderEmployeeButtonLabel('Cancel','\u53d6\u6d88')}</button>
+  </div>`:'';
+  const title=blockedExit?'Open Arrears Found':'Open Arrears Alert';
+  const subtitle=blockedExit?'This customer has unpaid arrears. Checkout or deposit refund requires owner approval. / \u8be5\u5ba2\u6237\u5b58\u5728\u672a\u6e05\u6b20\u6b3e\uff0c\u9000\u623f\u6216\u9000\u62bc\u91d1\u5fc5\u987b\u7531\u8001\u677f\u5ba1\u6838\u3002':'Collect Arrears First';
   box.className='open-arrears-core-alert warn';
-  box.innerHTML=`<div class="open-arrears-title"><div><b>Open Arrears Alert</b><small>\u672a\u6e05\u6b20\u6b3e\u63d0\u9192</small></div><span class="open-arrears-badge">Collect Arrears First</span></div><div class="open-arrears-list">${list}</div>`;
+  box.innerHTML=`<div class="open-arrears-title"><div><b>${title}</b><small>\u53d1\u73b0\u672a\u6e05\u6b20\u6b3e</small></div><span class="open-arrears-badge">${subtitle}</span></div><div class="open-arrears-list">${list}</div>${actions}`;
   box.querySelectorAll('[data-select-arrears-task]').forEach(btn=>{
     btn.onclick=()=>{
       if($('entryType').value!=='AP')setEntryType('AP');
@@ -6883,6 +6935,27 @@ function employeeRenderOpenArrearsAlert(){
         if(task)sel.value=employeeTaskRef(task);
         applyLinkedTask(task);
       }
+    };
+  });
+  box.querySelectorAll('[data-collect-arrears-first]').forEach(btn=>{
+    btn.onclick=()=>{
+      const first=rows[0];
+      if(!first)return;
+      setEntryType('AP');
+      populateTaskSelect();
+      $('linkedTaskId').value=employeeTaskRef(first);
+      applyLinkedTask(first);
+    };
+  });
+  box.querySelectorAll('[data-request-owner-approval]').forEach(btn=>{
+    btn.onclick=()=>requestOwnerApprovalForOpenArrears(type,rows);
+  });
+  box.querySelectorAll('[data-cancel-arrears-block]').forEach(btn=>{
+    btn.onclick=()=>{
+      $('bed').value='';
+      state.current=null;
+      renderContext();
+      syncForm();
     };
   });
 }
@@ -6935,6 +7008,22 @@ const employeeCollapsedLegacyValidate=validate;
 validate=function(){
   const result=employeeCollapsedLegacyValidate();
   employeeUpdateCollapsedStepSummaries(result);
+  return result;
+};
+const employeeCheckoutArrearsLegacyValidate=validate;
+validate=function(){
+  const result=employeeCheckoutArrearsLegacyValidate();
+  const type=$('entryType')?.value||'';
+  const blocked=['CO','DR'].includes(type)&&openTasksForBed().length>0;
+  if(blocked){
+    const msg='Open Arrears Found: This customer has unpaid arrears. Checkout or deposit refund requires owner approval. / \u8be5\u5ba2\u6237\u5b58\u5728\u672a\u6e05\u6b20\u6b3e\uff0c\u9000\u623f\u6216\u9000\u62bc\u91d1\u5fc5\u987b\u7531\u8001\u677f\u5ba1\u6838\u3002';
+    if(!result.errors.includes(msg))result.errors.push(msg);
+    const box=$('validationBox');
+    if(box&&!box.innerHTML.includes('Open Arrears Found'))box.innerHTML=`<div class="bad">Blocked: ${esc(msg)}</div>`+box.innerHTML;
+    const submit=$('btnSaveEntry');
+    if(submit){submit.disabled=true;submit.classList.add('disabled');submit.classList.remove('primary');}
+    employeeUpdateCollapsedStepSummaries(result);
+  }
   return result;
 };
 const employeeCollapsedLegacyRenderSummary=renderSummary;

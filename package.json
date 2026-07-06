@@ -335,6 +335,7 @@
     "test:employee-entry-flow-order": "node --test tests/employee-entry-flow-order.spec.mjs",
     "test:employee-entry-open-arrears-alert": "node --test tests/employee-entry-open-arrears-alert.spec.mjs",
     "test:employee-entry-open-arrears-selector": "node --test tests/employee-entry-open-arrears-selector.spec.mjs",
+    "test:employee-entry-checkout-deposit-arrears-block": "node --test tests/employee-entry-checkout-deposit-arrears-block.spec.mjs",
     "test:employee-entry-arrears-payment-flow": "node --test tests/employee-entry-arrears-payment-flow.spec.mjs",
     "test:cloud-arrears-anchor": "node --test tests/cloud-arrears-anchor.spec.mjs",
     "test:employee-entry-upload-performance": "node --test tests/employee-entry-upload-performance.spec.mjs",
