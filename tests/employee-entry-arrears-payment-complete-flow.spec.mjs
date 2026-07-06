@@ -48,3 +48,15 @@ test("arrears payment payload keeps arrears ref and settlement fields", async ()
   assert.match(html, /settlement_status:type==='AP'\?\(apRemaining<=0\?'settled':'partial'\):''/);
 });
 
+test("arrears payment keeps Add to Session controls visible after selected summary", async () => {
+  const html = await readFile(htmlPath, "utf8");
+
+  assert.match(html, /const type=\$\(\'entryType\'\)\?\.value\|\|''/);
+  assert.match(html, /const apPanel=\$\(\'arrearsPaymentCorePanel\'\)/);
+  assert.match(html, /const flowEnd=type==='AP'/);
+  assert.match(html, /\?\(apPanel\|\|fieldWrap\('amount'\)/);
+  assert.match(html, /if\(flowEnd&&mount\.previousElementSibling!==flowEnd\)flowEnd\.insertAdjacentElement\('afterend',mount\)/);
+  assert.match(html, /mount\.appendChild\(validation\)/);
+  assert.match(html, /mount\.appendChild\(actionRow\)/);
+  assert.match(html, /renderEmployeeButtonLabel\('Add to Session'/);
+});

@@ -7035,7 +7035,12 @@ function employeePrioritizeEntryInputs(){
   const actionRow=$('btnSaveEntry')?.closest('.row');
   if(!step3||!validation||!actionRow)return;
   employeeRenumberRequiredFlowTitles();
-  const flowEnd=$('remark')?.closest('.field')||$('periodStep')||$('amount')?.closest('.step')||$('paymentStep');
+  const type=$('entryType')?.value||'';
+  const exceptionVisible=$('exceptionStep')&&!$('exceptionStep').classList.contains('hidden');
+  const apPanel=$('arrearsPaymentCorePanel');
+  const flowEnd=type==='AP'
+    ?(apPanel||fieldWrap('amount')||$('amount')?.closest('.step')||$('paymentStep'))
+    :(exceptionVisible?($('remark')?.closest('.field')||$('exceptionStep')):(!$('periodStep')?.classList.contains('hidden')?$('periodStep'):($('amount')?.closest('.step')||$('paymentStep'))));
   let mount=$('employeeRequiredActionMount');
   if(!mount){
     mount=document.createElement('div');
