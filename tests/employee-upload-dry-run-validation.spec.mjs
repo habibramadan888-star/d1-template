@@ -47,9 +47,17 @@ test("arrears payment dry-run accepts projection-aware refs and returns exact AP
   const readOnlyLookup = functionBlock(worker, "empFindOpenArrearTaskForPaymentReadOnly");
 
   assert.match(validateBlock, /empFindOpenArrearTaskForPaymentReadOnly\(env,user,taskId,room\)/);
+  assert.match(validateBlock, /ARREARS_REF_STALE_REFRESH_REQUIRED/);
+  assert.match(validateBlock, /This arrears item is no longer open\. Please refresh arrears\./);
   assert.match(readOnlyLookup, /empFindProjectionArrearsForPayment\(env,user,cleanTaskId,bed\)/);
+  assert.ok(
+    readOnlyLookup.indexOf("empFindProjectionArrearsForPayment(env,user,cleanTaskId,bed)") <
+      readOnlyLookup.indexOf("SELECT * FROM arrear_tasks"),
+    "projection must be checked before stale materialized arrear_tasks"
+  );
+  assert.match(readOnlyLookup, /if\(projected\)return null/);
   assert.match(validateBlock, /LINKED_TASK_REQUIRED/);
-  assert.match(validateBlock, /LINKED_TASK_NOT_OPEN/);
+  assert.doesNotMatch(validateBlock, /LINKED_TASK_NOT_OPEN/);
   assert.match(validateBlock, /ARREAR_PAYMENT_AMOUNT_INVALID/);
   assert.match(validateBlock, /event_type:\"arrears_payment\"/);
 });
@@ -108,6 +116,23 @@ test("employee UI runs dry-run validation before real upload and surfaces backen
   assert.match(html, /renderEmployeeUploadDryRunError\(firstDryRunFailure\.result\)/);
   assert.match(html, /toast\(`Upload validation failed: \$\{firstDryRunFailure\.result\.error_code\}`/);
   assert.doesNotMatch(html, /toast\('Upload validation failed before cloud write\.'/);
+  assert.match(html, /state\.uploadValidationFailedIndex=Number\(firstDryRunFailure\.result\?\.event_index\|\|0\)/);
+  assert.match(html, /data-session-record-index="\$\{recordIndex\}"/);
+  assert.match(html, /upload-validation-failed/);
+  assert.match(html, /data-remove-session-record/);
+  assert.match(html, /removeCurrentSessionRecord\(btn\.dataset\.removeSessionRecord/);
+});
+
+test("checkout open arrears is blocked before add to session", async () => {
+  const html = await readFile(employeePath, "utf8");
+  const checkoutValidateIndex = html.lastIndexOf("const employeeCheckoutArrearsLegacyValidate=validate");
+  assert.ok(checkoutValidateIndex >= 0, "final checkout arrears validation wrapper must exist");
+  const validateBlock = html.slice(checkoutValidateIndex, html.indexOf("const employeeCollapsedLegacyRenderSummary=renderSummary", checkoutValidateIndex));
+
+  assert.match(validateBlock, /\['CO','DR'\]\.includes\(type\)&&openTasksForBed\(\)\.length>0/);
+  assert.match(validateBlock, /Open Arrears Found/);
+  assert.match(validateBlock, /submit\.disabled=true/);
+  assert.match(validateBlock, /submit\.classList\.add\('disabled'\)/);
 });
 
 test("left with arrears UI exposes required visible fields and preserves anchors", async () => {

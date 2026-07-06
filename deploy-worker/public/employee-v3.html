@@ -2062,6 +2062,19 @@ label .label-en{
     border-radius:16px!important;
     gap:8px!important;
   }
+  .preview-entry.upload-validation-failed{
+    border-color:rgba(185,28,28,.55)!important;
+    background:linear-gradient(135deg,rgba(254,226,226,.95),rgba(255,255,255,.92))!important;
+    box-shadow:0 14px 32px rgba(127,29,29,.14)!important;
+  }
+  .preview-entry.upload-validation-failed::before{
+    content:"Upload validation failed";
+    display:block;
+    color:#991b1b;
+    font-weight:950;
+    font-size:12px;
+    margin-bottom:4px;
+  }
   .preview-entry .amt{
     justify-self:start;
     font-size:17px!important;
@@ -4680,6 +4693,8 @@ async function saveEntry(){
   setOperator(operatorId());
   e.sync_status='DRAFT';
   e.session_id=currentSessionId();
+  state.uploadValidationFailedIndex=null;
+  state.uploadValidationFailedMessage='';
   state.drafts.unshift(e);
   const localOk=saveDrafts();
   refreshSessionViews();
@@ -6336,8 +6351,11 @@ async function commitSessionAndExport(){
     const firstDryRunFailure=dryRunFailed[0];
     state.drafts=originalDrafts;
     state.sessionId=originalSessionId;
+    state.uploadValidationFailedIndex=Number(firstDryRunFailure.result?.event_index||0);
+    state.uploadValidationFailedMessage=`${firstDryRunFailure.result?.error_code||'UPLOAD_VALIDATION_FAILED'}: ${firstDryRunFailure.result?.message||firstDryRunFailure.message||''}`;
     saveDrafts();
     buildExport();
+    refreshSessionViews();
     oldLabels.forEach(([b,html])=>{b.dataset.busy='0';b.disabled=false;b.classList.remove('disabled');b.innerHTML=html});
     $('validationBox').innerHTML=renderEmployeeUploadDryRunError(firstDryRunFailure.result);
     showStatus(`Upload validation failed: ${firstDryRunFailure.message}`,'bad');
@@ -7009,6 +7027,43 @@ renderSessionPreview=function(){
     return `<div class="preview-entry"><div><b>${rows.length-i}. ${subject}</b> ${status}<div class="small">${esc(detail)}</div><div class="small">Entry ID ${esc(e.id)} · ${esc(e.created_at||'')}</div><div class="small">${esc(e.note||e.expense_desc||'')}</div><div class="preview-tools">${undo}</div></div><div class="amt ${cls}">${sign}${fmtMoney(e.amount)}</div></div>`;
   }).join('');
   document.querySelectorAll('[data-undo]').forEach(btn=>btn.onclick=()=>undoDraft(btn.dataset.undo));
+};
+function removeCurrentSessionRecord(id,reason=''){
+  const item=state.drafts.find(e=>e.id===id);
+  if(!item)return;
+  if(item.sync_status==='SYNCED'){toast('Synced cloud records cannot be removed locally.',6000);return}
+  if(!confirm('Remove this local record from Current Session?'))return;
+  state.drafts=state.drafts.filter(e=>e.id!==id);
+  state.uploadValidationFailedIndex=null;
+  state.uploadValidationFailedMessage='';
+  saveDrafts();
+  refreshSessionViews();
+  buildExport();
+  toast(reason||'Record removed from Current Session');
+}
+renderSessionPreview=function(){
+  const rows=state.drafts;
+  $('sessionMeta').textContent=`${today()} ${new Date().toTimeString().slice(0,8)} · ${rows.length} records`;
+  if(!rows.length){
+    $('sessionPreview').innerHTML='<div class="preview-empty"><div><b>No Records</b><br><span>Select a type, fill the form, then add to session</span></div></div>';
+    return;
+  }
+  $('sessionPreview').innerHTML=rows.map((e,i)=>{
+    const dir=entryDirection(e);
+    const sign=dir==='out'?'-':(dir==='in'?'+':'');
+    const cls=dir==='out'?'red':'';
+    const recordIndex=i+1;
+    const failed=Number(state.uploadValidationFailedIndex)===i;
+    const subject=e.type==='TF'?`#${esc(e.bed_from||e.room||'')} -> #${esc(e.bed_to||'')}`:(e.type==='E'?esc(e.expense_category||'Expense'):`#${esc(e.room||'')}`);
+    const detail=[eventLabel(e.type),e.tenant_name||'',e.pay_type==='B'?'Bank':'Cash',e.period_start&&e.period_end?`${e.period_start} -> ${e.period_end}`:''].filter(Boolean).join(' · ');
+    const status=e.sync_status==='SYNCED'?'<span class="status-pill">Synced</span>':'<span class="status-pill local">Local</span>';
+    const undo=canUndo(e)?`<button class="mini-btn danger" data-undo="${esc(e.id)}">Undo</button>`:'';
+    const remove=e.sync_status!=='SYNCED'?`<button class="mini-btn danger" data-remove-session-record="${esc(e.id)}">Remove invalid record</button>`:'';
+    const failNote=failed?`<div class="bad">Record #${recordIndex}: ${esc(state.uploadValidationFailedMessage||'Upload validation failed')}</div>`:'';
+    return `<div class="preview-entry ${failed?'upload-validation-failed':''}" data-session-record-index="${recordIndex}" data-entry-id="${esc(e.id)}"><div><b>Record #${recordIndex} · ${subject}</b> ${status}${failNote}<div class="small">${esc(detail)}</div><div class="small">Entry ID ${esc(e.id)} · ${esc(e.created_at||'')}</div><div class="small">${esc(e.note||e.expense_desc||'')}</div><div class="preview-tools">${undo}${remove}</div></div><div class="amt ${cls}">${sign}${fmtMoney(e.amount)}</div></div>`;
+  }).join('');
+  document.querySelectorAll('[data-undo]').forEach(btn=>btn.onclick=()=>undoDraft(btn.dataset.undo));
+  document.querySelectorAll('[data-remove-session-record]').forEach(btn=>btn.onclick=()=>removeCurrentSessionRecord(btn.dataset.removeSessionRecord,'Invalid record removed'));
 };
 renderSummary=function(){
   const type=$('entryType').value, pay=$('payType').value;

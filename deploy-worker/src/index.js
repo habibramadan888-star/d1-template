@@ -1717,9 +1717,6 @@ __name(employeeEntryValidationFailure,"employeeEntryValidationFailure");
 async function empFindOpenArrearTaskForPaymentReadOnly(env,user,taskId,bed=""){
   const cleanTaskId=cleanId(taskId);
   if(!cleanTaskId)return null;
-  const existing=await env.DB.prepare(`SELECT * FROM arrear_tasks
-    WHERE task_id=? AND corpid=? LIMIT 1`).bind(cleanTaskId,user.corpid).first().catch(()=>null);
-  if(existing)return empCloseStatusIsOpen(existing.close_status)&&empTaskRemaining(existing)>0?existing:null;
   const projected=await empFindProjectionArrearsForPayment(env,user,cleanTaskId,bed);
   if(projected&&["open","partial"].includes(String(projected.status||"").toLowerCase())&&cleanMoney(projected.remaining_arrears||0)>0){
     return {
@@ -1732,6 +1729,10 @@ async function empFindOpenArrearTaskForPaymentReadOnly(env,user,taskId,bed=""){
       close_status:""
     };
   }
+  if(projected)return null;
+  const existing=await env.DB.prepare(`SELECT * FROM arrear_tasks
+    WHERE task_id=? AND corpid=? LIMIT 1`).bind(cleanTaskId,user.corpid).first().catch(()=>null);
+  if(existing)return empCloseStatusIsOpen(existing.close_status)&&empTaskRemaining(existing)>0?existing:null;
   if(!await empTableExists(env,"arrears"))return null;
   const legacy=await env.DB.prepare("SELECT * FROM arrears WHERE id=? AND corpid=? AND cleared=0 LIMIT 1")
     .bind(cleanTaskId,user.corpid).first().catch(()=>null);
@@ -1859,8 +1860,15 @@ async function validateEmployeeEntryUploadPayload(env,user,body,opts={}){
   }else if(type==="AP"){
     const taskId=cleanId(entry.linked_task_id||entry.arrears_ref||entry.original_arrears_id);
     if(!taskId)return employeeEntryValidationFailure("arrears_payment_ref","LINKED_TASK_REQUIRED","Arrears Payment requires a selected cloud arrears ref.",{event_index:eventIndex,event_type:"arrears_payment",missing_fields:["linked_task_id","arrears_ref"],anchor_preview:anchorPreview});
+    const projectedTask=await empFindProjectionArrearsForPayment(env,user,taskId,room);
+    if(projectedTask&&!["open","partial"].includes(String(projectedTask.status||"").toLowerCase())){
+      return employeeEntryValidationFailure("arrears_payment_ref","ARREARS_REF_STALE_REFRESH_REQUIRED","This arrears item is no longer open. Please refresh arrears.",{event_index:eventIndex,event_type:"arrears_payment",invalid_fields:["linked_task_id"],anchor_preview:{...anchorPreview,arrears_ref:taskId,projection_status:projectedTask.status||"",remaining_arrears:cleanMoney(projectedTask.remaining_arrears||0)}});
+    }
+    if(projectedTask&&cleanMoney(projectedTask.remaining_arrears||0)<=0){
+      return employeeEntryValidationFailure("arrears_payment_ref","ARREARS_REF_STALE_REFRESH_REQUIRED","This arrears item is no longer open. Please refresh arrears.",{event_index:eventIndex,event_type:"arrears_payment",invalid_fields:["linked_task_id"],anchor_preview:{...anchorPreview,arrears_ref:taskId,projection_status:projectedTask.status||"",remaining_arrears:cleanMoney(projectedTask.remaining_arrears||0)}});
+    }
     apTaskForPayment=await empFindOpenArrearTaskForPaymentReadOnly(env,user,taskId,room);
-    if(!apTaskForPayment)return employeeEntryValidationFailure("arrears_payment_ref","LINKED_TASK_NOT_OPEN","Selected cloud arrears ref is not open or partial.",{event_index:eventIndex,event_type:"arrears_payment",invalid_fields:["linked_task_id"],anchor_preview:{...anchorPreview,arrears_ref:taskId}});
+    if(!apTaskForPayment)return employeeEntryValidationFailure("arrears_payment_ref","ARREARS_REF_STALE_REFRESH_REQUIRED","This arrears item is no longer open. Please refresh arrears.",{event_index:eventIndex,event_type:"arrears_payment",invalid_fields:["linked_task_id"],anchor_preview:{...anchorPreview,arrears_ref:taskId}});
     const remain=Math.max(0,Number(apTaskForPayment.arrear_amount||0)-Number(apTaskForPayment.actual_received||0));
     if(amount<=0||amount>remain+0.01)return employeeEntryValidationFailure("arrears_payment_ref","ARREAR_PAYMENT_AMOUNT_INVALID","Arrears payment amount must be positive and no more than remaining arrears.",{event_index:eventIndex,event_type:"arrears_payment",invalid_fields:["amount"],anchor_preview:{...anchorPreview,arrears_ref:taskId,remaining_arrears:remain}});
     due=amount;
