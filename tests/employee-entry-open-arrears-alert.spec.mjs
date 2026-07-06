@@ -33,13 +33,13 @@ test("arrears payment can select an open arrears task from the core alert", asyn
   assert.match(html, /applyLinkedTask\(\)/);
 });
 
-test("add to session controls are moved above collapsed reference checks", async () => {
+test("add to session controls remain in the required input flow", async () => {
   const html = await readFile(employeePath, "utf8");
 
   assert.match(html, /function employeePrioritizeEntryInputs\(\)/);
   assert.match(html, /employeeRequiredActionMount/);
   assert.match(html, /Required Input Actions/);
-  assert.match(html, /step3\.insertAdjacentElement\('beforebegin',mount\)/);
+  assert.match(html, /flowEnd\.insertAdjacentElement\('afterend',mount\)/);
   assert.match(html, /mount\.appendChild\(validation\)/);
   assert.match(html, /mount\.appendChild\(actionRow\)/);
   assert.match(html, /employeePrioritizeEntryInputs\(\)/);
