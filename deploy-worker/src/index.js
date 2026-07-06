@@ -4569,6 +4569,47 @@ async function ownerOverviewFetchTransactions(env,user,range){
   return rows;
 }
 __name(ownerOverviewFetchTransactions,"ownerOverviewFetchTransactions");
+async function ownerOverviewFetchSessionPeriodSummary(env,user,range){
+  const summary={
+    rows_checked:0,
+    gross_received:0,
+    cash_handover:0,
+    bank_transfer_total:0,
+    sessions:[],
+    source_table:"sessions",
+    rule:"owner_visible_sessions_summary"
+  };
+  if(!await phase0TableExists(env,"sessions"))return summary;
+  const rows=await phase0All(env,
+    "SELECT id, anchor_id, date, source, entries_count, cash_handover, bank_transfer_total, gross_received, handover_status, voided_at, created_at FROM sessions WHERE corpid=? AND COALESCE(voided_at,'')='' AND COALESCE(handover_status,'')<>'VOID' AND substr(COALESCE(date,created_at,''),1,10) BETWEEN ? AND ? ORDER BY substr(COALESCE(date,created_at,''),1,10) ASC, created_at ASC LIMIT 500",
+    [user.corpid,range.start,range.end]
+  ).catch(()=>[]);
+  summary.rows_checked=rows.length;
+  for(const row of rows){
+    const gross=ownerOverviewMoney(row?.gross_received);
+    const cash=ownerOverviewMoney(row?.cash_handover);
+    const bank=ownerOverviewMoney(row?.bank_transfer_total);
+    summary.gross_received+=gross;
+    summary.cash_handover+=cash;
+    summary.bank_transfer_total+=bank;
+    summary.sessions.push({
+      date:cleanText(row?.date||"",20).slice(0,10),
+      session_id:cleanText(row?.id||"",120),
+      anchor:cleanText(row?.anchor_id||"",160),
+      source:cleanText(row?.source||"",80),
+      entries_count:Number(row?.entries_count||0),
+      cash,
+      bank,
+      gross,
+      included_reason:"owner_visible_session"
+    });
+  }
+  summary.gross_received=ownerOverviewMoney(summary.gross_received);
+  summary.cash_handover=ownerOverviewMoney(summary.cash_handover);
+  summary.bank_transfer_total=ownerOverviewMoney(summary.bank_transfer_total);
+  return summary;
+}
+__name(ownerOverviewFetchSessionPeriodSummary,"ownerOverviewFetchSessionPeriodSummary");
 function ownerOverviewParseEntryEventPayload(raw){
   try{
     const parsed=JSON.parse(String(raw||"{}"));
@@ -4838,6 +4879,7 @@ async function phase0OwnerOverviewComparativeSummary(env,user,url){
   const [
     monthRows,
     billingPeriodRows,
+    billingPeriodSessionSummary,
     lastMonthRows,
     sameMonthLastYearRows,
     quarterRows,
@@ -4848,6 +4890,7 @@ async function phase0OwnerOverviewComparativeSummary(env,user,url){
   ]=await Promise.all([
     safeRows(ownerOverviewFetchTransactions(env,user,currentMonth)),
     safeRows(ownerOverviewFetchTransactions(env,user,currentBillingPeriod)),
+    ownerOverviewFetchSessionPeriodSummary(env,user,currentBillingPeriod).catch(()=>({rows_checked:0,gross_received:0,cash_handover:0,bank_transfer_total:0,sessions:[],source_table:"sessions",rule:"owner_visible_sessions_summary"})),
     safeRows(ownerOverviewFetchTransactions(env,user,lastMonth)),
     safeRows(ownerOverviewFetchTransactions(env,user,sameMonthLastYear)),
     safeRows(ownerOverviewFetchTransactions(env,user,currentQuarter)),
@@ -4858,6 +4901,7 @@ async function phase0OwnerOverviewComparativeSummary(env,user,url){
   ]);
   const month=ownerOverviewSummarizeTransactions(monthRows);
   const billingPeriod=ownerOverviewSummarizeTransactions(billingPeriodRows);
+  const currentPeriodReceived={...billingPeriodSessionSummary,range:currentBillingPeriod,rule:"billing_period_3_to_2_owner_visible_sessions"};
   const prevMonth=ownerOverviewSummarizeTransactions(lastMonthRows);
   const sameLastYear=ownerOverviewSummarizeTransactions(sameMonthLastYearRows);
   const quarter=ownerOverviewSummarizeTransactions(quarterRows);
@@ -4875,7 +4919,7 @@ async function phase0OwnerOverviewComparativeSummary(env,user,url){
   }
   const noData=[];
   if(!monthRows.length)noData.push("current_month_transactions");
-  if(!billingPeriodRows.length)noData.push("current_billing_period_transactions");
+  if(!billingPeriodSessionSummary.rows_checked)noData.push("current_billing_period_sessions");
   if(!lastMonthRows.length)noData.push("last_month_transactions");
   if(!sameMonthLastYearRows.length)noData.push("same_month_last_year_transactions");
   if(!arrearRows.length)noData.push("open_arrears");
@@ -4885,7 +4929,7 @@ async function phase0OwnerOverviewComparativeSummary(env,user,url){
     readonly:true,
     period:{today,current_billing_period:currentBillingPeriod,current_month:currentMonth,last_month:lastMonth,same_month_last_year:sameMonthLastYear,current_quarter:currentQuarter,last_quarter:lastQuarter,same_quarter_last_year:sameQuarterLastYear},
     current:{month,quarter,billing_period:billingPeriod},
-    current_period_received:{...billingPeriod,range:currentBillingPeriod,rule:"billing_period_3_to_2"},
+    current_period_received:currentPeriodReceived,
     last_month:prevMonth,
     same_month_last_year:sameLastYear,
     quarter_to_date:quarter,
@@ -4953,7 +4997,7 @@ async function phase0OwnerOverviewComparativeSummary(env,user,url){
       needs_review_count:arrears.needs_review_count
     },
     data_quality:{
-      rows_checked:{current_month:month.rows_checked,current_billing_period:billingPeriod.rows_checked,last_month:prevMonth.rows_checked,same_month_last_year:sameLastYear.rows_checked,current_quarter:quarter.rows_checked,arrears:arrearRows.length},
+      rows_checked:{current_month:month.rows_checked,current_billing_period_transactions:billingPeriod.rows_checked,current_billing_period_sessions:billingPeriodSessionSummary.rows_checked,last_month:prevMonth.rows_checked,same_month_last_year:sameLastYear.rows_checked,current_quarter:quarter.rows_checked,arrears:arrearRows.length},
       no_data:noData,
       warnings:noData.length?["Some comparison windows have no source rows; show no-data instead of fabricating trend."]:[]
     }
