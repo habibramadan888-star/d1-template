@@ -957,6 +957,11 @@ label .label-en{
   background:rgba(255,255,255,.84);
   padding:12px;
 }
+.open-arrears-item.selected{
+  border-color:rgba(22,163,74,.74);
+  background:linear-gradient(135deg,rgba(220,252,231,.96),rgba(255,255,255,.9));
+  box-shadow:0 16px 34px rgba(22,163,74,.18);
+}
 .open-arrears-item-head{
   display:flex;
   align-items:center;
@@ -994,6 +999,18 @@ label .label-en{
 }
 .open-arrears-select{
   margin-top:10px;
+}
+.open-arrears-select.selected{
+  border-color:rgba(22,163,74,.88)!important;
+  background:#16a34a!important;
+  color:#fff!important;
+  box-shadow:0 12px 26px rgba(22,163,74,.22);
+}
+.open-arrears-selected-ref{
+  margin-top:8px;
+  color:#166534;
+  font-size:12px;
+  font-weight:900;
 }
 @media(max-width:720px){
   .open-arrears-grid{grid-template-columns:1fr}
@@ -3754,6 +3771,7 @@ function selectEmployeeCloudArrears(taskOrRef){
   $('linkedTaskId').value=employeeTaskRef(task);
   applyLinkedTask(task);
   renderArrearsPaymentPanel();
+  employeeRenderOpenArrearsAlert();
   validate();
 }
 function fieldWrap(id){
@@ -6978,10 +6996,12 @@ function employeeRenderOpenArrearsAlert(){
     return;
   }
   const blockedExit=type==='CO'||type==='DR';
+  const selectedRef=String($('linkedTaskId')?.value||state.selectedArrearsTaskRef||'').trim();
   const list=rows.map(t=>{
     const m=employeeArrearsMeta(t);
-    const select=type==='AP'?`<button type="button" class="mini-btn open-arrears-select" data-select-arrears-task="${esc(m.ref)}">${renderEmployeeButtonLabel('Select Arrears','\u9009\u62e9\u8fd8\u6b3e')}</button>`:'';
-    return `<div class="open-arrears-item">
+    const isSelected=!!selectedRef&&m.ref===selectedRef;
+    const select=type==='AP'?`<button type="button" class="mini-btn open-arrears-select ${isSelected?'selected':''}" data-select-arrears-task="${esc(m.ref)}" aria-pressed="${isSelected?'true':'false'}">${isSelected?renderEmployeeButtonLabel('Arrears Selected','\u6b20\u6b3e\u5df2\u9009\u62e9'):renderEmployeeButtonLabel('Select Arrears','\u9009\u62e9\u8fd8\u6b3e')}</button>${isSelected?`<div class="open-arrears-selected-ref">selected_arrears_ref: ${esc(m.ref)}</div>`:''}`:'';
+    return `<div class="open-arrears-item ${isSelected?'selected':''}" data-open-arrears-ref="${esc(m.ref)}" data-selected-arrears="${isSelected?'true':'false'}">
       <div class="open-arrears-item-head"><b>#${esc(m.bed)} · ${esc(m.ref)}</b><span>Remaining ${fmtMoney(m.remaining)} AED</span></div>
       <div class="open-arrears-grid">
         <div><b>Original Date / \u539f\u6b20\u6b3e\u65e5\u671f</b>${esc(m.date)}</div>

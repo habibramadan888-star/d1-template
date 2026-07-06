@@ -5269,6 +5269,95 @@ function showOwnerCloudArrearsModal(){
   window._ownerCloudArrearsEsc=event=>{if(event.key==='Escape')closeOwnerCloudArrearsModal();};
   document.addEventListener('keydown',window._ownerCloudArrearsEsc);
 }
+function closeOwnerOverviewPreviewModal(){
+  const modal=document.getElementById('ownerOverviewPreviewModal');
+  if(modal)modal.remove();
+  if(window._ownerOverviewPreviewEsc){
+    document.removeEventListener('keydown',window._ownerOverviewPreviewEsc);
+    window._ownerOverviewPreviewEsc=null;
+  }
+}
+function ownerOverviewPreviewRow(main,amount='',status='',meta=''){
+  return `<div class="detail-row owner-mobile-row">
+    <div class="room">${esc(main||'-')}</div>
+    <div class="note">${status?esc(status):'&nbsp;'}${meta?`<div style="font-size:11px;color:var(--color-text-muted);margin-top:3px">${esc(meta)}</div>`:''}</div>
+    <div class="amount">${amount!==''?esc(amount):''}</div>
+  </div>`;
+}
+function ownerOverviewPreviewEmpty(){
+  return `<div class="empty-state hl-empty-state"><div class="empty-title">No items</div><div class="empty-text">\u6682\u65e0\u9879\u76ee</div></div>`;
+}
+function showOwnerOverviewPreviewModal(titleEn,titleZh,bodyHtml,totalLabel,totalValue){
+  closeOwnerOverviewPreviewModal();
+  const overlay=document.createElement('div');
+  overlay.id='ownerOverviewPreviewModal';
+  overlay.className='modal-bg';
+  overlay.style.cssText='position:fixed;inset:0;z-index:520;background:rgba(12,22,18,.34);backdrop-filter:blur(12px);display:flex;align-items:center;justify-content:center;padding:18px;';
+  overlay.innerHTML=`<div class="modal" style="max-width:620px;width:min(620px,96vw);max-height:84vh;overflow:hidden;background:rgba(255,255,255,.86);backdrop-filter:blur(18px);border:1px solid rgba(255,255,255,.58);box-shadow:0 24px 80px rgba(20,32,51,.24);">
+    <div class="modal-head">
+      <div><b>${esc(titleEn)}</b><small>${esc(titleZh)}</small></div>
+      <button class="icon-btn" type="button" aria-label="Close" data-close-owner-overview-preview>×</button>
+    </div>
+    <div class="modal-body" style="overflow:auto;max-height:68vh">
+      <div class="detail-list">${bodyHtml||ownerOverviewPreviewEmpty()}</div>
+      <div class="hist-card" style="margin-top:12px"><div class="hist-stat"><span>${esc(totalLabel||'Total')}</span><b>${esc(totalValue||'0.00')}</b></div></div>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  overlay.querySelector('[data-close-owner-overview-preview]')?.addEventListener('click',closeOwnerOverviewPreviewModal);
+  overlay.addEventListener('click',event=>{if(event.target===overlay)closeOwnerOverviewPreviewModal();});
+  window._ownerOverviewPreviewEsc=event=>{if(event.key==='Escape')closeOwnerOverviewPreviewModal();};
+  document.addEventListener('keydown',window._ownerOverviewPreviewEsc);
+}
+function ownerOverviewPreviewArrearStatus(row){
+  const raw=String(row?.console_status||row?.summary_bucket||row?.status||'').trim().toLowerCase();
+  if(raw.includes('today'))return 'due today';
+  if(raw.includes('soon'))return 'due soon';
+  if(raw.includes('overdue'))return 'overdue';
+  const due=String(row?.dueDate||row?.due_date||row?.promiseDate||row?.promise_date||'').slice(0,10);
+  const today=fmtD(new Date());
+  if(due&&due<today)return 'overdue';
+  if(due&&due===today)return 'due today';
+  if(due){
+    const days=Math.ceil((new Date(due)-new Date(today))/(1000*60*60*24));
+    if(days>=0&&days<=3)return 'due soon';
+  }
+  return 'required';
+}
+function ownerOverviewShowCurrentPeriodPreview(){
+  const period=ownerOverviewCurrentPeriodReceived();
+  const rows=Array.isArray(period.sessions)?period.sessions:[];
+  const body=rows.length?rows.map(row=>ownerOverviewPreviewRow(String(row.date||'-'),fmtMoney(row.gross||0),'',row.anchor||row.session_id||'')).join(''):ownerOverviewPreviewEmpty();
+  showOwnerOverviewPreviewModal('Current Period Received','\u5f53\u524d\u8d26\u671f\u5b9e\u6536',body,'Total',fmtMoney(period.gross_received||0));
+}
+function ownerOverviewShowCloudArrearsPreview(){
+  const collection=ownerOverviewCloudArrearsCollection();
+  const rows=collection.details||[];
+  const body=rows.length?rows.map(row=>ownerOverviewPreviewRow(row.bed||'-',fmtMoney(row.remaining_arrears||0),`due ${row.due_date||row.promise_date||'-'}`,row.arrears_ref||'')).join(''):ownerOverviewPreviewEmpty();
+  showOwnerOverviewPreviewModal('Cloud Arrears Collection','\u6b20\u6b3e\u4ee3\u6536',body,'Total',fmtMoney(collection.total_remaining||0));
+}
+function ownerOverviewShowOutstandingPreview(){
+  const rows=ownerArrearsActiveRows();
+  const body=rows.length?rows.map(row=>ownerOverviewPreviewRow(row.bed||row.room||'-',fmtMoney(row.remain||0),ownerOverviewPreviewArrearStatus(row),row.sourceLabel||row.sourceType||'')).join(''):ownerOverviewPreviewEmpty();
+  const total=rows.reduce((sum,row)=>sum+Number(row.remain||0),0);
+  showOwnerOverviewPreviewModal('Outstanding Collection','\u5f85\u6536\u5c3e\u6b3e',body,'Total',fmtMoney(total));
+}
+function ownerOverviewShowTodayActionsPreview(){
+  const rows=ownerArrearsActiveRows();
+  const groups=[['overdue','Overdue'],['due today','Due Today'],['due soon','Due Soon'],['required','Required']];
+  const sections=groups.map(([key,label])=>{
+    const items=rows.filter(row=>ownerOverviewPreviewArrearStatus(row)===key);
+    if(!items.length)return '';
+    return `<div class="hist-card" style="margin:0 0 10px"><div class="hist-title">${esc(label)}</div><div class="detail-list">${items.map(row=>ownerOverviewPreviewRow(row.bed||row.room||'-',fmtMoney(row.remain||0),label,row.dueDate||row.due_date||'')).join('')}</div></div>`;
+  }).filter(Boolean).join('');
+  showOwnerOverviewPreviewModal('Today Actions','\u4eca\u65e5\u5f85\u529e',sections||ownerOverviewPreviewEmpty(),'Total',String(rows.length));
+}
+function showOwnerOverviewCardPreview(kind){
+  if(kind==='current-period')return ownerOverviewShowCurrentPeriodPreview();
+  if(kind==='cloud-arrears')return ownerOverviewShowCloudArrearsPreview();
+  if(kind==='outstanding')return ownerOverviewShowOutstandingPreview();
+  if(kind==='today-actions')return ownerOverviewShowTodayActionsPreview();
+}
 function ownerOverviewRiskCloud(){
   return ownerOverviewCloudData().risk_watch||{};
 }
@@ -5443,8 +5532,16 @@ function renderOwnerOverview(){
   const cloudArrearsRemaining=Number(cloudArrearsCollection.total_remaining||0);
   const kpi=(label,en,value,color='var(--color-primary)',note='',attrs='')=>{
     if(en==='TODAY ACTIONS'&&hasConsoleSot)note=consoleRiskNote;
+    const previewKind={
+      'OUTSTANDING COLLECTION':'outstanding',
+      'TODAY ACTIONS':'today-actions',
+      'CURRENT PERIOD RECEIVED':'current-period',
+      'CLOUD ARREARS COLLECTION':'cloud-arrears'
+    }[en]||'';
+    const previewAttrs=previewKind?`role="button" tabindex="0" data-owner-overview-preview="${previewKind}"`:'';
+    const cardAttrs=[attrs,previewAttrs].filter(Boolean).join(' ');
     return `
-    <div class="owner-overview-card hl-card" ${attrs}>
+    <div class="owner-overview-card hl-card" ${cardAttrs}>
       <strong>${esc(label)}</strong>
       <span>${esc(en)}</span>
       <b style="color:${color}">${esc(value)}</b>
@@ -5496,16 +5593,16 @@ function renderOwnerOverview(){
       <div class="card-head"><div><div class="card-title">最近流水摘要</div><div class="card-sub">RECENT LEDGER</div></div></div>
       <div class="card-body"><div class="detail-list">${recentEntryHtml}</div></div>
     </div>`;
-  const cloudArrearsCard=wrap.querySelector('[data-owner-cloud-arrears-card]');
-  if(cloudArrearsCard){
-    cloudArrearsCard.addEventListener('click',showOwnerCloudArrearsModal);
-    cloudArrearsCard.addEventListener('keydown',event=>{
+  wrap.querySelectorAll('[data-owner-overview-preview]').forEach(card=>{
+    const kind=card.getAttribute('data-owner-overview-preview')||'';
+    card.addEventListener('click',()=>showOwnerOverviewCardPreview(kind));
+    card.addEventListener('keydown',event=>{
       if(event.key==='Enter'||event.key===' '){
         event.preventDefault();
-        showOwnerCloudArrearsModal();
+        showOwnerOverviewCardPreview(kind);
       }
     });
-  }
+  });
   ensureOwnerOverviewComparativeAsync();
   ensureOwnerOverviewArrearsAsync();
 }
