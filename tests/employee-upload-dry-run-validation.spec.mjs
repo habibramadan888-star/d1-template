@@ -112,15 +112,53 @@ test("employee UI runs dry-run validation before real upload and surfaces backen
   assert.match(html, /Error Code/);
   assert.match(html, /Missing Fields/);
   assert.match(html, /Invalid Fields/);
+  assert.match(html, /Suggested Action/);
+  assert.match(html, /employeeUploadValidationSuggestedAction\(r\)/);
   assert.match(html, /err\.dryRunResult=result/);
   assert.match(html, /renderEmployeeUploadDryRunError\(firstDryRunFailure\.result\)/);
   assert.match(html, /toast\(`Upload validation failed: \$\{firstDryRunFailure\.result\.error_code\}`/);
   assert.doesNotMatch(html, /toast\('Upload validation failed before cloud write\.'/);
-  assert.match(html, /state\.uploadValidationFailedIndex=Number\(firstDryRunFailure\.result\?\.event_index\|\|0\)/);
+  assert.match(html, /const failedIndex=Number\(firstDryRunFailure\.result\?\.event_index\|\|0\)/);
+  assert.match(html, /state\.uploadValidationFailedIndex=failedIndex/);
   assert.match(html, /data-session-record-index="\$\{recordIndex\}"/);
   assert.match(html, /upload-validation-failed/);
   assert.match(html, /data-remove-session-record/);
   assert.match(html, /removeCurrentSessionRecord\(btn\.dataset\.removeSessionRecord/);
+  assert.match(commitBlock, /uploadList\.forEach\(e=>\{e\.upload_status='VALIDATING';e\.upload_validation_error=null;\}\)/);
+  assert.match(commitBlock, /originalDrafts\[failedIndex\]\.upload_status=firstDryRunFailure\.result\?\.error_code==='ARREARS_REF_STALE_REFRESH_REQUIRED'\?'STALE':'VALIDATION_FAILED'/);
+  assert.match(commitBlock, /e\.upload_status='UPLOADING'/);
+  assert.match(commitBlock, /upload_status:'SYNCED'/);
+});
+
+test("current session status machine prioritizes validation failed and stale over synced", async () => {
+  const html = await readFile(employeePath, "utf8");
+  const finalRenderStart = html.lastIndexOf("renderSessionPreview=function(){");
+  assert.ok(finalRenderStart >= 0, "final renderSessionPreview override must exist");
+  const finalRender = html.slice(finalRenderStart, html.indexOf("renderSummary=function(){", finalRenderStart));
+
+  assert.match(html, /function employeeSessionRecordState\(entry,index\)/);
+  assert.match(html, /function renderSessionRecordValidationDetails\(result,index\)/);
+  assert.match(html, /ARREARS_REF_STALE_REFRESH_REQUIRED/);
+  assert.match(html, /This arrears item is no longer open\. Please refresh arrears or remove this record\./);
+  assert.match(finalRender, /const recordState=employeeSessionRecordState\(e,i\)/);
+  assert.match(finalRender, /recordState\.key!=='SYNCED'/);
+  assert.match(finalRender, /renderSessionRecordValidationDetails\(recordState\.validation,i\)/);
+  assert.match(finalRender, /data-refresh-arrears-record/);
+  assert.match(finalRender, /Refresh Arrears/);
+  assert.match(html, /Validation Failed/);
+  assert.match(html, /Stale \/ Needs Refresh/);
+  assert.doesNotMatch(finalRender, /const status=e\.sync_status==='SYNCED'/);
+});
+
+test("stale arrears selection is cleared or marked when open refs disappear", async () => {
+  const html = await readFile(employeePath, "utf8");
+
+  assert.match(html, /state\.selectedArrearsTaskRef=''/);
+  assert.match(html, /state\.selectedArrearsTaskSnapshot=null/);
+  assert.match(html, /state\.arrearsTasksLoaded=Array\.isArray\(state\.tasks\)/);
+  assert.match(html, /employeeOpenTaskRefSet\(\)/);
+  assert.match(html, /state\.arrearsTasksLoaded&&!openRefs\.has\(ref\)/);
+  assert.match(html, /Refresh Arrears/);
 });
 
 test("checkout open arrears is blocked before add to session", async () => {
