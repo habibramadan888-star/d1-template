@@ -89,12 +89,25 @@ test("employee UI runs dry-run validation before real upload and surfaces backen
   const realUploadIndex = commitBlock.indexOf("apiFetch('/api/employee/entry',{");
 
   assert.match(html, /function formatEmployeeUploadDryRunError\(result,index\)/);
+  assert.match(html, /function normalizeEmployeeUploadDryRunError\(result,index/);
+  assert.match(html, /function renderEmployeeUploadDryRunError\(result\)/);
   assert.match(html, /apiFetch\('\/api\/employee\/entry\/validate'/);
   assert.ok(dryRunIndex > 0, "commit flow must call dry-run validation");
   assert.ok(realUploadIndex > dryRunIndex, "real upload must happen only after dry-run validation");
   assert.match(html, /Upload validation failed:/);
   assert.match(html, /Missing: \$\{missing\}/);
   assert.match(html, /Invalid: \$\{invalid\}/);
+  assert.match(html, /data-upload-validation-error=\"true\"/);
+  assert.match(html, /Record/);
+  assert.match(html, /Stage/);
+  assert.match(html, /Event/);
+  assert.match(html, /Error Code/);
+  assert.match(html, /Missing Fields/);
+  assert.match(html, /Invalid Fields/);
+  assert.match(html, /err\.dryRunResult=result/);
+  assert.match(html, /renderEmployeeUploadDryRunError\(firstDryRunFailure\.result\)/);
+  assert.match(html, /toast\(`Upload validation failed: \$\{firstDryRunFailure\.result\.error_code\}`/);
+  assert.doesNotMatch(html, /toast\('Upload validation failed before cloud write\.'/);
 });
 
 test("left with arrears UI exposes required visible fields and preserves anchors", async () => {

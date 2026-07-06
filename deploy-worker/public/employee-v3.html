@@ -1989,6 +1989,59 @@ label .label-en{
     margin-top:8px!important;
     font-size:12px!important;
   }
+  .upload-validation-panel{
+    display:grid;
+    gap:10px;
+    padding:14px;
+    border:1px solid rgba(185,28,28,.28);
+    border-radius:18px;
+    background:linear-gradient(135deg,rgba(255,241,242,.96),rgba(255,255,255,.9));
+    box-shadow:0 14px 32px rgba(127,29,29,.12);
+  }
+  .upload-validation-panel .uv-title{
+    font-weight:900;
+    font-size:15px;
+    color:#7f1d1d;
+  }
+  .upload-validation-panel .uv-sub{
+    font-size:11px;
+    color:#9f1239;
+  }
+  .upload-validation-panel .uv-grid{
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:8px;
+  }
+  .upload-validation-panel .uv-cell{
+    padding:9px 10px;
+    border-radius:12px;
+    background:rgba(255,255,255,.78);
+    border:1px solid rgba(127,29,29,.12);
+  }
+  .upload-validation-panel .uv-label{
+    display:block;
+    font-size:10px;
+    font-weight:800;
+    color:#9f1239;
+    text-transform:uppercase;
+    letter-spacing:.05em;
+  }
+  .upload-validation-panel .uv-value{
+    display:block;
+    margin-top:2px;
+    font-size:12px;
+    font-weight:800;
+    color:#111827;
+    overflow-wrap:anywhere;
+  }
+  .upload-validation-panel .uv-list{
+    padding:10px;
+    border-radius:12px;
+    background:rgba(254,226,226,.76);
+    color:#7f1d1d;
+    font-weight:800;
+    overflow-wrap:anywhere;
+  }
 
   #view-entry>.card:nth-child(3) .head{
     display:grid!important;
@@ -6155,14 +6208,58 @@ function formatEmployeeUploadDryRunError(result,index){
   if(invalid)parts.push(`Invalid: ${invalid}`);
   return parts.join(' · ');
 }
+function normalizeEmployeeUploadDryRunError(result,index,fallbackMessage=''){
+  const data=result&&typeof result==='object'?result:{};
+  const eventIndex=Number(data.event_index ?? index ?? 0);
+  return {
+    ok:false,
+    stage:data.stage||'upload_validation',
+    event_index:Number.isFinite(eventIndex)?eventIndex:0,
+    event_type:data.event_type||data.anchor_preview?.event_type||'entry',
+    error_code:data.error_code||data.code||data.error||'UNKNOWN_UPLOAD_VALIDATION_ERROR',
+    message:data.message||fallbackMessage||'Upload validation failed.',
+    missing_fields:Array.isArray(data.missing_fields)?data.missing_fields.filter(Boolean):[],
+    invalid_fields:Array.isArray(data.invalid_fields)?data.invalid_fields.filter(Boolean):[],
+    anchor_preview:data.anchor_preview&&typeof data.anchor_preview==='object'?data.anchor_preview:{}
+  };
+}
+function renderEmployeeUploadDryRunError(result){
+  const r=normalizeEmployeeUploadDryRunError(result,result?.event_index);
+  const missing=r.missing_fields.length?r.missing_fields.join(' / '):'None';
+  const invalid=r.invalid_fields.length?r.invalid_fields.join(' / '):'None';
+  const preview=Object.entries(r.anchor_preview||{})
+    .filter(([,value])=>value!==''&&value!==null&&typeof value!=='undefined')
+    .map(([key,value])=>`${key}: ${value}`)
+    .join(' | ');
+  return `
+    <div class="upload-validation-panel" role="alert" data-upload-validation-error="true">
+      <div>
+        <div class="uv-title">Upload Validation Failed</div>
+        <div class="uv-sub">Dry-run stopped before cloud write. / 上传校验失败，未写入云端。</div>
+      </div>
+      <div class="uv-grid">
+        <div class="uv-cell"><span class="uv-label">Record</span><span class="uv-value">#${esc(String(r.event_index+1))}</span></div>
+        <div class="uv-cell"><span class="uv-label">Stage</span><span class="uv-value">${esc(r.stage)}</span></div>
+        <div class="uv-cell"><span class="uv-label">Event</span><span class="uv-value">${esc(r.event_type)}</span></div>
+        <div class="uv-cell"><span class="uv-label">Error Code</span><span class="uv-value">${esc(r.error_code)}</span></div>
+      </div>
+      <div class="uv-list"><span class="uv-label">Message</span><span class="uv-value">${esc(r.message)}</span></div>
+      <div class="uv-list"><span class="uv-label">Missing Fields</span><span class="uv-value">${esc(missing)}</span></div>
+      <div class="uv-list"><span class="uv-label">Invalid Fields</span><span class="uv-value">${esc(invalid)}</span></div>
+      ${preview?`<div class="uv-list"><span class="uv-label">Anchor Preview</span><span class="uv-value">${esc(preview)}</span></div>`:''}
+      <div class="warn">No cloud data was written. Fix this record and upload again. / 未写入云端，请修复该记录后重新上传。</div>
+    </div>`;
+}
 async function validateEmployeeUploadDryRun(entry,sessionForEntry,index){
   const r=await apiFetch('/api/employee/entry/validate',{method:'POST',body:JSON.stringify({entry,session:sessionForEntry,event_index:index})});
   const raw=await r.text();
   let data=null;
   try{data=raw?unwrapStandardResponse(JSON.parse(raw)):null}catch{}
   if(!r.ok||data?.success===false||data?.ok===false){
-    const result=data||{};
-    throw new Error(formatEmployeeUploadDryRunError(result,index)||raw||('HTTP '+r.status));
+    const result=normalizeEmployeeUploadDryRunError(data||{},index,raw||('HTTP '+r.status));
+    const err=new Error(formatEmployeeUploadDryRunError(result,index)||raw||('HTTP '+r.status));
+    err.dryRunResult=result;
+    throw err;
   }
   return data;
 }
@@ -6228,21 +6325,23 @@ async function commitSessionAndExport(){
       setUploadPhase(`Dry-run validating ${i+1}/${uploadList.length}`,'Validating');
       await validateEmployeeUploadDryRun(e,sessionForEntry,i);
     }catch(err){
+      const dryRunResult=normalizeEmployeeUploadDryRunError(err?.dryRunResult||{},i,err?.message||'dry_run_validation_failed');
       e.sync_status='LOCAL';
-      e.sync_error=String(err?.message||err||'dry_run_validation_failed');
-      dryRunFailed.push(e);
+      e.sync_error=formatEmployeeUploadDryRunError(dryRunResult,i);
+      dryRunFailed.push({entry:e,result:dryRunResult,message:e.sync_error});
       break;
     }
   }
   if(dryRunFailed.length){
+    const firstDryRunFailure=dryRunFailed[0];
     state.drafts=originalDrafts;
     state.sessionId=originalSessionId;
     saveDrafts();
     buildExport();
     oldLabels.forEach(([b,html])=>{b.dataset.busy='0';b.disabled=false;b.classList.remove('disabled');b.innerHTML=html});
-    $('validationBox').innerHTML=`<div class="bad">Upload validation failed: ${esc(dryRunFailed[0].sync_error)}</div><div class="warn">No cloud data was written. Fix the listed field and upload again. / Dry-run 未写入云端，请修复后重新上传。</div>`;
-    showStatus(`Upload validation failed: ${dryRunFailed[0].sync_error}`,'bad');
-    toast('Upload validation failed before cloud write.',6000);
+    $('validationBox').innerHTML=renderEmployeeUploadDryRunError(firstDryRunFailure.result);
+    showStatus(`Upload validation failed: ${firstDryRunFailure.message}`,'bad');
+    toast(`Upload validation failed: ${firstDryRunFailure.result.error_code}`,6000);
     updateEntrySessionActionState();
     return;
   }
