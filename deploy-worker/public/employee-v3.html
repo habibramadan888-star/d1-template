@@ -3727,7 +3727,7 @@ function renderTaskInfo(){
   $('apTaskInfo').innerHTML=bed&&open.length===0?'No Open Arrears / 无未清欠款':'Select a cloud open arrears item for this bed. Arrears Payment does not use billing period. / 请选择该床位的云端未清欠款；还欠款不使用账期。';
 }
 function applyLinkedTask(taskOverride=null){
-  const task=taskOverride||selectedTask();
+  const task=taskOverride&&typeof taskOverride==='object'&&employeeTaskRef(taskOverride)?taskOverride:selectedTask();
   if(!task)return;
   const ref=employeeTaskRef(task);
   $('linkedTaskId').value=ref;
@@ -3745,6 +3745,79 @@ function applyLinkedTask(taskOverride=null){
   $('reasonCode').value='ARREARS_PAYMENT';
   renderTaskInfo();
   syncForm();
+}
+function selectEmployeeCloudArrears(taskOrRef){
+  const task=typeof taskOrRef==='string'?findEmployeeTaskByRef(taskOrRef):taskOrRef;
+  if(!task){toast('Cloud arrears not found / \u672a\u627e\u5230\u4e91\u7aef\u6b20\u6b3e',5000);return}
+  if($('entryType').value!=='AP')setEntryType('AP');
+  populateTaskSelect();
+  $('linkedTaskId').value=employeeTaskRef(task);
+  applyLinkedTask(task);
+  renderArrearsPaymentPanel();
+  validate();
+}
+function fieldWrap(id){
+  return $(id)?.closest('.field')||$(id);
+}
+function employeeEnsureArrearsPaymentPanel(){
+  let panel=$('arrearsPaymentCorePanel');
+  if(panel)return panel;
+  const amountField=fieldWrap('amount');
+  if(!amountField)return null;
+  panel=document.createElement('div');
+  panel.id='arrearsPaymentCorePanel';
+  panel.className='open-arrears-core-alert neutral';
+  panel.dataset.arrearsPaymentCorePanel='true';
+  amountField.insertAdjacentElement('afterend',panel);
+  return panel;
+}
+function renderArrearsPaymentPanel(){
+  const panel=employeeEnsureArrearsPaymentPanel();
+  if(!panel)return;
+  const isAp=$('entryType')?.value==='AP';
+  panel.classList.toggle('hidden',!isAp);
+  if(!isAp)return;
+  const task=selectedTask();
+  if(!task){
+    const bed=$('bed').value.trim().replace(/^#/,'');
+    const open=bed?openTasksForBed():[];
+    panel.className='open-arrears-core-alert neutral';
+    panel.innerHTML=`<div class="open-arrears-title"><div><b>Select Cloud Arrears</b><small>\u9009\u62e9\u4e91\u7aef\u672a\u6e05\u6b20\u6b3e</small></div><span class="open-arrears-badge">${open.length?`${open.length} Open`:'Waiting'}</span></div><div class="small">Arrears Payment uses cloud arrears only. It does not use rent period or monthly rent. / \u8fd8\u6b20\u6b3e\u53ea\u4f7f\u7528\u4e91\u7aef\u672a\u6e05\u6b20\u6b3e\uff0c\u4e0d\u4f7f\u7528\u8d26\u671f\u6216\u6708\u79df\u3002</div>`;
+    return;
+  }
+  const already=num(task.actual_received||task.already_paid_amount||task.paid_amount);
+  const original=num(task.arrear_amount||task.amount||task.original_arrears_amount||(taskRemain(task)+already));
+  const before=Math.max(0,original-already);
+  const payment=num($('amount').value);
+  const after=Math.max(0,before-payment);
+  const status=after<=0?'settled':'partial';
+  panel.className='open-arrears-core-alert warn';
+  panel.innerHTML=`<div class="open-arrears-title"><div><b>Selected Cloud Arrears</b><small>\u5df2\u9009\u62e9\u4e91\u7aef\u6b20\u6b3e</small></div><span class="open-arrears-badge">${status==='settled'?'Settled':'Partial'}</span></div>
+    <div class="open-arrears-grid">
+      <div><b>Arrears Ref / \u6b20\u6b3e\u7f16\u53f7</b>${esc(employeeTaskRef(task))}</div>
+      <div><b>Original Arrears / \u539f\u6b20\u6b3e</b>${fmtMoney(original)} AED</div>
+      <div><b>Already Paid / \u5df2\u8fd8</b>${fmtMoney(already)} AED</div>
+      <div><b>Remaining Before / \u8fd8\u6b3e\u524d\u5269\u4f59</b>${fmtMoney(before)} AED</div>
+      <div><b>This Payment / \u672c\u6b21\u8fd8\u6b3e</b>${fmtMoney(payment)} AED</div>
+      <div><b>Remaining After / \u8fd8\u6b3e\u540e\u5269\u4f59</b>${fmtMoney(after)} AED</div>
+      <div><b>Settlement Status / \u7ed3\u6e05\u72b6\u6001</b>${status}</div>
+    </div>`;
+}
+function employeeApplyArrearsPaymentLayout(type){
+  const isAp=type==='AP';
+  ['listPrice','periodStart','periodEnd','periodDays','periodDue','due','paid','entryClr'].forEach(id=>{
+    const wrap=fieldWrap(id);
+    if(wrap)wrap.classList.toggle('hidden',isAp);
+  });
+  if(isAp){
+    $('periodStep')?.classList.add('hidden');
+    $('entryClr').value='Y';
+    $('periodDue').value='';
+    $('periodStart').value='';
+    $('periodEnd').value='';
+    $('periodDays').value='';
+  }
+  renderArrearsPaymentPanel();
 }
 function eventLabel(type){
   return {R:'收租',AP:'还欠款',D:'收押金',DR:'退押金',CO:'退房',E:'支出',TF:'换床',TFF:'换床费'}[type]||type;
@@ -3818,7 +3891,8 @@ function applyEntryAnchors(e){
     });
   }else if(type==='AP'){
     const t=typeof selectedTask==='function'?selectedTask():null;
-    const original=num(e.original_arrears_amount||t?.arrear_amount||e.period_due||e.due||0);
+    const taskAlready=num(t?.actual_received||t?.already_paid_amount||t?.paid_amount);
+    const original=num(e.original_arrears_amount||t?.arrear_amount||t?.amount||t?.original_arrears_amount||(t?(taskRemain(t)+taskAlready):0)||e.payment_amount||e.amount||0);
     const already=num(e.already_paid_amount||t?.actual_received||0);
     const payment=num(e.payment_amount||e.amount||0);
     const remaining=Math.max(0,original-already-payment);
@@ -4119,13 +4193,13 @@ function syncForm(){
   let periodDue=num($('periodDue').value);
   if(type==='AP'){
     const task=selectedTask();
-    const remain=task?taskRemain(task):num($('due').value);
+    const remain=task?taskRemain(task):0;
     if(task&&!num($('amount').value))$('amount').value=fmtMoney(remain);
     if(task){
-      $('due').value=fmtMoney(remain);
-      $('periodDue').value=fmtMoney(remain);
+      $('due').value=fmtMoney(num($('amount').value));
+      $('periodDue').value='';
     }
-    periodDue=remain;
+    periodDue=0;
   }else if(hasPeriod&&(!periodDue||document.activeElement===$('cycle')||document.activeElement===$('periodStart')||document.activeElement===$('periodEnd')||type==='R'||type==='TFF')){
     periodDue=$('cycle').value==='15D'?400:($('cycle').value==='CUST'?num($('periodDays').value)*40:(type==='TFF'?50:lp));
     $('periodDue').value=periodDue?fmtMoney(periodDue):'';
@@ -4137,7 +4211,11 @@ function syncForm(){
   else if(type==='AP')$('paid').value=fmtMoney(amt);
   else if(['TF','CO'].includes(type)&&amt===0)$('paid').value='0.00';
   else if(amt)$('paid').value=fmtMoney(amt);
-  $('entryClr').value=due&&amt<due?'N':'Y';
+  if(type==='AP'){
+    const task=selectedTask();
+    const after=task?Math.max(0,taskRemain(task)-amt):0;
+    $('entryClr').value=task?(after<=0?'Y':'P'):'Y';
+  }else $('entryClr').value=due&&amt<due?'N':'Y';
   if(type==='R'&&due>0&&amt>0&&amt<due&&!$('reasonCode').value)$('reasonCode').value='SHORT_PAID';
   if(type==='DR'&&depositHeld()>0&&!$('amount').value)$('amount').value=fmtMoney(depositHeld());
   if(type==='CO'){const co=checkoutCalc();$('overdayDeduction').value=fmtMoney(co.overDed);$('depositDeduction').value=fmtMoney(co.total);$('depositReturnAmount').value=fmtMoney(Math.max(0,depositHeld()-co.total));}
@@ -4145,6 +4223,7 @@ function syncForm(){
   visible(['exceptionStep'],needsException());
   visible(['excessWrap'],type==='R'&&num($('amount').value)>num($('due').value));
   renderTaskInfo();
+  employeeApplyArrearsPaymentLayout(type);
   renderContext();
   renderContextNotice();
   updateBedTransferReviewPanel();
@@ -4215,8 +4294,8 @@ function entryPayload(){
   const type=$('entryType').value, amt=num($('amount').value), due=num($('due').value), paid=num($('paid').value)||Math.min(amt,due||amt);
   const pay=$('payType').value;
   const apTask=type==='AP'?selectedTask():null;
-  const apOriginal=apTask?num(apTask.arrear_amount||apTask.amount||apTask.original_arrears_amount):0;
   const apAlready=apTask?num(apTask.actual_received||apTask.already_paid_amount||apTask.paid_amount):0;
+  const apOriginal=apTask?num(apTask.arrear_amount||apTask.amount||apTask.original_arrears_amount||(taskRemain(apTask)+apAlready)):0;
   const apBefore=Math.max(0,apOriginal-apAlready);
   const apRemaining=Math.max(0,apOriginal-apAlready-amt);
   const co=checkoutCalc();
@@ -6927,24 +7006,14 @@ function employeeRenderOpenArrearsAlert(){
   box.innerHTML=`<div class="open-arrears-title"><div><b>${title}</b><small>\u53d1\u73b0\u672a\u6e05\u6b20\u6b3e</small></div><span class="open-arrears-badge">${subtitle}</span></div><div class="open-arrears-list">${list}</div>${actions}`;
   box.querySelectorAll('[data-select-arrears-task]').forEach(btn=>{
     btn.onclick=()=>{
-      if($('entryType').value!=='AP')setEntryType('AP');
-      const sel=$('linkedTaskId');
-      if(sel){
-        const task=findEmployeeTaskByRef(btn.dataset.selectArrearsTask||'');
-        populateTaskSelect();
-        if(task)sel.value=employeeTaskRef(task);
-        applyLinkedTask(task);
-      }
+      selectEmployeeCloudArrears(btn.getAttribute('data-select-arrears-task')||'');
     };
   });
   box.querySelectorAll('[data-collect-arrears-first]').forEach(btn=>{
     btn.onclick=()=>{
       const first=rows[0];
       if(!first)return;
-      setEntryType('AP');
-      populateTaskSelect();
-      $('linkedTaskId').value=employeeTaskRef(first);
-      applyLinkedTask(first);
+      selectEmployeeCloudArrears(first);
     };
   });
   box.querySelectorAll('[data-request-owner-approval]').forEach(btn=>{

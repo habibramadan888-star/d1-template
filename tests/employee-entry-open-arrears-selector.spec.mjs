@@ -19,11 +19,19 @@ test("select arrears alert writes selected cloud arrears into current AP form st
   const html = await readFile(htmlPath, "utf8");
 
   assert.match(html, /data-select-arrears-task="\$\{esc\(m\.ref\)\}"/);
-  assert.match(html, /const task=findEmployeeTaskByRef\(btn\.dataset\.selectArrearsTask\|\|''\)/);
-  assert.match(html, /sel\.value=employeeTaskRef\(task\)/);
+  assert.match(html, /function selectEmployeeCloudArrears\(taskOrRef\)/);
+  assert.match(html, /selectEmployeeCloudArrears\(btn\.getAttribute\('data-select-arrears-task'\)\|\|''\)/);
+  assert.match(html, /\$\(\'linkedTaskId\'\)\.value=employeeTaskRef\(task\)/);
   assert.match(html, /applyLinkedTask\(task\)/);
   assert.match(html, /state\.selectedArrearsTaskRef=ref/);
   assert.match(html, /Selected Cloud Arrears/);
+});
+
+test("linkedTaskId change event cannot be mistaken for a cloud arrears task", async () => {
+  const html = await readFile(htmlPath, "utf8");
+
+  assert.match(html, /\$\(\'linkedTaskId\'\)\.addEventListener\('change',applyLinkedTask\)/);
+  assert.match(html, /const task=taskOverride&&typeof taskOverride==='object'&&employeeTaskRef\(taskOverride\)\?taskOverride:selectedTask\(\)/);
 });
 
 test("arrears payment anchor includes before and after remaining balances", async () => {
