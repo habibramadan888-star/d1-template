@@ -113,8 +113,46 @@ Required fields:
 - `checkout_date`
 - `deposit_refund`
 - `outstanding_arrears`
+- `owner_approval_required`
+- `owner_approval_status`
+- `checkout_mode`
 - `final_note`
 - `ttlock_context`
+
+When `checkout_mode = left_with_arrears`, the checkout anchor must preserve the
+departed-customer arrears tracking fields:
+
+- `left_with_arrears = true`
+- `customer_left = true`
+- `former_customer_name` / `card_name`
+- `whatsapp_phone` / `former_customer_phone`
+- `contact_method`
+- `contact_note`
+- `arrears_amount`
+- `cloud_arrears_ref`
+- `deposit_balance`
+- `belongings_held`
+- `belongings_note`
+- `promised_payment_date`
+- `promised_return_date`
+- `left_date` / `checkout_attempt_date`
+- `left_status`
+- `final_status`
+- `grace_days_after_promise`
+- `review_date`
+- `confirmed_not_returning_date`
+- `confirmed_not_returning_by`
+- `confirmation_note`
+- `original_session_id`
+- `original_event_id`
+
+Left-with-arrears rules:
+
+1. The Cloud Arrears record remains `open` or `partial`; checkout must not clear it.
+2. The arrears record must keep `customer_left`, contact, belongings, and promise metadata.
+3. Same-bed future customers must not overwrite the departed customer's arrears anchor.
+4. `abandoned_confirmed` must be set only by an owner or authorized operator, never automatically.
+5. Later `arrears_payment` anchors must bind the same `cloud_arrears_ref`.
 
 ### expense
 
@@ -180,4 +218,3 @@ Summary fields:
 4. Employee, owner, parser-adjacent readers, and exports must share this
    contract.
 5. New features must read anchors instead of redefining field semantics.
-

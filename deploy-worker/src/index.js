@@ -1516,6 +1516,72 @@ async function empReconcileArrearTask(env,user,taskId,operatorId,now){
   return {task_id:cleanTaskId,actual_received:actual,arrear_amount:target,closed};
 }
 __name(empReconcileArrearTask,"empReconcileArrearTask");
+function empLeftWithArrearsMetaFromEntry(entry,taskId){
+  const phone=cleanText(entry.whatsapp_phone||entry.former_customer_phone||"",80);
+  const contactMethod=cleanText(entry.contact_method||"",40);
+  const contactNote=cleanText(entry.contact_note||"",300);
+  return {
+    left_with_arrears:true,
+    customer_left:true,
+    arrears_id:cleanText(taskId||entry.cloud_arrears_ref||"",120),
+    arrears_ref:cleanText(taskId||entry.cloud_arrears_ref||"",120),
+    bed:cleanText(entry.bed||entry.room||"",40).replace(/^#+/,""),
+    former_bed:cleanText(entry.bed||entry.room||"",40).replace(/^#+/,""),
+    former_customer_ref:cleanText(entry.former_customer_ref||entry.tenant_card_id||"",120),
+    former_customer_name:cleanText(entry.former_customer_name||entry.card_name||entry.tenant_name||"",120),
+    card_name:cleanText(entry.card_name||entry.former_customer_name||entry.tenant_name||"",120),
+    former_customer_phone:phone,
+    whatsapp_phone:phone,
+    contact_method:contactMethod||"whatsapp",
+    contact_note:contactNote,
+    checkout_date:cleanDate(entry.checkout_date||entry.left_date||entry.checkout_attempt_date||""),
+    left_date:cleanDate(entry.left_date||entry.checkout_date||""),
+    checkout_attempt_date:cleanDate(entry.checkout_attempt_date||entry.checkout_date||""),
+    arrears_amount:cleanMoney(entry.arrears_amount||entry.outstanding_arrears||0),
+    cloud_arrears_ref:cleanText(entry.cloud_arrears_ref||taskId||"",120),
+    deposit_balance:cleanMoney(entry.deposit_balance||entry.deposit_held||0),
+    belongings_held:entry.belongings_held===true||String(entry.belongings_held||"").toLowerCase()==="yes",
+    belongings_note:cleanText(entry.belongings_note||"",500),
+    promised_payment_date:cleanDate(entry.promised_payment_date||entry.promise_date||""),
+    promised_return_date:cleanDate(entry.promised_return_date||entry.promise_return_date||""),
+    promise_return_date:cleanDate(entry.promise_return_date||entry.promised_return_date||""),
+    promise_note:cleanText(entry.promise_note||entry.note||entry.final_note||"",500),
+    note:cleanText(entry.note||entry.final_note||"",500),
+    left_status:cleanText(entry.left_status||"left_pending_return",80),
+    final_status:cleanText(entry.final_status||"left_pending_return",80),
+    status:cleanText(entry.status||"open",40),
+    grace_days_after_promise:Number(entry.grace_days_after_promise||0)||0,
+    review_date:cleanDate(entry.review_date||""),
+    confirmed_not_returning_date:cleanDate(entry.confirmed_not_returning_date||""),
+    confirmed_not_returning_by:cleanText(entry.confirmed_not_returning_by||"",80),
+    confirmation_note:cleanText(entry.confirmation_note||"",500),
+    original_session_id:cleanText(entry.original_session_id||entry.session_id||"",120),
+    original_event_id:cleanText(entry.original_event_id||entry.event_id||entry.id||"",120),
+    operator:cleanText(entry.operator||entry.operator_name||entry.operator_id||"",120),
+    created_at:cleanText(entry.created_at||empNow(),40)
+  };
+}
+__name(empLeftWithArrearsMetaFromEntry,"empLeftWithArrearsMetaFromEntry");
+async function empApplyLeftWithArrearsMetadata(env,user,entry,entryId,operatorId,now){
+  if(!entry?.left_with_arrears)return null;
+  const taskId=cleanId(entry.cloud_arrears_ref||entry.arrears_ref||"");
+  if(!taskId)return {ok:false,error:"cloud_arrears_ref_required"};
+  const task=await env.DB.prepare(`SELECT * FROM arrear_tasks
+    WHERE task_id=? AND corpid=? AND COALESCE(close_status,'') NOT IN ('PAID','CLEARED','CLOSED','VOID','WAIVED','WRITTEN_OFF','已结清','结清','作废') LIMIT 1`)
+    .bind(taskId,user.corpid).first();
+  if(!task)return {ok:false,error:"cloud_arrears_not_open",task_id:taskId};
+  const meta=empLeftWithArrearsMetaFromEntry({...entry,id:entryId},taskId);
+  const marker=`LEFT_WITH_ARREARS ${JSON.stringify(meta)}`;
+  const existingStaff=cleanText(task.staff_note||"",4000);
+  const staffNote=existingStaff.includes("LEFT_WITH_ARREARS")?existingStaff:cleanText([existingStaff,marker].filter(Boolean).join("\n"),4000);
+  const ownerNote=cleanText(task.owner_note||marker,4000);
+  await env.DB.prepare(`UPDATE arrear_tasks
+    SET staff_note=?, owner_note=?, updated_by=?, updated_at=?
+    WHERE task_id=? AND corpid=?`).bind(staffNote,ownerNote,operatorId||user.userid,now||empNow(),taskId,user.corpid).run();
+  await empEvent(env,user,{ref_id:taskId,ref_type:"arrear_task",event_type:"left_with_arrears_anchor",field_name:"staff_note",old_value:task.staff_note||"",new_value:marker,operator_id:operatorId||user.userid,ts:now||empNow()});
+  return {ok:true,task_id:taskId,metadata:meta};
+}
+__name(empApplyLeftWithArrearsMetadata,"empApplyLeftWithArrearsMetadata");
 async function empEnsureOpenArrearTaskForPayment(env,user,taskId,operatorId,now){
   const cleanTaskId=cleanId(taskId);
   if(!cleanTaskId)return null;
@@ -1863,6 +1929,20 @@ async function handleEmployeeEntry(request,env,user){
     const taskId=cleanId(entry.linked_task_id);
     if(taskId&&apTaskForPayment)arrearTask=await empReconcileArrearTask(env,user,taskId,authOperatorId,now);
   }
+  let leftWithArrearsTask=null;
+  if(type==="CO"&&entry.left_with_arrears){
+    leftWithArrearsTask=await empApplyLeftWithArrearsMetadata(env,user,{
+      ...entry,
+      id:entryId,
+      room,
+      bed:room,
+      tenant_name:tenantName,
+      tenant_card_id:tenantCardId,
+      checkout_date:cleanText(entry.checkout_date,20),
+      deposit_held:type==="CO"?depositBalance:depositHeldInput,
+      session_id:sessionId
+    },entryId,authOperatorId,now);
+  }
   const finalEntryForAudit={
     ...entry,
     id:entryId,room,amount,due,paid,deficit:Math.max(0,due-paid),period_due:periodDue,
@@ -1881,6 +1961,7 @@ async function handleEmployeeEntry(request,env,user){
     inserted,
     timing:timingEnabled?timing:void 0,
     arrear_task:arrearTask,
+    left_with_arrears_task:leftWithArrearsTask,
     deposit_ledger:depositLedger,
     ...(liveRouteAdapterDraft?{adapter_live_route_rehearsal:eeaLiveRouteSummary(liveRouteAdapterDraft,liveRouteGate,{legacyWriteContinued:true})}: {})
   });
@@ -1891,7 +1972,7 @@ const entryAnchorContract={
   AP:["event_type","bed","arrears_ref","original_arrears_id","original_arrears_amount","already_paid_amount","payment_amount","remaining_arrears","settlement_status","payment_method","note","operator","created_at"],
   D:["event_type","bed","deposit_amount","payment_method","linked_tenant","note","operator","created_at"],
   DR:["event_type","bed","refund_amount","payment_method","refund_reason","checkout_ref","note","operator","created_at"],
-  CO:["event_type","bed","checkout_date","deposit_refund","outstanding_arrears","final_note","ttlock_context","operator","created_at"],
+  CO:["event_type","bed","checkout_date","deposit_refund","outstanding_arrears","owner_approval_required","owner_approval_status","checkout_mode","left_with_arrears","customer_left","former_customer_name","whatsapp_phone","contact_method","contact_note","arrears_amount","cloud_arrears_ref","belongings_held","belongings_note","promised_payment_date","promised_return_date","deposit_balance","left_status","final_status","final_note","ttlock_context","operator","created_at"],
   E:["event_type","expense_amount","expense_category","target_bed","reason","note","payment_method","operator","created_at"],
   TF:["event_type","from_bed","to_bed","transfer_date","fee_amount","fee_status","waiver_reason","transfer_reason","old_tenant_context","old_ttlock_context","note","operator","created_at"]
 };
@@ -1936,7 +2017,13 @@ function renderEntryAnchorForOwner(row){
   if(type==="AP")return `${row.room||row.bed} arrears_payment ${entryAnchorMoney(row.payment_amount||row.amount).toFixed(2)} ref ${row.arrears_ref||row.original_arrears_id||row.linked_task_id||"-"} remaining ${entryAnchorMoney(row.remaining_arrears||row.remaining_arrears_after_payment).toFixed(2)}`.trim();
   if(type==="D")return `${row.room||row.bed} deposit_in ${entryAnchorMoney(row.deposit_amount||row.amount).toFixed(2)} ${row.payment_method||""} ${row.note||""}`.trim();
   if(type==="DR")return `${row.room||row.bed} deposit_out ${entryAnchorMoney(row.refund_amount||row.amount).toFixed(2)} ${row.payment_method||""} reason ${row.refund_reason||row.reason||"-"} note ${row.note||"-"}`.trim();
-  if(type==="CO")return `${row.room||row.bed} checkout ${row.checkout_date||"-"} deposit_refund ${entryAnchorMoney(row.deposit_refund||row.deposit_amt||0).toFixed(2)} outstanding ${entryAnchorMoney(row.outstanding_arrears||0).toFixed(2)} note ${row.final_note||row.note||"-"}`.trim();
+  if(type==="CO"){
+    const base=`${row.room||row.bed} checkout ${row.checkout_date||"-"} deposit_refund ${entryAnchorMoney(row.deposit_refund||row.deposit_amt||0).toFixed(2)} outstanding ${entryAnchorMoney(row.outstanding_arrears||0).toFixed(2)} note ${row.final_note||row.note||"-"}`.trim();
+    if(row.left_with_arrears||row.checkout_mode==="left_with_arrears"){
+      return `${base} left_with_arrears ref ${row.cloud_arrears_ref||"-"} phone ${row.whatsapp_phone||row.former_customer_phone||"-"} belongings ${row.belongings_held?"yes":"no"} promised_payment ${row.promised_payment_date||"-"} promised_return ${row.promised_return_date||row.promise_return_date||"-"}`.trim();
+    }
+    return base;
+  }
   if(type==="E")return `${row.target_bed||row.room||row.expense_category||""} expense ${entryAnchorMoney(row.expense_amount||row.amount).toFixed(2)} ${row.expense_category||""} ${row.reason||row.expense_desc||row.note||""}`.trim();
   if(type==="TF")return `${row.bed_from||row.from_bed||row.room}->${row.bed_to||row.to_bed||row.room_to} bed_transfer ${entryAnchorMoney(row.fee_amount||row.amount).toFixed(2)} ${row.fee_status||"paid"} reason ${row.transfer_reason||row.reason||"-"}`.trim();
   return `${row?.room||row?.bed||row?.expense_category||""} ${eventType} ${entryAnchorMoney(row?.amount).toFixed(2)}`.trim();
@@ -1977,7 +2064,8 @@ function normalizeEntryAnchor(row){
   }else if(type==="DR"){
     Object.assign(anchor,{bed:anchor.bed||anchor.room||"",refund_amount:entryAnchorMoney(anchor.refund_amount||anchor.amount),refund_reason:anchor.refund_reason||anchor.ded_reason||anchor.ded_note||anchor.reason||anchor.note||"",checkout_ref:anchor.checkout_ref||anchor.checkout_date||"",note:anchor.note||""});
   }else if(type==="CO"){
-    Object.assign(anchor,{bed:anchor.bed||anchor.room||"",checkout_date:anchor.checkout_date||"",deposit_refund:entryAnchorMoney(anchor.deposit_refund||anchor.deposit_amt||anchor.deposit_deduction||0),outstanding_arrears:entryAnchorMoney(anchor.outstanding_arrears||anchor.carry_over_arrears||anchor.deficit||0),final_note:anchor.final_note||anchor.note||anchor.ded_note||""});
+    const left=!!anchor.left_with_arrears||anchor.checkout_mode==="left_with_arrears";
+    Object.assign(anchor,{bed:anchor.bed||anchor.room||"",checkout_date:anchor.checkout_date||"",deposit_refund:entryAnchorMoney(anchor.deposit_refund||anchor.deposit_amt||anchor.deposit_deduction||0),outstanding_arrears:entryAnchorMoney(anchor.outstanding_arrears||anchor.carry_over_arrears||anchor.deficit||0),owner_approval_required:left?false:!!anchor.owner_approval_required,owner_approval_status:left?"not_required":anchor.owner_approval_status||"not_required",checkout_mode:left?"left_with_arrears":anchor.checkout_mode||"normal",left_with_arrears:left,customer_left:left,former_customer_name:anchor.former_customer_name||anchor.card_name||anchor.tenant_name||"",card_name:anchor.card_name||anchor.former_customer_name||anchor.tenant_name||"",whatsapp_phone:anchor.whatsapp_phone||anchor.former_customer_phone||"",former_customer_phone:anchor.former_customer_phone||anchor.whatsapp_phone||"",contact_method:anchor.contact_method||"",contact_note:anchor.contact_note||"",arrears_amount:entryAnchorMoney(anchor.arrears_amount||anchor.outstanding_arrears||0),cloud_arrears_ref:anchor.cloud_arrears_ref||anchor.arrears_ref||"",belongings_held:!!anchor.belongings_held,belongings_note:anchor.belongings_note||"",promised_payment_date:anchor.promised_payment_date||anchor.promise_date||"",promised_return_date:anchor.promised_return_date||anchor.promise_return_date||"",promise_return_date:anchor.promise_return_date||anchor.promised_return_date||"",deposit_balance:entryAnchorMoney(anchor.deposit_balance||anchor.deposit_held||0),left_date:anchor.left_date||anchor.checkout_date||"",checkout_attempt_date:anchor.checkout_attempt_date||anchor.checkout_date||"",left_status:anchor.left_status||"",final_status:anchor.final_status||"",grace_days_after_promise:Number(anchor.grace_days_after_promise||0)||0,review_date:anchor.review_date||"",confirmed_not_returning_date:anchor.confirmed_not_returning_date||"",confirmed_not_returning_by:anchor.confirmed_not_returning_by||"",confirmation_note:anchor.confirmation_note||"",original_session_id:anchor.original_session_id||anchor.session_id||"",original_event_id:anchor.original_event_id||anchor.event_id||anchor.id||"",final_note:anchor.final_note||anchor.note||anchor.ded_note||""});
   }else if(type==="E"){
     Object.assign(anchor,{expense_amount:entryAnchorMoney(anchor.expense_amount||anchor.amount),expense_category:anchor.expense_category||anchor.reason_code||"",target_bed:anchor.target_bed||anchor.room||"",reason:anchor.reason||anchor.expense_desc||anchor.custom_reason||"",note:anchor.note||anchor.expense_desc||""});
   }
@@ -4790,6 +4878,13 @@ function ownerOverviewIsCloudArrearsRow(row){
     || /\b(balance|arrears|short paid|short_paid)\b/.test(text);
 }
 __name(ownerOverviewIsCloudArrearsRow,"ownerOverviewIsCloudArrearsRow");
+function ownerOverviewParseLeftWithArrearsMeta(row){
+  const text=[row?.staff_note,row?.owner_note,row?.arrear_reason,row?.note,row?.raw_display_line].map(v=>String(v||"")).join("\n");
+  const match=text.match(/LEFT_WITH_ARREARS\s+({[\s\S]*?})(?:\n|$)/);
+  if(!match)return {};
+  try{return JSON.parse(match[1])||{};}catch{return {};}
+}
+__name(ownerOverviewParseLeftWithArrearsMeta,"ownerOverviewParseLeftWithArrearsMeta");
 function ownerOverviewArrearsSummary(rows=[],today=empTodayDubai()){
   const summary={
     open_count:0,
@@ -4830,6 +4925,7 @@ function ownerOverviewArrearsSummary(rows=[],today=empTodayDubai()){
     else summary.employee_followup.unassigned_count+=1;
     if(promise)summary.employee_followup.promise_count+=1;
     if(remaining>0&&ownerOverviewIsCloudArrearsRow(row)){
+      const leftMeta=ownerOverviewParseLeftWithArrearsMeta(row);
       const detail={
         bed:cleanText(row?.room_bed||row?.bed_no||row?.bed||row?.room||"",40),
         customer_name:cleanText(row?.tenant_name||row?.customer_name||row?.card_name||row?.customer_code||"",120),
@@ -4842,7 +4938,25 @@ function ownerOverviewArrearsSummary(rows=[],today=empTodayDubai()){
         promise_date:promise,
         original_note:cleanText(row?.arrears_note||row?.staff_note||row?.owner_note||row?.note||row?.raw_display_line||"",300),
         status:received>0?"partial":"open",
-        repayment_history:Array.isArray(row?.linked_repayment_events)?row.linked_repayment_events:[]
+        repayment_history:Array.isArray(row?.linked_repayment_events)?row.linked_repayment_events:[],
+        left_with_arrears:!!(leftMeta.left_with_arrears||leftMeta.customer_left),
+        customer_left:!!leftMeta.customer_left,
+        former_customer_name:cleanText(leftMeta.former_customer_name||leftMeta.card_name||"",120),
+        card_name:cleanText(leftMeta.card_name||leftMeta.former_customer_name||"",120),
+        former_customer_phone:cleanText(leftMeta.former_customer_phone||leftMeta.whatsapp_phone||"",80),
+        whatsapp_phone:cleanText(leftMeta.whatsapp_phone||leftMeta.former_customer_phone||"",80),
+        contact_method:cleanText(leftMeta.contact_method||"",40),
+        contact_note:cleanText(leftMeta.contact_note||"",300),
+        belongings_held:!!leftMeta.belongings_held,
+        belongings_note:cleanText(leftMeta.belongings_note||"",500),
+        promised_payment_date:cleanText(leftMeta.promised_payment_date||"",40),
+        promised_return_date:cleanText(leftMeta.promised_return_date||leftMeta.promise_return_date||"",40),
+        promise_return_date:cleanText(leftMeta.promise_return_date||leftMeta.promised_return_date||"",40),
+        deposit_balance:ownerOverviewMoney(leftMeta.deposit_balance||0),
+        left_status:cleanText(leftMeta.left_status||"",80),
+        final_status:cleanText(leftMeta.final_status||"",80),
+        review_date:cleanText(leftMeta.review_date||"",40),
+        grace_days_after_promise:Number(leftMeta.grace_days_after_promise||0)||0
       };
       summary.cloud_arrears_collection.details.push(detail);
       summary.cloud_arrears_collection.total_remaining+=remaining;

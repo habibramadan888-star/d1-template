@@ -5212,6 +5212,8 @@ function ownerCloudArrearsRowsHtml(rows,query='',sort='amount_desc'){
   if(!visible.length)return `<div class="empty-state hl-empty-state"><div class="empty-title">No Cloud Arrears</div><div class="empty-text">暂无欠款代收明细。</div></div>`;
   return visible.map(row=>{
     const history=Array.isArray(row.repayment_history)&&row.repayment_history.length?row.repayment_history.map(item=>esc(item?.event_id||item?.id||item)).join(', '):'-';
+    const left=row.left_with_arrears||row.customer_left;
+    const leftHtml=left?`<div><b>Left With Arrears</b> / 离店未清欠款</div><div>Phone: ${esc(row.whatsapp_phone||row.former_customer_phone||'-')} · Contact: ${esc(row.contact_method||'-')}</div><div>Belongings Held: ${row.belongings_held?'yes':'no'} · ${esc(row.belongings_note||'-')}</div><div>Promise Payment: ${esc(row.promised_payment_date||'-')} · Promise Return: ${esc(row.promised_return_date||row.promise_return_date||'-')}</div><div>Deposit Balance: ${fmtMoney(row.deposit_balance||0)} · Final Status: ${esc(row.final_status||row.left_status||'-')}</div>`:'';
     return `<div class="detail-row owner-mobile-row" style="align-items:flex-start">
       <div class="room">${esc(row.bed||'-')}</div>
       <div class="note">
@@ -5219,7 +5221,9 @@ function ownerCloudArrearsRowsHtml(rows,query='',sort='amount_desc'){
         <div>Ref: ${esc(row.arrears_ref||'-')} · Status: ${esc(row.status||'-')}</div>
         <div>Original: ${esc(row.original_date||'-')} · Due: ${esc(row.due_date||row.promise_date||'-')}</div>
         <div>Note: ${esc(row.original_note||'-')}</div>
+        ${left?'<div class="status-pill">Left With Arrears / 离店未清欠款</div>':''}
         <div>Repayment: ${history}</div>
+        ${leftHtml}
       </div>
       <div class="amount">${fmtMoney(row.remaining_arrears||0)}<br><span style="font-size:11px;color:var(--color-text-muted)">Paid ${fmtMoney(row.already_paid||0)} / Original ${fmtMoney(row.original_amount||0)}</span></div>
     </div>`;
