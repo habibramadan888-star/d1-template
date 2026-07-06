@@ -4485,6 +4485,31 @@ function ownerOverviewMonthRange(today,offsetMonths=0){
   };
 }
 __name(ownerOverviewMonthRange,"ownerOverviewMonthRange");
+function ownerOverviewBillingPeriodRange(today,offsetPeriods=0){
+  const p=ownerOverviewDateParts(today);
+  if(!p)return {start:today,end:today,label:"billing_period"};
+  let year=p.y;
+  let month=p.mo;
+  if(p.d<3){
+    month-=1;
+    if(month<1){
+      month=12;
+      year-=1;
+    }
+  }
+  const start=new Date(Date.UTC(year,month-1,3));
+  start.setUTCMonth(start.getUTCMonth()+offsetPeriods);
+  const startYear=start.getUTCFullYear();
+  const startMonth=start.getUTCMonth()+1;
+  const nextStart=new Date(Date.UTC(startYear,startMonth,3));
+  nextStart.setUTCDate(nextStart.getUTCDate()-1);
+  return {
+    start:empFormatDate(start),
+    end:empFormatDate(nextStart),
+    label:`${startYear}-${String(startMonth).padStart(2,"0")}-billing`
+  };
+}
+__name(ownerOverviewBillingPeriodRange,"ownerOverviewBillingPeriodRange");
 function ownerOverviewQuarterRange(today,offsetQuarters=0){
   const p=ownerOverviewDateParts(today);
   if(!p)return {start:today,end:today,label:"quarter"};
@@ -4706,6 +4731,24 @@ function ownerOverviewDelta(current,comparison){
   return {current:currentValue,comparison:comparisonValue,absolute_delta,percent_delta,direction,interpretation};
 }
 __name(ownerOverviewDelta,"ownerOverviewDelta");
+function ownerOverviewIsCloudArrearsRow(row){
+  const source=String(row?.source_type||row?.source||"").toLowerCase();
+  const type=String(row?.event_type||row?.original_type||row?.category||"").toLowerCase();
+  const text=String(row?.arrears_note||row?.staff_note||row?.owner_note||row?.note||row?.raw_display_line||"").toLowerCase();
+  const status=String(row?.status||row?.arrears_status||row?.accounting_status||"").toLowerCase();
+  if(["settled","closed","waived","void","voided","cleared"].includes(status))return false;
+  if(source.includes("ttlock")||source.includes("card_expired")||type.includes("ttlock"))return false;
+  return [
+    "existing_arrears_record",
+    "historical_arrears",
+    "system_arrears",
+    "employee_entry_short_paid",
+    "short_paid",
+    "cloud_arrears"
+  ].some(marker=>source.includes(marker)||type.includes(marker)||text.includes(marker.replaceAll("_"," ")))
+    || /\b(balance|arrears|short paid|short_paid)\b/.test(text);
+}
+__name(ownerOverviewIsCloudArrearsRow,"ownerOverviewIsCloudArrearsRow");
 function ownerOverviewArrearsSummary(rows=[],today=empTodayDubai()){
   const summary={
     open_count:0,
@@ -4716,7 +4759,9 @@ function ownerOverviewArrearsSummary(rows=[],today=empTodayDubai()){
     needs_review_count:0,
     partial_payment_count:0,
     source_counts:{existing_arrears_record:0,ttlock_expired_unpaid:0,other:0},
-    employee_followup:{assigned_count:0,followed_up_count:0,promise_count:0,unassigned_count:0}
+    employee_followup:{assigned_count:0,followed_up_count:0,promise_count:0,unassigned_count:0},
+    cloud_arrears_collection:{total_remaining:0,open_count:0,partial_count:0,details:[]},
+    cloud_arrears_details:[]
   };
   for(const row of rows){
     const amount=ownerOverviewMoney(row?.arrear_amount??row?.remain??(Number(row?.amount_fils||0)/100));
@@ -4743,9 +4788,31 @@ function ownerOverviewArrearsSummary(rows=[],today=empTodayDubai()){
     else if(["followed_up","promised"].includes(directive))summary.employee_followup.followed_up_count+=1;
     else summary.employee_followup.unassigned_count+=1;
     if(promise)summary.employee_followup.promise_count+=1;
+    if(remaining>0&&ownerOverviewIsCloudArrearsRow(row)){
+      const detail={
+        bed:cleanText(row?.room_bed||row?.bed_no||row?.bed||row?.room||"",40),
+        customer_name:cleanText(row?.tenant_name||row?.customer_name||row?.card_name||row?.customer_code||"",120),
+        arrears_ref:cleanText(row?.arrears_ref||row?.task_id||row?.id||row?.source_ref||"",160),
+        original_date:cleanText(row?.original_date||row?.source_date||row?.date||row?.created_at||"",40).slice(0,10),
+        original_amount:amount,
+        already_paid:received,
+        remaining_arrears:remaining,
+        due_date:due,
+        promise_date:promise,
+        original_note:cleanText(row?.arrears_note||row?.staff_note||row?.owner_note||row?.note||row?.raw_display_line||"",300),
+        status:received>0?"partial":"open",
+        repayment_history:Array.isArray(row?.linked_repayment_events)?row.linked_repayment_events:[]
+      };
+      summary.cloud_arrears_collection.details.push(detail);
+      summary.cloud_arrears_collection.total_remaining+=remaining;
+      if(detail.status==="partial")summary.cloud_arrears_collection.partial_count+=1;
+      else summary.cloud_arrears_collection.open_count+=1;
+    }
   }
   summary.outstanding_amount=ownerOverviewMoney(summary.outstanding_amount);
   summary.overdue_amount=ownerOverviewMoney(summary.overdue_amount);
+  summary.cloud_arrears_collection.total_remaining=ownerOverviewMoney(summary.cloud_arrears_collection.total_remaining);
+  summary.cloud_arrears_details=summary.cloud_arrears_collection.details;
   return summary;
 }
 __name(ownerOverviewArrearsSummary,"ownerOverviewArrearsSummary");
@@ -4761,6 +4828,7 @@ __name(ownerOverviewFetchBedTransferReviews,"ownerOverviewFetchBedTransferReview
 async function phase0OwnerOverviewComparativeSummary(env,user,url){
   const today=empTodayDubai();
   const currentMonth=ownerOverviewMonthRange(today,0);
+  const currentBillingPeriod=ownerOverviewBillingPeriodRange(today,0);
   const lastMonth=ownerOverviewMonthRange(today,-1);
   const sameMonthLastYear=ownerOverviewSameMonthLastYearRange(today);
   const currentQuarter=ownerOverviewQuarterRange(today,0);
@@ -4769,6 +4837,7 @@ async function phase0OwnerOverviewComparativeSummary(env,user,url){
   const safeRows=(promise)=>promise.catch(()=>[]);
   const [
     monthRows,
+    billingPeriodRows,
     lastMonthRows,
     sameMonthLastYearRows,
     quarterRows,
@@ -4778,6 +4847,7 @@ async function phase0OwnerOverviewComparativeSummary(env,user,url){
     bedTransferReviews
   ]=await Promise.all([
     safeRows(ownerOverviewFetchTransactions(env,user,currentMonth)),
+    safeRows(ownerOverviewFetchTransactions(env,user,currentBillingPeriod)),
     safeRows(ownerOverviewFetchTransactions(env,user,lastMonth)),
     safeRows(ownerOverviewFetchTransactions(env,user,sameMonthLastYear)),
     safeRows(ownerOverviewFetchTransactions(env,user,currentQuarter)),
@@ -4787,6 +4857,7 @@ async function phase0OwnerOverviewComparativeSummary(env,user,url){
     safeRows(ownerOverviewFetchBedTransferReviews(env,user))
   ]);
   const month=ownerOverviewSummarizeTransactions(monthRows);
+  const billingPeriod=ownerOverviewSummarizeTransactions(billingPeriodRows);
   const prevMonth=ownerOverviewSummarizeTransactions(lastMonthRows);
   const sameLastYear=ownerOverviewSummarizeTransactions(sameMonthLastYearRows);
   const quarter=ownerOverviewSummarizeTransactions(quarterRows);
@@ -4804,6 +4875,7 @@ async function phase0OwnerOverviewComparativeSummary(env,user,url){
   }
   const noData=[];
   if(!monthRows.length)noData.push("current_month_transactions");
+  if(!billingPeriodRows.length)noData.push("current_billing_period_transactions");
   if(!lastMonthRows.length)noData.push("last_month_transactions");
   if(!sameMonthLastYearRows.length)noData.push("same_month_last_year_transactions");
   if(!arrearRows.length)noData.push("open_arrears");
@@ -4811,8 +4883,9 @@ async function phase0OwnerOverviewComparativeSummary(env,user,url){
     generated_at:empNow(),
     production_cutover:"PRODUCTION_NO_GO",
     readonly:true,
-    period:{today,current_month:currentMonth,last_month:lastMonth,same_month_last_year:sameMonthLastYear,current_quarter:currentQuarter,last_quarter:lastQuarter,same_quarter_last_year:sameQuarterLastYear},
-    current:{month,quarter},
+    period:{today,current_billing_period:currentBillingPeriod,current_month:currentMonth,last_month:lastMonth,same_month_last_year:sameMonthLastYear,current_quarter:currentQuarter,last_quarter:lastQuarter,same_quarter_last_year:sameQuarterLastYear},
+    current:{month,quarter,billing_period:billingPeriod},
+    current_period_received:{...billingPeriod,range:currentBillingPeriod,rule:"billing_period_3_to_2"},
     last_month:prevMonth,
     same_month_last_year:sameLastYear,
     quarter_to_date:quarter,
@@ -4880,7 +4953,7 @@ async function phase0OwnerOverviewComparativeSummary(env,user,url){
       needs_review_count:arrears.needs_review_count
     },
     data_quality:{
-      rows_checked:{current_month:month.rows_checked,last_month:prevMonth.rows_checked,same_month_last_year:sameLastYear.rows_checked,current_quarter:quarter.rows_checked,arrears:arrearRows.length},
+      rows_checked:{current_month:month.rows_checked,current_billing_period:billingPeriod.rows_checked,last_month:prevMonth.rows_checked,same_month_last_year:sameLastYear.rows_checked,current_quarter:quarter.rows_checked,arrears:arrearRows.length},
       no_data:noData,
       warnings:noData.length?["Some comparison windows have no source rows; show no-data instead of fabricating trend."]:[]
     }

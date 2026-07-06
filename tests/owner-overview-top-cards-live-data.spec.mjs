@@ -15,15 +15,16 @@ function extractLastFunction(source, name) {
   throw new Error(`Could not extract ${name}`);
 }
 
-test("owner overview top cards use authenticated cloud summary data instead of static zero placeholders", async () => {
+test("owner overview top cards use authenticated cloud summary data instead of static placeholders", async () => {
   const ui = await readFile("deploy-worker/public/index-51-main.js", "utf8");
   const render = extractLastFunction(ui, "renderOwnerOverview");
 
-  assert.match(render, /ownerOverviewCurrentMonth\(\)/);
+  assert.match(render, /ownerOverviewCurrentPeriodReceived\(\)/);
+  assert.match(render, /ownerOverviewCurrentPeriodRangeLabel\(\)/);
   assert.match(render, /ownerOverviewArrearsCloud\(\)/);
+  assert.match(render, /ownerOverviewCloudArrearsCollection\(\)/);
   assert.match(render, /ownerOverviewRiskCloud\(\)/);
-  assert.match(render, /ownerOverviewFlowCloud\(\)/);
-  assert.match(render, /state\.overviewComparativeStatus==='success'\?'来自云端 entry_events':'读取云端中'/);
-  assert.doesNotMatch(render, /本月实收[^`]+0/);
+  assert.doesNotMatch(render, /ownerOverviewFlowCloud\(\)/);
+  assert.match(render, /state\.overviewComparativeStatus==='success'\?currentPeriodRange:'读取云端中'/);
+  assert.doesNotMatch(render, /CURRENT PERIOD RECEIVED[^`]+0/);
 });
-

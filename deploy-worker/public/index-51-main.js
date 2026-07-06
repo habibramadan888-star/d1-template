@@ -5170,8 +5170,104 @@ function ownerOverviewCloudData(){
 function ownerOverviewCurrentMonth(){
   return ownerOverviewCloudData().current?.month||ownerOverviewCloudData().quarter_to_date||{};
 }
+function ownerOverviewCurrentPeriodReceived(){
+  const data=ownerOverviewCloudData();
+  return data.current_period_received||data.current?.billing_period||data.current?.month||{};
+}
+function ownerOverviewCurrentPeriodRangeLabel(){
+  const data=ownerOverviewCloudData();
+  const range=ownerOverviewCurrentPeriodReceived().range||data.period?.current_billing_period||{};
+  if(range.start&&range.end)return `${range.start} → ${range.end}`;
+  return 'Billing period 3rd → 2nd';
+}
 function ownerOverviewArrearsCloud(){
   return ownerOverviewCloudData().arrears||{};
+}
+function ownerOverviewCloudArrearsCollection(){
+  const arrears=ownerOverviewArrearsCloud();
+  const collection=arrears.cloud_arrears_collection||{};
+  return {
+    total_remaining:Number(collection.total_remaining??arrears.cloud_arrears_total_remaining??0),
+    open_count:Number(collection.open_count??arrears.cloud_arrears_open_count??0),
+    partial_count:Number(collection.partial_count??arrears.cloud_arrears_partial_count??0),
+    details:Array.isArray(collection.details)?collection.details:(Array.isArray(arrears.cloud_arrears_details)?arrears.cloud_arrears_details:[])
+  };
+}
+function closeOwnerCloudArrearsModal(){
+  const modal=document.getElementById('ownerCloudArrearsModal');
+  if(modal)modal.remove();
+  if(window._ownerCloudArrearsEsc){
+    document.removeEventListener('keydown',window._ownerCloudArrearsEsc);
+    window._ownerCloudArrearsEsc=null;
+  }
+}
+function ownerCloudArrearsRowsHtml(rows,query='',sort='amount_desc'){
+  const q=String(query||'').trim().toLowerCase();
+  let visible=rows.filter(row=>!q||String(row.bed||'').toLowerCase().includes(q)||String(row.arrears_ref||'').toLowerCase().includes(q));
+  visible=visible.sort((a,b)=>{
+    if(sort==='amount_asc')return Number(a.remaining_arrears||0)-Number(b.remaining_arrears||0);
+    if(sort==='bed')return String(a.bed||'').localeCompare(String(b.bed||''),undefined,{numeric:true});
+    return Number(b.remaining_arrears||0)-Number(a.remaining_arrears||0);
+  });
+  if(!visible.length)return `<div class="empty-state hl-empty-state"><div class="empty-title">No Cloud Arrears</div><div class="empty-text">暂无欠款代收明细。</div></div>`;
+  return visible.map(row=>{
+    const history=Array.isArray(row.repayment_history)&&row.repayment_history.length?row.repayment_history.map(item=>esc(item?.event_id||item?.id||item)).join(', '):'-';
+    return `<div class="detail-row owner-mobile-row" style="align-items:flex-start">
+      <div class="room">${esc(row.bed||'-')}</div>
+      <div class="note">
+        <b>${esc(row.customer_name||row.arrears_ref||'-')}</b>
+        <div>Ref: ${esc(row.arrears_ref||'-')} · Status: ${esc(row.status||'-')}</div>
+        <div>Original: ${esc(row.original_date||'-')} · Due: ${esc(row.due_date||row.promise_date||'-')}</div>
+        <div>Note: ${esc(row.original_note||'-')}</div>
+        <div>Repayment: ${history}</div>
+      </div>
+      <div class="amount">${fmtMoney(row.remaining_arrears||0)}<br><span style="font-size:11px;color:var(--color-text-muted)">Paid ${fmtMoney(row.already_paid||0)} / Original ${fmtMoney(row.original_amount||0)}</span></div>
+    </div>`;
+  }).join('');
+}
+function showOwnerCloudArrearsModal(){
+  closeOwnerCloudArrearsModal();
+  const collection=ownerOverviewCloudArrearsCollection();
+  const rows=collection.details||[];
+  const overlay=document.createElement('div');
+  overlay.id='ownerCloudArrearsModal';
+  overlay.className='modal-bg';
+  overlay.style.cssText='position:fixed;inset:0;z-index:500;background:rgba(12,22,18,.34);backdrop-filter:blur(12px);display:flex;align-items:center;justify-content:center;padding:18px;';
+  overlay.innerHTML=`<div class="modal" style="max-width:860px;width:min(860px,96vw);max-height:88vh;overflow:hidden;background:rgba(255,255,255,.86);backdrop-filter:blur(18px);border:1px solid rgba(255,255,255,.55);box-shadow:0 24px 80px rgba(20,32,51,.24);">
+    <div class="modal-head">
+      <div><b>Cloud Arrears Details</b><small>欠款代收明细</small></div>
+      <button class="btn ghost" type="button" data-close-owner-cloud-arrears>Close / 关闭</button>
+    </div>
+    <div class="modal-body" style="overflow:auto;max-height:74vh">
+      <div class="ana-kpi-grid">
+        <div class="hist-card"><div class="hist-title">Total Remaining</div><div class="hist-stat"><span>欠款余额</span><b>${fmtMoney(collection.total_remaining||0)}</b></div></div>
+        <div class="hist-card"><div class="hist-title">Open Count</div><div class="hist-stat"><span>未结清</span><b>${Number(collection.open_count||0)}</b></div></div>
+        <div class="hist-card"><div class="hist-title">Partial Count</div><div class="hist-stat"><span>部分已还</span><b>${Number(collection.partial_count||0)}</b></div></div>
+      </div>
+      <div class="hist-toolbar" style="margin:12px 0">
+        <input id="ownerCloudArrearsSearch" class="input" placeholder="Search bed / 搜索床位" style="max-width:220px">
+        <select id="ownerCloudArrearsSort" class="input" style="max-width:180px">
+          <option value="amount_desc">Amount high first</option>
+          <option value="amount_asc">Amount low first</option>
+          <option value="bed">Bed number</option>
+        </select>
+      </div>
+      <div id="ownerCloudArrearsRows" class="detail-list">${ownerCloudArrearsRowsHtml(rows)}</div>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  const renderRows=()=>{
+    const q=document.getElementById('ownerCloudArrearsSearch')?.value||'';
+    const sort=document.getElementById('ownerCloudArrearsSort')?.value||'amount_desc';
+    const target=document.getElementById('ownerCloudArrearsRows');
+    if(target)target.innerHTML=ownerCloudArrearsRowsHtml(rows,q,sort);
+  };
+  overlay.querySelector('[data-close-owner-cloud-arrears]')?.addEventListener('click',closeOwnerCloudArrearsModal);
+  overlay.addEventListener('click',event=>{if(event.target===overlay)closeOwnerCloudArrearsModal();});
+  overlay.querySelector('#ownerCloudArrearsSearch')?.addEventListener('input',renderRows);
+  overlay.querySelector('#ownerCloudArrearsSort')?.addEventListener('change',renderRows);
+  window._ownerCloudArrearsEsc=event=>{if(event.key==='Escape')closeOwnerCloudArrearsModal();};
+  document.addEventListener('keydown',window._ownerCloudArrearsEsc);
 }
 function ownerOverviewRiskCloud(){
   return ownerOverviewCloudData().risk_watch||{};
@@ -5244,7 +5340,7 @@ function renderOwnerOverviewComparativePanel(){
       <span class="hist-order">本月 vs 上月 / 去年同月 / 本季度累计</span>
     </div>
     <div class="ana-kpi-grid" data-owner-overview-business-snapshot="true">
-      ${ownerOverviewMetricCard('本月实收',comp.last_month?.gross_received)}
+      ${ownerOverviewMetricCard('当前账期实收',comp.last_month?.gross_received)}
       ${ownerOverviewMetricCard('租金收入',comp.last_month?.rent_received)}
       ${ownerOverviewMetricCard('净现金流',comp.last_month?.net_cashflow)}
       ${ownerOverviewMetricCard('欠款回收',comp.last_month?.arrears_recovered)}
@@ -5258,12 +5354,11 @@ function renderOwnerOverviewComparativePanel(){
         <div class="hist-stat"><span>押金退款</span><b>${fmtMoney(accounting.deposit_refund||0)}</b></div>
         <div class="hist-stat"><span>支出</span><b>${fmtMoney(accounting.expenses||0)}</b></div>
       </div>
-      <div class="hist-card" data-owner-overview-occupancy-flow="true"><div class="hist-title">入住净变化</div>
-        <div class="hist-stat"><span>新入住</span><b>${Number(flow.new_tenants||0)}</b></div>
-        <div class="hist-stat"><span>退房</span><b>${Number(flow.checkouts||0)}</b></div>
-        <div class="hist-stat"><span>净变化</span><b>${Number(flow.new_tenants||0)-Number(flow.checkouts||0)}</b></div>
-        <div class="hist-stat"><span>换床</span><b>${Number(flow.bed_transfers||0)}</b></div>
-        <div class="hist-anchor">换床不计入新入住/退房。</div>
+      <div class="hist-card" data-owner-overview-cloud-arrears-detail="true"><div class="hist-title">Cloud Arrears Collection / 欠款代收</div>
+        <div class="hist-stat"><span>Total remaining</span><b>${fmtMoney(arrears.cloud_arrears_collection?.total_remaining||0)}</b></div>
+        <div class="hist-stat"><span>Open</span><b>${Number(arrears.cloud_arrears_collection?.open_count||0)}</b></div>
+        <div class="hist-stat"><span>Partial</span><b>${Number(arrears.cloud_arrears_collection?.partial_count||0)}</b></div>
+        <div class="hist-anchor">Only historical open/partial cloud arrears are included. Future rent is excluded.</div>
       </div>
       <div class="hist-card" data-owner-bed-transfer-records="true"><div class="hist-title">换床记录</div>
         <div class="hist-stat"><span>已记录事件</span><b>${Number(bedReview.recorded_count||bedReview.pending_review_count||transferRecords.length||0)}</b></div>
@@ -5332,22 +5427,24 @@ function renderOwnerOverview(){
   const latest=sessions.slice().sort((a,b)=>(b.date||'').localeCompare(a.date||'')).slice(0,3);
   const recentEntries=entries.slice().reverse().slice(0,4);
   const month=ownerOverviewCurrentMonth();
+  const currentPeriod=ownerOverviewCurrentPeriodReceived();
+  const currentPeriodRange=ownerOverviewCurrentPeriodRangeLabel();
   const cloudArrears=ownerOverviewArrearsCloud();
+  const cloudArrearsCollection=ownerOverviewCloudArrearsCollection();
   const cloudRisk=ownerOverviewRiskCloud();
   const consoleSot=ownerOverviewConsoleSotCloud();
   const consoleSummary=consoleSot.summary||{};
   const hasConsoleSot=!!consoleSot.summary;
-  const flow=ownerOverviewFlowCloud();
   const outstandingAmount=hasConsoleSot?Number(consoleSummary.outstanding_amount_fils||consoleSummary.total_amount_fils||0)/100:(Number.isFinite(Number(cloudArrears.outstanding_amount))?Number(cloudArrears.outstanding_amount):openArrears.reduce((sum,a)=>sum+(Number(a.remain)||0),0));
   const outstandingCount=hasConsoleSot?Number(consoleSummary.action_count??consoleSummary.total_count??0):(Number.isFinite(Number(cloudArrears.open_count))?Number(cloudArrears.open_count):openArrears.length);
   const todayTodo=hasConsoleSot?Number(consoleSummary.action_count??0):(Number(cloudRisk.overdue_count||0)+Number(cloudRisk.broken_promise_count||0)+Number(cloudRisk.needs_review_count||0)||openArrears.length+overdue.length);
   const consoleRiskNote=`欠款中 ${Number(consoleSummary.overdue_count||0)} / 今天 ${Number(consoleSummary.due_today_count||0)} / 3天内 ${Number(consoleSummary.due_soon_count||0)}`;
-  const monthReceived=Number(month.gross_received||0);
-  const netChange=Number(flow.new_tenants||0)-Number(flow.checkouts||0);
-  const kpi=(label,en,value,color='var(--color-primary)',note='')=>{
+  const periodReceived=Number(currentPeriod.gross_received||0);
+  const cloudArrearsRemaining=Number(cloudArrearsCollection.total_remaining||0);
+  const kpi=(label,en,value,color='var(--color-primary)',note='',attrs='')=>{
     if(en==='TODAY ACTIONS'&&hasConsoleSot)note=consoleRiskNote;
     return `
-    <div class="owner-overview-card hl-card">
+    <div class="owner-overview-card hl-card" ${attrs}>
       <strong>${esc(label)}</strong>
       <span>${esc(en)}</span>
       <b style="color:${color}">${esc(value)}</b>
@@ -5376,8 +5473,8 @@ function renderOwnerOverview(){
     <div class="owner-overview-grid">
       ${kpi('待收尾款','OUTSTANDING COLLECTION',fmtMoney(outstandingAmount),'var(--color-warning)',`${outstandingCount} 项未结清`)}
       ${kpi('今日待办','TODAY ACTIONS',String(todayTodo),'#142033','逾期、承诺逾期、待核对')}
-      ${kpi('本月实收','MONTH RECEIVED',fmtMoney(monthReceived),'var(--color-primary)',state.overviewComparativeStatus==='success'?'来自云端 entry_events':'读取云端中')}
-      ${kpi('入住净变化','OCCUPANCY NET',String(netChange),'#1a73e8',`新入住 ${Number(flow.new_tenants||0)} / 退房 ${Number(flow.checkouts||0)}，换床不计入`)}
+      ${kpi('当前账期实收','CURRENT PERIOD RECEIVED',fmtMoney(periodReceived),'var(--color-primary)',state.overviewComparativeStatus==='success'?currentPeriodRange:'读取云端中')}
+      ${kpi('欠款代收','CLOUD ARREARS COLLECTION',fmtMoney(cloudArrearsRemaining),'#1a73e8',`Open ${Number(cloudArrearsCollection.open_count||0)} / Partial ${Number(cloudArrearsCollection.partial_count||0)}`,'role="button" tabindex="0" data-owner-cloud-arrears-card="true"')}
     </div>
     <div class="card hl-card owner-overview-section" style="margin-top:16px">
       <div class="card-head"><div><div class="card-title">经营对比</div><div class="card-sub">COMPARATIVE BUSINESS INTELLIGENCE</div></div></div>
@@ -5399,6 +5496,16 @@ function renderOwnerOverview(){
       <div class="card-head"><div><div class="card-title">最近流水摘要</div><div class="card-sub">RECENT LEDGER</div></div></div>
       <div class="card-body"><div class="detail-list">${recentEntryHtml}</div></div>
     </div>`;
+  const cloudArrearsCard=wrap.querySelector('[data-owner-cloud-arrears-card]');
+  if(cloudArrearsCard){
+    cloudArrearsCard.addEventListener('click',showOwnerCloudArrearsModal);
+    cloudArrearsCard.addEventListener('keydown',event=>{
+      if(event.key==='Enter'||event.key===' '){
+        event.preventDefault();
+        showOwnerCloudArrearsModal();
+      }
+    });
+  }
   ensureOwnerOverviewComparativeAsync();
   ensureOwnerOverviewArrearsAsync();
 }

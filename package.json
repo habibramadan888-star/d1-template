@@ -167,6 +167,8 @@
     "test:owner-overview-today-action-card": "node --test tests/owner-overview-today-action-card.spec.mjs",
     "test:owner-overview-month-received-card": "node --test tests/owner-overview-month-received-card.spec.mjs",
     "test:owner-overview-occupancy-net-change-card": "node --test tests/owner-overview-occupancy-net-change-card.spec.mjs",
+    "test:owner-overview-current-period-received": "node --test tests/owner-overview-current-period-received.spec.mjs",
+    "test:owner-overview-cloud-arrears-modal": "node --test tests/owner-overview-cloud-arrears-modal.spec.mjs",
     "test:owner-overview-comparative-ui-cn": "node --test tests/owner-overview-comparative-ui-cn.spec.mjs",
     "test:owner-overview-comparative-auto-load": "node --test tests/owner-overview-comparative-auto-load.spec.mjs",
     "test:owner-overview-cloud-ledger-preload": "node --test tests/owner-overview-cloud-ledger-preload.spec.mjs",

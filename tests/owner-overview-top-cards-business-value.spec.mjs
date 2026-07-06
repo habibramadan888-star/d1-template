@@ -15,18 +15,20 @@ function extractLastFunction(source, name) {
   throw new Error(`Could not extract ${name}`);
 }
 
-test("owner overview active renderer uses four internal QA business cards", async () => {
+test("owner overview active renderer uses current period and cloud arrears cards", async () => {
   const ui = await readFile("deploy-worker/public/index-51-main.js", "utf8");
   const render = extractLastFunction(ui, "renderOwnerOverview");
 
-  for (const label of ["待收尾款", "今日待办", "本月实收", "入住净变化"]) {
+  for (const label of ["OUTSTANDING COLLECTION", "TODAY ACTIONS", "CURRENT PERIOD RECEIVED", "CLOUD ARREARS COLLECTION"]) {
     assert.match(render, new RegExp(label));
   }
-  assert.doesNotMatch(render, /今日实收/);
-  assert.doesNotMatch(render, /最近交接/);
-  assert.match(render, /ownerOverviewCurrentMonth\(\)/);
+  assert.doesNotMatch(render, /TODAY RECEIVED/);
+  assert.doesNotMatch(render, /LATEST HANDOVER/);
+  assert.doesNotMatch(render, /MONTH RECEIVED/);
+  assert.doesNotMatch(render, /OCCUPANCY NET/);
+  assert.match(render, /ownerOverviewCurrentPeriodReceived\(\)/);
+  assert.match(render, /ownerOverviewCurrentPeriodRangeLabel\(\)/);
   assert.match(render, /ownerOverviewArrearsCloud\(\)/);
+  assert.match(render, /ownerOverviewCloudArrearsCollection\(\)/);
   assert.match(render, /ownerOverviewRiskCloud\(\)/);
-  assert.match(render, /ownerOverviewFlowCloud\(\)/);
 });
-
