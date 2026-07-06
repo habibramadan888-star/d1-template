@@ -29,12 +29,13 @@ test("Current Session WhatsApp baseline uses final Statement format", async () =
   ]);
 
   assert.match(text, /^Statement\nDate 0602 Time \d{4}\nEmployee Abdul/m);
-  assert.match(text, /💼 ▬▬▬▬▬▬▬▬▬▬▬ 💼\nCore Summary/);
-  assert.match(text, /📊 ▬▬▬▬▬▬▬▬▬▬▬ 📊\nBreakdown/);
-  assert.match(text, /💵 ▬▬▬▬▬▬▬▬▬▬▬ 💵\nCash Details/);
+  assert.match(text, /💼 ▬+ 💼\nCore Summary/);
+  assert.match(text, /📊 ▬+ 📊\nBreakdown/);
+  assert.match(text, /💵 ▬+ 💵\nCash Details/);
   assert.match(text, /\[144\] paid 770 cash 2243/);
-  assert.match(text, /🔄 ▬▬▬▬▬▬▬▬▬▬▬ 🔄\nTransfer Details/);
+  assert.match(text, /🔄 ▬+ 🔄\nTransfer Details/);
   assert.match(text, /\[144\]\n\[145\]\ntransfer 50 cash 2251 customer_request/);
+  assert.doesNotMatch(text, /\uFFFD|�/);
   assert.doesNotMatch(text, /#144/);
   assert.doesNotMatch(text, /#144->#145/);
   assert.doesNotMatch(text, /\[144-145\]/);
@@ -82,10 +83,7 @@ test("Rent short paid WhatsApp export preserves arrears anchor", async () => {
     }
   ]);
 
-  assert.match(
-    text,
-    /\[144\] paid 700 cash 2243 short 70 due 0610 customer pays later/
-  );
+  assert.match(text, /\[144\] paid 700 cash 2243 short 70 due 0610 customer pays later/);
   assert.doesNotMatch(text, /expected/);
   assert.doesNotMatch(text, /short_paid/);
   assert.doesNotMatch(text, /2026-06-10/);

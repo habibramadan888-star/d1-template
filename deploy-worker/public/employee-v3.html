@@ -5463,6 +5463,7 @@ async function exportEntrySessionWhatsApp(){
     return '';
   }
   const text=buildEntrySessionWhatsAppText();
+  if(!entryWhatsappAssertTextSafe(text,'WhatsApp export'))return '';
   const url='https://wa.me/?text='+encodeURIComponent(text);
   let copied=false;
   try{
@@ -5599,6 +5600,65 @@ function buildEntrySessionWhatsAppText(){
     sections.join('\n\n\n')
   ].join('\n').trim();
 }
+function entryWhatsappHasReplacementChar(text){
+  return /\uFFFD/.test(String(text||''));
+}
+function entryWhatsappAssertTextSafe(text,context='WhatsApp export'){
+  if(!entryWhatsappHasReplacementChar(text))return true;
+  const message=`${context} text encoding is damaged. Please refresh and retry. / WhatsApp 文本编码异常，请刷新后重试。`;
+  showStatus(message,'bad');
+  toast(message,8000);
+  return false;
+}
+function entryStatementSection(lines,emoji,title){
+  if(!lines.length)return '';
+  return [`${emoji} ${'\u25AC'.repeat(13)} ${emoji}`,title,...lines].join('\n');
+}
+function buildEntrySessionWhatsAppText(){
+  const rows=state.drafts.map(e=>typeof normalizeEntryAnchor==='function'?normalizeEntryAnchor(e):e);
+  const stats=sessionStats();
+  const rentCash=rows.filter(e=>entryStatementType(e)==='rent'&&entryStatementPay(e)==='cash');
+  const rentBank=rows.filter(e=>entryStatementType(e)==='rent'&&entryStatementPay(e)==='bank');
+  const arrears=rows.filter(e=>entryStatementType(e)==='arrears_payment');
+  const deposits=rows.filter(e=>entryStatementType(e)==='deposit_in');
+  const transfers=rows.filter(e=>entryStatementType(e)==='bed_transfer');
+  const expenses=rows.filter(e=>['expense','deposit_out','checkout'].includes(entryStatementType(e)));
+  const sum=(list,selector)=>list.reduce((total,row)=>total+num(selector?selector(row):row.amount),0);
+  const cashReceived=sum(rentCash,row=>row.paid_amount||row.paid||row.amount);
+  const arrearsTotal=sum(arrears,row=>row.payment_amount||row.amount);
+  const depositTotal=sum(deposits,row=>row.deposit_amount||row.amount);
+  const transferTotal=sum(transfers,row=>row.fee_status==='waived'||row.fee_mode==='waived'||row.fee_paid==='N'?0:(row.fee_amount||row.amount));
+  const expenseTotal=sum(expenses,row=>row.expense_amount||row.refund_amount||row.amount);
+  const sections=[
+    entryStatementSection([
+      `Cash Handover ${entryStatementAmount(stats.cashBalance)}`,
+      `Bank ${entryStatementAmount(stats.bankIn)}`,
+      `Gross Received ${entryStatementAmount(stats.grossReceived)}`
+    ],'\u{1F4BC}','Core Summary'),
+    entryStatementSection([
+      `Cash Received ${entryStatementAmount(cashReceived)}`,
+      `Arrears ${entryStatementAmount(arrearsTotal)}`,
+      `Deposit ${entryStatementAmount(depositTotal)}`,
+      `Transfer ${entryStatementAmount(transferTotal)}`,
+      `Expense ${entryStatementAmount(expenseTotal)}`
+    ],'\u{1F4CA}','Breakdown'),
+    entryStatementSection(rentCash.map(entryStatementLine),'\u{1F4B5}','Cash Details'),
+    entryStatementSection(rentBank.map(entryStatementLine),'\u{1F3E6}','Bank Details'),
+    entryStatementSection(arrears.map(entryStatementLine),'\u{1F9FE}','Arrears Details'),
+    entryStatementSection(deposits.map(entryStatementLine),'\u{1F3F7}\uFE0F','Deposit Details'),
+    entryStatementSection(transfers.map(entryStatementLine),'\u{1F504}','Transfer Details'),
+    entryStatementSection(expenses.map(entryStatementLine),'\u{1F4E4}','Expense Details')
+  ].filter(Boolean);
+  const text=[
+    'Statement',
+    `Date ${entryStatementDate(today())} Time ${entryStatementTime()}`,
+    `Employee ${entryWhatsappSafe(operatorName()||operatorId())}`,
+    '',
+    '',
+    sections.join('\n\n\n')
+  ].join('\n').trim();
+  return text;
+}
 function previewField(label,value){
   return `<div class="preview-field"><span>${esc(label)}</span><b>${esc(value||'-')}</b></div>`;
 }
@@ -5729,6 +5789,7 @@ async function commitSessionAndExport(){
   }
 }
 async function copyEntryWhatsappText(text,button,textarea){
+  if(!entryWhatsappAssertTextSafe(text,'WhatsApp copy'))return false;
   let copied=false;
   try{
     if(navigator.clipboard?.writeText){
@@ -5750,18 +5811,20 @@ async function copyEntryWhatsappText(text,button,textarea){
   return copied;
 }
 function showEntryWhatsappFallback(text,url){
+  if(!entryWhatsappAssertTextSafe(text,'WhatsApp fallback'))return;
   const body=$('previewModalBody');
   if(!body)return;
   body.innerHTML=`<div class="preview-detail-card entry-session-whatsapp-fallback">
     <div class="preview-detail-top"><b>WhatsApp Export</b><button class="btn" id="btnEntryWhatsappOpen" type="button">${renderEmployeeButtonLabel('Open WhatsApp','打开 WhatsApp')}</button></div>
     <div class="small">If WhatsApp does not open, copy the confirmed session text below. / 如果 WhatsApp 无法打开，请复制下方已确认本票文本。</div>
     <div class="row"><button class="btn primary" id="btnEntryWhatsappCopy" type="button">${renderEmployeeButtonLabel('Copy WhatsApp Text','复制 WhatsApp 文本')}</button></div>
-    <textarea id="entryWhatsappFallbackText" style="width:100%;min-height:220px;border:1px solid #d8e1dd;border-radius:16px;padding:12px;font-family:ui-monospace,Consolas,monospace;white-space:pre-wrap">${esc(text)}</textarea>
+    <textarea id="entryWhatsappFallbackText" style="width:100%;min-height:220px;border:1px solid #d8e1dd;border-radius:16px;padding:12px;font-family:ui-monospace,Consolas,monospace;white-space:pre-wrap"></textarea>
   </div>`;
   const openBtn=$('btnEntryWhatsappOpen');
   if(openBtn)openBtn.onclick=()=>window.open(url,'_blank','noopener,noreferrer');
   const copyBtn=$('btnEntryWhatsappCopy');
   const textarea=$('entryWhatsappFallbackText');
+  if(textarea)textarea.value=text;
   if(copyBtn)copyBtn.onclick=()=>copyEntryWhatsappText(text,copyBtn,textarea);
   if(!navigator.clipboard?.writeText&&textarea){textarea.focus();textarea.select();}
   $('previewModal').classList.add('show');

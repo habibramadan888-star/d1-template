@@ -345,6 +345,7 @@
     "test:employee-entry-session-whatsapp-export": "node --test tests/employee-entry-session-whatsapp-export.spec.mjs",
     "test:employee-entry-whatsapp-export-hash-searchable": "node --test tests/employee-entry-whatsapp-export-hash-searchable.spec.mjs",
     "test:employee-entry-whatsapp-export-golden-baseline": "node --test tests/employee-entry-whatsapp-export-golden-baseline.spec.mjs",
+    "test:employee-entry-whatsapp-emoji-encoding": "node --test tests/employee-entry-whatsapp-emoji-encoding.spec.mjs",
     "test:employee-entry-whatsapp-export-baseline": "node --test tests/employee-entry-whatsapp-export-baseline.spec.mjs",
     "test:employee-entry-whatsapp-export-no-debug": "node --test tests/employee-entry-whatsapp-export-no-debug.spec.mjs",
     "test:employee-entry-whatsapp-export-searchable": "node --test tests/employee-entry-whatsapp-export-searchable.spec.mjs",
