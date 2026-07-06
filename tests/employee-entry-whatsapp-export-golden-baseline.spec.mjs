@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { buildWhatsappTextWithDrafts } from "./helpers/employee-entry-whatsapp-helper.mjs";
 
-test("Current Session WhatsApp export uses compact golden searchable baseline", async () => {
+test("Current Session WhatsApp export uses final Statement baseline", async () => {
   const text = await buildWhatsappTextWithDrafts([
     {
       type: "R",
@@ -26,8 +26,14 @@ test("Current Session WhatsApp export uses compact golden searchable baseline", 
     }
   ]);
 
-  assert.match(text, /^Entry 06\/02 \| Abdul \| 2 records/m);
-  assert.match(text, /1\. #144 rent 770\.00 cash expected 770\.00 0605-0705/);
-  assert.match(text, /2\. #144->#145 bed_transfer 50\.00 cash customer_request/);
+  assert.match(text, /^Statement/m);
+  assert.match(text, /Date 0602 Time \d{4}/);
+  assert.match(text, /Employee Abdul/);
+  assert.match(text, /Core Summary/);
+  assert.match(text, /Cash Handover 820/);
+  assert.match(text, /\[144\] paid 770 cash \d{4}/);
+  assert.match(text, /Transfer Details/);
+  assert.match(text, /\[144\]\n\[145\]\ntransfer 50 cash \d{4} customer_request/);
+  assert.doesNotMatch(text, /#144|144->145|\[144-145\]/);
   assert.doesNotMatch(text, /Markdown|EID|trace|source_ref|\+971|debug/i);
 });

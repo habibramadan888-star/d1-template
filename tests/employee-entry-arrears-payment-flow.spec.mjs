@@ -51,6 +51,8 @@ test("arrears payment WhatsApp export preserves repayment anchor", async () => {
 
   assert.match(
     text,
-    /#144 arrears_payment 70\.00 cash ref task-short-144 original 770\.00 already 700\.00 remaining 0\.00 settled note paid balance/
+    /\[144\] arrears paid 70 cash \d{4} paid balance/
   );
+  assert.match(text, /Arrears Details/);
+  assert.doesNotMatch(text, /#144/);
 });

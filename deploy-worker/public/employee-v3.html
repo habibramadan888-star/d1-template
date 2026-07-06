@@ -873,6 +873,131 @@ label .label-en{
 .employee-collapsible-step.collapsed .step-title:after{
   content:"Expand";
 }
+.employee-required-actions{
+  border:1px solid rgba(15,142,77,.18);
+  border-radius:22px;
+  background:linear-gradient(135deg,rgba(255,255,255,.92),rgba(241,250,245,.9));
+  box-shadow:0 12px 32px rgba(15,23,42,.07);
+  padding:16px;
+  margin:16px 0 20px;
+}
+.employee-required-actions-title{
+  margin:0 0 12px;
+  font-size:15px;
+  font-weight:950;
+  color:#142033;
+}
+.employee-required-actions-title small{
+  display:block;
+  margin-top:3px;
+  color:#7b8797;
+  font-size:11px;
+  font-weight:680;
+}
+.open-arrears-core-alert{
+  border:1px solid rgba(34,197,94,.28);
+  border-radius:22px;
+  background:linear-gradient(135deg,rgba(240,253,244,.96),rgba(255,255,255,.9));
+  box-shadow:0 14px 34px rgba(15,23,42,.07);
+  padding:16px;
+  margin:16px 0 4px;
+}
+.open-arrears-core-alert.warn{
+  border-color:rgba(245,158,11,.38);
+  background:linear-gradient(135deg,rgba(255,251,235,.98),rgba(255,255,255,.92));
+  box-shadow:0 16px 36px rgba(180,83,9,.11);
+}
+.open-arrears-core-alert.neutral{
+  border-color:rgba(148,163,184,.3);
+  background:rgba(248,250,252,.88);
+}
+.open-arrears-title{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:10px;
+}
+.open-arrears-title b{
+  display:block;
+  color:#142033;
+  font-size:16px;
+  font-weight:950;
+  line-height:1.15;
+}
+.open-arrears-title small{
+  display:block;
+  margin-top:3px;
+  color:#6b7280;
+  font-size:11px;
+  font-weight:680;
+}
+.open-arrears-badge{
+  flex:0 0 auto;
+  border-radius:999px;
+  padding:6px 10px;
+  font-size:12px;
+  font-weight:900;
+  color:#92400e;
+  background:#fffbeb;
+  border:1px solid #fde68a;
+}
+.open-arrears-core-alert.ok .open-arrears-badge{
+  color:#047857;
+  background:#ecfdf5;
+  border-color:#bbf7d0;
+}
+.open-arrears-list{
+  display:grid;
+  gap:10px;
+}
+.open-arrears-item{
+  border:1px solid rgba(245,158,11,.25);
+  border-radius:18px;
+  background:rgba(255,255,255,.84);
+  padding:12px;
+}
+.open-arrears-item-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  margin-bottom:8px;
+}
+.open-arrears-item-head b{
+  color:#111827;
+  font-size:15px;
+  font-weight:950;
+}
+.open-arrears-item-head span{
+  color:#b45309;
+  font-weight:950;
+}
+.open-arrears-grid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:8px;
+}
+.open-arrears-grid div{
+  border-radius:14px;
+  background:rgba(248,250,252,.9);
+  padding:8px 10px;
+  color:#374151;
+  font-size:12px;
+  line-height:1.35;
+}
+.open-arrears-grid b{
+  display:block;
+  color:#111827;
+  font-size:11px;
+  letter-spacing:.02em;
+}
+.open-arrears-select{
+  margin-top:10px;
+}
+@media(max-width:720px){
+  .open-arrears-grid{grid-template-columns:1fr}
+}
 .pay-option .label-en{
   display:block;
   margin-top:3px;
@@ -6515,6 +6640,113 @@ function employeeStep8SummaryHtml(validationResult=null){
     `<span class="${cls}">${esc(employeeEnglishFirstMessage(issue))}</span>`
   ].join(' · ');
 }
+function employeeCurrentArrearsBed(){
+  const type=$('entryType')?.value||'';
+  const bed=type==='TF'?(transferValue('transferFromBed')||transferValue('bed')):($('bed')?.value||'');
+  return String(bed||'').trim().replace(/^#/,'');
+}
+function employeeOpenArrearsForBed(bed){
+  const clean=String(bed||'').trim().replace(/^#/,'');
+  const cid=String($('tenantCardId')?.value||'').trim();
+  if(!clean&&!cid)return [];
+  const closed=new Set(['PAID','CLEARED','CLOSED','VOID','WRITTEN_OFF','WAIVED','\u5df2\u7ed3\u6e05','\u7ed3\u6e05','\u4f5c\u5e9f']);
+  return (state.tasks||[]).filter(t=>{
+    const status=String(t.close_status||t.status||'').trim();
+    const taskBed=String(t.bed||t.room_bed||'').trim().replace(/^#/,'');
+    const taskCid=String(t.tenant_card_id||t.customer_code||'').trim();
+    return !closed.has(status)&&taskRemain(t)>0&&((clean&&taskBed===clean)||(cid&&taskCid===cid));
+  });
+}
+function employeeArrearsMeta(t){
+  const original=num(t.arrear_amount||t.amount||t.original_arrears_amount);
+  const paid=num(t.actual_received||t.already_paid_amount||t.paid_amount);
+  return {
+    ref:t.task_id||t.arrears_ref||t.original_arrears_id||t.id||'-',
+    bed:t.bed||t.room_bed||'-',
+    original,
+    paid,
+    remaining:taskRemain(t),
+    date:String(t.original_date||t.created_at||t.date||t.source_date||t.period_start||'-').slice(0,10),
+    type:t.event_type||t.source_type||t.source||'historical_arrears',
+    note:t.arrears_note||t.staff_note||t.owner_note||t.note||t.raw_display_line||'-',
+    due:t.arrears_due_date||t.promise_date||t.promised_payment_date||t.due_date||'-'
+  };
+}
+function employeeEnsureOpenArrearsMount(){
+  let box=$('openArrearsCoreAlert');
+  if(box)return box;
+  const step3=employeeFindEntryStep(3);
+  const anchor=step3||$('bedTransferStep2Mount')?.parentElement||$('paymentStep');
+  if(!anchor)return null;
+  box=document.createElement('div');
+  box.id='openArrearsCoreAlert';
+  box.className='open-arrears-core-alert neutral';
+  box.dataset.openArrearsAlert='true';
+  anchor.insertAdjacentElement('beforebegin',box);
+  return box;
+}
+function employeeRenderOpenArrearsAlert(){
+  const box=employeeEnsureOpenArrearsMount();
+  if(!box)return;
+  const bed=employeeCurrentArrearsBed();
+  const type=$('entryType')?.value||'';
+  if(!bed){
+    box.className='open-arrears-core-alert neutral';
+    box.innerHTML=`<div class="open-arrears-title"><div><b>Open Arrears Check</b><small>\u8f93\u5165\u5e8a\u4f4d\u540e\u68c0\u67e5\u672a\u6e05\u6b20\u6b3e</small></div><span class="open-arrears-badge">Waiting</span></div>`;
+    return;
+  }
+  const rows=employeeOpenArrearsForBed(bed);
+  if(!rows.length){
+    box.className='open-arrears-core-alert ok';
+    box.innerHTML=`<div class="open-arrears-title"><div><b>No Open Arrears</b><small>\u65e0\u672a\u6e05\u6b20\u6b3e</small></div><span class="open-arrears-badge">OK</span></div>`;
+    return;
+  }
+  const list=rows.map(t=>{
+    const m=employeeArrearsMeta(t);
+    const select=type==='AP'?`<button type="button" class="mini-btn open-arrears-select" data-select-arrears-task="${esc(m.ref)}">${renderEmployeeButtonLabel('Select Arrears','\u9009\u62e9\u8fd8\u6b3e')}</button>`:'';
+    return `<div class="open-arrears-item">
+      <div class="open-arrears-item-head"><b>#${esc(m.bed)} 路 ${esc(m.ref)}</b><span>Remaining ${fmtMoney(m.remaining)} AED</span></div>
+      <div class="open-arrears-grid">
+        <div><b>Original Date / \u539f\u6b20\u6b3e\u65e5\u671f</b>${esc(m.date)}</div>
+        <div><b>Original Type / \u539f\u59cb\u4e8b\u4ef6</b>${esc(m.type)}</div>
+        <div><b>Original Amount / \u539f\u6b20\u6b3e\u91d1\u989d</b>${fmtMoney(m.original)} AED</div>
+        <div><b>Already Paid / \u5df2\u8fd8\u91d1\u989d</b>${fmtMoney(m.paid)} AED</div>
+        <div><b>Due Date / Promise Date</b>${esc(m.due)}</div>
+        <div><b>Original Note / \u539f\u59cb\u5907\u6ce8</b>${esc(m.note)}</div>
+      </div>
+      ${select}
+    </div>`;
+  }).join('');
+  box.className='open-arrears-core-alert warn';
+  box.innerHTML=`<div class="open-arrears-title"><div><b>Open Arrears Alert</b><small>\u672a\u6e05\u6b20\u6b3e\u63d0\u9192</small></div><span class="open-arrears-badge">Collect Arrears First</span></div><div class="open-arrears-list">${list}</div>`;
+  box.querySelectorAll('[data-select-arrears-task]').forEach(btn=>{
+    btn.onclick=()=>{
+      if($('entryType').value!=='AP')setEntryType('AP');
+      const sel=$('linkedTaskId');
+      if(sel){
+        populateTaskSelect();
+        sel.value=btn.dataset.selectArrearsTask||'';
+        applyLinkedTask();
+      }
+    };
+  });
+}
+function employeePrioritizeEntryInputs(){
+  const step3=employeeFindEntryStep(3);
+  const validation=$('validationBox');
+  const actionRow=$('btnSaveEntry')?.closest('.row');
+  if(!step3||!validation||!actionRow)return;
+  let mount=$('employeeRequiredActionMount');
+  if(!mount){
+    mount=document.createElement('div');
+    mount.id='employeeRequiredActionMount';
+    mount.className='employee-required-actions';
+    mount.innerHTML='<div class="employee-required-actions-title">Required Input Actions<small>\u5fc5\u586b\u5f55\u5165\u64cd\u4f5c</small></div>';
+    step3.insertAdjacentElement('beforebegin',mount);
+  }
+  if(validation.parentElement!==mount)mount.appendChild(validation);
+  if(actionRow.parentElement!==mount)mount.appendChild(actionRow);
+}
 function employeeUpdateCollapsedStepSummaries(validationResult=null){
   const step3=employeeEnsureCollapsibleStep(3,'Verify System Context','核对系统资料');
   const step8=employeeEnsureCollapsibleStep(8,'Review & Submit','预览确认与提交');
@@ -6522,6 +6754,8 @@ function employeeUpdateCollapsedStepSummaries(validationResult=null){
   const s8=step8?.querySelector(':scope > .employee-collapsible-step-summary');
   if(s3)s3.innerHTML=employeeStep3SummaryHtml();
   if(s8)s8.innerHTML=employeeStep8SummaryHtml(validationResult);
+  employeePrioritizeEntryInputs();
+  employeeRenderOpenArrearsAlert();
 }
 const employeeCollapsedLegacyValidate=validate;
 validate=function(){
