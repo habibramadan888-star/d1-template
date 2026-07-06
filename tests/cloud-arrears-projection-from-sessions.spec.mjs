@@ -48,6 +48,22 @@ test("voided sessions are excluded from projection", async () => {
   assert.match(worker, /COALESCE\(handover_status,''\)<>'VOID'/);
 });
 
+test("production sessions without entries_json still project from export_text anchors", async () => {
+  const worker = await readFile(workerPath, "utf8");
+  const fetchBlock = worker.slice(
+    worker.indexOf("async function cloudArrearsFetchActiveSessionRows"),
+    worker.indexOf("__name(cloudArrearsFetchActiveSessionRows")
+  );
+
+  assert.match(fetchBlock, /const columns=await empTableColumns\(env,"sessions"\)/);
+  assert.match(fetchBlock, /const hasEntriesJson=columns\.has\("entries_json"\)/);
+  assert.match(fetchBlock, /where\+=hasEntriesJson\?/);
+  assert.match(fetchBlock, /COALESCE\(entries_json,''\)<>'' OR COALESCE\(export_text,''\) LIKE '%ENTRY ANCHORS JSON%'/);
+  assert.match(fetchBlock, /:"COALESCE\(export_text,''\) LIKE '%ENTRY ANCHORS JSON%'"/);
+  assert.match(fetchBlock, /const entriesExpr=hasEntriesJson\?"entries_json":"'' AS entries_json"/);
+  assert.match(fetchBlock, /const summaryExpr=hasSummaryJson\?"summary_json":"'' AS summary_json"/);
+});
+
 test("only arrears_payment with matching ref settles projection arrears", async () => {
   const worker = await readFile(workerPath, "utf8");
   const projectionBlock = worker.slice(

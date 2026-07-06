@@ -2318,13 +2318,19 @@ async function cloudArrearsFetchActiveSessionRows(env,user,opts={}){
   if(!await empTableExists(env,"sessions").catch(()=>false))return [];
   const limit=Math.min(Math.max(Number(opts.limit||1000),1),2000);
   const sessionId=cleanId(opts.session_id||opts.sessionId||"");
+  const columns=await empTableColumns(env,"sessions").catch(()=>[]);
+  const hasEntriesJson=columns.has("entries_json");
+  const hasSummaryJson=columns.has("summary_json");
   const params=[user.corpid];
-  let where="corpid=? AND COALESCE(voided_at,'')='' AND COALESCE(handover_status,'')<>'VOID' AND (COALESCE(entries_json,'')<>'' OR COALESCE(export_text,'') LIKE '%ENTRY ANCHORS JSON%')";
+  let where="corpid=? AND COALESCE(voided_at,'')='' AND COALESCE(handover_status,'')<>'VOID' AND ";
+  where+=hasEntriesJson?"(COALESCE(entries_json,'')<>'' OR COALESCE(export_text,'') LIKE '%ENTRY ANCHORS JSON%')":"COALESCE(export_text,'') LIKE '%ENTRY ANCHORS JSON%'";
   if(sessionId){
     where+=" AND id=?";
     params.push(sessionId);
   }
-  const rows=await env.DB.prepare(`SELECT id, corpid, anchor_id, date, entries_count, created_by, created_at, operator_id, operator_name, handover_status, exported_at, export_text, source, entries_json, summary_json, voided_at
+  const entriesExpr=hasEntriesJson?"entries_json":"'' AS entries_json";
+  const summaryExpr=hasSummaryJson?"summary_json":"'' AS summary_json";
+  const rows=await env.DB.prepare(`SELECT id, corpid, anchor_id, date, entries_count, created_by, created_at, operator_id, operator_name, handover_status, exported_at, export_text, source, ${entriesExpr}, ${summaryExpr}, voided_at
     FROM sessions
     WHERE ${where}
     ORDER BY date ASC, COALESCE(exported_at,created_at,'') ASC
