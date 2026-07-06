@@ -36,6 +36,18 @@ test("arrears payment binds existing cloud arrears and reconciles remaining stat
   assert.match(source, /closed\?"已结清":\(actual>0\?"部分支付"/);
 });
 
+test("arrears payment upload accepts projection-derived arrears refs", async () => {
+  const source = await readFile(workerPath, "utf8");
+
+  assert.match(source, /function empFindProjectionArrearsForPayment/);
+  assert.match(source, /rebuildCloudArrearsForBed\(env,user,bed\)/);
+  assert.match(source, /\[row\.task_id,row\.arrears_ref,row\.id,row\.source_ref\]/);
+  assert.match(source, /empEnsureOpenArrearTaskForPayment\(env,user,taskId,authOperatorId,now,room\)/);
+  assert.match(source, /empReconcileArrearTask\(env,user,taskId,authOperatorId,now,room\)/);
+  assert.match(source, /projection:true/);
+  assert.match(source, /remaining_arrears:cleanMoney\(projected\.remaining_arrears\|\|0\)/);
+});
+
 test("owner can read cloud arrears anchors from arrears APIs", async () => {
   const source = await readFile(workerPath, "utf8");
 

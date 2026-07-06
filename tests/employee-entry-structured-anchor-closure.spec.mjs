@@ -14,6 +14,7 @@ async function loadWorkerAnchorHarness() {
     `
     function __name(fn){ return fn; }
     function cleanText(value,max=10000){ return String(value ?? '').slice(0,max); }
+    function cleanDate(value){ return String(value || '').slice(0, 10); }
     ${worker.slice(start, end)}
     globalThis.extractEmployeeEntryAnchorsFromSession = extractEmployeeEntryAnchorsFromSession;
     globalThis.employeeEntryExportTextWithAnchors = employeeEntryExportTextWithAnchors;
@@ -65,6 +66,9 @@ const sevenAnchors = [
     room: "222",
     amount: 200,
     pay_type: "C",
+    deposit_balance: 200,
+    actual_refund_amount: 200,
+    refund_date: "2026-07-05",
     ded_note: "refund to home"
   },
   {
@@ -146,8 +150,11 @@ test("worker extracts canonical structured employee anchors before legacy export
 
   assert.equal(rows[2].deposit_amount, 500);
   assert.equal(rows[3].refund_amount, 200);
+  assert.equal(rows[3].actual_refund_amount, 200);
+  assert.equal(rows[3].deposit_balance, 200);
+  assert.equal(rows[3].refund_difference, 0);
   assert.equal(rows[4].checkout_date, "2026-07-05");
-  assert.equal(rows[4].deposit_refund, 300);
+  assert.equal(rows[4].deposit_refund, 0);
   assert.equal(rows[5].expense_category, "maintenance");
   assert.equal(rows[6].from_bed, "112");
   assert.equal(rows[6].to_bed, "111");

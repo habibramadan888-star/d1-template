@@ -19,11 +19,12 @@ test("employee checkout exposes Left With Arrears required fields and validation
   assert.match(html, /id="leftGraceDays"[^>]*type="hidden"[^>]*value="0"/);
   assert.match(html, /Blocked: WhatsApp phone is required for left customer arrears/);
   assert.match(html, /Promised Payment Date is required/);
+  assert.match(html, /Confirmed Not Returning Date is required/);
   assert.doesNotMatch(html, /Promised Return Date is required/);
   assert.match(html, /Belongings Note is required when belongings are held/);
   assert.doesNotMatch(html, />\s*Contact Method\s*</);
   assert.doesNotMatch(html, />\s*Grace Days\s*</);
-  assert.doesNotMatch(html, />\s*Deposit Balance\s*</);
+  assert.match(html, /id="leftDepositBalance"[^>]*type="hidden"/);
 });
 
 test("Left With Arrears anchor is added to employee checkout payload", async () => {

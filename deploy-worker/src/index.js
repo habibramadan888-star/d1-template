@@ -1472,13 +1472,33 @@ async function empDepositMove(env,user,move){
   return {ledger_id:ledgerId,balance_before:before,balance_after:balanceAfter,delta};
 }
 __name(empDepositMove,"empDepositMove");
-async function empReconcileArrearTask(env,user,taskId,operatorId,now){
+async function empFindProjectionArrearsForPayment(env,user,taskId,bed=""){
+  const cleanTaskId=cleanId(taskId);
+  if(!cleanTaskId)return null;
+  const projection=bed?await rebuildCloudArrearsForBed(env,user,bed):await rebuildAllCloudArrears(env,user,{limit:2000});
+  const rows=[...(projection.open_items||[]),...(projection.closed_items||[]),...(projection.all_items||[])];
+  return rows.find(row=>[row.task_id,row.arrears_ref,row.id,row.source_ref].some(v=>cleanText(v,160)===cleanTaskId))||null;
+}
+__name(empFindProjectionArrearsForPayment,"empFindProjectionArrearsForPayment");
+async function empReconcileArrearTask(env,user,taskId,operatorId,now,bed=""){
   const cleanTaskId=cleanId(taskId);
   if(!cleanTaskId)return null;
   const task=await env.DB.prepare(`SELECT * FROM arrear_tasks
     WHERE task_id=? AND corpid=? AND COALESCE(close_status,'') NOT IN ('PAID','CLEARED','CLOSED','VOID','WAIVED','WRITTEN_OFF','已结清','结清','作废') LIMIT 1`)
     .bind(cleanTaskId,user.corpid).first();
-  if(!task)return null;
+  if(!task){
+    const projected=await empFindProjectionArrearsForPayment(env,user,cleanTaskId,bed);
+    if(!projected)return null;
+    return {
+      task_id:cleanTaskId,
+      projection:true,
+      source_session_id:projected.source_session_id||"",
+      actual_received:cleanMoney(projected.actual_received||0),
+      arrear_amount:cleanMoney(projected.arrear_amount||projected.original_arrears_amount||0),
+      remaining_arrears:cleanMoney(projected.remaining_arrears||0),
+      closed:String(projected.status||"").toLowerCase()==="settled"||cleanMoney(projected.remaining_arrears||0)<=0
+    };
+  }
   const paidRow=await env.DB.prepare(`SELECT COALESCE(SUM(amount),0) AS total_paid FROM transactions
     WHERE corpid=? AND linked_task_id=? AND COALESCE(status,'ACTIVE')='ACTIVE' AND COALESCE(type,'')='AP'`)
     .bind(user.corpid,cleanTaskId).first();
@@ -1582,13 +1602,25 @@ async function empApplyLeftWithArrearsMetadata(env,user,entry,entryId,operatorId
   return {ok:true,task_id:taskId,metadata:meta};
 }
 __name(empApplyLeftWithArrearsMetadata,"empApplyLeftWithArrearsMetadata");
-async function empEnsureOpenArrearTaskForPayment(env,user,taskId,operatorId,now){
+async function empEnsureOpenArrearTaskForPayment(env,user,taskId,operatorId,now,bed=""){
   const cleanTaskId=cleanId(taskId);
   if(!cleanTaskId)return null;
   const existing=await env.DB.prepare(`SELECT * FROM arrear_tasks
     WHERE task_id=? AND corpid=? LIMIT 1`).bind(cleanTaskId,user.corpid).first();
   if(existing){
     return empCloseStatusIsOpen(existing.close_status)&&empTaskRemaining(existing)>0?existing:null;
+  }
+  const projected=await empFindProjectionArrearsForPayment(env,user,cleanTaskId,bed);
+  if(projected&&["open","partial"].includes(String(projected.status||"").toLowerCase())&&cleanMoney(projected.remaining_arrears||0)>0){
+    return {
+      ...projected,
+      task_id:cleanTaskId,
+      source:"cloud_arrears_projection",
+      materialized_from:projected.materialized_from||"sessions.entries_json",
+      arrear_amount:cleanMoney(projected.arrear_amount||projected.original_arrears_amount||0),
+      actual_received:cleanMoney(projected.actual_received||projected.already_paid_amount||0),
+      close_status:""
+    };
   }
   if(!await empTableExists(env,"arrears"))return null;
   const legacy=await env.DB.prepare("SELECT * FROM arrears WHERE id=? AND corpid=? AND cleared=0 LIMIT 1")
@@ -1794,7 +1826,7 @@ async function handleEmployeeEntry(request,env,user){
   }else if(type==="AP"){
     const taskId=cleanId(entry.linked_task_id);
     if(!taskId)return badRequest("linked_task_required");
-    apTaskForPayment=await empEnsureOpenArrearTaskForPayment(env,user,taskId,authOperatorId,now);
+    apTaskForPayment=await empEnsureOpenArrearTaskForPayment(env,user,taskId,authOperatorId,now,room);
     if(!apTaskForPayment)return badRequest("linked_task_not_open");
     const remain=Math.max(0,Number(apTaskForPayment.arrear_amount||0)-Number(apTaskForPayment.actual_received||0));
     if(amount<=0||amount>remain+0.01)return badRequest("arrear_payment_amount_invalid");
@@ -1816,7 +1848,15 @@ async function handleEmployeeEntry(request,env,user){
   let depositBalance=tenantCardId?await empDepositBalance(env,user.corpid,tenantCardId):0;
   const seedLegacyDeposit=tenantCardId&&["DR","CO"].includes(type)&&depositBalance<=0&&depositHeldInput>0;
   if(seedLegacyDeposit)depositBalance=depositHeldInput;
-  if(type==="DR"&&tenantCardId&&amount>depositBalance+0.01)return badRequest("deposit_insufficient");
+  if(type==="DR"){
+    const diff=cleanMoney(amount-depositBalance);
+    const refundReason=cleanText(entry.refund_reason||entry.difference_reason||entry.ded_note||entry.note,500);
+    if(Math.abs(diff)>0.01&&!refundReason)return badRequest("deposit_refund_difference_reason_required");
+  }
+  if(["DR","CO"].includes(type)&&!(type==="CO"&&entry.left_with_arrears)){
+    const openArrears=room?await getOpenCloudArrearsForBed(env,user,room,{limit:2000}).catch(()=>[]):[];
+    if(openArrears.length)return badRequest(type==="DR"?"deposit_refund_open_arrears_owner_approval_required":"checkout_open_arrears_owner_approval_required");
+  }
   if(type==="CO"&&depositDeduction>depositBalance+0.01)return badRequest("deposit_deduction_exceeds_balance");
   const d1WriteStart=Date.now();
   const sessionAnchorEntries=Array.isArray(session.entries)?session.entries.map(row=>normalizeEntryAnchor(row)):[];
@@ -1921,7 +1961,7 @@ async function handleEmployeeEntry(request,env,user){
   }
   if(type==="AP"){
     const taskId=cleanId(entry.linked_task_id);
-    if(taskId&&apTaskForPayment)arrearTask=await empReconcileArrearTask(env,user,taskId,authOperatorId,now);
+    if(taskId&&apTaskForPayment)arrearTask=await empReconcileArrearTask(env,user,taskId,authOperatorId,now,room);
   }
   let leftWithArrearsTask=null;
   if(type==="CO"&&entry.left_with_arrears){
@@ -2010,7 +2050,7 @@ function renderEntryAnchorForOwner(row){
   }
   if(type==="AP")return `${row.room||row.bed} arrears_payment ${entryAnchorMoney(row.payment_amount||row.amount).toFixed(2)} ref ${row.arrears_ref||row.original_arrears_id||row.linked_task_id||"-"} remaining ${entryAnchorMoney(row.remaining_arrears||row.remaining_arrears_after_payment).toFixed(2)}`.trim();
   if(type==="D")return `${row.room||row.bed} deposit_in ${entryAnchorMoney(row.deposit_amount||row.amount).toFixed(2)} ${row.payment_method||""} ${row.note||""}`.trim();
-  if(type==="DR")return `${row.room||row.bed} deposit_out ${entryAnchorMoney(row.refund_amount||row.amount).toFixed(2)} ${row.payment_method||""} reason ${row.refund_reason||row.reason||"-"} note ${row.note||"-"}`.trim();
+  if(type==="DR")return `${row.room||row.bed} deposit_out ${entryAnchorMoney(row.actual_refund_amount||row.refund_amount||row.amount).toFixed(2)} ${row.refund_method||row.payment_method||""} balance ${entryAnchorMoney(row.deposit_balance||0).toFixed(2)} diff ${entryAnchorMoney(row.refund_difference||0).toFixed(2)} reason ${row.refund_reason||row.difference_reason||row.reason||"-"} note ${row.note||"-"}`.trim();
   if(type==="CO"){
     const base=`${row.room||row.bed} checkout ${row.checkout_date||"-"} deposit_refund ${entryAnchorMoney(row.deposit_refund||row.deposit_amt||0).toFixed(2)} outstanding ${entryAnchorMoney(row.outstanding_arrears||0).toFixed(2)} note ${row.final_note||row.note||"-"}`.trim();
     if(row.left_with_arrears||row.checkout_mode==="left_with_arrears"){
@@ -2056,10 +2096,12 @@ function normalizeEntryAnchor(row){
   }else if(type==="D"){
     Object.assign(anchor,{bed:anchor.bed||anchor.room||"",deposit_amount:entryAnchorMoney(anchor.deposit_amount||anchor.amount),linked_tenant:anchor.linked_tenant||anchor.tenant_card_id||anchor.tenant_name||"",note:anchor.note||""});
   }else if(type==="DR"){
-    Object.assign(anchor,{bed:anchor.bed||anchor.room||"",refund_amount:entryAnchorMoney(anchor.refund_amount||anchor.amount),refund_reason:anchor.refund_reason||anchor.ded_reason||anchor.ded_note||anchor.reason||anchor.note||"",checkout_ref:anchor.checkout_ref||anchor.checkout_date||"",note:anchor.note||""});
+    const depositBalance=entryAnchorMoney(anchor.deposit_balance||anchor.deposit_held||0);
+    const refundAmount=entryAnchorMoney(anchor.actual_refund_amount||anchor.refund_amount||anchor.amount);
+    Object.assign(anchor,{bed:anchor.bed||anchor.room||"",deposit_balance:depositBalance,actual_refund_amount:refundAmount,refund_amount:refundAmount,refund_difference:entryAnchorMoney(refundAmount-depositBalance),refund_method:entryAnchorPaymentMethod(anchor.refund_method||anchor.payment_method||anchor.pay_type),payment_method:entryAnchorPaymentMethod(anchor.payment_method||anchor.refund_method||anchor.pay_type),refund_date:cleanDate(anchor.refund_date||anchor.checkout_date||anchor.date||""),refund_reason:anchor.refund_reason||anchor.difference_reason||anchor.ded_reason||anchor.ded_note||anchor.reason||anchor.note||"",difference_reason:anchor.difference_reason||anchor.refund_reason||anchor.ded_note||anchor.note||"",checkout_ref:anchor.checkout_ref||anchor.checkout_date||"",open_arrears_amount:entryAnchorMoney(anchor.open_arrears_amount||anchor.outstanding_arrears||0),owner_approval_required:!!anchor.owner_approval_required,owner_approval_status:anchor.owner_approval_status||"not_required",note:anchor.note||""});
   }else if(type==="CO"){
     const left=!!anchor.left_with_arrears||anchor.checkout_mode==="left_with_arrears";
-    Object.assign(anchor,{bed:anchor.bed||anchor.room||"",checkout_date:anchor.checkout_date||"",deposit_refund:entryAnchorMoney(anchor.deposit_refund||anchor.deposit_amt||anchor.deposit_deduction||0),outstanding_arrears:entryAnchorMoney(anchor.outstanding_arrears||anchor.carry_over_arrears||anchor.deficit||0),owner_approval_required:left?false:!!anchor.owner_approval_required,owner_approval_status:left?"not_required":anchor.owner_approval_status||"not_required",checkout_mode:left?"left_with_arrears":anchor.checkout_mode||"normal",left_with_arrears:left,customer_left:left,former_customer_name:anchor.former_customer_name||anchor.card_name||anchor.tenant_name||"",card_name:anchor.card_name||anchor.former_customer_name||anchor.tenant_name||"",whatsapp_phone:anchor.whatsapp_phone||anchor.former_customer_phone||"",former_customer_phone:anchor.former_customer_phone||anchor.whatsapp_phone||"",contact_method:anchor.contact_method||"",contact_note:anchor.contact_note||"",arrears_amount:entryAnchorMoney(anchor.arrears_amount||anchor.outstanding_arrears||0),cloud_arrears_ref:anchor.cloud_arrears_ref||anchor.arrears_ref||"",belongings_held:!!anchor.belongings_held,belongings_note:anchor.belongings_note||"",promised_payment_date:anchor.promised_payment_date||anchor.promise_date||"",promised_return_date:anchor.promised_return_date||anchor.promise_return_date||"",promise_return_date:anchor.promise_return_date||anchor.promised_return_date||"",deposit_balance:entryAnchorMoney(anchor.deposit_balance||anchor.deposit_held||0),left_date:anchor.left_date||anchor.checkout_date||"",checkout_attempt_date:anchor.checkout_attempt_date||anchor.checkout_date||"",left_status:anchor.left_status||"",final_status:anchor.final_status||"",grace_days_after_promise:Number(anchor.grace_days_after_promise||0)||0,review_date:anchor.review_date||"",confirmed_not_returning_date:anchor.confirmed_not_returning_date||"",confirmed_not_returning_by:anchor.confirmed_not_returning_by||"",confirmation_note:anchor.confirmation_note||"",original_session_id:anchor.original_session_id||anchor.session_id||"",original_event_id:anchor.original_event_id||anchor.event_id||anchor.id||"",final_note:anchor.final_note||anchor.note||anchor.ded_note||""});
+    Object.assign(anchor,{bed:anchor.bed||anchor.room||"",checkout_date:anchor.checkout_date||"",deposit_refund:left?0:entryAnchorMoney(anchor.deposit_refund||0),outstanding_arrears:entryAnchorMoney(anchor.outstanding_arrears||anchor.carry_over_arrears||anchor.deficit||0),owner_approval_required:left?false:!!anchor.owner_approval_required,owner_approval_status:left?"not_required":anchor.owner_approval_status||"not_required",checkout_mode:left?"left_with_arrears":anchor.checkout_mode||"normal",left_with_arrears:left,customer_left:left,former_customer_name:anchor.former_customer_name||anchor.card_name||anchor.tenant_name||"",card_name:anchor.card_name||anchor.former_customer_name||anchor.tenant_name||"",whatsapp_phone:anchor.whatsapp_phone||anchor.former_customer_phone||"",former_customer_phone:anchor.former_customer_phone||anchor.whatsapp_phone||"",contact_method:anchor.contact_method||"",contact_note:anchor.contact_note||"",arrears_amount:entryAnchorMoney(anchor.arrears_amount||anchor.outstanding_arrears||0),cloud_arrears_ref:anchor.cloud_arrears_ref||anchor.arrears_ref||"",belongings_held:!!anchor.belongings_held,belongings_note:anchor.belongings_note||"",promised_payment_date:anchor.promised_payment_date||anchor.promise_date||"",promised_return_date:anchor.promised_return_date||anchor.promise_return_date||"",promise_return_date:anchor.promise_return_date||anchor.promised_return_date||"",deposit_balance:entryAnchorMoney(anchor.deposit_balance||anchor.deposit_held||0),left_date:anchor.left_date||anchor.checkout_date||"",checkout_attempt_date:anchor.checkout_attempt_date||anchor.checkout_date||"",left_status:anchor.left_status||"",final_status:anchor.final_status||"",grace_days_after_promise:Number(anchor.grace_days_after_promise||0)||0,review_date:anchor.review_date||"",confirmed_not_returning_date:anchor.confirmed_not_returning_date||"",confirmed_not_returning_by:anchor.confirmed_not_returning_by||"",confirmation_note:anchor.confirmation_note||"",original_session_id:anchor.original_session_id||anchor.session_id||"",original_event_id:anchor.original_event_id||anchor.event_id||anchor.id||"",final_note:anchor.final_note||anchor.note||anchor.ded_note||""});
   }else if(type==="E"){
     Object.assign(anchor,{expense_amount:entryAnchorMoney(anchor.expense_amount||anchor.amount),expense_category:anchor.expense_category||anchor.reason_code||"",target_bed:anchor.target_bed||anchor.room||"",reason:anchor.reason||anchor.expense_desc||anchor.custom_reason||"",note:anchor.note||anchor.expense_desc||""});
   }

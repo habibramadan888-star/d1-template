@@ -58,3 +58,25 @@ test("deposit refund and checkout hide rent-only fields and render event-specifi
   assert.match(html, /Checkout \/ \\u9000\\u623f/);
   assert.match(html, /Deposit Refund Amount \/ \\u5e94\\u9000\\u62bc\\u91d1/);
 });
+
+test("deposit refund has event-specific actual refund and difference reason fields", async () => {
+  const html = await readFile(employeePath, "utf8");
+
+  assert.match(html, /id="depositOutFields"/);
+  assert.match(html, /id="depositOutBalance"/);
+  assert.match(html, /id="depositOutRefundDate"/);
+  assert.match(html, /id="depositOutDifferenceReason"/);
+  assert.match(html, /employeeSetFieldLabel\('amount','Actual Refund Amount'/);
+  assert.match(html, /Difference Reason is required when actual refund differs from deposit balance/);
+  assert.match(html, /actual_refund_amount:type==='DR'\?amt:0/);
+  assert.match(html, /refund_difference:type==='DR'\?Math\.round\(\(amt-depositHeld\(\)\)\*100\)\/100:0/);
+});
+
+test("normal checkout does not write deposit refund or deduction amounts", async () => {
+  const html = await readFile(employeePath, "utf8");
+
+  assert.match(html, /deposit_amt:type==='CO'\?0:0/);
+  assert.match(html, /deposit_deduction:type==='CO'\?0:0/);
+  assert.match(html, /deposit_refund:0/);
+  assert.match(html, /\['overdayDeduction','noNoticeDeduction','otherDeduction','depositDeduction','depositReturnAmount','dedNote'\]/);
+});

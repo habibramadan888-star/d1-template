@@ -2851,6 +2851,12 @@ label .label-en{
           <div class="context-note" id="apTaskInfo" style="margin-top:12px"></div>
         </div>
 
+        <div class="grid hidden" id="depositOutFields" data-deposit-out-fields="true">
+          <div class="field"><label>Deposit Balance<span class="label-en">应退押金</span></label><input id="depositOutBalance" readonly placeholder="System read"></div>
+          <div class="field"><label>Refund Date<span class="label-en">退款日期</span></label><input id="depositOutRefundDate" type="date"></div>
+          <div class="field"><label>Difference Reason<span class="label-en">差异原因</span></label><input id="depositOutDifferenceReason" placeholder="Required if actual refund differs from deposit balance"></div>
+        </div>
+
         <div class="grid" id="checkoutFields">
           <div class="field"><label>Checkout Type<span class="label-en">退房类型</span></label><select id="leftWithArrearsMode" data-left-with-arrears-mode="true"><option value="normal">Normal Checkout / 正常退房</option><option value="left_with_arrears">Left With Arrears / 离店未清欠款</option></select></div>
           <div class="field"><label>实际离开日期 checkout_date</label><input id="checkoutDate" type="date"></div>
@@ -3874,6 +3880,18 @@ function employeeApplyArrearsPaymentLayout(type){
   });
   const amountWrap=fieldWrap('amount');
   if(amountWrap)amountWrap.classList.toggle('hidden',isCheckout);
+  visible(['depositOutFields'],isDepositOut);
+  visible(['checkoutFields'],isCheckout);
+  if(isDepositOut){
+    if($('depositOutBalance'))$('depositOutBalance').value=depositHeld()?fmtMoney(depositHeld()):'Needs Review';
+    if($('depositOutRefundDate')&&!$('depositOutRefundDate').value)$('depositOutRefundDate').value=today();
+  }
+  if(isCheckout){
+    ['overdayDeduction','noNoticeDeduction','otherDeduction','depositDeduction','depositReturnAmount','dedNote'].forEach(id=>{
+      const wrap=fieldWrap(id);
+      if(wrap)wrap.classList.add('hidden');
+    });
+  }
   employeeApplyEventSpecificFieldLabels(type);
   if(hideRentOnly){
     $('periodStep')?.classList.add('hidden');
@@ -3891,13 +3909,12 @@ function employeeSetFieldLabel(id,en,zh){
 }
 function employeeApplyEventSpecificFieldLabels(type){
   if(type==='DR'){
-    employeeSetFieldLabel('amount','Refund Amount','\u9000\u62bc\u91d1\u91d1\u989d');
+    employeeSetFieldLabel('amount','Actual Refund Amount','\u5b9e\u9000\u91d1\u989d');
     employeeSetFieldLabel('payType','Refund Method','\u9000\u6b3e\u65b9\u5f0f');
-    employeeSetFieldLabel('remark','Refund Reason / Note','\u9000\u6b3e\u539f\u56e0 / \u5907\u6ce8');
+    employeeSetFieldLabel('remark','Refund Note','\u9000\u6b3e\u5907\u6ce8');
   }else if(type==='CO'){
     employeeSetFieldLabel('checkoutDate','Checkout Date','\u9000\u623f\u65e5\u671f');
-    employeeSetFieldLabel('depositReturnAmount','Deposit Refund Amount','\u5e94\u9000\u62bc\u91d1');
-    employeeSetFieldLabel('dedNote','Checkout Note','\u9000\u623f\u5907\u6ce8');
+    employeeSetFieldLabel('remark','Checkout Note','\u9000\u623f\u5907\u6ce8');
   }else if(type==='AP'){
     employeeSetFieldLabel('amount','Payment Amount','\u672c\u6b21\u8fd8\u6b3e\u91d1\u989d');
     employeeSetFieldLabel('payType','Payment Method','\u4ed8\u6b3e\u65b9\u5f0f');
@@ -3945,6 +3962,9 @@ function buildEntryRawDisplayLine(e){
   if(e.type==='AP'){
     const ref=e.arrears_ref||e.original_arrears_id||e.linked_task_id||'-';
     return `${e.room} arrears_payment ${fmtMoney(e.payment_amount||e.amount)} ${paymentMethodLabel(e.pay_type)} ref ${ref} original ${fmtMoney(e.original_arrears_amount)} already ${fmtMoney(e.already_paid_amount)} remaining ${fmtMoney(e.remaining_arrears)} ${e.settlement_status||''} ${e.note||''}`.trim();
+  }
+  if(e.type==='DR'){
+    return `${e.room} deposit_out refund ${fmtMoney(e.actual_refund_amount||e.refund_amount||e.amount)} ${paymentMethodLabel(e.refund_method||e.pay_type)} balance ${fmtMoney(e.deposit_balance||e.deposit_held)} diff ${fmtMoney(e.refund_difference||0)} reason ${e.refund_reason||e.difference_reason||'-'} ${e.note||''}`.trim();
   }
   if(e.type==='CO'&&e.left_with_arrears){
     return `${e.room} checkout left_with_arrears ref ${e.cloud_arrears_ref||'-'} phone ${e.whatsapp_phone||e.former_customer_phone||'-'} remaining ${fmtMoney(e.arrears_amount||e.outstanding_arrears)} belongings ${e.belongings_held?'yes':'no'} promised_payment ${e.promised_payment_date||'-'} promised_return ${e.promised_return_date||e.promise_return_date||'-'} note ${e.note||e.final_note||''}`.trim();
@@ -4007,11 +4027,13 @@ function applyEntryAnchors(e){
     Object.assign(e,{bed:e.room,deposit_amount:num(e.amount),linked_tenant:e.tenant_card_id||e.tenant_name||'',note:e.note||''});
   }else if(type==='DR'){
     const outstanding=num(e.outstanding_arrears||e.carry_over_arrears||0);
-    Object.assign(e,{bed:e.room,refund_amount:num(e.amount),refund_reason:e.ded_note||e.note||'',checkout_ref:e.checkout_date||'',outstanding_arrears:outstanding,owner_approval_required:outstanding>0,owner_approval_status:outstanding>0?(e.owner_approval_status||'pending_owner_approval'):(e.owner_approval_status||'not_required'),note:e.note||''});
+    const depositBalance=num(e.deposit_balance||e.deposit_held||0);
+    const actualRefund=num(e.actual_refund_amount||e.refund_amount||e.amount);
+    Object.assign(e,{bed:e.room,deposit_balance:depositBalance,actual_refund_amount:actualRefund,refund_amount:actualRefund,refund_difference:Math.round((actualRefund-depositBalance)*100)/100,refund_method:e.refund_method||method,refund_date:e.refund_date||today(),refund_reason:e.refund_reason||e.difference_reason||e.ded_note||e.note||'',difference_reason:e.difference_reason||e.refund_reason||e.ded_note||'',checkout_ref:e.checkout_date||'',open_arrears_amount:outstanding,outstanding_arrears:outstanding,owner_approval_required:outstanding>0,owner_approval_status:outstanding>0?(e.owner_approval_status||'pending_owner_approval'):(e.owner_approval_status||'not_required'),note:e.note||''});
   }else if(type==='CO'){
     const outstanding=num(e.outstanding_arrears||e.carry_over_arrears||0);
     const left=!!e.left_with_arrears;
-    Object.assign(e,{bed:e.room,checkout_date:e.checkout_date||'',deposit_refund:num(e.deposit_amt||0),outstanding_arrears:outstanding,owner_approval_required:outstanding>0&&!left,owner_approval_status:outstanding>0&&!left?(e.owner_approval_status||'pending_owner_approval'):(e.owner_approval_status||'not_required'),final_note:e.note||e.ded_note||'',
+    Object.assign(e,{bed:e.room,checkout_date:e.checkout_date||'',deposit_refund:0,outstanding_arrears:outstanding,owner_approval_required:outstanding>0&&!left,owner_approval_status:outstanding>0&&!left?(e.owner_approval_status||'pending_owner_approval'):(e.owner_approval_status||'not_required'),final_note:e.note||e.ded_note||'',
       checkout_mode:left?'left_with_arrears':(e.checkout_mode||'normal'),left_with_arrears:left,customer_left:left,former_customer_name:e.former_customer_name||e.card_name||e.tenant_name||'',card_name:e.card_name||e.former_customer_name||e.tenant_name||'',
       whatsapp_phone:e.whatsapp_phone||e.former_customer_phone||'',former_customer_phone:e.former_customer_phone||e.whatsapp_phone||'',contact_method:e.contact_method||'',contact_note:e.contact_note||'',
       arrears_amount:num(e.arrears_amount||outstanding),cloud_arrears_ref:e.cloud_arrears_ref||'',belongings_held:!!e.belongings_held,belongings_note:e.belongings_note||'',
@@ -4354,10 +4376,12 @@ function validate(){
     if(!$('arrearReasonDetail').value.trim())errors.push('尾款必须填写原因或承诺说明，方便老板端追踪。');
   }
   if(type==='CO'&&!$('checkoutDate').value)errors.push('退房必须填写实际离开日期。');
-  if(type==='DR'&&depositHeld()&&amt>depositHeld())errors.push('退押金金额不能超过当前押金可用余额。');
-  if(type==='CO'&&num($('depositDeduction').value)>depositHeld())errors.push('退房押金扣款不能超过当前押金余额。');
-  if(type==='CO'&&num($('otherDeduction').value)>0&&!$('dedNote').value.trim())errors.push('退房其他扣款必须填写扣款说明。');
-  if(type==='CO'&&Math.max(0,depositHeld()-num($('depositDeduction').value))>0)warns.push('退房后仍有应退押金，请继续录入 DR 退押金完成现金流。');
+  if(type==='DR'){
+    const expectedRefund=depositHeld();
+    const diff=amt-expectedRefund;
+    if(!$('depositOutRefundDate')?.value)errors.push('Refund Date is required for Deposit Out / 退押金必须填写退款日期。');
+    if(Math.abs(diff)>0.01&&!($('depositOutDifferenceReason')?.value||'').trim())errors.push('Difference Reason is required when actual refund differs from deposit balance / 实退金额与应退押金不一致时必须填写差异原因。');
+  }
   if(type==='R'&&due>0&&amt>due&&!$('excessTo').value)errors.push('收租超收必须选择处理方式：找零已退还，或转老板处理。');
   if(type==='TF'&&!$('transferFromBed').value.trim())errors.push('换床必须填写原床位 from_bed。');
   if(type==='TF'&&!$('bedTo').value.trim())errors.push('换床必须填写目标床位 to_bed。');
@@ -4418,8 +4442,9 @@ function entryPayload(){
     amount:amt,due,paid,deficit:Math.max(0,due-paid),entry_clr:$('entryClr').value,clr:$('entryClr').value,excess:Math.max(0,amt-due),excess_to:$('excessTo').value,
     list_price:num($('listPrice').value),period_start:$('periodStart').value,period_end:$('periodEnd').value,cycle:$('cycle').value,
     period_day_count:num($('periodDays').value),period_due:num($('periodDue').value)||due,custom_reason:$('customReason').value.trim()||tailReason,
-    checkout_date:$('checkoutDate').value,deposit_held:depositHeld(),deposit_return:type==='CO'?depositReturnStatus(depositHeld(),co.total):'',deposit_amt:type==='CO'?Math.max(0,depositHeld()-co.total):0,deposit_deduction:type==='CO'?co.total:num($('depositDeduction').value),
-    ded_reason:dedReasons.join('+'),ded_days:co.overDays,ded_rate:40,ded_note:$('dedNote').value.trim(),early_days:co.earlyDays,
+    checkout_date:$('checkoutDate').value,refund_date:type==='DR'?($('depositOutRefundDate')?.value||today()):'',deposit_held:depositHeld(),deposit_balance:depositHeld(),deposit_return:type==='CO'?'':(type==='DR'?'DR':''),deposit_amt:type==='CO'?0:0,deposit_deduction:type==='CO'?0:0,
+    actual_refund_amount:type==='DR'?amt:0,refund_amount:type==='DR'?amt:0,refund_difference:type==='DR'?Math.round((amt-depositHeld())*100)/100:0,refund_method:type==='DR'?(pay==='B'?'bank':'cash'):'',refund_reason:type==='DR'?(($('depositOutDifferenceReason')?.value||'').trim()||$('remark').value.trim()):'',difference_reason:type==='DR'?($('depositOutDifferenceReason')?.value||'').trim():'',
+    ded_reason:type==='DR'?(($('depositOutDifferenceReason')?.value||'').trim()?'DIFFERENCE':''):dedReasons.join('+'),ded_days:type==='CO'?0:co.overDays,ded_rate:40,ded_note:type==='DR'?(($('depositOutDifferenceReason')?.value||'').trim()||$('remark').value.trim()):$('dedNote').value.trim(),early_days:type==='CO'?0:co.earlyDays,
     fee_paid:$('feePaid').value,fee_mode:$('feePaid').value==='N'?'waived':'charged',amount_fils:$('feePaid').value==='N'?0:5000,fee_waiver_reason:$('feePaid').value==='N'?$('transferWaiverReason').value.trim():'',
     transfer_date:$('transferDate').value,transfer_reason:$('transferReason').value,transfer_validation_status:type==='TF'?bedTransferValidationSummary(transferValue('transferFromBed')||transferValue('bed'),transferValue('bedTo'),bedTransferReviewContext()).status:'',
     carry_over_arrears:openArrearsTotal,outstanding_arrears:['CO','DR'].includes(type)?openArrearsTotal:0,owner_approval_required:ownerApprovalRequired,owner_approval_status:ownerApprovalRequired?'pending_owner_approval':'not_required',
@@ -4612,7 +4637,7 @@ async function saveEntryWithTtlockGate(){
   return saveEntryWithoutTtlockGate();
 }
 saveEntry=saveEntryWithTtlockGate;
-function resetForm(){['bed','transferFromBed','bedTo','transferDate','transferReason','amount','due','paid','tenantName','tenantCardId','periodStart','periodEnd','periodDays','periodDue','listPrice','customReason','bankRef','checkoutDate','depositDeduction','depositReturnAmount','overdayDeduction','noNoticeDeduction','otherDeduction','dedNote','leftFormerCustomerName','leftWhatsappPhone','leftContactNote','leftDepositBalance','leftBelongingsNote','leftPromisedPaymentDate','leftPromisedReturnDate','leftConfirmedNotReturningDate','leftGraceDays','expenseDesc','remark','excessTo','arrearAmount','arrearPromiseDate','arrearReasonDetail'].forEach(id=>$(id).value='');$('leftWithArrearsMode').value='normal';$('leftContactMethod').value='whatsapp';$('leftBelongingsHeld').value='no';$('arrearHandling').value='ARREAR';state.current=null;state.depositBalance=null;renderContext();syncForm();refreshSessionViews()}
+function resetForm(){['bed','transferFromBed','bedTo','transferDate','transferReason','amount','due','paid','tenantName','tenantCardId','periodStart','periodEnd','periodDays','periodDue','listPrice','customReason','bankRef','checkoutDate','depositOutBalance','depositOutRefundDate','depositOutDifferenceReason','depositDeduction','depositReturnAmount','overdayDeduction','noNoticeDeduction','otherDeduction','dedNote','leftFormerCustomerName','leftWhatsappPhone','leftContactNote','leftDepositBalance','leftBelongingsNote','leftPromisedPaymentDate','leftPromisedReturnDate','leftConfirmedNotReturningDate','leftGraceDays','expenseDesc','remark','excessTo','arrearAmount','arrearPromiseDate','arrearReasonDetail'].forEach(id=>{if($(id))$(id).value=''});$('leftWithArrearsMode').value='normal';$('leftContactMethod').value='whatsapp';$('leftBelongingsHeld').value='no';$('arrearHandling').value='ARREAR';state.current=null;state.depositBalance=null;renderContext();syncForm();refreshSessionViews()}
 function hasLocalOnly(){return state.drafts.some(e=>e.sync_status!=='SYNCED')}
 function newSession(){
   if(hasLocalOnly()){toast('仍有云端未确认记录，不能开始新会话');return}
@@ -6249,7 +6274,7 @@ if(location.hash==='#export'){
 showEmployeeView(location.hash||'entry',{pushHash:false});
 document.querySelectorAll('.event-chip').forEach(btn=>btn.addEventListener('click',e=>{e.preventDefault();setEntryType(btn.dataset.type);}));
 document.querySelectorAll('.pay-option').forEach(btn=>btn.addEventListener('click',e=>{e.preventDefault();setPaymentType(btn.dataset.pay);}));
-['entryType','cycle','payType','amount','reasonCode','feePaid','transferWaiverReason','customReason','tenantName','bankRef','periodDays','depositDeduction','checkoutDate','noNoticeDeduction','otherDeduction','dedNote','leftWithArrearsMode','leftFormerCustomerName','leftWhatsappPhone','leftContactMethod','leftContactNote','leftDepositBalance','leftBelongingsHeld','leftBelongingsNote','leftPromisedPaymentDate','leftPromisedReturnDate','leftConfirmedNotReturningDate','leftGraceDays','excessTo','bedTo','transferDate','transferReason','expenseCategory','expenseDesc','remark','arrearHandling','arrearPromiseDate','arrearReasonDetail'].forEach(id=>$(id).addEventListener('input',syncForm));
+['entryType','cycle','payType','amount','reasonCode','feePaid','transferWaiverReason','customReason','tenantName','bankRef','periodDays','depositOutRefundDate','depositOutDifferenceReason','depositDeduction','checkoutDate','noNoticeDeduction','otherDeduction','dedNote','leftWithArrearsMode','leftFormerCustomerName','leftWhatsappPhone','leftContactMethod','leftContactNote','leftDepositBalance','leftBelongingsHeld','leftBelongingsNote','leftPromisedPaymentDate','leftPromisedReturnDate','leftConfirmedNotReturningDate','leftGraceDays','excessTo','bedTo','transferDate','transferReason','expenseCategory','expenseDesc','remark','arrearHandling','arrearPromiseDate','arrearReasonDetail'].forEach(id=>$(id).addEventListener('input',syncForm));
 $('linkedTaskId').addEventListener('change',applyLinkedTask);
 $('bed').addEventListener('input',()=>{if($('entryType').value==='TF')$('transferFromBed').value=$('bed').value.trim().replace(/^#/,'');lookupBed();if($('entryType').value==='AP'){populateTaskSelect();syncForm();}});
 $('transferFromBed').addEventListener('input',()=>{if($('entryType').value==='TF'){$('bed').value=$('transferFromBed').value.trim().replace(/^#/,'');lookupBed();syncForm();}});
@@ -7305,6 +7330,7 @@ validate=function(){
     if(!rows.length)addError('Left With Arrears requires an open Cloud Arrears item. / 离店未清欠款必须关联未清云端欠款。');
     if(!phone)addError('Blocked: WhatsApp phone is required for left customer arrears. / 阻断：离店未清欠款必须填写客户 WhatsApp 号码。');
     if(!($('leftPromisedPaymentDate')?.value||''))addError('Promised Payment Date is required. / 必须填写承诺付款日期。');
+    if(!($('leftConfirmedNotReturningDate')?.value||''))addError('Confirmed Not Returning Date is required. / 确认不再回来日期必填。');
     if(($('leftFinalStatus')?.value||$('leftStatus')?.value||'')==='abandoned_confirmed'&&!($('leftConfirmedNotReturningDate')?.value||''))addError('Confirmed Not Returning Date is required when abandoned is confirmed. / 确认不再回来时必须填写确认日期。');
     if(belongingsHeld&&!($('leftBelongingsNote')?.value||'').trim())addError('Belongings Note is required when belongings are held. / 物品留存时必须填写物品说明。');
   }
