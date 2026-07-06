@@ -29,8 +29,9 @@ test("arrears payment can select an open arrears task from the core alert", asyn
   assert.match(html, /Select Arrears/);
   assert.match(html, /setEntryType\('AP'\)/);
   assert.match(html, /populateTaskSelect\(\)/);
-  assert.match(html, /sel\.value=btn\.dataset\.selectArrearsTask/);
-  assert.match(html, /applyLinkedTask\(\)/);
+  assert.match(html, /const task=findEmployeeTaskByRef\(btn\.dataset\.selectArrearsTask\|\|''\)/);
+  assert.match(html, /sel\.value=employeeTaskRef\(task\)/);
+  assert.match(html, /applyLinkedTask\(task\)/);
 });
 
 test("add to session controls remain in the required input flow", async () => {
