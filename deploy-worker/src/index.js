@@ -2104,6 +2104,253 @@ function extractEmployeeEntryAnchorsFromSession(session){
   return rows;
 }
 __name(extractEmployeeEntryAnchorsFromSession,"extractEmployeeEntryAnchorsFromSession");
+function cloudArrearsSessionIsActive(session){
+  if(!session)return false;
+  const status=String(session?.handover_status||"").trim().toUpperCase();
+  return !String(session?.voided_at||"").trim()&&status!=="VOID";
+}
+__name(cloudArrearsSessionIsActive,"cloudArrearsSessionIsActive");
+function cloudArrearsSourceEventId(anchor,index){
+  return cleanText(anchor?.event_id||anchor?.anchor_id||anchor?.id||anchor?.entry_id||`entry-${index+1}`,120);
+}
+__name(cloudArrearsSourceEventId,"cloudArrearsSourceEventId");
+function cloudArrearsProjectionRef(session,anchor,index,prefix="ca"){
+  return cleanText(anchor?.arrears_ref||anchor?.cloud_arrears_ref||anchor?.original_arrears_id||anchor?.task_id||anchor?.source_ref||`${prefix}-${session?.id||"session"}-${cloudArrearsSourceEventId(anchor,index)}`,160);
+}
+__name(cloudArrearsProjectionRef,"cloudArrearsProjectionRef");
+function cloudArrearsNormalizePaymentEvent(session,anchor,index){
+  const ref=cleanText(anchor?.arrears_ref||anchor?.original_arrears_id||anchor?.linked_task_id||anchor?.cloud_arrears_ref||"",160);
+  if(!ref)return null;
+  const amount=entryAnchorMoney(anchor?.payment_amount||anchor?.amount);
+  if(amount<=0)return null;
+  return {
+    ref,
+    event_id:cloudArrearsSourceEventId(anchor,index),
+    session_id:cleanText(session?.id||anchor?.session_id||"",120),
+    date:cleanDate(anchor?.date||session?.date||anchor?.created_at||session?.created_at||""),
+    payment_amount:amount,
+    payment_method:entryAnchorPaymentMethod(anchor?.payment_method||anchor?.pay_type),
+    note:cleanText(anchor?.note||anchor?.raw_display_line||"",300),
+    operator:cleanText(anchor?.operator||anchor?.operator_name||session?.operator_name||"",120)
+  };
+}
+__name(cloudArrearsNormalizePaymentEvent,"cloudArrearsNormalizePaymentEvent");
+function cloudArrearsBaseItem(session,anchor,index,extra={}){
+  const sourceEventId=cloudArrearsSourceEventId(anchor,index);
+  const ref=cleanText(extra.arrears_ref||cloudArrearsProjectionRef(session,anchor,index,extra.prefix||"ca"),160);
+  const amount=entryAnchorMoney(extra.arrears_amount||anchor?.arrears_amount||anchor?.outstanding_arrears||0);
+  const originalDate=cleanDate(extra.original_date||anchor?.date||session?.date||anchor?.created_at||session?.created_at||"");
+  return {
+    task_id:ref,
+    id:ref,
+    arrears_ref:ref,
+    corpid:cleanText(session?.corpid||anchor?.corpid||"",80),
+    userid:cleanText(session?.created_by||anchor?.userid||anchor?.operator_id||"",80),
+    entry_id:sourceEventId,
+    original_entry_id:sourceEventId,
+    source_session_id:cleanText(session?.id||anchor?.session_id||"",120),
+    source_event_id:sourceEventId,
+    source_type:cleanText(extra.source_type||"cloud_arrears_projection",80),
+    source:"cloud_arrears_projection",
+    materialized_from:"sessions.entries_json",
+    bed:cleanText(extra.bed||anchor?.bed||anchor?.room||"",80).replace(/^#/,""),
+    tenant_name:cleanText(extra.customer_name||anchor?.tenant_name||anchor?.former_customer_name||anchor?.card_name||"",120),
+    tenant_card_id:cleanText(anchor?.tenant_card_id||anchor?.former_customer_ref||"",120),
+    arrear_amount:amount,
+    original_arrears_amount:amount,
+    original_amount:amount,
+    actual_received:0,
+    already_paid_amount:0,
+    remaining_arrears:amount,
+    close_status:"",
+    status:"open",
+    followup_status:"待跟进",
+    arrear_reason:cleanText(extra.reason||anchor?.arrears_note||anchor?.arrear_reason_detail||anchor?.note||"SHORT_PAID",500),
+    original_note:cleanText(extra.original_note||anchor?.arrears_note||anchor?.arrear_reason_detail||anchor?.note||anchor?.raw_display_line||"",500),
+    promise_date:cleanDate(extra.due_date||anchor?.arrears_due_date||anchor?.promise_date||anchor?.promised_payment_date||""),
+    due_date:cleanDate(extra.due_date||anchor?.arrears_due_date||anchor?.promise_date||anchor?.promised_payment_date||""),
+    promise_amount:amount,
+    original_period_start:cleanDate(anchor?.rent_period_start||anchor?.period_start||""),
+    original_period_end:cleanDate(anchor?.rent_period_end||anchor?.period_end||""),
+    original_date:originalDate,
+    original_type:cleanText(extra.original_type||anchor?.event_type||entryAnchorEventType(entryAnchorType(anchor)),80),
+    expected_amount:entryAnchorMoney(extra.expected_amount||anchor?.expected_rent||anchor?.period_due||anchor?.due),
+    paid_amount:entryAnchorMoney(extra.paid_amount||anchor?.paid_amount||anchor?.paid||anchor?.amount),
+    created_at:cleanText(anchor?.created_at||session?.created_at||session?.exported_at||"",40),
+    updated_at:cleanText(anchor?.updated_at||session?.exported_at||session?.created_at||"",40),
+    source_ref:sourceEventId,
+    source_fingerprint:[cleanText(session?.corpid||"",80),cleanText(session?.id||"",120),sourceEventId,ref].join("|"),
+    linked_repayment_events:[]
+  };
+}
+__name(cloudArrearsBaseItem,"cloudArrearsBaseItem");
+function cloudArrearsApplyLeftWithArrearsMeta(item,anchor){
+  if(!item||!anchor)return item;
+  item.customer_left=true;
+  item.left_with_arrears=true;
+  item.belongings_held=!!anchor.belongings_held;
+  item.belongings_note=cleanText(anchor.belongings_note||"",500);
+  item.whatsapp_phone=cleanText(anchor.whatsapp_phone||anchor.former_customer_phone||"",80);
+  item.former_customer_phone=cleanText(anchor.former_customer_phone||anchor.whatsapp_phone||"",80);
+  item.former_customer_name=cleanText(anchor.former_customer_name||anchor.card_name||anchor.tenant_name||"",120);
+  item.card_name=cleanText(anchor.card_name||anchor.former_customer_name||anchor.tenant_name||"",120);
+  item.promised_payment_date=cleanDate(anchor.promised_payment_date||anchor.promise_date||"");
+  item.promised_return_date=cleanDate(anchor.promised_return_date||anchor.promise_return_date||"");
+  item.confirmed_not_returning_date=cleanDate(anchor.confirmed_not_returning_date||"");
+  item.deposit_balance=entryAnchorMoney(anchor.deposit_balance||anchor.deposit_held||0);
+  item.left_status=cleanText(anchor.left_status||"",80);
+  item.final_status=cleanText(anchor.final_status||"",80);
+  item.owner_note=`${cleanText(item.owner_note||"",500)}\nLEFT_WITH_ARREARS ${JSON.stringify({
+    left_with_arrears:true,
+    customer_left:true,
+    former_customer_name:item.former_customer_name,
+    card_name:item.card_name,
+    whatsapp_phone:item.whatsapp_phone,
+    former_customer_phone:item.former_customer_phone,
+    belongings_held:item.belongings_held,
+    belongings_note:item.belongings_note,
+    promised_payment_date:item.promised_payment_date,
+    promised_return_date:item.promised_return_date,
+    confirmed_not_returning_date:item.confirmed_not_returning_date,
+    deposit_balance:item.deposit_balance,
+    left_status:item.left_status,
+    final_status:item.final_status
+  })}`.trim();
+  return item;
+}
+__name(cloudArrearsApplyLeftWithArrearsMeta,"cloudArrearsApplyLeftWithArrearsMeta");
+function buildCloudArrearsProjectionFromSessions(sessions=[],opts={}){
+  const itemsByRef=new Map();
+  const payments=[];
+  let activeSessions=0;
+  let scannedAnchors=0;
+  for(const session of sessions||[]){
+    if(!cloudArrearsSessionIsActive(session))continue;
+    activeSessions++;
+    const anchors=extractEmployeeEntryAnchorsFromSession(session);
+    for(let index=0;index<anchors.length;index++){
+      const anchor=normalizeEntryAnchor(anchors[index]);
+      const type=entryAnchorType(anchor);
+      scannedAnchors++;
+      if(type==="R"&&(anchor.short_paid||entryAnchorMoney(anchor.arrears_amount)>0)&&entryAnchorMoney(anchor.arrears_amount)>0){
+        const item=cloudArrearsBaseItem(session,anchor,index,{
+          prefix:"rent-short-paid",
+          source_type:"employee_entry_short_paid",
+          original_type:"rent_short_paid",
+          arrears_amount:anchor.arrears_amount,
+          reason:anchor.arrears_note||"SHORT_PAID",
+          due_date:anchor.arrears_due_date,
+          expected_amount:anchor.expected_rent,
+          paid_amount:anchor.paid_amount
+        });
+        if(item.bed&&item.arrear_amount>0)itemsByRef.set(item.arrears_ref,item);
+        continue;
+      }
+      if(type==="CO"&&(anchor.left_with_arrears||anchor.checkout_mode==="left_with_arrears")){
+        const ref=cloudArrearsProjectionRef(session,anchor,index,"left-with-arrears");
+        let item=itemsByRef.get(ref);
+        const amount=entryAnchorMoney(anchor.arrears_amount||anchor.outstanding_arrears);
+        if(!item&&amount>0){
+          item=cloudArrearsBaseItem(session,anchor,index,{
+            arrears_ref:ref,
+            prefix:"left-with-arrears",
+            source_type:"left_with_arrears",
+            original_type:"left_with_arrears",
+            arrears_amount:amount,
+            reason:"LEFT_WITH_ARREARS",
+            due_date:anchor.promised_payment_date
+          });
+          if(item.bed)itemsByRef.set(ref,item);
+        }
+        if(item)cloudArrearsApplyLeftWithArrearsMeta(item,anchor);
+        continue;
+      }
+      if(type==="AP"){
+        const payment=cloudArrearsNormalizePaymentEvent(session,anchor,index);
+        if(payment)payments.push(payment);
+      }
+    }
+  }
+  for(const payment of payments){
+    const item=itemsByRef.get(payment.ref);
+    if(!item)continue;
+    item.linked_repayment_events.push(payment);
+    item.actual_received=entryAnchorMoney(Number(item.actual_received||0)+payment.payment_amount);
+    item.already_paid_amount=item.actual_received;
+    item.remaining_arrears=entryAnchorMoney(Math.max(0,Number(item.arrear_amount||0)-item.actual_received));
+    if(item.remaining_arrears<=0){
+      item.status="settled";
+      item.close_status="PAID";
+      item.followup_status="已结清";
+    }else{
+      item.status="partial";
+      item.close_status="";
+      item.followup_status="部分支付";
+    }
+  }
+  const all_items=[...itemsByRef.values()].map(item=>({
+    ...item,
+    accounting_status:item.status==="settled"?"closed":"open",
+    projection_source:"sessions.entries_json"
+  }));
+  const open_items=all_items.filter(item=>["open","partial"].includes(item.status)&&entryAnchorMoney(item.remaining_arrears)>0);
+  const closed_items=all_items.filter(item=>!open_items.includes(item));
+  const bed=cleanText(opts.bed||"",80).replace(/^#/,"");
+  const filteredOpen=bed?open_items.filter(item=>item.bed===bed):open_items;
+  const filteredClosed=bed?closed_items.filter(item=>item.bed===bed):closed_items;
+  return {
+    source:"cloud_arrears_projection",
+    materialized_from:"sessions.entries_json",
+    readonly:true,
+    active_sessions_count:activeSessions,
+    scanned_anchor_count:scannedAnchors,
+    all_items:bed?[...filteredOpen,...filteredClosed]:all_items,
+    open_items:filteredOpen,
+    closed_items:filteredClosed,
+    total_remaining:entryAnchorMoney(filteredOpen.reduce((sum,item)=>sum+entryAnchorMoney(item.remaining_arrears),0)),
+    open_count:filteredOpen.filter(item=>item.status==="open").length,
+    partial_count:filteredOpen.filter(item=>item.status==="partial").length,
+    settled_count:filteredClosed.filter(item=>item.status==="settled").length
+  };
+}
+__name(buildCloudArrearsProjectionFromSessions,"buildCloudArrearsProjectionFromSessions");
+async function cloudArrearsFetchActiveSessionRows(env,user,opts={}){
+  if(!await empTableExists(env,"sessions").catch(()=>false))return [];
+  const limit=Math.min(Math.max(Number(opts.limit||1000),1),2000);
+  const sessionId=cleanId(opts.session_id||opts.sessionId||"");
+  const params=[user.corpid];
+  let where="corpid=? AND COALESCE(voided_at,'')='' AND COALESCE(handover_status,'')<>'VOID' AND (COALESCE(entries_json,'')<>'' OR COALESCE(export_text,'') LIKE '%ENTRY ANCHORS JSON%')";
+  if(sessionId){
+    where+=" AND id=?";
+    params.push(sessionId);
+  }
+  const rows=await env.DB.prepare(`SELECT id, corpid, anchor_id, date, entries_count, created_by, created_at, operator_id, operator_name, handover_status, exported_at, export_text, source, entries_json, summary_json, voided_at
+    FROM sessions
+    WHERE ${where}
+    ORDER BY date ASC, COALESCE(exported_at,created_at,'') ASC
+    LIMIT ?`).bind(...params,limit).all().catch(()=>({results:[]}));
+  return rows.results||[];
+}
+__name(cloudArrearsFetchActiveSessionRows,"cloudArrearsFetchActiveSessionRows");
+async function rebuildAllCloudArrears(env,user,opts={}){
+  const sessions=await cloudArrearsFetchActiveSessionRows(env,user,opts);
+  return buildCloudArrearsProjectionFromSessions(sessions,opts);
+}
+__name(rebuildAllCloudArrears,"rebuildAllCloudArrears");
+async function updateCloudArrearsProjectionForSession(env,user,sessionId,opts={}){
+  const sessions=await cloudArrearsFetchActiveSessionRows(env,user,{...opts,session_id:sessionId});
+  return buildCloudArrearsProjectionFromSessions(sessions,opts);
+}
+__name(updateCloudArrearsProjectionForSession,"updateCloudArrearsProjectionForSession");
+async function rebuildCloudArrearsForBed(env,user,bed,opts={}){
+  return rebuildAllCloudArrears(env,user,{...opts,bed});
+}
+__name(rebuildCloudArrearsForBed,"rebuildCloudArrearsForBed");
+async function getOpenCloudArrearsForBed(env,user,bed,opts={}){
+  const projection=await rebuildCloudArrearsForBed(env,user,bed,opts);
+  return projection.open_items||[];
+}
+__name(getOpenCloudArrearsForBed,"getOpenCloudArrearsForBed");
 function employeeEntryExportTextWithAnchors(exportText,entries,session){
   const base=String(exportText||"").replace(/\n*==== ENTRY ANCHORS JSON ====\s*[\s\S]*?\s*==== END ENTRY ANCHORS JSON ====\s*$/i,"").trimEnd();
   const normalized=Array.isArray(entries)?entries.map(row=>normalizeEntryAnchor(row)):[];
@@ -2264,11 +2511,12 @@ function empTaskToBossArrear(t){
   const type=/deposit|\u62bc\u91d1/i.test(reason)?"deposit":"rent";
   const directiveStatus=empDirectiveStatus(t);
   const isOverdue=empDirectiveIsOverdue(t);
+  const rawSourceType=cleanText(t?.source_type||t?.source||"",80);
   return {
     id:cleanId(t?.task_id)||empId("arrear-view"),
     task_id:cleanText(t?.task_id||"",100),
     source:cleanText(t?.source||"arrear_tasks",40),
-    source_type:/ttlock/i.test(String(t?.source_type||t?.source||""))?"ttlock_expired_unpaid":"existing_arrears_record",
+    source_type:/ttlock/i.test(String(t?.source_type||t?.source||""))?"ttlock_expired_unpaid":(rawSourceType||"existing_arrears_record"),
     source_ref:cleanText(t?.source_ref||t?.task_id||"",120),
     dedupe_key:cleanText(t?.source_ref||t?.task_id||"",120)||[
       cleanText(t?.source||"arrear_tasks",40),
@@ -3129,6 +3377,43 @@ async function empCachedTtlockRowsForConsoleSot(env,user,opts={}){
   return {rows:rows.slice(0,limit),byStatus,missingRent:[],source_status:empSourceStatus(true,"",{data_source:"materialized_cache",source_function:"materialized_ttlock_arrear_tasks",count:rows.length})};
 }
 __name(empCachedTtlockRowsForConsoleSot,"empCachedTtlockRowsForConsoleSot");
+async function empAppendCloudArrearsProjectionRows(env,user,tasks,seenIds,seenKeys,source_status,opts={}){
+  let added=0;
+  try{
+    const projection=await rebuildAllCloudArrears(env,user,{limit:opts.limit||1000});
+    for(const item of projection.open_items||[]){
+      const mappedId=cleanText(item.task_id||item.arrears_ref||"",160);
+      const mappedKey=[
+        cleanText(item.bed||"",160),
+        cleanText(item.entry_id||item.original_entry_id||item.source_event_id||"",120),
+        empTaskRemaining(item).toFixed(2)
+      ].join("|");
+      if((mappedId&&seenIds.has(mappedId))||seenKeys.has(mappedKey))continue;
+      if(empTaskRemaining(item)>0){
+        tasks.push(item);
+        added++;
+        if(mappedId)seenIds.add(mappedId);
+        seenKeys.add(mappedKey);
+      }
+    }
+    source_status.existing_arrears_record={
+      ...(source_status.existing_arrears_record||empSourceStatus(true,"")),
+      ok:true,
+      projection:"sessions.entries_json",
+      projection_count:added,
+      projection_active_sessions:projection.active_sessions_count,
+      projection_total_remaining:projection.total_remaining
+    };
+  }catch(e){
+    source_status.existing_arrears_record={
+      ...(source_status.existing_arrears_record||empSourceStatus(false,"projection_failed")),
+      projection:"sessions.entries_json",
+      projection_error:empReadErrorCode(e)
+    };
+  }
+  return added;
+}
+__name(empAppendCloudArrearsProjectionRows,"empAppendCloudArrearsProjectionRows");
 async function empLoadExistingArrearsRowsForConsoleSot(env,user,opts={}){
   const limit=Math.min(Math.max(Number(opts.limit||500),1),500);
   const tasks=[];
@@ -3169,6 +3454,7 @@ async function empLoadExistingArrearsRowsForConsoleSot(env,user,opts={}){
       else source_status.existing_arrears_record={...source_status.existing_arrears_record,legacy_error:empReadErrorCode(e)};
     }
   }
+  await empAppendCloudArrearsProjectionRows(env,user,tasks,seenIds,seenKeys,source_status,{limit});
   const rows=[];
   const seenMapped=new Set();
   for(const row of tasks.map(empTaskToBossArrear)){
@@ -3330,6 +3616,7 @@ async function empListMergedArrearTasksDetailed(env,user,opts={}){
       else source_status.existing_arrears_record={...source_status.existing_arrears_record,legacy_error:empReadErrorCode(e)};
     }
   }
+  await empAppendCloudArrearsProjectionRows(env,user,tasks,seenIds,seenKeys,source_status,{limit});
   const ttlock=await empLoadTtlockConsoleUnresolvedForArrears(env,user,tasks,{timeoutMs:opts.ttlockTimeoutMs||8000});
   ttlockRows=ttlock.rows||[];
   ttlockMissingRent=ttlock.missingRent||[];
@@ -4112,6 +4399,8 @@ async function bedTransferActiveTenantSnapshot(env,user,fromBed){
 }
 __name(bedTransferActiveTenantSnapshot,"bedTransferActiveTenantSnapshot");
 async function bedTransferOpenArrearsAed(env,user,fromBed){
+  const projectionRows=await getOpenCloudArrearsForBed(env,user,fromBed,{limit:1000}).catch(()=>[]);
+  if(projectionRows.length)return projectionRows.reduce((sum,row)=>sum+entryAnchorMoney(row.remaining_arrears||empTaskRemaining(row)),0);
   if(!await empTableExists(env,"arrear_tasks").catch(()=>false))return 0;
   const rows=await env.DB.prepare(`SELECT arrear_amount, actual_received, close_status
     FROM arrear_tasks
@@ -4416,6 +4705,29 @@ async function handleOwnerBedTransfers(request,env,user){
   });
 }
 __name(handleOwnerBedTransfers,"handleOwnerBedTransfers");
+async function handleOwnerCloudArrearsProjection(request,env,user){
+  if(!canReadOwnerData(user))return forbidden();
+  const url=new URL(request.url);
+  const bed=cleanText(url.searchParams.get("bed")||"",80).replace(/^#/,"");
+  const sessionId=cleanId(url.searchParams.get("session_id")||url.searchParams.get("sessionId")||"");
+  const limit=Math.min(Math.max(Number(url.searchParams.get("limit")||1000),1),2000);
+  const projection=sessionId
+    ? await updateCloudArrearsProjectionForSession(env,user,sessionId,{limit,bed})
+    : bed
+      ? await rebuildCloudArrearsForBed(env,user,bed,{limit})
+      : await rebuildAllCloudArrears(env,user,{limit});
+  return success({
+    success:true,
+    projection,
+    open_items:projection.open_items||[],
+    closed_items:projection.closed_items||[],
+    source:"cloud_arrears_projection",
+    materialized_from:"sessions.entries_json",
+    readonly:true,
+    production_cutover:"PRODUCTION_NO_GO"
+  });
+}
+__name(handleOwnerCloudArrearsProjection,"handleOwnerCloudArrearsProjection");
 async function handleEmployeeApi(request,env,user){
   const path=new URL(request.url).pathname;
   if(isReadonlyAdminRoleValue(user?.role)&&request.method!=="GET")return forbidden();
@@ -4767,18 +5079,40 @@ async function ownerOverviewFetchEntryEventTransactions(env,user,range){
 }
 __name(ownerOverviewFetchEntryEventTransactions,"ownerOverviewFetchEntryEventTransactions");
 async function ownerOverviewFetchArrears(env,user){
-  if(!await phase0TableExists(env,"arrear_tasks"))return [];
+  const projection=await rebuildAllCloudArrears(env,user,{limit:1000}).catch(()=>({open_items:[]}));
+  const projectedRows=[...(projection.open_items||[])];
+  const seenIds=new Set(projectedRows.map(row=>cleanText(row.task_id||row.arrears_ref||"",160)).filter(Boolean));
+  const seenKeys=new Set(projectedRows.map(row=>[
+    cleanText(row.bed||row.room||"",160),
+    cleanText(row.entry_id||row.original_entry_id||row.source_event_id||"",120),
+    empTaskRemaining(row).toFixed(2)
+  ].join("|")));
+  if(!await phase0TableExists(env,"arrear_tasks"))return projectedRows;
+  let rows=[];
   try{
-    return phase0All(env,
+    rows=await phase0All(env,
       "SELECT task_id, customer_code, room_bed, room, bed_no, arrear_amount, actual_received, close_status, accounting_status, followup_status, directive_status, promise_date, promise_amount, promised_payment_date, promised_amount_fils, staff_note, followup_note, source_type, due_date, created_at, updated_at, userid FROM arrear_tasks WHERE corpid=? AND COALESCE(close_status,'')<>'closed' AND COALESCE(accounting_status,'')<>'voided' ORDER BY COALESCE(room_bed,room,bed_no,''), task_id LIMIT 1000",
       [user.corpid]
     );
   }catch{
-    return phase0All(env,
+    rows=await phase0All(env,
       "SELECT task_id, room AS room_bed, room, arrear_amount, actual_received, close_status, followup_status, promise_date, staff_note, created_at, updated_at, userid FROM arrear_tasks WHERE corpid=? AND COALESCE(close_status,'')<>'closed' ORDER BY COALESCE(room,''), task_id LIMIT 1000",
       [user.corpid]
     ).catch(()=>[]);
   }
+  for(const row of rows||[]){
+    const rowId=cleanText(row.task_id||row.source_ref||"",160);
+    const key=[
+      cleanText(row.bed||row.room_bed||row.room||row.bed_no||"",160),
+      cleanText(row.entry_id||row.original_entry_id||"",120),
+      empTaskRemaining(row).toFixed(2)
+    ].join("|");
+    if((rowId&&seenIds.has(rowId))||seenKeys.has(key))continue;
+    projectedRows.push(row);
+    if(rowId)seenIds.add(rowId);
+    seenKeys.add(key);
+  }
+  return projectedRows;
 }
 __name(ownerOverviewFetchArrears,"ownerOverviewFetchArrears");
 function ownerOverviewMoney(value){
@@ -5161,6 +5495,7 @@ async function handlePhase0ReadOnlyApi(request,env,user){
     if(path==="/api/owner/properties")return phase0Properties(env,user,url);
     if(path==="/api/owner/totals")return phase0DashboardTotals(env,user);
     if(path==="/api/owner/bed-transfers")return handleOwnerBedTransfers(request,env,user);
+    if(path==="/api/owner/cloud-arrears/projection")return handleOwnerCloudArrearsProjection(request,env,user);
     if(path==="/api/owner/console-receivables-sot"||path==="/api/owner/current-receivables-sot"){
       const limit=Math.min(Math.max(Number(url.searchParams.get("limit")||500),1),500);
       return success(await resolveConsoleReceivablesSot(env,user,{limit,ttlockTimeoutMs:8000}));
@@ -5981,6 +6316,9 @@ async function handleRequest(request, env, ctx) {
     if (path === "/api/owner/bed-transfers" && method === "GET") {
       return handleOwnerBedTransfers(request, env, user);
     }
+    if (path === "/api/owner/cloud-arrears/projection" && method === "GET") {
+      return handleOwnerCloudArrearsProjection(request, env, user);
+    }
     if (path === "/api/arrears" && method === "GET") {
       return handleBossArrears(request, env, user);
     }
@@ -6332,6 +6670,9 @@ async function handleRequest(request, env, ctx) {
     if (path === "/api/owner/overview/comparative-summary" && method === "GET") {
       if (!canReadOwnerData(user)) return forbidden();
       return phase0OwnerOverviewComparativeSummary(env,user,url);
+    }
+    if (path === "/api/owner/cloud-arrears/projection" && method === "GET") {
+      return handleOwnerCloudArrearsProjection(request, env, user);
     }
     if (path === "/api/history") {
       if(!await empTableExists(env,"sessions"))return success([]);

@@ -352,6 +352,7 @@
     "test:employee-entry-arrears-payment-flow": "node --test tests/employee-entry-arrears-payment-flow.spec.mjs",
     "test:employee-entry-arrears-payment-complete-flow": "node --test tests/employee-entry-arrears-payment-complete-flow.spec.mjs",
     "test:cloud-arrears-anchor": "node --test tests/cloud-arrears-anchor.spec.mjs",
+    "test:cloud-arrears-projection-from-sessions": "node --test tests/cloud-arrears-projection-from-sessions.spec.mjs",
     "test:rent-short-paid-open-arrears": "node --test tests/rent-short-paid-duplicate-arrears.spec.mjs",
     "test:duplicate-rent-does-not-close-arrears": "node --test tests/rent-short-paid-duplicate-arrears.spec.mjs",
     "test:left-with-arrears-compact-form": "node --test tests/employee-checkout-left-with-arrears.spec.mjs",
