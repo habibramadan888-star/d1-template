@@ -62,8 +62,9 @@ test("templates keep event-specific forbidden fields out of the active main flow
   assert.match(checkout, /forbidden_fields:\['listPrice','periodStep','periodStart','periodEnd','periodDue','due','paid','entryClr','depositOutFields','paymentStep','amount','transferFields','expenseFields'\]/);
 
   const expense = templateBlock(html, "expense");
-  assert.match(expense, /fields:\['selectedEventWrap','paymentStep','amount','expenseFields','remark'\]/);
-  assert.match(expense, /forbidden_fields:\['genericBedFieldWrap','periodStep','linkedTaskId','depositOutFields','checkoutFields','transferFields','listPrice'\]/);
+  assert.match(expense, /fields:\['selectedEventWrap','genericBedFieldWrap','paymentStep','amount','expenseFields','remark'\]/);
+  assert.match(expense, /required_fields:\['target_bed','expense_amount','expense_category','payment_method','reason'\]/);
+  assert.match(expense, /forbidden_fields:\['periodStep','linkedTaskId','depositOutFields','checkoutFields','transferFields','listPrice'\]/);
 
   const transfer = templateBlock(html, "bed_transfer");
   assert.match(transfer, /fields:\['selectedEventWrap','transferFromBed','bedTo','transferDate','feePaid','transferReason','transferWaiverReasonWrap','remark'\]/);

@@ -1086,8 +1086,72 @@ label .label-en{
   font-size:12px;
   font-weight:900;
 }
+.bed-info-strip{
+  display:grid;
+  gap:6px;
+  margin-top:8px;
+  border:1px solid rgba(148,163,184,.26);
+  border-radius:16px;
+  background:rgba(248,250,252,.88);
+  padding:10px 12px;
+  font-size:12px;
+  line-height:1.35;
+}
+.bed-info-strip.warn{
+  border-color:rgba(245,158,11,.42);
+  background:linear-gradient(135deg,rgba(255,251,235,.95),rgba(255,255,255,.9));
+}
+.bed-info-strip.ok{
+  border-color:rgba(34,197,94,.34);
+  background:linear-gradient(135deg,rgba(240,253,244,.95),rgba(255,255,255,.9));
+}
+.bed-info-strip .bed-info-main{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  color:#111827;
+  font-weight:900;
+}
+.bed-info-strip .bed-info-main small,
+.bed-info-strip .bed-info-row small{
+  display:block;
+  color:#6b7280;
+  font-size:10px;
+  font-weight:650;
+}
+.bed-info-strip .bed-info-badge{
+  border-radius:999px;
+  padding:4px 8px;
+  border:1px solid rgba(148,163,184,.28);
+  background:#fff;
+  color:#334155;
+  font-size:11px;
+  font-weight:900;
+  white-space:nowrap;
+}
+.bed-info-strip.warn .bed-info-badge{
+  border-color:#fde68a;
+  background:#fffbeb;
+  color:#92400e;
+}
+.bed-info-strip.ok .bed-info-badge{
+  border-color:#bbf7d0;
+  background:#ecfdf5;
+  color:#047857;
+}
+.bed-info-strip .bed-info-rows{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:6px 10px;
+}
+.bed-info-strip .bed-info-row{
+  min-width:0;
+  color:#334155;
+  word-break:break-word;
+}
 @media(max-width:720px){
-  .open-arrears-grid{grid-template-columns:1fr}
+  .open-arrears-grid,.bed-info-strip .bed-info-rows{grid-template-columns:1fr}
 }
 .pay-option .label-en{
   display:block;
@@ -2921,7 +2985,7 @@ label .label-en{
             <option value="R">R 收租</option><option value="D">D 收押金</option><option value="DR">DR 退押金</option><option value="CO">CO 退房</option><option value="AP">AP 还欠款</option><option value="E">E 支出</option><option value="TF">TF 换床</option>
           </select></div>
           <div class="field" id="selectedEventWrap"><label>Selected Event<span class="label-en">已选事件</span></label><div id="selectedEventDisplay" class="readonly-pill">Rent / 收租</div></div>
-          <div class="field" id="genericBedFieldWrap"><label>床位 BED</label><input id="bed" placeholder="431" autocomplete="off"></div>
+          <div class="field" id="genericBedFieldWrap"><label>床位 BED</label><input id="bed" placeholder="431" autocomplete="off"><div id="employeeBedInfoStrip" class="bed-info-strip hidden" data-bed-info-strip="true"></div></div>
         </div>
         <div class="small" id="objectHint">收租/收押金/退押金/还欠款：填写床位号；换床：填写原床位后再填新床位；支出：选择支出类别。</div>
         <div id="bedTransferStep2Mount" data-bed-transfer-step2="true"></div>
@@ -3011,7 +3075,7 @@ label .label-en{
           </div>
         </div>
         <div class="grid" id="transferFields">
-          <div class="field"><label>原床位 from_bed</label><input id="transferFromBed" data-bed-transfer-from="true" placeholder="431"></div>
+          <div class="field"><label>原床位 from_bed</label><input id="transferFromBed" data-bed-transfer-from="true" placeholder="431"><div id="employeeTransferFromBedInfoStrip" class="bed-info-strip hidden" data-bed-transfer-bed-info-strip="true"></div></div>
           <div class="field"><label>新床位 to_bed</label><input id="bedTo" data-bed-transfer-to="true" placeholder="852"></div>
           <div class="field"><label>换床日期 transfer_date</label><input id="transferDate" data-bed-transfer-date="true" type="date"></div>
           <div class="field"><label>换床原因 reason</label><select id="transferReason" data-bed-transfer-reason="true"><option value="">请选择原因</option><option value="customer_request">customer request / 客户要求</option><option value="room_issue">room issue / 房间问题</option><option value="management_adjustment">management adjustment / 管理调整</option><option value="bed_upgrade">bed upgrade / 升级</option><option value="other">other / 其他</option></select></div>
@@ -3159,7 +3223,7 @@ function readSessionId(userid){
   try{return localStorage.getItem(employeeStorageKey('empv3:sessionId',userid))||''}
   catch{return ''}
 }
-const state={lockCards:[],current:null,depositBalance:null,rentConfig:{},rentConfigLoaded:false,drafts:[],tasks:[],closedTasks:[],employeeDirectives:[],followupItems:[],systemReminderItems:[],systemReminderStatus:'idle',systemReminderSummary:null,systemReminderSources:null,systemReminderLimit:100,sessionId:'',user:null,ttlockStatus:'idle',ttlockLoadedAt:0,ttlockError:'',ttlockDataSource:''};
+const state={lockCards:[],current:null,depositBalance:null,rentConfig:{},rentConfigLoaded:false,drafts:[],tasks:[],closedTasks:[],arrearsTasksLoaded:false,employeeDirectives:[],followupItems:[],systemReminderItems:[],systemReminderStatus:'idle',systemReminderSummary:null,systemReminderSources:null,systemReminderLimit:100,sessionId:'',user:null,ttlockStatus:'idle',ttlockLoadedAt:0,ttlockError:'',ttlockDataSource:''};
 const BED_TRANSFER_WRITE_ENABLED=true;
 const BED_TRANSFER_EVENT_LEDGER_MESSAGE='Bed transfer records save event anchors only. This does not directly change bed occupancy, deposit, arrears, or Access Card. 换床记录只保存信息锚点，不会直接改变床位、押金、欠款或门禁卡。';
 const BED_TRANSFER_SUBMITTED_MESSAGE='Bed transfer recorded / 换床记录已保存';
@@ -3555,11 +3619,11 @@ function normalizeCard(raw){
   return {bed,remark_bed:anchors.bed,room,tenant,tenant_card_id:String(cid),deposit,start,start_md:anchors.start_md,end,remark,cardText,vacant,staff_bed,followup_class:staff_bed?'staff':(vacant?'vacant':'customer'),searchText:text,remark_parse_ok:anchors.ok,remark_parse_missing:anchors.missing||[],raw};
 }
 function lookupBed(){
-  const bed=$('bed').value.trim().replace(/^#/,'');if(!bed){state.current=null;renderContext();return}
+  const bed=$('bed').value.trim().replace(/^#/,'');if(!bed){state.current=null;renderEmployeeBedInfoStrips();renderContext();return}
   const exact=state.lockCards.filter(c=>String(c.bed)===bed);
   const loose=state.lockCards.filter(c=>new RegExp(`(^|\\D)${bed}(\\D|$)`).test(String(c.searchText||'')));
   if(!exact.length){
-    state.current=null;$('tenantName').value='';$('tenantCardId').value='';state.depositBalance=null;renderContext();
+    state.current=null;$('tenantName').value='';$('tenantCardId').value='';state.depositBalance=null;renderEmployeeBedInfoStrips();renderContext();
     toast(loose.length?'找到相关文本，但没有可靠的备注床位匹配。请检查门禁卡备注格式：床位 D押金 入住月日。':'未找到该床位的门禁卡，请先刷新或检查备注。',6000);
     syncForm();
     return;
@@ -3572,6 +3636,7 @@ function lookupBed(){
   $('listPrice').value=rent?fmtMoney(rent):'';
   if(c.deposit&&$('entryType').value==='D'&&!$('amount').value)$('amount').value=fmtMoney(c.deposit);
   state.depositBalance=null;
+  renderEmployeeBedInfoStrips();
   renderContext();
   const cid=$('tenantCardId').value.trim()||c.tenant_card_id||'';
   if(cid)loadDepositBalance(cid);
@@ -3773,6 +3838,83 @@ function openTasksForBed(){
   const bed=$('bed').value.trim().replace(/^#/,'');
   const cid=$('tenantCardId').value.trim();
   return state.tasks.filter(t=>!['PAID','CLEARED','CLOSED','VOID','已结清','结清','作废','WRITTEN_OFF','WAIVED'].includes(String(t.close_status||''))&&taskRemain(t)>0&&((bed&&String(t.bed||'')===bed)||(cid&&String(t.tenant_card_id||'')===cid)));
+}
+function employeeNormalizeBedValue(value){
+  return String(value||'').trim().replace(/^#/,'');
+}
+function employeeOpenTasksForBedValue(bedValue){
+  const bed=employeeNormalizeBedValue(bedValue);
+  if(!bed)return [];
+  const closed=new Set(['PAID','SETTLED','CLEARED','CLOSED','VOID','WRITTEN_OFF','WAIVED','已结清','结清','作废','豁免']);
+  return (state.tasks||[]).filter(t=>{
+    const status=String(t.close_status||t.status||t.task_status||'').trim().toUpperCase();
+    const taskBed=employeeNormalizeBedValue(t.bed||t.room_bed||t.room||t.target_bed);
+    return taskBed===bed&&taskRemain(t)>0&&!closed.has(status);
+  });
+}
+function employeeFindCardForBedValue(bedValue){
+  const bed=employeeNormalizeBedValue(bedValue);
+  if(!bed)return null;
+  const cards=state.lockCards||[];
+  const exact=cards.filter(c=>String(c.bed||'')===bed);
+  if(exact.length)return exact.find(c=>!c.vacant)||exact[0]||null;
+  const rx=new RegExp(`(^|\\D)${bed}(\\D|$)`);
+  return cards.find(c=>rx.test(String(c.searchText||c.remark||c.cardText||'')))||null;
+}
+function employeeCardUntilText(card){
+  return String(card?.end||card?.end_date||card?.valid_until||card?.validTo||'').trim();
+}
+function employeeCardStatus(card){
+  if(!card)return {en:'No Card Data',zh:'无门禁卡数据',kind:'neutral'};
+  const until=employeeCardUntilText(card);
+  if(!until)return {en:'Needs Review',zh:'需要核对',kind:'neutral'};
+  const parsed=new Date(until.replace(' ','T'));
+  if(Number.isNaN(parsed.getTime()))return {en:'Needs Review',zh:'需要核对',kind:'neutral'};
+  const days=(parsed.getTime()-Date.now())/86400000;
+  if(days<0)return {en:'Expired',zh:'已过期',kind:'warn'};
+  if(days<=3)return {en:'Due Soon',zh:'即将到期',kind:'warn'};
+  return {en:'Active',zh:'有效',kind:'ok'};
+}
+function employeeRenderBedInfoStrip(el,bedValue,{label='Bed',labelZh='床位'}={}){
+  if(!el)return;
+  const bed=employeeNormalizeBedValue(bedValue);
+  if(!bed){
+    el.className='bed-info-strip hidden';
+    el.innerHTML='';
+    return;
+  }
+  const loading=state.ttlockStatus==='loading'||state.arrearsTasksLoaded===false;
+  const open=employeeOpenTasksForBedValue(bed);
+  const arrearsTotal=open.reduce((sum,t)=>sum+taskRemain(t),0);
+  const card=employeeFindCardForBedValue(bed);
+  const status=employeeCardStatus(card);
+  const cardName=card?(card.remark||card.cardText||card.tenant||card.room||card.bed||'Access Card'):'';
+  const cardUntil=employeeCardUntilText(card);
+  const stripKind=open.length?'warn':(status.kind==='ok'?'ok':(status.kind==='warn'?'warn':''));
+  el.className=`bed-info-strip ${stripKind}`.trim();
+  const badge=loading?'Loading Bed Info':(open.length?'Open Arrears':'No Open Arrears');
+  const badgeZh=loading?'正在读取床位信息':(open.length?'未清欠款':'无未清欠款');
+  const cardLine=state.ttlockStatus==='error'&&!card?'Bed Info Unavailable':(cardName||'No Card Data');
+  const cardLineZh=state.ttlockStatus==='error'&&!card?'床位信息暂不可用':(cardName?'门禁卡':'无门禁卡数据');
+  el.innerHTML=`<div class="bed-info-main"><div>${esc(label)} ${esc(bed)}<small>${esc(labelZh)} ${esc(bed)}</small></div><span class="bed-info-badge">${esc(badge)}<small>${esc(badgeZh)}</small></span></div>
+    <div class="bed-info-rows">
+      <div class="bed-info-row"><b>Open Arrears: ${open.length?fmtMoney(arrearsTotal)+' AED':'No Open Arrears'}</b><small>${open.length?'未清欠款：'+fmtMoney(arrearsTotal)+' AED':'无未清欠款'}</small></div>
+      <div class="bed-info-row"><b>Access Card: ${esc(cardLine)}</b><small>${esc(cardLineZh)}</small></div>
+      <div class="bed-info-row"><b>Card Until: ${esc(cardUntil||'No Card Data')}</b><small>${cardUntil?'卡片截止：'+esc(cardUntil):'无门禁卡数据'}</small></div>
+      <div class="bed-info-row"><b>Status: ${esc(status.en)}</b><small>状态：${esc(status.zh)}</small></div>
+    </div>`;
+}
+let employeeBedInfoStripTimer=null;
+function renderEmployeeBedInfoStrips(){
+  employeeRenderBedInfoStrip($('employeeBedInfoStrip'),$('bed')?.value,{label:$('entryType')?.value==='E'?'Target Bed / Room':'Bed',labelZh:$('entryType')?.value==='E'?'目标床位 / 房间':'床位'});
+  employeeRenderBedInfoStrip($('employeeTransferFromBedInfoStrip'),$('transferFromBed')?.value,{label:'From Bed',labelZh:'原床位'});
+}
+function employeeScheduleBedInfoStrip(){
+  if(employeeBedInfoStripTimer)clearTimeout(employeeBedInfoStripTimer);
+  employeeBedInfoStripTimer=setTimeout(()=>{
+    employeeBedInfoStripTimer=null;
+    renderEmployeeBedInfoStrips();
+  },160);
 }
 function openTaskForCurrentRentPeriod(){
   const ps=$('periodStart').value;
@@ -4039,6 +4181,8 @@ function employeeSetFieldLabel(id,en,zh){
   if(label)label.innerHTML=`${esc(en)}<span class="label-en">${esc(zh)}</span>`;
 }
 function employeeApplyEventSpecificFieldLabels(type){
+  if(type==='E')employeeSetFieldLabel('bed','Target Bed / Room','目标床位 / 房间');
+  else employeeSetFieldLabel('bed','Bed','床位');
   if(type==='DR'){
     employeeSetFieldLabel('amount','Actual Refund Amount','\u5b9e\u9000\u91d1\u989d');
     employeeSetFieldLabel('payType','Refund Method','\u9000\u6b3e\u65b9\u5f0f');
@@ -4195,6 +4339,7 @@ function validateCheckoutEntry(){
 }
 function validateExpenseEntry(){
   const errors=[],warns=[];
+  employeeRequire(errors,!!employeeTrimField('bed'),'Target Bed / Room is required.');
   employeeValidateCommonAmount(errors,{label:'Expense Amount'});
   employeeRequire(errors,!!employeeTrimField('expenseCategory'),'Expense Category is required.');
   employeeRequire(errors,!!employeePaymentMethodValue(),'Payment Method is required.');
@@ -4297,7 +4442,8 @@ function buildExpenseAnchor(){
   const amount=num(employeeFieldValue('amount'));
   const category=employeeTrimField('expenseCategory');
   const note=employeeTrimField('expenseDesc')||employeeTrimField('remark');
-  const payload=employeeBaseEntryPayload('E',{reason_code:category||'E',cat:'expense',room:employeeTrimField('bed').replace(/^#/,''),amount,due:amount,paid:amount,expense_category:category,expense_desc:note,note,remark:note});
+  const targetBed=employeeTrimField('bed').replace(/^#/,'');
+  const payload=employeeBaseEntryPayload('E',{reason_code:category||'E',cat:'expense',room:targetBed,target_bed:targetBed,amount,due:amount,paid:amount,expense_category:category,expense_desc:note,note,remark:note});
   return applyEntryAnchors(payload);
 }
 function buildBedTransferAnchor(){
@@ -4362,10 +4508,10 @@ const entryTemplates={
   },
   expense:{
     code:'E',event_type:'expense',title:['Expense','\u652f\u51fa'],
-    fields:['selectedEventWrap','paymentStep','amount','expenseFields','remark'],
-    required_fields:['expense_amount','expense_category','payment_method','reason'],
+    fields:['selectedEventWrap','genericBedFieldWrap','paymentStep','amount','expenseFields','remark'],
+    required_fields:['target_bed','expense_amount','expense_category','payment_method','reason'],
     system_read_fields:[],
-    forbidden_fields:['genericBedFieldWrap','periodStep','linkedTaskId','depositOutFields','checkoutFields','transferFields','listPrice'],
+    forbidden_fields:['periodStep','linkedTaskId','depositOutFields','checkoutFields','transferFields','listPrice'],
     validator:validateExpenseEntry,anchorBuilder:buildExpenseAnchor,uploadValidation:uploadValidationByEventType,whatsappRenderer:renderEntryAnchorForWhatsapp,ownerDetailRenderer:renderEntryAnchorForOwner
   },
   bed_transfer:{
@@ -4400,6 +4546,7 @@ function employeeEntryActiveEditable(){
 }
 let employeeBedLookupTimer=null;
 function employeeScheduleLookupBed(){
+  employeeScheduleBedInfoStrip();
   if(employeeBedLookupTimer)clearTimeout(employeeBedLookupTimer);
   employeeBedLookupTimer=setTimeout(()=>{
     employeeBedLookupTimer=null;
@@ -4425,6 +4572,7 @@ function employeeMountEntryTemplate(type=$('entryType')?.value){
   const existingBody=mount.querySelector(':scope > .event-template-fields');
   if(mount.dataset.eventTemplate===key&&existingBody){
     mount.dataset.eventType=template.event_type;
+    renderEmployeeBedInfoStrips();
     return template;
   }
   const uniqueNodes=new Set();
@@ -4456,6 +4604,7 @@ function employeeMountEntryTemplate(type=$('entryType')?.value){
     const node=employeeTemplateNode(id);
     if(node&&node.parentElement===parking)node.removeAttribute('data-active-event-template');
   });
+  renderEmployeeBedInfoStrips();
   return template;
 }
 function eventLabel(type){
@@ -4850,7 +4999,7 @@ function syncForm(){
     if(!$('transferDate').value)$('transferDate').value=today();
   }
   updateEventChips();
-  $('objectHint').textContent=type==='E'?'支出不需要床位时可以只选择类别；如果是指定房间维修，可在备注写床位。':(type==='TF'?'换床需要填写原床位和新床位，系统会保留换床前后锚点。':(type==='AP'?'还欠款只针对云端未清欠款，不使用本期账期。请输入床位后选择要偿还的欠款。':'收租/收押金/退押金：填写床位号，系统自动抓取租客上下文。'));
+  $('objectHint').textContent=type==='E'?'Expense requires Target Bed / Room. Enter the related bed or room before adding to session. / 支出必须填写目标床位或房间。':(type==='TF'?'Bed Transfer requires From Bed and To Bed. / 换床需要填写原床位和新床位。':(type==='AP'?'Arrears Payment uses cloud open arrears for the selected bed only. / 还欠款只针对云端未清欠款，不使用本期账期。':'Enter Bed first. The system shows open arrears and access card status below. / 请先填写床位，系统会显示欠款和门禁卡状态。'));
   if($('btnSaveEntry'))$('btnSaveEntry').innerHTML=type==='TF'?renderEmployeeButtonLabel('Record Transfer','保存换床记录'):renderEmployeeButtonLabel('Add to Session','加入本票');
   visible(['periodStep'],hasPeriod);visible(['apFields'],type==='AP');visible(['checkoutFields'],type==='CO');visible(['transferFields'],type==='TF');visible(['expenseFields'],type==='E');visible(['paymentStep'],type!=='CO');visible(['genericBedFieldWrap'],type!=='TF');
   updatePaymentButtons();
@@ -4919,13 +5068,14 @@ function syncForm(){
   renderContextNotice();
   updateBedTransferReviewPanel();
   renderSummary();
+  renderEmployeeBedInfoStrips();
   validate();
 }
 function validateDeprecatedGenericEntryValidation(){
   const type=$('entryType').value, errors=[], warns=[];
   const amt=num($('amount').value), due=num($('due').value);
   const amountOptional=['CO','TF'].includes(type)&&amt===0;
-  if(!$('bed').value.trim()&&type!=='E')errors.push('必须填写床位。');
+  if(!$('bed').value.trim()&&type!=='TF')errors.push(type==='E'?'Expense must include Target Bed / Room.':'必须填写床位。');
   if((!amt||amt<=0)&&!amountOptional)errors.push('AMT 必须大于 0。');
   if(['D','DR','CO'].includes(type)&&!$('tenantCardId').value.trim())errors.push('押金相关事件必须有门禁卡 CID，押金台账需要跟着租客走。');
   if(state.current&&!state.current.remark_parse_ok)warns.push(`门禁卡备注解析不完整：缺少 ${state.current.remark_parse_missing.join('、')}。请先检查卡片备注是否为“床位 D押金 入住月日”。`);
@@ -5263,6 +5413,7 @@ const employeeUploadStateLegacyLoadTasks=loadTasks;
 loadTasks=async function(render=true){
   await employeeUploadStateLegacyLoadTasks(render);
   state.arrearsTasksLoaded=Array.isArray(state.tasks);
+  renderEmployeeBedInfoStrips();
   refreshSessionViews();
 };
 function employeeDirectiveSourceLabel(source){

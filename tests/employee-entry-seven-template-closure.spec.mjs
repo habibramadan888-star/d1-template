@@ -58,7 +58,7 @@ const events = [
     validator: "validateExpenseEntry",
     builder: "buildExpenseAnchor",
     uploadValidator: "validateExpenseUploadFields",
-    mustHave: ["expense_category", "expense_desc"],
+    mustHave: ["target_bed", "expense_category", "expense_desc"],
     forbidden: ["periodStep", "linkedTaskId", "depositOutFields", "checkoutFields", "listPrice"]
   },
   {

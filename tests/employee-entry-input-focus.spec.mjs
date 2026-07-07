@@ -11,7 +11,7 @@ test("employee Entry keeps the active template mounted while typing", async () =
   assert.match(html, /const existingBody=mount\.querySelector\(':scope > \.event-template-fields'\);/);
   assert.match(
     html,
-    /if\(mount\.dataset\.eventTemplate===key&&existingBody\)\{\s*mount\.dataset\.eventType=template\.event_type;\s*return template;\s*\}/s,
+    /if\(mount\.dataset\.eventTemplate===key&&existingBody\)\{\s*mount\.dataset\.eventType=template\.event_type;\s*renderEmployeeBedInfoStrips\(\);\s*return template;\s*\}/s,
     "same event template must not be replaceChildren-remounted during input"
   );
 
@@ -50,4 +50,3 @@ test("bed lookups are debounced so typing does not trigger full lookup per chara
     /\$\(\'transferFromBed\'\)\.addEventListener\('input',\(\)=>\{if\(\$\(\'entryType\'\)\.value===\'TF\'\)\{\$\(\'bed\'\)\.value=\$\(\'transferFromBed\'\)\.value\.trim\(\)\.replace\(\/\^#\/,''\);employeeScheduleLookupBed\(\);syncForm\(\);\}\}\);/
   );
 });
-
