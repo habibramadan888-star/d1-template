@@ -24,7 +24,7 @@ test("Bed Transfer from/to bed inputs can be cleared before validation", async (
   assert.match(genericListener, /bedTo/, "To Bed remains a normal controlled input and can be empty.");
   assert.match(
     html,
-    /\$\(\'transferFromBed\'\)\.addEventListener\('input',\(\)=>\{if\(\$\(\'entryType\'\)\.value===\'TF\'\)\{\$\(\'bed\'\)\.value=\$\(\'transferFromBed\'\)\.value\.trim\(\)\.replace\(\s*\/\^#\/,\s*\'\'\);lookupBed\(\);syncForm\(\);\}\}\);/
+    /\$\(\'transferFromBed\'\)\.addEventListener\('input',\(\)=>\{if\(\$\(\'entryType\'\)\.value===\'TF\'\)\{\$\(\'bed\'\)\.value=\$\(\'transferFromBed\'\)\.value\.trim\(\)\.replace\(\s*\/\^#\/,\s*\'\'\);employeeScheduleLookupBed\(\);syncForm\(\);\}\}\);/
   );
   assert.match(html, /if\(type==='TF'&&!\$\(\'transferFromBed\'\)\.value\.trim\(\)\)errors\.push/);
   assert.match(html, /if\(type==='TF'&&!\$\(\'bedTo\'\)\.value\.trim\(\)\)errors\.push/);

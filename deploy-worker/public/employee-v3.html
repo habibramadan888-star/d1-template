@@ -4386,6 +4386,18 @@ function employeeTemplateParking(){
   return $('employeeTemplateFieldParking')||document.body.appendChild(Object.assign(document.createElement('div'),{id:'employeeTemplateFieldParking',hidden:true}));
 }
 function employeeTemplateMount(){return $('employeeEventTemplateMount');}
+function employeeEntryActiveEditable(){
+  const el=document.activeElement;
+  return !!(el&&el.closest?.('#view-entry')&&['INPUT','TEXTAREA'].includes(el.tagName));
+}
+let employeeBedLookupTimer=null;
+function employeeScheduleLookupBed(){
+  if(employeeBedLookupTimer)clearTimeout(employeeBedLookupTimer);
+  employeeBedLookupTimer=setTimeout(()=>{
+    employeeBedLookupTimer=null;
+    lookupBed();
+  },250);
+}
 function employeeTemplateMarkLegacyShells(){
   const step2=typeof employeeFindEntryStep==='function'?employeeFindEntryStep(2):null;
   const amountShell=fieldWrap('amount')?.closest('.step');
@@ -4402,6 +4414,11 @@ function employeeMountEntryTemplate(type=$('entryType')?.value){
   const parking=employeeTemplateParking();
   if(!mount||!parking)return null;
   employeeTemplateMarkLegacyShells();
+  const existingBody=mount.querySelector(':scope > .event-template-fields');
+  if(mount.dataset.eventTemplate===key&&existingBody){
+    mount.dataset.eventType=template.event_type;
+    return template;
+  }
   const uniqueNodes=new Set();
   employeeEntryTemplateNodes.forEach(id=>{
     const node=employeeTemplateNode(id);
@@ -7187,8 +7204,8 @@ document.querySelectorAll('.event-chip').forEach(btn=>btn.addEventListener('clic
 document.querySelectorAll('.pay-option').forEach(btn=>btn.addEventListener('click',e=>{e.preventDefault();setPaymentType(btn.dataset.pay);}));
 ['entryType','cycle','payType','amount','reasonCode','feePaid','transferWaiverReason','customReason','tenantName','bankRef','periodDays','depositOutRefundDate','depositOutDifferenceReason','depositDeduction','checkoutDate','noNoticeDeduction','otherDeduction','dedNote','leftWithArrearsMode','leftFormerCustomerName','leftWhatsappPhone','leftContactMethod','leftContactNote','leftDepositBalance','leftCoverageEndDate','leftArrearsAmount','leftBelongingsHeld','leftBelongingsNote','leftPromisedPaymentDate','leftPromisedReturnDate','leftConfirmedNotReturningDate','leftGraceDays','excessTo','bedTo','transferDate','transferReason','expenseCategory','expenseDesc','remark','arrearHandling','arrearPromiseDate','arrearReasonDetail'].forEach(id=>$(id).addEventListener('input',syncForm));
 $('linkedTaskId').addEventListener('change',applyLinkedTask);
-$('bed').addEventListener('input',()=>{if($('entryType').value==='TF')$('transferFromBed').value=$('bed').value.trim().replace(/^#/,'');lookupBed();if($('entryType').value==='AP'){populateTaskSelect();syncForm();}});
-$('transferFromBed').addEventListener('input',()=>{if($('entryType').value==='TF'){$('bed').value=$('transferFromBed').value.trim().replace(/^#/,'');lookupBed();syncForm();}});
+$('bed').addEventListener('input',()=>{if($('entryType').value==='TF')$('transferFromBed').value=$('bed').value.trim().replace(/^#/,'');employeeScheduleLookupBed();if($('entryType').value==='AP'){populateTaskSelect();syncForm();}});
+$('transferFromBed').addEventListener('input',()=>{if($('entryType').value==='TF'){$('bed').value=$('transferFromBed').value.trim().replace(/^#/,'');employeeScheduleLookupBed();syncForm();}});
 $('transferFromBed').addEventListener('change',()=>{if($('entryType').value==='TF'){$('bed').value=$('transferFromBed').value.trim().replace(/^#/,'');lookupBed();syncForm();}});
 $('tenantCardId').addEventListener('change',e=>{state.depositBalance=null;if(e.target.value.trim())loadDepositBalance(e.target.value.trim());else renderContext();});$('btnLoadLock').onclick=loadLock;$('btnSaveEntry').onclick=saveEntry;$('btnReset').onclick=()=>{resetForm();showStatus('表单已清空。');toast('表单已清空')};$('btnRefreshTasks').onclick=refreshFollowup;$('btnBuildExport').onclick=commitSessionAndExport;$('btnCopyExport').onclick=async()=>{try{await navigator.clipboard.writeText($('exportText').textContent);showStatus('导出文本已复制。');toast('已复制')}catch{showStatus('复制失败，请手动选择导出文本。','warn');toast('复制失败，请手动选择文本',6000)}};$('btnClearLocal').onclick=()=>{if(hasLocalOnly()){showStatus('仍有云端未确认记录，不能清空。','warn');toast('仍有云端未确认记录，不能清空',6000);return}if(confirm('清空本机草稿？')){state.drafts=[];saveDrafts();buildExport();refreshSessionViews();showStatus('本机草稿已清空。');toast('已清空')}};$('btnNewSessionTop').onclick=newSession;$('btnPreviewSession').onclick=previewSession;$('btnWhatsAppSession').onclick=exportEntrySessionWhatsApp;$('btnExportSession').onclick=commitSessionAndExport;$('operatorId').value=localStorage.getItem('empv3:operator')||'';$('operatorId').onchange=e=>{setOperator(e.target.value.trim());refreshSessionViews();showStatus('员工编号已更新。')};
 $('btnClosePreview').onclick=closePreviewModal;
@@ -8315,7 +8332,7 @@ function employeeUpdateCollapsedStepSummaries(validationResult=null){
   const s8=step8?.querySelector(':scope > .employee-collapsible-step-summary');
   if(s3)s3.innerHTML=employeeStep3SummaryHtml();
   if(s8)s8.innerHTML=employeeStep8SummaryHtml(validationResult);
-  employeePrioritizeEntryInputs();
+  if(!employeeEntryActiveEditable())employeePrioritizeEntryInputs();
   employeeRenderOpenArrearsAlert();
 }
 const employeeCollapsedLegacyValidate=validate;

@@ -12,7 +12,8 @@ test("employee Entry required input flow is ordered before reference sections", 
   assert.match(html, /step2\.insertAdjacentElement\('afterend',box\)/);
 
   assert.match(html, /function employeePrioritizeEntryInputs\(\)/);
-  assert.match(html, /const flowEnd=\$\(\'remark\'\)\?\.closest\('\.field'\)\|\|\$\(\'periodStep\'\)\|\|\$\(\'amount\'\)\?\.closest\('\.step'\)\|\|\$\(\'paymentStep\'\)/);
+  assert.match(html, /const legacyFlowEnd=type==='AP'/);
+  assert.match(html, /const flowEnd=templateMount\|\|legacyFlowEnd;/);
   assert.match(html, /flowEnd\.insertAdjacentElement\('afterend',mount\)/);
   assert.match(html, /mount\.appendChild\(validation\)/);
   assert.match(html, /mount\.appendChild\(actionRow\)/);
