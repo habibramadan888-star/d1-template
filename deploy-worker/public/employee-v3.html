@@ -7318,6 +7318,7 @@ renderEmployeeUploadDryRunError=function(result){
     </div>`;
 };
 function employeeRecordValidationError(entry,index){
+  if(entry?.sync_status==='SYNCED'||entry?.upload_status==='SYNCED')return null;
   if(entry?.upload_validation_error)return normalizeEmployeeUploadDryRunError(entry.upload_validation_error,index,entry.sync_error||'');
   if(Number(state.uploadValidationFailedIndex)===index){
     return normalizeEmployeeUploadDryRunError({
@@ -7695,12 +7696,15 @@ async function commitSessionAndExport(){
     updateEntrySessionActionState();
     return;
   }
-  state.drafts=uploadList.map(e=>({...e,sync_status:'SYNCED',upload_status:'SYNCED',upload_validation_error:null,sync_error:''}));
+  state.drafts=uploadList.map(e=>({...e,sync_status:'SYNCED',upload_status:'SYNCED',upload_validation_error:null,upload_validation_error_code:'',sync_error:''}));
   state.sessionId=uploadSessionId;
+  state.uploadValidationFailedIndex=null;
+  state.uploadValidationFailedMessage='';
   saveDrafts();
   buildExport();
   refreshSessionViews();
   renderContext();
+  if($('validationBox'))$('validationBox').innerHTML='';
   if(uploadList.some(e=>['R','AP'].includes(e.type)))setTimeout(()=>loadTasks(false),0);
   uploadTiming.total_ms=Math.round(performance.now()-uploadT0);
   employeeUploadTimingLog('client',uploadTiming);
