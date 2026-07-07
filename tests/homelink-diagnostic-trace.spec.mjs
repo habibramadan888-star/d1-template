@@ -147,13 +147,64 @@ test("employee asset disables stale cache and exposes diagnostic version", async
   const html = await readFile(employeePath, "utf8");
 
   assert.match(worker, /HOMELINK_DIAGNOSTIC_ASSET_VERSION="upload-diagnostic-trace-20260707-001"/);
+  assert.match(worker, /function employeeEntryDiagnosticAssetInfo\(body=\{\}\)/);
+  assert.match(worker, /asset_status:stale\?"STALE_FRONTEND_ASSET":"ASSET_VERSION_OK"/);
+  assert.match(worker, /frontend_asset_version:frontendAssetVersion\|\|null/);
+  assert.match(worker, /expected_frontend_asset_version:expected/);
   assert.match(worker, /Cache-Control", "no-store, no-cache, max-age=0, must-revalidate"/);
   assert.match(worker, /X-Employee-Asset-Version", HOMELINK_DIAGNOSTIC_ASSET_VERSION/);
   assert.match(html, /employee_asset_version:'upload-diagnostic-trace-20260707-001'/);
+  assert.match(html, /frontend_asset_version:'upload-diagnostic-trace-20260707-001'/);
+  assert.match(html, /STALE_FRONTEND_ASSET/);
   assert.match(html, /window\.__EMPLOYEE_ASSET_DIAGNOSTIC/);
 });
 
-test("rent 145 diagnostic path reaches exact rent validator before final preflight", async () => {
+test("frontend validation failed records expose copyable diagnostic JSON", async () => {
+  const html = await readFile(employeePath, "utf8");
+  const finalRenderStart = html.lastIndexOf("renderSessionPreview=function(){");
+  assert.ok(finalRenderStart >= 0, "final renderSessionPreview override must exist");
+  const finalRender = html.slice(finalRenderStart, html.indexOf("renderSummary=function(){", finalRenderStart));
+
+  assert.match(html, /function employeeDiagnosticObjectForRecord\(index\)/);
+  assert.match(html, /async function employeeCopyDiagnosticJson\(index\)/);
+  assert.match(html, /function employeeBindDiagnosticCopyButtons\(\)/);
+  assert.match(html, /data-copy-diagnostic-json/);
+  assert.match(html, /Copy Diagnostic JSON/);
+  assert.match(html, /Diagnostic JSON copied/);
+  assert.match(html, /Diagnostic missing/);
+  assert.match(finalRender, /employeeBindDiagnosticCopyButtons\(\)/);
+});
+
+test("frontend generic UPLOAD_VALIDATION_FAILED is converted to diagnostic trace missing", async () => {
+  const html = await readFile(employeePath, "utf8");
+
+  assert.match(html, /function employeeIsGenericTraceMissing\(data\)/);
+  assert.match(html, /code==='UPLOAD_VALIDATION_FAILED'/);
+  assert.match(html, /function employeeDiagnosticMissingTrace\(index,eventType/);
+  assert.match(html, /error_code:'DIAGNOSTIC_TRACE_MISSING'/);
+  assert.match(html, /missing_fields:\['source','stage','validation_trace'\]/);
+  assert.match(html, /stage:'diagnostic_trace_guard'/);
+  assert.match(html, /client_diagnostic_guard/);
+  assert.doesNotMatch(html, /upload_validation_error_code=firstDryRunFailure\.result\?\.error_code\|\|'UPLOAD_VALIDATION_FAILED'/);
+  assert.doesNotMatch(html, /state\.uploadValidationFailedMessage=`\$\{firstDryRunFailure\.result\?\.error_code\|\|'UPLOAD_VALIDATION_FAILED'\}/);
+});
+
+test("dry-run request carries frontend diagnostic metadata and server echoes asset state", async () => {
+  const html = await readFile(employeePath, "utf8");
+  const worker = await readFile(workerPath, "utf8");
+
+  assert.match(html, /function employeeDiagnosticAssetMeta\(\)/);
+  assert.match(html, /diagnostic:employeeDiagnosticAssetMeta\(\)/);
+  assert.match(html, /frontend_asset_version:r\.frontend_asset_version/);
+  assert.match(html, /worker_version:r\.worker_version/);
+  assert.match(html, /commit_hash:r\.commit_hash/);
+  assert.match(html, /built_at:r\.built_at/);
+  assert.match(worker, /const assetInfo=employeeEntryDiagnosticAssetInfo\(body\)/);
+  assert.match(worker, /result=\{\.\.\.result,\.\.\.assetInfo\}/);
+  assert.match(worker, /\.\.\.assetInfo,\s+event_index:eventIndex/s);
+});
+
+test("rent 411 diagnostic fixture reaches exact short-paid validator before final preflight", async () => {
   const worker = await readFile(workerPath, "utf8");
   const validateBlock = functionBlock(worker, "validateEmployeeEntryUploadPayload");
   const successTraceBlock = functionBlock(worker, "employeeEntryValidationSuccessTrace");
@@ -164,4 +215,7 @@ test("rent 145 diagnostic path reaches exact rent validator before final preflig
   assert.match(successTraceBlock, /R:\["rent_event_validation","validateRentUploadFields"\]/);
   assert.match(validateBlock, /employeeEntryValidationFailure\("rent_validation","PERIOD_DATES_REQUIRED"/);
   assert.match(validateBlock, /employeeEntryValidationFailure\("rent_validation","PERIOD_END_INVALID_FOR_1M"/);
+  assert.match(validateBlock, /employeeEntryValidationFailure\("rent_short_paid","ARREAR_PROMISE_DATE_REQUIRED"/);
+  assert.match(validateBlock, /missing_fields:\["arrear_promise_date"\]/);
+  assert.match(validateBlock, /employeeEntryValidationFailure\("rent_short_paid","ARREAR_REASON_REQUIRED"/);
 });

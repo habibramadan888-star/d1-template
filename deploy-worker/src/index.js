@@ -1745,6 +1745,23 @@ __name(employeeEntryValidationExplanation,"employeeEntryValidationExplanation");
 const HOMELINK_DIAGNOSTIC_ASSET_VERSION="upload-diagnostic-trace-20260707-001";
 const HOMELINK_DIAGNOSTIC_COMMIT_HASH="runtime-git-commit";
 const HOMELINK_DIAGNOSTIC_WORKER_VERSION="runtime-response-header";
+const HOMELINK_DIAGNOSTIC_BUILT_AT="2026-07-07T00:00:00+04:00";
+function employeeEntryDiagnosticAssetInfo(body={}){
+  const diagnostic=body?.diagnostic&&typeof body.diagnostic==="object"?body.diagnostic:{};
+  const frontendAssetVersion=cleanText(diagnostic.frontend_asset_version||diagnostic.employee_asset_version||"",120);
+  const expected=HOMELINK_DIAGNOSTIC_ASSET_VERSION;
+  const stale=!!frontendAssetVersion&&frontendAssetVersion!==expected;
+  return {
+    frontend_asset_version:frontendAssetVersion||null,
+    expected_frontend_asset_version:expected,
+    stale_frontend_asset:stale,
+    asset_status:stale?"STALE_FRONTEND_ASSET":"ASSET_VERSION_OK",
+    built_at:HOMELINK_DIAGNOSTIC_BUILT_AT,
+    worker_version:HOMELINK_DIAGNOSTIC_WORKER_VERSION,
+    commit_hash:HOMELINK_DIAGNOSTIC_COMMIT_HASH
+  };
+}
+__name(employeeEntryDiagnosticAssetInfo,"employeeEntryDiagnosticAssetInfo");
 function homelinkDiagnosticTraceId(prefix="diag"){
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,10)}`;
 }
@@ -1827,7 +1844,11 @@ function employeeEntryValidationFailure(stage,errorCode,message,extra={}){
     validation_trace:Array.isArray(extra.validation_trace)&&extra.validation_trace.length?extra.validation_trace:[traceStep],
     asset_version:extra.asset_version||HOMELINK_DIAGNOSTIC_ASSET_VERSION,
     worker_version:extra.worker_version||HOMELINK_DIAGNOSTIC_WORKER_VERSION,
-    commit_hash:extra.commit_hash||HOMELINK_DIAGNOSTIC_COMMIT_HASH
+    commit_hash:extra.commit_hash||HOMELINK_DIAGNOSTIC_COMMIT_HASH,
+    frontend_asset_version:extra.frontend_asset_version||null,
+    expected_frontend_asset_version:extra.expected_frontend_asset_version||HOMELINK_DIAGNOSTIC_ASSET_VERSION,
+    stale_frontend_asset:!!extra.stale_frontend_asset,
+    built_at:extra.built_at||HOMELINK_DIAGNOSTIC_BUILT_AT
   };
 }
 __name(employeeEntryValidationFailure,"employeeEntryValidationFailure");
@@ -2231,13 +2252,18 @@ async function validateEmployeeEntryUploadPayload(env,user,body,opts={}){
     validation_trace:employeeEntryValidationSuccessTrace(type,eventIndex,normalized.event_type||entryAnchorEventType(type)),
     asset_version:HOMELINK_DIAGNOSTIC_ASSET_VERSION,
     worker_version:HOMELINK_DIAGNOSTIC_WORKER_VERSION,
-    commit_hash:HOMELINK_DIAGNOSTIC_COMMIT_HASH
+    commit_hash:HOMELINK_DIAGNOSTIC_COMMIT_HASH,
+    frontend_asset_version:null,
+    expected_frontend_asset_version:HOMELINK_DIAGNOSTIC_ASSET_VERSION,
+    stale_frontend_asset:false,
+    built_at:HOMELINK_DIAGNOSTIC_BUILT_AT
   };
 }
 __name(validateEmployeeEntryUploadPayload,"validateEmployeeEntryUploadPayload");
 async function handleEmployeeEntryValidate(request,env,user){
   let body;
   try{body=await request.json();}catch{return errorResponse("invalid_json",400,"INVALID_JSON",employeeEntryValidationFailure("payload","INVALID_JSON","Invalid JSON payload."));}
+  const assetInfo=employeeEntryDiagnosticAssetInfo(body);
   let result;
   try{
     result=await validateEmployeeEntryUploadPayload(env,user,body,{event_index:body?.event_index});
@@ -2245,6 +2271,7 @@ async function handleEmployeeEntryValidate(request,env,user){
     const eventIndex=Number(body?.event_index||0)||0;
     const eventType=entryAnchorEventType(cleanText(body?.entry?.type||body?.entry?.reason_code||"R",12).toUpperCase());
     return json({success:false,...employeeEntryValidationFailure("validate_exception","VALIDATION_EXCEPTION","Upload validation threw an exception before cloud write.",{
+      ...assetInfo,
       event_index:eventIndex,
       event_type:eventType,
       message_en:"Upload validation threw an exception before cloud write.",
@@ -2254,6 +2281,7 @@ async function handleEmployeeEntryValidate(request,env,user){
       anchor_preview:{exception_name:err?.name||"Error"}
     })},422);
   }
+  result={...result,...assetInfo};
   if(!result.ok)return json({success:false,...result},422);
   return success(result);
 }
