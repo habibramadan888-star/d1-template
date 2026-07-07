@@ -6408,7 +6408,8 @@ function entryStatementNote(value){
   return entryWhatsappSafe(value).replace(/\b(expected|method|raw enum|raw|source)\b/ig,'').trim();
 }
 function entryStatementType(e){
-  return entryWhatsappType(e);
+  const event=String(e?.event_type||'').trim().toLowerCase();
+  return event||entryWhatsappType(e);
 }
 function entryStatementLine(e){
   const type=entryStatementType(e);
@@ -6438,7 +6439,21 @@ function entryStatementLine(e){
     const fee=waived?'waived':`${entryStatementAmount(e?.fee_amount||e?.amount)} ${pay}`;
     return `${entryStatementBed(from)}\n${entryStatementBed(to)}\ntransfer ${fee} ${time}${reason?' '+reason:''}`.trim();
   }
-  if(type==='expense'||type==='deposit_out'||type==='checkout'){
+  if(type==='deposit_out'){
+    const reason=entryStatementNote(e?.refund_reason||e?.difference_reason||e?.reason||e?.note||e?.ded_note||'');
+    return `${entryStatementBed(e?.room||e?.bed)} deposit refund ${entryStatementAmount(e?.actual_refund_amount||e?.refund_amount||e?.amount)} ${pay||'cash'} ${time}${reason?' '+reason:''}`.trim();
+  }
+  if(type==='left_with_arrears'){
+    const promise=entryStatementDate(e?.promised_payment_date||e?.promise_date||e?.promised_return_date||e?.promise_return_date||'');
+    const note=entryStatementNote(e?.note||e?.final_note||e?.belongings_note||'');
+    return `${entryStatementBed(e?.room||e?.bed)} left with arrears ${entryStatementAmount(e?.left_arrears_amount||e?.arrears_amount||e?.outstanding_arrears)} promise ${promise}${note?' '+note:''}`.trim();
+  }
+  if(type==='checkout'){
+    const date=entryStatementDate(e?.checkout_date||e?.left_date||'');
+    const note=entryStatementNote(e?.note||e?.final_note||'');
+    return `${entryStatementBed(e?.room||e?.bed)} checkout ${date}${note?' '+note:''}`.trim();
+  }
+  if(type==='expense'){
     const bed=e?.room||e?.bed||e?.target_bed||e?.expense_category||'item';
     const reason=entryStatementNote(e?.expense_desc||e?.expense_category||e?.reason||e?.note||e?.ded_note||'');
     return `${entryStatementBed(bed)} expense ${entryStatementAmount(e?.expense_amount||e?.refund_amount||e?.amount)} ${pay||'cash'} ${time}${reason?' '+reason:''}`.trim();

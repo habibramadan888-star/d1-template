@@ -339,6 +339,7 @@
     "test:bed-transfer-no-mutation": "node --test tests/bed-transfer-no-mutation.spec.mjs",
     "test:employee-entry-summary-number-layout": "node --test tests/employee-entry-summary-number-layout.spec.mjs",
     "test:employee-entry-anchor-contract": "node --test tests/employee-entry-anchor-contract.spec.mjs",
+    "test:employee-entry-seven-template-closure": "node --test tests/employee-entry-seven-template-closure.spec.mjs",
     "test:employee-entry-input-focus": "node --test tests/employee-entry-input-focus.spec.mjs",
     "test:employee-entry-flow-order": "node --test tests/employee-entry-flow-order.spec.mjs",
     "test:employee-entry-open-arrears-alert": "node --test tests/employee-entry-open-arrears-alert.spec.mjs",
