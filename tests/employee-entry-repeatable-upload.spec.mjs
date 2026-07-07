@@ -38,7 +38,7 @@ test("same request idempotency is per upload attempt, while a new click gets a n
   assert.match(html, /copy\.original_local_entry_id=entry\?\.id\|\|entry\?\.event_id\|\|entry\?\.anchor_id/);
 });
 
-test("invalid anchor rejects the whole upload before cloud write", async () => {
+test("local anchor validation cannot block server dry-run upload validation", async () => {
   const html = await readFile(employeePath, "utf8");
   const uploadBlock = finalFunctionBlock(
     html,
@@ -47,13 +47,12 @@ test("invalid anchor rejects the whole upload before cloud write", async () => {
   );
 
   assert.match(html, /function validateUploadAnchorBatch\(rows\)/);
-  assert.match(uploadBlock, /const validation=validateUploadAnchorBatch\(uploadList\)/);
-  assert.match(uploadBlock, /if\(!validation\.ok\)/);
-  assert.match(uploadBlock, /state\.drafts=originalDrafts/);
-  assert.match(uploadBlock, /renderEmployeeUploadDryRunError\(localResult\)/);
-  assert.match(uploadBlock, /Upload validation failed \/ \\u4e0a\\u4f20\\u6821\\u9a8c\\u5931\\u8d25/);
-  assert.match(uploadBlock, /updateEntrySessionActionState\(\)/);
-  const rejectionIndex = uploadBlock.indexOf("if(!validation.ok)");
+  assert.doesNotMatch(uploadBlock, /const validation=validateUploadAnchorBatch\(uploadList\)/);
+  assert.doesNotMatch(uploadBlock, /if\(!validation\.ok\)/);
+  assert.doesNotMatch(uploadBlock, /CLIENT_ANCHOR_BATCH_VALIDATION_FAILED/);
+  assert.doesNotMatch(uploadBlock, /source:'client_local_validation'/);
+  const dryRunIndex = uploadBlock.indexOf("validateEmployeeUploadDryRun(e,sessionForEntry,i)");
   const apiIndex = uploadBlock.indexOf("apiFetch('/api/employee/entry'");
-  assert.ok(rejectionIndex > 0 && apiIndex > rejectionIndex, "validation must run before /api/employee/entry");
+  assert.ok(dryRunIndex > 0, "server dry-run must be called");
+  assert.ok(apiIndex > dryRunIndex, "real upload must run only after server dry-run");
 });

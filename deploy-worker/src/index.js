@@ -1702,6 +1702,24 @@ async function handleEmployeeLockCards(request,env,user){
 __name(handleEmployeeLockCards,"handleEmployeeLockCards");
 function employeeEntryValidationExplanation(errorCode,message){
   const map={
+    PAYLOAD_PARSE_FAILED:{
+      en:"Upload payload could not be parsed.",
+      zh:"上传数据格式无法解析。",
+      action_en:"Refresh the page and try Upload Session again. If it repeats, copy the diagnostic response.",
+      action_zh:"请刷新页面后重新上传；如果重复出现，请复制诊断返回。"
+    },
+    SHORT_PAID_DUE_DATE_REQUIRED:{
+      en:"Short-paid rent requires an arrears due date.",
+      zh:"短付收租必须填写尾款承诺日期。",
+      action_en:"Enter the arrears due date, then upload again.",
+      action_zh:"请填写尾款承诺日期后重新上传。"
+    },
+    RENT_PERIOD_INVALID:{
+      en:"Rent period is invalid.",
+      zh:"租金覆盖账期无效。",
+      action_en:"Check the rent period start and end dates, then upload again.",
+      action_zh:"请核对租金开始和结束日期后重新上传。"
+    },
     CHECKOUT_OPEN_ARREARS_LEFT_WITH_ARREARS_REQUIRED:{
       en:"This customer has unpaid arrears. Normal checkout is not allowed.",
       zh:"该客户存在未清欠款，不能直接正常退房。",
@@ -2104,26 +2122,26 @@ async function validateEmployeeEntryUploadPayload(env,user,body,opts={}){
   if(type==="R"){
     const cleanPeriodStart=cleanDate(periodStart);
     const cleanPeriodEnd=cleanDate(periodEnd);
-    if(!cleanPeriodStart||!cleanPeriodEnd)return employeeEntryValidationFailure("rent_validation","PERIOD_DATES_REQUIRED","Rent period dates are required.",{event_index:eventIndex,event_type:"rent",missing_fields:["period_start","period_end"],anchor_preview:anchorPreview});
-    if(cleanPeriodEnd<cleanPeriodStart)return employeeEntryValidationFailure("rent_validation","PERIOD_END_BEFORE_START","Rent period end cannot be before start.",{event_index:eventIndex,event_type:"rent",invalid_fields:["period_end"],anchor_preview:anchorPreview});
+    if(!cleanPeriodStart||!cleanPeriodEnd)return employeeEntryValidationFailure("rent_validation","RENT_PERIOD_INVALID","Rent period dates are required.",{event_index:eventIndex,event_type:"rent",missing_fields:["period_start","period_end"],anchor_preview:anchorPreview});
+    if(cleanPeriodEnd<cleanPeriodStart)return employeeEntryValidationFailure("rent_validation","RENT_PERIOD_INVALID","Rent period end cannot be before start.",{event_index:eventIndex,event_type:"rent",invalid_fields:["period_end"],anchor_preview:anchorPreview});
     const rentConfig=await empRentConfigReadOnly(env,user.corpid);
     const configuredRent=Number(rentConfig[room]||0);
     if(cycle==="1M"){
       if(!configuredRent)return employeeEntryValidationFailure("rent_validation","RENT_CONFIG_MISSING","Monthly rent config is missing.",{event_index:eventIndex,event_type:"rent",missing_fields:["rent_config"],anchor_preview:anchorPreview});
-      if(cleanPeriodEnd!==empAddMonths(cleanPeriodStart,1))return employeeEntryValidationFailure("rent_validation","PERIOD_END_INVALID_FOR_1M","Rent period end is invalid for 1M cycle.",{event_index:eventIndex,event_type:"rent",invalid_fields:["period_end"],anchor_preview:anchorPreview});
+      if(cleanPeriodEnd!==empAddMonths(cleanPeriodStart,1))return employeeEntryValidationFailure("rent_validation","RENT_PERIOD_INVALID","Rent period end is invalid for 1M cycle.",{event_index:eventIndex,event_type:"rent",invalid_fields:["period_end"],anchor_preview:anchorPreview});
       listPrice=configuredRent;
       periodDue=configuredRent;
       due=configuredRent;
     }else if(cycle==="15D"){
-      if(periodDays&&periodDays!==15)return employeeEntryValidationFailure("rent_validation","PERIOD_DAYS_INVALID_FOR_15D","15D cycle must use 15 days.",{event_index:eventIndex,event_type:"rent",invalid_fields:["period_day_count"],anchor_preview:anchorPreview});
-      if(cleanPeriodEnd!==empAddDays(cleanPeriodStart,14))return employeeEntryValidationFailure("rent_validation","PERIOD_END_INVALID_FOR_15D","Rent period end is invalid for 15D cycle.",{event_index:eventIndex,event_type:"rent",invalid_fields:["period_end"],anchor_preview:anchorPreview});
+      if(periodDays&&periodDays!==15)return employeeEntryValidationFailure("rent_validation","RENT_PERIOD_INVALID","15D cycle must use 15 days.",{event_index:eventIndex,event_type:"rent",invalid_fields:["period_day_count"],anchor_preview:anchorPreview});
+      if(cleanPeriodEnd!==empAddDays(cleanPeriodStart,14))return employeeEntryValidationFailure("rent_validation","RENT_PERIOD_INVALID","Rent period end is invalid for 15D cycle.",{event_index:eventIndex,event_type:"rent",invalid_fields:["period_end"],anchor_preview:anchorPreview});
       listPrice=configuredRent||listPrice;
       periodDue=400;
       due=400;
     }else if(cycle==="CUST"){
-      if(!periodDays||periodDays<=0)return employeeEntryValidationFailure("rent_validation","CUSTOM_DAYS_REQUIRED","Custom day count is required.",{event_index:eventIndex,event_type:"rent",missing_fields:["period_day_count"],anchor_preview:anchorPreview});
-      if(!Number.isInteger(periodDays))return employeeEntryValidationFailure("rent_validation","CUSTOM_DAYS_MUST_BE_INTEGER","Custom day count must be an integer.",{event_index:eventIndex,event_type:"rent",invalid_fields:["period_day_count"],anchor_preview:anchorPreview});
-      if(cleanPeriodEnd!==empAddDays(cleanPeriodStart,periodDays-1))return employeeEntryValidationFailure("rent_validation","PERIOD_END_INVALID_FOR_CUSTOM","Rent period end is invalid for custom cycle.",{event_index:eventIndex,event_type:"rent",invalid_fields:["period_end"],anchor_preview:anchorPreview});
+      if(!periodDays||periodDays<=0)return employeeEntryValidationFailure("rent_validation","RENT_PERIOD_INVALID","Custom day count is required.",{event_index:eventIndex,event_type:"rent",missing_fields:["period_day_count"],anchor_preview:anchorPreview});
+      if(!Number.isInteger(periodDays))return employeeEntryValidationFailure("rent_validation","RENT_PERIOD_INVALID","Custom day count must be an integer.",{event_index:eventIndex,event_type:"rent",invalid_fields:["period_day_count"],anchor_preview:anchorPreview});
+      if(cleanPeriodEnd!==empAddDays(cleanPeriodStart,periodDays-1))return employeeEntryValidationFailure("rent_validation","RENT_PERIOD_INVALID","Rent period end is invalid for custom cycle.",{event_index:eventIndex,event_type:"rent",invalid_fields:["period_end"],anchor_preview:anchorPreview});
       listPrice=configuredRent||listPrice;
       periodDue=Math.round(periodDays*40*100)/100;
       due=periodDue;
@@ -2170,7 +2188,7 @@ async function validateEmployeeEntryUploadPayload(env,user,body,opts={}){
   const currentShortfall=type==="R"&&periodDue>0 ? Math.max(0,periodDue-paid) : 0;
   if(currentShortfall>0){
     if(arrearHandling!=="ARREAR")return employeeEntryValidationFailure("rent_short_paid","ARREAR_TASK_REQUIRED_FOR_SHORTFALL","Short-paid rent must create an arrears task.",{event_index:eventIndex,event_type:"rent",missing_fields:["arrear_handling"],anchor_preview:anchorPreview});
-    if(!arrearPromiseDate)return employeeEntryValidationFailure("rent_short_paid","ARREAR_PROMISE_DATE_REQUIRED","Short-paid rent requires promised payment date.",{event_index:eventIndex,event_type:"rent",missing_fields:["arrear_promise_date"],anchor_preview:anchorPreview});
+    if(!arrearPromiseDate)return employeeEntryValidationFailure("rent_short_paid","SHORT_PAID_DUE_DATE_REQUIRED","Short-paid rent requires promised payment date.",{event_index:eventIndex,event_type:"rent",missing_fields:["arrear_promise_date"],anchor_preview:anchorPreview});
     if(arrearPromiseDate<empTodayDubai())return employeeEntryValidationFailure("rent_short_paid","ARREAR_PROMISE_DATE_IN_PAST","Short-paid rent promise date cannot be in the past.",{event_index:eventIndex,event_type:"rent",invalid_fields:["arrear_promise_date"],anchor_preview:anchorPreview});
     if(!arrearReasonDetail)return employeeEntryValidationFailure("rent_short_paid","ARREAR_REASON_REQUIRED","Short-paid rent requires reason/note.",{event_index:eventIndex,event_type:"rent",missing_fields:["arrear_reason_detail"],anchor_preview:anchorPreview});
   }
@@ -2262,7 +2280,15 @@ async function validateEmployeeEntryUploadPayload(env,user,body,opts={}){
 __name(validateEmployeeEntryUploadPayload,"validateEmployeeEntryUploadPayload");
 async function handleEmployeeEntryValidate(request,env,user){
   let body;
-  try{body=await request.json();}catch{return errorResponse("invalid_json",400,"INVALID_JSON",employeeEntryValidationFailure("payload","INVALID_JSON","Invalid JSON payload."));}
+  try{body=await request.json();}catch{return json({success:false,...employeeEntryValidationFailure("payload","PAYLOAD_PARSE_FAILED","Upload payload could not be parsed.",{
+    event_index:0,
+    event_type:"entry",
+    message_en:"Upload payload could not be parsed.",
+    message_zh:"上传数据格式无法解析。",
+    invalid_fields:["request_body"],
+    suggested_action_en:"Refresh the page and try Upload Session again. If it repeats, copy the diagnostic response.",
+    suggested_action_zh:"请刷新页面后重新上传；如果重复出现，请复制诊断返回。"
+  })},400);}
   const assetInfo=employeeEntryDiagnosticAssetInfo(body);
   let result;
   try{

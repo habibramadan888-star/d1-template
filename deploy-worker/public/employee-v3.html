@@ -3191,7 +3191,7 @@ const EMPLOYEE_ASSET_DIAGNOSTIC={
   commit_hash:'runtime-git-commit',
   worker_version:'runtime-response-header',
   built_at:'2026-07-07T00:00:00+04:00',
-  upload_path:'btnExportSession -> commitSessionAndExport -> validateUploadAnchorBatch -> /api/employee/entry/validate -> /api/employee/entry'
+  upload_path:'btnExportSession -> commitSessionAndExport -> /api/employee/entry/validate -> /api/employee/entry'
 };
 window.__EMPLOYEE_ASSET_DIAGNOSTIC=EMPLOYEE_ASSET_DIAGNOSTIC;
 console.info('employee_asset_diagnostic',EMPLOYEE_ASSET_DIAGNOSTIC);
@@ -4865,12 +4865,6 @@ updateEntrySessionActionState=function(){
   }
   const exportBtn=$('btnExportSession');
   if(exportBtn&&exportBtn.dataset.busy!=='1'){
-    if(blocked){
-      exportBtn.innerHTML=renderEmployeeButtonLabel('Upload Failed','\u4e0a\u4f20\u5931\u8d25');
-      exportBtn.disabled=true;
-      exportBtn.classList.add('disabled');
-      return;
-    }
     if(uploaded&&hasRows){
       exportBtn.innerHTML=renderEmployeeButtonLabel('Done','Upload Complete');
       exportBtn.disabled=true;
@@ -6992,15 +6986,15 @@ function employeeDiagnosticMissingTrace(index,eventType,reason='Generic upload v
     trace_id:`client-diag-missing-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`,
     action:'employee_upload_validation',
     ok:false,
-    source:'client_diagnostic_guard',
+    source:'server_dry_run_validation',
     stage:'diagnostic_trace_guard',
     last_successful_stage:'unknown',
     event_index:eventIndex,
     event_type:type,
-    error_code:'DIAGNOSTIC_TRACE_MISSING',
+    error_code:'SERVER_DRY_RUN_GENERIC_ERROR',
     message:reason,
-    message_en:'Diagnostic trace missing for upload validation failure.',
-    message_zh:'上传校验失败缺少诊断链路，无法定位真实失败阶段。',
+    message_en:'Server dry-run returned a generic validation error.',
+    message_zh:'服务器预校验返回了通用错误。',
     missing_fields:['source','stage','validation_trace'],
     invalid_fields:[],
     suggested_action:'Copy Diagnostic JSON and refresh the page. If it repeats, escalate this diagnostic failure.',
@@ -7014,7 +7008,7 @@ function employeeDiagnosticMissingTrace(index,eventType,reason='Generic upload v
       ok:false,
       event_index:eventIndex,
       event_type:type,
-      error_code:'DIAGNOSTIC_TRACE_MISSING',
+      error_code:'SERVER_DRY_RUN_GENERIC_ERROR',
       message:reason,
       missing_fields:['source','stage','validation_trace'],
       invalid_fields:[]
@@ -7046,7 +7040,7 @@ normalizeEmployeeUploadDryRunError=function(result,index,fallbackMessage=''){
     trace_id:guarded.trace_id||`client-trace-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`,
     action:guarded.action||'employee_upload_validation',
     ok:false,
-    source:guarded.source||'client_diagnostic_guard',
+    source:guarded.source||'server_dry_run_validation',
     stage:guarded.stage||'diagnostic_trace_guard',
     last_successful_stage:guarded.last_successful_stage||null,
     event_index:Number.isFinite(eventIndex)?eventIndex:0,
@@ -7190,13 +7184,14 @@ function employeeUploadErrorExplanation(code){
   const map={
     UPLOAD_VALIDATION_FAILED:['Upload validation failed.','上传前校验未通过。'],
     UNKNOWN_UPLOAD_VALIDATION_ERROR:['Upload validation failed.','上传前校验未通过。'],
-    DIAGNOSTIC_TRACE_MISSING:['Diagnostic trace is missing for this upload validation failure.','上传校验失败缺少诊断链路。'],
+    SERVER_DRY_RUN_REQUIRED:['Server dry-run validation is required.','需要服务器预校验。'],
+    SERVER_DRY_RUN_GENERIC_ERROR:['Server dry-run returned a generic validation error.','服务器预校验返回了通用错误。'],
     CHECKOUT_OPEN_ARREARS_OWNER_APPROVAL_REQUIRED:['This bed has open arrears. Normal checkout requires owner approval.','该床位存在未清欠款，普通退房需要老板审核。'],
     DEPOSIT_REFUND_OPEN_ARREARS_OWNER_APPROVAL_REQUIRED:['This bed has open arrears. Deposit refund requires owner approval.','该床位存在未清欠款，退押金需要老板审核。'],
     LINKED_TASK_NOT_OPEN:['The selected arrears item is no longer open. Please refresh arrears.','所选欠款已不是未清状态，请刷新欠款。'],
     ARREARS_REF_STALE_REFRESH_REQUIRED:['Arrears status changed. Refresh arrears and select again.','欠款状态已变化，请刷新欠款后重新选择。'],
     DEPOSIT_REFUND_DIFFERENCE_REASON_REQUIRED:['Actual refund differs from deposit balance. Difference reason is required.','实退金额和应退金额不一致，必须填写差额原因。'],
-    CLIENT_ANCHOR_BATCH_VALIDATION_FAILED:['Client anchor validation failed before dry-run API.','本地锚点校验未通过，尚未调用云端 dry-run。'],
+    NO_RECORDS_TO_UPLOAD:['No records to upload.','没有可上传记录。'],
     LINKED_TASK_REQUIRED:['Select one open cloud arrears item before adding arrears payment.','还欠款必须先选择一条云端未清欠款。'],
     ARREAR_PAYMENT_AMOUNT_INVALID:['Payment amount must be greater than 0 and cannot exceed remaining arrears.','还款金额必须大于 0，且不能超过剩余欠款。'],
     LEFT_WITH_ARREARS_REQUIRED_FIELDS_MISSING:['Left With Arrears is missing required tracking fields.','离店未清欠款缺少必填追踪字段。']
@@ -7328,8 +7323,8 @@ function employeeRecordValidationError(entry,index){
     return normalizeEmployeeUploadDryRunError({
       event_index:index,
       event_type:entryEventType(entry?.type||entry?.event_type||'entry'),
-      source:'client_upload_state_fallback',
-      error_code:entry?.upload_validation_error_code||'DIAGNOSTIC_TRACE_MISSING',
+      source:'server_dry_run_validation',
+      error_code:entry?.upload_validation_error_code||'SERVER_DRY_RUN_REQUIRED',
       message:state.uploadValidationFailedMessage||entry?.sync_error||'Upload validation failed.',
       validation_trace:[{
         stage:'client_upload_state_fallback',
@@ -7337,7 +7332,7 @@ function employeeRecordValidationError(entry,index){
         ok:false,
         event_index:index,
         event_type:entryEventType(entry?.type||entry?.event_type||'entry'),
-        error_code:entry?.upload_validation_error_code||'DIAGNOSTIC_TRACE_MISSING',
+        error_code:entry?.upload_validation_error_code||'SERVER_DRY_RUN_REQUIRED',
         message:state.uploadValidationFailedMessage||entry?.sync_error||'Upload validation failed.',
         missing_fields:[],
         invalid_fields:[]
@@ -7378,7 +7373,8 @@ function employeeSessionRecordState(entry,index){
       const staleResult=normalizeEmployeeUploadDryRunError({
         event_index:index,
         event_type:'arrears_payment',
-        source:'client_local_validation',
+        source:'server_dry_run_validation',
+        last_successful_stage:'client_reference_snapshot',
         error_code:'ARREARS_REF_STALE_REFRESH_REQUIRED',
         message:'This arrears item is no longer open. Please refresh arrears.',
         validation_trace:[{
@@ -7433,10 +7429,70 @@ renderSessionRecordValidationDetails=function(result,index){
   </div>`;
 };
 async function validateEmployeeUploadDryRun(entry,sessionForEntry,index){
-  const r=await apiFetch('/api/employee/entry/validate',{method:'POST',body:JSON.stringify({entry,session:sessionForEntry,event_index:index,diagnostic:employeeDiagnosticAssetMeta()})});
+  let r;
+  try{
+    r=await apiFetch('/api/employee/entry/validate',{method:'POST',body:JSON.stringify({entry,session:sessionForEntry,event_index:index,diagnostic:employeeDiagnosticAssetMeta()})});
+  }catch(err){
+    const result=normalizeEmployeeUploadDryRunError({
+      source:'network_error',
+      stage:'server_dry_run_request',
+      event_index:index,
+      event_type:entry?.event_type||entryEventType(entry?.type||'entry'),
+      error_code:'SERVER_VALIDATE_UNREACHABLE',
+      message:'Unable to reach upload validation endpoint.',
+      message_en:'Unable to reach upload validation endpoint.',
+      message_zh:'无法连接上传校验接口。',
+      suggested_action:'Check network and retry Upload Session.',
+      suggested_action_en:'Check network and retry Upload Session.',
+      suggested_action_zh:'请检查网络后重新点击上传本票。',
+      validation_trace:[{
+        stage:'server_dry_run_request',
+        function:'validateEmployeeUploadDryRun',
+        ok:false,
+        event_index:index,
+        event_type:entry?.event_type||entryEventType(entry?.type||'entry'),
+        error_code:'SERVER_VALIDATE_UNREACHABLE',
+        message:String(err?.message||err||'network_error'),
+        missing_fields:[],
+        invalid_fields:[]
+      }],
+      raw_validation_response:{source:'network_error',message:String(err?.message||err||'network_error')}
+    },index,String(err?.message||err||'network_error'));
+    const e=new Error(formatEmployeeUploadDryRunError(result,index));
+    e.dryRunResult=result;
+    throw e;
+  }
   const raw=await r.text();
   let data=null;
   try{data=raw?unwrapStandardResponse(JSON.parse(raw)):null}catch{}
+  if(r.ok&&!data){
+    const result=normalizeEmployeeUploadDryRunError({
+      source:'server_dry_run_validation',
+      stage:'server_dry_run_response_parse',
+      event_index:index,
+      event_type:entry?.event_type||entryEventType(entry?.type||'entry'),
+      error_code:'SERVER_VALIDATE_MALFORMED_RESPONSE',
+      message:'Upload validation returned an unreadable response.',
+      message_en:'Upload validation returned an unreadable response.',
+      message_zh:'上传校验接口返回内容无法解析。',
+      invalid_fields:['response_body'],
+      validation_trace:[{
+        stage:'server_dry_run_response_parse',
+        function:'validateEmployeeUploadDryRun',
+        ok:false,
+        event_index:index,
+        event_type:entry?.event_type||entryEventType(entry?.type||'entry'),
+        error_code:'SERVER_VALIDATE_MALFORMED_RESPONSE',
+        message:String(raw||'empty_response').slice(0,400),
+        missing_fields:[],
+        invalid_fields:['response_body']
+      }],
+      raw_validation_response:{http_status:r.status,raw_body:String(raw||'').slice(0,4000)}
+    },index,raw||('HTTP '+r.status));
+    const err=new Error(formatEmployeeUploadDryRunError(result,index));
+    err.dryRunResult=result;
+    throw err;
+  }
   if(!r.ok||data?.success===false||data?.ok===false){
     const result=normalizeEmployeeUploadDryRunError({
       ...(data||{}),
@@ -7452,6 +7508,38 @@ async function validateEmployeeUploadDryRun(entry,sessionForEntry,index){
 async function commitSessionAndExport(){
   const uploadT0=performance.now();
   const uploadTiming={payload_build_ms:0,validation_ms:0,api_request_ms:0,response_parse_ms:0,total_ms:0};
+  if(state.user&&!state.drafts.length){
+    const result=normalizeEmployeeUploadDryRunError({
+      source:'no_records_to_upload',
+      stage:'local_empty_session',
+      event_index:0,
+      event_type:'session',
+      error_code:'NO_RECORDS_TO_UPLOAD',
+      message:'No records to upload.',
+      message_en:'No records to upload.',
+      message_zh:'没有可上传记录。',
+      suggested_action:'Add at least one record to Current Session, then upload again.',
+      suggested_action_en:'Add at least one record to Current Session, then upload again.',
+      suggested_action_zh:'请先添加至少一条记录到当前本票，然后重新上传。',
+      missing_fields:['current_session_records'],
+      invalid_fields:[],
+      validation_trace:[{
+        stage:'local_empty_session',
+        function:'commitSessionAndExport',
+        ok:false,
+        event_index:0,
+        event_type:'session',
+        error_code:'NO_RECORDS_TO_UPLOAD',
+        message:'Current Session is empty.',
+        missing_fields:['current_session_records'],
+        invalid_fields:[]
+      }]
+    },0);
+    showStatus('NO_RECORDS_TO_UPLOAD: No records to upload / 没有可上传记录','warn');
+    if($('validationBox'))$('validationBox').innerHTML=renderEmployeeUploadDryRunError(result);
+    toast('NO_RECORDS_TO_UPLOAD / 没有可上传记录',6000);
+    return;
+  }
   if(!state.user){applyEmployeeUser(null);toast('Please sign in first / 请先登录',6000);return}
   if(!state.drafts.length){
     showStatus('Current Session has no entries. Upload is not available. / 当前本票没有流水，不能上传。','warn');
@@ -7476,64 +7564,6 @@ async function commitSessionAndExport(){
   refreshSessionViews();
   buildExport();
   uploadTiming.payload_build_ms=Math.round(performance.now()-payloadStart);
-  const validationStart=performance.now();
-  const validation=validateUploadAnchorBatch(uploadList);
-  uploadTiming.validation_ms=Math.round(performance.now()-validationStart);
-  if(!validation.ok){
-    const localResult=normalizeEmployeeUploadDryRunError({
-      event_index:0,
-      event_type:uploadList[0]?.event_type||entryEventType(uploadList[0]?.type||'entry'),
-      source:'client_local_validation',
-      error_code:'CLIENT_ANCHOR_BATCH_VALIDATION_FAILED',
-      message:'Client anchor validation failed before dry-run API.',
-      missing_fields:validation.errors,
-      raw_validation_response:{
-        source:'client_local_validation',
-        ok:false,
-        stage:'client_anchor_batch_validation',
-        event_index:0,
-        event_type:uploadList[0]?.event_type||entryEventType(uploadList[0]?.type||'entry'),
-        error_code:'CLIENT_ANCHOR_BATCH_VALIDATION_FAILED',
-        message:'Client anchor validation failed before dry-run API.',
-        missing_fields:validation.errors,
-        invalid_fields:[],
-        validation_trace:[]
-      },
-      validation_trace:[{
-        stage:'client_anchor_batch_validation',
-        function:'validateUploadAnchorBatch',
-        ok:false,
-        event_index:0,
-        event_type:uploadList[0]?.event_type||entryEventType(uploadList[0]?.type||'entry'),
-        error_code:'CLIENT_ANCHOR_BATCH_VALIDATION_FAILED',
-        message:'Client anchor validation failed before dry-run API.',
-        missing_fields:validation.errors,
-        invalid_fields:[]
-      }]
-    },0);
-    if(originalDrafts[0]){
-      originalDrafts[0].sync_status='LOCAL';
-      originalDrafts[0].upload_status='VALIDATION_FAILED';
-      originalDrafts[0].upload_validation_error=localResult;
-      originalDrafts[0].upload_validation_error_code='CLIENT_ANCHOR_BATCH_VALIDATION_FAILED';
-      originalDrafts[0].sync_error=formatEmployeeUploadDryRunError(localResult,0);
-    }
-    state.drafts=originalDrafts;
-    state.sessionId=originalSessionId;
-    state.uploadValidationFailedIndex=0;
-    state.uploadValidationFailedMessage='CLIENT_ANCHOR_BATCH_VALIDATION_FAILED: Client anchor validation failed before dry-run API.';
-    saveDrafts();
-    buildExport();
-    refreshSessionViews();
-    oldLabels.forEach(([b,html])=>{b.dataset.busy='0';b.disabled=false;b.classList.remove('disabled');b.innerHTML=html});
-    const message='Upload validation failed / \u4e0a\u4f20\u6821\u9a8c\u5931\u8d25: '+validation.errors.join('; ');
-    showStatus(message,'bad');
-    $('validationBox').innerHTML=renderEmployeeUploadDryRunError(localResult);
-    employeeBindDiagnosticCopyButtons();
-    toast('Upload validation failed / \u4e0a\u4f20\u6821\u9a8c\u5931\u8d25',6000);
-    updateEntrySessionActionState();
-    return;
-  }
   const canonicalEntries=uploadList.map(normalizeEntryAnchor);
   const session=currentSessionPayload();
   const completedExportText=($('exportText')?.textContent||'').replace(/Sync pending/g,'All synced');
@@ -7572,13 +7602,13 @@ async function commitSessionAndExport(){
       originalDrafts[failedIndex].sync_status='LOCAL';
       originalDrafts[failedIndex].upload_status=firstDryRunFailure.result?.error_code==='ARREARS_REF_STALE_REFRESH_REQUIRED'?'STALE':'VALIDATION_FAILED';
       originalDrafts[failedIndex].upload_validation_error=firstDryRunFailure.result;
-      originalDrafts[failedIndex].upload_validation_error_code=firstDryRunFailure.result?.error_code||'DIAGNOSTIC_TRACE_MISSING';
+      originalDrafts[failedIndex].upload_validation_error_code=firstDryRunFailure.result?.error_code||'SERVER_DRY_RUN_GENERIC_ERROR';
       originalDrafts[failedIndex].sync_error=firstDryRunFailure.message;
     }
     state.drafts=originalDrafts;
     state.sessionId=originalSessionId;
     state.uploadValidationFailedIndex=failedIndex;
-    state.uploadValidationFailedMessage=`${firstDryRunFailure.result?.error_code||'DIAGNOSTIC_TRACE_MISSING'}: ${firstDryRunFailure.result?.message||firstDryRunFailure.message||''}`;
+    state.uploadValidationFailedMessage=`${firstDryRunFailure.result?.error_code||'SERVER_DRY_RUN_GENERIC_ERROR'}: ${firstDryRunFailure.result?.message||firstDryRunFailure.message||''}`;
     saveDrafts();
     buildExport();
     refreshSessionViews();

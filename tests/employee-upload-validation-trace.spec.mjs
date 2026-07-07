@@ -37,13 +37,13 @@ test("rent validation failures return exact stage and exact error code", async (
   const worker = await readFile(workerPath, "utf8");
   const validateBlock = functionBlock(worker, "validateEmployeeEntryUploadPayload");
 
-  assert.match(validateBlock, /employeeEntryValidationFailure\("rent_validation","PERIOD_DATES_REQUIRED"/);
+  assert.match(validateBlock, /employeeEntryValidationFailure\("rent_validation","RENT_PERIOD_INVALID"/);
   assert.match(validateBlock, /missing_fields:\["period_start","period_end"\]/);
-  assert.match(validateBlock, /employeeEntryValidationFailure\("rent_validation","PERIOD_END_INVALID_FOR_1M"/);
+  assert.match(validateBlock, /employeeEntryValidationFailure\("rent_validation","RENT_PERIOD_INVALID"/);
   assert.match(validateBlock, /invalid_fields:\["period_end"\]/);
   assert.match(validateBlock, /employeeEntryValidationFailure\("rent_validation","RENT_CONFIG_MISSING"/);
   assert.match(validateBlock, /missing_fields:\["rent_config"\]/);
-  assert.match(validateBlock, /employeeEntryValidationFailure\("rent_short_paid","ARREAR_PROMISE_DATE_REQUIRED"/);
+  assert.match(validateBlock, /employeeEntryValidationFailure\("rent_short_paid","SHORT_PAID_DUE_DATE_REQUIRED"/);
   assert.match(validateBlock, /employeeEntryValidationFailure\("rent_short_paid","ARREAR_REASON_REQUIRED"/);
 });
 
@@ -85,19 +85,17 @@ test("frontend preserves and renders validation_trace from dry-run", async () =>
   assert.match(html, /stage:'client_upload_state_fallback'/);
 });
 
-test("client-side batch validation cannot return generic no-stage upload error", async () => {
+test("client-side batch validation cannot block server dry-run", async () => {
   const html = await readFile(employeePath, "utf8");
   const commitStart = html.lastIndexOf("async function commitSessionAndExport");
   assert.ok(commitStart >= 0, "effective commitSessionAndExport function must exist");
   const commitBlock = html.slice(commitStart);
-  const localFailStart = commitBlock.indexOf("if(!validation.ok)");
-  const dryRunStart = commitBlock.indexOf("const canonicalEntries=uploadList.map", localFailStart);
-  assert.ok(localFailStart >= 0 && dryRunStart > localFailStart, "local validation failure branch must exist");
-  const localFailureBranch = commitBlock.slice(localFailStart, dryRunStart);
+  const dryRunStart = commitBlock.indexOf("validateEmployeeUploadDryRun(e,sessionForEntry,i)");
+  const realUploadStart = commitBlock.indexOf("apiFetch('/api/employee/entry'", dryRunStart);
 
-  assert.match(localFailureBranch, /CLIENT_ANCHOR_BATCH_VALIDATION_FAILED/);
-  assert.match(localFailureBranch, /stage:'client_anchor_batch_validation'/);
-  assert.match(localFailureBranch, /function:'validateUploadAnchorBatch'/);
-  assert.doesNotMatch(localFailureBranch, /error_code:'UPLOAD_VALIDATION_FAILED'/);
+  assert.ok(dryRunStart > 0, "server dry-run branch must exist");
+  assert.ok(realUploadStart > dryRunStart, "real upload must run after server dry-run");
+  assert.doesNotMatch(commitBlock, /CLIENT_ANCHOR_BATCH_VALIDATION_FAILED/);
+  assert.doesNotMatch(commitBlock, /source:'client_local_validation'/);
+  assert.doesNotMatch(commitBlock, /if\(!validation\.ok\)/);
 });
-

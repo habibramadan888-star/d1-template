@@ -134,7 +134,8 @@ test("employee UI runs dry-run validation before real upload and surfaces backen
   assert.match(commitBlock, /originalDrafts\[failedIndex\]\.upload_status=firstDryRunFailure\.result\?\.error_code==='ARREARS_REF_STALE_REFRESH_REQUIRED'\?'STALE':'VALIDATION_FAILED'/);
   assert.match(commitBlock, /e\.upload_status='UPLOADING'/);
   assert.match(commitBlock, /upload_status:'SYNCED'/);
-  assert.match(html, /renderEmployeeButtonLabel\('Upload Failed','\\u4e0a\\u4f20\\u5931\\u8d25'\)/);
+  assert.doesNotMatch(html, /renderEmployeeButtonLabel\('Upload Failed','\\u4e0a\\u4f20\\u5931\\u8d25'\)/);
+  assert.match(html, /exportBtn\.disabled=!hasRows/);
   assert.match(html, /renderEmployeeButtonLabel\('Done','Upload Complete'\)/);
 });
 
@@ -180,7 +181,8 @@ test("validation failure does not restore done or uploaded success state", async
   assert.match(successBranch, /Session uploaded to cloud/);
 
   assert.match(html, /currentSessionHasUploadBlockingError\(\)/);
-  assert.match(html, /renderEmployeeButtonLabel\('Upload Failed','\\u4e0a\\u4f20\\u5931\\u8d25'\)/);
+  assert.doesNotMatch(html, /renderEmployeeButtonLabel\('Upload Failed','\\u4e0a\\u4f20\\u5931\\u8d25'\)/);
+  assert.match(html, /exportBtn\.disabled=!hasRows/);
   assert.match(html, /whats\.disabled=!uploaded\|\|blocked/);
 });
 

@@ -99,28 +99,29 @@ test("frontend diagnostic report renders trace id, source, raw debug, and safe r
   assert.match(html, /password\|token\|cookie\|set-cookie\|authorization\|secret/i);
 });
 
-test("frontend maps upload path sources for local, dry-run, and real upload failures", async () => {
+test("frontend maps upload path sources to server dry-run authority", async () => {
   const html = await readFile(employeePath, "utf8");
 
-  assert.match(html, /source:'client_local_validation'/);
   assert.match(html, /source:'server_dry_run_validation'/);
   assert.match(html, /source:'server_upload'/);
-  assert.match(html, /upload_path:'btnExportSession -> commitSessionAndExport -> validateUploadAnchorBatch -> \/api\/employee\/entry\/validate -> \/api\/employee\/entry'/);
+  assert.match(html, /source:'network_error'/);
+  assert.match(html, /source:'no_records_to_upload'/);
+  assert.match(html, /upload_path:'btnExportSession -> commitSessionAndExport -> \/api\/employee\/entry\/validate -> \/api\/employee\/entry'/);
+  assert.doesNotMatch(html, /source:'client_local_validation'/);
 });
 
-test("generic upload validation failure without diagnostic stage is forbidden", async () => {
+test("frontend upload path does not run local batch gate before server dry-run", async () => {
   const html = await readFile(employeePath, "utf8");
   const commitStart = html.lastIndexOf("async function commitSessionAndExport");
   assert.ok(commitStart >= 0, "commitSessionAndExport must exist");
   const commitBlock = html.slice(commitStart);
-  const localFailStart = commitBlock.indexOf("if(!validation.ok)");
-  const dryRunStart = commitBlock.indexOf("const canonicalEntries=uploadList.map", localFailStart);
-  assert.ok(localFailStart >= 0 && dryRunStart > localFailStart, "local validation branch must exist");
-  const localBranch = commitBlock.slice(localFailStart, dryRunStart);
+  const dryRunStart = commitBlock.indexOf("await validateEmployeeUploadDryRun");
+  const uploadStart = commitBlock.indexOf("apiFetch('/api/employee/entry'", dryRunStart);
+  assert.ok(dryRunStart >= 0 && uploadStart > dryRunStart, "server dry-run must precede real upload");
 
-  assert.match(localBranch, /CLIENT_ANCHOR_BATCH_VALIDATION_FAILED/);
-  assert.match(localBranch, /stage:'client_anchor_batch_validation'/);
-  assert.doesNotMatch(localBranch, /error_code:'UPLOAD_VALIDATION_FAILED'/);
+  assert.doesNotMatch(commitBlock, /const validation=validateUploadAnchorBatch\(uploadList\)/);
+  assert.doesNotMatch(commitBlock, /if\(!validation\.ok\)/);
+  assert.doesNotMatch(commitBlock, /CLIENT_ANCHOR_BATCH_VALIDATION_FAILED/);
 
   const worker = await readFile(workerPath, "utf8");
   const failureBlock = functionBlock(worker, "employeeEntryValidationFailure");
@@ -175,16 +176,17 @@ test("frontend validation failed records expose copyable diagnostic JSON", async
   assert.match(finalRender, /employeeBindDiagnosticCopyButtons\(\)/);
 });
 
-test("frontend generic UPLOAD_VALIDATION_FAILED is converted to diagnostic trace missing", async () => {
+test("frontend generic UPLOAD_VALIDATION_FAILED is converted to server dry-run generic diagnostic", async () => {
   const html = await readFile(employeePath, "utf8");
 
   assert.match(html, /function employeeIsGenericTraceMissing\(data\)/);
   assert.match(html, /code==='UPLOAD_VALIDATION_FAILED'/);
   assert.match(html, /function employeeDiagnosticMissingTrace\(index,eventType/);
-  assert.match(html, /error_code:'DIAGNOSTIC_TRACE_MISSING'/);
+  assert.match(html, /error_code:'SERVER_DRY_RUN_GENERIC_ERROR'/);
   assert.match(html, /missing_fields:\['source','stage','validation_trace'\]/);
   assert.match(html, /stage:'diagnostic_trace_guard'/);
-  assert.match(html, /client_diagnostic_guard/);
+  assert.match(html, /source:'server_dry_run_validation'/);
+  assert.doesNotMatch(html, /DIAGNOSTIC_TRACE_MISSING/);
   assert.doesNotMatch(html, /upload_validation_error_code=firstDryRunFailure\.result\?\.error_code\|\|'UPLOAD_VALIDATION_FAILED'/);
   assert.doesNotMatch(html, /state\.uploadValidationFailedMessage=`\$\{firstDryRunFailure\.result\?\.error_code\|\|'UPLOAD_VALIDATION_FAILED'\}/);
 });
@@ -213,9 +215,8 @@ test("rent 411 diagnostic fixture reaches exact short-paid validator before fina
   assert.match(validateBlock, /validateEmployeeEntryUploadEventFields\(type,entry,normalized,eventIndex,anchorPreview\)/);
   assert.match(validateBlock, /employeeEntryValidationSuccessTrace\(type,eventIndex,normalized\.event_type\|\|entryAnchorEventType\(type\)\)/);
   assert.match(successTraceBlock, /R:\["rent_event_validation","validateRentUploadFields"\]/);
-  assert.match(validateBlock, /employeeEntryValidationFailure\("rent_validation","PERIOD_DATES_REQUIRED"/);
-  assert.match(validateBlock, /employeeEntryValidationFailure\("rent_validation","PERIOD_END_INVALID_FOR_1M"/);
-  assert.match(validateBlock, /employeeEntryValidationFailure\("rent_short_paid","ARREAR_PROMISE_DATE_REQUIRED"/);
+  assert.match(validateBlock, /employeeEntryValidationFailure\("rent_validation","RENT_PERIOD_INVALID"/);
+  assert.match(validateBlock, /employeeEntryValidationFailure\("rent_short_paid","SHORT_PAID_DUE_DATE_REQUIRED"/);
   assert.match(validateBlock, /missing_fields:\["arrear_promise_date"\]/);
   assert.match(validateBlock, /employeeEntryValidationFailure\("rent_short_paid","ARREAR_REASON_REQUIRED"/);
 });

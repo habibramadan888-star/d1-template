@@ -164,8 +164,8 @@ test("invalid fixtures produce event-specific DiagnosticTrace error codes", asyn
   const validateBlock = functionBlock(worker, "validateEmployeeEntryUploadPayload");
 
   const expectedCodes = [
-    "PERIOD_DATES_REQUIRED",
-    "ARREAR_PROMISE_DATE_REQUIRED",
+    "RENT_PERIOD_INVALID",
+    "SHORT_PAID_DUE_DATE_REQUIRED",
     "LINKED_TASK_REQUIRED",
     "DEPOSIT_IN_REQUIRED_FIELD_MISSING",
     "DEPOSIT_REFUND_DIFFERENCE_REASON_REQUIRED",
