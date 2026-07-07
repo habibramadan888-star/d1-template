@@ -3121,6 +3121,14 @@ label .label-en{
 </div>
 <script>
 const API_ORIGIN='https://homelink-finance.habibramadan888.workers.dev';
+const EMPLOYEE_ASSET_DIAGNOSTIC={
+  employee_asset_version:'upload-diagnostic-trace-20260707-001',
+  commit_hash:'runtime-git-commit',
+  worker_version:'runtime-response-header',
+  upload_path:'btnExportSession -> commitSessionAndExport -> validateUploadAnchorBatch -> /api/employee/entry/validate -> /api/employee/entry'
+};
+window.__EMPLOYEE_ASSET_DIAGNOSTIC=EMPLOYEE_ASSET_DIAGNOSTIC;
+console.info('employee_asset_diagnostic',EMPLOYEE_ASSET_DIAGNOSTIC);
 const $=id=>document.getElementById(id);
 const pad=n=>String(n).padStart(2,'0');
 const num=v=>Number(String(v||'').replace(/,/g,''));
@@ -6645,7 +6653,21 @@ async function commitSessionAndExport(){
       try{data=raw?unwrapStandardResponse(JSON.parse(raw)):null}catch{}
       uploadTiming.response_parse_ms+=Math.round(performance.now()-parseStart);
       if(data?.timing)employeeUploadTimingLog('server',data.timing);
-      if(!r.ok||data?.success===false)throw new Error(data?.error||data?.message||raw||('HTTP '+r.status));
+      if(!r.ok||data?.success===false){
+        const uploadResult=normalizeEmployeeUploadDryRunError({
+          ...(data||{}),
+          source:'server_upload',
+          stage:data?.stage||'server_upload',
+          event_index:i,
+          event_type:data?.event_type||e.event_type||entryEventType(e.type||'entry'),
+          error_code:data?.error_code||data?.code||data?.error||'SERVER_UPLOAD_FAILED',
+          message:data?.message||data?.error||raw||('HTTP '+r.status),
+          raw_validation_response:data||{http_status:r.status,raw_body:String(raw||'').slice(0,4000)}
+        },i,raw||('HTTP '+r.status));
+        const uploadErr=new Error(formatEmployeeUploadDryRunError(uploadResult,i)||raw||('HTTP '+r.status));
+        uploadErr.uploadResult=uploadResult;
+        throw uploadErr;
+      }
       e.sync_status='SYNCED';
       e.cloud_entry_id=data?.entry_id||e.cloud_entry_id||'';
       e.sync_error='';
@@ -6737,17 +6759,66 @@ function normalizeEmployeeUploadDryRunError(result,index,fallbackMessage=''){
   const data=result&&typeof result==='object'?result:{};
   const eventIndex=Number(data.event_index ?? index ?? 0);
   return {
+    trace_id:data.trace_id||'client-trace-unavailable',
+    action:data.action||'employee_upload_validation',
     ok:false,
+    source:data.source||'unknown_validation_source',
     stage:data.stage||'upload_validation',
     event_index:Number.isFinite(eventIndex)?eventIndex:0,
     event_type:data.event_type||data.anchor_preview?.event_type||'entry',
     error_code:data.error_code||data.code||data.error||'UNKNOWN_UPLOAD_VALIDATION_ERROR',
     message:data.message||fallbackMessage||'Upload validation failed.',
+    message_en:data.message_en||data.message||fallbackMessage||'Upload validation failed.',
+    message_zh:data.message_zh||'上传前校验未通过。',
     missing_fields:Array.isArray(data.missing_fields)?data.missing_fields.filter(Boolean):[],
     invalid_fields:Array.isArray(data.invalid_fields)?data.invalid_fields.filter(Boolean):[],
+    suggested_action:data.suggested_action||data.suggested_action_en||'Fix or remove this record, then upload again.',
+    suggested_action_en:data.suggested_action_en||data.suggested_action||'Fix or remove this record, then upload again.',
+    suggested_action_zh:data.suggested_action_zh||'请修正或删除这条记录后重新上传。',
     anchor_preview:data.anchor_preview&&typeof data.anchor_preview==='object'?data.anchor_preview:{},
-    validation_trace:Array.isArray(data.validation_trace)?data.validation_trace.filter(Boolean):[]
+    validation_trace:Array.isArray(data.validation_trace)?data.validation_trace.filter(Boolean):[],
+    raw_validation_response:data.raw_validation_response&&typeof data.raw_validation_response==='object'?data.raw_validation_response:data
   };
+}
+function employeeUploadSafeDebugValue(value,depth=0){
+  if(depth>5)return '[max-depth]';
+  if(value===null||typeof value==='undefined')return value;
+  if(typeof value==='string')return value.length>8000?value.slice(0,8000)+'...':value;
+  if(typeof value==='number'||typeof value==='boolean')return value;
+  if(Array.isArray(value))return value.slice(0,80).map(item=>employeeUploadSafeDebugValue(item,depth+1));
+  if(typeof value==='object'){
+    const out={};
+    Object.entries(value).slice(0,120).forEach(([key,val])=>{
+      if(/password|token|cookie|set-cookie|authorization|secret/i.test(key))out[key]='[redacted]';
+      else out[key]=employeeUploadSafeDebugValue(val,depth+1);
+    });
+    return out;
+  }
+  return String(value);
+}
+function employeeUploadRawDebugObject(result){
+  const r=normalizeEmployeeUploadDryRunError(result,result?.event_index);
+  return employeeUploadSafeDebugValue({
+    source:r.source,
+    trace_id:r.trace_id,
+    action:r.action,
+    ok:r.ok,
+    stage:r.stage,
+    event_index:r.event_index,
+    event_type:r.event_type,
+    error_code:r.error_code,
+    message:r.message,
+    message_en:r.message_en,
+    message_zh:r.message_zh,
+    missing_fields:r.missing_fields,
+    invalid_fields:r.invalid_fields,
+    validation_trace:r.validation_trace,
+    anchor_preview:r.anchor_preview,
+    suggested_action:r.suggested_action,
+    suggested_action_en:r.suggested_action_en,
+    suggested_action_zh:r.suggested_action_zh,
+    raw_validation_response:r.raw_validation_response
+  });
 }
 function employeeUploadEventLabel(value){
   const raw=String(value||'').trim();
@@ -6882,14 +6953,18 @@ renderEmployeeUploadDryRunError=function(result){
     const code=step?.error_code?` ${step.error_code}`:'';
     return `${status} ${stage} · ${fn}${code}`;
   }).join('\n');
+  const rawDebug=JSON.stringify(employeeUploadRawDebugObject(r),null,2);
   return `
     <div class="upload-validation-panel" role="alert" data-upload-validation-error="true">
       <div>
-        <div class="uv-title">Upload Validation Failed</div>
-        <div class="uv-sub">\u4e0a\u4f20\u6821\u9a8c\u5931\u8d25</div>
+        <div class="uv-title">Diagnostic Report</div>
+        <div class="uv-sub">\u9519\u8bef\u8bca\u65ad\u62a5\u544a</div>
       </div>
       <div class="uv-grid">
+        <div class="uv-cell"><span class="uv-label">Trace ID<br><small>\u8bca\u65ad ID</small></span><span class="uv-value">${esc(r.trace_id)}</span></div>
+        <div class="uv-cell"><span class="uv-label">Action<br><small>\u52a8\u4f5c</small></span><span class="uv-value">${esc(r.action)}</span></div>
         <div class="uv-cell"><span class="uv-label">Record<br><small>\u8bb0\u5f55</small></span><span class="uv-value">#${esc(String(r.event_index+1))}<br><small>\u7b2c ${esc(String(r.event_index+1))} \u6761\u8bb0\u5f55</small></span></div>
+        <div class="uv-cell"><span class="uv-label">Source<br><small>\u6765\u6e90</small></span><span class="uv-value">${esc(r.source)}</span></div>
         <div class="uv-cell"><span class="uv-label">Stage<br><small>\u9636\u6bb5</small></span><span class="uv-value">${esc(r.stage)}</span></div>
         <div class="uv-cell"><span class="uv-label">Event<br><small>\u4e8b\u4ef6</small></span><span class="uv-value">${esc(event.en)}<br><small>${esc(event.zh)}</small></span></div>
         <div class="uv-cell"><span class="uv-label">Error Code<br><small>\u9519\u8bef\u4ee3\u7801</small></span><span class="uv-value">${esc(r.error_code)}<br><small>${esc(explanation.zh)}</small></span></div>
@@ -6900,6 +6975,7 @@ renderEmployeeUploadDryRunError=function(result){
       <div class="uv-list"><span class="uv-label">Suggested Action<br><small>\u5efa\u8bae\u64cd\u4f5c</small></span><span class="uv-value">${esc(suggested.en)}<br><small>${esc(suggested.zh)}</small></span></div>
       ${preview?`<div class="uv-list"><span class="uv-label">Anchor Preview<br><small>\u951a\u70b9\u9884\u89c8</small></span><span class="uv-value">${esc(preview)}</span></div>`:''}
       ${trace?`<div class="uv-list"><span class="uv-label">Validation Trace<br><small>\u6821\u9a8c\u94fe\u8def</small></span><span class="uv-value"><pre>${esc(trace)}</pre></span></div>`:''}
+      <details class="uv-list" open><summary><span class="uv-label">Raw Validation Debug<br><small>\u539f\u59cb\u6821\u9a8c\u8fd4\u56de</small></span></summary><pre>${esc(rawDebug)}</pre></details>
       <div class="warn">No cloud data was written. Fix this record and upload again. / \u672a\u5199\u5165\u4e91\u7aef\uff0c\u8bf7\u4fee\u6b63\u8fd9\u6761\u8bb0\u5f55\u540e\u91cd\u65b0\u4e0a\u4f20\u3002</div>
     </div>`;
 };
@@ -6909,6 +6985,7 @@ function employeeRecordValidationError(entry,index){
     return normalizeEmployeeUploadDryRunError({
       event_index:index,
       event_type:entryEventType(entry?.type||entry?.event_type||'entry'),
+      source:'client_upload_state_fallback',
       error_code:entry?.upload_validation_error_code||'UPLOAD_VALIDATION_FAILED',
       message:state.uploadValidationFailedMessage||entry?.sync_error||'Upload validation failed.',
       validation_trace:[{
@@ -6958,6 +7035,7 @@ function employeeSessionRecordState(entry,index){
       const staleResult=normalizeEmployeeUploadDryRunError({
         event_index:index,
         event_type:'arrears_payment',
+        source:'client_local_validation',
         error_code:'ARREARS_REF_STALE_REFRESH_REQUIRED',
         message:'This arrears item is no longer open. Please refresh arrears.',
         validation_trace:[{
@@ -7016,7 +7094,11 @@ async function validateEmployeeUploadDryRun(entry,sessionForEntry,index){
   let data=null;
   try{data=raw?unwrapStandardResponse(JSON.parse(raw)):null}catch{}
   if(!r.ok||data?.success===false||data?.ok===false){
-    const result=normalizeEmployeeUploadDryRunError(data||{},index,raw||('HTTP '+r.status));
+    const result=normalizeEmployeeUploadDryRunError({
+      ...(data||{}),
+      source:'server_dry_run_validation',
+      raw_validation_response:data||{http_status:r.status,raw_body:String(raw||'').slice(0,4000)}
+    },index,raw||('HTTP '+r.status));
     const err=new Error(formatEmployeeUploadDryRunError(result,index)||raw||('HTTP '+r.status));
     err.dryRunResult=result;
     throw err;
@@ -7057,9 +7139,22 @@ async function commitSessionAndExport(){
     const localResult=normalizeEmployeeUploadDryRunError({
       event_index:0,
       event_type:uploadList[0]?.event_type||entryEventType(uploadList[0]?.type||'entry'),
+      source:'client_local_validation',
       error_code:'CLIENT_ANCHOR_BATCH_VALIDATION_FAILED',
       message:'Client anchor validation failed before dry-run API.',
       missing_fields:validation.errors,
+      raw_validation_response:{
+        source:'client_local_validation',
+        ok:false,
+        stage:'client_anchor_batch_validation',
+        event_index:0,
+        event_type:uploadList[0]?.event_type||entryEventType(uploadList[0]?.type||'entry'),
+        error_code:'CLIENT_ANCHOR_BATCH_VALIDATION_FAILED',
+        message:'Client anchor validation failed before dry-run API.',
+        missing_fields:validation.errors,
+        invalid_fields:[],
+        validation_trace:[]
+      },
       validation_trace:[{
         stage:'client_anchor_batch_validation',
         function:'validateUploadAnchorBatch',
@@ -7182,20 +7277,43 @@ async function commitSessionAndExport(){
       e.sync_error='';
       if(data?.arrear_task)e.cloud_task_id=data.arrear_task.task_id||e.cloud_task_id||'';
     }catch(err){
+      const uploadResult=normalizeEmployeeUploadDryRunError(err?.uploadResult||{
+        source:'server_upload',
+        stage:'server_upload',
+        event_index:i,
+        event_type:e.event_type||entryEventType(e.type||'entry'),
+        error_code:'SERVER_UPLOAD_FAILED',
+        message:String(err?.message||err||'cloud_submit_failed'),
+        raw_validation_response:{source:'server_upload',message:String(err?.message||err||'cloud_submit_failed')}
+      },i,String(err?.message||err||'cloud_submit_failed'));
       e.sync_status='LOCAL';
-      e.upload_status='LOCAL';
-      e.sync_error=String(err?.message||err||'cloud_submit_failed');
-      failed.push(e);
+      e.upload_status='VALIDATION_FAILED';
+      e.upload_validation_error=uploadResult;
+      e.upload_validation_error_code=uploadResult.error_code;
+      e.sync_error=formatEmployeeUploadDryRunError(uploadResult,i);
+      failed.push({entry:e,index:i,result:uploadResult,message:e.sync_error});
       break;
     }
   }
   oldLabels.forEach(([b,html])=>{b.dataset.busy='0';b.disabled=false;b.classList.remove('disabled');b.innerHTML=html});
   if(failed.length){
+    const firstUploadFailure=failed[0];
+    const failedIndex=Number(firstUploadFailure.index||0);
+    if(originalDrafts[failedIndex]){
+      originalDrafts[failedIndex].sync_status='LOCAL';
+      originalDrafts[failedIndex].upload_status='VALIDATION_FAILED';
+      originalDrafts[failedIndex].upload_validation_error=firstUploadFailure.result;
+      originalDrafts[failedIndex].upload_validation_error_code=firstUploadFailure.result?.error_code||'SERVER_UPLOAD_FAILED';
+      originalDrafts[failedIndex].sync_error=firstUploadFailure.message;
+    }
     state.drafts=originalDrafts;
     state.sessionId=originalSessionId;
+    state.uploadValidationFailedIndex=failedIndex;
+    state.uploadValidationFailedMessage=`${firstUploadFailure.result?.error_code||'SERVER_UPLOAD_FAILED'}: ${firstUploadFailure.result?.message||firstUploadFailure.message||''}`;
     saveDrafts();
     buildExport();
-    $('validationBox').innerHTML=`<div class="bad">Session upload failed: ${esc(failed[0].sync_error)}</div><div class="warn">No local entries were locked. Fix the issue and upload the full session again. / 本地流水未锁死，修复后可整票重新上传。</div>`;
+    refreshSessionViews();
+    $('validationBox').innerHTML=renderEmployeeUploadDryRunError(firstUploadFailure.result);
     toast('Session upload failed. You can upload the full session again.',6000);
     updateEntrySessionActionState();
     return;

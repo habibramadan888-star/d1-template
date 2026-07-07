@@ -1742,6 +1742,13 @@ function employeeEntryValidationExplanation(errorCode,message){
   };
 }
 __name(employeeEntryValidationExplanation,"employeeEntryValidationExplanation");
+const HOMELINK_DIAGNOSTIC_ASSET_VERSION="upload-diagnostic-trace-20260707-001";
+const HOMELINK_DIAGNOSTIC_COMMIT_HASH="runtime-git-commit";
+const HOMELINK_DIAGNOSTIC_WORKER_VERSION="runtime-response-header";
+function homelinkDiagnosticTraceId(prefix="diag"){
+  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,10)}`;
+}
+__name(homelinkDiagnosticTraceId,"homelinkDiagnosticTraceId");
 function employeeEntryValidationFunctionForStage(stage,eventType=""){
   const byStage={
     payload:"handleEmployeeEntryValidate",
@@ -1775,12 +1782,16 @@ __name(employeeEntryValidationFunctionForStage,"employeeEntryValidationFunctionF
 function employeeEntryValidationTraceStep(stage,ok,extra={}){
   return {
     stage,
+    function_name:extra.function_name||employeeEntryValidationFunctionForStage(stage,extra.event_type||""),
     function:extra.function_name||employeeEntryValidationFunctionForStage(stage,extra.event_type||""),
     ok:!!ok,
+    duration_ms:Number(extra.duration_ms||0),
     event_index:Number(extra.event_index||0),
     event_type:extra.event_type||"",
     error_code:extra.error_code||"",
     message:extra.message||"",
+    message_en:extra.message_en||extra.message||"",
+    message_zh:extra.message_zh||"",
     missing_fields:Array.isArray(extra.missing_fields)?extra.missing_fields:[],
     invalid_fields:Array.isArray(extra.invalid_fields)?extra.invalid_fields:[]
   };
@@ -1794,10 +1805,14 @@ function employeeEntryValidationFailure(stage,errorCode,message,extra={}){
     message:message||errorCode
   });
   return {
+    trace_id:extra.trace_id||homelinkDiagnosticTraceId("emp-upload"),
+    action:extra.action||"employee_upload_validation",
+    source:extra.source||"dry_run",
     ok:false,
     stage,
     event_index:Number(extra.event_index||0),
     event_type:extra.event_type||"",
+    record_id:extra.record_id||extra.anchor_preview?.id||null,
     error_code:errorCode,
     message:message||errorCode,
     message_en:extra.message_en||explanation.message_en,
@@ -1806,8 +1821,13 @@ function employeeEntryValidationFailure(stage,errorCode,message,extra={}){
     invalid_fields:Array.isArray(extra.invalid_fields)?extra.invalid_fields:[],
     suggested_action_en:extra.suggested_action_en||explanation.suggested_action_en,
     suggested_action_zh:extra.suggested_action_zh||explanation.suggested_action_zh,
+    last_successful_stage:extra.last_successful_stage||null,
+    payload_preview:extra.payload_preview||{},
     anchor_preview:extra.anchor_preview||{},
-    validation_trace:Array.isArray(extra.validation_trace)&&extra.validation_trace.length?extra.validation_trace:[traceStep]
+    validation_trace:Array.isArray(extra.validation_trace)&&extra.validation_trace.length?extra.validation_trace:[traceStep],
+    asset_version:extra.asset_version||HOMELINK_DIAGNOSTIC_ASSET_VERSION,
+    worker_version:extra.worker_version||HOMELINK_DIAGNOSTIC_WORKER_VERSION,
+    commit_hash:extra.commit_hash||HOMELINK_DIAGNOSTIC_COMMIT_HASH
   };
 }
 __name(employeeEntryValidationFailure,"employeeEntryValidationFailure");
@@ -2180,17 +2200,38 @@ async function validateEmployeeEntryUploadPayload(env,user,body,opts={}){
     balance_total:entryAnchorMoney(Number(String(session.cash_handover||0).replace(/,/g,""))+Number(String(session.bank_transfer_total||0).replace(/,/g,"")))
   };
   return {
+    trace_id:homelinkDiagnosticTraceId("emp-upload"),
+    action:"employee_upload_validation",
+    source:"dry_run",
     ok:true,
-    stage:"validated",
+    stage:"final_preflight",
     event_index:eventIndex,
     event_type:normalized.event_type||entryAnchorEventType(type),
+    record_id:anchorPreview.id||null,
+    error_code:"",
+    message:"Upload validation passed.",
+    message_en:"Upload validation passed.",
+    message_zh:"上传前校验通过。",
+    missing_fields:[],
+    invalid_fields:[],
+    suggested_action_en:"Continue upload.",
+    suggested_action_zh:"可以继续上传。",
+    last_successful_stage:"final_preflight",
+    payload_preview:{
+      session_id:cleanText(session.id||session.session_id||"",80),
+      entries_count:sessionAnchorEntries.length||1,
+      source:cleanText(session.source||"employee_entry",40)
+    },
     summary,
     entries_count:sessionAnchorEntries.length||1,
     export_text_preview:String(sessionExportText||"").slice(0,1000),
     anchor_types:sessionAnchorEntries.map(row=>row.event_type||entryAnchorEventType(entryAnchorType(row))),
     anchor_preview:anchorPreview,
     normalized_entry:normalized,
-    validation_trace:employeeEntryValidationSuccessTrace(type,eventIndex,normalized.event_type||entryAnchorEventType(type))
+    validation_trace:employeeEntryValidationSuccessTrace(type,eventIndex,normalized.event_type||entryAnchorEventType(type)),
+    asset_version:HOMELINK_DIAGNOSTIC_ASSET_VERSION,
+    worker_version:HOMELINK_DIAGNOSTIC_WORKER_VERSION,
+    commit_hash:HOMELINK_DIAGNOSTIC_COMMIT_HASH
   };
 }
 __name(validateEmployeeEntryUploadPayload,"validateEmployeeEntryUploadPayload");
@@ -6673,12 +6714,21 @@ async function fetchStaticAsset(request, env, pathname) {
   const assetUrl = new URL(request.url);
   assetUrl.pathname = pathname;
   assetUrl.search = "";
-  return env.ASSETS.fetch(new Request(assetUrl.toString(), {
+  const response = await env.ASSETS.fetch(new Request(assetUrl.toString(), {
     method: "GET",
     headers: {
       Accept: request.headers.get("Accept") || "text/html"
     }
   }));
+  if (pathname === "/employee-v3" || pathname === "/employee-v3.html") {
+    const headers = new Headers(response.headers);
+    headers.set("Cache-Control", "no-store, no-cache, max-age=0, must-revalidate");
+    headers.set("Pragma", "no-cache");
+    headers.set("X-Employee-Asset-Version", HOMELINK_DIAGNOSTIC_ASSET_VERSION);
+    headers.set("X-Employee-Asset-Commit", HOMELINK_DIAGNOSTIC_COMMIT_HASH);
+    return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+  }
+  return response;
 }
 __name(fetchStaticAsset, "fetchStaticAsset");
 async function handleAppEntryRoute(request, env, path, method) {
