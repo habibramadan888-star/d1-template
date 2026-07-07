@@ -3225,7 +3225,7 @@ function readSessionId(userid){
   try{return localStorage.getItem(employeeStorageKey('empv3:sessionId',userid))||''}
   catch{return ''}
 }
-const state={lockCards:[],current:null,depositBalance:null,rentConfig:{},rentConfigLoaded:false,drafts:[],tasks:[],closedTasks:[],arrearsTasksLoaded:false,employeeDirectives:[],followupItems:[],systemReminderItems:[],systemReminderStatus:'idle',systemReminderSummary:null,systemReminderSources:null,systemReminderLimit:100,sessionId:'',user:null,ttlockStatus:'idle',ttlockLoadedAt:0,ttlockError:'',ttlockDataSource:''};
+const state={lockCards:[],current:null,depositBalance:null,rentConfig:{},rentConfigLoaded:false,drafts:[],tasks:[],closedTasks:[],arrearsTasksLoaded:false,arrearTasksError:null,employeeDirectives:[],followupItems:[],systemReminderItems:[],systemReminderStatus:'idle',systemReminderSummary:null,systemReminderSources:null,systemReminderLimit:100,sessionId:'',user:null,ttlockStatus:'idle',ttlockLoadedAt:0,ttlockError:'',ttlockDataSource:''};
 const BED_TRANSFER_WRITE_ENABLED=true;
 const BED_TRANSFER_EVENT_LEDGER_MESSAGE='Bed transfer records save event anchors only. This does not directly change bed occupancy, deposit, arrears, or Access Card. 换床记录只保存信息锚点，不会直接改变床位、押金、欠款或门禁卡。';
 const BED_TRANSFER_SUBMITTED_MESSAGE='Bed transfer recorded / 换床记录已保存';
@@ -3886,21 +3886,24 @@ function employeeRenderBedInfoStrip(el,bedValue,{label='Bed',labelZh='床位'}={
     return;
   }
   const loading=state.ttlockStatus==='loading'||state.arrearsTasksLoaded===false;
-  const open=employeeOpenTasksForBedValue(bed);
+  const arrearsUnavailable=!!state.arrearTasksError&&!loading;
+  const open=arrearsUnavailable?[]:employeeOpenTasksForBedValue(bed);
   const arrearsTotal=open.reduce((sum,t)=>sum+taskRemain(t),0);
   const card=employeeFindCardForBedValue(bed);
   const status=employeeCardStatus(card);
   const cardName=card?(card.remark||card.cardText||card.tenant||card.room||card.bed||'Access Card'):'';
   const cardUntil=employeeCardUntilText(card);
-  const stripKind=open.length?'warn':(status.kind==='ok'?'ok':(status.kind==='warn'?'warn':''));
+  const stripKind=(open.length||arrearsUnavailable)?'warn':(status.kind==='ok'?'ok':(status.kind==='warn'?'warn':''));
   el.className=`bed-info-strip ${stripKind}`.trim();
-  const badge=loading?'Loading Bed Info':(open.length?'Open Arrears':'No Open Arrears');
-  const badgeZh=loading?'正在读取床位信息':(open.length?'未清欠款':'无未清欠款');
+  const badge=loading?'Loading Bed Info':(arrearsUnavailable?'Arrears Unavailable':(open.length?'Open Arrears':'No Open Arrears'));
+  const badgeZh=loading?'正在读取床位信息':(arrearsUnavailable?'欠款信息暂不可用':(open.length?'未清欠款':'无未清欠款'));
   const cardLine=state.ttlockStatus==='error'&&!card?'Bed Info Unavailable':(cardName||'No Card Data');
   const cardLineZh=state.ttlockStatus==='error'&&!card?'床位信息暂不可用':(cardName?'门禁卡':'无门禁卡数据');
+  const arrearsLine=arrearsUnavailable?'Arrears temporarily unavailable':(open.length?fmtMoney(arrearsTotal)+' AED':'No Open Arrears');
+  const arrearsLineZh=arrearsUnavailable?'欠款信息暂不可用':(open.length?'未清欠款：'+fmtMoney(arrearsTotal)+' AED':'无未清欠款');
   el.innerHTML=`<div class="bed-info-main"><div>${esc(label)} ${esc(bed)}<small>${esc(labelZh)} ${esc(bed)}</small></div><span class="bed-info-badge">${esc(badge)}<small>${esc(badgeZh)}</small></span></div>
     <div class="bed-info-rows">
-      <div class="bed-info-row"><b>Open Arrears: ${open.length?fmtMoney(arrearsTotal)+' AED':'No Open Arrears'}</b><small>${open.length?'未清欠款：'+fmtMoney(arrearsTotal)+' AED':'无未清欠款'}</small></div>
+      <div class="bed-info-row"><b>Open Arrears: ${esc(arrearsLine)}</b><small>${esc(arrearsLineZh)}</small></div>
       <div class="bed-info-row"><b>Access Card: ${esc(cardLine)}</b><small>${esc(cardLineZh)}</small></div>
       <div class="bed-info-row"><b>Card Until: ${esc(cardUntil||'No Card Data')}</b><small>${cardUntil?'卡片截止：'+esc(cardUntil):'无门禁卡数据'}</small></div>
       <div class="bed-info-row"><b>Status: ${esc(status.en)}</b><small>状态：${esc(status.zh)}</small></div>
@@ -5402,12 +5405,25 @@ newSession=newSessionFinal;
 async function loadTasks(render=true){
   try{
     const r=await apiFetch('/api/arrear_tasks');
-    const data=r.ok?await r.json():{tasks:[]};
+    const data=await r.json().catch(()=>({tasks:[],error_code:'ARREAR_TASKS_UNAVAILABLE'}));
+    if(!r.ok){
+      state.arrearTasksError=data||{error_code:'ARREAR_TASKS_UNAVAILABLE'};
+      state.tasks=[];
+      state.closedTasks=[];
+      populateTaskSelect();
+      if(render)$('taskList').innerHTML='<div class="hint">Arrears temporarily unavailable / 欠款信息暂不可用</div>';
+      return;
+    }
+    state.arrearTasksError=null;
     state.tasks=data.tasks||[];
     state.closedTasks=data.closed_tasks||data.closedTasks||[];
     populateTaskSelect();
     if(render)renderTasks();
   }catch{
+    state.arrearTasksError={error_code:'ARREAR_TASKS_UNAVAILABLE'};
+    state.tasks=[];
+    state.closedTasks=[];
+    populateTaskSelect();
     if(render)$('taskList').textContent='欠款任务加载失败';
   }
 }

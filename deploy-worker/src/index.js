@@ -4314,6 +4314,61 @@ async function empListMergedArrearTasks(env,user,opts={}){
   return detailed.tasks;
 }
 __name(empListMergedArrearTasks,"empListMergedArrearTasks");
+function arrearTasksDiagnosticTraceStep(stage,ok,extra={}){
+  return {
+    stage,
+    function_name:extra.function_name||"handleArrearTasks",
+    ok:!!ok,
+    error_code:extra.error_code||"",
+    message:extra.message||"",
+    count:Number(extra.count||0),
+    bed:cleanText(extra.bed||"",80),
+    source:extra.source||""
+  };
+}
+__name(arrearTasksDiagnosticTraceStep,"arrearTasksDiagnosticTraceStep");
+function arrearTasksBedFromRequest(request){
+  const url=new URL(request.url);
+  return cleanText(url.searchParams.get("bed")||url.searchParams.get("room")||url.searchParams.get("room_bed")||"",80).replace(/^#/,"");
+}
+__name(arrearTasksBedFromRequest,"arrearTasksBedFromRequest");
+function arrearTasksFilterByBed(tasks=[],bed=""){
+  const cleanBed=cleanText(bed,80).replace(/^#/,"");
+  if(!cleanBed)return tasks||[];
+  return (tasks||[]).filter(t=>cleanText(t?.bed||t?.room_bed||t?.room||t?.bed_no||"",80).replace(/^#/,"")===cleanBed);
+}
+__name(arrearTasksFilterByBed,"arrearTasksFilterByBed");
+function arrearTasksTotalRemaining(tasks=[]){
+  return cleanMoney((tasks||[]).reduce((sum,t)=>sum+cleanMoney(t?.remaining_arrears||t?.remain||empTaskRemaining(t)),0));
+}
+__name(arrearTasksTotalRemaining,"arrearTasksTotalRemaining");
+async function arrearTasksProjectionFallback(env,user,bed,trace,opts={}){
+  try{
+    const projection=bed?await rebuildCloudArrearsForBed(env,user,bed,{limit:opts.limit||1000}):await rebuildAllCloudArrears(env,user,{limit:opts.limit||1000});
+    const tasks=(projection.open_items||[]).filter(t=>cleanMoney(t?.remaining_arrears||empTaskRemaining(t))>0);
+    trace.push(arrearTasksDiagnosticTraceStep("build_projection_fallback",true,{function_name:bed?"rebuildCloudArrearsForBed":"rebuildAllCloudArrears",bed,count:tasks.length,source:"cloud_arrears_projection"}));
+    return {ok:true,tasks,projection};
+  }catch(e){
+    const code=empReadErrorCode(e);
+    trace.push(arrearTasksDiagnosticTraceStep("build_projection_fallback",false,{function_name:bed?"rebuildCloudArrearsForBed":"rebuildAllCloudArrears",bed,error_code:"PROJECTION_FALLBACK_FAILED",message:code,source:"cloud_arrears_projection"}));
+    return {ok:false,tasks:[],error_code:"PROJECTION_FALLBACK_FAILED",message:code};
+  }
+}
+__name(arrearTasksProjectionFallback,"arrearTasksProjectionFallback");
+function arrearTasksPayload(tasks=[],closedTasks=[],source="arrear_tasks",trace=[],extra={}){
+  return {
+    success:true,
+    ok:true,
+    tasks,
+    closed_tasks:closedTasks,
+    source,
+    total_remaining:arrearTasksTotalRemaining(tasks),
+    total_count:(tasks||[]).length,
+    diagnostic_trace:trace,
+    ...extra
+  };
+}
+__name(arrearTasksPayload,"arrearTasksPayload");
 async function resolveCurrentReceivablesSot(env,user,opts={}){
   return resolveConsoleReceivablesSot(env,user,opts);
 }
@@ -4420,17 +4475,59 @@ async function empCloseArrearEverywhere(env,user,id,now){
 }
 __name(empCloseArrearEverywhere,"empCloseArrearEverywhere");
 async function handleArrearTasks(request,env,user){
-  const tasks=await empListMergedArrearTasks(env,user);
+  const bed=arrearTasksBedFromRequest(request);
+  const trace=[
+    arrearTasksDiagnosticTraceStep("auth",true,{function_name:"requireAuth",bed,source:"authenticated_user"})
+  ];
+  let tasks=[];
+  let source="arrear_tasks";
+  try{
+    const detailed=await empListMergedArrearTasksDetailed(env,user,{limit:200});
+    tasks=arrearTasksFilterByBed(detailed.tasks||[],bed);
+    source="materialized_plus_projection";
+    trace.push(arrearTasksDiagnosticTraceStep("query_arrear_tasks",true,{function_name:"empListMergedArrearTasksDetailed",bed,count:tasks.length,source}));
+    trace.push(arrearTasksDiagnosticTraceStep("merge_materialized_projection",true,{function_name:"empListMergedArrearTasksDetailed",bed,count:tasks.length,source}));
+  }catch(e){
+    const code=empReadErrorCode(e);
+    trace.push(arrearTasksDiagnosticTraceStep("merge_materialized_projection",false,{function_name:"empListMergedArrearTasksDetailed",bed,error_code:"MERGE_MATERIALIZED_PROJECTION_FAILED",message:code,source:"materialized_plus_projection"}));
+    const fallback=await arrearTasksProjectionFallback(env,user,bed,trace,{limit:1000});
+    if(fallback.ok){
+      return success(arrearTasksPayload(fallback.tasks,[],"cloud_arrears_projection_fallback",trace,{
+        fallback_used:true,
+        materialized_error:code
+      }));
+    }
+    return json({
+      success:false,
+      ok:false,
+      error_code:"ARREAR_TASKS_UNAVAILABLE",
+      root_cause:"MERGE_MATERIALIZED_PROJECTION_FAILED",
+      message:"Arrears temporarily unavailable.",
+      message_en:"Arrears temporarily unavailable.",
+      message_zh:"欠款信息暂不可用。",
+      tasks:[],
+      closed_tasks:[],
+      source:"arrear_tasks_failed",
+      total_remaining:0,
+      total_count:0,
+      diagnostic_trace:trace,
+      materialized_error:code,
+      projection_error:fallback.error_code||fallback.message||"PROJECTION_FALLBACK_FAILED"
+    },503);
+  }
   let closedTasks=[];
   if(await empTableExists(env,"arrear_tasks")){
     try{
       const rows=await env.DB.prepare("SELECT * FROM arrear_tasks WHERE corpid=? ORDER BY COALESCE(updated_at,created_at) DESC LIMIT 200").bind(user.corpid).all();
-      closedTasks=(rows.results||[]).filter(t=>!empCloseStatusIsOpen(t.close_status)||empTaskRemaining(t)<=0).slice(0,100);
-    }catch{
+      closedTasks=arrearTasksFilterByBed((rows.results||[]).filter(t=>!empCloseStatusIsOpen(t.close_status)||empTaskRemaining(t)<=0),bed).slice(0,100);
+      trace.push(arrearTasksDiagnosticTraceStep("closed_tasks_query",true,{function_name:"handleArrearTasks.closed_tasks",bed,count:closedTasks.length,source:"arrear_tasks"}));
+    }catch(e){
+      trace.push(arrearTasksDiagnosticTraceStep("closed_tasks_query",false,{function_name:"handleArrearTasks.closed_tasks",bed,error_code:"ARREAR_TASKS_D1_QUERY_FAILED",message:empReadErrorCode(e),source:"arrear_tasks"}));
       closedTasks=[];
     }
   }
-  return success({success:true,tasks,closed_tasks:closedTasks});
+  trace.push(arrearTasksDiagnosticTraceStep("response_mapping",true,{function_name:"handleArrearTasks",bed,count:tasks.length,source}));
+  return success(arrearTasksPayload(tasks,closedTasks,source,trace));
 }
 __name(handleArrearTasks,"handleArrearTasks");
 async function handleArrearTaskDirective(request,env,user){
