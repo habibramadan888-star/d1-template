@@ -4360,6 +4360,7 @@ function arrearTasksPayload(tasks=[],closedTasks=[],source="arrear_tasks",trace=
     success:true,
     ok:true,
     tasks,
+    items:tasks,
     closed_tasks:closedTasks,
     source,
     total_remaining:arrearTasksTotalRemaining(tasks),
@@ -4480,54 +4481,77 @@ async function handleArrearTasks(request,env,user){
     arrearTasksDiagnosticTraceStep("auth",true,{function_name:"requireAuth",bed,source:"authenticated_user"})
   ];
   let tasks=[];
-  let source="arrear_tasks";
-  try{
-    const detailed=await empListMergedArrearTasksDetailed(env,user,{limit:200});
-    tasks=arrearTasksFilterByBed(detailed.tasks||[],bed);
-    source="materialized_plus_projection";
-    trace.push(arrearTasksDiagnosticTraceStep("query_arrear_tasks",true,{function_name:"empListMergedArrearTasksDetailed",bed,count:tasks.length,source}));
-    trace.push(arrearTasksDiagnosticTraceStep("merge_materialized_projection",true,{function_name:"empListMergedArrearTasksDetailed",bed,count:tasks.length,source}));
-  }catch(e){
-    const code=empReadErrorCode(e);
-    trace.push(arrearTasksDiagnosticTraceStep("merge_materialized_projection",false,{function_name:"empListMergedArrearTasksDetailed",bed,error_code:"MERGE_MATERIALIZED_PROJECTION_FAILED",message:code,source:"materialized_plus_projection"}));
-    const fallback=await arrearTasksProjectionFallback(env,user,bed,trace,{limit:1000});
-    if(fallback.ok){
-      return success(arrearTasksPayload(fallback.tasks,[],"cloud_arrears_projection_fallback",trace,{
-        fallback_used:true,
-        materialized_error:code
-      }));
-    }
-    return json({
-      success:false,
-      ok:false,
-      error_code:"ARREAR_TASKS_UNAVAILABLE",
-      root_cause:"MERGE_MATERIALIZED_PROJECTION_FAILED",
-      message:"Arrears temporarily unavailable.",
-      message_en:"Arrears temporarily unavailable.",
-      message_zh:"欠款信息暂不可用。",
-      tasks:[],
-      closed_tasks:[],
-      source:"arrear_tasks_failed",
-      total_remaining:0,
-      total_count:0,
-      diagnostic_trace:trace,
-      materialized_error:code,
-      projection_error:fallback.error_code||fallback.message||"PROJECTION_FALLBACK_FAILED"
-    },503);
-  }
   let closedTasks=[];
-  if(await empTableExists(env,"arrear_tasks")){
+  let source="arrear_tasks";
+  let fallbackAttempted=false;
+  let projectionResult={ok:false,count:0};
+  try{
     try{
-      const rows=await env.DB.prepare("SELECT * FROM arrear_tasks WHERE corpid=? ORDER BY COALESCE(updated_at,created_at) DESC LIMIT 200").bind(user.corpid).all();
-      closedTasks=arrearTasksFilterByBed((rows.results||[]).filter(t=>!empCloseStatusIsOpen(t.close_status)||empTaskRemaining(t)<=0),bed).slice(0,100);
-      trace.push(arrearTasksDiagnosticTraceStep("closed_tasks_query",true,{function_name:"handleArrearTasks.closed_tasks",bed,count:closedTasks.length,source:"arrear_tasks"}));
+      const detailed=await empListMergedArrearTasksDetailed(env,user,{limit:200});
+      tasks=arrearTasksFilterByBed(detailed.tasks||[],bed);
+      source="materialized_plus_projection";
+      trace.push(arrearTasksDiagnosticTraceStep("query_arrear_tasks",true,{function_name:"empListMergedArrearTasksDetailed",bed,count:tasks.length,source}));
+      trace.push(arrearTasksDiagnosticTraceStep("merge_materialized_projection",true,{function_name:"empListMergedArrearTasksDetailed",bed,count:tasks.length,source}));
+    }catch(e){
+      const code=empReadErrorCode(e);
+      fallbackAttempted=true;
+      trace.push(arrearTasksDiagnosticTraceStep("merge_materialized_projection",false,{function_name:"empListMergedArrearTasksDetailed",bed,error_code:"MERGE_MATERIALIZED_PROJECTION_FAILED",message:code,source:"materialized_plus_projection"}));
+      const fallback=await arrearTasksProjectionFallback(env,user,bed,trace,{limit:1000});
+      projectionResult={ok:!!fallback.ok,count:(fallback.tasks||[]).length,error_code:fallback.error_code||"",message:fallback.message||""};
+      if(fallback.ok){
+        tasks=arrearTasksFilterByBed(fallback.tasks||[],bed);
+        source=tasks.length?"cloud_arrears_projection_fallback":"projection_or_empty";
+      }else{
+        trace.push(arrearTasksDiagnosticTraceStep("response_mapping",false,{function_name:"handleArrearTasks",bed,error_code:"PROJECTION_FALLBACK_THROW",message:fallback.message||fallback.error_code||"projection_failed",source:"arrear_tasks_failed"}));
+        return json({
+          ...arrearTasksPayload([],[],"arrear_tasks_failed",trace,{
+            success:false,
+            ok:false,
+            error_code:"ARREAR_TASKS_UNAVAILABLE",
+            root_cause:"PROJECTION_FALLBACK_THROW",
+            message:"Arrears temporarily unavailable.",
+            message_en:"Arrears temporarily unavailable.",
+            message_zh:"欠款信息暂不可用。",
+            fallback_attempted:fallbackAttempted,
+            projection_result:projectionResult,
+            materialized_error:code,
+            projection_error:fallback.error_code||fallback.message||"PROJECTION_FALLBACK_FAILED"
+          })
+        },200);
+      }
+    }
+    try{
+      if(await empTableExists(env,"arrear_tasks")){
+        const rows=await env.DB.prepare("SELECT * FROM arrear_tasks WHERE corpid=? ORDER BY COALESCE(updated_at,created_at) DESC LIMIT 200").bind(user.corpid).all();
+        closedTasks=arrearTasksFilterByBed((rows.results||[]).filter(t=>!empCloseStatusIsOpen(t.close_status)||empTaskRemaining(t)<=0),bed).slice(0,100);
+        trace.push(arrearTasksDiagnosticTraceStep("closed_tasks_query",true,{function_name:"handleArrearTasks.closed_tasks",bed,count:closedTasks.length,source:"arrear_tasks"}));
+      }
     }catch(e){
       trace.push(arrearTasksDiagnosticTraceStep("closed_tasks_query",false,{function_name:"handleArrearTasks.closed_tasks",bed,error_code:"ARREAR_TASKS_D1_QUERY_FAILED",message:empReadErrorCode(e),source:"arrear_tasks"}));
       closedTasks=[];
     }
+    trace.push(arrearTasksDiagnosticTraceStep("response_mapping",true,{function_name:"handleArrearTasks",bed,count:tasks.length,source}));
+    return json(arrearTasksPayload(tasks,closedTasks,source,trace,{
+      fallback_attempted:fallbackAttempted,
+      projection_result:projectionResult
+    }));
+  }catch(e){
+    trace.push(arrearTasksDiagnosticTraceStep("response_mapping",false,{function_name:"handleArrearTasks",bed,error_code:"ARREAR_TASKS_ROUTE_THROW",message:empReadErrorCode(e),source:"arrear_tasks_failed"}));
+    return json({
+      ...arrearTasksPayload([],[],"arrear_tasks_failed",trace,{
+        success:false,
+        ok:false,
+        error_code:"ARREAR_TASKS_UNAVAILABLE",
+        root_cause:"ARREAR_TASKS_ROUTE_THROW",
+        message:"Arrears temporarily unavailable.",
+        message_en:"Arrears temporarily unavailable.",
+        message_zh:"欠款信息暂不可用。",
+        fallback_attempted:fallbackAttempted,
+        projection_result:projectionResult,
+        safe_error:empReadErrorCode(e)
+      })
+    },200);
   }
-  trace.push(arrearTasksDiagnosticTraceStep("response_mapping",true,{function_name:"handleArrearTasks",bed,count:tasks.length,source}));
-  return success(arrearTasksPayload(tasks,closedTasks,source,trace));
 }
 __name(handleArrearTasks,"handleArrearTasks");
 async function handleArrearTaskDirective(request,env,user){

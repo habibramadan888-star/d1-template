@@ -5406,7 +5406,7 @@ async function loadTasks(render=true){
   try{
     const r=await apiFetch('/api/arrear_tasks');
     const data=await r.json().catch(()=>({tasks:[],error_code:'ARREAR_TASKS_UNAVAILABLE'}));
-    if(!r.ok){
+    if(!r.ok||data.ok===false){
       state.arrearTasksError=data||{error_code:'ARREAR_TASKS_UNAVAILABLE'};
       state.tasks=[];
       state.closedTasks=[];
@@ -5430,7 +5430,7 @@ async function loadTasks(render=true){
 const employeeUploadStateLegacyLoadTasks=loadTasks;
 loadTasks=async function(render=true){
   await employeeUploadStateLegacyLoadTasks(render);
-  state.arrearsTasksLoaded=Array.isArray(state.tasks);
+  state.arrearsTasksLoaded=Array.isArray(state.tasks)&&!state.arrearTasksError;
   renderEmployeeBedInfoStrips();
   refreshSessionViews();
 };
