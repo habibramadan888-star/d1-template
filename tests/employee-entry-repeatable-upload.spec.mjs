@@ -50,7 +50,9 @@ test("invalid anchor rejects the whole upload before cloud write", async () => {
   assert.match(uploadBlock, /const validation=validateUploadAnchorBatch\(uploadList\)/);
   assert.match(uploadBlock, /if\(!validation\.ok\)/);
   assert.match(uploadBlock, /state\.drafts=originalDrafts/);
-  assert.match(uploadBlock, /Upload rejected\. Fix required fields first/);
+  assert.match(uploadBlock, /renderEmployeeUploadDryRunError\(localResult\)/);
+  assert.match(uploadBlock, /Upload validation failed \/ \\u4e0a\\u4f20\\u6821\\u9a8c\\u5931\\u8d25/);
+  assert.match(uploadBlock, /updateEntrySessionActionState\(\)/);
   const rejectionIndex = uploadBlock.indexOf("if(!validation.ok)");
   const apiIndex = uploadBlock.indexOf("apiFetch('/api/employee/entry'");
   assert.ok(rejectionIndex > 0 && apiIndex > rejectionIndex, "validation must run before /api/employee/entry");

@@ -4227,6 +4227,41 @@ function updateEntrySessionActionState(){
     exportBtn.classList.toggle('disabled',!hasRows);
   }
 }
+function currentSessionHasUploadBlockingError(){
+  return (state.drafts||[]).some((entry,index)=>{
+    const key=employeeSessionRecordState(entry,index).key;
+    return key==='VALIDATION_FAILED'||key==='STALE';
+  });
+}
+updateEntrySessionActionState=function(){
+  const uploaded=entrySessionUploaded();
+  const blocked=currentSessionHasUploadBlockingError();
+  const hasRows=state.drafts.length>0;
+  const whats=$('btnWhatsAppSession');
+  if(whats){
+    whats.disabled=!uploaded||blocked;
+    whats.classList.toggle('disabled',!uploaded||blocked);
+    whats.title=uploaded&&!blocked?'':'Upload this session to cloud before WhatsApp export / \u8bf7\u5148\u786e\u8ba4\u672c\u7968\u5e76\u4e0a\u4f20\u4e91\u7aef';
+  }
+  const exportBtn=$('btnExportSession');
+  if(exportBtn&&exportBtn.dataset.busy!=='1'){
+    if(blocked){
+      exportBtn.innerHTML=renderEmployeeButtonLabel('Upload Failed','\u4e0a\u4f20\u5931\u8d25');
+      exportBtn.disabled=true;
+      exportBtn.classList.add('disabled');
+      return;
+    }
+    if(uploaded&&hasRows){
+      exportBtn.innerHTML=renderEmployeeButtonLabel('Done','Upload Complete');
+      exportBtn.disabled=true;
+      exportBtn.classList.add('disabled');
+      return;
+    }
+    exportBtn.innerHTML=renderEmployeeButtonLabel('Upload Session','\u786e\u8ba4\u672c\u7968\u5e76\u4e0a\u4f20\u4e91\u7aef');
+    exportBtn.disabled=!hasRows;
+    exportBtn.classList.toggle('disabled',!hasRows);
+  }
+};
 function refreshSessionViews(){
   renderSessionKpis();
   renderSessionPreview();
@@ -6244,11 +6279,76 @@ function normalizeEmployeeUploadDryRunError(result,index,fallbackMessage=''){
     anchor_preview:data.anchor_preview&&typeof data.anchor_preview==='object'?data.anchor_preview:{}
   };
 }
+function employeeUploadEventLabel(value){
+  const raw=String(value||'').trim();
+  const key=raw.toLowerCase();
+  const map={
+    r:['Rent','收租'],
+    rent:['Rent','收租'],
+    ap:['Arrears Payment','还欠款'],
+    arrears_payment:['Arrears Payment','还欠款'],
+    d:['Deposit In','收押金'],
+    deposit_in:['Deposit In','收押金'],
+    dr:['Deposit Out','退押金'],
+    deposit_out:['Deposit Out','退押金'],
+    co:['Checkout','退房'],
+    checkout:['Checkout','退房'],
+    e:['Expense','支出'],
+    expense:['Expense','支出'],
+    tf:['Bed Transfer','换床'],
+    bed_transfer:['Bed Transfer','换床']
+  };
+  const hit=map[key]||[raw||'Entry','记录'];
+  return {en:hit[0],zh:hit[1]};
+}
+function employeeUploadErrorExplanation(code){
+  const key=String(code||'').trim().toUpperCase();
+  const map={
+    UPLOAD_VALIDATION_FAILED:['Upload validation failed.','上传前校验未通过。'],
+    UNKNOWN_UPLOAD_VALIDATION_ERROR:['Upload validation failed.','上传前校验未通过。'],
+    CHECKOUT_OPEN_ARREARS_OWNER_APPROVAL_REQUIRED:['This bed has open arrears. Normal checkout requires owner approval.','该床位存在未清欠款，普通退房需要老板审核。'],
+    DEPOSIT_REFUND_OPEN_ARREARS_OWNER_APPROVAL_REQUIRED:['This bed has open arrears. Deposit refund requires owner approval.','该床位存在未清欠款，退押金需要老板审核。'],
+    LINKED_TASK_NOT_OPEN:['The selected arrears item is no longer open. Please refresh arrears.','所选欠款已不是未清状态，请刷新欠款。'],
+    ARREARS_REF_STALE_REFRESH_REQUIRED:['Arrears status changed. Refresh arrears and select again.','欠款状态已变化，请刷新欠款后重新选择。'],
+    DEPOSIT_REFUND_DIFFERENCE_REASON_REQUIRED:['Actual refund differs from deposit balance. Difference reason is required.','实退金额和应退金额不一致，必须填写差额原因。'],
+    LINKED_TASK_REQUIRED:['Select one open cloud arrears item before adding arrears payment.','还欠款必须先选择一条云端未清欠款。'],
+    ARREAR_PAYMENT_AMOUNT_INVALID:['Payment amount must be greater than 0 and cannot exceed remaining arrears.','还款金额必须大于 0，且不能超过剩余欠款。'],
+    LEFT_WITH_ARREARS_REQUIRED_FIELDS_MISSING:['Left With Arrears is missing required tracking fields.','离店未清欠款缺少必填追踪字段。']
+  };
+  const hit=map[key]||['Upload validation failed.','上传前校验未通过。'];
+  return {en:hit[0],zh:hit[1]};
+}
+function employeeUploadFieldListText(fields){
+  const list=(fields||[]).filter(Boolean);
+  if(!list.length)return {en:'None',zh:'无'};
+  return {en:list.join(', '),zh:list.join('、')};
+}
+function employeeUploadSuggestedActionParts(result){
+  const r=normalizeEmployeeUploadDryRunError(result,result?.event_index);
+  if(r.error_code==='ARREARS_REF_STALE_REFRESH_REQUIRED'||r.event_type==='arrears_payment'){
+    return {en:'Refresh arrears or remove this record, then select an open arrears item again.',zh:'请刷新欠款或删除这条记录，然后重新选择未清欠款。'};
+  }
+  if((r.error_code||'').includes('CHECKOUT_OPEN_ARREARS')||(r.invalid_fields||[]).includes('open_arrears')){
+    return {en:'Choose Collect Arrears First, Request Owner Approval, or Left With Arrears before adding checkout.',zh:'请先选择先收欠款、申请老板审核，或离店未清欠款后再录入退房。'};
+  }
+  if((r.error_code||'').includes('DEPOSIT_REFUND_OPEN_ARREARS')){
+    return {en:'Collect arrears first or request owner approval before refunding deposit.',zh:'请先收清欠款或申请老板审核后再退押金。'};
+  }
+  if((r.error_code||'').includes('DEPOSIT_REFUND_DIFFERENCE_REASON')){
+    return {en:'Enter Difference Reason, then upload again.',zh:'请填写差额原因后重新上传。'};
+  }
+  if((r.missing_fields||[]).length){
+    return {en:'Fill the missing fields shown above, then upload again.',zh:'请补齐上方缺失字段后重新上传。'};
+  }
+  return {en:'Fix or remove this record, then upload again.',zh:'请修正或删除这条记录后重新上传。'};
+}
 function renderEmployeeUploadDryRunError(result){
   const r=normalizeEmployeeUploadDryRunError(result,result?.event_index);
-  const missing=r.missing_fields.length?r.missing_fields.join(' / '):'None';
-  const invalid=r.invalid_fields.length?r.invalid_fields.join(' / '):'None';
-  const suggested=employeeUploadValidationSuggestedAction(r);
+  const missing=employeeUploadFieldListText(r.missing_fields);
+  const invalid=employeeUploadFieldListText(r.invalid_fields);
+  const suggested=employeeUploadSuggestedActionParts(r);
+  const event=employeeUploadEventLabel(r.event_type);
+  const explanation=employeeUploadErrorExplanation(r.error_code);
   const preview=Object.entries(r.anchor_preview||{})
     .filter(([,value])=>value!==''&&value!==null&&typeof value!=='undefined')
     .map(([key,value])=>`${key}: ${value}`)
@@ -6286,6 +6386,41 @@ function employeeUploadValidationSuggestedAction(result){
   }
   return 'Fix or remove the highlighted record, then upload again.';
 }
+employeeUploadValidationSuggestedAction=function(result){
+  const action=employeeUploadSuggestedActionParts(result);
+  return `${action.en} / ${action.zh}`;
+};
+renderEmployeeUploadDryRunError=function(result){
+  const r=normalizeEmployeeUploadDryRunError(result,result?.event_index);
+  const missing=employeeUploadFieldListText(r.missing_fields);
+  const invalid=employeeUploadFieldListText(r.invalid_fields);
+  const suggested=employeeUploadSuggestedActionParts(r);
+  const event=employeeUploadEventLabel(r.event_type);
+  const explanation=employeeUploadErrorExplanation(r.error_code);
+  const preview=Object.entries(r.anchor_preview||{})
+    .filter(([,value])=>value!==''&&value!==null&&typeof value!=='undefined')
+    .map(([key,value])=>`${key}: ${value}`)
+    .join(' | ');
+  return `
+    <div class="upload-validation-panel" role="alert" data-upload-validation-error="true">
+      <div>
+        <div class="uv-title">Upload Validation Failed</div>
+        <div class="uv-sub">\u4e0a\u4f20\u6821\u9a8c\u5931\u8d25</div>
+      </div>
+      <div class="uv-grid">
+        <div class="uv-cell"><span class="uv-label">Record<br><small>\u8bb0\u5f55</small></span><span class="uv-value">#${esc(String(r.event_index+1))}<br><small>\u7b2c ${esc(String(r.event_index+1))} \u6761\u8bb0\u5f55</small></span></div>
+        <div class="uv-cell"><span class="uv-label">Stage<br><small>\u9636\u6bb5</small></span><span class="uv-value">${esc(r.stage)}</span></div>
+        <div class="uv-cell"><span class="uv-label">Event<br><small>\u4e8b\u4ef6</small></span><span class="uv-value">${esc(event.en)}<br><small>${esc(event.zh)}</small></span></div>
+        <div class="uv-cell"><span class="uv-label">Error Code<br><small>\u9519\u8bef\u4ee3\u7801</small></span><span class="uv-value">${esc(r.error_code)}<br><small>${esc(explanation.zh)}</small></span></div>
+      </div>
+      <div class="uv-list"><span class="uv-label">Message<br><small>\u9519\u8bef\u8bf4\u660e</small></span><span class="uv-value">${esc(r.message||explanation.en)}<br><small>${esc(explanation.zh)}</small></span></div>
+      <div class="uv-list"><span class="uv-label">Missing Fields<br><small>\u7f3a\u5931\u5b57\u6bb5</small></span><span class="uv-value">${esc(missing.en)}<br><small>${esc(missing.zh)}</small></span></div>
+      <div class="uv-list"><span class="uv-label">Invalid Fields<br><small>\u65e0\u6548\u5b57\u6bb5</small></span><span class="uv-value">${esc(invalid.en)}<br><small>${esc(invalid.zh)}</small></span></div>
+      <div class="uv-list"><span class="uv-label">Suggested Action<br><small>\u5efa\u8bae\u64cd\u4f5c</small></span><span class="uv-value">${esc(suggested.en)}<br><small>${esc(suggested.zh)}</small></span></div>
+      ${preview?`<div class="uv-list"><span class="uv-label">Anchor Preview<br><small>\u951a\u70b9\u9884\u89c8</small></span><span class="uv-value">${esc(preview)}</span></div>`:''}
+      <div class="warn">No cloud data was written. Fix this record and upload again. / \u672a\u5199\u5165\u4e91\u7aef\uff0c\u8bf7\u4fee\u6b63\u8fd9\u6761\u8bb0\u5f55\u540e\u91cd\u65b0\u4e0a\u4f20\u3002</div>
+    </div>`;
+};
 function employeeRecordValidationError(entry,index){
   if(entry?.upload_validation_error)return normalizeEmployeeUploadDryRunError(entry.upload_validation_error,index,entry.sync_error||'');
   if(Number(state.uploadValidationFailedIndex)===index){
@@ -6354,6 +6489,23 @@ function renderSessionRecordValidationDetails(result,index){
     <div>Suggested Action: ${esc(action)}</div>
   </div>`;
 }
+renderSessionRecordValidationDetails=function(result,index){
+  if(!result)return '';
+  const r=normalizeEmployeeUploadDryRunError(result,index);
+  const missing=employeeUploadFieldListText(r.missing_fields);
+  const invalid=employeeUploadFieldListText(r.invalid_fields);
+  const action=employeeUploadSuggestedActionParts(r);
+  const event=employeeUploadEventLabel(r.event_type);
+  const explanation=employeeUploadErrorExplanation(r.error_code);
+  return `<div class="bad session-validation-detail">
+    <div><b>Record #${esc(String(r.event_index+1))}</b> · ${esc(event.en)} <small>${esc(event.zh)}</small></div>
+    <div>Error Code / \u9519\u8bef\u4ee3\u7801: ${esc(r.error_code)} · ${esc(explanation.zh)}</div>
+    <div>Message / \u9519\u8bef\u8bf4\u660e: ${esc(r.message||explanation.en)} · ${esc(explanation.zh)}</div>
+    <div>Missing Fields / \u7f3a\u5931\u5b57\u6bb5: ${esc(missing.en)} · ${esc(missing.zh)}</div>
+    <div>Invalid Fields / \u65e0\u6548\u5b57\u6bb5: ${esc(invalid.en)} · ${esc(invalid.zh)}</div>
+    <div>Suggested Action / \u5efa\u8bae\u64cd\u4f5c: ${esc(action.en)} · ${esc(action.zh)}</div>
+  </div>`;
+};
 async function validateEmployeeUploadDryRun(entry,sessionForEntry,index){
   const r=await apiFetch('/api/employee/entry/validate',{method:'POST',body:JSON.stringify({entry,session:sessionForEntry,event_index:index})});
   const raw=await r.text();
@@ -6398,15 +6550,32 @@ async function commitSessionAndExport(){
   const validation=validateUploadAnchorBatch(uploadList);
   uploadTiming.validation_ms=Math.round(performance.now()-validationStart);
   if(!validation.ok){
+    const localResult=normalizeEmployeeUploadDryRunError({
+      event_index:0,
+      event_type:uploadList[0]?.event_type||entryEventType(uploadList[0]?.type||'entry'),
+      error_code:'UPLOAD_VALIDATION_FAILED',
+      message:'Upload validation failed.',
+      missing_fields:validation.errors
+    },0);
+    if(originalDrafts[0]){
+      originalDrafts[0].sync_status='LOCAL';
+      originalDrafts[0].upload_status='VALIDATION_FAILED';
+      originalDrafts[0].upload_validation_error=localResult;
+      originalDrafts[0].upload_validation_error_code='UPLOAD_VALIDATION_FAILED';
+      originalDrafts[0].sync_error=formatEmployeeUploadDryRunError(localResult,0);
+    }
     state.drafts=originalDrafts;
     state.sessionId=originalSessionId;
+    state.uploadValidationFailedIndex=0;
+    state.uploadValidationFailedMessage='UPLOAD_VALIDATION_FAILED: Upload validation failed.';
     saveDrafts();
     buildExport();
+    refreshSessionViews();
     oldLabels.forEach(([b,html])=>{b.dataset.busy='0';b.disabled=false;b.classList.remove('disabled');b.innerHTML=html});
-    const message='Upload rejected. Fix required fields first: '+validation.errors.join('; ');
-    $('validationBox').innerHTML=`<div class="bad">${esc(message)}</div>`;
+    const message='Upload validation failed / \u4e0a\u4f20\u6821\u9a8c\u5931\u8d25: '+validation.errors.join('; ');
     showStatus(message,'bad');
-    toast('Upload rejected: missing anchor fields',6000);
+    $('validationBox').innerHTML=renderEmployeeUploadDryRunError(localResult);
+    toast('Upload validation failed / \u4e0a\u4f20\u6821\u9a8c\u5931\u8d25',6000);
     updateEntrySessionActionState();
     return;
   }
@@ -6459,9 +6628,9 @@ async function commitSessionAndExport(){
     buildExport();
     refreshSessionViews();
     oldLabels.forEach(([b,html])=>{b.dataset.busy='0';b.disabled=false;b.classList.remove('disabled');b.innerHTML=html});
+    showStatus(`Upload validation failed / \u4e0a\u4f20\u6821\u9a8c\u5931\u8d25: ${firstDryRunFailure.message}`,'bad');
     $('validationBox').innerHTML=renderEmployeeUploadDryRunError(firstDryRunFailure.result);
-    showStatus(`Upload validation failed: ${firstDryRunFailure.message}`,'bad');
-    toast(`Upload validation failed: ${firstDryRunFailure.result.error_code}`,6000);
+    toast(`Upload validation failed / \u4e0a\u4f20\u6821\u9a8c\u5931\u8d25: ${firstDryRunFailure.result.error_code}`,6000);
     updateEntrySessionActionState();
     return;
   }
@@ -7191,8 +7360,8 @@ renderSessionPreview=function(){
     const detail=[eventLabel(e.type),e.tenant_name||'',e.pay_type==='B'?'Bank':'Cash',e.period_start&&e.period_end?`${e.period_start} -> ${e.period_end}`:''].filter(Boolean).join(' · ');
     const status=`<span class="status-pill ${esc(recordState.className||'')}">${esc(recordState.label)}</span>`;
     const undo=canUndo(e)?`<button class="mini-btn danger" data-undo="${esc(e.id)}">Undo</button>`:'';
-    const remove=recordState.key!=='SYNCED'?`<button class="mini-btn danger" data-remove-session-record="${esc(e.id)}">Remove invalid record</button>`:'';
-    const refresh=recordState.key==='STALE'?`<button class="mini-btn" data-refresh-arrears-record="${esc(e.id)}">Refresh Arrears</button>`:'';
+    const remove=recordState.key!=='SYNCED'?`<button class="mini-btn danger" data-remove-session-record="${esc(e.id)}">${renderEmployeeButtonLabel('Remove Invalid Record','删除无效记录')}</button>`:'';
+    const refresh=recordState.key==='STALE'?`<button class="mini-btn" data-refresh-arrears-record="${esc(e.id)}">${renderEmployeeButtonLabel('Refresh Arrears','刷新欠款')}</button>`:'';
     const failNote=failed?renderSessionRecordValidationDetails(recordState.validation,i):'';
     return `<div class="preview-entry ${failed?'upload-validation-failed':''}" data-session-record-index="${recordIndex}" data-entry-id="${esc(e.id)}"><div><b>Record #${recordIndex} · ${subject}</b> ${status}${failNote}<div class="small">${esc(detail)}</div><div class="small">Entry ID ${esc(e.id)} · ${esc(e.created_at||'')}</div><div class="small">${esc(e.note||e.expense_desc||'')}</div><div class="preview-tools">${undo}${refresh}${remove}</div></div><div class="amt ${cls}">${sign}${fmtMoney(e.amount)}</div></div>`;
   }).join('');

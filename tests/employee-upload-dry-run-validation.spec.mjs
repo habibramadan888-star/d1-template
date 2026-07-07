@@ -102,7 +102,8 @@ test("employee UI runs dry-run validation before real upload and surfaces backen
   assert.match(html, /apiFetch\('\/api\/employee\/entry\/validate'/);
   assert.ok(dryRunIndex > 0, "commit flow must call dry-run validation");
   assert.ok(realUploadIndex > dryRunIndex, "real upload must happen only after dry-run validation");
-  assert.match(html, /Upload validation failed:/);
+  assert.match(html, /Upload validation failed \//);
+  assert.match(html, /\\u4e0a\\u4f20\\u6821\\u9a8c\\u5931\\u8d25/);
   assert.match(html, /Missing: \$\{missing\}/);
   assert.match(html, /Invalid: \$\{invalid\}/);
   assert.match(html, /data-upload-validation-error=\"true\"/);
@@ -110,13 +111,17 @@ test("employee UI runs dry-run validation before real upload and surfaces backen
   assert.match(html, /Stage/);
   assert.match(html, /Event/);
   assert.match(html, /Error Code/);
+  assert.match(html, /\\u9519\\u8bef\\u4ee3\\u7801/);
   assert.match(html, /Missing Fields/);
+  assert.match(html, /\\u7f3a\\u5931\\u5b57\\u6bb5/);
   assert.match(html, /Invalid Fields/);
+  assert.match(html, /\\u65e0\\u6548\\u5b57\\u6bb5/);
   assert.match(html, /Suggested Action/);
+  assert.match(html, /\\u5efa\\u8bae\\u64cd\\u4f5c/);
   assert.match(html, /employeeUploadValidationSuggestedAction\(r\)/);
   assert.match(html, /err\.dryRunResult=result/);
   assert.match(html, /renderEmployeeUploadDryRunError\(firstDryRunFailure\.result\)/);
-  assert.match(html, /toast\(`Upload validation failed: \$\{firstDryRunFailure\.result\.error_code\}`/);
+  assert.match(html, /toast\(`Upload validation failed \/ \\u4e0a\\u4f20\\u6821\\u9a8c\\u5931\\u8d25: \$\{firstDryRunFailure\.result\.error_code\}`/);
   assert.doesNotMatch(html, /toast\('Upload validation failed before cloud write\.'/);
   assert.match(html, /const failedIndex=Number\(firstDryRunFailure\.result\?\.event_index\|\|0\)/);
   assert.match(html, /state\.uploadValidationFailedIndex=failedIndex/);
@@ -128,6 +133,8 @@ test("employee UI runs dry-run validation before real upload and surfaces backen
   assert.match(commitBlock, /originalDrafts\[failedIndex\]\.upload_status=firstDryRunFailure\.result\?\.error_code==='ARREARS_REF_STALE_REFRESH_REQUIRED'\?'STALE':'VALIDATION_FAILED'/);
   assert.match(commitBlock, /e\.upload_status='UPLOADING'/);
   assert.match(commitBlock, /upload_status:'SYNCED'/);
+  assert.match(html, /renderEmployeeButtonLabel\('Upload Failed','\\u4e0a\\u4f20\\u5931\\u8d25'\)/);
+  assert.match(html, /renderEmployeeButtonLabel\('Done','Upload Complete'\)/);
 });
 
 test("current session status machine prioritizes validation failed and stale over synced", async () => {
@@ -148,6 +155,46 @@ test("current session status machine prioritizes validation failed and stale ove
   assert.match(html, /Validation Failed/);
   assert.match(html, /Stale \/ Needs Refresh/);
   assert.doesNotMatch(finalRender, /const status=e\.sync_status==='SYNCED'/);
+});
+
+test("validation failure does not restore done or uploaded success state", async () => {
+  const html = await readFile(employeePath, "utf8");
+  const commitStart = html.lastIndexOf("async function commitSessionAndExport");
+  assert.ok(commitStart >= 0, "effective commitSessionAndExport function must exist");
+  const commitBlock = html.slice(commitStart);
+  const failureStart = commitBlock.indexOf("if(dryRunFailed.length)");
+  const uploadStart = commitBlock.indexOf("showStatus(`Uploading confirmed session");
+  const successStart = commitBlock.indexOf("state.drafts=uploadList.map");
+  assert.ok(failureStart > 0 && uploadStart > failureStart, "dry-run failure branch must precede real upload");
+  const failureBranch = commitBlock.slice(failureStart, uploadStart);
+  const successBranch = commitBlock.slice(successStart);
+
+  assert.match(failureBranch, /renderEmployeeUploadDryRunError\(firstDryRunFailure\.result\)/);
+  assert.match(failureBranch, /Upload validation failed \//);
+  assert.match(failureBranch, /\\u4e0a\\u4f20\\u6821\\u9a8c\\u5931\\u8d25/);
+  assert.match(failureBranch, /updateEntrySessionActionState\(\)/);
+  assert.doesNotMatch(failureBranch, /setUploadPhase\('Upload complete','Done'\)/);
+  assert.doesNotMatch(failureBranch, /Session uploaded to cloud/);
+  assert.match(successBranch, /setUploadPhase\('Upload complete','Done'\)/);
+  assert.match(successBranch, /Session uploaded to cloud/);
+
+  assert.match(html, /currentSessionHasUploadBlockingError\(\)/);
+  assert.match(html, /renderEmployeeButtonLabel\('Upload Failed','\\u4e0a\\u4f20\\u5931\\u8d25'\)/);
+  assert.match(html, /whats\.disabled=!uploaded\|\|blocked/);
+});
+
+test("upload error codes have bilingual explanations", async () => {
+  const html = await readFile(employeePath, "utf8");
+
+  assert.match(html, /function employeeUploadErrorExplanation\(code\)/);
+  assert.match(html, /UPLOAD_VALIDATION_FAILED:\['Upload validation failed\.'/);
+  assert.match(html, /CHECKOUT_OPEN_ARREARS_OWNER_APPROVAL_REQUIRED/);
+  assert.match(html, /ARREARS_REF_STALE_REFRESH_REQUIRED/);
+  assert.match(html, /DEPOSIT_REFUND_DIFFERENCE_REASON_REQUIRED/);
+  assert.match(html, /employeeUploadFieldListText\(r\.missing_fields\)/);
+  assert.match(html, /employeeUploadSuggestedActionParts\(r\)/);
+  assert.match(html, /Message<br><small>\\u9519\\u8bef\\u8bf4\\u660e<\/small>/);
+  assert.match(html, /Suggested Action<br><small>\\u5efa\\u8bae\\u64cd\\u4f5c<\/small>/);
 });
 
 test("stale arrears selection is cleared or marked when open refs disappear", async () => {
