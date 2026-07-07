@@ -80,7 +80,8 @@ test("left with arrears dry-run returns required missing fields", async () => {
 
   assert.match(validateBlock, /LEFT_WITH_ARREARS_REQUIRED_FIELDS_MISSING/);
   assert.match(validateBlock, /missing\.push\(\"whatsapp_phone\"\)/);
-  assert.match(validateBlock, /missing\.push\(\"coverage_end_date\"\)/);
+  assert.match(validateBlock, /missing\.push\(\"left_date\"\)/);
+  assert.doesNotMatch(validateBlock, /missing\.push\(\"coverage_end_date\"\)/);
   assert.match(validateBlock, /missing\.push\(\"confirmed_not_returning_date\"\)/);
   assert.match(validateBlock, /missing\.push\(\"promised_payment_date\"\)/);
   assert.match(validateBlock, /missing\.push\(\"left_arrears_amount\"\)/);
@@ -225,8 +226,8 @@ test("left with arrears UI exposes required visible fields and preserves anchors
 
   assert.match(html, /id=\"leftCoverageEndDate\"/);
   assert.match(html, /id=\"leftArrearsAmount\"/);
-  assert.match(html, /coverage_end_date:leftMode\?\$\(\'leftCoverageEndDate\'\)\.value:''/);
-  assert.match(html, /left_arrears_amount:leftMode\?num\(\$\(\'leftArrearsAmount\'\)\?\.value\|\|openArrearsTotal\):0/);
-  assert.match(html, /Coverage End Date is required/);
+  assert.match(html, /coverage_end_date:left\?employeeFieldValue\('leftCoverageEndDate'\):''/);
+  assert.match(html, /left_arrears_amount:left\?num\(employeeFieldValue\('leftArrearsAmount'\)\|\|openArrearsTotal\):0/);
+  assert.doesNotMatch(html, /Coverage End Date is required/);
   assert.match(html, /Left Arrears Amount is required/);
 });

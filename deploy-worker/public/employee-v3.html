@@ -4173,8 +4173,9 @@ function validateCheckoutEntry(){
   employeeRequire(errors,!!employeeTrimField('bed'),'Bed is required.');
   employeeRequire(errors,!!employeeFieldValue('leftWithArrearsMode'),'Checkout Type is required.');
   if(!left)employeeRequire(errors,!!employeeFieldValue('checkoutDate'),'Checkout Date is required for normal checkout.');
-  if(!left&&openTasksForBed().some(t=>taskRemain(t)>0))errors.push('Open Arrears Found. Normal Checkout requires arrears collection, owner approval, or Left With Arrears.');
+  if(!left&&openTasksForBed().some(t=>taskRemain(t)>0))errors.push('Open Arrears Found: This customer has unpaid arrears. Normal checkout is not allowed. / 发现未清欠款：该客户存在未清欠款，不能直接正常退房。');
   if(left){
+    employeeRequire(errors,!!employeeFieldValue('checkoutDate'),'Left Date is required for Left With Arrears.');
     employeeRequire(errors,!!employeeTrimField('leftWhatsappPhone'),'WhatsApp Phone is required for Left With Arrears.');
     employeeRequire(errors,!!employeeFieldValue('leftConfirmedNotReturningDate'),'Confirmed Not Returning Date is required.');
     employeeRequire(errors,!!employeeFieldValue('leftPromisedPaymentDate'),'Promised Payment Date is required.');
@@ -4264,12 +4265,13 @@ function buildCheckoutAnchor(){
   const openArrearsTotal=openTasksForBed().reduce((s,t)=>s+taskRemain(t),0);
   const leftTask=left?leftWithArrearsPrimaryTask():null;
   const leftArrearsRef=leftTask?employeeTaskRef(leftTask):'';
+  const formerCustomer=employeeTrimField('leftFormerCustomerName')||employeeTrimField('tenantName');
   const payload=employeeBaseEntryPayload('CO',{
     reason_code:'CO',amount:0,due:0,paid:0,checkout_date:employeeFieldValue('checkoutDate')||today(),deposit_held:depositHeld(),deposit_balance:depositHeld(),
     carry_over_arrears:openArrearsTotal,outstanding_arrears:openArrearsTotal,owner_approval_required:openArrearsTotal>0&&!left,owner_approval_status:openArrearsTotal>0&&!left?'pending_owner_approval':'not_required',
-    checkout_mode:left?'left_with_arrears':'normal',left_with_arrears:left,customer_left:left,cloud_arrears_ref:leftArrearsRef,
-    former_customer_ref:left?(employeeTrimField('tenantCardId')||leftArrearsRef):'',former_customer_name:left?(employeeTrimField('leftFormerCustomerName')||employeeTrimField('tenantName')):'',
-    card_name:left?(employeeTrimField('leftFormerCustomerName')||employeeTrimField('tenantName')):'',
+    checkout_type:left?'left_with_arrears':'normal',checkout_mode:left?'left_with_arrears':'normal',left_with_arrears:left,customer_left:left,cloud_arrears_ref:leftArrearsRef,open_arrears_amount:openArrearsTotal,
+    former_customer_ref:employeeTrimField('tenantCardId')||(left?leftArrearsRef:''),former_customer_name:formerCustomer,
+    card_name:formerCustomer,
     former_customer_phone:left?employeeTrimField('leftWhatsappPhone'):'',whatsapp_phone:left?employeeTrimField('leftWhatsappPhone'):'',
     contact_method:left?employeeFieldValue('leftContactMethod'):'',contact_note:left?employeeTrimField('leftContactNote'):'',
     arrears_amount:left?num(employeeFieldValue('leftArrearsAmount')||openArrearsTotal):0,left_arrears_amount:left?num(employeeFieldValue('leftArrearsAmount')||openArrearsTotal):0,
@@ -4277,7 +4279,8 @@ function buildCheckoutAnchor(){
     coverage_end_date:left?employeeFieldValue('leftCoverageEndDate'):'',rent_coverage_end:left?employeeFieldValue('leftCoverageEndDate'):'',card_end_date:left?employeeFieldValue('leftCoverageEndDate'):'',
     promised_payment_date:left?employeeFieldValue('leftPromisedPaymentDate'):'',promised_return_date:left?employeeFieldValue('leftPromisedReturnDate'):'',promise_return_date:left?employeeFieldValue('leftPromisedReturnDate'):'',
     left_date:left?employeeFieldValue('checkoutDate'):'',checkout_attempt_date:left?employeeFieldValue('checkoutDate'):'',
-    left_status:left?'left_pending_return':'',final_status:left?'left_pending_return':'',confirmed_not_returning_date:left?employeeFieldValue('leftConfirmedNotReturningDate'):'',
+    left_status:left?'left_pending_return':'',final_status:left?'left_pending_return':'',status:left?'left_pending_return':'',confirmed_not_returning_date:left?employeeFieldValue('leftConfirmedNotReturningDate'):'',
+    overdue_days:left?Math.max(0,daysBetween(employeeFieldValue('leftCoverageEndDate')||today(),today())):0,
     original_session_id:left?(leftTask?.session_id||leftTask?.original_session_id||''):'',original_event_id:left?(leftTask?.entry_id||leftTask?.original_entry_id||leftTask?.original_event_id||leftTask?.task_id||''):''
   });
   return applyEntryAnchors(payload);
@@ -4473,13 +4476,13 @@ function buildEntryRawDisplayLine(e){
     return `${e.room} deposit_out refund ${fmtMoney(e.actual_refund_amount||e.refund_amount||e.amount)} ${paymentMethodLabel(e.refund_method||e.pay_type)} balance ${fmtMoney(e.deposit_balance||e.deposit_held)} diff ${fmtMoney(e.refund_difference||0)} reason ${e.refund_reason||e.difference_reason||'-'} ${e.note||''}`.trim();
   }
   if(e.type==='CO'&&e.left_with_arrears){
-    return `${e.room} checkout left_with_arrears ref ${e.cloud_arrears_ref||'-'} phone ${e.whatsapp_phone||e.former_customer_phone||'-'} remaining ${fmtMoney(e.arrears_amount||e.outstanding_arrears)} belongings ${e.belongings_held?'yes':'no'} promised_payment ${e.promised_payment_date||'-'} promised_return ${e.promised_return_date||e.promise_return_date||'-'} note ${e.note||e.final_note||''}`.trim();
+    return `${e.room} checkout left_with_arrears ref ${e.cloud_arrears_ref||'-'} phone ${e.whatsapp_phone||e.former_customer_phone||'-'} left_date ${e.left_date||e.checkout_date||'-'} confirmed_not_returning ${e.confirmed_not_returning_date||'-'} left_arrears ${fmtMoney(e.left_arrears_amount||e.arrears_amount||e.outstanding_arrears)} deposit_balance ${fmtMoney(e.deposit_balance||0)} belongings ${e.belongings_held?'yes':'no'} promised_payment ${e.promised_payment_date||'-'} promised_return ${e.promised_return_date||e.promise_return_date||'-'} status ${e.final_status||e.left_status||'left_pending_return'} note ${e.note||e.final_note||''}`.trim();
   }
   if(e.type==='TF')return `${e.bed_from||e.room}->${e.bed_to||e.roomTo} bed_transfer ${fmtMoney(e.amount)} ${paymentMethodLabel(e.pay_type)} ${e.transfer_reason||e.fee_waiver_reason||''}`.trim();
   return `${e.room||e.expense_category||''} ${type} ${fmtMoney(e.amount)} ${paymentMethodLabel(e.pay_type)} ${e.note||e.expense_desc||''}`.trim();
 }
 function validateEntryAnchor(e){
-  const type=e?.type||Object.entries({R:'rent',AP:'arrears_payment',D:'deposit_in',DR:'deposit_out',CO:'checkout',E:'expense',TF:'bed_transfer'}).find(([,v])=>v===e?.event_type)?.[0]||'';
+  const type=e?.type||Object.entries({R:'rent',AP:'arrears_payment',D:'deposit_in',DR:'deposit_out',CO:'checkout',CO_LEFT:'left_with_arrears',E:'expense',TF:'bed_transfer'}).find(([,v])=>v===e?.event_type)?.[0]?.replace('CO_LEFT','CO')||'';
   const required=entryAnchorContract[type]||[];
   const missing=required.filter(field=>!(field in (e||{})));
   return {ok:missing.length===0,missing};
@@ -4539,14 +4542,14 @@ function applyEntryAnchors(e){
   }else if(type==='CO'){
     const outstanding=num(e.outstanding_arrears||e.carry_over_arrears||0);
     const left=!!e.left_with_arrears;
-    Object.assign(e,{bed:e.room,checkout_date:e.checkout_date||'',deposit_refund:0,outstanding_arrears:outstanding,owner_approval_required:outstanding>0&&!left,owner_approval_status:outstanding>0&&!left?(e.owner_approval_status||'pending_owner_approval'):(e.owner_approval_status||'not_required'),final_note:e.note||e.ded_note||'',
+    Object.assign(e,{event_type:left?'left_with_arrears':'checkout',bed:e.room,checkout_date:e.checkout_date||'',deposit_refund:0,outstanding_arrears:outstanding,open_arrears_amount:num(e.open_arrears_amount||outstanding),owner_approval_required:outstanding>0&&!left,owner_approval_status:outstanding>0&&!left?(e.owner_approval_status||'pending_owner_approval'):(e.owner_approval_status||'not_required'),final_note:e.note||e.ded_note||'',
       checkout_mode:left?'left_with_arrears':(e.checkout_mode||'normal'),left_with_arrears:left,customer_left:left,former_customer_name:e.former_customer_name||e.card_name||e.tenant_name||'',card_name:e.card_name||e.former_customer_name||e.tenant_name||'',
       whatsapp_phone:e.whatsapp_phone||e.former_customer_phone||'',former_customer_phone:e.former_customer_phone||e.whatsapp_phone||'',contact_method:e.contact_method||'',contact_note:e.contact_note||'',
       arrears_amount:num(e.arrears_amount||e.left_arrears_amount||outstanding),left_arrears_amount:num(e.left_arrears_amount||e.arrears_amount||outstanding),cloud_arrears_ref:e.cloud_arrears_ref||'',belongings_held:!!e.belongings_held,belongings_note:e.belongings_note||'',
       coverage_end_date:e.coverage_end_date||e.card_end_date||e.rent_coverage_end||e.old_lock_valid_until||'',card_end_date:e.card_end_date||e.coverage_end_date||e.rent_coverage_end||e.old_lock_valid_until||'',rent_coverage_end:e.rent_coverage_end||e.coverage_end_date||e.card_end_date||e.old_lock_valid_until||'',
       promised_payment_date:e.promised_payment_date||'',promised_return_date:e.promised_return_date||e.promise_return_date||'',promise_return_date:e.promise_return_date||e.promised_return_date||'',
       deposit_balance:num(e.deposit_balance||e.deposit_held||0),left_date:e.left_date||e.checkout_date||'',checkout_attempt_date:e.checkout_attempt_date||e.checkout_date||'',
-      left_status:e.left_status||'',final_status:e.final_status||'',grace_days_after_promise:num(e.grace_days_after_promise||0),review_date:e.review_date||'',original_session_id:e.original_session_id||'',original_event_id:e.original_event_id||''});
+      left_status:e.left_status||(left?'left_pending_return':''),final_status:e.final_status||(left?'left_pending_return':''),status:e.status||(left?'left_pending_return':''),overdue_days:num(e.overdue_days||0),grace_days_after_promise:num(e.grace_days_after_promise||0),review_date:e.review_date||'',original_session_id:e.original_session_id||'',original_event_id:e.original_event_id||''});
   }else if(type==='E'){
     Object.assign(e,{expense_amount:num(e.amount),expense_category:e.expense_category||e.reason_code||'',target_bed:e.room||'',reason:e.expense_category||e.reason_code||'',note:e.expense_desc||e.note||''});
   }else if(type==='TF'){
@@ -6752,6 +6755,9 @@ function employeeUploadEventLabel(value){
 }
 function employeeUploadErrorExplanation(code){
   const key=String(code||'').trim().toUpperCase();
+  if(key==='CHECKOUT_OPEN_ARREARS_LEFT_WITH_ARREARS_REQUIRED'){
+    return {en:'This customer has unpaid arrears. Normal checkout is not allowed.',zh:'该客户存在未清欠款，不能直接正常退房。'};
+  }
   const map={
     UPLOAD_VALIDATION_FAILED:['Upload validation failed.','上传前校验未通过。'],
     UNKNOWN_UPLOAD_VALIDATION_ERROR:['Upload validation failed.','上传前校验未通过。'],
@@ -8125,6 +8131,7 @@ function renderLeftWithArrearsFields(){
     const coverage=state.current?.end||state.current?.end_md||state.current?.valid_until||'Needs Review';
     const checkIn=state.current?.start||state.current?.start_md||state.current?.valid_from||'Needs Review';
     const overdue=coverage&&coverage!=='Needs Review'?Math.max(0,daysBetween(coverage,today())):'Needs Review';
+    const repaymentSummary=rows.length?rows.map(t=>employeeArrearsMeta(t).repayment||'-').filter(x=>x&&x!=='-').join('; ')||'No repayment yet':'Needs Review';
     system.innerHTML=`<b>System-Read Fields</b><br>
       Bed: #${esc(($('bed')?.value||'').trim().replace(/^#/,''))||'Needs Review'} ·
       Customer: ${esc(customer)} ·
@@ -8133,7 +8140,8 @@ function renderLeftWithArrearsFields(){
       Deposit Balance: ${fmtMoney(depositHeld())} AED ·
       Open Arrears: ${fmtMoney(rows.reduce((s,t)=>s+taskRemain(t),0))} AED ·
       Cloud Arrears Ref: ${esc(meta?.ref||'Needs Review')} ·
-      Check-in: ${esc(checkIn)}`;
+      Check-in: ${esc(checkIn)} ·
+      Existing Payment History Summary: ${esc(repaymentSummary)}`;
   }
   const summary=$('leftWithArrearsSummary');
   if(!summary)return;
@@ -8210,11 +8218,18 @@ function employeeRenderOpenArrearsAlert(){
   }).join('');
   const actions=blockedExit?`<div class="row open-arrears-actions">
     <button type="button" class="mini-btn" data-collect-arrears-first="true">${renderEmployeeButtonLabel('Collect Arrears First','\u5148\u6536\u6b20\u6b3e')}</button>
-    <button type="button" class="mini-btn" data-request-owner-approval="true">${renderEmployeeButtonLabel('Request Owner Approval','\u7533\u8bf7\u8001\u677f\u5ba1\u6838')}</button>
+    ${type==='CO'
+      ?`<button type="button" class="mini-btn" data-left-with-arrears-choice="true">${renderEmployeeButtonLabel('Left With Arrears','\u79bb\u5e97\u672a\u6e05\u6b20\u6b3e')}</button>
+        <button type="button" class="mini-btn" data-contact-owner="true">${renderEmployeeButtonLabel('Contact Owner','\u8054\u7cfb\u8001\u677f')}</button>`
+      :`<button type="button" class="mini-btn" data-request-owner-approval="true">${renderEmployeeButtonLabel('Request Owner Approval','\u7533\u8bf7\u8001\u677f\u5ba1\u6838')}</button>`}
     <button type="button" class="mini-btn danger" data-cancel-arrears-block="true">${renderEmployeeButtonLabel('Cancel','\u53d6\u6d88')}</button>
   </div>`:'';
   const title=blockedExit?'Open Arrears Found':'Open Arrears Alert';
-  const subtitle=blockedExit?'This customer has unpaid arrears. Checkout or deposit refund requires owner approval. / \u8be5\u5ba2\u6237\u5b58\u5728\u672a\u6e05\u6b20\u6b3e\uff0c\u9000\u623f\u6216\u9000\u62bc\u91d1\u5fc5\u987b\u7531\u8001\u677f\u5ba1\u6838\u3002':'Collect Arrears First';
+  const subtitle=blockedExit
+    ?(type==='CO'
+      ?'This customer has unpaid arrears. Normal checkout is not allowed. / \u8be5\u5ba2\u6237\u5b58\u5728\u672a\u6e05\u6b20\u6b3e\uff0c\u4e0d\u80fd\u76f4\u63a5\u6b63\u5e38\u9000\u623f\u3002'
+      :'This customer has unpaid arrears. Deposit refund requires owner approval. / \u8be5\u5ba2\u6237\u5b58\u5728\u672a\u6e05\u6b20\u6b3e\uff0c\u9000\u62bc\u91d1\u5fc5\u987b\u7531\u8001\u677f\u5ba1\u6838\u3002')
+    :'Collect Arrears First';
   box.className='open-arrears-core-alert warn';
   box.innerHTML=`<div class="open-arrears-title"><div><b>${title}</b><small>\u53d1\u73b0\u672a\u6e05\u6b20\u6b3e</small></div><span class="open-arrears-badge">${subtitle}</span></div><div class="open-arrears-list">${list}</div>${actions}`;
   box.querySelectorAll('[data-select-arrears-task]').forEach(btn=>{
@@ -8231,6 +8246,16 @@ function employeeRenderOpenArrearsAlert(){
   });
   box.querySelectorAll('[data-request-owner-approval]').forEach(btn=>{
     btn.onclick=()=>requestOwnerApprovalForOpenArrears(type,rows);
+  });
+  box.querySelectorAll('[data-left-with-arrears-choice]').forEach(btn=>{
+    btn.onclick=()=>{
+      if($('leftWithArrearsMode'))$('leftWithArrearsMode').value='left_with_arrears';
+      renderLeftWithArrearsFields();
+      syncForm();
+    };
+  });
+  box.querySelectorAll('[data-contact-owner]').forEach(btn=>{
+    btn.onclick=()=>toast('Contact Owner: ask the owner to review this checkout before proceeding. / \u8bf7\u8054\u7cfb\u8001\u677f\u5ba1\u6838\u8fd9\u7b14\u9000\u623f\u540e\u518d\u7ee7\u7eed\u3002',7000);
   });
   box.querySelectorAll('[data-cancel-arrears-block]').forEach(btn=>{
     btn.onclick=()=>{
@@ -8311,7 +8336,6 @@ validate=function(){
     const addError=msg=>{if(!result.errors.includes(msg))result.errors.push(msg);};
     if(!rows.length)addError('Left With Arrears requires an open Cloud Arrears item. / 离店未清欠款必须关联未清云端欠款。');
     if(!phone)addError('Blocked: WhatsApp phone is required for left customer arrears. / 阻断：离店未清欠款必须填写客户 WhatsApp 号码。');
-    if(!($('leftCoverageEndDate')?.value||''))addError('Coverage End Date is required. / 必须填写租期或卡片截止日期。');
     if(num($('leftArrearsAmount')?.value)<=0)addError('Left Arrears Amount is required. / 必须填写离店欠款总金额。');
     if(!($('leftPromisedPaymentDate')?.value||''))addError('Promised Payment Date is required. / 必须填写承诺付款日期。');
     if(!($('leftConfirmedNotReturningDate')?.value||''))addError('Confirmed Not Returning Date is required. / 确认不再回来日期必填。');
@@ -8320,7 +8344,9 @@ validate=function(){
   }
   const blocked=['CO','DR'].includes(type)&&openTasksForBed().length>0;
   if(blocked&&!(type==='CO'&&leftMode)){
-    const msg='Open Arrears Found: This customer has unpaid arrears. Checkout or deposit refund requires owner approval. / \u8be5\u5ba2\u6237\u5b58\u5728\u672a\u6e05\u6b20\u6b3e\uff0c\u9000\u623f\u6216\u9000\u62bc\u91d1\u5fc5\u987b\u7531\u8001\u677f\u5ba1\u6838\u3002';
+    const msg=type==='CO'
+      ?'Open Arrears Found: This customer has unpaid arrears. Normal checkout is not allowed. / \u53d1\u73b0\u672a\u6e05\u6b20\u6b3e\uff1a\u8be5\u5ba2\u6237\u5b58\u5728\u672a\u6e05\u6b20\u6b3e\uff0c\u4e0d\u80fd\u76f4\u63a5\u6b63\u5e38\u9000\u623f\u3002'
+      :'Open Arrears Found: This customer has unpaid arrears. Deposit refund requires owner approval. / \u53d1\u73b0\u672a\u6e05\u6b20\u6b3e\uff1a\u8be5\u5ba2\u6237\u5b58\u5728\u672a\u6e05\u6b20\u6b3e\uff0c\u9000\u62bc\u91d1\u5fc5\u987b\u7531\u8001\u677f\u5ba1\u6838\u3002';
     if(!result.errors.includes(msg))result.errors.push(msg);
     const box=$('validationBox');
     if(box&&!box.innerHTML.includes('Open Arrears Found'))box.innerHTML=`<div class="bad">Blocked: ${esc(msg)}</div>`+box.innerHTML;

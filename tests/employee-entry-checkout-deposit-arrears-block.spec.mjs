@@ -13,16 +13,20 @@ test("checkout and deposit refund are blocked when cloud arrears are open", asyn
   assert.match(html, /!!employeeCheckoutRefundEventType\(\)&&openTasksForBed\(\)\.length>0/);
   assert.match(html, /\['CO','DR'\]\.includes\(type\)&&openTasksForBed\(\)\.length>0/);
   assert.match(html, /Open Arrears Found/);
-  assert.match(html, /Checkout or deposit refund requires owner approval/);
+  assert.match(html, /Normal checkout is not allowed/);
   assert.match(html, /submit\.disabled=true/);
 });
 
-test("blocked checkout and deposit refund expose owner approval actions", async () => {
+test("blocked checkout exposes left-with-arrears actions and deposit refund keeps owner approval", async () => {
   const html = await readFile(employeePath, "utf8");
 
   assert.match(html, /data-collect-arrears-first/);
   assert.match(html, /Collect Arrears First/);
   assert.match(html, /setEntryType\('AP'\)/);
+  assert.match(html, /data-left-with-arrears-choice/);
+  assert.match(html, /Left With Arrears/);
+  assert.match(html, /data-contact-owner/);
+  assert.match(html, /Contact Owner/);
   assert.match(html, /data-request-owner-approval/);
   assert.match(html, /Request Owner Approval/);
   assert.match(html, /requestOwnerApprovalForOpenArrears\(type,rows\)/);
@@ -41,6 +45,7 @@ test("checkout and deposit refund anchors preserve approval state", async () => 
   assert.match(html, /owner_approval_status:ownerApprovalRequired\?'pending_owner_approval':'not_required'/);
   assert.match(html, /outstanding_arrears:outstanding/);
   assert.match(html, /owner_approval_status:outstanding>0\?\(e\.owner_approval_status\|\|'pending_owner_approval'\)/);
+  assert.match(html, /event_type:left\?'left_with_arrears':'checkout'/);
   assert.match(html, /return applyEntryAnchors\(payload\)/);
 });
 

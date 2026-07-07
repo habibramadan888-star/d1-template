@@ -1700,7 +1700,50 @@ async function handleEmployeeLockCards(request,env,user){
   return success(result);
 }
 __name(handleEmployeeLockCards,"handleEmployeeLockCards");
+function employeeEntryValidationExplanation(errorCode,message){
+  const map={
+    CHECKOUT_OPEN_ARREARS_LEFT_WITH_ARREARS_REQUIRED:{
+      en:"This customer has unpaid arrears. Normal checkout is not allowed.",
+      zh:"该客户存在未清欠款，不能直接正常退房。",
+      action_en:"Collect arrears first, choose Left With Arrears, or contact the owner.",
+      action_zh:"请先收欠款、选择离店未清欠款，或联系老板审核。"
+    },
+    CHECKOUT_REQUIRED_FIELD_MISSING:{
+      en:"Checkout entry is missing required fields.",
+      zh:"退房记录缺少必填字段。",
+      action_en:"Complete the missing checkout fields, then validate again.",
+      action_zh:"请补齐退房必填字段后重新校验。"
+    },
+    LEFT_WITH_ARREARS_REQUIRED_FIELDS_MISSING:{
+      en:"Left With Arrears is missing required tracking fields.",
+      zh:"离店未清欠款缺少必填追踪字段。",
+      action_en:"Fill WhatsApp phone, left date, promised payment date, arrears amount, belongings status, and required notes.",
+      action_zh:"请填写 WhatsApp 号码、离开日期、承诺付款日期、欠款金额、物品留存状态和必填备注。"
+    },
+    CLOUD_ARREARS_REF_REQUIRED:{
+      en:"Left With Arrears requires an open Cloud Arrears reference.",
+      zh:"离店未清欠款必须关联一笔未清云端欠款。",
+      action_en:"Refresh arrears and select an open Cloud Arrears item.",
+      action_zh:"请刷新欠款并选择一笔未清云端欠款。"
+    },
+    CLOUD_ARREARS_NOT_OPEN:{
+      en:"The selected Cloud Arrears item is no longer open.",
+      zh:"所选云端欠款已不是未清状态。",
+      action_en:"Refresh arrears and choose an open or partial item.",
+      action_zh:"请刷新欠款并选择 open 或 partial 状态的欠款。"
+    }
+  };
+  const info=map[errorCode]||{};
+  return {
+    message_en:info.en||message||errorCode,
+    message_zh:info.zh||"上传前校验未通过。",
+    suggested_action_en:info.action_en||"Fix or remove the highlighted record, then upload again.",
+    suggested_action_zh:info.action_zh||"请修正或删除高亮记录后重新上传。"
+  };
+}
+__name(employeeEntryValidationExplanation,"employeeEntryValidationExplanation");
 function employeeEntryValidationFailure(stage,errorCode,message,extra={}){
+  const explanation=employeeEntryValidationExplanation(errorCode,message);
   return {
     ok:false,
     stage,
@@ -1708,8 +1751,12 @@ function employeeEntryValidationFailure(stage,errorCode,message,extra={}){
     event_type:extra.event_type||"",
     error_code:errorCode,
     message:message||errorCode,
+    message_en:extra.message_en||explanation.message_en,
+    message_zh:extra.message_zh||explanation.message_zh,
     missing_fields:Array.isArray(extra.missing_fields)?extra.missing_fields:[],
     invalid_fields:Array.isArray(extra.invalid_fields)?extra.invalid_fields:[],
+    suggested_action_en:extra.suggested_action_en||explanation.suggested_action_en,
+    suggested_action_zh:extra.suggested_action_zh||explanation.suggested_action_zh,
     anchor_preview:extra.anchor_preview||{}
   };
 }
@@ -1784,10 +1831,12 @@ function validateCheckoutUploadFields(entry,normalized,eventIndex,anchorPreview)
   const missing=[];
   const invalid=[];
   const left=!!normalized.left_with_arrears||!!entry.left_with_arrears||entry.checkout_mode==="left_with_arrears";
+  const eventType=left?"left_with_arrears":"checkout";
   if(!employeeEntryUploadHasValue(normalized.bed||entry.room))missing.push("bed");
   if(!employeeEntryUploadHasValue(normalized.checkout_mode||entry.checkout_mode))missing.push("checkout_type");
   if(!left&&!employeeEntryUploadHasValue(normalized.checkout_date||entry.checkout_date))missing.push("checkout_date");
   if(left){
+    if(!employeeEntryUploadHasValue(normalized.left_date||entry.left_date||normalized.checkout_date||entry.checkout_date))missing.push("left_date");
     if(!employeeEntryUploadHasValue(normalized.whatsapp_phone||entry.whatsapp_phone||entry.former_customer_phone))missing.push("whatsapp_phone");
     if(!employeeEntryUploadHasValue(normalized.confirmed_not_returning_date||entry.confirmed_not_returning_date))missing.push("confirmed_not_returning_date");
     if(!employeeEntryUploadHasValue(normalized.promised_payment_date||entry.promised_payment_date||entry.promise_date))missing.push("promised_payment_date");
@@ -1796,7 +1845,7 @@ function validateCheckoutUploadFields(entry,normalized,eventIndex,anchorPreview)
     const held=normalized.belongings_held===true||String(entry.belongings_held??normalized.belongings_held).toLowerCase()==="yes";
     if(held&&!employeeEntryUploadHasValue(normalized.belongings_note||entry.belongings_note))missing.push("belongings_note");
   }
-  if(missing.length||invalid.length)return employeeEntryValidationFailure("checkout_event_validation","CHECKOUT_REQUIRED_FIELD_MISSING","Checkout entry is missing required fields.",{event_index:eventIndex,event_type:"checkout",missing_fields:missing,invalid_fields:invalid,anchor_preview:anchorPreview});
+  if(missing.length||invalid.length)return employeeEntryValidationFailure(left?"left_with_arrears_event_validation":"checkout_event_validation",left?"LEFT_WITH_ARREARS_REQUIRED_FIELDS_MISSING":"CHECKOUT_REQUIRED_FIELD_MISSING",left?"Left With Arrears is missing required fields.":"Checkout entry is missing required fields.",{event_index:eventIndex,event_type:eventType,missing_fields:missing,invalid_fields:invalid,anchor_preview:anchorPreview});
   return null;
 }
 __name(validateCheckoutUploadFields,"validateCheckoutUploadFields");
@@ -2024,13 +2073,13 @@ async function validateEmployeeEntryUploadPayload(env,user,body,opts={}){
   if(["DR","CO"].includes(type)&&!(type==="CO"&&entry.left_with_arrears)){
     const openArrears=room?await getOpenCloudArrearsForBed(env,user,room,{limit:2000}).catch(()=>[]):[];
     if(openArrears.length){
-      return employeeEntryValidationFailure(type==="DR"?"deposit_out_validation":"checkout_validation",type==="DR"?"DEPOSIT_REFUND_OPEN_ARREARS_OWNER_APPROVAL_REQUIRED":"CHECKOUT_OPEN_ARREARS_OWNER_APPROVAL_REQUIRED","Open cloud arrears block direct deposit refund or checkout.",{event_index:eventIndex,event_type:type==="DR"?"deposit_out":"checkout",invalid_fields:["open_arrears"],anchor_preview:{...anchorPreview,open_arrears_count:openArrears.length}});
+      return employeeEntryValidationFailure(type==="DR"?"deposit_out_validation":"checkout_validation",type==="DR"?"DEPOSIT_REFUND_OPEN_ARREARS_OWNER_APPROVAL_REQUIRED":"CHECKOUT_OPEN_ARREARS_LEFT_WITH_ARREARS_REQUIRED",type==="DR"?"Open cloud arrears block direct deposit refund.":"This customer has unpaid arrears. Normal checkout is not allowed.",{event_index:eventIndex,event_type:type==="DR"?"deposit_out":"checkout",invalid_fields:["open_arrears"],anchor_preview:{...anchorPreview,open_arrears_count:openArrears.length}});
     }
   }
   if(type==="CO"&&entry.left_with_arrears){
     const missing=[];
     if(!cleanText(entry.whatsapp_phone||entry.former_customer_phone,80))missing.push("whatsapp_phone");
-    if(!cleanDate(entry.coverage_end_date||entry.card_end_date||entry.rent_coverage_end||entry.old_lock_valid_until||""))missing.push("coverage_end_date");
+    if(!cleanDate(entry.left_date||entry.checkout_date||entry.checkout_attempt_date||""))missing.push("left_date");
     if(!cleanDate(entry.confirmed_not_returning_date||""))missing.push("confirmed_not_returning_date");
     if(!cleanDate(entry.promised_payment_date||entry.promise_date||""))missing.push("promised_payment_date");
     if(cleanMoney(entry.left_arrears_amount||entry.arrears_amount||entry.outstanding_arrears||0)<=0)missing.push("left_arrears_amount");
@@ -2038,12 +2087,12 @@ async function validateEmployeeEntryUploadPayload(env,user,body,opts={}){
     const held=entry.belongings_held===true||String(entry.belongings_held||"").toLowerCase()==="yes";
     if(held&&!cleanText(entry.belongings_note,500))missing.push("belongings_note");
     if(missing.length){
-      return employeeEntryValidationFailure("left_with_arrears_validation","LEFT_WITH_ARREARS_REQUIRED_FIELDS_MISSING","Left With Arrears is missing required fields.",{event_index:eventIndex,event_type:"checkout",missing_fields:missing,anchor_preview:anchorPreview});
+      return employeeEntryValidationFailure("left_with_arrears_validation","LEFT_WITH_ARREARS_REQUIRED_FIELDS_MISSING","Left With Arrears is missing required fields.",{event_index:eventIndex,event_type:"left_with_arrears",missing_fields:missing,anchor_preview:anchorPreview});
     }
     const taskId=cleanId(entry.cloud_arrears_ref||entry.arrears_ref||"");
-    if(!taskId)return employeeEntryValidationFailure("left_with_arrears_validation","CLOUD_ARREARS_REF_REQUIRED","Left With Arrears requires a cloud arrears ref.",{event_index:eventIndex,event_type:"checkout",missing_fields:["cloud_arrears_ref"],anchor_preview:anchorPreview});
+    if(!taskId)return employeeEntryValidationFailure("left_with_arrears_validation","CLOUD_ARREARS_REF_REQUIRED","Left With Arrears requires a cloud arrears ref.",{event_index:eventIndex,event_type:"left_with_arrears",missing_fields:["cloud_arrears_ref"],anchor_preview:anchorPreview});
     const openLeftTask=await empFindOpenArrearTaskForPaymentReadOnly(env,user,taskId,room);
-    if(!openLeftTask)return employeeEntryValidationFailure("left_with_arrears_validation","CLOUD_ARREARS_NOT_OPEN","Left With Arrears cloud arrears ref is not open.",{event_index:eventIndex,event_type:"checkout",invalid_fields:["cloud_arrears_ref"],anchor_preview:{...anchorPreview,cloud_arrears_ref:taskId}});
+    if(!openLeftTask)return employeeEntryValidationFailure("left_with_arrears_validation","CLOUD_ARREARS_NOT_OPEN","Left With Arrears cloud arrears ref is not open.",{event_index:eventIndex,event_type:"left_with_arrears",invalid_fields:["cloud_arrears_ref"],anchor_preview:{...anchorPreview,cloud_arrears_ref:taskId}});
   }
   if(type==="CO"&&depositDeduction>depositBalance+0.01){
     return employeeEntryValidationFailure("checkout_validation","DEPOSIT_DEDUCTION_EXCEEDS_BALANCE","Deposit deduction exceeds deposit balance.",{event_index:eventIndex,event_type:"checkout",invalid_fields:["deposit_deduction"],anchor_preview:{...anchorPreview,deposit_balance:depositBalance,deposit_deduction:depositDeduction}});
@@ -2397,7 +2446,7 @@ function entryAnchorType(row){
   const raw=String(row?.type||"").trim().toUpperCase();
   if(entryAnchorContract[raw])return raw;
   const event=String(row?.event_type||"").trim().toLowerCase();
-  return {rent:"R",arrears_payment:"AP",deposit_in:"D",deposit_out:"DR",checkout:"CO",expense:"E",bed_transfer:"TF",bed_transfer_fee:"TFF"}[event]||raw;
+  return {rent:"R",arrears_payment:"AP",deposit_in:"D",deposit_out:"DR",checkout:"CO",left_with_arrears:"CO",expense:"E",bed_transfer:"TF",bed_transfer_fee:"TFF"}[event]||raw;
 }
 __name(entryAnchorType,"entryAnchorType");
 function entryAnchorEventType(type){
@@ -2437,7 +2486,7 @@ function renderEntryAnchorForOwner(row){
   if(type==="CO"){
     const base=`${row.room||row.bed} checkout ${row.checkout_date||"-"} deposit_refund ${entryAnchorMoney(row.deposit_refund||row.deposit_amt||0).toFixed(2)} outstanding ${entryAnchorMoney(row.outstanding_arrears||0).toFixed(2)} note ${row.final_note||row.note||"-"}`.trim();
     if(row.left_with_arrears||row.checkout_mode==="left_with_arrears"){
-      return `${base} left_with_arrears ref ${row.cloud_arrears_ref||"-"} phone ${row.whatsapp_phone||row.former_customer_phone||"-"} belongings ${row.belongings_held?"yes":"no"} promised_payment ${row.promised_payment_date||"-"} promised_return ${row.promised_return_date||row.promise_return_date||"-"}`.trim();
+      return `${base} left_with_arrears ref ${row.cloud_arrears_ref||"-"} phone ${row.whatsapp_phone||row.former_customer_phone||"-"} left_date ${row.left_date||row.checkout_date||"-"} confirmed_not_returning ${row.confirmed_not_returning_date||"-"} left_arrears ${entryAnchorMoney(row.left_arrears_amount||row.arrears_amount||row.outstanding_arrears||0).toFixed(2)} deposit_balance ${entryAnchorMoney(row.deposit_balance||0).toFixed(2)} belongings ${row.belongings_held?"yes":"no"} belongings_note ${row.belongings_note||"-"} promised_payment ${row.promised_payment_date||"-"} promised_return ${row.promised_return_date||row.promise_return_date||"-"} status ${row.final_status||row.left_status||row.status||"-"}`.trim();
     }
     return base;
   }
@@ -2484,7 +2533,7 @@ function normalizeEntryAnchor(row){
     Object.assign(anchor,{bed:anchor.bed||anchor.room||"",deposit_balance:depositBalance,actual_refund_amount:refundAmount,refund_amount:refundAmount,refund_difference:entryAnchorMoney(refundAmount-depositBalance),refund_method:entryAnchorPaymentMethod(anchor.refund_method||anchor.payment_method||anchor.pay_type),payment_method:entryAnchorPaymentMethod(anchor.payment_method||anchor.refund_method||anchor.pay_type),refund_date:cleanDate(anchor.refund_date||anchor.checkout_date||anchor.date||""),refund_reason:anchor.refund_reason||anchor.difference_reason||anchor.ded_reason||anchor.ded_note||anchor.reason||anchor.note||"",difference_reason:anchor.difference_reason||anchor.refund_reason||anchor.ded_note||anchor.note||"",checkout_ref:anchor.checkout_ref||anchor.checkout_date||"",open_arrears_amount:entryAnchorMoney(anchor.open_arrears_amount||anchor.outstanding_arrears||0),owner_approval_required:!!anchor.owner_approval_required,owner_approval_status:anchor.owner_approval_status||"not_required",note:anchor.note||""});
   }else if(type==="CO"){
     const left=!!anchor.left_with_arrears||anchor.checkout_mode==="left_with_arrears";
-    Object.assign(anchor,{bed:anchor.bed||anchor.room||"",checkout_date:anchor.checkout_date||"",deposit_refund:left?0:entryAnchorMoney(anchor.deposit_refund||0),outstanding_arrears:entryAnchorMoney(anchor.outstanding_arrears||anchor.carry_over_arrears||anchor.deficit||0),owner_approval_required:left?false:!!anchor.owner_approval_required,owner_approval_status:left?"not_required":anchor.owner_approval_status||"not_required",checkout_mode:left?"left_with_arrears":anchor.checkout_mode||"normal",left_with_arrears:left,customer_left:left,former_customer_name:anchor.former_customer_name||anchor.card_name||anchor.tenant_name||"",card_name:anchor.card_name||anchor.former_customer_name||anchor.tenant_name||"",whatsapp_phone:anchor.whatsapp_phone||anchor.former_customer_phone||"",former_customer_phone:anchor.former_customer_phone||anchor.whatsapp_phone||"",contact_method:anchor.contact_method||"",contact_note:anchor.contact_note||"",arrears_amount:entryAnchorMoney(anchor.arrears_amount||anchor.left_arrears_amount||anchor.outstanding_arrears||0),left_arrears_amount:entryAnchorMoney(anchor.left_arrears_amount||anchor.arrears_amount||anchor.outstanding_arrears||0),cloud_arrears_ref:anchor.cloud_arrears_ref||anchor.arrears_ref||"",belongings_held:!!anchor.belongings_held,belongings_note:anchor.belongings_note||"",coverage_end_date:anchor.coverage_end_date||anchor.card_end_date||anchor.rent_coverage_end||anchor.old_lock_valid_until||"",card_end_date:anchor.card_end_date||anchor.coverage_end_date||anchor.rent_coverage_end||anchor.old_lock_valid_until||"",rent_coverage_end:anchor.rent_coverage_end||anchor.coverage_end_date||anchor.card_end_date||anchor.old_lock_valid_until||"",promised_payment_date:anchor.promised_payment_date||anchor.promise_date||"",promised_return_date:anchor.promised_return_date||anchor.promise_return_date||"",promise_return_date:anchor.promise_return_date||anchor.promised_return_date||"",deposit_balance:entryAnchorMoney(anchor.deposit_balance||anchor.deposit_held||0),left_date:anchor.left_date||anchor.checkout_date||"",checkout_attempt_date:anchor.checkout_attempt_date||anchor.checkout_date||"",left_status:anchor.left_status||"",final_status:anchor.final_status||"",grace_days_after_promise:Number(anchor.grace_days_after_promise||0)||0,review_date:anchor.review_date||"",confirmed_not_returning_date:anchor.confirmed_not_returning_date||"",confirmed_not_returning_by:anchor.confirmed_not_returning_by||"",confirmation_note:anchor.confirmation_note||"",original_session_id:anchor.original_session_id||anchor.session_id||"",original_event_id:anchor.original_event_id||anchor.event_id||anchor.id||"",final_note:anchor.final_note||anchor.note||anchor.ded_note||""});
+    Object.assign(anchor,{event_type:left?"left_with_arrears":"checkout",bed:anchor.bed||anchor.room||"",checkout_date:anchor.checkout_date||"",checkout_type:left?"left_with_arrears":anchor.checkout_type||anchor.checkout_mode||"normal",deposit_refund:left?0:entryAnchorMoney(anchor.deposit_refund||0),outstanding_arrears:entryAnchorMoney(anchor.outstanding_arrears||anchor.carry_over_arrears||anchor.deficit||0),open_arrears_amount:entryAnchorMoney(anchor.open_arrears_amount||anchor.outstanding_arrears||anchor.carry_over_arrears||0),owner_approval_required:left?false:!!anchor.owner_approval_required,owner_approval_status:left?"not_required":anchor.owner_approval_status||"not_required",checkout_mode:left?"left_with_arrears":anchor.checkout_mode||"normal",left_with_arrears:left,customer_left:left,former_customer_name:anchor.former_customer_name||anchor.card_name||anchor.tenant_name||"",card_name:anchor.card_name||anchor.former_customer_name||anchor.tenant_name||"",whatsapp_phone:anchor.whatsapp_phone||anchor.former_customer_phone||"",former_customer_phone:anchor.former_customer_phone||anchor.whatsapp_phone||"",contact_method:anchor.contact_method||"",contact_note:anchor.contact_note||"",arrears_amount:entryAnchorMoney(anchor.arrears_amount||anchor.left_arrears_amount||anchor.outstanding_arrears||0),left_arrears_amount:entryAnchorMoney(anchor.left_arrears_amount||anchor.arrears_amount||anchor.outstanding_arrears||0),cloud_arrears_ref:anchor.cloud_arrears_ref||anchor.arrears_ref||"",belongings_held:!!anchor.belongings_held,belongings_note:anchor.belongings_note||"",coverage_end_date:anchor.coverage_end_date||anchor.card_end_date||anchor.rent_coverage_end||anchor.old_lock_valid_until||"",card_end_date:anchor.card_end_date||anchor.coverage_end_date||anchor.rent_coverage_end||anchor.old_lock_valid_until||"",rent_coverage_end:anchor.rent_coverage_end||anchor.coverage_end_date||anchor.card_end_date||anchor.old_lock_valid_until||"",promised_payment_date:anchor.promised_payment_date||anchor.promise_date||"",promised_return_date:anchor.promised_return_date||anchor.promise_return_date||"",promise_return_date:anchor.promise_return_date||anchor.promised_return_date||"",deposit_balance:entryAnchorMoney(anchor.deposit_balance||anchor.deposit_held||0),left_date:anchor.left_date||anchor.checkout_date||"",checkout_attempt_date:anchor.checkout_attempt_date||anchor.checkout_date||"",left_status:anchor.left_status||(left?"left_pending_return":""),final_status:anchor.final_status||(left?"left_pending_return":""),status:anchor.status||(left?"left_pending_return":""),overdue_days:Number(anchor.overdue_days||0)||0,grace_days_after_promise:Number(anchor.grace_days_after_promise||0)||0,review_date:anchor.review_date||"",confirmed_not_returning_date:anchor.confirmed_not_returning_date||"",confirmed_not_returning_by:anchor.confirmed_not_returning_by||"",confirmation_note:anchor.confirmation_note||"",original_session_id:anchor.original_session_id||anchor.session_id||"",original_event_id:anchor.original_event_id||anchor.event_id||anchor.id||"",final_note:anchor.final_note||anchor.note||anchor.ded_note||""});
   }else if(type==="E"){
     Object.assign(anchor,{expense_amount:entryAnchorMoney(anchor.expense_amount||anchor.amount),expense_category:anchor.expense_category||anchor.reason_code||"",target_bed:anchor.target_bed||anchor.room||"",reason:anchor.reason||anchor.expense_desc||anchor.custom_reason||"",note:anchor.note||anchor.expense_desc||""});
   }
@@ -2622,9 +2671,16 @@ function cloudArrearsApplyLeftWithArrearsMeta(item,anchor){
   item.promised_payment_date=cleanDate(anchor.promised_payment_date||anchor.promise_date||"");
   item.promised_return_date=cleanDate(anchor.promised_return_date||anchor.promise_return_date||"");
   item.confirmed_not_returning_date=cleanDate(anchor.confirmed_not_returning_date||"");
+  item.left_date=cleanDate(anchor.left_date||anchor.checkout_date||"");
+  item.checkout_date=cleanDate(anchor.checkout_date||anchor.left_date||"");
+  item.coverage_end_date=cleanDate(anchor.coverage_end_date||anchor.card_end_date||anchor.rent_coverage_end||"");
+  item.card_end_date=cleanDate(anchor.card_end_date||anchor.coverage_end_date||anchor.rent_coverage_end||"");
+  item.left_arrears_amount=entryAnchorMoney(anchor.left_arrears_amount||anchor.arrears_amount||anchor.outstanding_arrears||0);
+  item.cloud_arrears_ref=cleanText(anchor.cloud_arrears_ref||anchor.arrears_ref||item.arrears_ref||"",160);
+  item.overdue_days=Number(anchor.overdue_days||0)||0;
   item.deposit_balance=entryAnchorMoney(anchor.deposit_balance||anchor.deposit_held||0);
-  item.left_status=cleanText(anchor.left_status||"",80);
-  item.final_status=cleanText(anchor.final_status||"",80);
+  item.left_status=cleanText(anchor.left_status||"left_pending_return",80);
+  item.final_status=cleanText(anchor.final_status||"left_pending_return",80);
   item.owner_note=`${cleanText(item.owner_note||"",500)}\nLEFT_WITH_ARREARS ${JSON.stringify({
     left_with_arrears:true,
     customer_left:true,
@@ -2637,6 +2693,13 @@ function cloudArrearsApplyLeftWithArrearsMeta(item,anchor){
     promised_payment_date:item.promised_payment_date,
     promised_return_date:item.promised_return_date,
     confirmed_not_returning_date:item.confirmed_not_returning_date,
+    left_date:item.left_date,
+    checkout_date:item.checkout_date,
+    coverage_end_date:item.coverage_end_date,
+    card_end_date:item.card_end_date,
+    left_arrears_amount:item.left_arrears_amount,
+    cloud_arrears_ref:item.cloud_arrears_ref,
+    overdue_days:item.overdue_days,
     deposit_balance:item.deposit_balance,
     left_status:item.left_status,
     final_status:item.final_status
@@ -5721,6 +5784,14 @@ function ownerOverviewArrearsSummary(rows=[],today=empTodayDubai()){
         promised_payment_date:cleanText(leftMeta.promised_payment_date||"",40),
         promised_return_date:cleanText(leftMeta.promised_return_date||leftMeta.promise_return_date||"",40),
         promise_return_date:cleanText(leftMeta.promise_return_date||leftMeta.promised_return_date||"",40),
+        left_date:cleanText(leftMeta.left_date||leftMeta.checkout_date||"",40),
+        checkout_date:cleanText(leftMeta.checkout_date||leftMeta.left_date||"",40),
+        confirmed_not_returning_date:cleanText(leftMeta.confirmed_not_returning_date||"",40),
+        coverage_end_date:cleanText(leftMeta.coverage_end_date||leftMeta.card_end_date||"",40),
+        card_end_date:cleanText(leftMeta.card_end_date||leftMeta.coverage_end_date||"",40),
+        left_arrears_amount:ownerOverviewMoney(leftMeta.left_arrears_amount||leftMeta.arrears_amount||0),
+        cloud_arrears_ref:cleanText(leftMeta.cloud_arrears_ref||row?.task_id||row?.arrears_ref||"",160),
+        overdue_days:Number(leftMeta.overdue_days||0)||0,
         deposit_balance:ownerOverviewMoney(leftMeta.deposit_balance||0),
         left_status:cleanText(leftMeta.left_status||"",80),
         final_status:cleanText(leftMeta.final_status||"",80),

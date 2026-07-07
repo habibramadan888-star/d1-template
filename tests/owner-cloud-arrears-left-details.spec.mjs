@@ -10,9 +10,15 @@ test("owner Cloud Arrears details decode and render left customer metadata", asy
   assert.match(worker, /LEFT_WITH_ARREARS\\s\+\(\{\[\\s\\S\]\*\?\}\)/);
   assert.match(worker, /left_with_arrears:!!\(leftMeta\.left_with_arrears\|\|leftMeta\.customer_left\)/);
   assert.match(worker, /whatsapp_phone:cleanText\(leftMeta\.whatsapp_phone\|\|leftMeta\.former_customer_phone/);
+  assert.match(worker, /left_date:cleanText\(leftMeta\.left_date\|\|leftMeta\.checkout_date/);
+  assert.match(worker, /confirmed_not_returning_date:cleanText\(leftMeta\.confirmed_not_returning_date/);
+  assert.match(worker, /left_arrears_amount:ownerOverviewMoney\(leftMeta\.left_arrears_amount/);
   assert.match(worker, /promised_return_date:cleanText\(leftMeta\.promised_return_date/);
   assert.match(ui, /Left With Arrears/);
   assert.match(ui, /Phone:/);
+  assert.match(ui, /Left Date:/);
+  assert.match(ui, /Confirmed Not Returning:/);
+  assert.match(ui, /Left Arrears:/);
   assert.match(ui, /Belongings Held:/);
   assert.match(ui, /Promise Payment:/);
   assert.match(ui, /Deposit Balance:/);
