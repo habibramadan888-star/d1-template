@@ -1714,6 +1714,130 @@ function employeeEntryValidationFailure(stage,errorCode,message,extra={}){
   };
 }
 __name(employeeEntryValidationFailure,"employeeEntryValidationFailure");
+function employeeEntryUploadHasValue(value){
+  if(value===true||value===false)return true;
+  if(typeof value==="number")return Number.isFinite(value);
+  return String(value??"").trim()!=="";
+}
+__name(employeeEntryUploadHasValue,"employeeEntryUploadHasValue");
+function employeeEntryUploadAmount(value){
+  return Number(String(value??0).replace(/,/g,""))||0;
+}
+__name(employeeEntryUploadAmount,"employeeEntryUploadAmount");
+function validateRentUploadFields(entry,normalized,eventIndex,anchorPreview){
+  const missing=[];
+  const invalid=[];
+  const expected=employeeEntryUploadAmount(normalized.expected_rent||entry.period_due||entry.due);
+  const paid=employeeEntryUploadAmount(normalized.paid_amount||entry.paid||entry.amount);
+  if(!employeeEntryUploadHasValue(normalized.bed||entry.room))missing.push("bed");
+  if(paid<=0)missing.push("paid_amount");
+  if(!employeeEntryUploadHasValue(normalized.payment_method||entry.payment_method||entry.pay_type))missing.push("payment_method");
+  if(!employeeEntryUploadHasValue(normalized.rent_period_start||entry.period_start))missing.push("rent_period_start");
+  if(!employeeEntryUploadHasValue(normalized.rent_period_end||entry.period_end))missing.push("rent_period_end");
+  if(expected>0&&paid<expected){
+    if(!employeeEntryUploadHasValue(normalized.arrears_due_date||entry.arrear_promise_date||entry.promise_date))missing.push("arrears_due_date");
+    if(!employeeEntryUploadHasValue(normalized.arrears_note||entry.arrear_reason_detail||entry.custom_reason||entry.note))missing.push("arrears_note");
+  }
+  if(missing.length||invalid.length)return employeeEntryValidationFailure("rent_event_validation","RENT_REQUIRED_FIELD_MISSING","Rent entry is missing required fields.",{event_index:eventIndex,event_type:"rent",missing_fields:missing,invalid_fields:invalid,anchor_preview:anchorPreview});
+  return null;
+}
+__name(validateRentUploadFields,"validateRentUploadFields");
+function validateArrearsPaymentUploadFields(entry,normalized,eventIndex,anchorPreview){
+  const missing=[];
+  const invalid=[];
+  if(!employeeEntryUploadHasValue(normalized.bed||entry.room))missing.push("bed");
+  if(!employeeEntryUploadHasValue(normalized.arrears_ref||entry.arrears_ref||entry.original_arrears_id||entry.linked_task_id))missing.push("arrears_ref");
+  if(employeeEntryUploadAmount(normalized.payment_amount||entry.payment_amount||entry.amount)<=0)missing.push("payment_amount");
+  if(!employeeEntryUploadHasValue(normalized.payment_method||entry.payment_method||entry.pay_type))missing.push("payment_method");
+  if(!employeeEntryUploadHasValue(normalized.remaining_arrears_before_payment||entry.remaining_arrears_before_payment))missing.push("remaining_before");
+  if(!employeeEntryUploadHasValue(normalized.remaining_arrears_after_payment||entry.remaining_arrears_after_payment||normalized.remaining_arrears||entry.remaining_arrears))missing.push("remaining_after");
+  if(!employeeEntryUploadHasValue(normalized.settlement_status||entry.settlement_status))missing.push("settlement_status");
+  if(missing.length||invalid.length)return employeeEntryValidationFailure("arrears_payment_event_validation","ARREARS_PAYMENT_REQUIRED_FIELD_MISSING","Arrears Payment entry is missing required fields.",{event_index:eventIndex,event_type:"arrears_payment",missing_fields:missing,invalid_fields:invalid,anchor_preview:anchorPreview});
+  return null;
+}
+__name(validateArrearsPaymentUploadFields,"validateArrearsPaymentUploadFields");
+function validateDepositInUploadFields(entry,normalized,eventIndex,anchorPreview){
+  const missing=[];
+  if(!employeeEntryUploadHasValue(normalized.bed||entry.room))missing.push("bed");
+  if(employeeEntryUploadAmount(normalized.deposit_amount||entry.deposit_amount||entry.amount)<=0)missing.push("deposit_amount");
+  if(!employeeEntryUploadHasValue(normalized.payment_method||entry.payment_method||entry.pay_type))missing.push("payment_method");
+  if(missing.length)return employeeEntryValidationFailure("deposit_in_event_validation","DEPOSIT_IN_REQUIRED_FIELD_MISSING","Deposit In entry is missing required fields.",{event_index:eventIndex,event_type:"deposit_in",missing_fields:missing,anchor_preview:anchorPreview});
+  return null;
+}
+__name(validateDepositInUploadFields,"validateDepositInUploadFields");
+function validateDepositOutUploadFields(entry,normalized,eventIndex,anchorPreview){
+  const missing=[];
+  const invalid=[];
+  const balance=employeeEntryUploadAmount(normalized.deposit_balance||entry.deposit_balance||entry.deposit_held);
+  const refund=employeeEntryUploadAmount(normalized.actual_refund_amount||normalized.refund_amount||entry.actual_refund_amount||entry.refund_amount||entry.amount);
+  if(!employeeEntryUploadHasValue(normalized.bed||entry.room))missing.push("bed");
+  if(balance<=0)missing.push("deposit_balance");
+  if(refund<=0)missing.push("actual_refund_amount");
+  if(!employeeEntryUploadHasValue(normalized.refund_method||entry.refund_method||normalized.payment_method||entry.pay_type))missing.push("refund_method");
+  if(!employeeEntryUploadHasValue(normalized.refund_date||entry.refund_date))missing.push("refund_date");
+  if(Math.abs(refund-balance)>0.01&&!employeeEntryUploadHasValue(normalized.difference_reason||entry.difference_reason||normalized.refund_reason||entry.refund_reason))missing.push("difference_reason");
+  if(missing.length||invalid.length)return employeeEntryValidationFailure("deposit_out_event_validation","DEPOSIT_OUT_REQUIRED_FIELD_MISSING","Deposit Out entry is missing required fields.",{event_index:eventIndex,event_type:"deposit_out",missing_fields:missing,invalid_fields:invalid,anchor_preview:anchorPreview});
+  return null;
+}
+__name(validateDepositOutUploadFields,"validateDepositOutUploadFields");
+function validateCheckoutUploadFields(entry,normalized,eventIndex,anchorPreview){
+  const missing=[];
+  const invalid=[];
+  const left=!!normalized.left_with_arrears||!!entry.left_with_arrears||entry.checkout_mode==="left_with_arrears";
+  if(!employeeEntryUploadHasValue(normalized.bed||entry.room))missing.push("bed");
+  if(!employeeEntryUploadHasValue(normalized.checkout_mode||entry.checkout_mode))missing.push("checkout_type");
+  if(!left&&!employeeEntryUploadHasValue(normalized.checkout_date||entry.checkout_date))missing.push("checkout_date");
+  if(left){
+    if(!employeeEntryUploadHasValue(normalized.whatsapp_phone||entry.whatsapp_phone||entry.former_customer_phone))missing.push("whatsapp_phone");
+    if(!employeeEntryUploadHasValue(normalized.confirmed_not_returning_date||entry.confirmed_not_returning_date))missing.push("confirmed_not_returning_date");
+    if(!employeeEntryUploadHasValue(normalized.promised_payment_date||entry.promised_payment_date||entry.promise_date))missing.push("promised_payment_date");
+    if(employeeEntryUploadAmount(normalized.left_arrears_amount||normalized.arrears_amount||entry.left_arrears_amount||entry.arrears_amount)<=0)missing.push("left_arrears_amount");
+    if(!employeeEntryUploadHasValue(normalized.belongings_held||entry.belongings_held))missing.push("belongings_held");
+    const held=normalized.belongings_held===true||String(entry.belongings_held??normalized.belongings_held).toLowerCase()==="yes";
+    if(held&&!employeeEntryUploadHasValue(normalized.belongings_note||entry.belongings_note))missing.push("belongings_note");
+  }
+  if(missing.length||invalid.length)return employeeEntryValidationFailure("checkout_event_validation","CHECKOUT_REQUIRED_FIELD_MISSING","Checkout entry is missing required fields.",{event_index:eventIndex,event_type:"checkout",missing_fields:missing,invalid_fields:invalid,anchor_preview:anchorPreview});
+  return null;
+}
+__name(validateCheckoutUploadFields,"validateCheckoutUploadFields");
+function validateExpenseUploadFields(entry,normalized,eventIndex,anchorPreview){
+  const missing=[];
+  if(employeeEntryUploadAmount(normalized.expense_amount||entry.expense_amount||entry.amount)<=0)missing.push("expense_amount");
+  if(!employeeEntryUploadHasValue(normalized.expense_category||entry.expense_category||entry.reason_code))missing.push("expense_category");
+  if(!employeeEntryUploadHasValue(normalized.payment_method||entry.payment_method||entry.pay_type))missing.push("payment_method");
+  if(!employeeEntryUploadHasValue(normalized.reason||entry.reason||entry.expense_desc||entry.note))missing.push("reason");
+  if(missing.length)return employeeEntryValidationFailure("expense_event_validation","EXPENSE_REQUIRED_FIELD_MISSING","Expense entry is missing required fields.",{event_index:eventIndex,event_type:"expense",missing_fields:missing,anchor_preview:anchorPreview});
+  return null;
+}
+__name(validateExpenseUploadFields,"validateExpenseUploadFields");
+function validateBedTransferUploadFields(entry,normalized,eventIndex,anchorPreview){
+  const missing=[];
+  const feeStatus=String(normalized.fee_status||entry.fee_status||entry.fee_mode||(entry.fee_paid==="N"?"waived":"paid")).toLowerCase();
+  if(!employeeEntryUploadHasValue(normalized.from_bed||entry.bed_from||entry.room))missing.push("from_bed");
+  if(!employeeEntryUploadHasValue(normalized.to_bed||entry.bed_to||entry.roomTo))missing.push("to_bed");
+  if(!employeeEntryUploadHasValue(normalized.transfer_date||entry.transfer_date))missing.push("transfer_date");
+  if(!employeeEntryUploadHasValue(feeStatus))missing.push("fee_status");
+  if(!employeeEntryUploadHasValue(normalized.transfer_reason||entry.transfer_reason))missing.push("transfer_reason");
+  if(feeStatus==="waived"&&!employeeEntryUploadHasValue(normalized.waiver_reason||entry.waiver_reason||entry.fee_waiver_reason))missing.push("waiver_reason");
+  if(missing.length)return employeeEntryValidationFailure("bed_transfer_event_validation","BED_TRANSFER_REQUIRED_FIELD_MISSING","Bed Transfer entry is missing required fields.",{event_index:eventIndex,event_type:"bed_transfer",missing_fields:missing,anchor_preview:anchorPreview});
+  return null;
+}
+__name(validateBedTransferUploadFields,"validateBedTransferUploadFields");
+function validateEmployeeEntryUploadEventFields(type,entry,normalized,eventIndex,anchorPreview){
+  const dispatch={
+    R:validateRentUploadFields,
+    AP:validateArrearsPaymentUploadFields,
+    D:validateDepositInUploadFields,
+    DR:validateDepositOutUploadFields,
+    CO:validateCheckoutUploadFields,
+    E:validateExpenseUploadFields,
+    TF:validateBedTransferUploadFields,
+    TFF:validateBedTransferUploadFields
+  };
+  const validator=dispatch[type]||validateRentUploadFields;
+  return validator(entry,normalized,eventIndex,anchorPreview);
+}
+__name(validateEmployeeEntryUploadEventFields,"validateEmployeeEntryUploadEventFields");
 async function empFindOpenArrearTaskForPaymentReadOnly(env,user,taskId,bed=""){
   const cleanTaskId=cleanId(taskId);
   if(!cleanTaskId)return null;
@@ -1755,6 +1879,8 @@ async function validateEmployeeEntryUploadPayload(env,user,body,opts={}){
     bed:normalized.bed||normalized.room||entry.room||"",
     amount:entryAnchorMoney(normalized.amount||normalized.payment_amount||normalized.paid_amount||entry.amount)
   };
+  const eventFieldValidation=validateEmployeeEntryUploadEventFields(type,entry,normalized,eventIndex,anchorPreview);
+  if(eventFieldValidation)return eventFieldValidation;
   if(normalized.validation_status!=="valid"){
     return employeeEntryValidationFailure("anchor_validation","ANCHOR_CONTRACT_MISSING_FIELDS","Entry anchor is missing required fields.",{
       event_index:eventIndex,event_type:normalized.event_type||entryAnchorEventType(type),
