@@ -1,0 +1,15 @@
+{
+  "status_label": "NOT_VERIFIED",
+  "not_live_verified": true,
+  "reason": "No authenticated production browser session was available. The employee Upload Session flow was not reached.",
+  "expected_flow": {
+    "production_url": "https://homelink-finance.habibramadan888.workers.dev/employee",
+    "event_type": "rent",
+    "bed_examples": ["145", "411"],
+    "payment_method": "cash",
+    "rent_period_start": "2026-08-01",
+    "rent_period_end": "2026-09-01"
+  },
+  "raw_request_payload": null,
+  "secrets_captured": false
+}
