@@ -1742,8 +1742,57 @@ function employeeEntryValidationExplanation(errorCode,message){
   };
 }
 __name(employeeEntryValidationExplanation,"employeeEntryValidationExplanation");
+function employeeEntryValidationFunctionForStage(stage,eventType=""){
+  const byStage={
+    payload:"handleEmployeeEntryValidate",
+    schema:"empTableExists",
+    rent_event_validation:"validateRentUploadFields",
+    arrears_payment_event_validation:"validateArrearsPaymentUploadFields",
+    deposit_in_event_validation:"validateDepositInUploadFields",
+    deposit_out_event_validation:"validateDepositOutUploadFields",
+    checkout_event_validation:"validateCheckoutUploadFields",
+    left_with_arrears_event_validation:"validateCheckoutUploadFields",
+    expense_event_validation:"validateExpenseUploadFields",
+    bed_transfer_event_validation:"validateBedTransferUploadFields",
+    anchor_validation:"normalizeEntryAnchor",
+    session_anchor_validation:"normalizeEntryAnchor",
+    owner_decoder_compat:"parseEmployeeEntryAnchorJson",
+    export_text_build:"employeeEntryExportTextWithAnchors",
+    basic_fields:"validateEmployeeEntryUploadPayload",
+    rent_validation:"validateEmployeeEntryUploadPayload",
+    rent_short_paid:"validateEmployeeEntryUploadPayload",
+    bed_transfer_validation:"validateEmployeeEntryUploadPayload",
+    arrears_payment_ref:"empFindOpenArrearTaskForPaymentReadOnly",
+    deposit_out_validation:"validateEmployeeEntryUploadPayload",
+    checkout_validation:"validateEmployeeEntryUploadPayload",
+    left_with_arrears_validation:"validateEmployeeEntryUploadPayload",
+    validate_exception:"validateEmployeeEntryUploadPayload"
+  };
+  if(byStage[stage])return byStage[stage];
+  return eventType?`validateEmployeeEntryUploadPayload:${eventType}`:"validateEmployeeEntryUploadPayload";
+}
+__name(employeeEntryValidationFunctionForStage,"employeeEntryValidationFunctionForStage");
+function employeeEntryValidationTraceStep(stage,ok,extra={}){
+  return {
+    stage,
+    function:extra.function_name||employeeEntryValidationFunctionForStage(stage,extra.event_type||""),
+    ok:!!ok,
+    event_index:Number(extra.event_index||0),
+    event_type:extra.event_type||"",
+    error_code:extra.error_code||"",
+    message:extra.message||"",
+    missing_fields:Array.isArray(extra.missing_fields)?extra.missing_fields:[],
+    invalid_fields:Array.isArray(extra.invalid_fields)?extra.invalid_fields:[]
+  };
+}
+__name(employeeEntryValidationTraceStep,"employeeEntryValidationTraceStep");
 function employeeEntryValidationFailure(stage,errorCode,message,extra={}){
   const explanation=employeeEntryValidationExplanation(errorCode,message);
+  const traceStep=employeeEntryValidationTraceStep(stage,false,{
+    ...extra,
+    error_code:errorCode,
+    message:message||errorCode
+  });
   return {
     ok:false,
     stage,
@@ -1757,10 +1806,36 @@ function employeeEntryValidationFailure(stage,errorCode,message,extra={}){
     invalid_fields:Array.isArray(extra.invalid_fields)?extra.invalid_fields:[],
     suggested_action_en:extra.suggested_action_en||explanation.suggested_action_en,
     suggested_action_zh:extra.suggested_action_zh||explanation.suggested_action_zh,
-    anchor_preview:extra.anchor_preview||{}
+    anchor_preview:extra.anchor_preview||{},
+    validation_trace:Array.isArray(extra.validation_trace)&&extra.validation_trace.length?extra.validation_trace:[traceStep]
   };
 }
 __name(employeeEntryValidationFailure,"employeeEntryValidationFailure");
+function employeeEntryValidationSuccessTrace(type,eventIndex,eventType){
+  const base={event_index:eventIndex,event_type:eventType};
+  const eventStage={
+    R:["rent_event_validation","validateRentUploadFields"],
+    AP:["arrears_payment_event_validation","validateArrearsPaymentUploadFields"],
+    D:["deposit_in_event_validation","validateDepositInUploadFields"],
+    DR:["deposit_out_event_validation","validateDepositOutUploadFields"],
+    CO:["checkout_event_validation","validateCheckoutUploadFields"],
+    E:["expense_event_validation","validateExpenseUploadFields"],
+    TF:["bed_transfer_event_validation","validateBedTransferUploadFields"],
+    TFF:["bed_transfer_event_validation","validateBedTransferUploadFields"]
+  }[type]||["rent_event_validation","validateRentUploadFields"];
+  return [
+    employeeEntryValidationTraceStep("payload_parse",true,{...base,function_name:"handleEmployeeEntryValidate"}),
+    employeeEntryValidationTraceStep("event_dispatch",true,{...base,function_name:"validateEmployeeEntryUploadEventFields"}),
+    employeeEntryValidationTraceStep(eventStage[0],true,{...base,function_name:eventStage[1]}),
+    employeeEntryValidationTraceStep("anchor_validation",true,{...base,function_name:"normalizeEntryAnchor"}),
+    employeeEntryValidationTraceStep("session_summary_build",true,{...base,function_name:"validateEmployeeEntryUploadPayload"}),
+    employeeEntryValidationTraceStep("export_text_build",true,{...base,function_name:"employeeEntryExportTextWithAnchors"}),
+    employeeEntryValidationTraceStep("structured_anchor_block_build",true,{...base,function_name:"JSON.stringify(entries_json)"}),
+    employeeEntryValidationTraceStep("owner_decoder_compat",true,{...base,function_name:"parseEmployeeEntryAnchorJson"}),
+    employeeEntryValidationTraceStep("final_preflight",true,{...base,function_name:"validateEmployeeEntryUploadPayload"})
+  ];
+}
+__name(employeeEntryValidationSuccessTrace,"employeeEntryValidationSuccessTrace");
 function employeeEntryUploadHasValue(value){
   if(value===true||value===false)return true;
   if(typeof value==="number")return Number.isFinite(value);
@@ -2114,14 +2189,30 @@ async function validateEmployeeEntryUploadPayload(env,user,body,opts={}){
     export_text_preview:String(sessionExportText||"").slice(0,1000),
     anchor_types:sessionAnchorEntries.map(row=>row.event_type||entryAnchorEventType(entryAnchorType(row))),
     anchor_preview:anchorPreview,
-    normalized_entry:normalized
+    normalized_entry:normalized,
+    validation_trace:employeeEntryValidationSuccessTrace(type,eventIndex,normalized.event_type||entryAnchorEventType(type))
   };
 }
 __name(validateEmployeeEntryUploadPayload,"validateEmployeeEntryUploadPayload");
 async function handleEmployeeEntryValidate(request,env,user){
   let body;
   try{body=await request.json();}catch{return errorResponse("invalid_json",400,"INVALID_JSON",employeeEntryValidationFailure("payload","INVALID_JSON","Invalid JSON payload."));}
-  const result=await validateEmployeeEntryUploadPayload(env,user,body,{event_index:body?.event_index});
+  let result;
+  try{
+    result=await validateEmployeeEntryUploadPayload(env,user,body,{event_index:body?.event_index});
+  }catch(err){
+    const eventIndex=Number(body?.event_index||0)||0;
+    const eventType=entryAnchorEventType(cleanText(body?.entry?.type||body?.entry?.reason_code||"R",12).toUpperCase());
+    return json({success:false,...employeeEntryValidationFailure("validate_exception","VALIDATION_EXCEPTION","Upload validation threw an exception before cloud write.",{
+      event_index:eventIndex,
+      event_type:eventType,
+      message_en:"Upload validation threw an exception before cloud write.",
+      message_zh:"上传前校验发生异常，未写入云端。",
+      suggested_action_en:"Use the validation trace to identify the failing stage, then retry after the record is corrected.",
+      suggested_action_zh:"请根据校验链路定位失败阶段，修正记录后重试。",
+      anchor_preview:{exception_name:err?.name||"Error"}
+    })},422);
+  }
   if(!result.ok)return json({success:false,...result},422);
   return success(result);
 }

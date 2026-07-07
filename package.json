@@ -358,6 +358,7 @@
     "test:duplicate-rent-does-not-close-arrears": "node --test tests/rent-short-paid-duplicate-arrears.spec.mjs",
     "test:left-with-arrears-compact-form": "node --test tests/employee-checkout-left-with-arrears.spec.mjs",
     "test:employee-entry-upload-performance": "node --test tests/employee-entry-upload-performance.spec.mjs",
+    "test:employee-upload-validation-trace": "node --test tests/employee-upload-validation-trace.spec.mjs",
     "test:employee-session-contract": "node --test tests/employee-session-contract.spec.mjs",
     "test:owner-history-delete-performance": "node --test tests/owner-history-delete-performance.spec.mjs",
     "test:owner-history-read-employee-anchors": "node --test tests/owner-history-read-employee-anchors.spec.mjs",
