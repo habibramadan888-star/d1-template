@@ -894,6 +894,59 @@ label .label-en{
   font-size:11px;
   font-weight:680;
 }
+.event-template-mount{
+  border:1px solid rgba(16,185,129,.18);
+  border-radius:24px;
+  background:linear-gradient(135deg,rgba(248,253,250,.96),rgba(255,255,255,.86));
+  box-shadow:0 16px 40px rgba(20,32,51,.06);
+  padding:16px;
+  margin:18px 0;
+}
+.event-template-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:14px;
+}
+.event-template-head b{
+  display:block;
+  color:#142033;
+  font-size:18px;
+  font-weight:950;
+  line-height:1.15;
+}
+.event-template-head small{
+  display:block;
+  margin-top:4px;
+  color:#7b8797;
+  font-size:11px;
+  font-weight:680;
+}
+.event-template-badge{
+  flex:0 0 auto;
+  border:1px solid rgba(34,197,94,.24);
+  border-radius:999px;
+  background:#ecfdf5;
+  color:#047857;
+  padding:6px 10px;
+  font-size:12px;
+  font-weight:900;
+}
+.event-template-fields{
+  display:grid;
+  gap:14px;
+}
+.event-template-fields>.field,
+.event-template-fields>.grid,
+.event-template-fields>.grid3,
+.event-template-fields>.step,
+.event-template-fields>.open-arrears-core-alert{
+  margin:0;
+}
+.employee-template-legacy-shell{
+  display:none!important;
+}
 .open-arrears-core-alert{
   border:1px solid rgba(34,197,94,.28);
   border-radius:22px;
@@ -2859,6 +2912,8 @@ label .label-en{
             <button class="event-chip" data-type="TF"><span>Bed Transfer</span><small>换床</small></button>
           </div>
         </div>
+        <div id="employeeEventTemplateMount" class="event-template-mount" data-event-template-mount="true"></div>
+        <div id="employeeTemplateFieldParking" hidden></div>
         <div class="step">
           <div class="step-title"><span>2</span><div>Step 2 · Confirm Target<small>第二步：确定对象</small></div></div>
         <div class="grid">
@@ -3992,6 +4047,149 @@ function employeeApplyEventSpecificFieldLabels(type){
     employeeSetFieldLabel('remark','Remark','\u5907\u6ce8');
   }
 }
+function validateRentEntry(){return validate();}
+function validateArrearsPaymentEntry(){return validate();}
+function validateDepositInEntry(){return validate();}
+function validateDepositOutEntry(){return validate();}
+function validateCheckoutEntry(){return validate();}
+function validateExpenseEntry(){return validate();}
+function validateBedTransferEntry(){return validate();}
+function buildRentAnchor(){return applyEntryAnchors(entryPayload());}
+function buildArrearsPaymentAnchor(){return applyEntryAnchors(entryPayload());}
+function buildDepositInAnchor(){return applyEntryAnchors(entryPayload());}
+function buildDepositOutAnchor(){return applyEntryAnchors(entryPayload());}
+function buildCheckoutAnchor(){return applyEntryAnchors(entryPayload());}
+function buildExpenseAnchor(){return applyEntryAnchors(entryPayload());}
+function buildBedTransferAnchor(){return applyEntryAnchors(entryPayload());}
+function uploadValidationByEventType(entry){
+  const eventType=entryEventType(entry?.type||entry?.event_type);
+  return {event_type:eventType,validator:`validate_${eventType}`};
+}
+function employeeEntryTemplateKeyForType(type){
+  return {R:'rent',AP:'arrears_payment',D:'deposit_in',DR:'deposit_out',CO:'checkout',E:'expense',TF:'bed_transfer',TFF:'bed_transfer'}[normalizeEntryTypeValue(type)]||'rent';
+}
+const entryTemplates={
+  rent:{
+    code:'R',event_type:'rent',title:['Rent','\u6536\u79df'],
+    fields:['selectedEventWrap','genericBedFieldWrap','paymentStep','amount','listPrice','periodStep','arrearPlan','remark'],
+    required_fields:['bed','payment_method','paid_amount','rent_period_start','rent_period_end'],
+    system_read_fields:['expected_rent','open_arrears_alert','customer_card_info','deposit_info'],
+    forbidden_fields:['arrears_ref','linkedTaskId','depositOutFields','checkoutFields','transferFields','expenseFields'],
+    validator:validateRentEntry,anchorBuilder:buildRentAnchor,uploadValidation:uploadValidationByEventType,whatsappRenderer:renderEntryAnchorForWhatsapp,ownerDetailRenderer:renderEntryAnchorForOwner
+  },
+  arrears_payment:{
+    code:'AP',event_type:'arrears_payment',title:['Arrears Payment','\u8fd8\u6b20\u6b3e'],
+    fields:['selectedEventWrap','genericBedFieldWrap','apFields','paymentStep','amount','arrearsPaymentCorePanel','remark'],
+    required_fields:['bed','arrears_ref','payment_method','payment_amount'],
+    system_read_fields:['cloud_arrears_projection','original_arrears_amount','already_paid_amount','remaining_before_payment','remaining_after_payment','settlement_status'],
+    forbidden_fields:['listPrice','periodStep','periodStart','periodEnd','periodDue','due','paid','entryClr','checkoutFields','depositOutFields','transferFields','expenseFields'],
+    validator:validateArrearsPaymentEntry,anchorBuilder:buildArrearsPaymentAnchor,uploadValidation:uploadValidationByEventType,whatsappRenderer:renderEntryAnchorForWhatsapp,ownerDetailRenderer:renderEntryAnchorForOwner
+  },
+  deposit_in:{
+    code:'D',event_type:'deposit_in',title:['Deposit In','\u6536\u62bc\u91d1'],
+    fields:['selectedEventWrap','genericBedFieldWrap','paymentStep','amount','remark'],
+    required_fields:['bed','deposit_amount','payment_method'],
+    system_read_fields:['existing_deposit','customer_card_info'],
+    forbidden_fields:['periodStep','linkedTaskId','depositOutFields','checkoutFields','transferFields','expenseFields'],
+    validator:validateDepositInEntry,anchorBuilder:buildDepositInAnchor,uploadValidation:uploadValidationByEventType,whatsappRenderer:renderEntryAnchorForWhatsapp,ownerDetailRenderer:renderEntryAnchorForOwner
+  },
+  deposit_out:{
+    code:'DR',event_type:'deposit_out',title:['Deposit Out','\u9000\u62bc\u91d1'],
+    fields:['selectedEventWrap','genericBedFieldWrap','paymentStep','amount','depositOutFields','remark'],
+    required_fields:['bed','actual_refund_amount','refund_method','refund_date'],
+    system_read_fields:['deposit_balance','open_arrears_check'],
+    forbidden_fields:['listPrice','periodStep','periodStart','periodEnd','periodDue','due','paid','entryClr','checkoutFields','transferFields','expenseFields'],
+    validator:validateDepositOutEntry,anchorBuilder:buildDepositOutAnchor,uploadValidation:uploadValidationByEventType,whatsappRenderer:renderEntryAnchorForWhatsapp,ownerDetailRenderer:renderEntryAnchorForOwner
+  },
+  checkout:{
+    code:'CO',event_type:'checkout',title:['Checkout','\u9000\u623f'],
+    fields:['selectedEventWrap','genericBedFieldWrap','leftWithArrearsMode','checkoutDate','leftWithArrearsFields','remark'],
+    required_fields:['bed','checkout_type','checkout_date'],
+    system_read_fields:['former_customer_card_info','deposit_balance','open_arrears_check'],
+    forbidden_fields:['listPrice','periodStep','periodStart','periodEnd','periodDue','due','paid','entryClr','depositOutFields','paymentStep','amount','transferFields','expenseFields'],
+    validator:validateCheckoutEntry,anchorBuilder:buildCheckoutAnchor,uploadValidation:uploadValidationByEventType,whatsappRenderer:renderEntryAnchorForWhatsapp,ownerDetailRenderer:renderEntryAnchorForOwner
+  },
+  expense:{
+    code:'E',event_type:'expense',title:['Expense','\u652f\u51fa'],
+    fields:['selectedEventWrap','paymentStep','amount','expenseFields','remark'],
+    required_fields:['expense_amount','expense_category','payment_method','reason'],
+    system_read_fields:[],
+    forbidden_fields:['genericBedFieldWrap','periodStep','linkedTaskId','depositOutFields','checkoutFields','transferFields','listPrice'],
+    validator:validateExpenseEntry,anchorBuilder:buildExpenseAnchor,uploadValidation:uploadValidationByEventType,whatsappRenderer:renderEntryAnchorForWhatsapp,ownerDetailRenderer:renderEntryAnchorForOwner
+  },
+  bed_transfer:{
+    code:'TF',event_type:'bed_transfer',title:['Bed Transfer','\u6362\u5e8a'],
+    fields:['selectedEventWrap','transferFromBed','bedTo','transferDate','feePaid','transferReason','transferWaiverReasonWrap','remark'],
+    required_fields:['from_bed','to_bed','transfer_date','fee_option','transfer_reason'],
+    system_read_fields:['old_bed_customer_card_context','open_arrears_alert'],
+    forbidden_fields:['genericBedFieldWrap','periodStep','linkedTaskId','depositOutFields','checkoutFields','expenseFields','listPrice','arrearsPaymentCorePanel'],
+    validator:validateBedTransferEntry,anchorBuilder:buildBedTransferAnchor,uploadValidation:uploadValidationByEventType,whatsappRenderer:renderEntryAnchorForWhatsapp,ownerDetailRenderer:renderEntryAnchorForOwner
+  }
+};
+const employeeEntryTemplates=entryTemplates;
+const employeeEntryTemplateNodes=[
+  'selectedEventWrap','genericBedFieldWrap','paymentStep','amount','listPrice','periodStep','arrearPlan','apFields','arrearsPaymentCorePanel',
+  'depositOutFields','checkoutFields','leftWithArrearsMode','checkoutDate','leftWithArrearsFields',
+  'transferFields','transferFromBed','bedTo','transferDate','feePaid','transferReason','transferWaiverReasonWrap',
+  'expenseFields','remark'
+];
+function employeeTemplateNode(id){
+  const el=$(id);
+  if(!el)return null;
+  if(['paymentStep','periodStep','arrearPlan','apFields','depositOutFields','checkoutFields','leftWithArrearsFields','transferFields','expenseFields','arrearsPaymentCorePanel'].includes(id))return el;
+  return el.closest('.field')||el;
+}
+function employeeTemplateParking(){
+  return $('employeeTemplateFieldParking')||document.body.appendChild(Object.assign(document.createElement('div'),{id:'employeeTemplateFieldParking',hidden:true}));
+}
+function employeeTemplateMount(){return $('employeeEventTemplateMount');}
+function employeeTemplateMarkLegacyShells(){
+  const step2=typeof employeeFindEntryStep==='function'?employeeFindEntryStep(2):null;
+  const amountShell=fieldWrap('amount')?.closest('.step');
+  [step2,amountShell].filter(Boolean).forEach(shell=>{
+    if(shell.id==='employeeEventTemplateMount')return;
+    shell.dataset.employeeTemplateLegacyShell='true';
+    shell.classList.add('employee-template-legacy-shell');
+  });
+}
+function employeeMountEntryTemplate(type=$('entryType')?.value){
+  const key=employeeEntryTemplateKeyForType(type);
+  const template=employeeEntryTemplates[key]||employeeEntryTemplates.rent;
+  const mount=employeeTemplateMount();
+  const parking=employeeTemplateParking();
+  if(!mount||!parking)return null;
+  employeeTemplateMarkLegacyShells();
+  const uniqueNodes=new Set();
+  employeeEntryTemplateNodes.forEach(id=>{
+    const node=employeeTemplateNode(id);
+    if(node&&!uniqueNodes.has(node)){
+      uniqueNodes.add(node);
+      node.dataset.eventTemplateField=id;
+      parking.appendChild(node);
+    }
+  });
+  const head=document.createElement('div');
+  head.className='event-template-head';
+  head.innerHTML=`<div><b>${esc(template.title[0])}</b><small>${esc(template.title[1])}</small></div><span class="event-template-badge">${esc(template.event_type)}</span>`;
+  const body=document.createElement('div');
+  body.className='event-template-fields';
+  body.dataset.templateFields=key;
+  mount.replaceChildren(head,body);
+  mount.dataset.eventTemplate=key;
+  mount.dataset.eventType=template.event_type;
+  template.fields.forEach(id=>{
+    const node=employeeTemplateNode(id);
+    if(node){
+      node.dataset.activeEventTemplate=key;
+      body.appendChild(node);
+    }
+  });
+  employeeEntryTemplateNodes.forEach(id=>{
+    const node=employeeTemplateNode(id);
+    if(node&&node.parentElement===parking)node.removeAttribute('data-active-event-template');
+  });
+  return template;
+}
 function eventLabel(type){
   return {R:'收租',AP:'还欠款',D:'收押金',DR:'退押金',CO:'退房',E:'支出',TF:'换床',TFF:'换床费'}[type]||type;
 }
@@ -4386,7 +4584,7 @@ function syncForm(){
   updateEventChips();
   $('objectHint').textContent=type==='E'?'支出不需要床位时可以只选择类别；如果是指定房间维修，可在备注写床位。':(type==='TF'?'换床需要填写原床位和新床位，系统会保留换床前后锚点。':(type==='AP'?'还欠款只针对云端未清欠款，不使用本期账期。请输入床位后选择要偿还的欠款。':'收租/收押金/退押金：填写床位号，系统自动抓取租客上下文。'));
   if($('btnSaveEntry'))$('btnSaveEntry').innerHTML=type==='TF'?renderEmployeeButtonLabel('Record Transfer','保存换床记录'):renderEmployeeButtonLabel('Add to Session','加入本票');
-  visible(['periodStep'],hasPeriod);visible(['apFields'],type==='AP');visible(['checkoutFields'],type==='CO');visible(['transferFields'],type==='TF');visible(['expenseFields'],type==='E');visible(['paymentStep'],!['E','CO'].includes(type));visible(['genericBedFieldWrap'],type!=='TF');
+  visible(['periodStep'],hasPeriod);visible(['apFields'],type==='AP');visible(['checkoutFields'],type==='CO');visible(['transferFields'],type==='TF');visible(['expenseFields'],type==='E');visible(['paymentStep'],type!=='CO');visible(['genericBedFieldWrap'],type!=='TF');
   updatePaymentButtons();
   visible(['exceptionStep'],needsException());
   visible(['excessWrap'],type==='R'&&num($('amount').value)>num($('due').value));
@@ -4448,6 +4646,7 @@ function syncForm(){
   visible(['excessWrap'],type==='R'&&num($('amount').value)>num($('due').value));
   renderTaskInfo();
   employeeApplyArrearsPaymentLayout(type);
+  employeeMountEntryTemplate(type);
   renderContext();
   renderContextNotice();
   updateBedTransferReviewPanel();
@@ -7699,18 +7898,23 @@ function renderLeftWithArrearsFields(){
 }
 function employeeEnsureOpenArrearsMount(){
   let box=$('openArrearsCoreAlert');
+  const activeBedField=$('entryType')?.value==='TF'?fieldWrap('transferFromBed'):fieldWrap('bed');
+  if(box&&activeBedField&&activeBedField.parentElement?.closest?.('#employeeEventTemplateMount')){
+    if(box.previousElementSibling!==activeBedField)activeBedField.insertAdjacentElement('afterend',box);
+    return box;
+  }
   const step2=employeeFindEntryStep(2);
   if(box){
     if(step2&&box.previousElementSibling!==step2)step2.insertAdjacentElement('afterend',box);
     return box;
   }
-  const anchor=step2||$('bedTransferStep2Mount')?.parentElement||$('paymentStep');
+  const anchor=activeBedField||step2||$('bedTransferStep2Mount')?.parentElement||$('paymentStep');
   if(!anchor)return null;
   box=document.createElement('div');
   box.id='openArrearsCoreAlert';
   box.className='open-arrears-core-alert neutral';
   box.dataset.openArrearsAlert='true';
-  anchor.insertAdjacentElement(step2?'afterend':'beforebegin',box);
+  anchor.insertAdjacentElement('afterend',box);
   return box;
 }
 function employeeRenderOpenArrearsAlert(){
@@ -7797,9 +8001,11 @@ function employeePrioritizeEntryInputs(){
   const type=$('entryType')?.value||'';
   const exceptionVisible=$('exceptionStep')&&!$('exceptionStep').classList.contains('hidden');
   const apPanel=$('arrearsPaymentCorePanel');
-  const flowEnd=type==='AP'
+  const templateMount=employeeTemplateMount();
+  const legacyFlowEnd=type==='AP'
     ?(apPanel||fieldWrap('amount')||$('amount')?.closest('.step')||$('paymentStep'))
     :(exceptionVisible?($('remark')?.closest('.field')||$('exceptionStep')):(!$('periodStep')?.classList.contains('hidden')?$('periodStep'):($('amount')?.closest('.step')||$('paymentStep'))));
+  const flowEnd=templateMount||legacyFlowEnd;
   let mount=$('employeeRequiredActionMount');
   if(!mount){
     mount=document.createElement('div');

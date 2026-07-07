@@ -53,7 +53,8 @@ test("arrears payment keeps Add to Session controls visible after selected summa
 
   assert.match(html, /const type=\$\(\'entryType\'\)\?\.value\|\|''/);
   assert.match(html, /const apPanel=\$\(\'arrearsPaymentCorePanel\'\)/);
-  assert.match(html, /const flowEnd=type==='AP'/);
+  assert.match(html, /const legacyFlowEnd=type==='AP'/);
+  assert.match(html, /const flowEnd=templateMount\|\|legacyFlowEnd/);
   assert.match(html, /\?\(apPanel\|\|fieldWrap\('amount'\)/);
   assert.match(html, /if\(flowEnd&&mount\.previousElementSibling!==flowEnd\)flowEnd\.insertAdjacentElement\('afterend',mount\)/);
   assert.match(html, /mount\.appendChild\(validation\)/);
