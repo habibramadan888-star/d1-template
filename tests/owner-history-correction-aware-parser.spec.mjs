@@ -423,10 +423,14 @@ test("parser does not mutate source sessions or original events", () => {
   assert.equal(JSON.stringify(input), before);
 });
 
-test("owner history runtime behavior is not wired by H4A", async () => {
+test("owner history runtime wiring remains detail-only after H4B", async () => {
   const workerText = await readFile("deploy-worker/src/index.js", "utf8");
-  assert.doesNotMatch(workerText, /correction-aware-history-parser\.mjs/);
   assert.doesNotMatch(workerText, /buildCorrectionAwareOwnerHistoryView/);
+  assert.match(workerText, /buildAuditModeView/);
+  assert.match(workerText, /include_corrections/);
+  assert.match(workerText, /if \(path === "\/api\/session_detail" && method === "GET"\)/);
+  assert.doesNotMatch(workerText, /path === "\/api\/history"[\s\S]{0,1200}correction_summary/);
+  assert.doesNotMatch(workerText, /phase0OwnerOverviewComparativeSummary[\s\S]{0,1200}correction_summary/);
 });
 
 test("runtime production write and migration markers are absent from H4A module", async () => {

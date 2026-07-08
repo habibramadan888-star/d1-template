@@ -11,6 +11,7 @@ import {
   parseOwnerCorrectionAnchorText,
   validateOwnerCorrectionApplyRequest
 } from "../../modules/owner-corrections/correction-anchor-parser.mjs";
+import { buildAuditModeView } from "../../modules/owner-history/correction-aware-history-parser.mjs";
 import { createDashboardTotalsPayload } from "./handlers/dashboard-totals.js";
 import { ErrorCodes } from "../../dist/lib/constants/error-codes.js";
 import { fail, ok } from "../../dist/lib/lib/api-response.js";
@@ -6754,6 +6755,119 @@ async function ownerCorrectionFetchExistingCorrectionSessions(env,user,targetAnc
   return rows.results||[];
 }
 __name(ownerCorrectionFetchExistingCorrectionSessions,"ownerCorrectionFetchExistingCorrectionSessions");
+function ownerHistoryDetailZeroCorrectionTotals(){
+  return {
+    cash_delta:0,
+    bank_delta:0,
+    gross_delta:0,
+    rent_income_delta:0,
+    deposit_liability_delta:0,
+    arrears_repaid_delta:0,
+    arrears_open_delta:0,
+    expense_delta:0,
+    transfer_fee_delta:0
+  };
+}
+__name(ownerHistoryDetailZeroCorrectionTotals,"ownerHistoryDetailZeroCorrectionTotals");
+function ownerHistoryDetailNormalizeTotals(totals={}){
+  return {
+    cash:ownerCorrectionPreviewMoney(totals.cash),
+    bank:ownerCorrectionPreviewMoney(totals.bank),
+    gross:ownerCorrectionPreviewMoney(totals.gross),
+    rent_income:ownerCorrectionPreviewMoney(totals.rent_income),
+    deposit_liability:ownerCorrectionPreviewMoney(totals.deposit_liability),
+    arrears_repaid:ownerCorrectionPreviewMoney(totals.arrears_repaid),
+    arrears_open:ownerCorrectionPreviewMoney(totals.arrears_open),
+    expense:ownerCorrectionPreviewMoney(totals.expense),
+    transfer_fee:ownerCorrectionPreviewMoney(totals.transfer_fee)
+  };
+}
+__name(ownerHistoryDetailNormalizeTotals,"ownerHistoryDetailNormalizeTotals");
+function ownerHistoryDetailNormalizeCorrectionTotals(totals={}){
+  return {
+    cash_delta:ownerCorrectionPreviewMoney(totals.cash_delta),
+    bank_delta:ownerCorrectionPreviewMoney(totals.bank_delta),
+    gross_delta:ownerCorrectionPreviewMoney(totals.gross_delta),
+    rent_income_delta:ownerCorrectionPreviewMoney(totals.rent_income_delta),
+    deposit_liability_delta:ownerCorrectionPreviewMoney(totals.deposit_liability_delta),
+    arrears_repaid_delta:ownerCorrectionPreviewMoney(totals.arrears_repaid_delta),
+    arrears_open_delta:ownerCorrectionPreviewMoney(totals.arrears_open_delta),
+    expense_delta:ownerCorrectionPreviewMoney(totals.expense_delta),
+    transfer_fee_delta:ownerCorrectionPreviewMoney(totals.transfer_fee_delta)
+  };
+}
+__name(ownerHistoryDetailNormalizeCorrectionTotals,"ownerHistoryDetailNormalizeCorrectionTotals");
+function ownerHistoryDetailCorrectionSessionView(row={}){
+  return {
+    session_id:cleanText(row?.id||"",160),
+    anchor:cleanText(row?.anchor_id||"",180),
+    date:cleanText(row?.date||row?.created_at||"",40).slice(0,10),
+    employee:cleanText(row?.created_by||row?.operator_name||"owner",120),
+    source:cleanText(row?.source||"owner_correction",80),
+    export_text:String(row?.export_text||"")
+  };
+}
+__name(ownerHistoryDetailCorrectionSessionView,"ownerHistoryDetailCorrectionSessionView");
+function ownerHistoryDetailTargetSessionView(session={},rows=[]){
+  return {
+    session_id:cleanText(session?.id||"",160),
+    anchor:cleanText(session?.anchor_id||session?.anchorId||"",180),
+    date:cleanText(session?.date||session?.created_at||"",40).slice(0,10),
+    employee:cleanText(session?.operator_name||session?.created_by||session?.operator_id||"",120),
+    totals:ownerCorrectionPreviewSessionTotals(session,Array.isArray(rows)?rows:[]),
+    events:(Array.isArray(rows)?rows:[]).map((row,index)=>({
+      event_id:cleanText(row?.event_id||row?.id||`detail-row-${index+1}`,180),
+      id:cleanText(row?.id||row?.event_id||`detail-row-${index+1}`,180),
+      ...row
+    }))
+  };
+}
+__name(ownerHistoryDetailTargetSessionView,"ownerHistoryDetailTargetSessionView");
+function ownerHistoryDetailCorrectionFields(session={},rows=[],correctionRows=[]){
+  const target=ownerHistoryDetailTargetSessionView(session,rows);
+  let auditView={sessions:[],invalid_corrections:[],unresolved_corrections:[],correction_sessions:[]};
+  const warnings=[];
+  try{
+    auditView=buildAuditModeView([target,...(correctionRows||[]).map(ownerHistoryDetailCorrectionSessionView)]);
+  }catch(error){
+    warnings.push({code:"CORRECTION_AUDIT_BUILD_FAILED",message:"Correction-aware audit view failed closed.",safe_message:cleanText(error?.message||"audit build failed",240)});
+  }
+  const targetAudit=(auditView.sessions||[]).find(item=>item.anchor===target.anchor||item.session_id===target.session_id)||null;
+  const rawTotals=ownerHistoryDetailNormalizeTotals(targetAudit?.raw_totals||target.totals);
+  const correctionTotals=ownerHistoryDetailNormalizeCorrectionTotals(targetAudit?.correction_totals||ownerHistoryDetailZeroCorrectionTotals());
+  const adjustedTotals=ownerHistoryDetailNormalizeTotals(targetAudit?.adjusted_totals||rawTotals);
+  const invalidCorrections=[
+    ...(targetAudit?.invalid_corrections||[]),
+    ...(auditView.invalid_corrections||[]),
+    ...(auditView.unresolved_corrections||[])
+  ];
+  const correctionEvents=targetAudit?.correction_events||[];
+  const correctionSessions=targetAudit?.correction_sessions||[];
+  return {
+    correction_summary:{
+      correction_aware:true,
+      correction_applied:!!targetAudit?.correction_applied,
+      raw_totals:rawTotals,
+      correction_totals:correctionTotals,
+      adjusted_totals:adjustedTotals,
+      correction_events_count:correctionEvents.length,
+      invalid_corrections_count:invalidCorrections.length,
+      warnings:[...(targetAudit?.warnings||[]),...warnings]
+    },
+    correction_audit:{
+      raw_mode_available:true,
+      adjusted_mode_available:true,
+      audit_mode_available:true,
+      original_events_visible:true,
+      correction_events_visible:correctionEvents.length>0,
+      correction_sessions,
+      correction_events:correctionEvents,
+      invalid_corrections:invalidCorrections,
+      warnings:[...(targetAudit?.warnings||[]),...warnings]
+    }
+  };
+}
+__name(ownerHistoryDetailCorrectionFields,"ownerHistoryDetailCorrectionFields");
 async function handleOwnerCorrectionApply(request,env,user){
   if(!canWriteOwnerData(user))return forbidden();
   if(request.method!=="POST")return errorResponse("method_not_allowed",405,"METHOD_NOT_ALLOWED");
@@ -8831,6 +8945,7 @@ async function handleRequest(request, env, ctx) {
       const sid = cleanId(url.searchParams.get("id"));
       if (!sid) return badRequest("bad_request");
       const includeVoided = url.searchParams.get("include_voided") === "1";
+      const includeCorrections = ["1","true","yes","on"].includes(String(url.searchParams.get("include_corrections")||"").trim().toLowerCase());
       const sessionRow=await env.DB.prepare("SELECT * FROM sessions WHERE id=? AND corpid=? LIMIT 1").bind(sid,user.corpid).first();
       const hasTransactions=await empTableExists(env,"transactions");
       const results=hasTransactions?(await env.DB.prepare(
@@ -8842,7 +8957,57 @@ async function handleRequest(request, env, ctx) {
         const anchorRows=extractEmployeeEntryAnchorsFromSession(sessionRow);
         const exportRows=parseEmployeeEntryExportRows(sessionRow);
         const detailChoice=chooseOwnerEmployeeSessionDetailRows(sessionRow,results,anchorRows,exportRows);
-        if(detailChoice.rows.length)return success(detailChoice.rows);
+        if(detailChoice.rows.length){
+          if(includeCorrections){
+            const targetAnchor=cleanText(sessionRow.anchor_id||sessionRow.id||"",180);
+            const correctionRows=targetAnchor?await ownerCorrectionFetchExistingCorrectionSessions(env,user,targetAnchor).catch(()=>[]):[];
+            const correctionFields=ownerHistoryDetailCorrectionFields(sessionRow,detailChoice.rows,correctionRows);
+            return success({
+              rows:detailChoice.rows,
+              details:detailChoice.rows,
+              legacy_response_shape:"array_rows",
+              response_mode:"owner_history_detail_correction_aware_additive",
+              session:{
+                id:sessionRow.id||"",
+                anchor_id:sessionRow.anchor_id||"",
+                date:sessionRow.date||"",
+                entries_count:Number(sessionRow.entries_count||0),
+                operator_id:sessionRow.operator_id||"",
+                operator_name:sessionRow.operator_name||"",
+                source:sessionRow.source||"",
+                cash_handover:ownerCorrectionPreviewMoney(sessionRow.cash_handover),
+                bank_transfer_total:ownerCorrectionPreviewMoney(sessionRow.bank_transfer_total),
+                gross_received:ownerCorrectionPreviewMoney(sessionRow.gross_received)
+              },
+              ...correctionFields
+            });
+          }
+          return success(detailChoice.rows);
+        }
+      }
+      if(includeCorrections&&sessionRow){
+        const targetAnchor=cleanText(sessionRow.anchor_id||sessionRow.id||"",180);
+        const correctionRows=targetAnchor?await ownerCorrectionFetchExistingCorrectionSessions(env,user,targetAnchor).catch(()=>[]):[];
+        const correctionFields=ownerHistoryDetailCorrectionFields(sessionRow,results,correctionRows);
+        return success({
+          rows:results,
+          details:results,
+          legacy_response_shape:"array_rows",
+          response_mode:"owner_history_detail_correction_aware_additive",
+          session:{
+            id:sessionRow.id||"",
+            anchor_id:sessionRow.anchor_id||"",
+            date:sessionRow.date||"",
+            entries_count:Number(sessionRow.entries_count||0),
+            operator_id:sessionRow.operator_id||"",
+            operator_name:sessionRow.operator_name||"",
+            source:sessionRow.source||"",
+            cash_handover:ownerCorrectionPreviewMoney(sessionRow.cash_handover),
+            bank_transfer_total:ownerCorrectionPreviewMoney(sessionRow.bank_transfer_total),
+            gross_received:ownerCorrectionPreviewMoney(sessionRow.gross_received)
+          },
+          ...correctionFields
+        });
       }
       return success(results);
     }
