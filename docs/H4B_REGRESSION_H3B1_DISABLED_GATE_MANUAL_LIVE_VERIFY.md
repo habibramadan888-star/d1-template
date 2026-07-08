@@ -106,6 +106,15 @@ This script verifies the H4B opt-in detail endpoint regression fix and confirms 
     adjusted_cash: summary.adjusted_totals?.cash,
     correction_events_count: summary.correction_events_count,
     invalid_corrections_count: summary.invalid_corrections_count,
+    correction_sessions_count: Array.isArray(audit.correction_sessions) ? audit.correction_sessions.length : null,
+    correction_session_ids: Array.isArray(audit.correction_sessions) ? audit.correction_sessions.map((session) => session.session_id) : [],
+    correction_anchor_ids: Array.isArray(audit.correction_sessions) ? audit.correction_sessions.map((session) => session.anchor) : [],
+    correction_events_length: Array.isArray(audit.correction_events) ? audit.correction_events.length : null,
+    no_second_correction_anchor_visible:
+      Array.isArray(audit.correction_sessions) &&
+      audit.correction_sessions.length === 1 &&
+      audit.correction_sessions[0]?.session_id === "CORR-S20260708-0bhe6yg" &&
+      audit.correction_sessions[0]?.anchor === "CORR-20260708-owner-1sucnhp",
     audit_modes_available:
       audit.raw_mode_available === true &&
       audit.adjusted_mode_available === true &&
@@ -141,5 +150,7 @@ Expected:
 - raw gross/cash/rent_income/arrears_repaid remain `1550 / 1550 / 1470 / 80`.
 - correction gross/cash deltas are `-1470 / -1470`.
 - adjusted gross/cash are `80 / 80`.
+- `correction_sessions_count = 1` and the only visible correction session is `CORR-S20260708-0bhe6yg / CORR-20260708-owner-1sucnhp`.
+- `correction_events_length = 2`.
 - apply remains disabled/no-write with `OWNER_CORRECTION_APPLY_DISABLED`.
 - x6wio original rows remain unmutated; the additive correction anchor is read by opt-in detail only.

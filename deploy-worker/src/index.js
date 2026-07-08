@@ -12,7 +12,6 @@ import {
   validateOwnerCorrectionApplyRequest,
   validateOwnerCorrectionTargetScopedApplyAuthorization
 } from "../../modules/owner-corrections/correction-anchor-parser.mjs";
-import { buildAuditModeView } from "../../modules/owner-history/correction-aware-history-parser.mjs";
 import { createDashboardTotalsPayload } from "./handlers/dashboard-totals.js";
 import { ErrorCodes } from "../../dist/lib/constants/error-codes.js";
 import { fail, ok } from "../../dist/lib/lib/api-response.js";
@@ -7175,55 +7174,12 @@ function ownerHistoryDetailCorrectionFields(session={},rows=[],correctionRows=[]
   if(!Array.isArray(correctionRows)||correctionRows.length===0){
     return ownerHistoryDetailNoCorrectionFields(session,rows);
   }
-  let target;
-  let auditView={sessions:[],invalid_corrections:[],unresolved_corrections:[],correction_sessions:[]};
-  const warnings=[];
   try{
-    target=ownerHistoryDetailTargetSessionView(session,rows);
-    auditView=buildAuditModeView([target,...(correctionRows||[]).map(ownerHistoryDetailCorrectionSessionView)]);
+    return ownerHistoryDetailDirectCorrectionFields(session,rows,correctionRows);
   }catch(error){
-    try{
-      return ownerHistoryDetailDirectCorrectionFields(session,rows,correctionRows);
-    }catch(fallbackError){
-      warnings.push({code:"CORRECTION_AUDIT_BUILD_FAILED",message:"Correction-aware audit view failed closed.",safe_message:cleanText(error?.message||"audit build failed",240)});
-      warnings.push({code:"CORRECTION_DIRECT_READER_FAILED",message:"Correction direct reader failed closed.",safe_message:cleanText(fallbackError?.name||fallbackError?.code||"direct reader failed",120)});
-      return ownerHistoryDetailFailClosedCorrectionFields(session,rows,warnings);
-    }
+    const warnings=[{code:"CORRECTION_DIRECT_READER_FAILED",message:"Correction direct reader failed closed. Legacy detail rows were returned unchanged.",safe_message:cleanText(error?.name||error?.code||"direct reader failed",120)}];
+    return ownerHistoryDetailFailClosedCorrectionFields(session,rows,warnings);
   }
-  const targetAudit=(auditView.sessions||[]).find(item=>item.anchor===target.anchor||item.session_id===target.session_id)||null;
-  const rawTotals=ownerHistoryDetailNormalizeTotals(targetAudit?.raw_totals||target.totals);
-  const correctionTotals=ownerHistoryDetailNormalizeCorrectionTotals(targetAudit?.correction_totals||ownerHistoryDetailZeroCorrectionTotals());
-  const adjustedTotals=ownerHistoryDetailNormalizeTotals(targetAudit?.adjusted_totals||rawTotals);
-  const invalidCorrections=[
-    ...(targetAudit?.invalid_corrections||[]),
-    ...(auditView.invalid_corrections||[]),
-    ...(auditView.unresolved_corrections||[])
-  ];
-  const correctionEvents=targetAudit?.correction_events||[];
-  const correctionSessions=targetAudit?.correction_sessions||[];
-  return {
-    correction_summary:{
-      correction_aware:true,
-      correction_applied:!!targetAudit?.correction_applied,
-      raw_totals:rawTotals,
-      correction_totals:correctionTotals,
-      adjusted_totals:adjustedTotals,
-      correction_events_count:correctionEvents.length,
-      invalid_corrections_count:invalidCorrections.length,
-      warnings:[...(targetAudit?.warnings||[]),...warnings]
-    },
-    correction_audit:{
-      raw_mode_available:true,
-      adjusted_mode_available:true,
-      audit_mode_available:true,
-      original_events_visible:true,
-      correction_events_visible:correctionEvents.length>0,
-      correction_sessions,
-      correction_events:correctionEvents,
-      invalid_corrections:invalidCorrections,
-      warnings:[...(targetAudit?.warnings||[]),...warnings]
-    }
-  };
 }
 __name(ownerHistoryDetailCorrectionFields,"ownerHistoryDetailCorrectionFields");
 async function handleOwnerCorrectionApply(request,env,user){

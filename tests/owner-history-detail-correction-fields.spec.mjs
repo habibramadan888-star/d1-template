@@ -172,7 +172,9 @@ test("detail correction fields fail closed instead of returning HTTP 500", async
   assert.match(block, /catch\(error\)/);
   assert.match(block, /return ownerHistoryDetailDirectCorrectionFields\(session,rows,correctionRows\)/);
   assert.match(block, /return ownerHistoryDetailFailClosedCorrectionFields\(session,rows,warnings\)/);
-  assert.match(text, /CORRECTION_AUDIT_BUILD_FAILED/);
+  assert.doesNotMatch(block, /buildAuditModeView/);
+  assert.doesNotMatch(text, /import \{ buildAuditModeView \}/);
+  assert.doesNotMatch(text, /CORRECTION_AUDIT_BUILD_FAILED/);
   assert.match(text, /CORRECTION_DIRECT_READER_FAILED/);
 });
 
@@ -228,7 +230,7 @@ test("detail no-correction normal path bypasses audit builder and returns empty 
   assert.match(text, /correction_events_count:0/);
   assert.match(text, /invalid_corrections_count:0/);
   assert.match(text, /warnings:\[\]/);
-  assert.ok(block.indexOf("return ownerHistoryDetailNoCorrectionFields(session,rows)") < block.indexOf("buildAuditModeView"));
+  assert.doesNotMatch(block, /buildAuditModeView/);
 });
 
 test("detail no-correction normal path does not report fail-closed warning", async () => {
