@@ -38,6 +38,46 @@ test("cloud history rows carry export_text and avoid detail-row fallback when ra
   assert.match(source, /!ledgerSessionRawText\(s\)/);
 });
 
+test("owner detail main text uses stored employee export text instead of regenerated rows", async () => {
+  const { normalizeLedgerSession, ownerHistoryDetailMainText, employeeExportDisplayText } = await loadLedgerHarness();
+  const employeeText = [
+    "Statement",
+    "Date 0707",
+    "Employee Abdul",
+    "",
+    "💼 ▬▬▬▬▬▬▬▬▬▬▬ 💼",
+    "Core Summary",
+    "Cash Received 700",
+    "Bank Received 0",
+    "Gross Received 700",
+    "",
+    "💵 ▬▬▬▬▬▬▬▬▬▬▬ 💵",
+    "Cash Details",
+    "[334] paid 700 cash short 80 promise 0710 note 111",
+    "",
+    "End",
+    "Total 700"
+  ].join("\n");
+  const storedText = `${employeeText}\n\n==== ENTRY ANCHORS JSON ====\n{"entries":[{"event_type":"rent","bed":"334"}]}\n==== END ENTRY ANCHORS JSON ====`;
+
+  const normalized = normalizeLedgerSession({
+    id: "S20260707-test",
+    date: "2026-07-07",
+    anchorId: "EMPV3-20260707-abdul-test",
+    source: "employee_entry",
+    export_text: storedText,
+    entries: [{ cat: "cash", room: "334", amount: 700, type: "R" }],
+    entriesCount: 1,
+    _cloud: true
+  });
+  const detail = ownerHistoryDetailMainText(normalized);
+
+  assert.equal(employeeExportDisplayText(normalized), employeeText);
+  assert.equal(detail.source, "export_text");
+  assert.equal(detail.txt, employeeText);
+  assert.doesNotMatch(detail.txt, /ENTRY ANCHORS JSON|##ANCHOR|#334|\sO\s/);
+});
+
 test("cloud session archive persists export_text for future fixed-parser reloads", async () => {
   const worker = await readFile("deploy-worker/src/index.js", "utf8");
 

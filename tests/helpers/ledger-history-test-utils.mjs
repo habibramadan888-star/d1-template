@@ -62,6 +62,8 @@ export async function loadLedgerHarness() {
     globalThis.totals = totals;
     globalThis.normalizeLedgerSession = normalizeLedgerSession;
     globalThis.normalizeLedgerSessions = normalizeLedgerSessions;
+    globalThis.employeeExportDisplayText = employeeExportDisplayText;
+    globalThis.ownerHistoryDetailMainText = ownerHistoryDetailMainText;
     `,
     sandbox
   );

@@ -124,6 +124,88 @@ test("employee export detail decoder returns the four expected owner detail rows
   );
 });
 
+test("owner parser reads WhatsApp-friendly employee statement without changing display text", async () => {
+  const worker = await readFile("deploy-worker/src/index.js", "utf8");
+  const start = worker.indexOf("const entryAnchorContract");
+  const end = worker.indexOf("function empCloseStatusIsOpen", start);
+  assert.ok(start > 0 && end > start);
+  const sandbox = {};
+  vm.createContext(sandbox);
+  vm.runInContext(
+    `
+    function __name(fn){ return fn; }
+    function cleanText(value,max=10000){ return String(value ?? '').slice(0,max); }
+    ${worker.slice(start, end)}
+    globalThis.parseEmployeeEntryExportRows = parseEmployeeEntryExportRows;
+    `,
+    sandbox
+  );
+
+  const statement = [
+    "Statement",
+    "Date 0707",
+    "Employee Abdul",
+    "",
+    "💼 ▬▬▬▬▬▬▬▬▬▬▬ 💼",
+    "Core Summary",
+    "Cash Received 850",
+    "Bank Received 700",
+    "Gross Received 1550",
+    "",
+    "💵 ▬▬▬▬▬▬▬▬▬▬▬ 💵",
+    "Cash Details",
+    "[334] paid 700 cash short 80 promise 0710 note 111",
+    "[736] deposit 100 cash note new",
+    "",
+    "🏦 ▬▬▬▬▬▬▬▬▬▬▬ 🏦",
+    "Bank Details",
+    "[841] paid 700 bank",
+    "",
+    "🧾 ▬▬▬▬▬▬▬▬▬▬▬ 🧾",
+    "Arrears Details",
+    "[334] arrears paid 80 cash old balance",
+    "",
+    "🔄 ▬▬▬▬▬▬▬▬▬▬▬ 🔄",
+    "Transfer Details",
+    "[112]",
+    "[111]",
+    "transfer 50 cash management adjustment",
+    "",
+    "📤 ▬▬▬▬▬▬▬▬▬▬▬ 📤",
+    "Expense Details",
+    "[751] expense 200 cash maintenance"
+  ].join("\n");
+
+  const rows = sandbox.parseEmployeeEntryExportRows({
+    id: "S20260707-whatsapp",
+    corpid: "homelink",
+    anchor_id: "EMPV3-20260707-abdul-whatsapp",
+    operator_id: "abdul",
+    operator_name: "Abdul",
+    source: "employee_entry",
+    export_text: statement
+  });
+
+  assert.equal(rows.length, 6);
+  assert.equal(
+    JSON.stringify(rows.map((row) => row.event_type)),
+    JSON.stringify([
+      "rent",
+      "deposit_in",
+      "rent",
+      "arrears_payment",
+      "bed_transfer",
+      "expense"
+    ])
+  );
+  assert.equal(rows[0].room, "334");
+  assert.equal(rows[0].amount, 700);
+  assert.equal(rows[0].deficit, 80);
+  assert.equal(rows[0].arrear_promise_date, "0710");
+  assert.equal(rows[4].room, "112");
+  assert.equal(rows[4].room_to, "111");
+});
+
 test("owner session detail chooses complete transaction rows over partial export parser", async () => {
   const worker = await readFile("deploy-worker/src/index.js", "utf8");
   const start = worker.indexOf("const entryAnchorContract");

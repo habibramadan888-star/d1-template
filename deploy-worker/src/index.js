@@ -3068,6 +3068,7 @@ function parseEmployeeEntryExportRows(session){
   const rows=[];
   const seen=new Set();
   let section="";
+  const transferBeds=[];
   const add=row=>{
     const key=[row.type,row.room,row.room_to||"",row.amount,row.linked_task_id||""].join("|");
     if(seen.has(key))return;
@@ -3094,7 +3095,116 @@ function parseEmployeeEntryExportRows(session){
     const line=raw.trim();
     if(!line)continue;
     const sec=line.match(/^====\s+(.+?)\s+====$/);
-    if(sec){section=sec[1].toUpperCase();continue;}
+    if(sec){section=sec[1].toUpperCase();transferBeds.length=0;continue;}
+    if(/^(CASH|BANK|ARREARS|DEPOSIT|TRANSFER|EXPENSE)\s+DETAILS$/i.test(line)){
+      section=line.toUpperCase();
+      transferBeds.length=0;
+      continue;
+    }
+    if(line.startsWith("[")){
+      const paid=line.match(/^\[(\S+?)\]\s+paid\s+([\d,]+(?:\.\d+)?)\s+(cash|bank)\b(.*)$/i);
+      if(paid){
+        const amount=parseEmployeeExportAmount(paid[2]);
+        const method=paid[3].toLowerCase()==="bank"?"B":"C";
+        const rest=paid[4]||"";
+        const short=rest.match(/\bshort\s+([\d,]+(?:\.\d+)?)/i);
+        const shortAmount=short?parseEmployeeExportAmount(short[1]):0;
+        const promise=(rest.match(/\b(?:due|promise)\s+(\S+)/i)||[])[1]||"";
+        const note=(rest.match(/\bnote\s+(.+)$/i)||[])[1]||"";
+        add({
+          type:"R",
+          reason_code:shortAmount>0?"SHORT_PAID":"R",
+          room:cleanText(paid[1],40),
+          amount,
+          due:entryAnchorMoney(amount+shortAmount),
+          paid:amount,
+          period_due:entryAnchorMoney(amount+shortAmount),
+          deficit:shortAmount,
+          pay_type:method,
+          arrear_promise_date:cleanText(promise,40),
+          arrear_reason_detail:cleanText(note,500),
+          note:cleanText(note||line,500)
+        });
+        continue;
+      }
+      const arrears=line.match(/^\[(\S+?)\]\s+arrears\s+paid\s+([\d,]+(?:\.\d+)?)\s+(cash|bank)\b(.*)$/i);
+      if(arrears){
+        const amount=parseEmployeeExportAmount(arrears[2]);
+        add({
+          type:"AP",
+          reason_code:"AP",
+          room:cleanText(arrears[1],40),
+          amount,
+          due:amount,
+          paid:amount,
+          period_due:amount,
+          pay_type:arrears[3].toLowerCase()==="bank"?"B":"C",
+          note:cleanText(arrears[4]||line,500)
+        });
+        continue;
+      }
+      const deposit=line.match(/^\[(\S+?)\]\s+deposit\s+([\d,]+(?:\.\d+)?)\s+(cash|bank)\b(.*)$/i);
+      if(deposit){
+        const amount=parseEmployeeExportAmount(deposit[2]);
+        add({
+          type:"D",
+          reason_code:"D",
+          room:cleanText(deposit[1],40),
+          amount,
+          due:amount,
+          paid:amount,
+          period_due:amount,
+          pay_type:deposit[3].toLowerCase()==="bank"?"B":"C",
+          note:cleanText(deposit[4]||line,500)
+        });
+        continue;
+      }
+      const expense=line.match(/^\[(\S+?)\]\s+expense\s+([\d,]+(?:\.\d+)?)\s+(cash|bank)\b(.*)$/i);
+      if(expense){
+        const amount=parseEmployeeExportAmount(expense[2]);
+        add({
+          type:"E",
+          reason_code:"E",
+          cat:"expense",
+          room:cleanText(expense[1],40),
+          amount,
+          due:amount,
+          paid:amount,
+          period_due:amount,
+          pay_type:expense[3].toLowerCase()==="bank"?"B":"C",
+          note:cleanText(expense[4]||line,500)
+        });
+        continue;
+      }
+      const bedOnly=line.match(/^\[(\S+?)\]$/);
+      if(bedOnly&&section==="TRANSFER DETAILS"){
+        transferBeds.push(cleanText(bedOnly[1],40));
+        continue;
+      }
+    }
+    if(section==="TRANSFER DETAILS"&&transferBeds.length>=2&&/^transfer\s+/i.test(line)){
+      const m=line.match(/^transfer\s+(waived|[\d,]+(?:\.\d+)?)\s*(cash|bank)?\b(.*)$/i);
+      if(m){
+        const waived=m[1].toLowerCase()==="waived";
+        const amount=waived?0:parseEmployeeExportAmount(m[1]);
+        add({
+          type:"TF",
+          reason_code:"TF",
+          room:transferBeds[0],
+          room_to:transferBeds[1],
+          bed_from:transferBeds[0],
+          bed_to:transferBeds[1],
+          amount,
+          due:amount,
+          paid:amount,
+          period_due:amount,
+          pay_type:(m[2]||"cash").toLowerCase()==="bank"?"B":"C",
+          note:cleanText(m[3]||line,500)
+        });
+        transferBeds.length=0;
+        continue;
+      }
+    }
     if(!line.startsWith("#"))continue;
     if(section==="CASH RECEIVED"&&/\sTF\s/i.test(line)){
       const m=line.match(/^#(\S+)\s*(?:->|→)\s*#?(\S+).*?\sTF\s+FEE\s*([\d,]+(?:\.\d+)?)/i);

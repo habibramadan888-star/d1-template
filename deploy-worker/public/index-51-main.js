@@ -723,6 +723,19 @@ function ledgerSessionRawText(s){
   return String(s?.export_text||s?.exportText||s?.raw_text||s?.rawText||s?.txt||'');
 }
 
+function employeeExportDisplayText(s){
+  return ledgerSessionRawText(s)
+    .replace(/\r\n/g,'\n')
+    .replace(/\n*==== ENTRY ANCHORS JSON ====\s*[\s\S]*$/i,'')
+    .trim();
+}
+
+function ownerHistoryDetailMainText(session){
+  const raw=employeeExportDisplayText(session);
+  if(raw)return {txt:raw,source:'export_text'};
+  return genTXT(session);
+}
+
 function isEmployeeLedgerSession(s){
   const source=String(s?.source||s?.src||'').toLowerCase();
   const anchor=String(s?.anchorId||s?.anchor_id||'').toUpperCase();
@@ -2759,7 +2772,7 @@ async function renderHistory(){
         state.historyViewing=s;
       }catch(e){console.warn('session_detail failed:',e);wrap.innerHTML=`<div class="card" style="padding:24px;text-align:center;color:var(--red)">历史详情加载失败：${esc(e.message||'网络错误')}</div>`;return;}
     }
-    const{txt}=genTXT(s);
+    const{txt}=ownerHistoryDetailMainText(s);
     const cnt=s.entries?s.entries.length:0;
     const countWarning=historyDetailMismatchHtml(s,cnt);
     const deletedMeta=s._voided?`<div class="card-sub" style="margin-top:8px;color:var(--red);line-height:1.6">已删除/已作废记录 · 删除人：${esc(s.voidedBy||s.voided_by||'未知')} · 时间：${esc(s.voidedAt||s.voided_at||'未知')}</div>`:'';
