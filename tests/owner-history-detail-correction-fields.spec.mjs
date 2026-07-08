@@ -212,6 +212,33 @@ test("no correction sessions produce zero correction and adjusted equals raw", (
   assert.equal(session.correction_events.length, 0);
 });
 
+test("detail no-correction normal path bypasses audit builder and returns empty warnings", async () => {
+  const text = await worker();
+  const start = text.indexOf("function ownerHistoryDetailCorrectionFields");
+  const end = text.indexOf("__name(ownerHistoryDetailCorrectionFields", start);
+  const block = text.slice(start, end);
+
+  assert.match(text, /function ownerHistoryDetailNoCorrectionFields/);
+  assert.match(block, /if\(!Array\.isArray\(correctionRows\)\|\|correctionRows\.length===0\)\{/);
+  assert.match(block, /return ownerHistoryDetailNoCorrectionFields\(session,rows\)/);
+  assert.match(text, /correction_applied:false/);
+  assert.match(text, /correction_events_count:0/);
+  assert.match(text, /invalid_corrections_count:0/);
+  assert.match(text, /warnings:\[\]/);
+  assert.ok(block.indexOf("return ownerHistoryDetailNoCorrectionFields(session,rows)") < block.indexOf("buildAuditModeView"));
+});
+
+test("detail no-correction normal path does not report fail-closed warning", async () => {
+  const text = await worker();
+  const start = text.indexOf("function ownerHistoryDetailNoCorrectionFields");
+  const end = text.indexOf("__name(ownerHistoryDetailNoCorrectionFields", start);
+  const block = text.slice(start, end);
+
+  assert.doesNotMatch(block, /CORRECTION_AWARE_DETAIL_FAILED_CLOSED/);
+  assert.doesNotMatch(block, /CORRECTION_AUDIT_BUILD_FAILED/);
+  assert.match(block, /warnings:\[\]/);
+});
+
 test("embedded worker is the deployed entrypoint and supports opt-in correction fields", async () => {
   const wrangler = await readFile("deploy-worker/wrangler.embedded.toml", "utf8");
   const embedded = await embeddedWorker();
@@ -220,6 +247,7 @@ test("embedded worker is the deployed entrypoint and supports opt-in correction 
   assert.match(embedded, /if \(path === "\/api\/session_detail" && method === "GET"\)/);
   assert.match(embedded, /const includeCorrections =/);
   assert.match(embedded, /ownerHistoryDetailCorrectionFields/);
+  assert.match(embedded, /ownerHistoryDetailNoCorrectionFields/);
   assert.match(embedded, /return ownerHistoryDetailAdditiveResponse\(env,user,sessionRow,detailChoice\.rows\)/);
   assert.match(embedded, /return ownerHistoryDetailAdditiveResponse\(env,user,sessionRow,results\)/);
   assert.match(embedded, /return success\(results\);/);

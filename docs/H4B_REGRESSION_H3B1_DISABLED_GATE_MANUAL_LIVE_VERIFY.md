@@ -59,6 +59,8 @@ This script verifies the H4B opt-in detail endpoint regression fix and confirms 
 
   const summary = optIn.json.correction_summary || {};
   const audit = optIn.json.correction_audit || {};
+  const summaryWarnings = Array.isArray(summary.warnings) ? summary.warnings : null;
+  const auditWarnings = Array.isArray(audit.warnings) ? audit.warnings : null;
   const noWriteProof = apply.json.no_write_proof || {};
   const result = {
     status_label:
@@ -67,6 +69,16 @@ This script verifies the H4B opt-in detail endpoint regression fix and confirms 
       !!optIn.json.correction_summary &&
       !!optIn.json.correction_audit &&
       summary.correction_applied === false &&
+      summaryWarnings?.length === 0 &&
+      auditWarnings?.length === 0 &&
+      summary.raw_totals?.gross === 1550 &&
+      summary.raw_totals?.cash === 1550 &&
+      summary.raw_totals?.rent_income === 1470 &&
+      summary.raw_totals?.arrears_repaid === 80 &&
+      summary.correction_totals?.gross_delta === 0 &&
+      summary.correction_totals?.cash_delta === 0 &&
+      summary.adjusted_totals?.gross === 1550 &&
+      summary.adjusted_totals?.cash === 1550 &&
       apply.json.no_write === true
         ? "LIVE_VERIFIED"
         : "NOT_LIVE_VERIFIED",
@@ -79,6 +91,9 @@ This script verifies the H4B opt-in detail endpoint regression fix and confirms 
     opt_in_shape_ok: optIn.json.code === 0 && Array.isArray(optIn.json.data),
     correction_summary_exists: !!optIn.json.correction_summary,
     correction_audit_exists: !!optIn.json.correction_audit,
+    correction_summary_warnings: summaryWarnings,
+    correction_audit_warnings: auditWarnings,
+    warnings_empty: summaryWarnings?.length === 0 && auditWarnings?.length === 0,
     correction_aware: summary.correction_aware === true,
     correction_applied: summary.correction_applied === false,
     raw_gross: summary.raw_totals?.gross,
@@ -121,6 +136,10 @@ Expected:
 - legacy detail returns HTTP 200 with `{ code, message, data }` only.
 - opt-in detail returns HTTP 200 with top-level `correction_summary` and `correction_audit`.
 - `correction_applied = false`.
+- `correction_summary.warnings = []`.
+- `correction_audit.warnings = []`.
+- raw gross/cash/rent_income/arrears_repaid remain `1550 / 1550 / 1470 / 80`.
+- correction gross/cash deltas remain `0 / 0`.
 - adjusted gross remains `1550`.
 - apply remains disabled/no-write with `OWNER_CORRECTION_APPLY_DISABLED`.
 - x6wio remains uncorrected.

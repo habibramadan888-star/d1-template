@@ -6900,6 +6900,33 @@ function ownerHistoryDetailFailClosedCorrectionFields(session={},rows=[],warning
   };
 }
 __name(ownerHistoryDetailFailClosedCorrectionFields,"ownerHistoryDetailFailClosedCorrectionFields");
+function ownerHistoryDetailNoCorrectionFields(session={},rows=[]){
+  const rawTotals=ownerHistoryDetailSafeRawTotals(session,rows);
+  return {
+    correction_summary:{
+      correction_aware:true,
+      correction_applied:false,
+      raw_totals:rawTotals,
+      correction_totals:ownerHistoryDetailZeroCorrectionTotals(),
+      adjusted_totals:rawTotals,
+      correction_events_count:0,
+      invalid_corrections_count:0,
+      warnings:[]
+    },
+    correction_audit:{
+      raw_mode_available:true,
+      adjusted_mode_available:true,
+      audit_mode_available:true,
+      original_events_visible:true,
+      correction_events_visible:false,
+      correction_sessions:[],
+      correction_events:[],
+      invalid_corrections:[],
+      warnings:[]
+    }
+  };
+}
+__name(ownerHistoryDetailNoCorrectionFields,"ownerHistoryDetailNoCorrectionFields");
 function ownerHistoryDetailJsonSafeValue(value, seen=new WeakSet()){
   if(typeof value==="bigint")return value.toString();
   if(value instanceof Date)return value.toISOString();
@@ -6978,6 +7005,9 @@ function ownerHistoryDetailTargetSessionView(session={},rows=[]){
 }
 __name(ownerHistoryDetailTargetSessionView,"ownerHistoryDetailTargetSessionView");
 function ownerHistoryDetailCorrectionFields(session={},rows=[],correctionRows=[]){
+  if(!Array.isArray(correctionRows)||correctionRows.length===0){
+    return ownerHistoryDetailNoCorrectionFields(session,rows);
+  }
   let target;
   let auditView={sessions:[],invalid_corrections:[],unresolved_corrections:[],correction_sessions:[]};
   const warnings=[];
