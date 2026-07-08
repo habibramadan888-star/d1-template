@@ -4607,6 +4607,113 @@ async function handleAppEntryRoute(request, env, path, method) {
 }
 __name(handleAppEntryRoute, "handleAppEntryRoute");
 
+function embeddedCorrectionMoney(value) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return 0;
+  return Math.round(num * 100) / 100;
+}
+__name(embeddedCorrectionMoney, "embeddedCorrectionMoney");
+function embeddedCorrectionZeroTotals() {
+  return {
+    cash: 0,
+    bank: 0,
+    gross: 0,
+    rent_income: 0,
+    deposit_liability: 0,
+    arrears_repaid: 0,
+    arrears_open: 0,
+    expense: 0,
+    transfer_fee: 0
+  };
+}
+__name(embeddedCorrectionZeroTotals, "embeddedCorrectionZeroTotals");
+function embeddedCorrectionZeroDeltaTotals() {
+  return {
+    cash_delta: 0,
+    bank_delta: 0,
+    gross_delta: 0,
+    rent_income_delta: 0,
+    deposit_liability_delta: 0,
+    arrears_repaid_delta: 0,
+    arrears_open_delta: 0,
+    expense_delta: 0,
+    transfer_fee_delta: 0
+  };
+}
+__name(embeddedCorrectionZeroDeltaTotals, "embeddedCorrectionZeroDeltaTotals");
+function embeddedCorrectionAmountFromRow(row = {}) {
+  return embeddedCorrectionMoney(row.amount ?? row.paid_amount ?? row.payment_amount ?? row.paid ?? row.deposit_amount ?? row.refund_amount ?? row.expense_amount ?? row.fee_amount ?? 0);
+}
+__name(embeddedCorrectionAmountFromRow, "embeddedCorrectionAmountFromRow");
+function embeddedCorrectionTypeFromRow(row = {}) {
+  return String(row.event_type || row.type || row.cat || row.category || row.reason_code || row.entry_type || "").trim().toLowerCase();
+}
+__name(embeddedCorrectionTypeFromRow, "embeddedCorrectionTypeFromRow");
+function embeddedCorrectionRawTotals(session = {}, rows = []) {
+  const totals = embeddedCorrectionZeroTotals();
+  totals.cash = embeddedCorrectionMoney(session.cash_handover ?? session.cash_receipts ?? session.cash_total ?? 0);
+  totals.bank = embeddedCorrectionMoney(session.bank_transfer_total ?? session.bank_receipts ?? session.bank_total ?? 0);
+  totals.gross = embeddedCorrectionMoney(session.gross_received ?? session.gross_income ?? session.total_income ?? 0);
+  const hasSessionCash = totals.cash > 0;
+  const hasSessionBank = totals.bank > 0;
+  for (const row of Array.isArray(rows) ? rows : []) {
+    const type = embeddedCorrectionTypeFromRow(row);
+    const amount = embeddedCorrectionAmountFromRow(row);
+    const method = String(row.payment_method || row.pay_type || row.method || row.payment || "").trim().toLowerCase();
+    let incomeLike = false;
+    if (type === "r" || type === "rent" || type.includes("rent") || type.includes("收租")) {
+      totals.rent_income += amount;
+      incomeLike = true;
+    } else if (type === "ap" || type === "arrears_payment" || type.includes("arrears") || type.includes("欠")) {
+      totals.arrears_repaid += amount;
+      incomeLike = true;
+    } else if (type === "d" || type === "deposit_in" || type.includes("deposit_in") || type.includes("收押金")) {
+      totals.deposit_liability += amount;
+      incomeLike = true;
+    } else if (type === "dr" || type === "deposit_out" || type.includes("deposit_out") || type.includes("退押金")) {
+      totals.deposit_liability -= amount;
+    } else if (type === "e" || type === "expense" || type.includes("expense") || type.includes("支出")) {
+      totals.expense += amount;
+    } else if (type === "tf" || type === "bed_transfer" || type.includes("transfer") || type.includes("换床")) {
+      totals.transfer_fee += amount;
+      incomeLike = true;
+    }
+    if (incomeLike && !hasSessionCash && (method === "cash" || method === "c" || method.includes("现金"))) totals.cash += amount;
+    if (incomeLike && !hasSessionBank && (method === "bank" || method === "b" || method.includes("银行"))) totals.bank += amount;
+  }
+  if (!totals.gross) totals.gross = embeddedCorrectionMoney(totals.cash + totals.bank);
+  for (const key of Object.keys(totals)) totals[key] = embeddedCorrectionMoney(totals[key]);
+  return totals;
+}
+__name(embeddedCorrectionRawTotals, "embeddedCorrectionRawTotals");
+function embeddedSessionDetailCorrectionFields(session = {}, rows = []) {
+  const rawTotals = embeddedCorrectionRawTotals(session, rows);
+  const correctionTotals = embeddedCorrectionZeroDeltaTotals();
+  return {
+    correction_summary: {
+      correction_aware: true,
+      correction_applied: false,
+      raw_totals: rawTotals,
+      correction_totals: correctionTotals,
+      adjusted_totals: { ...rawTotals },
+      correction_events_count: 0,
+      invalid_corrections_count: 0,
+      warnings: []
+    },
+    correction_audit: {
+      raw_mode_available: true,
+      adjusted_mode_available: true,
+      audit_mode_available: true,
+      original_events_visible: true,
+      correction_events_visible: false,
+      correction_sessions: [],
+      correction_events: [],
+      invalid_corrections: [],
+      warnings: []
+    }
+  };
+}
+__name(embeddedSessionDetailCorrectionFields, "embeddedSessionDetailCorrectionFields");
 async function handleRequest(request, env, ctx) {
   const url = new URL(request.url);
   const path = url.pathname;
@@ -5172,13 +5279,25 @@ async function handleRequest(request, env, ctx) {
     if (path === "/api/session_detail" && method === "GET") {
       const sid = cleanId(url.searchParams.get("id"));
       if (!sid) return badRequest("bad_request");
-      if(!await empTableExists(env,"transactions"))return success([]);
       const includeVoided = url.searchParams.get("include_voided") === "1";
+      const includeCorrections = ["1","true","yes","on"].includes(String(url.searchParams.get("include_corrections")||"").trim().toLowerCase());
+      const sessionRow = await env.DB.prepare("SELECT * FROM sessions WHERE id=? AND corpid=? LIMIT 1").bind(sid,user.corpid).first().catch(()=>null);
+      if(!await empTableExists(env,"transactions")){
+        if(includeCorrections){
+          const correctionFields=embeddedSessionDetailCorrectionFields(sessionRow||{id:sid},[]);
+          return json({ ...ok([]), ...correctionFields });
+        }
+        return success([]);
+      }
       const { results } = await env.DB.prepare(
         includeVoided
           ? "SELECT * FROM transactions WHERE session_id=? AND corpid=? ORDER BY created_at ASC"
           : "SELECT * FROM transactions WHERE session_id=? AND corpid=? AND COALESCE(voided_at,'')='' AND COALESCE(status,'ACTIVE')<>'VOID' ORDER BY created_at ASC"
       ).bind(sid, user.corpid).all();
+      if(includeCorrections){
+        const correctionFields=embeddedSessionDetailCorrectionFields(sessionRow||{id:sid},results||[]);
+        return json({ ...ok(results||[]), ...correctionFields });
+      }
       return success(results);
     }
     return errorResponse("not_found", 404, "not_found");

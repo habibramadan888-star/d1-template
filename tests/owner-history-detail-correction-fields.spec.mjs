@@ -7,6 +7,10 @@ async function worker() {
   return readFile("deploy-worker/src/index.js", "utf8");
 }
 
+async function embeddedWorker() {
+  return readFile("deploy-worker/src/index.embedded.js", "utf8");
+}
+
 const x6wioSession = {
   session_id: "S20260707-x6wio",
   anchor: "EMPV3-20260707-abdul-x6wio",
@@ -117,12 +121,11 @@ test("detail endpoint keeps default array response unchanged", async () => {
 test("detail endpoint opt-in response exposes additive correction fields", async () => {
   const text = await worker();
   assert.match(text, /include_corrections/);
-  assert.match(text, /response_mode:"owner_history_detail_correction_aware_additive"/);
   assert.match(text, /correction_summary/);
   assert.match(text, /correction_audit/);
-  assert.match(text, /rows:detailChoice\.rows/);
-  assert.match(text, /details:detailChoice\.rows/);
-  assert.match(text, /legacy_response_shape:"array_rows"/);
+  assert.match(text, /json\(\{\s*\.\.\.ok\(detailChoice\.rows\),\s*\.\.\.correctionFields\s*\}\)/);
+  assert.match(text, /json\(\{\s*\.\.\.ok\(results\),\s*\.\.\.correctionFields\s*\}\)/);
+  assert.doesNotMatch(text, /return success\(\{\s*rows:detailChoice\.rows/);
 });
 
 test("correction summary contract contains required nested totals and counters", async () => {
@@ -166,6 +169,27 @@ test("no correction sessions produce zero correction and adjusted equals raw", (
   assert.equal(session.correction_totals.gross_delta, 0);
   assert.equal(session.adjusted_totals.gross, 1550);
   assert.equal(session.correction_events.length, 0);
+});
+
+test("embedded worker is the deployed entrypoint and supports opt-in correction fields", async () => {
+  const wrangler = await readFile("deploy-worker/wrangler.embedded.toml", "utf8");
+  const embedded = await embeddedWorker();
+
+  assert.match(wrangler, /main\s*=\s*"src\/index\.embedded\.js"/);
+  assert.match(embedded, /if \(path === "\/api\/session_detail" && method === "GET"\)/);
+  assert.match(embedded, /const includeCorrections =/);
+  assert.match(embedded, /embeddedSessionDetailCorrectionFields/);
+  assert.match(embedded, /return json\(\{\s*\.\.\.ok\(results\|\|\[\]\),\s*\.\.\.correctionFields\s*\}\)/);
+  assert.match(embedded, /return success\(results\);/);
+});
+
+test("embedded opt-in keeps legacy wrapper data as array with top-level correction fields", async () => {
+  const embedded = await embeddedWorker();
+
+  assert.match(embedded, /return json\(\{\s*\.\.\.ok\(\[\]\),\s*\.\.\.correctionFields\s*\}\)/);
+  assert.match(embedded, /correction_summary:\s*\{/);
+  assert.match(embedded, /correction_audit:\s*\{/);
+  assert.doesNotMatch(embedded, /return success\(\{\s*rows:/);
 });
 
 test("fixture correction session produces x6wio adjusted totals", () => {

@@ -8962,23 +8962,8 @@ async function handleRequest(request, env, ctx) {
             const targetAnchor=cleanText(sessionRow.anchor_id||sessionRow.id||"",180);
             const correctionRows=targetAnchor?await ownerCorrectionFetchExistingCorrectionSessions(env,user,targetAnchor).catch(()=>[]):[];
             const correctionFields=ownerHistoryDetailCorrectionFields(sessionRow,detailChoice.rows,correctionRows);
-            return success({
-              rows:detailChoice.rows,
-              details:detailChoice.rows,
-              legacy_response_shape:"array_rows",
-              response_mode:"owner_history_detail_correction_aware_additive",
-              session:{
-                id:sessionRow.id||"",
-                anchor_id:sessionRow.anchor_id||"",
-                date:sessionRow.date||"",
-                entries_count:Number(sessionRow.entries_count||0),
-                operator_id:sessionRow.operator_id||"",
-                operator_name:sessionRow.operator_name||"",
-                source:sessionRow.source||"",
-                cash_handover:ownerCorrectionPreviewMoney(sessionRow.cash_handover),
-                bank_transfer_total:ownerCorrectionPreviewMoney(sessionRow.bank_transfer_total),
-                gross_received:ownerCorrectionPreviewMoney(sessionRow.gross_received)
-              },
+            return json({
+              ...ok(detailChoice.rows),
               ...correctionFields
             });
           }
@@ -8989,23 +8974,8 @@ async function handleRequest(request, env, ctx) {
         const targetAnchor=cleanText(sessionRow.anchor_id||sessionRow.id||"",180);
         const correctionRows=targetAnchor?await ownerCorrectionFetchExistingCorrectionSessions(env,user,targetAnchor).catch(()=>[]):[];
         const correctionFields=ownerHistoryDetailCorrectionFields(sessionRow,results,correctionRows);
-        return success({
-          rows:results,
-          details:results,
-          legacy_response_shape:"array_rows",
-          response_mode:"owner_history_detail_correction_aware_additive",
-          session:{
-            id:sessionRow.id||"",
-            anchor_id:sessionRow.anchor_id||"",
-            date:sessionRow.date||"",
-            entries_count:Number(sessionRow.entries_count||0),
-            operator_id:sessionRow.operator_id||"",
-            operator_name:sessionRow.operator_name||"",
-            source:sessionRow.source||"",
-            cash_handover:ownerCorrectionPreviewMoney(sessionRow.cash_handover),
-            bank_transfer_total:ownerCorrectionPreviewMoney(sessionRow.bank_transfer_total),
-            gross_received:ownerCorrectionPreviewMoney(sessionRow.gross_received)
-          },
+        return json({
+          ...ok(results),
           ...correctionFields
         });
       }
