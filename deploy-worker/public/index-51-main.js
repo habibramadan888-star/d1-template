@@ -692,6 +692,33 @@ function balanceTotalFromTotals(t){
   return Math.round((Number(t?.cashBal||0)+Number(t?.bankIn||0))*100)/100;
 }
 
+function historyDetailMismatchHtml(session,renderedCount){
+  const entries=Array.isArray(session?.entries)?session.entries:[];
+  const rendered=totals(entries);
+  const expectedCount=Number(session?.entriesCount||session?.entries_count||0)||0;
+  const summaryCash=Math.round(Number(session?.cash_handover||0)*100)/100;
+  const summaryBank=Math.round(Number(session?.bank_transfer_total||0)*100)/100;
+  const summaryGross=Math.round(Number(session?.gross_received||0)*100)/100;
+  const diff=(a,b)=>Math.round((Number(a||0)-Number(b||0))*100)/100;
+  const problems=[];
+  if(expectedCount&&expectedCount!==renderedCount)problems.push(`saved record count ${expectedCount} / rendered ${renderedCount}`);
+  if(summaryCash&&Math.abs(diff(summaryCash,rendered.cashIn))>=0.01)problems.push(`summary cash ${fmtMoney(summaryCash)} / rendered ${fmtMoney(rendered.cashIn)}`);
+  if(summaryBank&&Math.abs(diff(summaryBank,rendered.bankIn))>=0.01)problems.push(`summary bank ${fmtMoney(summaryBank)} / rendered ${fmtMoney(rendered.bankIn)}`);
+  if(summaryGross&&Math.abs(diff(summaryGross,rendered.total))>=0.01)problems.push(`summary gross ${fmtMoney(summaryGross)} / rendered ${fmtMoney(rendered.total)}`);
+  if(!problems.length)return '';
+  const missing=[];
+  if(expectedCount&&expectedCount>renderedCount)missing.push(`${expectedCount-renderedCount} records`);
+  if(summaryCash>rendered.cashIn)missing.push('cash income');
+  if(summaryBank>rendered.bankIn)missing.push('bank income');
+  if(summaryGross>rendered.total)missing.push('gross total');
+  return `<div class="card-sub" data-owner-detail-render-mismatch="true" style="margin-top:8px;color:var(--red);font-weight:800;line-height:1.6">
+    <div>Detail Render Mismatch / 详情解析不完整</div>
+    <div>saved record count ${expectedCount||0} · rendered record count ${renderedCount||0} · missing count ${Math.max(0,(expectedCount||0)-(renderedCount||0))}</div>
+    <div>summary cash ${fmtMoney(summaryCash)} · rendered cash ${fmtMoney(rendered.cashIn)} · summary bank ${fmtMoney(summaryBank)} · rendered bank ${fmtMoney(rendered.bankIn)} · summary gross ${fmtMoney(summaryGross)} · rendered gross ${fmtMoney(rendered.total)}</div>
+    <div>suspected missing categories: ${esc(missing.join(', ')||'unknown')}</div>
+  </div>`;
+}
+
 function ledgerSessionRawText(s){
   return String(s?.export_text||s?.exportText||s?.raw_text||s?.rawText||s?.txt||'');
 }
@@ -2734,8 +2761,7 @@ async function renderHistory(){
     }
     const{txt}=genTXT(s);
     const cnt=s.entries?s.entries.length:0;
-    const expectedCount=Number(s.entriesCount||s.entries_count||0);
-    const countWarning=expectedCount&&expectedCount!==cnt?`<div class="card-sub" style="margin-top:8px;color:var(--red);font-weight:800">记录数与交易行数量不一致，需单独核对。已存记录数 ${expectedCount}，交易行 ${cnt}。</div>`:'';
+    const countWarning=historyDetailMismatchHtml(s,cnt);
     const deletedMeta=s._voided?`<div class="card-sub" style="margin-top:8px;color:var(--red);line-height:1.6">已删除/已作废记录 · 删除人：${esc(s.voidedBy||s.voided_by||'未知')} · 时间：${esc(s.voidedAt||s.voided_at||'未知')}</div>`:'';
     wrap.innerHTML=`<button class="btn btn-ghost" id="btnHistBack" style="margin-bottom:14px"><svg class="ico"><use href="#i-back"/></svg>返回历史</button>
     <div class="card"><div class="card-head"><div>${s.anchorId?`<div class="card-sub" style="color:var(--accent);margin-bottom:3px">🔐 ${esc(s.anchorId)}</div>`:''}<div class="card-title">${esc((s.date||'').slice(0,10))}</div><div class="card-sub">${cnt} 笔记录</div>${deletedMeta}${countWarning}</div><div style="display:flex;gap:7px"><button class="btn btn-ghost" id="btnHistCopy"><svg class="ico"><use href="#i-copy"/></svg>复制</button><button class="btn btn-primary" id="btnHistDl"><svg class="ico"><use href="#i-download"/></svg>下载</button></div></div><div class="card-body"><pre style="background:var(--surface2);padding:14px;border-radius:8px;max-height:60vh;overflow:auto;line-height:1.7;font-size:12px;color:var(--text2);border:1px solid var(--border)">${esc(txt)}</pre></div></div>`;

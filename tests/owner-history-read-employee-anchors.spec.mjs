@@ -45,6 +45,6 @@ test("owner session detail reads structured transaction rows from cloud", async 
   assert.match(worker, /if \(path === "\/api\/session_detail" && method === "GET"\)/);
   assert.match(worker, /SELECT \* FROM transactions WHERE session_id=\?/);
   assert.match(worker, /const anchorRows=extractEmployeeEntryAnchorsFromSession\(sessionRow\)/);
-  assert.match(worker, /if\(anchorRows\.length\)return success\(anchorRows\)/);
+  assert.match(worker, /chooseOwnerEmployeeSessionDetailRows\(sessionRow,results,anchorRows,exportRows\)/);
   assert.match(worker, /ORDER BY created_at ASC/);
 });

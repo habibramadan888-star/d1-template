@@ -3158,6 +3158,65 @@ function parseEmployeeEntryExportRows(session){
   return rows;
 }
 __name(parseEmployeeEntryExportRows,"parseEmployeeEntryExportRows");
+function ownerEmployeeDetailRowsTotals(rows=[]){
+  const totals={cash:0,bank:0,expense:0,refund:0,gross:0};
+  for(const row of rows||[]){
+    const type=entryAnchorType(row);
+    const event=String(row?.event_type||"").trim().toLowerCase();
+    const cat=String(row?.cat||"").trim().toLowerCase();
+    const method=entryAnchorPaymentMethod(row?.payment_method||row?.pay_type||cat);
+    const amount=entryAnchorMoney(row?.amount??row?.paid_amount??row?.payment_amount??row?.deposit_amount??row?.refund_amount??row?.actual_refund_amount??row?.expense_amount??row?.fee_amount??0);
+    if(type==="E"||event==="expense"||cat==="expense"){
+      totals.expense=entryAnchorMoney(totals.expense+amount);
+      continue;
+    }
+    if(type==="DR"||event==="deposit_out"||cat==="refund"){
+      totals.refund=entryAnchorMoney(totals.refund+amount);
+      continue;
+    }
+    if(method==="bank"||cat==="bank")totals.bank=entryAnchorMoney(totals.bank+amount);
+    else totals.cash=entryAnchorMoney(totals.cash+amount);
+  }
+  totals.gross=entryAnchorMoney(totals.cash+totals.bank);
+  return totals;
+}
+__name(ownerEmployeeDetailRowsTotals,"ownerEmployeeDetailRowsTotals");
+function ownerEmployeeDetailRowsReconcileSession(session,rows=[]){
+  const count=Array.isArray(rows)?rows.length:0;
+  const expectedCount=Number(session?.entries_count||session?.entriesCount||0)||0;
+  const summaryCash=entryAnchorMoney(session?.cash_handover||0);
+  const summaryBank=entryAnchorMoney(session?.bank_transfer_total||0);
+  const summaryGross=entryAnchorMoney(session?.gross_received||0);
+  const totals=ownerEmployeeDetailRowsTotals(rows);
+  const moneyOk=(expected,actual)=>!expected||Math.abs(entryAnchorMoney(expected)-entryAnchorMoney(actual))<0.01;
+  const countOk=!expectedCount||count===expectedCount;
+  const cashOk=moneyOk(summaryCash,totals.cash);
+  const bankOk=moneyOk(summaryBank,totals.bank);
+  const grossOk=moneyOk(summaryGross,totals.gross);
+  return {ok:countOk&&cashOk&&bankOk&&grossOk,count,expectedCount,totals,summary:{cash:summaryCash,bank:summaryBank,gross:summaryGross},countOk,cashOk,bankOk,grossOk};
+}
+__name(ownerEmployeeDetailRowsReconcileSession,"ownerEmployeeDetailRowsReconcileSession");
+function chooseOwnerEmployeeSessionDetailRows(session,transactionRows=[],anchorRows=[],exportRows=[]){
+  const candidates=[
+    {source:"structured",rows:Array.isArray(anchorRows)?anchorRows:[]},
+    {source:"transactions",rows:Array.isArray(transactionRows)?transactionRows:[]},
+    {source:"export_text",rows:Array.isArray(exportRows)?exportRows:[]}
+  ].filter(candidate=>candidate.rows.length);
+  for(const candidate of candidates){
+    const reconciliation=ownerEmployeeDetailRowsReconcileSession(session,candidate.rows);
+    if(reconciliation.ok)return {...candidate,reconciliation};
+  }
+  if(!candidates.length)return {source:"none",rows:[],reconciliation:ownerEmployeeDetailRowsReconcileSession(session,[])};
+  return candidates
+    .map(candidate=>({...candidate,reconciliation:ownerEmployeeDetailRowsReconcileSession(session,candidate.rows)}))
+    .sort((a,b)=>{
+      const countDelta=(b.reconciliation.count||0)-(a.reconciliation.count||0);
+      if(countDelta)return countDelta;
+      const sourceRank={structured:0,transactions:1,export_text:2};
+      return (sourceRank[a.source]??9)-(sourceRank[b.source]??9);
+    })[0];
+}
+__name(chooseOwnerEmployeeSessionDetailRows,"chooseOwnerEmployeeSessionDetailRows");
 function empCloseStatusIsOpen(status){
   const raw=cleanText(status,40);
   const upper=raw.toUpperCase();
@@ -7515,19 +7574,19 @@ async function handleRequest(request, env, ctx) {
     if (path === "/api/session_detail" && method === "GET") {
       const sid = cleanId(url.searchParams.get("id"));
       if (!sid) return badRequest("bad_request");
-      if(!await empTableExists(env,"transactions"))return success([]);
       const includeVoided = url.searchParams.get("include_voided") === "1";
       const sessionRow=await env.DB.prepare("SELECT * FROM sessions WHERE id=? AND corpid=? LIMIT 1").bind(sid,user.corpid).first();
-      const { results } = await env.DB.prepare(
-        includeVoided
-          ? "SELECT * FROM transactions WHERE session_id=? AND corpid=? ORDER BY created_at ASC"
-          : "SELECT * FROM transactions WHERE session_id=? AND corpid=? AND COALESCE(voided_at,'')='' AND COALESCE(status,'ACTIVE')<>'VOID' ORDER BY created_at ASC"
-      ).bind(sid, user.corpid).all();
+      const hasTransactions=await empTableExists(env,"transactions");
+      const results=hasTransactions?(await env.DB.prepare(
+          includeVoided
+            ? "SELECT * FROM transactions WHERE session_id=? AND corpid=? ORDER BY created_at ASC"
+            : "SELECT * FROM transactions WHERE session_id=? AND corpid=? AND COALESCE(voided_at,'')='' AND COALESCE(status,'ACTIVE')<>'VOID' ORDER BY created_at ASC"
+        ).bind(sid, user.corpid).all()).results||[]:[];
       if(sessionRow&&isEmployeeEntrySession(sessionRow)){
         const anchorRows=extractEmployeeEntryAnchorsFromSession(sessionRow);
-        if(anchorRows.length)return success(anchorRows);
         const exportRows=parseEmployeeEntryExportRows(sessionRow);
-        if(exportRows.length)return success(exportRows);
+        const detailChoice=chooseOwnerEmployeeSessionDetailRows(sessionRow,results,anchorRows,exportRows);
+        if(detailChoice.rows.length)return success(detailChoice.rows);
       }
       return success(results);
     }

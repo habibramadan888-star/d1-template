@@ -73,7 +73,7 @@ test("owner session detail has employee export decoder fallback for R AP and TF 
   assert.match(worker, /section==="CASH RECEIVED"&&\/\\sR\\s\/i\.test\(line\)/);
   assert.match(worker, /section==="ARREAR REPAID"&&\/\\sAP\\s\/i\.test\(line\)/);
   assert.match(worker, /if\(sessionRow&&isEmployeeEntrySession\(sessionRow\)\)/);
-  assert.match(worker, /if\(exportRows\.length\)return success\(exportRows\)/);
+  assert.match(worker, /chooseOwnerEmployeeSessionDetailRows\(sessionRow,results,anchorRows,exportRows\)/);
 });
 
 test("employee export detail decoder returns the four expected owner detail rows", async () => {
@@ -122,4 +122,68 @@ test("employee export detail decoder returns the four expected owner detail rows
       ["AP", "144", "", 70]
     ])
   );
+});
+
+test("owner session detail chooses complete transaction rows over partial export parser", async () => {
+  const worker = await readFile("deploy-worker/src/index.js", "utf8");
+  const start = worker.indexOf("const entryAnchorContract");
+  const end = worker.indexOf("function empCloseStatusIsOpen", start);
+  assert.ok(start > 0 && end > start);
+  const sandbox = {};
+  vm.createContext(sandbox);
+  vm.runInContext(
+    `
+    function __name(fn){ return fn; }
+    function cleanText(value,max=10000){ return String(value ?? '').slice(0,max); }
+    function cleanDate(value){ return String(value || '').slice(0,10); }
+    ${worker.slice(start, end)}
+    globalThis.chooseOwnerEmployeeSessionDetailRows = chooseOwnerEmployeeSessionDetailRows;
+    globalThis.ownerEmployeeDetailRowsTotals = ownerEmployeeDetailRowsTotals;
+    `,
+    sandbox
+  );
+
+  const session = {
+    id: "S20260707-057sk",
+    anchor_id: "EMPV3-20260707-abdul-057sk",
+    source: "employee_entry",
+    entries_count: 23,
+    cash_handover: 10940,
+    bank_transfer_total: 4060,
+    gross_received: 15000
+  };
+  const cashRows = Array.from({ length: 13 }, (_, index) => ({
+    id: `cash-${index + 1}`,
+    cat: "cash",
+    room: `C${index + 1}`,
+    amount: index === 12 ? 1340 : 800,
+    pay_type: "C",
+    type: "R"
+  }));
+  const bankRows = Array.from({ length: 10 }, (_, index) => ({
+    id: `bank-${index + 1}`,
+    cat: "bank",
+    room: `B${index + 1}`,
+    amount: 406,
+    pay_type: "B",
+    type: "R"
+  }));
+  const transactionRows = [...cashRows, ...bankRows];
+  const partialExportRows = Array.from({ length: 13 }, (_, index) => ({
+    id: `export-${index + 1}`,
+    cat: "cash",
+    room: `E${index + 1}`,
+    amount: index === 12 ? 990 : 800,
+    pay_type: "C",
+    type: "R"
+  }));
+
+  const choice = sandbox.chooseOwnerEmployeeSessionDetailRows(session, transactionRows, [], partialExportRows);
+  const totals = sandbox.ownerEmployeeDetailRowsTotals(choice.rows);
+
+  assert.equal(choice.source, "transactions");
+  assert.equal(choice.rows.length, 23);
+  assert.equal(totals.cash, 10940);
+  assert.equal(totals.bank, 4060);
+  assert.equal(totals.gross, 15000);
 });

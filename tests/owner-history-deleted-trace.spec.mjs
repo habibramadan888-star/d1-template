@@ -32,7 +32,9 @@ test("deleted trace can view voided session detail without changing active histo
 test("history detail warns when saved entry count differs from transaction rows", async () => {
   const main = await readFile(ownerMainPath, "utf8");
 
-  assert.match(main, /记录数与交易行数量不一致，需单独核对。/);
-  assert.match(main, /const expectedCount=Number\(s\.entriesCount\|\|s\.entries_count\|\|0\)/);
-  assert.match(main, /expectedCount&&expectedCount!==cnt/);
+  assert.match(main, /function historyDetailMismatchHtml\(session,renderedCount\)/);
+  assert.match(main, /Detail Render Mismatch \/ 详情解析不完整/);
+  assert.match(main, /summary cash \$\{fmtMoney\(summaryCash\)\} · rendered cash/);
+  assert.match(main, /suspected missing categories/);
+  assert.match(main, /historyDetailMismatchHtml\(s,cnt\)/);
 });

@@ -166,8 +166,8 @@ test("owner session detail route prefers structured anchors over legacy text dec
   const worker = await readFile("deploy-worker/src/index.js", "utf8");
 
   assert.match(worker, /const anchorRows=extractEmployeeEntryAnchorsFromSession\(sessionRow\)/);
-  assert.match(worker, /if\(anchorRows\.length\)return success\(anchorRows\)/);
   assert.match(worker, /const exportRows=parseEmployeeEntryExportRows\(sessionRow\)/);
+  assert.match(worker, /chooseOwnerEmployeeSessionDetailRows\(sessionRow,results,anchorRows,exportRows\)/);
 });
 
 test("owner detail mapper preserves all structured employee anchor fields", async () => {
