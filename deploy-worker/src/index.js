@@ -1930,6 +1930,192 @@ function employeeEntryUploadAmount(value){
   return Number(String(value??0).replace(/,/g,""))||0;
 }
 __name(employeeEntryUploadAmount,"employeeEntryUploadAmount");
+function employeeEntryOccupancyCandidateNoWriteProof(){
+  return {
+    dry_run:true,
+    write_endpoints_called:[],
+    d1_write_count:0,
+    session_write_attempted:false,
+    transaction_write_attempted:false,
+    arrear_task_write_attempted:false,
+    deposit_write_attempted:false,
+    access_snapshot_write_attempted:false,
+    occupancy_write_attempted:false,
+    owner_history_write_attempted:false,
+    real_upload_called:false,
+    candidate_persistence:"not_persisted",
+    wrote_sessions:false,
+    wrote_transactions:false,
+    wrote_arrear_tasks:false,
+    wrote_deposit_ledger:false,
+    wrote_access_snapshot:false,
+    wrote_occupancy_session:false,
+    wrote_owner_history:false,
+    write_guard_mode:"route_level_no_write",
+    proof_limitations:"D1 write count not measured, but validate route does not call write functions"
+  };
+}
+__name(employeeEntryOccupancyCandidateNoWriteProof,"employeeEntryOccupancyCandidateNoWriteProof");
+function employeeEntryOccupancyForbiddenInputsUsed(){
+  return {
+    card_id:false,
+    tenant_card_id:false,
+    provider_phone:false,
+    phone_99099:false
+  };
+}
+__name(employeeEntryOccupancyForbiddenInputsUsed,"employeeEntryOccupancyForbiddenInputsUsed");
+function employeeEntryOccupancyCandidateAnomaly(riskCode,eventIndex,eventId,suggestedAction,sourceFields=[],riskLevel="medium",confidence=0.7){
+  return {
+    risk_code:riskCode,
+    risk_level:riskLevel,
+    confidence_score:Math.max(0,Math.min(1,Number(confidence)||0)),
+    event_index:Number(eventIndex||0),
+    event_id:cleanText(eventId,100),
+    suggested_action:cleanText(suggestedAction,300),
+    source_fields:Array.isArray(sourceFields)?sourceFields.map(field=>cleanText(field,80)).filter(Boolean):[]
+  };
+}
+__name(employeeEntryOccupancyCandidateAnomaly,"employeeEntryOccupancyCandidateAnomaly");
+function employeeEntryOccupancyCandidateBed(entry,normalized,type){
+  if(type==="TF"||type==="TFF")return cleanText(normalized.from_bed||entry.bed_from||entry.from_bed||entry.room||"",40).replace(/^#+/,"");
+  if(type==="E")return cleanText(normalized.target_bed||entry.target_bed||entry.room||"",40).replace(/^#+/,"");
+  return cleanText(normalized.bed||entry.bed||entry.room||"",40).replace(/^#+/,"");
+}
+__name(employeeEntryOccupancyCandidateBed,"employeeEntryOccupancyCandidateBed");
+function employeeEntryOccupancyCandidateBusinessDate(entry,normalized){
+  return cleanDate(normalized.date||entry.date||entry.business_date||entry.created_at||entry.rent_period_start||entry.period_start||entry.checkout_date||entry.transfer_date||empTodayDubai());
+}
+__name(employeeEntryOccupancyCandidateBusinessDate,"employeeEntryOccupancyCandidateBusinessDate");
+function employeeEntryOccupancyCandidateId(propertyId,bed,businessDate,eventId){
+  if(!propertyId||!bed||!businessDate||!eventId)return null;
+  return `occ_candidate:${propertyId}:${bed}:${businessDate.replace(/-/g,"")}:${eventId}`;
+}
+__name(employeeEntryOccupancyCandidateId,"employeeEntryOccupancyCandidateId");
+function employeeEntryOccupancyAccessSnapshotSummary(entry,bed){
+  const remark=cleanText(entry.access_remark||entry.card_remark||entry.ttlock_context?.raw_remark||entry.access_snapshot?.raw_remark||"",1000);
+  const snapshot=remark?buildAccessSnapshotDTO(remark,{property_id:"preview"}):null;
+  return {
+    bed:cleanText(snapshot?.bed||bed||"",40),
+    parsed_deposit_amount:snapshot?.parsed_deposit_amount??null,
+    parsed_checkin_mmdd:snapshot?.parsed_checkin_mmdd||"",
+    parsed_valid_until_mmdd:snapshot?.parsed_valid_until_mmdd||"",
+    parse_status:snapshot?.parse_status||"not_provided"
+  };
+}
+__name(employeeEntryOccupancyAccessSnapshotSummary,"employeeEntryOccupancyAccessSnapshotSummary");
+function buildEmployeeEntryOccupancyCandidateEventPreview(entry,index,user,body){
+  const normalized=normalizeEntryAnchor(entry||{});
+  const type=entryAnchorType(entry)||cleanText(entry?.type||entry?.reason_code||"R",12).toUpperCase();
+  const eventType=normalized.event_type||entryAnchorEventType(type);
+  const eventId=cleanText(normalized.id||normalized.event_id||entry?.id||entry?.event_id||`preview-${index}`,100);
+  const propertyId=cleanText(user?.corpid||body?.corpid||body?.property_id||"homelink",80);
+  const bed=employeeEntryOccupancyCandidateBed(entry,normalized,type);
+  const businessDate=employeeEntryOccupancyCandidateBusinessDate(entry,normalized);
+  const linkedArrearsRef=cleanId(normalized.arrears_ref||entry?.arrears_ref||entry?.linked_task_id||entry?.original_arrears_id||entry?.cloud_arrears_ref||"");
+  const linkedEventId=cleanText(normalized.original_event_id||entry?.original_event_id||entry?.linked_event_id||"",100);
+  const candidateBasis={
+    property_id:propertyId,
+    bed,
+    business_date:businessDate,
+    access_snapshot_summary:employeeEntryOccupancyAccessSnapshotSummary(entry,bed),
+    linked_event_id:linkedEventId||null,
+    linked_arrears_ref:linkedArrearsRef||null,
+    staff_entered_customer_phone_present:!!cleanText(entry?.whatsapp_phone||entry?.former_customer_phone||entry?.customer_phone,80)
+  };
+  const anomalies=[];
+  let status="candidate_unresolved";
+  let candidateId=null;
+  if(type==="R"){
+    status=bed&&businessDate?"candidate_created":"candidate_unresolved";
+    candidateId=status==="candidate_created"?employeeEntryOccupancyCandidateId(propertyId,bed,businessDate,eventId):null;
+  }else if(type==="AP"){
+    status="candidate_unresolved";
+    candidateId=null;
+    if(!linkedArrearsRef)anomalies.push(employeeEntryOccupancyCandidateAnomaly("ARREARS_PAYMENT_WITHOUT_ORIGINAL_CANDIDATE",index,eventId,"Select an arrears_ref that can inherit a future occupancy candidate.",["arrears_ref"],"high",0.85));
+  }else if(type==="D"){
+    const depositReason=cleanText(entry?.deposit_reason||normalized.deposit_reason||"",40).toLowerCase();
+    candidateBasis.deposit_reason=depositReason||null;
+    if(depositReason==="new"){
+      status=bed&&businessDate?"candidate_created":"candidate_unresolved";
+      candidateId=status==="candidate_created"?employeeEntryOccupancyCandidateId(propertyId,bed,businessDate,eventId):null;
+    }else if(["balance","additional"].includes(depositReason)){
+      status="candidate_continued";
+      candidateId=bed&&businessDate?employeeEntryOccupancyCandidateId(propertyId,bed,businessDate,eventId):null;
+    }else{
+      status="candidate_unresolved";
+    }
+  }else if(type==="DR"){
+    status=bed?"candidate_unresolved":"candidate_unresolved";
+    anomalies.push(employeeEntryOccupancyCandidateAnomaly("DEPOSIT_OUT_WITHOUT_ACTIVE_CANDIDATE",index,eventId,"Future implementation must link Deposit Out to an active candidate before refund.",["bed"],"medium",0.7));
+  }else if(type==="CO"){
+    const left=!!normalized.left_with_arrears||!!entry?.left_with_arrears||entry?.checkout_mode==="left_with_arrears";
+    candidateBasis.checkout_type=left?"left_with_arrears":"normal";
+    status=left?"candidate_left_with_arrears":"candidate_checkout_pending";
+    candidateId=bed&&businessDate?employeeEntryOccupancyCandidateId(propertyId,bed,businessDate,eventId):null;
+    if(entry?.open_arrears_count||entry?.outstanding_arrears>0)anomalies.push(employeeEntryOccupancyCandidateAnomaly("CHECKOUT_WITH_OPEN_ARREARS",index,eventId,"Collect arrears first or use Left With Arrears / owner approval.",["open_arrears"],"high",0.8));
+  }else if(type==="E"){
+    status=bed?"candidate_unresolved":"candidate_not_applicable";
+    candidateId=null;
+  }else if(type==="TF"||type==="TFF"){
+    const fromBed=cleanText(normalized.from_bed||entry?.bed_from||entry?.from_bed||entry?.room||"",40).replace(/^#+/,"");
+    const toBed=cleanText(normalized.to_bed||entry?.bed_to||entry?.to_bed||entry?.roomTo||"",40).replace(/^#+/,"");
+    candidateBasis.from_bed=fromBed;
+    candidateBasis.to_bed=toBed;
+    status=fromBed&&toBed?"candidate_unresolved":"candidate_unresolved";
+    candidateId=null;
+    if(entry?.to_bed_occupied||entry?.to_occupied){
+      status="candidate_conflict";
+      anomalies.push(employeeEntryOccupancyCandidateAnomaly("BED_TRANSFER_TO_OCCUPIED_BED",index,eventId,"Resolve target bed occupancy before transfer.",["to_bed"],"critical",0.9));
+    }else if(!fromBed){
+      anomalies.push(employeeEntryOccupancyCandidateAnomaly("BED_TRANSFER_WITHOUT_FROM_CANDIDATE",index,eventId,"Future implementation must identify the from_bed candidate before transfer.",["from_bed"],"high",0.85));
+    }
+    candidateBasis.from_state_before=fromBed?"active_or_unknown":"unknown";
+    candidateBasis.to_state_before=toBed?"vacant_or_unknown":"unknown";
+    candidateBasis.from_state_after_expected="vacant_or_closed_preview";
+    candidateBasis.to_state_after_expected="active_under_same_candidate_preview";
+    candidateBasis.deposit_moved="preview_only";
+    candidateBasis.rent_coverage_moved="preview_only";
+    candidateBasis.arrears_moved="preview_only";
+    candidateBasis.access_validity_moved="preview_only";
+  }
+  return {
+    event_index:Number(index||0),
+    event_id:eventId,
+    event_type:eventType,
+    ...(bed?{bed}:{}),
+    ...(candidateBasis.from_bed?{from_bed:candidateBasis.from_bed}:{}),
+    ...(candidateBasis.to_bed?{to_bed:candidateBasis.to_bed}:{}),
+    occupancy_candidate_id:candidateId,
+    occupancy_candidate_status:status,
+    candidate_basis:candidateBasis,
+    forbidden_inputs_used:employeeEntryOccupancyForbiddenInputsUsed(),
+    warnings:[],
+    anomalies
+  };
+}
+__name(buildEmployeeEntryOccupancyCandidateEventPreview,"buildEmployeeEntryOccupancyCandidateEventPreview");
+function buildEmployeeEntryOccupancyCandidatePreview(user,body){
+  const session=body?.session||{};
+  const entries=Array.isArray(session.entries)&&session.entries.length?session.entries:[body?.entry||{}];
+  const events=entries.map((entry,index)=>buildEmployeeEntryOccupancyCandidateEventPreview(entry,index,user,body));
+  const batchAnomalies=events.flatMap(event=>event.anomalies||[]);
+  return {
+    enabled:true,
+    mode:"dry_run_preview_only",
+    no_write:true,
+    source:"server_dry_run",
+    candidate_persistence:"not_persisted",
+    migration_required_for_durable_id:true,
+    batch_id:cleanText(session.id||session.session_id||body?.batch_id||`dryrun-${Date.now().toString(36)}`,100),
+    preview_generated_at:new Date().toISOString(),
+    events,
+    batch_warnings:[],
+    batch_anomalies:batchAnomalies,
+    no_write_proof:employeeEntryOccupancyCandidateNoWriteProof()
+  };
+}
+__name(buildEmployeeEntryOccupancyCandidatePreview,"buildEmployeeEntryOccupancyCandidatePreview");
 function validateRentUploadFields(entry,normalized,eventIndex,anchorPreview){
   const missing=[];
   const invalid=[];
@@ -2392,7 +2578,7 @@ async function handleEmployeeEntryValidate(request,env,user){
   }
   result={...result,...assetInfo};
   if(!result.ok)return json({success:false,...result},422);
-  return success(result);
+  return success({...result,occupancy_candidate_preview:buildEmployeeEntryOccupancyCandidatePreview(user,body)});
 }
 __name(handleEmployeeEntryValidate,"handleEmployeeEntryValidate");
 async function handleEmployeeEntry(request,env,user){
