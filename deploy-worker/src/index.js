@@ -2841,6 +2841,111 @@ function buildSafeBusinessIdentityContext(input={}){
   };
 }
 __name(buildSafeBusinessIdentityContext,"buildSafeBusinessIdentityContext");
+function accessSnapshotRuntimeHash(value){
+  let hash=2166136261;
+  for(const char of String(value||"")){
+    hash^=char.charCodeAt(0);
+    hash=Math.imul(hash,16777619);
+  }
+  return (hash>>>0).toString(36);
+}
+__name(accessSnapshotRuntimeHash,"accessSnapshotRuntimeHash");
+function accessSnapshotMonthDay(token){
+  const match=String(token||"").match(/(\d{4})/);
+  if(!match)return "";
+  const value=match[1];
+  const month=Number(value.slice(0,2));
+  const day=Number(value.slice(2,4));
+  if(month<1||month>12)return "";
+  const maxDay=new Date(Date.UTC(2024,month,0)).getUTCDate();
+  if(day<1||day>maxDay)return "";
+  return `${String(month).padStart(2,"0")}${String(day).padStart(2,"0")}`;
+}
+__name(accessSnapshotMonthDay,"accessSnapshotMonthDay");
+function accessSnapshotProviderMetadata(input={}){
+  const providerPhone=normalizeBusinessPhone(input.provider_phone||input.providerPhone||input.card_phone||input.access_card_phone||"");
+  const providerAccountPhone=normalizeBusinessPhone(input.provider_account_phone||input.providerAccountPhone||"");
+  return {
+    ...(cleanText(input.card_id||input.cardId,120)?{card_id:cleanText(input.card_id||input.cardId,120)}:{}),
+    ...(cleanText(input.tenant_card_id||input.tenantCardId,120)?{tenant_card_id:cleanText(input.tenant_card_id||input.tenantCardId,120)}:{}),
+    ...(cleanText(input.hardware_card_id||input.hardwareCardId,120)?{hardware_card_id:cleanText(input.hardware_card_id||input.hardwareCardId,120)}:{}),
+    ...(providerPhone?{provider_phone:providerPhone}:{}),
+    ...(providerAccountPhone?{provider_account_phone:providerAccountPhone}:{}),
+    is_provider_phone_non_authoritative:true
+  };
+}
+__name(accessSnapshotProviderMetadata,"accessSnapshotProviderMetadata");
+function parseAccessCardRemark(rawRemark){
+  const raw=cleanText(rawRemark,1000);
+  const tokens=raw.replace(/[;,]+/g," ").replace(/\s+/g," ").trim().split(" ").filter(Boolean);
+  let bed="";
+  let parsedDepositAmount=null;
+  let parsedCheckinMmdd="";
+  let parsedValidUntilMmdd="";
+  let parsedBusinessNote="";
+  const warnings=[];
+  for(let i=0;i<tokens.length;i++){
+    const token=tokens[i];
+    if(!bed)bed=(token.match(/^#?(\d{2,5}[A-Za-z]?)$/)||[])[1]||"";
+    if(parsedDepositAmount===null){
+      const deposit=token.match(/^D(\d{1,5}(?:\.\d{1,2})?)$/i);
+      if(deposit)parsedDepositAmount=entryAnchorMoney(deposit[1]);
+    }
+    if(!parsedCheckinMmdd&&!/^(exp|until|valid)$/i.test(token)){
+      parsedCheckinMmdd=accessSnapshotMonthDay(token);
+      if(parsedCheckinMmdd&&token.replace(/\d{4}/,""))parsedBusinessNote=token.replace(/\d{4}/,"");
+    }
+    if(/^(exp|until|valid)$/i.test(token))parsedValidUntilMmdd=accessSnapshotMonthDay(tokens[i+1]||"");
+  }
+  if(!parsedBusinessNote&&tokens.length){
+    const noteTokens=[];
+    let seenCheckin=false;
+    for(let i=0;i<tokens.length;i++){
+      const token=tokens[i];
+      if(i===0&&bed)continue;
+      if(/^D\d/i.test(token))continue;
+      if(/^(exp|until|valid)$/i.test(token)){i++;continue;}
+      const md=accessSnapshotMonthDay(token);
+      if(md&&!seenCheckin){
+        seenCheckin=true;
+        const remainder=token.replace(/\d{4}/,"");
+        if(remainder)noteTokens.push(remainder);
+        continue;
+      }
+      if(md&&seenCheckin)continue;
+      noteTokens.push(token);
+    }
+    parsedBusinessNote=cleanText(noteTokens.join(" "),500);
+  }
+  if(!raw)return {bed:"",parsed_deposit_amount:null,parsed_checkin_mmdd:"",parsed_valid_until_mmdd:"",parsed_business_note:"",parse_status:"invalid",warnings:["empty_remark"]};
+  if(!bed)return {bed:"",parsed_deposit_amount:parsedDepositAmount,parsed_checkin_mmdd:parsedCheckinMmdd,parsed_valid_until_mmdd:parsedValidUntilMmdd,parsed_business_note:parsedBusinessNote,parse_status:"unparsed",warnings:["missing_bed"]};
+  if(parsedDepositAmount===null||!parsedCheckinMmdd)warnings.push("missing_deposit_or_checkin");
+  return {bed,parsed_deposit_amount:parsedDepositAmount,parsed_checkin_mmdd:parsedCheckinMmdd,parsed_valid_until_mmdd:parsedValidUntilMmdd,parsed_business_note:parsedBusinessNote,parse_status:warnings.length?"partial":"parsed",warnings};
+}
+__name(parseAccessCardRemark,"parseAccessCardRemark");
+function buildAccessSnapshotDTO(rawRemark,opts={}){
+  const parsed=parseAccessCardRemark(rawRemark);
+  const propertyId=cleanText(opts.property_id||opts.propertyId||"",80);
+  const syncedAt=cleanText(opts.synced_at||opts.syncedAt||"",40);
+  const provider=accessSnapshotProviderMetadata(opts.provider_metadata||opts.providerMetadata||opts);
+  const idSeed=[propertyId,cleanText(rawRemark,1000),syncedAt,provider.card_id||provider.tenant_card_id||""].join("|");
+  return {
+    access_snapshot_id:cleanText(idSeed)?`runtime_access_snapshot_${accessSnapshotRuntimeHash(idSeed)}`:"",
+    property_id:propertyId,
+    bed:parsed.bed,
+    raw_remark:cleanText(rawRemark,1000),
+    parsed_deposit_amount:parsed.parsed_deposit_amount,
+    parsed_checkin_mmdd:parsed.parsed_checkin_mmdd,
+    parsed_valid_until_mmdd:parsed.parsed_valid_until_mmdd,
+    parsed_business_note:parsed.parsed_business_note,
+    parse_status:parsed.parse_status,
+    source:"access_card_remark",
+    synced_at:syncedAt,
+    non_authoritative_provider_metadata:provider,
+    warnings:parsed.warnings
+  };
+}
+__name(buildAccessSnapshotDTO,"buildAccessSnapshotDTO");
 function validateEntryAnchor(row){
   const type=entryAnchorType(row);
   const required=entryAnchorContract[type]||[];
