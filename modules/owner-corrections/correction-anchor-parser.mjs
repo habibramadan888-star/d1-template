@@ -18,6 +18,7 @@ const FORBIDDEN_IDENTITY_KEYS = [
   "hardware_card_id",
   "provider_phone",
   "access_card_metadata_phone",
+  "old_ttlock_ref",
   "identity_card_id",
   "identity_tenant_card_id",
   "identity_provider_phone"
