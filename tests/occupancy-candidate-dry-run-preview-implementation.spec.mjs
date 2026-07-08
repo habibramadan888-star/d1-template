@@ -33,6 +33,7 @@ async function loadPreviewHarness() {
     function entryAnchorMoney(value){ return cleanMoney(value); }
     function entryAnchorType(row){
       const raw=String(row?.type||'').trim().toUpperCase();
+      if(raw==='T'||raw==='TRANSFER'||raw==='BED_TRANSFER')return 'TF';
       if(raw)return raw;
       const event=String(row?.event_type||'').trim().toLowerCase();
       return {rent:'R',arrears_payment:'AP',deposit_in:'D',deposit_out:'DR',checkout:'CO',left_with_arrears:'CO',expense:'E',bed_transfer:'TF'}[event]||raw;
@@ -234,6 +235,54 @@ test("bed transfer occupied target returns candidate conflict anomaly", async ()
 
   assert.equal(event.occupancy_candidate_status, "candidate_conflict");
   assert.equal(event.anomalies[0].risk_code, "BED_TRANSFER_TO_OCCUPIED_BED");
+});
+
+test("bed transfer dispatch uses event_type before legacy type and never falls through to rent", async () => {
+  const worker = await readFile(workerPath, "utf8");
+  const typeResolver = functionBlock(worker, "employeeEntryUploadType");
+  const validateBlock = functionBlock(worker, "validateEmployeeEntryUploadPayload", "async function");
+  const anchorType = functionBlock(worker, "entryAnchorType");
+
+  assert.match(typeResolver, /const event=cleanText\(entry\.event_type,60\)\.toLowerCase\(\)/);
+  assert.match(typeResolver, /bed_transfer:"TF"/);
+  assert.match(typeResolver, /T:"TF"/);
+  assert.match(typeResolver, /return eventMap\[event\]/);
+  assert.match(validateBlock, /const type=employeeEntryUploadType\(entry\)/);
+  assert.doesNotMatch(validateBlock, /const type=cleanText\(entry\.type\|\|entry\.reason_code\|\|"R",12\)\.toUpperCase\(\)/);
+  assert.match(anchorType, /raw==="T"\|\|raw==="TRANSFER"\|\|raw==="BED_TRANSFER"/);
+});
+
+test("legacy type T bed transfer preview is not routed to rent preview", async () => {
+  const h = await loadPreviewHarness();
+  const preview = h.buildEmployeeEntryOccupancyCandidatePreview(
+    { corpid: "homelink" },
+    sessionBody([
+      {
+        type: "T",
+        event_type: "bed_transfer",
+        id: "ent-transfer-live-fixture",
+        from_bed: "145",
+        to_bed: "146",
+        transfer_date: "2026-10-01",
+        amount: 50,
+        payment_method: "cash"
+      }
+    ])
+  );
+  const event = preview.events[0];
+
+  assert.equal(event.event_type, "bed_transfer");
+  assert.equal(event.from_bed, "145");
+  assert.equal(event.to_bed, "146");
+  assert.notEqual(event.event_type, "rent");
+  assert.notEqual(event.occupancy_candidate_status, "candidate_created");
+  assert.deepEqual(JSON.parse(JSON.stringify(event.forbidden_inputs_used)), {
+    card_id: false,
+    tenant_card_id: false,
+    provider_phone: false,
+    phone_99099: false
+  });
+  assert.equal(preview.no_write_proof.real_upload_called, false);
 });
 
 test("duplicate guard still runs before business validation", async () => {

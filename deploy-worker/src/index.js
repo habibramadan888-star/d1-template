@@ -2232,6 +2232,15 @@ function validateEmployeeEntryUploadEventFields(type,entry,normalized,eventIndex
   return validator(entry,normalized,eventIndex,anchorPreview);
 }
 __name(validateEmployeeEntryUploadEventFields,"validateEmployeeEntryUploadEventFields");
+function employeeEntryUploadType(entry={}){
+  const event=cleanText(entry.event_type,60).toLowerCase();
+  const eventMap={rent:"R",arrears_payment:"AP",deposit_in:"D",deposit_out:"DR",checkout:"CO",left_with_arrears:"CO",expense:"E",bed_transfer:"TF",bed_transfer_fee:"TFF"};
+  if(eventMap[event])return eventMap[event];
+  const raw=cleanText(entry.type||entry.reason_code||"R",12).toUpperCase();
+  const legacyMap={T:"TF",TRANSFER:"TF",BED_TRANSFER:"TF"};
+  return legacyMap[raw]||raw||"R";
+}
+__name(employeeEntryUploadType,"employeeEntryUploadType");
 async function empFindOpenArrearTaskForPaymentReadOnly(env,user,taskId,bed=""){
   const cleanTaskId=cleanId(taskId);
   if(!cleanTaskId)return null;
@@ -2312,7 +2321,7 @@ async function validateEmployeeEntryUploadPayload(env,user,body,opts={}){
       built_at:HOMELINK_DIAGNOSTIC_BUILT_AT
     };
   }
-  const type=cleanText(entry.type||entry.reason_code||"R",12).toUpperCase();
+  const type=employeeEntryUploadType(entry);
   const normalized=normalizeEntryAnchor(entry);
   const anchorPreview={
     id:cleanText(normalized.id||normalized.event_id||normalized.anchor_id,80),
@@ -2914,6 +2923,7 @@ const entryAnchorContract={
 function entryAnchorType(row){
   const raw=String(row?.type||"").trim().toUpperCase();
   if(entryAnchorContract[raw])return raw;
+  if(raw==="T"||raw==="TRANSFER"||raw==="BED_TRANSFER")return "TF";
   const event=String(row?.event_type||"").trim().toLowerCase();
   return {rent:"R",arrears_payment:"AP",deposit_in:"D",deposit_out:"DR",checkout:"CO",left_with_arrears:"CO",expense:"E",bed_transfer:"TF",bed_transfer_fee:"TFF"}[event]||raw;
 }
