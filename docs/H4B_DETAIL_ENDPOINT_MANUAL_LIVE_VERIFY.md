@@ -16,7 +16,8 @@ This script only calls `GET /api/history` and `GET /api/session_detail?id=...&in
     console.log({ step: "history", status: historyRes.status, raw: historyText });
     throw error;
   }
-  const session = (Array.isArray(history) ? history : []).find((row) => row.anchor_id === targetAnchor || row.id === "S20260707-x6wio");
+  const historyRows = Array.isArray(history) ? history : (Array.isArray(history?.data) ? history.data : []);
+  const session = historyRows.find((row) => row.anchor_id === targetAnchor || row.id === "S20260707-x6wio");
   if (!session) {
     console.log({ status_label: "NOT_LIVE_VERIFIED", reason: "target session not found", targetAnchor });
     return;
@@ -44,7 +45,7 @@ This script only calls `GET /api/history` and `GET /api/session_detail?id=...&in
     correction_summary_exists: !!detail.correction_summary,
     correction_audit_exists: !!detail.correction_audit,
     correction_aware: summary.correction_aware === true,
-    correction_applied: summary.correction_applied === true,
+    correction_applied: summary.correction_applied === false,
     raw_gross: summary.raw_totals?.gross,
     correction_gross_delta: summary.correction_totals?.gross_delta,
     adjusted_gross: summary.adjusted_totals?.gross,

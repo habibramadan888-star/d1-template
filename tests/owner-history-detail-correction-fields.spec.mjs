@@ -262,7 +262,9 @@ test("owner list overview and UI are not changed for H4B", async () => {
 test("manual live verification script is read-only and uses additive detail mode", async () => {
   const text = await readFile("docs/H4B_DETAIL_ENDPOINT_MANUAL_LIVE_VERIFY.md", "utf8");
   assert.match(text, /\/api\/history\?limit=100/);
+  assert.match(text, /Array\.isArray\(history\?\.data\) \? history\.data : \[\]/);
   assert.match(text, /\/api\/session_detail\?id=\$\{encodeURIComponent\(session\.id\)\}&include_corrections=1/);
+  assert.match(text, /correction_applied: summary\.correction_applied === false/);
   assert.match(text, /production_write: "no"/);
   assert.doesNotMatch(text, /method:\s*["']POST["']/);
   assert.doesNotMatch(text, /\/api\/owner\/corrections\/apply/);
