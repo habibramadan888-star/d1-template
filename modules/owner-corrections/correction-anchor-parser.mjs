@@ -23,6 +23,27 @@ const FORBIDDEN_IDENTITY_KEYS = [
   "identity_provider_phone"
 ];
 
+function stableValue(value) {
+  if (Array.isArray(value)) return value.map((item) => stableValue(item));
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.keys(value).sort().map((key) => [key, stableValue(value[key])]));
+  }
+  return value;
+}
+
+function stableStringify(value) {
+  return JSON.stringify(stableValue(value));
+}
+
+function hashString(value) {
+  let hash = 2166136261;
+  for (const char of String(value || "")) {
+    hash ^= char.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(36).padStart(7, "0");
+}
+
 function asObject(value) {
   return value && typeof value === "object" && !Array.isArray(value) ? value : {};
 }
@@ -212,6 +233,48 @@ function correctionTotalsWithDeltaKeys(correctionTotals = {}) {
   };
 }
 
+export function hashCorrectionStablePayload(payload = {}) {
+  return `och_${hashString(stableStringify(payload))}`;
+}
+
+export function buildCorrectionRequestFingerprint(correction = {}) {
+  const root = asObject(correction);
+  return hashCorrectionStablePayload({
+    target_session_anchor: root.target_session_anchor || "",
+    target_session_id: root.target_session_id || "",
+    correction_type: root.correction_type || "",
+    correction_events: asArray(root.correction_events).map((event) => ({
+      correction_event_type: event?.correction_event_type || "",
+      original_event_id: event?.original_event_id || "",
+      affected_bed: event?.affected_bed || "",
+      affected_event_type: event?.affected_event_type || "",
+      financial_effect: normalizedFinancialEffect(event?.financial_effect)
+    }))
+  });
+}
+
+export function buildOwnerCorrectionPreviewHash(preview = {}, correction = {}, options = {}) {
+  return hashCorrectionStablePayload({
+    target_session_anchor: preview.target_session_anchor || correction.target_session_anchor || "",
+    target_session_id: preview.target_session_id || correction.target_session_id || "",
+    correction_type: correction.correction_type || "",
+    correction_events: asArray(correction.correction_events).map((event) => ({
+      correction_event_id: event?.correction_event_id || "",
+      correction_event_type: event?.correction_event_type || "",
+      original_event_id: event?.original_event_id || "",
+      affected_bed: event?.affected_bed || "",
+      affected_event_type: event?.affected_event_type || "",
+      financial_effect: normalizedFinancialEffect(event?.financial_effect)
+    })),
+    original_totals: preview.original_totals || {},
+    correction_totals: preview.correction_totals || {},
+    adjusted_totals: preview.adjusted_totals || {},
+    target_session_content_hash: options.target_session_content_hash || "",
+    owner_identity: options.owner_identity || "",
+    preview_window: options.preview_window || ""
+  });
+}
+
 function negativeTotalErrors(adjustedTotals = {}, allowNegativeTotals = false) {
   if (allowNegativeTotals) return [];
   const errors = [];
@@ -279,6 +342,112 @@ export function buildOwnerCorrectionDryRunPreview(originalSession = {}, correcti
       write_guard_mode: "route_level_no_write",
       proof_limitations: "D1 write count is reported by route contract; preview route does not call write functions."
     }
+  };
+}
+
+export function validateOwnerCorrectionApplyRequest(body = {}, preview = {}, options = {}) {
+  const errors = [];
+  const request = asObject(body);
+  const confirmation = asObject(request.explicit_owner_confirmation);
+  const expectedPreviewHash = options.expected_preview_hash || preview.preview_hash || "";
+  const correctionGrossDelta = money(preview?.correction_totals?.gross_delta);
+  const adjustedGross = money(preview?.adjusted_totals?.gross);
+
+  for (const field of ["target_session_anchor", "target_session_id", "correction_type", "correction_reason", "evidence_summary", "preview_hash", "idempotency_key"]) {
+    if (!String(request[field] || "").trim()) addIssue(errors, "APPLY_REQUIRED_FIELD_MISSING", `${field} is required.`, { field });
+  }
+  if (!Array.isArray(request.correction_events) || request.correction_events.length === 0) {
+    addIssue(errors, "CORRECTION_EVENTS_REQUIRED", "correction_events array must not be empty.", { field: "correction_events" });
+  }
+  if (expectedPreviewHash && request.preview_hash && request.preview_hash !== expectedPreviewHash) {
+    addIssue(errors, "PREVIEW_HASH_INVALID", "preview_hash does not match the recomputed preview.", {
+      expected_preview_hash: expectedPreviewHash,
+      received_preview_hash: request.preview_hash
+    });
+  }
+  if (!confirmation.confirmed) addIssue(errors, "OWNER_CONFIRMATION_REQUIRED", "explicit_owner_confirmation.confirmed is required.", { field: "explicit_owner_confirmation.confirmed" });
+  for (const field of ["understands_original_events_immutable", "understands_no_hard_delete", "understands_correction_is_additive"]) {
+    if (confirmation[field] !== true) addIssue(errors, "OWNER_CONFIRMATION_REQUIRED", `${field} must be true.`, { field: `explicit_owner_confirmation.${field}` });
+  }
+  if (String(confirmation.confirmed_target_session_anchor || "") !== String(request.target_session_anchor || "")) {
+    addIssue(errors, "OWNER_CONFIRMATION_MISMATCH", "confirmed_target_session_anchor does not match target_session_anchor.", {
+      field: "explicit_owner_confirmation.confirmed_target_session_anchor"
+    });
+  }
+  if (Math.abs(money(confirmation.confirmed_adjusted_gross) - adjustedGross) > 0.01) {
+    addIssue(errors, "OWNER_CONFIRMATION_MISMATCH", "confirmed_adjusted_gross does not match preview adjusted gross.", {
+      field: "explicit_owner_confirmation.confirmed_adjusted_gross",
+      expected: adjustedGross,
+      actual: money(confirmation.confirmed_adjusted_gross)
+    });
+  }
+  if (Math.abs(money(confirmation.confirmed_correction_gross_delta) - correctionGrossDelta) > 0.01) {
+    addIssue(errors, "OWNER_CONFIRMATION_MISMATCH", "confirmed_correction_gross_delta does not match preview correction gross delta.", {
+      field: "explicit_owner_confirmation.confirmed_correction_gross_delta",
+      expected: correctionGrossDelta,
+      actual: money(confirmation.confirmed_correction_gross_delta)
+    });
+  }
+  for (const error of asArray(preview.invalid_corrections)) errors.push(error);
+  return { ok: errors.length === 0, errors };
+}
+
+export function buildOwnerCorrectionSessionAnchor(input = {}) {
+  const preview = asObject(input.preview);
+  const correction = asObject(input.correction);
+  const now = input.created_at || new Date().toISOString();
+  const correctionAnchorId = input.correction_anchor_id || `CORR-${now.slice(0, 10).replace(/-/g, "")}-owner-${hashString(`${preview.target_session_anchor}|${input.idempotency_key || ""}`)}`;
+  const correctionSessionId = input.correction_session_id || `CORR-S${now.slice(0, 10).replace(/-/g, "")}-${hashString(correctionAnchorId)}`;
+  const payload = {
+    anchor_contract_version: "owner_correction_anchor_v1",
+    correction_session_id: correctionSessionId,
+    correction_anchor_id: correctionAnchorId,
+    correction_anchor_contract_version: "owner_correction_anchor_v1",
+    correction_type: correction.correction_type || "",
+    target_session_anchor: preview.target_session_anchor || correction.target_session_anchor || "",
+    target_session_id: preview.target_session_id || correction.target_session_id || "",
+    target_employee_userid: input.target_employee_userid || "",
+    target_business_date: input.target_business_date || "",
+    correction_reason: correction.correction_reason || "",
+    evidence_summary: correction.evidence_summary || "",
+    created_by: input.created_by || "",
+    created_by_role: input.created_by_role || "",
+    authorized_by: input.authorized_by || input.created_by || "",
+    authorized_role: input.authorized_role || input.created_by_role || "",
+    created_at: now,
+    effective_date: input.effective_date || now.slice(0, 10),
+    applied_at: now,
+    status: "applied",
+    preview_hash: input.preview_hash || preview.preview_hash || "",
+    idempotency_key: input.idempotency_key || "",
+    correction_request_fingerprint: input.correction_request_fingerprint || buildCorrectionRequestFingerprint(correction),
+    original_totals: preview.original_totals || {},
+    correction_totals: preview.correction_totals || {},
+    adjusted_totals: preview.adjusted_totals || {},
+    no_hard_delete: true,
+    original_events_immutable: true,
+    production_write_scope: "correction_anchor_only",
+    correction_events: asArray(correction.correction_events).map((event) => ({
+      ...event,
+      status: event.status || "applied",
+      audit_note: event.audit_note || correction.evidence_summary || correction.correction_reason || ""
+    }))
+  };
+  const exportText = [
+    "HOMELINK OWNER CORRECTION",
+    `Correction Anchor ID: ${correctionAnchorId}`,
+    `Target Session: ${payload.target_session_anchor}`,
+    `Reason: ${payload.correction_reason}`,
+    "",
+    "==== CORRECTION ANCHORS JSON ====",
+    JSON.stringify(payload),
+    "==== END CORRECTION ANCHORS JSON ===="
+  ].join("\n");
+  return {
+    correction_session_id: correctionSessionId,
+    correction_anchor_id: correctionAnchorId,
+    payload,
+    export_text: exportText
   };
 }
 

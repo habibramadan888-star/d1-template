@@ -3,10 +3,14 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import {
   applyCorrectionEffectsInMemory,
+  buildCorrectionRequestFingerprint,
   buildOwnerCorrectionDryRunPreview,
+  buildOwnerCorrectionPreviewHash,
+  buildOwnerCorrectionSessionAnchor,
   buildCorrectionAuditView,
   calculateCorrectionAdjustedTotals,
   parseOwnerCorrectionAnchorText,
+  validateOwnerCorrectionApplyRequest,
   validateCorrectionAnchorContract
 } from "../modules/owner-corrections/correction-anchor-parser.mjs";
 
@@ -265,6 +269,10 @@ test("parser module is pure and owner history parser is unaffected", async () =>
 
 test("owner correction dry-run preview returns x6wio adjusted totals and no-write proof", () => {
   const preview = buildOwnerCorrectionDryRunPreview(x6wioOriginalSession, x6wioCorrection());
+  const previewHash = buildOwnerCorrectionPreviewHash(preview, x6wioCorrection(), {
+    target_session_content_hash: "fixture-target-hash",
+    owner_identity: "owner"
+  });
 
   assert.equal(preview.ok, true);
   assert.equal(preview.mode, "owner_correction_dry_run_preview_only");
@@ -284,6 +292,7 @@ test("owner correction dry-run preview returns x6wio adjusted totals and no-writ
   assert.equal(preview.no_write_proof.d1_write_count, 0);
   assert.equal(preview.no_write_proof.session_write_attempted, false);
   assert.equal(preview.no_write_proof.real_apply_called, false);
+  assert.match(previewHash, /^och_/);
 });
 
 test("owner correction preview rejects missing and unmatched original event ids", () => {
@@ -345,7 +354,116 @@ test("owner correction preview endpoint is route-level no-write and owner scoped
   assert.ok(routeIndex > worker.indexOf("const auth = await requireAuth(request, env)"), "route must be behind API auth");
   assert.match(handler, /canReadOwnerData\(user\)/);
   assert.match(handler, /SELECT \* FROM sessions WHERE corpid=\?/);
-  assert.match(handler, /buildOwnerCorrectionDryRunPreview/);
+  assert.match(worker, /buildOwnerCorrectionDryRunPreview/);
+  assert.match(handler, /ownerCorrectionBuildPreviewForSession/);
   assert.match(handler, /ownerCorrectionPreviewNoWriteProof/);
   assert.doesNotMatch(handler, /env\.DB\.batch|\.run\(|empInsertDynamic|INSERT\s+INTO|UPDATE\s+\w+\s+SET|DELETE\s+FROM|audit\(/i);
+});
+
+test("owner correction apply request validates preview hash confirmation and idempotency", () => {
+  const correction = { ...x6wioCorrection(), target_session_id: "S20260707-x6wio" };
+  const preview = buildOwnerCorrectionDryRunPreview({ ...x6wioOriginalSession, id: "S20260707-x6wio" }, correction);
+  const previewHash = buildOwnerCorrectionPreviewHash(preview, correction, {
+    target_session_content_hash: "fixture-target-hash",
+    owner_identity: "owner"
+  });
+  const validBody = {
+    ...correction,
+    correction_reason: "duplicate upload correction",
+    preview_hash: previewHash,
+    idempotency_key: "idem-x6wio",
+    evidence_summary: "Fixture evidence.",
+    explicit_owner_confirmation: {
+      confirmed: true,
+      understands_original_events_immutable: true,
+      understands_no_hard_delete: true,
+      understands_correction_is_additive: true,
+      confirmed_target_session_anchor: "EMPV3-20260707-abdul-x6wio",
+      confirmed_correction_gross_delta: -1470,
+      confirmed_adjusted_gross: 80
+    }
+  };
+
+  const valid = validateOwnerCorrectionApplyRequest(validBody, { ...preview, preview_hash: previewHash }, { expected_preview_hash: previewHash });
+  const invalidHash = validateOwnerCorrectionApplyRequest({ ...validBody, preview_hash: "bad" }, { ...preview, preview_hash: previewHash }, { expected_preview_hash: previewHash });
+  const missingConfirmation = validateOwnerCorrectionApplyRequest({ ...validBody, explicit_owner_confirmation: {} }, { ...preview, preview_hash: previewHash }, { expected_preview_hash: previewHash });
+  const mismatchedGross = validateOwnerCorrectionApplyRequest({
+    ...validBody,
+    explicit_owner_confirmation: { ...validBody.explicit_owner_confirmation, confirmed_adjusted_gross: 1550 }
+  }, { ...preview, preview_hash: previewHash }, { expected_preview_hash: previewHash });
+  const missingIdempotency = validateOwnerCorrectionApplyRequest({ ...validBody, idempotency_key: "" }, { ...preview, preview_hash: previewHash }, { expected_preview_hash: previewHash });
+
+  assert.equal(valid.ok, true);
+  assert.equal(invalidHash.ok, false);
+  assert.equal(invalidHash.errors.some((error) => error.code === "PREVIEW_HASH_INVALID"), true);
+  assert.equal(missingConfirmation.ok, false);
+  assert.equal(missingConfirmation.errors.some((error) => error.code === "OWNER_CONFIRMATION_REQUIRED"), true);
+  assert.equal(mismatchedGross.ok, false);
+  assert.equal(mismatchedGross.errors.some((error) => error.code === "OWNER_CONFIRMATION_MISMATCH"), true);
+  assert.equal(missingIdempotency.ok, false);
+  assert.equal(missingIdempotency.errors.some((error) => error.code === "APPLY_REQUIRED_FIELD_MISSING" && error.field === "idempotency_key"), true);
+});
+
+test("owner correction session anchor builder is additive and preserves source immutability", () => {
+  const correction = { ...x6wioCorrection(), target_session_id: "S20260707-x6wio" };
+  const preview = buildOwnerCorrectionDryRunPreview({ ...x6wioOriginalSession, id: "S20260707-x6wio" }, correction);
+  const previewHash = buildOwnerCorrectionPreviewHash(preview, correction, {
+    target_session_content_hash: "fixture-target-hash",
+    owner_identity: "owner"
+  });
+  const fingerprint = buildCorrectionRequestFingerprint(correction);
+  const built = buildOwnerCorrectionSessionAnchor({
+    preview: { ...preview, preview_hash: previewHash },
+    correction,
+    preview_hash: previewHash,
+    idempotency_key: "idem-x6wio",
+    correction_request_fingerprint: fingerprint,
+    created_by: "owner",
+    created_by_role: "manager",
+    authorized_by: "owner",
+    authorized_role: "manager",
+    target_employee_userid: "abdul",
+    target_business_date: "2026-07-07",
+    created_at: "2026-07-08T00:00:00.000Z"
+  });
+  const parsed = parseOwnerCorrectionAnchorText(built.export_text);
+
+  assert.match(built.export_text, /HOMELINK OWNER CORRECTION/);
+  assert.match(built.export_text, /CORRECTION ANCHORS JSON/);
+  assert.equal(parsed.ok, true);
+  assert.equal(parsed.correction.anchor_contract_version, "owner_correction_anchor_v1");
+  assert.equal(parsed.correction.preview_hash, previewHash);
+  assert.equal(parsed.correction.idempotency_key, "idem-x6wio");
+  assert.equal(parsed.correction.correction_request_fingerprint, fingerprint);
+  assert.equal(parsed.correction.original_totals.gross, 1550);
+  assert.equal(parsed.correction.correction_totals.gross_delta, -1470);
+  assert.equal(parsed.correction.adjusted_totals.gross, 80);
+  assert.equal(parsed.correction.no_hard_delete, true);
+  assert.equal(parsed.correction.original_events_immutable, true);
+  assert.equal(parsed.correction.production_write_scope, "correction_anchor_only");
+  assert.equal(x6wioOriginalSession.events.length, 3);
+});
+
+test("owner correction apply endpoint is gated disabled by default and controlled write only when enabled", async () => {
+  const worker = await readFile("deploy-worker/src/index.js", "utf8");
+  const routeIndex = worker.indexOf('path === "/api/owner/corrections/apply"');
+  const handlerIndex = worker.indexOf("async function handleOwnerCorrectionApply");
+  const handlerEnd = worker.indexOf("__name(handleOwnerCorrectionApply", handlerIndex);
+  const handler = worker.slice(handlerIndex, handlerEnd);
+  const disabledIndex = handler.indexOf("ownerCorrectionApplyEnabled(env)");
+  const writeIndex = handler.indexOf('empInsertDynamic(env,"sessions"');
+
+  assert.ok(routeIndex > -1, "owner correction apply route must exist");
+  assert.ok(handlerIndex > -1, "owner correction apply handler must exist");
+  assert.match(handler, /canWriteOwnerData\(user\)/);
+  assert.match(worker, /OWNER_CORRECTION_APPLY_ENABLED/);
+  assert.match(worker, /OWNER_CORRECTION_APPLY_DISABLED/);
+  assert.ok(disabledIndex > -1 && writeIndex > disabledIndex, "disabled gate must run before controlled write");
+  assert.match(handler, /validateOwnerCorrectionApplyRequest/);
+  assert.match(handler, /buildCorrectionRequestFingerprint/);
+  assert.match(handler, /ownerCorrectionFetchExistingCorrectionSessions/);
+  assert.match(worker, /ORIGINAL_EVENT_ALREADY_CORRECTED/);
+  assert.match(worker, /IDEMPOTENCY_CONFLICT/);
+  assert.match(handler, /source:"owner_correction"/);
+  assert.doesNotMatch(handler, /UPDATE\s+\w+\s+SET|DELETE\s+FROM|env\.DB\.batch|arrear_tasks|deposit_ledger/i);
 });

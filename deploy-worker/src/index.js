@@ -2,7 +2,15 @@
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 
 import { createEmployeeEntryLiveWriteAdapterDraft } from "../../modules/worker/employee-entry-live-write-adapter.mjs";
-import { buildOwnerCorrectionDryRunPreview } from "../../modules/owner-corrections/correction-anchor-parser.mjs";
+import {
+  buildCorrectionRequestFingerprint,
+  buildOwnerCorrectionDryRunPreview,
+  buildOwnerCorrectionPreviewHash,
+  buildOwnerCorrectionSessionAnchor,
+  hashCorrectionStablePayload,
+  parseOwnerCorrectionAnchorText,
+  validateOwnerCorrectionApplyRequest
+} from "../../modules/owner-corrections/correction-anchor-parser.mjs";
 import { createDashboardTotalsPayload } from "./handlers/dashboard-totals.js";
 import { ErrorCodes } from "../../dist/lib/constants/error-codes.js";
 import { fail, ok } from "../../dist/lib/lib/api-response.js";
@@ -6622,6 +6630,73 @@ function ownerCorrectionPreviewNoWriteProof(extra={}){
   };
 }
 __name(ownerCorrectionPreviewNoWriteProof,"ownerCorrectionPreviewNoWriteProof");
+function ownerCorrectionApplyEnabled(env){
+  return ["1","true","yes","on"].includes(String(env.OWNER_CORRECTION_APPLY_ENABLED||"").trim().toLowerCase());
+}
+__name(ownerCorrectionApplyEnabled,"ownerCorrectionApplyEnabled");
+function ownerCorrectionDisabledResponse(){
+  return json({
+    ok:false,
+    mode:"owner_correction_apply_disabled",
+    code:"OWNER_CORRECTION_APPLY_DISABLED",
+    error_code:"OWNER_CORRECTION_APPLY_DISABLED",
+    message:"Owner correction apply is disabled in this environment.",
+    no_write:true,
+    production_write:false,
+    production_cutover:"PRODUCTION_NO_GO",
+    no_write_proof:ownerCorrectionPreviewNoWriteProof()
+  },403);
+}
+__name(ownerCorrectionDisabledResponse,"ownerCorrectionDisabledResponse");
+function ownerCorrectionTargetSessionHash(session={}){
+  return hashCorrectionStablePayload({
+    id:session.id||"",
+    anchor_id:session.anchor_id||"",
+    entries_count:session.entries_count||0,
+    cash_handover:session.cash_handover||0,
+    bank_transfer_total:session.bank_transfer_total||0,
+    gross_received:session.gross_received||0,
+    export_text:session.export_text||"",
+    entries_json:session.entries_json||"",
+    updated_at:session.updated_at||session.exported_at||session.created_at||""
+  });
+}
+__name(ownerCorrectionTargetSessionHash,"ownerCorrectionTargetSessionHash");
+function ownerCorrectionNormalizeBody(body={},targetAnchor=""){
+  return {
+    anchor_contract_version:"owner_correction_anchor_v1",
+    correction_session_id:cleanText(body?.correction_session_id||body?.correctionSessionId||`CORR-PREVIEW-${targetAnchor}`,180),
+    correction_type:cleanText(body?.correction_type||body?.correctionType||"",120),
+    target_session_anchor:targetAnchor||cleanText(body?.target_session_anchor||body?.targetSessionAnchor||"",160),
+    target_session_id:cleanText(body?.target_session_id||body?.targetSessionId||"",160),
+    correction_reason:cleanText(body?.correction_reason||body?.correctionReason||"",500),
+    evidence_summary:cleanText(body?.evidence_summary||body?.evidenceSummary||"",1000),
+    no_hard_delete:true,
+    original_events_immutable:true,
+    allow_negative_totals_owner_override:body?.allow_negative_totals_owner_override===true,
+    correction_events:Array.isArray(body?.correction_events)?body.correction_events:[]
+  };
+}
+__name(ownerCorrectionNormalizeBody,"ownerCorrectionNormalizeBody");
+function ownerCorrectionBuildPreviewForSession(session,body,user){
+  const targetAnchor=cleanText(body?.target_session_anchor||body?.targetSessionAnchor||body?.target_session_id||"",160);
+  const originalEvents=extractEmployeeEntryAnchorsFromSession(session);
+  const correction=ownerCorrectionNormalizeBody(body,targetAnchor);
+  const preview=buildOwnerCorrectionDryRunPreview({
+    id:session.id||"",
+    session_id:session.id||"",
+    anchor:session.anchor_id||targetAnchor,
+    totals:ownerCorrectionPreviewSessionTotals(session,originalEvents),
+    events:originalEvents
+  },correction);
+  const targetSessionContentHash=ownerCorrectionTargetSessionHash(session);
+  const previewHash=buildOwnerCorrectionPreviewHash(preview,correction,{
+    target_session_content_hash:targetSessionContentHash,
+    owner_identity:cleanText(user?.userid||"",120)
+  });
+  return {preview:{...preview,preview_hash:previewHash,target_session_content_hash:targetSessionContentHash},correction,originalEvents,targetSessionContentHash};
+}
+__name(ownerCorrectionBuildPreviewForSession,"ownerCorrectionBuildPreviewForSession");
 async function handleOwnerCorrectionPreview(request,env,user){
   if(!canReadOwnerData(user))return forbidden();
   if(request.method!=="POST")return errorResponse("method_not_allowed",405,"METHOD_NOT_ALLOWED");
@@ -6636,26 +6711,7 @@ async function handleOwnerCorrectionPreview(request,env,user){
   if(!session){
     return json({ok:false,mode:"owner_correction_dry_run_preview_only",no_write:true,error_code:"TARGET_SESSION_NOT_FOUND",message:"Target session was not found.",target_session_anchor:targetAnchor,no_write_proof:ownerCorrectionPreviewNoWriteProof()},404);
   }
-  const originalEvents=extractEmployeeEntryAnchorsFromSession(session);
-  const correction={
-    anchor_contract_version:"owner_correction_anchor_v1",
-    correction_session_id:cleanText(body?.correction_session_id||body?.correctionSessionId||`CORR-PREVIEW-${targetAnchor}`,180),
-    correction_type:cleanText(body?.correction_type||body?.correctionType||"",120),
-    target_session_anchor:targetAnchor,
-    correction_reason:cleanText(body?.correction_reason||body?.correctionReason||"",500),
-    evidence_summary:cleanText(body?.evidence_summary||body?.evidenceSummary||"",1000),
-    no_hard_delete:true,
-    original_events_immutable:true,
-    allow_negative_totals_owner_override:body?.allow_negative_totals_owner_override===true,
-    correction_events:Array.isArray(body?.correction_events)?body.correction_events:[]
-  };
-  const preview=buildOwnerCorrectionDryRunPreview({
-    id:session.id||"",
-    session_id:session.id||"",
-    anchor:session.anchor_id||targetAnchor,
-    totals:ownerCorrectionPreviewSessionTotals(session,originalEvents),
-    events:originalEvents
-  },correction);
+  const {preview}=ownerCorrectionBuildPreviewForSession(session,{...body,target_session_anchor:targetAnchor},user);
   return json({
     ...preview,
     target_session_anchor:session.anchor_id||preview.target_session_anchor,
@@ -6666,6 +6722,122 @@ async function handleOwnerCorrectionPreview(request,env,user){
   },preview.ok?200:422);
 }
 __name(handleOwnerCorrectionPreview,"handleOwnerCorrectionPreview");
+function ownerCorrectionExistingScanResult(rows=[],fingerprint="",idempotencyKey="",originalEventIds=[]){
+  const originalSet=new Set(originalEventIds.filter(Boolean));
+  for(const row of rows||[]){
+    const parsed=parseOwnerCorrectionAnchorText(row.export_text||"");
+    if(!parsed?.found||!parsed?.correction)continue;
+    const correction=parsed.correction;
+    const existingFingerprint=String(correction.correction_request_fingerprint||"");
+    const existingKey=String(correction.idempotency_key||"");
+    if(existingKey&&existingKey===idempotencyKey&&existingFingerprint===fingerprint){
+      return {ok:true,idempotent:true,existing:row,correction};
+    }
+    if(existingKey&&existingKey===idempotencyKey&&existingFingerprint!==fingerprint){
+      return {ok:false,error_code:"IDEMPOTENCY_CONFLICT",message:"Same idempotency_key was already used with a different correction request.",existing:row};
+    }
+    const correctedIds=(correction.correction_events||[]).map(event=>String(event.original_event_id||"")).filter(Boolean);
+    if(correctedIds.some(id=>originalSet.has(id))){
+      return {ok:false,error_code:"ORIGINAL_EVENT_ALREADY_CORRECTED",message:"One or more original_event_id values were already corrected by an active correction.",existing:row,corrected_original_event_ids:correctedIds.filter(id=>originalSet.has(id))};
+    }
+  }
+  return {ok:true,idempotent:false};
+}
+__name(ownerCorrectionExistingScanResult,"ownerCorrectionExistingScanResult");
+async function ownerCorrectionFetchExistingCorrectionSessions(env,user,targetAnchor){
+  if(!await empTableExists(env,"sessions").catch(()=>false))return [];
+  const rows=await env.DB.prepare(`SELECT id, anchor_id, export_text, source, created_at FROM sessions
+    WHERE corpid=? AND COALESCE(voided_at,'')='' AND COALESCE(handover_status,'')<>'VOID'
+      AND COALESCE(export_text,'') LIKE '%CORRECTION ANCHORS JSON%'
+      AND (COALESCE(export_text,'') LIKE ? OR COALESCE(anchor_id,'') LIKE 'CORR-%')
+    ORDER BY created_at DESC LIMIT 1000`).bind(user.corpid,`%${targetAnchor}%`).all().catch(()=>({results:[]}));
+  return rows.results||[];
+}
+__name(ownerCorrectionFetchExistingCorrectionSessions,"ownerCorrectionFetchExistingCorrectionSessions");
+async function handleOwnerCorrectionApply(request,env,user){
+  if(!canWriteOwnerData(user))return forbidden();
+  if(request.method!=="POST")return errorResponse("method_not_allowed",405,"METHOD_NOT_ALLOWED");
+  let body;
+  try{body=await request.json();}catch{return json({ok:false,mode:"owner_correction_apply",error_code:"INVALID_JSON",message:"Request body must be valid JSON.",no_write:true,production_write:false,production_cutover:"PRODUCTION_NO_GO",no_write_proof:ownerCorrectionPreviewNoWriteProof()},400);}
+  if(!ownerCorrectionApplyEnabled(env))return ownerCorrectionDisabledResponse();
+  const targetAnchor=cleanText(body?.target_session_anchor||body?.targetSessionAnchor||"",160);
+  const targetSessionId=cleanText(body?.target_session_id||body?.targetSessionId||"",160);
+  if(!targetAnchor||!targetSessionId){
+    return json({ok:false,mode:"owner_correction_apply",error_code:"TARGET_SESSION_REQUIRED",message:"target_session_anchor and target_session_id are required.",no_write:true,production_write:false,production_cutover:"PRODUCTION_NO_GO",no_write_proof:ownerCorrectionPreviewNoWriteProof()},422);
+  }
+  if(!await empTableExists(env,"sessions").catch(()=>false)){
+    return json({ok:false,mode:"owner_correction_apply",error_code:"SESSIONS_TABLE_NOT_READY",message:"sessions table is not available.",no_write:true,production_write:false,production_cutover:"PRODUCTION_NO_GO",no_write_proof:ownerCorrectionPreviewNoWriteProof()},503);
+  }
+  const session=await env.DB.prepare("SELECT * FROM sessions WHERE corpid=? AND anchor_id=? AND id=? LIMIT 1").bind(user.corpid,targetAnchor,targetSessionId).first().catch(()=>null);
+  if(!session){
+    return json({ok:false,mode:"owner_correction_apply",error_code:"TARGET_SESSION_NOT_FOUND",message:"Target session was not found.",target_session_anchor:targetAnchor,target_session_id:targetSessionId,no_write:true,production_write:false,production_cutover:"PRODUCTION_NO_GO",no_write_proof:ownerCorrectionPreviewNoWriteProof()},404);
+  }
+  const {preview,correction}=ownerCorrectionBuildPreviewForSession(session,body,user);
+  const applyValidation=validateOwnerCorrectionApplyRequest(body,preview,{expected_preview_hash:preview.preview_hash});
+  if(!applyValidation.ok){
+    return json({ok:false,mode:"owner_correction_apply_validation_failed",error_code:"OWNER_CORRECTION_APPLY_VALIDATION_FAILED",message:"Owner correction apply validation failed.",invalid_corrections:applyValidation.errors,no_write:true,production_write:false,production_cutover:"PRODUCTION_NO_GO",preview,no_write_proof:ownerCorrectionPreviewNoWriteProof()},422);
+  }
+  const fingerprint=buildCorrectionRequestFingerprint({...correction,target_session_id:targetSessionId});
+  const originalEventIds=(correction.correction_events||[]).map(event=>String(event.original_event_id||"")).filter(Boolean);
+  const existingRows=await ownerCorrectionFetchExistingCorrectionSessions(env,user,targetAnchor);
+  const existing=ownerCorrectionExistingScanResult(existingRows,fingerprint,cleanText(body.idempotency_key||"",180),originalEventIds);
+  if(!existing.ok){
+    return json({ok:false,mode:"owner_correction_apply_validation_failed",error_code:existing.error_code,message:existing.message,no_write:true,production_write:false,production_cutover:"PRODUCTION_NO_GO",no_write_proof:ownerCorrectionPreviewNoWriteProof(),existing_correction_anchor:existing.existing?.anchor_id||""},409);
+  }
+  if(existing.idempotent){
+    return json({ok:true,mode:"owner_correction_apply_idempotent_replay",correction_session_id:existing.existing.id,correction_anchor_id:existing.existing.anchor_id,existing:true,no_write:true,production_write:false,production_cutover:"PRODUCTION_NO_GO",no_write_proof:ownerCorrectionPreviewNoWriteProof({idempotent_replay:true})},200);
+  }
+  const now=empNow();
+  const built=buildOwnerCorrectionSessionAnchor({
+    preview,
+    correction:{...correction,target_session_id:targetSessionId},
+    preview_hash:preview.preview_hash,
+    idempotency_key:cleanText(body.idempotency_key||"",180),
+    correction_request_fingerprint:fingerprint,
+    created_by:cleanText(user.userid||"",120),
+    created_by_role:cleanText(user.role||"",80),
+    authorized_by:cleanText(user.userid||"",120),
+    authorized_role:cleanText(user.role||"",80),
+    target_employee_userid:cleanText(session.created_by||session.operator_id||"",120),
+    target_business_date:cleanText(session.date||"",40),
+    created_at:now
+  });
+  await empInsertDynamic(env,"sessions",{
+    id:built.correction_session_id,
+    corpid:user.corpid,
+    anchor_id:built.correction_anchor_id,
+    date:cleanText(session.date||now.slice(0,10),40),
+    entries_count:built.payload.correction_events.length,
+    created_by:user.userid,
+    operator_id:user.userid,
+    operator_name:user.userid,
+    cash_handover:0,
+    bank_transfer_total:0,
+    bank_transfer_count:0,
+    gross_received:0,
+    handover_status:"CORRECTION_APPLIED",
+    exported_at:now,
+    export_text:built.export_text,
+    source:"owner_correction"
+  },EMP_SESSION_COLUMNS);
+  return json({
+    ok:true,
+    mode:"owner_correction_apply",
+    correction_session_id:built.correction_session_id,
+    correction_anchor_id:built.correction_anchor_id,
+    target_session_anchor:targetAnchor,
+    target_session_id:targetSessionId,
+    preview_hash:preview.preview_hash,
+    correction_request_fingerprint:fingerprint,
+    production_write_scope:"correction_anchor_only",
+    original_session_mutated:false,
+    transaction_write_attempted:false,
+    arrear_task_write_attempted:false,
+    deposit_write_attempted:false,
+    production_cutover:"PRODUCTION_NO_GO"
+  },201);
+}
+__name(handleOwnerCorrectionApply,"handleOwnerCorrectionApply");
 async function handleEmployeeApi(request,env,user){
   const path=new URL(request.url).pathname;
   if(isReadonlyAdminRoleValue(user?.role)&&request.method!=="GET")return forbidden();
@@ -8116,6 +8288,9 @@ async function handleRequest(request, env, ctx) {
     const user = auth.payload;
     if (path === "/api/owner/corrections/preview" && method === "POST") {
       return handleOwnerCorrectionPreview(request, env, user);
+    }
+    if (path === "/api/owner/corrections/apply" && method === "POST") {
+      return handleOwnerCorrectionApply(request, env, user);
     }
     const employeeApiResponse = await handleEmployeeApi(request, env, user);
     if (employeeApiResponse) return employeeApiResponse;
