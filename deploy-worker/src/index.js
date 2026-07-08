@@ -7024,11 +7024,39 @@ function ownerHistoryDetailJsonSafeValue(value, seen=new WeakSet()){
   return value;
 }
 __name(ownerHistoryDetailJsonSafeValue,"ownerHistoryDetailJsonSafeValue");
+function ownerHistoryDetailReferenceSymbolHint(error){
+  const message=String(error?.message||"");
+  let match=message.match(/^([A-Za-z_$][\w$]*) is not defined$/);
+  if(match)return cleanText(match[1],120);
+  match=message.match(/^Cannot access '([^']+)' before initialization$/);
+  if(match)return cleanText(match[1],120);
+  return "";
+}
+__name(ownerHistoryDetailReferenceSymbolHint,"ownerHistoryDetailReferenceSymbolHint");
+function ownerHistoryDetailStageError(error,stage,component){
+  const wrapped=error instanceof Error?error:new Error("correction direct reader failed");
+  wrapped.safe_stage=cleanText(stage,80);
+  wrapped.safe_component=cleanText(component,120);
+  wrapped.safe_symbol_hint=ownerHistoryDetailReferenceSymbolHint(error);
+  return wrapped;
+}
+__name(ownerHistoryDetailStageError,"ownerHistoryDetailStageError");
+function ownerHistoryDetailDirectStage(stage,component,fn){
+  try{
+    return fn();
+  }catch(error){
+    throw ownerHistoryDetailStageError(error,stage,component);
+  }
+}
+__name(ownerHistoryDetailDirectStage,"ownerHistoryDetailDirectStage");
 function ownerHistoryDetailSafeWarning(error,code="CORRECTION_AWARE_DETAIL_FAILED_CLOSED"){
   return {
     code,
     message:"Correction-aware detail failed closed. Legacy detail rows were returned unchanged.",
-    safe_message:cleanText(error?.name||error?.code||"correction add-on failed",120)
+    safe_message:cleanText(error?.name||error?.code||"correction add-on failed",120),
+    safe_stage:cleanText(error?.safe_stage||"",80),
+    safe_component:cleanText(error?.safe_component||"",120),
+    safe_symbol_hint:cleanText(error?.safe_symbol_hint||ownerHistoryDetailReferenceSymbolHint(error)||"",120)
   };
 }
 __name(ownerHistoryDetailSafeWarning,"ownerHistoryDetailSafeWarning");
@@ -7037,7 +7065,7 @@ async function ownerHistoryDetailAdditiveResponse(env,user,sessionRow,rows=[]){
   try{
     const targetAnchor=cleanText(sessionRow?.anchor_id||sessionRow?.id||"",180);
     const correctionRows=targetAnchor?await ownerCorrectionFetchExistingCorrectionSessions(env,user,targetAnchor).catch(error=>{
-      throw Object.assign(new Error("correction lookup failed"),{safe_code:"CORRECTION_LOOKUP_FAILED_CLOSED",cause:error});
+      throw Object.assign(new Error("correction lookup failed"),{safe_code:"CORRECTION_LOOKUP_FAILED_CLOSED",safe_stage:"discover_correction_sessions",safe_component:"ownerCorrectionFetchExistingCorrectionSessions",cause:error});
     }):[];
     correctionFields=ownerHistoryDetailCorrectionFields(sessionRow,rows,correctionRows);
   }catch(error){
@@ -7069,17 +7097,19 @@ function ownerHistoryDetailCorrectionSessionView(row={}){
 }
 __name(ownerHistoryDetailCorrectionSessionView,"ownerHistoryDetailCorrectionSessionView");
 function ownerHistoryDetailDirectCorrectionFields(session={},rows=[],correctionRows=[]){
-  const target=ownerHistoryDetailTargetSessionView(session,rows);
-  const rawTotals=ownerHistoryDetailNormalizeTotals(target.totals);
-  const eventIds=new Set((target.events||[]).map(event=>cleanText(event?.event_id||event?.id||"",180)).filter(Boolean));
+  const target=ownerHistoryDetailDirectStage("derive_raw_totals","ownerHistoryDetailTargetSessionView",()=>ownerHistoryDetailTargetSessionView(session,rows));
+  const rawTotals=ownerHistoryDetailDirectStage("derive_raw_totals","ownerHistoryDetailNormalizeTotals",()=>ownerHistoryDetailNormalizeTotals(target.totals));
+  const eventIds=ownerHistoryDetailDirectStage("derive_raw_totals","targetEventIdSet",()=>new Set((target.events||[]).map(event=>cleanText(event?.event_id||event?.id||"",180)).filter(Boolean)));
   const usedIds=new Set();
   const correctionSessions=[];
   const correctionEvents=[];
   const invalidCorrections=[];
   let correctionTotals=ownerHistoryDetailZeroCorrectionTotals();
   for(const row of correctionRows||[]){
-    const sessionView=ownerHistoryDetailCorrectionSessionView(row);
-    const parsed=parseOwnerCorrectionAnchorText(sessionView.export_text||"");
+    const sessionView=ownerHistoryDetailDirectStage("load_correction_session_rows","ownerHistoryDetailCorrectionSessionView",()=>ownerHistoryDetailCorrectionSessionView(row));
+    const hasCorrectionBlock=ownerHistoryDetailDirectStage("extract_correction_anchor_json","correctionAnchorBlockScan",()=>String(sessionView.export_text||"").includes("CORRECTION ANCHORS JSON"));
+    if(!hasCorrectionBlock)continue;
+    const parsed=ownerHistoryDetailDirectStage("parse_correction_anchor","parseOwnerCorrectionAnchorText",()=>parseOwnerCorrectionAnchorText(sessionView.export_text||""));
     if(!parsed?.found)continue;
     if(!parsed?.ok||!parsed?.correction){
       invalidCorrections.push(...(parsed?.errors||[]).map(error=>({
@@ -7091,7 +7121,8 @@ function ownerHistoryDetailDirectCorrectionFields(session={},rows=[],correctionR
       continue;
     }
     const correction=parsed.correction;
-    if(!ownerHistoryDetailCorrectionTargetsMatch(correction,target)){
+    const targetMatched=ownerHistoryDetailDirectStage("validate_correction_anchor","ownerHistoryDetailCorrectionTargetsMatch",()=>ownerHistoryDetailCorrectionTargetsMatch(correction,target));
+    if(!targetMatched){
       invalidCorrections.push({
         code:"TARGET_SESSION_NOT_FOUND",
         message:"Correction target session was not found.",
@@ -7102,18 +7133,23 @@ function ownerHistoryDetailDirectCorrectionFields(session={},rows=[],correctionR
       correctionSessions.push(sessionView);
       continue;
     }
-    if(correction.no_hard_delete!==true){
+    const safeContract=ownerHistoryDetailDirectStage("validate_correction_anchor","correctionSafetyContract",()=>({
+      no_hard_delete:correction.no_hard_delete===true,
+      original_events_immutable:correction.original_events_immutable===true,
+      events:Array.isArray(correction.correction_events)?correction.correction_events:[]
+    }));
+    if(!safeContract.no_hard_delete){
       invalidCorrections.push({code:"NO_HARD_DELETE_REQUIRED",message:"no_hard_delete must be true.",correction_anchor_id:cleanText(correction?.correction_anchor_id||sessionView.anchor,180)});
       correctionSessions.push(sessionView);
       continue;
     }
-    if(correction.original_events_immutable!==true){
+    if(!safeContract.original_events_immutable){
       invalidCorrections.push({code:"ORIGINAL_EVENTS_IMMUTABLE_REQUIRED",message:"original_events_immutable must be true.",correction_anchor_id:cleanText(correction?.correction_anchor_id||sessionView.anchor,180)});
       correctionSessions.push(sessionView);
       continue;
     }
-    for(const [index,event] of (Array.isArray(correction.correction_events)?correction.correction_events:[]).entries()){
-      const invalid=ownerHistoryDetailCorrectionEventInvalid(event,index,eventIds,usedIds,correction);
+    for(const [index,event] of safeContract.events.entries()){
+      const invalid=ownerHistoryDetailDirectStage("link_correction_events","ownerHistoryDetailCorrectionEventInvalid",()=>ownerHistoryDetailCorrectionEventInvalid(event,index,eventIds,usedIds,correction));
       if(invalid){
         invalidCorrections.push({
           ...invalid,
@@ -7124,35 +7160,41 @@ function ownerHistoryDetailDirectCorrectionFields(session={},rows=[],correctionR
       }
       const originalId=cleanText(event?.original_event_id||"",180);
       usedIds.add(originalId);
-      correctionTotals=ownerHistoryDetailAddCorrectionDelta(correctionTotals,event.financial_effect);
+      correctionTotals=ownerHistoryDetailDirectStage("calculate_correction_totals","ownerHistoryDetailAddCorrectionDelta",()=>ownerHistoryDetailAddCorrectionDelta(correctionTotals,event.financial_effect));
       correctionEvents.push({...event});
     }
     correctionSessions.push(sessionView);
   }
-  const adjustedTotals=ownerHistoryDetailAddTotals(rawTotals,ownerHistoryDetailDeltaToTotals(correctionTotals));
-  return {
+  const adjustedTotals=ownerHistoryDetailDirectStage("calculate_correction_totals","ownerHistoryDetailAddTotals",()=>ownerHistoryDetailAddTotals(rawTotals,ownerHistoryDetailDeltaToTotals(correctionTotals)));
+  const correctionSummary=ownerHistoryDetailDirectStage("build_correction_summary","correctionSummary",()=>({
+    correction_aware:true,
+    correction_applied:correctionEvents.length>0,
+    raw_totals:rawTotals,
+    correction_totals:correctionTotals,
+    adjusted_totals:adjustedTotals,
+    correction_events_count:correctionEvents.length,
+    invalid_corrections_count:invalidCorrections.length,
+    warnings:[]
+  }));
+  const correctionAudit=ownerHistoryDetailDirectStage("build_correction_audit","correctionAudit",()=>({
+    raw_mode_available:true,
+    adjusted_mode_available:true,
+    audit_mode_available:true,
+    original_events_visible:true,
+    correction_events_visible:correctionEvents.length>0,
+    correction_sessions:correctionSessions,
+    correction_events:correctionEvents,
+    invalid_corrections:invalidCorrections,
+    warnings:[]
+  }));
+  return ownerHistoryDetailDirectStage("serialize_response","correctionAwareDetailResponse",()=>({
     correction_summary:{
-      correction_aware:true,
-      correction_applied:correctionEvents.length>0,
-      raw_totals:rawTotals,
-      correction_totals,
-      adjusted_totals:adjustedTotals,
-      correction_events_count:correctionEvents.length,
-      invalid_corrections_count:invalidCorrections.length,
-      warnings:[]
+      ...correctionSummary
     },
     correction_audit:{
-      raw_mode_available:true,
-      adjusted_mode_available:true,
-      audit_mode_available:true,
-      original_events_visible:true,
-      correction_events_visible:correctionEvents.length>0,
-      correction_sessions:correctionSessions,
-      correction_events:correctionEvents,
-      invalid_corrections:invalidCorrections,
-      warnings:[]
+      ...correctionAudit
     }
-  };
+  }));
 }
 __name(ownerHistoryDetailDirectCorrectionFields,"ownerHistoryDetailDirectCorrectionFields");
 function ownerHistoryDetailTargetSessionView(session={},rows=[]){
@@ -7177,7 +7219,7 @@ function ownerHistoryDetailCorrectionFields(session={},rows=[],correctionRows=[]
   try{
     return ownerHistoryDetailDirectCorrectionFields(session,rows,correctionRows);
   }catch(error){
-    const warnings=[{code:"CORRECTION_DIRECT_READER_FAILED",message:"Correction direct reader failed closed. Legacy detail rows were returned unchanged.",safe_message:cleanText(error?.name||error?.code||"direct reader failed",120)}];
+    const warnings=[{code:"CORRECTION_DIRECT_READER_FAILED",message:"Correction direct reader failed closed. Legacy detail rows were returned unchanged.",safe_message:cleanText(error?.name||error?.code||"direct reader failed",120),safe_stage:cleanText(error?.safe_stage||"",80),safe_component:cleanText(error?.safe_component||"ownerHistoryDetailDirectCorrectionFields",120),safe_symbol_hint:cleanText(error?.safe_symbol_hint||ownerHistoryDetailReferenceSymbolHint(error)||"",120)}];
     return ownerHistoryDetailFailClosedCorrectionFields(session,rows,warnings);
   }
 }

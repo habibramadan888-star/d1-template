@@ -201,9 +201,46 @@ test("detail fail-closed warnings are safe and do not expose stack or secret fie
   const block = text.slice(start, end);
 
   assert.match(block, /safe_message:cleanText\(error\?\.name\|\|error\?\.code\|\|"correction add-on failed",120\)/);
+  assert.match(block, /safe_stage:cleanText\(error\?\.safe_stage/);
+  assert.match(block, /safe_component:cleanText\(error\?\.safe_component/);
+  assert.match(block, /safe_symbol_hint:cleanText\(error\?\.safe_symbol_hint\|\|ownerHistoryDetailReferenceSymbolHint\(error\)/);
   assert.doesNotMatch(block, /stack/);
   assert.doesNotMatch(block, /message:\s*error\?\.message/);
   assert.doesNotMatch(block, /token|cookie|secret|password|env\./i);
+});
+
+test("direct correction reader reports safe stage diagnostics without stack leakage", async () => {
+  const text = await worker();
+  const start = text.indexOf("function ownerHistoryDetailDirectCorrectionFields");
+  const end = text.indexOf("__name(ownerHistoryDetailDirectCorrectionFields", start);
+  const directBlock = text.slice(start, end);
+  const fieldsStart = text.indexOf("function ownerHistoryDetailCorrectionFields");
+  const fieldsEnd = text.indexOf("__name(ownerHistoryDetailCorrectionFields", fieldsStart);
+  const fieldsBlock = text.slice(fieldsStart, fieldsEnd);
+
+  for (const stage of [
+    "derive_raw_totals",
+    "load_correction_session_rows",
+    "extract_correction_anchor_json",
+    "parse_correction_anchor",
+    "validate_correction_anchor",
+    "link_correction_events",
+    "calculate_correction_totals",
+    "build_correction_summary",
+    "build_correction_audit",
+    "serialize_response"
+  ]) {
+    assert.match(directBlock, new RegExp(stage));
+  }
+  assert.match(text, /function ownerHistoryDetailDirectStage/);
+  assert.match(text, /function ownerHistoryDetailStageError/);
+  assert.match(text, /function ownerHistoryDetailReferenceSymbolHint/);
+  assert.match(fieldsBlock, /safe_stage:cleanText\(error\?\.safe_stage/);
+  assert.match(fieldsBlock, /safe_component:cleanText\(error\?\.safe_component/);
+  assert.match(fieldsBlock, /safe_symbol_hint:cleanText\(error\?\.safe_symbol_hint\|\|ownerHistoryDetailReferenceSymbolHint\(error\)/);
+  assert.doesNotMatch(fieldsBlock, /stack/);
+  assert.doesNotMatch(fieldsBlock, /error\?\.message/);
+  assert.doesNotMatch(fieldsBlock, /token|cookie|secret|password|env\./i);
 });
 
 test("no correction sessions produce zero correction and adjusted equals raw", () => {

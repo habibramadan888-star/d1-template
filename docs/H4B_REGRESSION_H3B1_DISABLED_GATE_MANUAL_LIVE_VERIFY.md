@@ -61,6 +61,13 @@ This script verifies the H4B opt-in detail endpoint regression fix and confirms 
   const audit = optIn.json.correction_audit || {};
   const summaryWarnings = Array.isArray(summary.warnings) ? summary.warnings : null;
   const auditWarnings = Array.isArray(audit.warnings) ? audit.warnings : null;
+  const warningDiagnostics = [...(summaryWarnings || []), ...(auditWarnings || [])].map((warning) => ({
+    code: warning.code || "",
+    safe_message: warning.safe_message || "",
+    safe_stage: warning.safe_stage || "",
+    safe_component: warning.safe_component || "",
+    safe_symbol_hint: warning.safe_symbol_hint || ""
+  }));
   const noWriteProof = apply.json.no_write_proof || {};
   const result = {
     status_label:
@@ -93,6 +100,7 @@ This script verifies the H4B opt-in detail endpoint regression fix and confirms 
     correction_audit_exists: !!optIn.json.correction_audit,
     correction_summary_warnings: summaryWarnings,
     correction_audit_warnings: auditWarnings,
+    warning_diagnostics: warningDiagnostics,
     warnings_empty: summaryWarnings?.length === 0 && auditWarnings?.length === 0,
     correction_aware: summary.correction_aware === true,
     correction_applied: summary.correction_applied === true,
