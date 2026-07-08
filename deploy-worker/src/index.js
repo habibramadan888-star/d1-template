@@ -2162,6 +2162,69 @@ function buildEmployeeEntryOccupancyCandidatePreview(user,body){
   };
 }
 __name(buildEmployeeEntryOccupancyCandidatePreview,"buildEmployeeEntryOccupancyCandidatePreview");
+function employeeEntryOccupancyCandidateAccessSnapshotMetadata(value){
+  const source=value&&typeof value==="object"?value:{};
+  return {
+    bed:cleanText(source.bed||"",40),
+    parsed_deposit_amount:source.parsed_deposit_amount??null,
+    parsed_checkin_mmdd:cleanText(source.parsed_checkin_mmdd||"",20),
+    parsed_valid_until_mmdd:cleanText(source.parsed_valid_until_mmdd||"",20),
+    parse_status:cleanText(source.parse_status||"not_provided",40)
+  };
+}
+__name(employeeEntryOccupancyCandidateAccessSnapshotMetadata,"employeeEntryOccupancyCandidateAccessSnapshotMetadata");
+function employeeEntryOccupancyCandidateBasisMetadata(value){
+  const source=value&&typeof value==="object"?value:{};
+  const basis={
+    property_id:cleanText(source.property_id||"",80),
+    bed:cleanText(source.bed||"",40),
+    business_date:cleanDate(source.business_date||""),
+    access_snapshot_summary:employeeEntryOccupancyCandidateAccessSnapshotMetadata(source.access_snapshot_summary),
+    linked_event_id:source.linked_event_id?cleanText(source.linked_event_id,100):null,
+    linked_arrears_ref:source.linked_arrears_ref?cleanId(source.linked_arrears_ref):null,
+    staff_entered_customer_phone_present:!!source.staff_entered_customer_phone_present
+  };
+  for(const key of ["deposit_reason","checkout_type","from_bed","to_bed","from_state_before","to_state_before","from_state_after_expected","to_state_after_expected","deposit_moved","rent_coverage_moved","arrears_moved","access_validity_moved"]){
+    if(source[key]!==undefined&&source[key]!==null&&String(source[key]).trim()!=="")basis[key]=cleanText(source[key],120);
+  }
+  return basis;
+}
+__name(employeeEntryOccupancyCandidateBasisMetadata,"employeeEntryOccupancyCandidateBasisMetadata");
+function employeeEntryOccupancyCandidateMetadataFromPreviewEvent(event,generatedAt){
+  const source=event&&typeof event==="object"?event:{};
+  return {
+    version:"occupancy_candidate_v1",
+    non_authoritative:true,
+    metadata_only:true,
+    not_durable:true,
+    not_final_identity:true,
+    not_used_for_matching:true,
+    candidate_id:source.occupancy_candidate_id?cleanText(source.occupancy_candidate_id,160):null,
+    candidate_status:cleanText(source.occupancy_candidate_status||"candidate_unresolved",60),
+    candidate_persistence:"metadata_only_not_authoritative",
+    source:"server_upload_preflight",
+    generated_at:cleanText(generatedAt||new Date().toISOString(),40),
+    basis:employeeEntryOccupancyCandidateBasisMetadata(source.candidate_basis||{}),
+    forbidden_inputs_used:employeeEntryOccupancyForbiddenInputsUsed(),
+    warnings:Array.isArray(source.warnings)?source.warnings.slice(0,20):[],
+    anomalies:Array.isArray(source.anomalies)?source.anomalies.slice(0,20):[]
+  };
+}
+__name(employeeEntryOccupancyCandidateMetadataFromPreviewEvent,"employeeEntryOccupancyCandidateMetadataFromPreviewEvent");
+function buildEmployeeEntryEntriesWithOccupancyCandidateMetadata(user,body,entries){
+  const rows=Array.isArray(entries)?entries:[];
+  if(!rows.length)return [];
+  const preview=buildEmployeeEntryOccupancyCandidatePreview(user,body);
+  const generatedAt=cleanText(preview.preview_generated_at||new Date().toISOString(),40);
+  const events=Array.isArray(preview.events)?preview.events:[];
+  return rows.map((row,index)=>{
+    const anchor=normalizeEntryAnchor(row);
+    delete anchor.occupancy_candidate_metadata;
+    anchor.occupancy_candidate_metadata=employeeEntryOccupancyCandidateMetadataFromPreviewEvent(events[index],generatedAt);
+    return anchor;
+  });
+}
+__name(buildEmployeeEntryEntriesWithOccupancyCandidateMetadata,"buildEmployeeEntryEntriesWithOccupancyCandidateMetadata");
 function validateRentUploadFields(entry,normalized,eventIndex,anchorPreview){
   const missing=[];
   const invalid=[];
@@ -2813,7 +2876,7 @@ async function handleEmployeeEntry(request,env,user){
   }
   if(type==="CO"&&depositDeduction>depositBalance+0.01)return badRequest("deposit_deduction_exceeds_balance");
   const d1WriteStart=Date.now();
-  const sessionAnchorEntries=Array.isArray(session.entries)?session.entries.map(row=>normalizeEntryAnchor(row)):[];
+  const sessionAnchorEntries=Array.isArray(session.entries)?buildEmployeeEntryEntriesWithOccupancyCandidateMetadata(user,body,session.entries):[];
   const sessionEntriesJson=JSON.stringify({anchor_contract_version:"employee_entry_anchor_v1",entries:sessionAnchorEntries});
   const sessionSummaryJson=JSON.stringify({
     cash_handover:Number(String(session.cash_handover||0).replace(/,/g,"")),

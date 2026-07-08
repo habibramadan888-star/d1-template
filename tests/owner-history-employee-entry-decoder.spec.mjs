@@ -87,6 +87,11 @@ test("employee export detail decoder returns the four expected owner detail rows
     `
     function __name(fn){ return fn; }
     function cleanText(value,max=10000){ return String(value ?? '').slice(0,max); }
+    function employeeEntryBedTransferFee(entry){
+      const fee=Number(String(entry?.fee_amount||entry?.transfer_fee||entry?.amount||0).replace(/,/g,''))||0;
+      const waived=entry?.fee_waived===true||String(entry?.fee_choice||entry?.fee_status||'').toLowerCase()==='waived';
+      return {fee_amount:waived?0:fee,fee_choice:waived?'waived':(fee>0?'paid':''),waiver_reason:entry?.waiver_reason||entry?.fee_waiver_reason||''};
+    }
     ${worker.slice(start, end)}
     globalThis.parseEmployeeEntryExportRows = parseEmployeeEntryExportRows;
     `,
@@ -135,6 +140,11 @@ test("owner parser reads WhatsApp-friendly employee statement without changing d
     `
     function __name(fn){ return fn; }
     function cleanText(value,max=10000){ return String(value ?? '').slice(0,max); }
+    function employeeEntryBedTransferFee(entry){
+      const fee=Number(String(entry?.fee_amount||entry?.transfer_fee||entry?.amount||0).replace(/,/g,''))||0;
+      const waived=entry?.fee_waived===true||String(entry?.fee_choice||entry?.fee_status||'').toLowerCase()==='waived';
+      return {fee_amount:waived?0:fee,fee_choice:waived?'waived':(fee>0?'paid':''),waiver_reason:entry?.waiver_reason||entry?.fee_waiver_reason||''};
+    }
     ${worker.slice(start, end)}
     globalThis.parseEmployeeEntryExportRows = parseEmployeeEntryExportRows;
     `,
