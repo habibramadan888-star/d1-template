@@ -1749,6 +1749,30 @@ function employeeEntryValidationExplanation(errorCode,message){
       zh:"所选云端欠款已不是未清状态。",
       action_en:"Refresh arrears and choose an open or partial item.",
       action_zh:"请刷新欠款并选择 open 或 partial 状态的欠款。"
+    },
+    DUPLICATE_EVENT_FOUND:{
+      en:"Duplicate event detected. This record was already uploaded.",
+      zh:"发现重复记录。这条记录已经上传过。",
+      action_en:"Remove already-synced records and upload only new records.",
+      action_zh:"请删除已经同步的旧记录，只上传新的记录。"
+    },
+    DUPLICATE_SOURCE_FINGERPRINT:{
+      en:"Duplicate source fingerprint detected. This source record was already uploaded.",
+      zh:"发现重复来源指纹。该来源记录已经上传过。",
+      action_en:"Remove already-synced records and upload only new records.",
+      action_zh:"请删除已经同步的旧记录，只上传新的记录。"
+    },
+    DUPLICATE_CANONICAL_FINGERPRINT:{
+      en:"Duplicate business event detected. This business record was already uploaded.",
+      zh:"发现重复业务记录。该业务记录已经上传过。",
+      action_en:"Remove already-synced records and upload only new records.",
+      action_zh:"请删除已经同步的旧记录，只上传新的记录。"
+    },
+    DUPLICATE_EVENT_IN_PAYLOAD:{
+      en:"Duplicate records were found inside the current upload payload.",
+      zh:"当前上传本票内发现重复记录。",
+      action_en:"Remove duplicate records from the current session, then upload again.",
+      action_zh:"请从当前本票删除重复记录后重新上传。"
     }
   };
   const info=map[errorCode]||{};
@@ -1808,6 +1832,7 @@ function employeeEntryValidationFunctionForStage(stage,eventType=""){
     deposit_out_validation:"validateEmployeeEntryUploadPayload",
     checkout_validation:"validateEmployeeEntryUploadPayload",
     left_with_arrears_validation:"validateEmployeeEntryUploadPayload",
+    duplicate_validation:"checkEmployeeEntryDuplicates",
     validate_exception:"validateEmployeeEntryUploadPayload"
   };
   if(byStage[stage])return byStage[stage];
@@ -2231,6 +2256,8 @@ async function validateEmployeeEntryUploadPayload(env,user,body,opts={}){
   if(type==="CO"&&depositDeduction>depositBalance+0.01){
     return employeeEntryValidationFailure("checkout_validation","DEPOSIT_DEDUCTION_EXCEEDS_BALANCE","Deposit deduction exceeds deposit balance.",{event_index:eventIndex,event_type:"checkout",invalid_fields:["deposit_deduction"],anchor_preview:{...anchorPreview,deposit_balance:depositBalance,deposit_deduction:depositDeduction}});
   }
+  const duplicateGuard=await checkEmployeeEntryDuplicates(env,user,body,{event_index:eventIndex});
+  if(!duplicateGuard.ok)return employeeEntryDuplicateValidationFailure(duplicateGuard,eventIndex);
   const summary={
     cash_handover:Number(String(session.cash_handover||0).replace(/,/g,"")),
     bank_transfer_total:Number(String(session.bank_transfer_total||0).replace(/,/g,"")),
@@ -2267,6 +2294,16 @@ async function validateEmployeeEntryUploadPayload(env,user,body,opts={}){
     anchor_types:sessionAnchorEntries.map(row=>row.event_type||entryAnchorEventType(entryAnchorType(row))),
     anchor_preview:anchorPreview,
     normalized_entry:normalized,
+    duplicate_guard:{
+      ok:true,
+      idempotent:!!duplicateGuard.idempotent,
+      existing_session_id:duplicateGuard.existing_session_id||"",
+      existing_anchor:duplicateGuard.existing_anchor||"",
+      canonical_fingerprint_persistence:duplicateGuard.canonical_fingerprint_persistence||"PARTIAL"
+    },
+    idempotent:!!duplicateGuard.idempotent,
+    existing_session_id:duplicateGuard.existing_session_id||"",
+    existing_anchor:duplicateGuard.existing_anchor||"",
     validation_trace:employeeEntryValidationSuccessTrace(type,eventIndex,normalized.event_type||entryAnchorEventType(type)),
     asset_version:HOMELINK_DIAGNOSTIC_ASSET_VERSION,
     worker_version:HOMELINK_DIAGNOSTIC_WORKER_VERSION,
@@ -2320,6 +2357,20 @@ async function handleEmployeeEntry(request,env,user){
   try{body=await request.json();}catch{return badRequest("invalid_json");}
   const validationResult=await validateEmployeeEntryUploadPayload(env,user,body,{event_index:body?.event_index});
   if(!validationResult.ok)return json({success:false,...validationResult},422);
+  if(validationResult.idempotent){
+    const entry=body?.entry||{};
+    return success({
+      success:true,
+      ok:true,
+      idempotent:true,
+      no_write:true,
+      entry_id:cleanId(entry.id)||cleanText(validationResult.record_id||"",80),
+      session_id:validationResult.existing_session_id||cleanText(body?.session?.id||body?.session?.session_id||"",120),
+      existing_session_id:validationResult.existing_session_id||"",
+      existing_anchor:validationResult.existing_anchor||"",
+      duplicate_guard:validationResult.duplicate_guard||{ok:true,idempotent:true,canonical_fingerprint_persistence:"PARTIAL"}
+    });
+  }
   const entry=body?.entry||{};
   const session=body?.session||{};
   const liveRouteGate=eeaLiveRouteGate(env);
@@ -2732,6 +2783,275 @@ function normalizeEntryAnchor(row){
   return anchor;
 }
 __name(normalizeEntryAnchor,"normalizeEntryAnchor");
+function employeeEntryFingerprintText(value){
+  return cleanText(value,240).toLowerCase().replace(/\s+/g," ");
+}
+__name(employeeEntryFingerprintText,"employeeEntryFingerprintText");
+function employeeEntryFingerprintMoney(value){
+  return entryAnchorMoney(value).toFixed(2);
+}
+__name(employeeEntryFingerprintMoney,"employeeEntryFingerprintMoney");
+function employeeEntryFingerprintDate(value){
+  return cleanDate(value||"").slice(0,10);
+}
+__name(employeeEntryFingerprintDate,"employeeEntryFingerprintDate");
+function buildCanonicalEventFingerprint(row,user={}){
+  const anchor=normalizeEntryAnchor(row);
+  const type=entryAnchorType(anchor);
+  const property=employeeEntryFingerprintText(anchor.property_id||anchor.corpid||user.corpid||"");
+  const eventType=entryAnchorEventType(type);
+  const bed=employeeEntryFingerprintText(anchor.bed||anchor.room||"");
+  const pay=employeeEntryFingerprintText(anchor.payment_method||anchor.pay_type||"");
+  let parts=[property,eventType];
+  if(type==="R"){
+    parts=parts.concat([
+      bed,
+      employeeEntryFingerprintDate(anchor.rent_period_start||anchor.period_start),
+      employeeEntryFingerprintDate(anchor.rent_period_end||anchor.period_end),
+      employeeEntryFingerprintMoney(anchor.paid_amount||anchor.paid||anchor.amount),
+      employeeEntryFingerprintMoney(anchor.expected_rent||anchor.period_due||anchor.due),
+      pay,
+      employeeEntryFingerprintMoney(anchor.arrears_amount||0),
+      employeeEntryFingerprintDate(anchor.arrears_due_date||anchor.arrear_promise_date||anchor.promise_date)
+    ]);
+  }else if(type==="AP"){
+    parts=parts.concat([
+      employeeEntryFingerprintText(anchor.arrears_ref||anchor.original_arrears_id||anchor.linked_task_id||""),
+      employeeEntryFingerprintMoney(anchor.payment_amount||anchor.amount),
+      pay,
+      employeeEntryFingerprintMoney(anchor.remaining_arrears_before_payment||anchor.original_arrears_amount||anchor.due||anchor.period_due),
+      employeeEntryFingerprintMoney(anchor.remaining_arrears_after_payment||anchor.remaining_arrears)
+    ]);
+  }else if(type==="D"){
+    parts=parts.concat([
+      bed,
+      employeeEntryFingerprintMoney(anchor.deposit_amount||anchor.amount),
+      pay,
+      employeeEntryFingerprintText(anchor.deposit_reason||anchor.reason||""),
+      employeeEntryFingerprintDate(anchor.business_date||anchor.date||anchor.created_at)
+    ]);
+  }else if(type==="DR"){
+    parts=parts.concat([
+      bed,
+      employeeEntryFingerprintMoney(anchor.actual_refund_amount||anchor.refund_amount||anchor.amount),
+      employeeEntryFingerprintText(anchor.refund_method||anchor.payment_method||anchor.pay_type||""),
+      employeeEntryFingerprintMoney(anchor.deposit_deduction||anchor.deduction_amount||0),
+      employeeEntryFingerprintDate(anchor.business_date||anchor.refund_date||anchor.date||anchor.created_at)
+    ]);
+  }else if(type==="CO"){
+    parts=parts.concat([
+      bed,
+      employeeEntryFingerprintText(anchor.checkout_mode||anchor.checkout_type||"normal"),
+      employeeEntryFingerprintDate(anchor.checkout_date||anchor.left_date||anchor.business_date||anchor.date)
+    ]);
+  }else if(type==="E"){
+    parts=parts.concat([
+      employeeEntryFingerprintText(anchor.expense_scope||anchor.scope||"property"),
+      employeeEntryFingerprintText(anchor.target_bed||anchor.room||anchor.expense_category||""),
+      employeeEntryFingerprintMoney(anchor.expense_amount||anchor.amount),
+      pay,
+      employeeEntryFingerprintText(anchor.expense_category||anchor.category||""),
+      employeeEntryFingerprintDate(anchor.business_date||anchor.date||anchor.created_at)
+    ]);
+  }else if(type==="TF"||type==="TFF"){
+    parts=parts.concat([
+      employeeEntryFingerprintText(anchor.from_bed||anchor.bed_from||anchor.room||""),
+      employeeEntryFingerprintText(anchor.to_bed||anchor.bed_to||anchor.room_to||""),
+      employeeEntryFingerprintDate(anchor.transfer_date||anchor.business_date||anchor.date||anchor.created_at),
+      employeeEntryFingerprintMoney(anchor.fee_amount||anchor.amount),
+      employeeEntryFingerprintText(anchor.waiver_reason||anchor.fee_waiver_reason||"")
+    ]);
+  }else{
+    parts=parts.concat([
+      bed,
+      employeeEntryFingerprintMoney(anchor.amount),
+      employeeEntryFingerprintDate(anchor.business_date||anchor.date||anchor.created_at)
+    ]);
+  }
+  return cleanText(parts.map(part=>String(part??"")).join("|"),1000);
+}
+__name(buildCanonicalEventFingerprint,"buildCanonicalEventFingerprint");
+function buildEmployeeEntrySourceFingerprint(row){
+  return cleanText(row?.source_fingerprint||row?.sourceFingerprint||"",1000);
+}
+__name(buildEmployeeEntrySourceFingerprint,"buildEmployeeEntrySourceFingerprint");
+function buildEmployeeEntryDuplicateKeys(row,user={},index=0){
+  const anchor=normalizeEntryAnchor(row);
+  const eventId=cleanText(anchor.event_id||anchor.id||anchor.anchor_id||"",120);
+  const sourceFingerprint=buildEmployeeEntrySourceFingerprint(anchor);
+  const canonicalFingerprint=cleanText(anchor.canonical_fingerprint||buildCanonicalEventFingerprint(anchor,user),1000);
+  return {
+    index,
+    event_id:eventId,
+    source_fingerprint:sourceFingerprint,
+    canonical_fingerprint:canonicalFingerprint,
+    event_type:anchor.event_type||entryAnchorEventType(entryAnchorType(anchor)),
+    bed:anchor.bed||anchor.room||anchor.from_bed||anchor.target_bed||"",
+    amount:entryAnchorMoney(anchor.payment_amount||anchor.paid_amount||anchor.deposit_amount||anchor.refund_amount||anchor.expense_amount||anchor.fee_amount||anchor.amount),
+    anchor
+  };
+}
+__name(buildEmployeeEntryDuplicateKeys,"buildEmployeeEntryDuplicateKeys");
+function employeeEntryDuplicateDetail(errorCode,duplicateType,incoming,existing={}){
+  return {
+    duplicate_type:duplicateType,
+    incoming_event_id:incoming?.event_id||"",
+    incoming_source_fingerprint:incoming?.source_fingerprint||"",
+    incoming_canonical_fingerprint:incoming?.canonical_fingerprint||"",
+    incoming_event_type:incoming?.event_type||"",
+    incoming_bed:incoming?.bed||"",
+    incoming_index:Number(incoming?.index||0),
+    existing_event_id:existing?.event_id||existing?.id||"",
+    existing_session_id:existing?.session_id||existing?.id||"",
+    existing_anchor:existing?.existing_anchor||existing?.anchor_id||"",
+    existing_created_at:existing?.created_at||"",
+    action_required:"remove_already_synced_records_and_upload_only_new_records"
+  };
+}
+__name(employeeEntryDuplicateDetail,"employeeEntryDuplicateDetail");
+function employeeEntryDuplicateValidationFailure(result,eventIndex=0){
+  const duplicate=(result?.duplicates||[])[0]||{};
+  const failure=employeeEntryValidationFailure("duplicate_validation",result?.error_code||"DUPLICATE_EVENT_FOUND",result?.message||"Duplicate event detected. This record was already uploaded.",{
+    event_index:Number(duplicate.incoming_index??eventIndex)||0,
+    event_type:duplicate.incoming_event_type||"",
+    invalid_fields:[duplicate.duplicate_type||"duplicate"],
+    anchor_preview:duplicate,
+    payload_preview:{duplicates:result?.duplicates||[]},
+    suggested_action_en:"Remove already-synced records and upload only new records.",
+    suggested_action_zh:"请删除已经同步的旧记录，只上传新的记录。"
+  });
+  return {
+    ...failure,
+    duplicate_guard:{ok:false,canonical_fingerprint_persistence:"PARTIAL",duplicates:result?.duplicates||[]},
+    duplicates:result?.duplicates||[],
+    idempotent:false
+  };
+}
+__name(employeeEntryDuplicateValidationFailure,"employeeEntryDuplicateValidationFailure");
+function employeeEntryDuplicateIncomingRows(body){
+  const session=body?.session||{};
+  const rows=Array.isArray(session.entries)&&session.entries.length?session.entries:[body?.entry||{}];
+  return rows.map(row=>normalizeEntryAnchor(row));
+}
+__name(employeeEntryDuplicateIncomingRows,"employeeEntryDuplicateIncomingRows");
+function employeeEntryDuplicateSetFingerprint(keys){
+  return keys.map(key=>`${key.event_id}|${key.source_fingerprint}|${key.canonical_fingerprint}`).sort().join("\n");
+}
+__name(employeeEntryDuplicateSetFingerprint,"employeeEntryDuplicateSetFingerprint");
+function employeeEntryDuplicateInPayload(keys){
+  const seenEvent=new Map();
+  const seenSource=new Map();
+  const seenCanonical=new Map();
+  for(const key of keys){
+    const checks=[
+      ["event_id",key.event_id,seenEvent],
+      ["source_fingerprint",key.source_fingerprint,seenSource],
+      ["canonical_fingerprint",key.canonical_fingerprint,seenCanonical]
+    ];
+    for(const [type,value,map] of checks){
+      if(!value)continue;
+      if(map.has(value)){
+        return employeeEntryDuplicateDetail("DUPLICATE_EVENT_IN_PAYLOAD",`${type}_in_payload`,key,map.get(value));
+      }
+      map.set(value,key);
+    }
+  }
+  return null;
+}
+__name(employeeEntryDuplicateInPayload,"employeeEntryDuplicateInPayload");
+async function employeeEntryExistingTransactionsByEventId(env,user,keys){
+  const rows=new Map();
+  for(const key of keys){
+    if(!key.event_id||rows.has(key.event_id))continue;
+    const row=await env.DB.prepare(`SELECT id, session_id, created_at, type FROM transactions
+      WHERE id=? AND corpid=? AND COALESCE(voided_at,'')='' AND COALESCE(status,'ACTIVE')<>'VOID' LIMIT 1`)
+      .bind(key.event_id,user.corpid).first().catch(()=>null);
+    if(row)rows.set(key.event_id,row);
+  }
+  return rows;
+}
+__name(employeeEntryExistingTransactionsByEventId,"employeeEntryExistingTransactionsByEventId");
+async function employeeEntryExistingSessionAnchors(env,user,incomingSessionId){
+  const rows=await env.DB.prepare(`SELECT id, anchor_id, created_at, entries_json, export_text FROM sessions
+    WHERE corpid=? AND COALESCE(voided_at,'')='' AND COALESCE(handover_status,'')<>'VOID'
+    ORDER BY created_at DESC LIMIT 1000`).bind(user.corpid).all().catch(()=>({results:[]}));
+  const anchors=[];
+  for(const session of rows.results||[]){
+    if(incomingSessionId&&String(session.id||"")===String(incomingSessionId))continue;
+    const extracted=extractEmployeeEntryAnchorsFromSession(session);
+    extracted.forEach((anchor,index)=>anchors.push({session,index,anchor}));
+  }
+  return anchors;
+}
+__name(employeeEntryExistingSessionAnchors,"employeeEntryExistingSessionAnchors");
+async function checkEmployeeEntryDuplicates(env,user,body,opts={}){
+  const session=body?.session||{};
+  const incomingSessionId=cleanText(session.id||session.session_id||"",120);
+  const incomingRows=employeeEntryDuplicateIncomingRows(body);
+  const incomingKeys=incomingRows.map((row,index)=>buildEmployeeEntryDuplicateKeys(row,user,index));
+  const inPayload=employeeEntryDuplicateInPayload(incomingKeys);
+  if(inPayload){
+    return {ok:false,error_code:"DUPLICATE_EVENT_IN_PAYLOAD",message:"Duplicate records were found inside the current upload payload.",duplicates:[inPayload]};
+  }
+  const existingTx=await employeeEntryExistingTransactionsByEventId(env,user,incomingKeys);
+  const txDuplicates=[];
+  for(const key of incomingKeys){
+    const existing=key.event_id?existingTx.get(key.event_id):null;
+    if(existing&&String(existing.session_id||"")!==String(incomingSessionId||"")){
+      txDuplicates.push(employeeEntryDuplicateDetail("DUPLICATE_EVENT_FOUND","event_id",key,{...existing,event_id:existing.id}));
+    }
+  }
+  if(txDuplicates.length){
+    return {ok:false,error_code:"DUPLICATE_EVENT_FOUND",message:"Duplicate event detected. This record was already uploaded.",duplicates:txDuplicates};
+  }
+  const allSameSessionExisting=incomingSessionId&&incomingKeys.length>0&&incomingKeys.every(key=>{
+    const existing=key.event_id?existingTx.get(key.event_id):null;
+    return existing&&String(existing.session_id||"")===String(incomingSessionId);
+  });
+  if(allSameSessionExisting){
+    return {
+      ok:true,
+      idempotent:true,
+      existing_session_id:incomingSessionId,
+      existing_anchor:cleanText(session.anchorId||session.anchor_id||"",120),
+      canonical_fingerprint_persistence:"PARTIAL",
+      incoming_fingerprint_set:employeeEntryDuplicateSetFingerprint(incomingKeys)
+    };
+  }
+  const existingAnchors=await employeeEntryExistingSessionAnchors(env,user,incomingSessionId);
+  const sourceMap=new Map();
+  const canonicalMap=new Map();
+  for(const existing of existingAnchors){
+    const key=buildEmployeeEntryDuplicateKeys(existing.anchor,user,existing.index);
+    const detail={
+      event_id:key.event_id,
+      session_id:existing.session.id,
+      anchor_id:existing.session.anchor_id,
+      created_at:existing.session.created_at,
+      existing_anchor:existing.session.anchor_id
+    };
+    if(key.source_fingerprint&&!sourceMap.has(key.source_fingerprint))sourceMap.set(key.source_fingerprint,detail);
+    if(key.canonical_fingerprint&&!canonicalMap.has(key.canonical_fingerprint))canonicalMap.set(key.canonical_fingerprint,detail);
+  }
+  const sourceDuplicates=[];
+  const canonicalDuplicates=[];
+  for(const key of incomingKeys){
+    if(key.source_fingerprint&&sourceMap.has(key.source_fingerprint)){
+      sourceDuplicates.push(employeeEntryDuplicateDetail("DUPLICATE_SOURCE_FINGERPRINT","source_fingerprint",key,sourceMap.get(key.source_fingerprint)));
+    }
+    if(key.canonical_fingerprint&&canonicalMap.has(key.canonical_fingerprint)){
+      canonicalDuplicates.push(employeeEntryDuplicateDetail("DUPLICATE_CANONICAL_FINGERPRINT","canonical_fingerprint",key,canonicalMap.get(key.canonical_fingerprint)));
+    }
+  }
+  if(sourceDuplicates.length){
+    return {ok:false,error_code:"DUPLICATE_SOURCE_FINGERPRINT",message:"Duplicate source fingerprint detected. This source record was already uploaded.",duplicates:sourceDuplicates};
+  }
+  if(canonicalDuplicates.length){
+    return {ok:false,error_code:"DUPLICATE_CANONICAL_FINGERPRINT",message:"Duplicate business event detected. This business record was already uploaded.",duplicates:canonicalDuplicates};
+  }
+  return {ok:true,idempotent:false,canonical_fingerprint_persistence:"PARTIAL",incoming_fingerprint_set:employeeEntryDuplicateSetFingerprint(incomingKeys)};
+}
+__name(checkEmployeeEntryDuplicates,"checkEmployeeEntryDuplicates");
 function parseEmployeeEntryAnchorJson(value){
   const raw=String(value||"").trim();
   if(!raw)return [];
