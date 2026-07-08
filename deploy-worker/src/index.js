@@ -2748,6 +2748,99 @@ function entryAnchorMoney(value){
   return Math.round((Number(String(value??0).replace(/,/g,""))||0)*100)/100;
 }
 __name(entryAnchorMoney,"entryAnchorMoney");
+const providerMetadataBusinessIdentityFields=new Set([
+  "card_id","cardid","tenant_card_id","tenantcardid","physical_card_id","hardware_card_id",
+  "provider_phone","providerphone","card_phone","cardphone","access_card_phone","accesscardphone",
+  "ttlock_phone","ttlockphone"
+]);
+const authoritativeBusinessPhoneSources=new Set([
+  "staff_entered","staff_entered_customer_phone","customer_profile","explicit_customer_profile",
+  "checkin_form","left_with_arrears_staff_entered","explicit_left_with_arrears_phone"
+]);
+function normalizeProviderMetadataFieldName(field){
+  return cleanText(field,80).toLowerCase().replace(/[^a-z0-9_]/g,"");
+}
+__name(normalizeProviderMetadataFieldName,"normalizeProviderMetadataFieldName");
+function normalizeBusinessPhone(value){
+  return cleanText(value,80).replace(/[^\d+]/g,"");
+}
+__name(normalizeBusinessPhone,"normalizeBusinessPhone");
+function isProviderCardId(field,value){
+  const name=normalizeProviderMetadataFieldName(field);
+  return !!cleanText(value,160)&&["card_id","cardid","tenant_card_id","tenantcardid","physical_card_id","hardware_card_id"].includes(name);
+}
+__name(isProviderCardId,"isProviderCardId");
+function isNonAuthoritativeProviderPhone(value,source=""){
+  const phone=normalizeBusinessPhone(value);
+  if(!phone)return false;
+  const sourceName=normalizeProviderMetadataFieldName(source);
+  if(/99099$/.test(phone))return true;
+  return /provider|card|access|ttlock|lock/.test(sourceName)&&!authoritativeBusinessPhoneSources.has(sourceName);
+}
+__name(isNonAuthoritativeProviderPhone,"isNonAuthoritativeProviderPhone");
+function classifyProviderMetadataAuthority(input={}){
+  const field=normalizeProviderMetadataFieldName(input.field||input.name||"");
+  const value=cleanText(input.value,240);
+  const source=normalizeProviderMetadataFieldName(input.source||input.authority_source||"");
+  if(isProviderCardId(field,value))return {authority:"non_authoritative",classification:"provider_lookup_handle_raw_audit_only",field,value,source};
+  if((field.includes("phone")||source.includes("phone"))&&isNonAuthoritativeProviderPhone(value,source)){
+    return {authority:"non_authoritative",classification:"provider_phone_raw_audit_only",field,value:normalizeBusinessPhone(value),source};
+  }
+  if(["remark","card_remark","access_card_remark","card_name","label"].includes(field)){
+    return {authority:"context_only",classification:"business_readable_context",field,value,source};
+  }
+  if((field.includes("phone")||source.includes("phone"))&&authoritativeBusinessPhoneSources.has(source)){
+    return {authority:"authoritative",classification:"explicit_business_contact",field,value:normalizeBusinessPhone(value),source};
+  }
+  return {authority:value?"unknown":"empty",classification:value?"source_authority_marker_required":"empty",field,value,source};
+}
+__name(classifyProviderMetadataAuthority,"classifyProviderMetadataAuthority");
+function sanitizeBusinessContactFromProviderMetadata(value,opts={}){
+  const source=cleanText(opts.source||opts.authority_source||"",80);
+  const phone=normalizeBusinessPhone(value);
+  if(!phone)return "";
+  if(isNonAuthoritativeProviderPhone(phone,source))return "";
+  if(authoritativeBusinessPhoneSources.has(normalizeProviderMetadataFieldName(source)))return phone;
+  return opts.allowUnknownSource?phone:"";
+}
+__name(sanitizeBusinessContactFromProviderMetadata,"sanitizeBusinessContactFromProviderMetadata");
+function assertNoProviderMetadataInBusinessIdentity(identity={}){
+  const violations=[];
+  for(const [field,value] of Object.entries(identity||{})){
+    const name=normalizeProviderMetadataFieldName(field);
+    const raw=cleanText(value,1000);
+    if(!raw)continue;
+    if(providerMetadataBusinessIdentityFields.has(name)||isProviderCardId(name,raw)){
+      violations.push({field,reason:"provider_card_id_is_not_business_identity"});
+    }
+    if(name.includes("phone")&&isNonAuthoritativeProviderPhone(raw,identity[`${field}_source`]||identity.source||"")){
+      violations.push({field,reason:"provider_phone_is_not_business_contact"});
+    }
+    if(name.includes("fingerprint")&&/(card_id|tenant_card_id|provider_phone|card_phone|access_card_phone|ttlock|99099)/i.test(raw)){
+      violations.push({field,reason:"provider_metadata_in_fingerprint"});
+    }
+  }
+  return {ok:violations.length===0,violations};
+}
+__name(assertNoProviderMetadataInBusinessIdentity,"assertNoProviderMetadataInBusinessIdentity");
+function buildSafeBusinessIdentityContext(input={}){
+  const customerPhone=sanitizeBusinessContactFromProviderMetadata(input.customer_phone||input.whatsapp_phone||"",{source:input.customer_phone_source||input.whatsapp_phone_source||input.source||""});
+  const tenantPhone=sanitizeBusinessContactFromProviderMetadata(input.tenant_phone||"",{source:input.tenant_phone_source||input.source||""});
+  const contactPhone=sanitizeBusinessContactFromProviderMetadata(input.contact_phone||"",{source:input.contact_phone_source||input.source||""});
+  return {
+    bed:cleanText(input.bed||input.room||"",80).replace(/^#/,""),
+    customer_phone:customerPhone,
+    tenant_phone:tenantPhone,
+    contact_phone:contactPhone,
+    card_remark_context:cleanText(input.card_remark||input.remark||"",500),
+    card_remark_authority:cleanText(input.card_remark||input.remark||"",500)?"context_only":"none",
+    deposit_context_authority:cleanText(input.card_remark||input.remark||"",500)?"context_only":"none",
+    non_authoritative_card_id:cleanText(input.card_id||"",120),
+    non_authoritative_tenant_card_id:cleanText(input.tenant_card_id||"",120),
+    non_authoritative_provider_phone:isNonAuthoritativeProviderPhone(input.provider_phone||input.card_phone||input.access_card_phone||"",input.provider_phone_source||"provider_card_metadata")?normalizeBusinessPhone(input.provider_phone||input.card_phone||input.access_card_phone):""
+  };
+}
+__name(buildSafeBusinessIdentityContext,"buildSafeBusinessIdentityContext");
 function validateEntryAnchor(row){
   const type=entryAnchorType(row);
   const required=entryAnchorContract[type]||[];
@@ -2816,7 +2909,9 @@ function normalizeEntryAnchor(row){
     Object.assign(anchor,{bed:anchor.bed||anchor.room||"",deposit_balance:depositBalance,actual_refund_amount:refundAmount,refund_amount:refundAmount,refund_difference:entryAnchorMoney(refundAmount-depositBalance),refund_method:entryAnchorPaymentMethod(anchor.refund_method||anchor.payment_method||anchor.pay_type),payment_method:entryAnchorPaymentMethod(anchor.payment_method||anchor.refund_method||anchor.pay_type),refund_date:cleanDate(anchor.refund_date||anchor.checkout_date||anchor.date||""),refund_reason:anchor.refund_reason||anchor.difference_reason||anchor.ded_reason||anchor.ded_note||anchor.reason||anchor.note||"",difference_reason:anchor.difference_reason||anchor.refund_reason||anchor.ded_note||anchor.note||"",checkout_ref:anchor.checkout_ref||anchor.checkout_date||"",open_arrears_amount:entryAnchorMoney(anchor.open_arrears_amount||anchor.outstanding_arrears||0),owner_approval_required:!!anchor.owner_approval_required,owner_approval_status:anchor.owner_approval_status||"not_required",note:anchor.note||""});
   }else if(type==="CO"){
     const left=!!anchor.left_with_arrears||anchor.checkout_mode==="left_with_arrears";
-    Object.assign(anchor,{event_type:left?"left_with_arrears":"checkout",bed:anchor.bed||anchor.room||"",checkout_date:anchor.checkout_date||"",checkout_type:left?"left_with_arrears":anchor.checkout_type||anchor.checkout_mode||"normal",deposit_refund:left?0:entryAnchorMoney(anchor.deposit_refund||0),outstanding_arrears:entryAnchorMoney(anchor.outstanding_arrears||anchor.carry_over_arrears||anchor.deficit||0),open_arrears_amount:entryAnchorMoney(anchor.open_arrears_amount||anchor.outstanding_arrears||anchor.carry_over_arrears||0),owner_approval_required:left?false:!!anchor.owner_approval_required,owner_approval_status:left?"not_required":anchor.owner_approval_status||"not_required",checkout_mode:left?"left_with_arrears":anchor.checkout_mode||"normal",left_with_arrears:left,customer_left:left,former_customer_name:anchor.former_customer_name||anchor.card_name||anchor.tenant_name||"",card_name:anchor.card_name||anchor.former_customer_name||anchor.tenant_name||"",whatsapp_phone:anchor.whatsapp_phone||anchor.former_customer_phone||"",former_customer_phone:anchor.former_customer_phone||anchor.whatsapp_phone||"",contact_method:anchor.contact_method||"",contact_note:anchor.contact_note||"",arrears_amount:entryAnchorMoney(anchor.arrears_amount||anchor.left_arrears_amount||anchor.outstanding_arrears||0),left_arrears_amount:entryAnchorMoney(anchor.left_arrears_amount||anchor.arrears_amount||anchor.outstanding_arrears||0),cloud_arrears_ref:anchor.cloud_arrears_ref||anchor.arrears_ref||"",belongings_held:!!anchor.belongings_held,belongings_note:anchor.belongings_note||"",coverage_end_date:anchor.coverage_end_date||anchor.card_end_date||anchor.rent_coverage_end||anchor.old_lock_valid_until||"",card_end_date:anchor.card_end_date||anchor.coverage_end_date||anchor.rent_coverage_end||anchor.old_lock_valid_until||"",rent_coverage_end:anchor.rent_coverage_end||anchor.coverage_end_date||anchor.card_end_date||anchor.old_lock_valid_until||"",promised_payment_date:anchor.promised_payment_date||anchor.promise_date||"",promised_return_date:anchor.promised_return_date||anchor.promise_return_date||"",promise_return_date:anchor.promise_return_date||anchor.promised_return_date||"",deposit_balance:entryAnchorMoney(anchor.deposit_balance||anchor.deposit_held||0),left_date:anchor.left_date||anchor.checkout_date||"",checkout_attempt_date:anchor.checkout_attempt_date||anchor.checkout_date||"",left_status:anchor.left_status||(left?"left_pending_return":""),final_status:anchor.final_status||(left?"left_pending_return":""),status:anchor.status||(left?"left_pending_return":""),overdue_days:Number(anchor.overdue_days||0)||0,grace_days_after_promise:Number(anchor.grace_days_after_promise||0)||0,review_date:anchor.review_date||"",confirmed_not_returning_date:anchor.confirmed_not_returning_date||"",confirmed_not_returning_by:anchor.confirmed_not_returning_by||"",confirmation_note:anchor.confirmation_note||"",original_session_id:anchor.original_session_id||anchor.session_id||"",original_event_id:anchor.original_event_id||anchor.event_id||anchor.id||"",final_note:anchor.final_note||anchor.note||anchor.ded_note||""});
+    const contactSource=anchor.whatsapp_phone_source||anchor.former_customer_phone_source||(left?"left_with_arrears_staff_entered":"");
+    const safePhone=sanitizeBusinessContactFromProviderMetadata(anchor.whatsapp_phone||anchor.former_customer_phone||"",{source:contactSource});
+    Object.assign(anchor,{event_type:left?"left_with_arrears":"checkout",bed:anchor.bed||anchor.room||"",checkout_date:anchor.checkout_date||"",checkout_type:left?"left_with_arrears":anchor.checkout_type||anchor.checkout_mode||"normal",deposit_refund:left?0:entryAnchorMoney(anchor.deposit_refund||0),outstanding_arrears:entryAnchorMoney(anchor.outstanding_arrears||anchor.carry_over_arrears||anchor.deficit||0),open_arrears_amount:entryAnchorMoney(anchor.open_arrears_amount||anchor.outstanding_arrears||anchor.carry_over_arrears||0),owner_approval_required:left?false:!!anchor.owner_approval_required,owner_approval_status:left?"not_required":anchor.owner_approval_status||"not_required",checkout_mode:left?"left_with_arrears":anchor.checkout_mode||"normal",left_with_arrears:left,customer_left:left,former_customer_name:anchor.former_customer_name||anchor.card_name||anchor.tenant_name||"",card_name:anchor.card_name||anchor.former_customer_name||anchor.tenant_name||"",whatsapp_phone:safePhone,former_customer_phone:safePhone,contact_method:anchor.contact_method||"",contact_note:anchor.contact_note||"",arrears_amount:entryAnchorMoney(anchor.arrears_amount||anchor.left_arrears_amount||anchor.outstanding_arrears||0),left_arrears_amount:entryAnchorMoney(anchor.left_arrears_amount||anchor.arrears_amount||anchor.outstanding_arrears||0),cloud_arrears_ref:anchor.cloud_arrears_ref||anchor.arrears_ref||"",belongings_held:!!anchor.belongings_held,belongings_note:anchor.belongings_note||"",coverage_end_date:anchor.coverage_end_date||anchor.card_end_date||anchor.rent_coverage_end||anchor.old_lock_valid_until||"",card_end_date:anchor.card_end_date||anchor.coverage_end_date||anchor.rent_coverage_end||anchor.old_lock_valid_until||"",rent_coverage_end:anchor.rent_coverage_end||anchor.coverage_end_date||anchor.card_end_date||anchor.old_lock_valid_until||"",promised_payment_date:anchor.promised_payment_date||anchor.promise_date||"",promised_return_date:anchor.promised_return_date||anchor.promise_return_date||"",promise_return_date:anchor.promise_return_date||anchor.promised_return_date||"",deposit_balance:entryAnchorMoney(anchor.deposit_balance||anchor.deposit_held||0),left_date:anchor.left_date||anchor.checkout_date||"",checkout_attempt_date:anchor.checkout_attempt_date||anchor.checkout_date||"",left_status:anchor.left_status||(left?"left_pending_return":""),final_status:anchor.final_status||(left?"left_pending_return":""),status:anchor.status||(left?"left_pending_return":""),overdue_days:Number(anchor.overdue_days||0)||0,grace_days_after_promise:Number(anchor.grace_days_after_promise||0)||0,review_date:anchor.review_date||"",confirmed_not_returning_date:anchor.confirmed_not_returning_date||"",confirmed_not_returning_by:anchor.confirmed_not_returning_by||"",confirmation_note:anchor.confirmation_note||"",original_session_id:anchor.original_session_id||anchor.session_id||"",original_event_id:anchor.original_event_id||anchor.event_id||anchor.id||"",final_note:anchor.final_note||anchor.note||anchor.ded_note||""});
   }else if(type==="E"){
     Object.assign(anchor,{expense_amount:entryAnchorMoney(anchor.expense_amount||anchor.amount),expense_category:anchor.expense_category||anchor.reason_code||"",target_bed:anchor.target_bed||anchor.room||"",reason:anchor.reason||anchor.expense_desc||anchor.custom_reason||"",note:anchor.note||anchor.expense_desc||""});
   }
@@ -2918,14 +3013,15 @@ function buildCanonicalEventFingerprint(row,user={}){
 }
 __name(buildCanonicalEventFingerprint,"buildCanonicalEventFingerprint");
 function buildEmployeeEntrySourceFingerprint(row){
-  return cleanText(row?.source_fingerprint||row?.sourceFingerprint||"",1000);
+  const raw=cleanText(row?.source_fingerprint||row?.sourceFingerprint||"",1000);
+  return assertNoProviderMetadataInBusinessIdentity({source_fingerprint:raw}).ok?raw:"";
 }
 __name(buildEmployeeEntrySourceFingerprint,"buildEmployeeEntrySourceFingerprint");
 function buildEmployeeEntryDuplicateKeys(row,user={},index=0){
   const anchor=normalizeEntryAnchor(row);
   const eventId=cleanText(anchor.event_id||anchor.id||anchor.anchor_id||"",120);
   const sourceFingerprint=buildEmployeeEntrySourceFingerprint(anchor);
-  const canonicalFingerprint=cleanText(anchor.canonical_fingerprint||buildCanonicalEventFingerprint(anchor,user),1000);
+  const canonicalFingerprint=cleanText(buildCanonicalEventFingerprint(anchor,user),1000);
   return {
     index,
     event_id:eventId,
