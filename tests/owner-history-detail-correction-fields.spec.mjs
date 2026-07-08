@@ -160,6 +160,19 @@ test("correction audit contract contains original and correction visibility fiel
   }
 });
 
+test("detail correction fields fail closed instead of returning HTTP 500", async () => {
+  const text = await worker();
+  const start = text.indexOf("function ownerHistoryDetailCorrectionFields");
+  const end = text.indexOf("__name(ownerHistoryDetailCorrectionFields", start);
+  const block = text.slice(start, end);
+
+  assert.match(text, /function ownerHistoryDetailFailClosedCorrectionFields/);
+  assert.match(text, /function ownerHistoryDetailSafeRawTotals/);
+  assert.match(block, /catch\(error\)/);
+  assert.match(block, /return ownerHistoryDetailFailClosedCorrectionFields\(session,rows,warnings\)/);
+  assert.match(text, /CORRECTION_AUDIT_BUILD_FAILED/);
+});
+
 test("no correction sessions produce zero correction and adjusted equals raw", () => {
   const view = buildAuditModeView([x6wioSession]);
   const session = view.sessions[0];
@@ -270,4 +283,16 @@ test("manual live verification script is read-only and uses additive detail mode
   assert.match(text, /production_write: "no"/);
   assert.doesNotMatch(text, /method:\s*["']POST["']/);
   assert.doesNotMatch(text, /\/api\/owner\/corrections\/apply/);
+});
+
+test("H4B regression live verification script covers legacy opt-in and disabled apply", async () => {
+  const text = await readFile("docs/H4B_REGRESSION_H3B1_DISABLED_GATE_MANUAL_LIVE_VERIFY.md", "utf8");
+  assert.match(text, /\/api\/session_detail\?id=S20260707-x6wio"/);
+  assert.match(text, /\/api\/session_detail\?id=S20260707-x6wio&include_corrections=1/);
+  assert.match(text, /\/api\/owner\/corrections\/apply/);
+  assert.match(text, /OWNER_CORRECTION_APPLY_DISABLED/);
+  assert.match(text, /production_write: "no"/);
+  assert.match(text, /x6wio_corrected: false/);
+  assert.doesNotMatch(text, /OWNER_CORRECTION_APPLY_ENABLED/);
+  assert.doesNotMatch(text, /OWNER_CORRECTION_TARGET_SCOPED_APPLY_ENABLED/);
 });

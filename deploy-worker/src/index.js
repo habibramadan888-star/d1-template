@@ -6830,6 +6830,76 @@ function ownerHistoryDetailNormalizeCorrectionTotals(totals={}){
   };
 }
 __name(ownerHistoryDetailNormalizeCorrectionTotals,"ownerHistoryDetailNormalizeCorrectionTotals");
+function ownerHistoryDetailSafeRawTotals(session={},rows=[]){
+  const totals={
+    cash:ownerCorrectionPreviewMoney(session.cash_handover||session.cash_receipts||0),
+    bank:ownerCorrectionPreviewMoney(session.bank_transfer_total||session.bank_receipts||0),
+    gross:ownerCorrectionPreviewMoney(session.gross_received||session.gross_income||0),
+    rent_income:0,
+    deposit_liability:0,
+    arrears_repaid:0,
+    arrears_open:0,
+    expense:0,
+    transfer_fee:0
+  };
+  const hasSessionCash=totals.cash>0;
+  const hasSessionBank=totals.bank>0;
+  for(const row of Array.isArray(rows)?rows:[]){
+    const type=String(row?.event_type||row?.type||row?.cat||row?.reason_code||"").trim().toLowerCase();
+    const method=String(row?.payment_method||row?.pay_type||row?.method||"").trim().toLowerCase();
+    const amount=ownerCorrectionPreviewMoney(row?.paid_amount??row?.payment_amount??row?.deposit_amount??row?.refund_amount??row?.expense_amount??row?.fee_amount??row?.amount??row?.paid??0);
+    let incomeLike=false;
+    if(type==="r"||type==="rent"||type.includes("rent")||type.includes("收租")){
+      totals.rent_income+=amount;
+      incomeLike=true;
+    }else if(type==="ap"||type==="arrears_payment"||type.includes("arrears")||type.includes("欠")){
+      totals.arrears_repaid+=amount;
+      incomeLike=true;
+    }else if(type==="d"||type==="deposit_in"||type.includes("deposit_in")||type.includes("收押金")){
+      totals.deposit_liability+=amount;
+      incomeLike=true;
+    }else if(type==="dr"||type==="deposit_out"||type.includes("deposit_out")||type.includes("退押金")){
+      totals.deposit_liability-=amount;
+    }else if(type==="e"||type==="expense"||type.includes("expense")||type.includes("支出")){
+      totals.expense+=amount;
+    }else if(type==="tf"||type==="bed_transfer"||type.includes("transfer")||type.includes("换床")){
+      totals.transfer_fee+=amount;
+      incomeLike=true;
+    }
+    if(incomeLike&&!hasSessionCash&&(method==="cash"||method==="c"||method.includes("现金")))totals.cash+=amount;
+    if(incomeLike&&!hasSessionBank&&(method==="bank"||method==="b"||method.includes("银行")))totals.bank+=amount;
+  }
+  if(!totals.gross)totals.gross=ownerCorrectionPreviewMoney(totals.cash+totals.bank);
+  return ownerHistoryDetailNormalizeTotals(totals);
+}
+__name(ownerHistoryDetailSafeRawTotals,"ownerHistoryDetailSafeRawTotals");
+function ownerHistoryDetailFailClosedCorrectionFields(session={},rows=[],warnings=[]){
+  const rawTotals=ownerHistoryDetailSafeRawTotals(session,rows);
+  return {
+    correction_summary:{
+      correction_aware:true,
+      correction_applied:false,
+      raw_totals:rawTotals,
+      correction_totals:ownerHistoryDetailZeroCorrectionTotals(),
+      adjusted_totals:rawTotals,
+      correction_events_count:0,
+      invalid_corrections_count:0,
+      warnings
+    },
+    correction_audit:{
+      raw_mode_available:true,
+      adjusted_mode_available:true,
+      audit_mode_available:true,
+      original_events_visible:true,
+      correction_events_visible:false,
+      correction_sessions:[],
+      correction_events:[],
+      invalid_corrections:[],
+      warnings
+    }
+  };
+}
+__name(ownerHistoryDetailFailClosedCorrectionFields,"ownerHistoryDetailFailClosedCorrectionFields");
 function ownerHistoryDetailCorrectionSessionView(row={}){
   return {
     session_id:cleanText(row?.id||"",160),
@@ -6847,7 +6917,7 @@ function ownerHistoryDetailTargetSessionView(session={},rows=[]){
     anchor:cleanText(session?.anchor_id||session?.anchorId||"",180),
     date:cleanText(session?.date||session?.created_at||"",40).slice(0,10),
     employee:cleanText(session?.operator_name||session?.created_by||session?.operator_id||"",120),
-    totals:ownerCorrectionPreviewSessionTotals(session,Array.isArray(rows)?rows:[]),
+    totals:ownerHistoryDetailSafeRawTotals(session,rows),
     events:(Array.isArray(rows)?rows:[]).map((row,index)=>({
       event_id:cleanText(row?.event_id||row?.id||`detail-row-${index+1}`,180),
       id:cleanText(row?.id||row?.event_id||`detail-row-${index+1}`,180),
@@ -6857,13 +6927,15 @@ function ownerHistoryDetailTargetSessionView(session={},rows=[]){
 }
 __name(ownerHistoryDetailTargetSessionView,"ownerHistoryDetailTargetSessionView");
 function ownerHistoryDetailCorrectionFields(session={},rows=[],correctionRows=[]){
-  const target=ownerHistoryDetailTargetSessionView(session,rows);
+  let target;
   let auditView={sessions:[],invalid_corrections:[],unresolved_corrections:[],correction_sessions:[]};
   const warnings=[];
   try{
+    target=ownerHistoryDetailTargetSessionView(session,rows);
     auditView=buildAuditModeView([target,...(correctionRows||[]).map(ownerHistoryDetailCorrectionSessionView)]);
   }catch(error){
     warnings.push({code:"CORRECTION_AUDIT_BUILD_FAILED",message:"Correction-aware audit view failed closed.",safe_message:cleanText(error?.message||"audit build failed",240)});
+    return ownerHistoryDetailFailClosedCorrectionFields(session,rows,warnings);
   }
   const targetAudit=(auditView.sessions||[]).find(item=>item.anchor===target.anchor||item.session_id===target.session_id)||null;
   const rawTotals=ownerHistoryDetailNormalizeTotals(targetAudit?.raw_totals||target.totals);
