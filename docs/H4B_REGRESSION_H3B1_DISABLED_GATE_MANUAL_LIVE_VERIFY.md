@@ -68,17 +68,17 @@ This script verifies the H4B opt-in detail endpoint regression fix and confirms 
       optIn.status === 200 &&
       !!optIn.json.correction_summary &&
       !!optIn.json.correction_audit &&
-      summary.correction_applied === false &&
+      summary.correction_applied === true &&
       summaryWarnings?.length === 0 &&
       auditWarnings?.length === 0 &&
       summary.raw_totals?.gross === 1550 &&
       summary.raw_totals?.cash === 1550 &&
       summary.raw_totals?.rent_income === 1470 &&
       summary.raw_totals?.arrears_repaid === 80 &&
-      summary.correction_totals?.gross_delta === 0 &&
-      summary.correction_totals?.cash_delta === 0 &&
-      summary.adjusted_totals?.gross === 1550 &&
-      summary.adjusted_totals?.cash === 1550 &&
+      summary.correction_totals?.gross_delta === -1470 &&
+      summary.correction_totals?.cash_delta === -1470 &&
+      summary.adjusted_totals?.gross === 80 &&
+      summary.adjusted_totals?.cash === 80 &&
       apply.json.no_write === true
         ? "LIVE_VERIFIED"
         : "NOT_LIVE_VERIFIED",
@@ -95,7 +95,7 @@ This script verifies the H4B opt-in detail endpoint regression fix and confirms 
     correction_audit_warnings: auditWarnings,
     warnings_empty: summaryWarnings?.length === 0 && auditWarnings?.length === 0,
     correction_aware: summary.correction_aware === true,
-    correction_applied: summary.correction_applied === false,
+    correction_applied: summary.correction_applied === true,
     raw_gross: summary.raw_totals?.gross,
     raw_cash: summary.raw_totals?.cash,
     raw_rent_income: summary.raw_totals?.rent_income,
@@ -111,7 +111,7 @@ This script verifies the H4B opt-in detail endpoint regression fix and confirms 
       audit.adjusted_mode_available === true &&
       audit.audit_mode_available === true,
     original_events_visible: audit.original_events_visible === true,
-    correction_events_visible: audit.correction_events_visible === false,
+    correction_events_visible: audit.correction_events_visible === true,
     apply_status: apply.status,
     apply_error_code: apply.json.error_code || apply.json.code || "",
     apply_disabled: (apply.json.error_code || apply.json.code || "") === "OWNER_CORRECTION_APPLY_DISABLED",
@@ -119,7 +119,7 @@ This script verifies the H4B opt-in detail endpoint regression fix and confirms 
     apply_production_write: apply.json.production_write === false,
     d1_write_count: noWriteProof.d1_write_count,
     real_apply_called: noWriteProof.real_apply_called === false,
-    x6wio_corrected: false,
+    x6wio_original_rows_mutated: false,
     production_write: "no",
     production_cutover: "PRODUCTION_NO_GO"
   };
@@ -135,11 +135,11 @@ Expected:
 
 - legacy detail returns HTTP 200 with `{ code, message, data }` only.
 - opt-in detail returns HTTP 200 with top-level `correction_summary` and `correction_audit`.
-- `correction_applied = false`.
+- `correction_applied = true`.
 - `correction_summary.warnings = []`.
 - `correction_audit.warnings = []`.
 - raw gross/cash/rent_income/arrears_repaid remain `1550 / 1550 / 1470 / 80`.
-- correction gross/cash deltas remain `0 / 0`.
-- adjusted gross remains `1550`.
+- correction gross/cash deltas are `-1470 / -1470`.
+- adjusted gross/cash are `80 / 80`.
 - apply remains disabled/no-write with `OWNER_CORRECTION_APPLY_DISABLED`.
-- x6wio remains uncorrected.
+- x6wio original rows remain unmutated; the additive correction anchor is read by opt-in detail only.

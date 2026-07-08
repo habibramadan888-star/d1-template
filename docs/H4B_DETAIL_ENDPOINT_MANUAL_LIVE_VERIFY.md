@@ -45,7 +45,7 @@ This script only calls `GET /api/history` and `GET /api/session_detail?id=...&in
     correction_summary_exists: !!detail.correction_summary,
     correction_audit_exists: !!detail.correction_audit,
     correction_aware: summary.correction_aware === true,
-    correction_applied: summary.correction_applied === false,
+    correction_applied: summary.correction_applied === true,
     raw_gross: summary.raw_totals?.gross,
     correction_gross_delta: summary.correction_totals?.gross_delta,
     adjusted_gross: summary.adjusted_totals?.gross,
@@ -60,11 +60,12 @@ This script only calls `GET /api/history` and `GET /api/session_detail?id=...&in
 })();
 ```
 
-Expected before any real correction anchor exists:
+Expected after the x6wio correction anchor exists:
 
 - `correction_summary_exists = true`
 - `correction_aware = true`
-- `correction_applied = false`
-- `correction_gross_delta = 0`
-- `adjusted_gross = raw_gross`
+- `correction_applied = true`
+- `raw_gross = 1550`
+- `correction_gross_delta = -1470`
+- `adjusted_gross = 80`
 - production write remains `no`

@@ -168,9 +168,12 @@ test("detail correction fields fail closed instead of returning HTTP 500", async
 
   assert.match(text, /function ownerHistoryDetailFailClosedCorrectionFields/);
   assert.match(text, /function ownerHistoryDetailSafeRawTotals/);
+  assert.match(text, /function ownerHistoryDetailDirectCorrectionFields/);
   assert.match(block, /catch\(error\)/);
+  assert.match(block, /return ownerHistoryDetailDirectCorrectionFields\(session,rows,correctionRows\)/);
   assert.match(block, /return ownerHistoryDetailFailClosedCorrectionFields\(session,rows,warnings\)/);
   assert.match(text, /CORRECTION_AUDIT_BUILD_FAILED/);
+  assert.match(text, /CORRECTION_DIRECT_READER_FAILED/);
 });
 
 test("detail additive response protects lookup build sanitize and serialization boundaries", async () => {
@@ -260,6 +263,7 @@ test("embedded opt-in keeps legacy wrapper data as array with top-level correcti
   assert.match(embedded, /return ownerHistoryDetailAdditiveResponse\(env,user,sessionRow,results\)/);
   assert.match(embedded, /correction_summary:\s*\{/);
   assert.match(embedded, /correction_audit:\s*\{/);
+  assert.match(embedded, /function ownerHistoryDetailDirectCorrectionFields/);
   assert.doesNotMatch(embedded, /return success\(\{\s*rows:/);
 });
 
@@ -278,6 +282,70 @@ test("fixture correction session produces x6wio adjusted totals", () => {
   assert.equal(session.adjusted_totals.gross, 80);
   assert.equal(session.adjusted_totals.rent_income, 0);
   assert.equal(session.adjusted_totals.arrears_repaid, 80);
+});
+
+test("production x6wio applied correction anchor shape produces adjusted totals", () => {
+  const correction = x6wioCorrection({
+    correction_session_id: "CORR-S20260708-0bhe6yg",
+    correction_anchor_id: "CORR-20260708-owner-1sucnhp",
+    target_employee_userid: "abdul",
+    target_business_date: "2026-07-07",
+    created_by: "manager",
+    created_by_role: "manager",
+    authorized_by: "manager",
+    authorized_role: "manager",
+    created_at: "2026-07-08T19:46:42.185Z",
+    effective_date: "2026-07-08",
+    applied_at: "2026-07-08T19:46:42.185Z",
+    status: "applied",
+    preview_hash: "och_16z8y2f",
+    correction_request_fingerprint: "och_1t4n8gz",
+    production_write_scope: "correction_anchor_only",
+    original_totals: {
+      cash: 1550,
+      bank: 0,
+      gross: 1550,
+      rent_income: 1470,
+      deposit_liability: 0,
+      arrears_repaid: 80,
+      arrears_open: 0,
+      expense: 0,
+      transfer_fee: 0
+    },
+    correction_totals: {
+      cash_delta: -1470,
+      bank_delta: 0,
+      gross_delta: -1470,
+      rent_income_delta: -1470,
+      deposit_liability_delta: 0,
+      arrears_repaid_delta: 0,
+      arrears_open_delta: 0,
+      expense_delta: 0,
+      transfer_fee_delta: 0
+    },
+    adjusted_totals: {
+      cash: 80,
+      bank: 0,
+      gross: 80,
+      rent_income: 0,
+      deposit_liability: 0,
+      arrears_repaid: 80,
+      arrears_open: 0,
+      expense: 0,
+      transfer_fee: 0
+    }
+  });
+  const view = buildAuditModeView([x6wioSession, correctionSession(correction)]);
+  const session = view.sessions[0];
+
+  assert.equal(session.correction_applied, true);
+  assert.equal(session.correction_events.length, 2);
+  assert.equal(session.invalid_corrections.length, 0);
+  assert.equal(session.warnings.length, 0);
+  assert.equal(session.correction_totals.gross_delta, -1470);
+  assert.equal(session.correction_totals.cash_delta, -1470);
+  assert.equal(session.adjusted_totals.gross, 80);
+  assert.equal(session.adjusted_totals.cash, 80);
 });
 
 test("original events remain visible and correction events are separate", () => {
@@ -335,7 +403,8 @@ test("manual live verification script is read-only and uses additive detail mode
   assert.match(text, /\/api\/history\?limit=100/);
   assert.match(text, /Array\.isArray\(history\?\.data\) \? history\.data : \[\]/);
   assert.match(text, /\/api\/session_detail\?id=\$\{encodeURIComponent\(session\.id\)\}&include_corrections=1/);
-  assert.match(text, /correction_applied: summary\.correction_applied === false/);
+  assert.match(text, /correction_applied: summary\.correction_applied === true/);
+  assert.match(text, /adjusted_gross: summary\.adjusted_totals\?\.gross/);
   assert.match(text, /production_write: "no"/);
   assert.doesNotMatch(text, /method:\s*["']POST["']/);
   assert.doesNotMatch(text, /\/api\/owner\/corrections\/apply/);
@@ -348,7 +417,8 @@ test("H4B regression live verification script covers legacy opt-in and disabled 
   assert.match(text, /\/api\/owner\/corrections\/apply/);
   assert.match(text, /OWNER_CORRECTION_APPLY_DISABLED/);
   assert.match(text, /production_write: "no"/);
-  assert.match(text, /x6wio_corrected: false/);
+  assert.match(text, /x6wio_original_rows_mutated: false/);
+  assert.match(text, /correction_applied: summary\.correction_applied === true/);
   assert.doesNotMatch(text, /OWNER_CORRECTION_APPLY_ENABLED/);
   assert.doesNotMatch(text, /OWNER_CORRECTION_TARGET_SCOPED_APPLY_ENABLED/);
 });
