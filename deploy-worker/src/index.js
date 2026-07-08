@@ -2,6 +2,7 @@
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 
 import { createEmployeeEntryLiveWriteAdapterDraft } from "../../modules/worker/employee-entry-live-write-adapter.mjs";
+import { buildOwnerCorrectionDryRunPreview } from "../../modules/owner-corrections/correction-anchor-parser.mjs";
 import { createDashboardTotalsPayload } from "./handlers/dashboard-totals.js";
 import { ErrorCodes } from "../../dist/lib/constants/error-codes.js";
 import { fail, ok } from "../../dist/lib/lib/api-response.js";
@@ -6569,6 +6570,102 @@ async function handleOwnerCloudArrearsProjection(request,env,user){
   });
 }
 __name(handleOwnerCloudArrearsProjection,"handleOwnerCloudArrearsProjection");
+function ownerCorrectionPreviewMoney(value){
+  return Math.round((Number(String(value??0).replace(/,/g,""))||0)*100)/100;
+}
+__name(ownerCorrectionPreviewMoney,"ownerCorrectionPreviewMoney");
+function ownerCorrectionPreviewSessionTotals(session={},events=[]){
+  const totals={
+    cash:ownerCorrectionPreviewMoney(session.cash_handover),
+    bank:ownerCorrectionPreviewMoney(session.bank_transfer_total),
+    gross:ownerCorrectionPreviewMoney(session.gross_received),
+    rent_income:0,
+    deposit_liability:0,
+    arrears_repaid:0,
+    arrears_open:0,
+    expense:0,
+    transfer_fee:0
+  };
+  for(const event of events||[]){
+    const type=String(event?.event_type||entryAnchorEventType(entryAnchorType(event))).toLowerCase();
+    const method=entryAnchorPaymentMethod(event?.payment_method||event?.pay_type);
+    const amount=ownerCorrectionPreviewMoney(event?.paid_amount??event?.payment_amount??event?.deposit_amount??event?.refund_amount??event?.expense_amount??event?.fee_amount??event?.amount);
+    if(type==="rent")totals.rent_income+=ownerCorrectionPreviewMoney(event?.paid_amount??event?.amount);
+    else if(type==="arrears_payment")totals.arrears_repaid+=ownerCorrectionPreviewMoney(event?.payment_amount??event?.amount);
+    else if(type==="deposit_in")totals.deposit_liability+=ownerCorrectionPreviewMoney(event?.deposit_amount??event?.amount);
+    else if(type==="deposit_out")totals.deposit_liability-=ownerCorrectionPreviewMoney(event?.refund_amount??event?.actual_refund_amount??event?.amount);
+    else if(type==="expense")totals.expense+=ownerCorrectionPreviewMoney(event?.expense_amount??event?.amount);
+    else if(type==="bed_transfer"||type==="bed_transfer_fee")totals.transfer_fee+=ownerCorrectionPreviewMoney(event?.fee_amount??event?.amount);
+    if(!totals.gross&&["rent","arrears_payment","deposit_in","bed_transfer","bed_transfer_fee"].includes(type))totals.gross+=amount;
+    if(!ownerCorrectionPreviewMoney(session.cash_handover)&&method==="cash"&&["rent","arrears_payment","deposit_in","bed_transfer","bed_transfer_fee"].includes(type))totals.cash+=amount;
+    if(!ownerCorrectionPreviewMoney(session.bank_transfer_total)&&method==="bank"&&["rent","arrears_payment","deposit_in","bed_transfer","bed_transfer_fee"].includes(type))totals.bank+=amount;
+  }
+  for(const key of Object.keys(totals))totals[key]=ownerCorrectionPreviewMoney(totals[key]);
+  return totals;
+}
+__name(ownerCorrectionPreviewSessionTotals,"ownerCorrectionPreviewSessionTotals");
+function ownerCorrectionPreviewNoWriteProof(extra={}){
+  return {
+    dry_run:true,
+    write_endpoints_called:[],
+    d1_write_count:0,
+    session_write_attempted:false,
+    transaction_write_attempted:false,
+    correction_write_attempted:false,
+    arrear_task_write_attempted:false,
+    deposit_write_attempted:false,
+    owner_history_write_attempted:false,
+    real_apply_called:false,
+    write_guard_mode:"route_level_no_write",
+    proof_limitations:"D1 write count is reported by route contract; preview route does not call write functions.",
+    ...extra
+  };
+}
+__name(ownerCorrectionPreviewNoWriteProof,"ownerCorrectionPreviewNoWriteProof");
+async function handleOwnerCorrectionPreview(request,env,user){
+  if(!canReadOwnerData(user))return forbidden();
+  if(request.method!=="POST")return errorResponse("method_not_allowed",405,"METHOD_NOT_ALLOWED");
+  let body;
+  try{body=await request.json();}catch{return json({ok:false,mode:"owner_correction_dry_run_preview_only",no_write:true,error_code:"INVALID_JSON",message:"Request body must be valid JSON.",no_write_proof:ownerCorrectionPreviewNoWriteProof()},400);}
+  const targetAnchor=cleanText(body?.target_session_anchor||body?.targetSessionAnchor||body?.target_session_id||"",160);
+  if(!targetAnchor)return json({ok:false,mode:"owner_correction_dry_run_preview_only",no_write:true,error_code:"TARGET_SESSION_ANCHOR_REQUIRED",message:"target_session_anchor is required.",invalid_corrections:[{code:"CORRECTION_SESSION_FIELD_MISSING",field:"target_session_anchor"}],no_write_proof:ownerCorrectionPreviewNoWriteProof()},422);
+  if(!await empTableExists(env,"sessions").catch(()=>false)){
+    return json({ok:false,mode:"owner_correction_dry_run_preview_only",no_write:true,error_code:"SESSIONS_TABLE_NOT_READY",message:"sessions table is not available.",no_write_proof:ownerCorrectionPreviewNoWriteProof()},503);
+  }
+  const session=await env.DB.prepare("SELECT * FROM sessions WHERE corpid=? AND (anchor_id=? OR id=?) LIMIT 1").bind(user.corpid,targetAnchor,targetAnchor).first().catch(()=>null);
+  if(!session){
+    return json({ok:false,mode:"owner_correction_dry_run_preview_only",no_write:true,error_code:"TARGET_SESSION_NOT_FOUND",message:"Target session was not found.",target_session_anchor:targetAnchor,no_write_proof:ownerCorrectionPreviewNoWriteProof()},404);
+  }
+  const originalEvents=extractEmployeeEntryAnchorsFromSession(session);
+  const correction={
+    anchor_contract_version:"owner_correction_anchor_v1",
+    correction_session_id:cleanText(body?.correction_session_id||body?.correctionSessionId||`CORR-PREVIEW-${targetAnchor}`,180),
+    correction_type:cleanText(body?.correction_type||body?.correctionType||"",120),
+    target_session_anchor:targetAnchor,
+    correction_reason:cleanText(body?.correction_reason||body?.correctionReason||"",500),
+    evidence_summary:cleanText(body?.evidence_summary||body?.evidenceSummary||"",1000),
+    no_hard_delete:true,
+    original_events_immutable:true,
+    allow_negative_totals_owner_override:body?.allow_negative_totals_owner_override===true,
+    correction_events:Array.isArray(body?.correction_events)?body.correction_events:[]
+  };
+  const preview=buildOwnerCorrectionDryRunPreview({
+    id:session.id||"",
+    session_id:session.id||"",
+    anchor:session.anchor_id||targetAnchor,
+    totals:ownerCorrectionPreviewSessionTotals(session,originalEvents),
+    events:originalEvents
+  },correction);
+  return json({
+    ...preview,
+    target_session_anchor:session.anchor_id||preview.target_session_anchor,
+    target_session_id:session.id||preview.target_session_id,
+    readonly:true,
+    production_cutover:"PRODUCTION_NO_GO",
+    no_write_proof:{...ownerCorrectionPreviewNoWriteProof(),...(preview.no_write_proof||{})}
+  },preview.ok?200:422);
+}
+__name(handleOwnerCorrectionPreview,"handleOwnerCorrectionPreview");
 async function handleEmployeeApi(request,env,user){
   const path=new URL(request.url).pathname;
   if(isReadonlyAdminRoleValue(user?.role)&&request.method!=="GET")return forbidden();
@@ -8017,6 +8114,9 @@ async function handleRequest(request, env, ctx) {
       return authFailureResponse(auth);
     }
     const user = auth.payload;
+    if (path === "/api/owner/corrections/preview" && method === "POST") {
+      return handleOwnerCorrectionPreview(request, env, user);
+    }
     const employeeApiResponse = await handleEmployeeApi(request, env, user);
     if (employeeApiResponse) return employeeApiResponse;
     if (path === "/api/me") {

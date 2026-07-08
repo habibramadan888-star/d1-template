@@ -140,6 +140,8 @@ export function validateCorrectionAnchorContract(correction, options = {}) {
   }
   if (!Array.isArray(root.correction_events)) {
     addIssue(errors, "CORRECTION_EVENTS_REQUIRED", "correction_events array is required.");
+  } else if (!root.correction_events.length) {
+    addIssue(errors, "CORRECTION_EVENTS_REQUIRED", "correction_events array must not be empty.");
   }
   if (root.no_hard_delete === false || root.hard_delete === true) {
     addIssue(errors, "HARD_DELETE_FORBIDDEN", "Correction anchors must not request hard delete.");
@@ -178,6 +180,13 @@ export function validateCorrectionAnchorContract(correction, options = {}) {
     for (const issue of containsForbiddenIdentity(event, `correction_events[${index}]`)) {
       addIssue(errors, "FORBIDDEN_IDENTITY_INPUT", "Correction event must not use card/provider identity fields.", issue);
     }
+    const originalExists = !String(event.original_event_id || "").trim() || originalEventsById.has(event.original_event_id);
+    if (options.require_original_event_match && !originalExists) {
+      addIssue(errors, "ORIGINAL_EVENT_ID_NOT_FOUND", "original_event_id was not found in the target session.", {
+        event_index: index,
+        original_event_id: event.original_event_id
+      });
+    }
     validateFinancialEffectMatchesOriginal(event, originalEventsById, errors);
   });
 
@@ -186,6 +195,90 @@ export function validateCorrectionAnchorContract(correction, options = {}) {
     errors,
     warnings,
     correction: root
+  };
+}
+
+function correctionTotalsWithDeltaKeys(correctionTotals = {}) {
+  return {
+    cash_delta: money(correctionTotals.cash),
+    bank_delta: money(correctionTotals.bank),
+    gross_delta: money(correctionTotals.gross),
+    rent_income_delta: money(correctionTotals.rent_income),
+    deposit_liability_delta: money(correctionTotals.deposit_liability),
+    arrears_repaid_delta: money(correctionTotals.arrears_repaid),
+    arrears_open_delta: money(correctionTotals.arrears_open),
+    expense_delta: money(correctionTotals.expense),
+    transfer_fee_delta: money(correctionTotals.transfer_fee)
+  };
+}
+
+function negativeTotalErrors(adjustedTotals = {}, allowNegativeTotals = false) {
+  if (allowNegativeTotals) return [];
+  const errors = [];
+  for (const [field, value] of Object.entries(adjustedTotals || {})) {
+    if (money(value) < 0) {
+      addIssue(errors, "ADJUSTED_TOTAL_NEGATIVE", "Correction would make an adjusted total negative.", {
+        field,
+        adjusted_value: money(value)
+      });
+    }
+  }
+  return errors;
+}
+
+export function buildOwnerCorrectionDryRunPreview(originalSession = {}, correctionInput = {}, options = {}) {
+  const correction = asObject(correctionInput);
+  const originalEvents = asArray(originalSession.events);
+  const validation = validateCorrectionAnchorContract(correction, {
+    original_events: originalEvents,
+    require_original_event_match: true
+  });
+  const totals = calculateCorrectionAdjustedTotals(originalSession.totals || {}, validation.ok ? correction.correction_events : []);
+  const negativeErrors = negativeTotalErrors(totals.adjusted_totals, Boolean(correction.allow_negative_totals_owner_override || options.allow_negative_totals_owner_override));
+  const invalidCorrections = [...validation.errors, ...negativeErrors];
+  const ok = invalidCorrections.length === 0;
+  const appliedEvents = ok ? correction.correction_events : [];
+  const appliedTotals = ok ? totals : calculateCorrectionAdjustedTotals(originalSession.totals || {}, []);
+
+  return {
+    ok,
+    mode: "owner_correction_dry_run_preview_only",
+    no_write: true,
+    target_session_anchor: correction.target_session_anchor || originalSession.anchor || "",
+    target_session_id: originalSession.id || originalSession.session_id || "",
+    original_totals: appliedTotals.original_totals,
+    correction_totals: correctionTotalsWithDeltaKeys(appliedTotals.correction_totals),
+    adjusted_totals: appliedTotals.adjusted_totals,
+    original_events_visible: true,
+    original_events_count: originalEvents.length,
+    correction_events_count: asArray(correction.correction_events).length,
+    correction_events: appliedEvents,
+    invalid_corrections: invalidCorrections,
+    warnings: validation.warnings,
+    audit_view: {
+      raw_mode_available: true,
+      adjusted_mode_available: true,
+      audit_mode_available: true,
+      original_events_immutable: true,
+      hard_delete: false,
+      silent_overwrite: false,
+      original_events: originalEvents,
+      correction_events: appliedEvents
+    },
+    no_write_proof: {
+      dry_run: true,
+      write_endpoints_called: [],
+      d1_write_count: 0,
+      session_write_attempted: false,
+      transaction_write_attempted: false,
+      correction_write_attempted: false,
+      arrear_task_write_attempted: false,
+      deposit_write_attempted: false,
+      owner_history_write_attempted: false,
+      real_apply_called: false,
+      write_guard_mode: "route_level_no_write",
+      proof_limitations: "D1 write count is reported by route contract; preview route does not call write functions."
+    }
   };
 }
 
