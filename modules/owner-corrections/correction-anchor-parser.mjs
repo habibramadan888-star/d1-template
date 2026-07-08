@@ -393,6 +393,154 @@ export function validateOwnerCorrectionApplyRequest(body = {}, preview = {}, opt
   return { ok: errors.length === 0, errors };
 }
 
+function enabledFlag(value) {
+  return ["1", "true", "yes", "on"].includes(String(value || "").trim().toLowerCase());
+}
+
+function configValue(config, key, fallbackKey = "") {
+  return String(config?.[key] ?? (fallbackKey ? config?.[fallbackKey] : "") ?? "").trim();
+}
+
+function splitConfigList(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) return parsed.map((item) => String(item || "").trim()).filter(Boolean);
+  } catch {
+    // Comma/whitespace separated config is the intended non-JSON fallback.
+  }
+  return raw.split(/[,\s]+/).map((item) => item.trim()).filter(Boolean);
+}
+
+function sameStringSet(actual = [], expected = []) {
+  const actualSorted = [...new Set(actual.map((item) => String(item || "").trim()).filter(Boolean))].sort();
+  const expectedSorted = [...new Set(expected.map((item) => String(item || "").trim()).filter(Boolean))].sort();
+  return actualSorted.length === expectedSorted.length && actualSorted.every((item, index) => item === expectedSorted[index]);
+}
+
+function assertMoneyEquals(errors, code, field, actual, expected) {
+  if (expected === "" || typeof expected === "undefined" || expected === null) {
+    addIssue(errors, code, `${field} target-scope config is required.`, { field });
+    return;
+  }
+  const expectedMoney = money(expected);
+  const actualMoney = money(actual);
+  if (Math.abs(actualMoney - expectedMoney) > 0.01) {
+    addIssue(errors, code, `${field} does not match target-scoped authorization.`, {
+      field,
+      expected: expectedMoney,
+      actual: actualMoney
+    });
+  }
+}
+
+export function validateOwnerCorrectionTargetScopedApplyAuthorization(input = {}) {
+  const errors = [];
+  const request = asObject(input.request || input.body);
+  const preview = asObject(input.preview);
+  const config = asObject(input.config || input.env);
+  const confirmation = asObject(request.explicit_owner_confirmation);
+
+  if (!enabledFlag(config.OWNER_CORRECTION_TARGET_SCOPED_APPLY_ENABLED ?? config.target_scoped_apply_enabled)) {
+    addIssue(errors, "OWNER_CORRECTION_TARGET_SCOPE_REQUIRED", "Owner correction apply requires target-scoped authorization.", {
+      field: "OWNER_CORRECTION_TARGET_SCOPED_APPLY_ENABLED"
+    });
+  }
+
+  const forbidden = containsForbiddenIdentity(request);
+  for (const issue of forbidden) {
+    addIssue(errors, "FORBIDDEN_IDENTITY_INPUT", "Target-scoped apply authorization must not use provider/card/phone identity fields.", issue);
+  }
+
+  const expectedSessionId = configValue(config, "OWNER_CORRECTION_ALLOWED_TARGET_SESSION_ID", "allowed_target_session_id");
+  const expectedAnchor = configValue(config, "OWNER_CORRECTION_ALLOWED_TARGET_SESSION_ANCHOR", "allowed_target_session_anchor");
+  const expectedType = configValue(config, "OWNER_CORRECTION_ALLOWED_TYPE", "allowed_type");
+  const expectedIds = splitConfigList(config.OWNER_CORRECTION_ALLOWED_ORIGINAL_EVENT_IDS ?? config.allowed_original_event_ids);
+  const actualIds = asArray(request.correction_events).map((event) => String(asObject(event).original_event_id || "").trim()).filter(Boolean);
+
+  if (!expectedSessionId) addIssue(errors, "OWNER_CORRECTION_TARGET_SCOPE_CONFIG_MISSING", "Allowed target session id is not configured.", { field: "OWNER_CORRECTION_ALLOWED_TARGET_SESSION_ID" });
+  if (!expectedAnchor) addIssue(errors, "OWNER_CORRECTION_TARGET_SCOPE_CONFIG_MISSING", "Allowed target session anchor is not configured.", { field: "OWNER_CORRECTION_ALLOWED_TARGET_SESSION_ANCHOR" });
+  if (!expectedType) addIssue(errors, "OWNER_CORRECTION_TARGET_SCOPE_CONFIG_MISSING", "Allowed correction type is not configured.", { field: "OWNER_CORRECTION_ALLOWED_TYPE" });
+  if (!expectedIds.length) addIssue(errors, "OWNER_CORRECTION_TARGET_SCOPE_CONFIG_MISSING", "Allowed original_event_id list is not configured.", { field: "OWNER_CORRECTION_ALLOWED_ORIGINAL_EVENT_IDS" });
+
+  if (expectedSessionId && String(request.target_session_id || "") !== expectedSessionId) {
+    addIssue(errors, "OWNER_CORRECTION_TARGET_SESSION_ID_NOT_ALLOWED", "target_session_id is not allowed by target-scoped authorization.", {
+      expected: expectedSessionId,
+      actual: String(request.target_session_id || "")
+    });
+  }
+  if (expectedAnchor && String(request.target_session_anchor || "") !== expectedAnchor) {
+    addIssue(errors, "OWNER_CORRECTION_TARGET_ANCHOR_NOT_ALLOWED", "target_session_anchor is not allowed by target-scoped authorization.", {
+      expected: expectedAnchor,
+      actual: String(request.target_session_anchor || "")
+    });
+  }
+  if (expectedType && String(request.correction_type || "") !== expectedType) {
+    addIssue(errors, "OWNER_CORRECTION_TYPE_NOT_ALLOWED", "correction_type is not allowed by target-scoped authorization.", {
+      expected: expectedType,
+      actual: String(request.correction_type || "")
+    });
+  }
+  if (expectedIds.length && !sameStringSet(actualIds, expectedIds)) {
+    addIssue(errors, "OWNER_CORRECTION_ORIGINAL_EVENT_IDS_NOT_ALLOWED", "original_event_id list must exactly match target-scoped authorization.", {
+      expected: [...expectedIds].sort(),
+      actual: [...actualIds].sort()
+    });
+  }
+
+  assertMoneyEquals(errors, "OWNER_CORRECTION_GROSS_DELTA_NOT_ALLOWED", "correction_totals.gross_delta", preview?.correction_totals?.gross_delta, config.OWNER_CORRECTION_EXPECTED_GROSS_DELTA ?? config.expected_gross_delta);
+  assertMoneyEquals(errors, "OWNER_CORRECTION_CASH_DELTA_NOT_ALLOWED", "correction_totals.cash_delta", preview?.correction_totals?.cash_delta, config.OWNER_CORRECTION_EXPECTED_CASH_DELTA ?? config.expected_cash_delta);
+  assertMoneyEquals(errors, "OWNER_CORRECTION_ADJUSTED_GROSS_NOT_ALLOWED", "adjusted_totals.gross", preview?.adjusted_totals?.gross, config.OWNER_CORRECTION_EXPECTED_ADJUSTED_GROSS ?? config.expected_adjusted_gross);
+  assertMoneyEquals(errors, "OWNER_CORRECTION_ADJUSTED_CASH_NOT_ALLOWED", "adjusted_totals.cash", preview?.adjusted_totals?.cash, config.OWNER_CORRECTION_EXPECTED_ADJUSTED_CASH ?? config.expected_adjusted_cash);
+
+  if ((config.OWNER_CORRECTION_EXPECTED_RENT_INCOME_DELTA ?? config.expected_rent_income_delta ?? "") !== "") {
+    assertMoneyEquals(errors, "OWNER_CORRECTION_RENT_INCOME_DELTA_NOT_ALLOWED", "correction_totals.rent_income_delta", preview?.correction_totals?.rent_income_delta, config.OWNER_CORRECTION_EXPECTED_RENT_INCOME_DELTA ?? config.expected_rent_income_delta);
+  }
+  if ((config.OWNER_CORRECTION_EXPECTED_ADJUSTED_RENT_INCOME ?? config.expected_adjusted_rent_income ?? "") !== "") {
+    assertMoneyEquals(errors, "OWNER_CORRECTION_ADJUSTED_RENT_INCOME_NOT_ALLOWED", "adjusted_totals.rent_income", preview?.adjusted_totals?.rent_income, config.OWNER_CORRECTION_EXPECTED_ADJUSTED_RENT_INCOME ?? config.expected_adjusted_rent_income);
+  }
+  if ((config.OWNER_CORRECTION_EXPECTED_ADJUSTED_ARREARS_REPAID ?? config.expected_adjusted_arrears_repaid ?? "") !== "") {
+    assertMoneyEquals(errors, "OWNER_CORRECTION_ADJUSTED_ARREARS_REPAID_NOT_ALLOWED", "adjusted_totals.arrears_repaid", preview?.adjusted_totals?.arrears_repaid, config.OWNER_CORRECTION_EXPECTED_ADJUSTED_ARREARS_REPAID ?? config.expected_adjusted_arrears_repaid);
+  }
+
+  if (!String(request.preview_hash || "").trim()) {
+    addIssue(errors, "PREVIEW_HASH_REQUIRED", "preview_hash is required for target-scoped authorization.", { field: "preview_hash" });
+  }
+  if (!String(request.idempotency_key || "").trim()) {
+    addIssue(errors, "IDEMPOTENCY_KEY_REQUIRED", "idempotency_key is required for target-scoped authorization.", { field: "idempotency_key" });
+  }
+  if (confirmation.confirmed !== true) {
+    addIssue(errors, "OWNER_CONFIRMATION_REQUIRED", "explicit owner confirmation is required for target-scoped authorization.", { field: "explicit_owner_confirmation.confirmed" });
+  }
+  if (expectedSessionId && String(confirmation.confirmed_target_session_id || "") !== expectedSessionId) {
+    addIssue(errors, "OWNER_CONFIRMATION_MISMATCH", "confirmed_target_session_id must match target-scoped authorization.", {
+      expected: expectedSessionId,
+      actual: String(confirmation.confirmed_target_session_id || "")
+    });
+  }
+  if (expectedAnchor && String(confirmation.confirmed_target_session_anchor || "") !== expectedAnchor) {
+    addIssue(errors, "OWNER_CONFIRMATION_MISMATCH", "confirmed_target_session_anchor must match target-scoped authorization.", {
+      expected: expectedAnchor,
+      actual: String(confirmation.confirmed_target_session_anchor || "")
+    });
+  }
+  if (Math.abs(money(confirmation.confirmed_correction_cash_delta) - money(config.OWNER_CORRECTION_EXPECTED_CASH_DELTA ?? config.expected_cash_delta)) > 0.01) {
+    addIssue(errors, "OWNER_CONFIRMATION_MISMATCH", "confirmed_correction_cash_delta must match target-scoped authorization.", { field: "explicit_owner_confirmation.confirmed_correction_cash_delta" });
+  }
+  if (Math.abs(money(confirmation.confirmed_adjusted_cash) - money(config.OWNER_CORRECTION_EXPECTED_ADJUSTED_CASH ?? config.expected_adjusted_cash)) > 0.01) {
+    addIssue(errors, "OWNER_CONFIRMATION_MISMATCH", "confirmed_adjusted_cash must match target-scoped authorization.", { field: "explicit_owner_confirmation.confirmed_adjusted_cash" });
+  }
+
+  return {
+    ok: errors.length === 0,
+    errors,
+    mode: errors.length ? "owner_correction_target_scope_required" : "owner_correction_target_scope_authorized",
+    no_write: true,
+    production_write: false
+  };
+}
+
 export function buildOwnerCorrectionSessionAnchor(input = {}) {
   const preview = asObject(input.preview);
   const correction = asObject(input.correction);

@@ -9,7 +9,8 @@ import {
   buildOwnerCorrectionSessionAnchor,
   hashCorrectionStablePayload,
   parseOwnerCorrectionAnchorText,
-  validateOwnerCorrectionApplyRequest
+  validateOwnerCorrectionApplyRequest,
+  validateOwnerCorrectionTargetScopedApplyAuthorization
 } from "../../modules/owner-corrections/correction-anchor-parser.mjs";
 import { buildAuditModeView } from "../../modules/owner-history/correction-aware-history-parser.mjs";
 import { createDashboardTotalsPayload } from "./handlers/dashboard-totals.js";
@@ -6649,6 +6650,38 @@ function ownerCorrectionDisabledResponse(){
   },403);
 }
 __name(ownerCorrectionDisabledResponse,"ownerCorrectionDisabledResponse");
+function ownerCorrectionTargetScopeConfig(env={}){
+  return {
+    OWNER_CORRECTION_TARGET_SCOPED_APPLY_ENABLED:env.OWNER_CORRECTION_TARGET_SCOPED_APPLY_ENABLED,
+    OWNER_CORRECTION_ALLOWED_TARGET_SESSION_ID:env.OWNER_CORRECTION_ALLOWED_TARGET_SESSION_ID,
+    OWNER_CORRECTION_ALLOWED_TARGET_SESSION_ANCHOR:env.OWNER_CORRECTION_ALLOWED_TARGET_SESSION_ANCHOR,
+    OWNER_CORRECTION_ALLOWED_TYPE:env.OWNER_CORRECTION_ALLOWED_TYPE,
+    OWNER_CORRECTION_ALLOWED_ORIGINAL_EVENT_IDS:env.OWNER_CORRECTION_ALLOWED_ORIGINAL_EVENT_IDS,
+    OWNER_CORRECTION_EXPECTED_GROSS_DELTA:env.OWNER_CORRECTION_EXPECTED_GROSS_DELTA,
+    OWNER_CORRECTION_EXPECTED_CASH_DELTA:env.OWNER_CORRECTION_EXPECTED_CASH_DELTA,
+    OWNER_CORRECTION_EXPECTED_ADJUSTED_GROSS:env.OWNER_CORRECTION_EXPECTED_ADJUSTED_GROSS,
+    OWNER_CORRECTION_EXPECTED_ADJUSTED_CASH:env.OWNER_CORRECTION_EXPECTED_ADJUSTED_CASH,
+    OWNER_CORRECTION_EXPECTED_RENT_INCOME_DELTA:env.OWNER_CORRECTION_EXPECTED_RENT_INCOME_DELTA,
+    OWNER_CORRECTION_EXPECTED_ADJUSTED_RENT_INCOME:env.OWNER_CORRECTION_EXPECTED_ADJUSTED_RENT_INCOME,
+    OWNER_CORRECTION_EXPECTED_ADJUSTED_ARREARS_REPAID:env.OWNER_CORRECTION_EXPECTED_ADJUSTED_ARREARS_REPAID
+  };
+}
+__name(ownerCorrectionTargetScopeConfig,"ownerCorrectionTargetScopeConfig");
+function ownerCorrectionTargetScopeRequiredResponse(targetScope){
+  return json({
+    ok:false,
+    mode:"owner_correction_target_scope_required",
+    code:"OWNER_CORRECTION_TARGET_SCOPE_REQUIRED",
+    error_code:"OWNER_CORRECTION_TARGET_SCOPE_REQUIRED",
+    message:"Owner correction apply requires target-scoped authorization.",
+    invalid_corrections:targetScope?.errors||[],
+    no_write:true,
+    production_write:false,
+    production_cutover:"PRODUCTION_NO_GO",
+    no_write_proof:ownerCorrectionPreviewNoWriteProof({write_guard_mode:"target_scoped_authorization_required"})
+  },403);
+}
+__name(ownerCorrectionTargetScopeRequiredResponse,"ownerCorrectionTargetScopeRequiredResponse");
 function ownerCorrectionTargetSessionHash(session={}){
   return hashCorrectionStablePayload({
     id:session.id||"",
@@ -6891,6 +6924,13 @@ async function handleOwnerCorrectionApply(request,env,user){
   if(!applyValidation.ok){
     return json({ok:false,mode:"owner_correction_apply_validation_failed",error_code:"OWNER_CORRECTION_APPLY_VALIDATION_FAILED",message:"Owner correction apply validation failed.",invalid_corrections:applyValidation.errors,no_write:true,production_write:false,production_cutover:"PRODUCTION_NO_GO",preview,no_write_proof:ownerCorrectionPreviewNoWriteProof()},422);
   }
+  const targetScope=validateOwnerCorrectionTargetScopedApplyAuthorization({
+    request:body,
+    preview,
+    config:ownerCorrectionTargetScopeConfig(env),
+    user
+  });
+  if(!targetScope.ok)return ownerCorrectionTargetScopeRequiredResponse(targetScope);
   const fingerprint=buildCorrectionRequestFingerprint({...correction,target_session_id:targetSessionId});
   const originalEventIds=(correction.correction_events||[]).map(event=>String(event.original_event_id||"")).filter(Boolean);
   const existingRows=await ownerCorrectionFetchExistingCorrectionSessions(env,user,targetAnchor);

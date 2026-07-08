@@ -178,15 +178,17 @@ test("embedded worker is the deployed entrypoint and supports opt-in correction 
   assert.match(wrangler, /main\s*=\s*"src\/index\.embedded\.js"/);
   assert.match(embedded, /if \(path === "\/api\/session_detail" && method === "GET"\)/);
   assert.match(embedded, /const includeCorrections =/);
-  assert.match(embedded, /embeddedSessionDetailCorrectionFields/);
-  assert.match(embedded, /return json\(\{\s*\.\.\.ok\(results\|\|\[\]\),\s*\.\.\.correctionFields\s*\}\)/);
+  assert.match(embedded, /ownerHistoryDetailCorrectionFields/);
+  assert.match(embedded, /return json\(\{\s*\.\.\.ok\(detailChoice\.rows\),\s*\.\.\.correctionFields\s*\}\)/);
+  assert.match(embedded, /return json\(\{\s*\.\.\.ok\(results\),\s*\.\.\.correctionFields\s*\}\)/);
   assert.match(embedded, /return success\(results\);/);
 });
 
 test("embedded opt-in keeps legacy wrapper data as array with top-level correction fields", async () => {
   const embedded = await embeddedWorker();
 
-  assert.match(embedded, /return json\(\{\s*\.\.\.ok\(\[\]\),\s*\.\.\.correctionFields\s*\}\)/);
+  assert.match(embedded, /return json\(\{\s*\.\.\.ok\(detailChoice\.rows\),\s*\.\.\.correctionFields\s*\}\)/);
+  assert.match(embedded, /return json\(\{\s*\.\.\.ok\(results\),\s*\.\.\.correctionFields\s*\}\)/);
   assert.match(embedded, /correction_summary:\s*\{/);
   assert.match(embedded, /correction_audit:\s*\{/);
   assert.doesNotMatch(embedded, /return success\(\{\s*rows:/);
