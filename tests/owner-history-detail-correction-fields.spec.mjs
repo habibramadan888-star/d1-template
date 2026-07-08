@@ -123,8 +123,8 @@ test("detail endpoint opt-in response exposes additive correction fields", async
   assert.match(text, /include_corrections/);
   assert.match(text, /correction_summary/);
   assert.match(text, /correction_audit/);
-  assert.match(text, /json\(\{\s*\.\.\.ok\(detailChoice\.rows\),\s*\.\.\.correctionFields\s*\}\)/);
-  assert.match(text, /json\(\{\s*\.\.\.ok\(results\),\s*\.\.\.correctionFields\s*\}\)/);
+  assert.match(text, /return ownerHistoryDetailAdditiveResponse\(env,user,sessionRow,detailChoice\.rows\)/);
+  assert.match(text, /return ownerHistoryDetailAdditiveResponse\(env,user,sessionRow,results\)/);
   assert.doesNotMatch(text, /return success\(\{\s*rows:detailChoice\.rows/);
 });
 
@@ -173,6 +173,34 @@ test("detail correction fields fail closed instead of returning HTTP 500", async
   assert.match(text, /CORRECTION_AUDIT_BUILD_FAILED/);
 });
 
+test("detail additive response protects lookup build sanitize and serialization boundaries", async () => {
+  const text = await worker();
+  const start = text.indexOf("async function ownerHistoryDetailAdditiveResponse");
+  const end = text.indexOf("__name(ownerHistoryDetailAdditiveResponse", start);
+  const block = text.slice(start, end);
+
+  assert.match(block, /ownerCorrectionFetchExistingCorrectionSessions/);
+  assert.match(block, /CORRECTION_LOOKUP_FAILED_CLOSED/);
+  assert.match(block, /ownerHistoryDetailCorrectionFields/);
+  assert.match(block, /ownerHistoryDetailJsonSafeValue\(correctionFields\)/);
+  assert.match(block, /catch\(error\)/);
+  assert.match(block, /CORRECTION_AWARE_RESPONSE_FAILED_CLOSED/);
+  assert.match(block, /\.\.\.ok\(rows\)/);
+  assert.match(block, /ownerHistoryDetailFailClosedCorrectionFields\(sessionRow,rows/);
+});
+
+test("detail fail-closed warnings are safe and do not expose stack or secret fields", async () => {
+  const text = await worker();
+  const start = text.indexOf("function ownerHistoryDetailSafeWarning");
+  const end = text.indexOf("__name(ownerHistoryDetailSafeWarning", start);
+  const block = text.slice(start, end);
+
+  assert.match(block, /safe_message:cleanText\(error\?\.name\|\|error\?\.code\|\|"correction add-on failed",120\)/);
+  assert.doesNotMatch(block, /stack/);
+  assert.doesNotMatch(block, /message:\s*error\?\.message/);
+  assert.doesNotMatch(block, /token|cookie|secret|password|env\./i);
+});
+
 test("no correction sessions produce zero correction and adjusted equals raw", () => {
   const view = buildAuditModeView([x6wioSession]);
   const session = view.sessions[0];
@@ -192,16 +220,16 @@ test("embedded worker is the deployed entrypoint and supports opt-in correction 
   assert.match(embedded, /if \(path === "\/api\/session_detail" && method === "GET"\)/);
   assert.match(embedded, /const includeCorrections =/);
   assert.match(embedded, /ownerHistoryDetailCorrectionFields/);
-  assert.match(embedded, /return json\(\{\s*\.\.\.ok\(detailChoice\.rows\),\s*\.\.\.correctionFields\s*\}\)/);
-  assert.match(embedded, /return json\(\{\s*\.\.\.ok\(results\),\s*\.\.\.correctionFields\s*\}\)/);
+  assert.match(embedded, /return ownerHistoryDetailAdditiveResponse\(env,user,sessionRow,detailChoice\.rows\)/);
+  assert.match(embedded, /return ownerHistoryDetailAdditiveResponse\(env,user,sessionRow,results\)/);
   assert.match(embedded, /return success\(results\);/);
 });
 
 test("embedded opt-in keeps legacy wrapper data as array with top-level correction fields", async () => {
   const embedded = await embeddedWorker();
 
-  assert.match(embedded, /return json\(\{\s*\.\.\.ok\(detailChoice\.rows\),\s*\.\.\.correctionFields\s*\}\)/);
-  assert.match(embedded, /return json\(\{\s*\.\.\.ok\(results\),\s*\.\.\.correctionFields\s*\}\)/);
+  assert.match(embedded, /return ownerHistoryDetailAdditiveResponse\(env,user,sessionRow,detailChoice\.rows\)/);
+  assert.match(embedded, /return ownerHistoryDetailAdditiveResponse\(env,user,sessionRow,results\)/);
   assert.match(embedded, /correction_summary:\s*\{/);
   assert.match(embedded, /correction_audit:\s*\{/);
   assert.doesNotMatch(embedded, /return success\(\{\s*rows:/);

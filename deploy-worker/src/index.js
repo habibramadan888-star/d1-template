@@ -6900,6 +6900,57 @@ function ownerHistoryDetailFailClosedCorrectionFields(session={},rows=[],warning
   };
 }
 __name(ownerHistoryDetailFailClosedCorrectionFields,"ownerHistoryDetailFailClosedCorrectionFields");
+function ownerHistoryDetailJsonSafeValue(value, seen=new WeakSet()){
+  if(typeof value==="bigint")return value.toString();
+  if(value instanceof Date)return value.toISOString();
+  if(Array.isArray(value))return value.map(item=>ownerHistoryDetailJsonSafeValue(item,seen));
+  if(value&&typeof value==="object"){
+    if(seen.has(value))return "[Circular]";
+    seen.add(value);
+    const out={};
+    for(const [key,child] of Object.entries(value)){
+      if(typeof child==="undefined"||typeof child==="function"||typeof child==="symbol")continue;
+      out[key]=ownerHistoryDetailJsonSafeValue(child,seen);
+    }
+    seen.delete(value);
+    return out;
+  }
+  return value;
+}
+__name(ownerHistoryDetailJsonSafeValue,"ownerHistoryDetailJsonSafeValue");
+function ownerHistoryDetailSafeWarning(error,code="CORRECTION_AWARE_DETAIL_FAILED_CLOSED"){
+  return {
+    code,
+    message:"Correction-aware detail failed closed. Legacy detail rows were returned unchanged.",
+    safe_message:cleanText(error?.name||error?.code||"correction add-on failed",120)
+  };
+}
+__name(ownerHistoryDetailSafeWarning,"ownerHistoryDetailSafeWarning");
+async function ownerHistoryDetailAdditiveResponse(env,user,sessionRow,rows=[]){
+  let correctionFields;
+  try{
+    const targetAnchor=cleanText(sessionRow?.anchor_id||sessionRow?.id||"",180);
+    const correctionRows=targetAnchor?await ownerCorrectionFetchExistingCorrectionSessions(env,user,targetAnchor).catch(error=>{
+      throw Object.assign(new Error("correction lookup failed"),{safe_code:"CORRECTION_LOOKUP_FAILED_CLOSED",cause:error});
+    }):[];
+    correctionFields=ownerHistoryDetailCorrectionFields(sessionRow,rows,correctionRows);
+  }catch(error){
+    correctionFields=ownerHistoryDetailFailClosedCorrectionFields(sessionRow,rows,[ownerHistoryDetailSafeWarning(error,error?.safe_code||"CORRECTION_AWARE_DETAIL_FAILED_CLOSED")]);
+  }
+  try{
+    return json({
+      ...ok(rows),
+      ...ownerHistoryDetailJsonSafeValue(correctionFields)
+    });
+  }catch(error){
+    const fallback=ownerHistoryDetailFailClosedCorrectionFields(sessionRow,rows,[ownerHistoryDetailSafeWarning(error,"CORRECTION_AWARE_RESPONSE_FAILED_CLOSED")]);
+    return json({
+      ...ok(rows),
+      ...ownerHistoryDetailJsonSafeValue(fallback)
+    });
+  }
+}
+__name(ownerHistoryDetailAdditiveResponse,"ownerHistoryDetailAdditiveResponse");
 function ownerHistoryDetailCorrectionSessionView(row={}){
   return {
     session_id:cleanText(row?.id||"",160),
@@ -9071,25 +9122,13 @@ async function handleRequest(request, env, ctx) {
         const detailChoice=chooseOwnerEmployeeSessionDetailRows(sessionRow,results,anchorRows,exportRows);
         if(detailChoice.rows.length){
           if(includeCorrections){
-            const targetAnchor=cleanText(sessionRow.anchor_id||sessionRow.id||"",180);
-            const correctionRows=targetAnchor?await ownerCorrectionFetchExistingCorrectionSessions(env,user,targetAnchor).catch(()=>[]):[];
-            const correctionFields=ownerHistoryDetailCorrectionFields(sessionRow,detailChoice.rows,correctionRows);
-            return json({
-              ...ok(detailChoice.rows),
-              ...correctionFields
-            });
+            return ownerHistoryDetailAdditiveResponse(env,user,sessionRow,detailChoice.rows);
           }
           return success(detailChoice.rows);
         }
       }
       if(includeCorrections&&sessionRow){
-        const targetAnchor=cleanText(sessionRow.anchor_id||sessionRow.id||"",180);
-        const correctionRows=targetAnchor?await ownerCorrectionFetchExistingCorrectionSessions(env,user,targetAnchor).catch(()=>[]):[];
-        const correctionFields=ownerHistoryDetailCorrectionFields(sessionRow,results,correctionRows);
-        return json({
-          ...ok(results),
-          ...correctionFields
-        });
+        return ownerHistoryDetailAdditiveResponse(env,user,sessionRow,results);
       }
       return success(results);
     }
