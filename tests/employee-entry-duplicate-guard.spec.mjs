@@ -242,6 +242,66 @@ test("production duplicate incident fixture rejects the whole mixed batch", asyn
   assert.deepEqual(Array.from(result.duplicates, (item) => item.incoming_event_id).sort(), ["new-134", "new-334"]);
 });
 
+test("duplicate stale short-paid rent is caught before missing arrear handling validation", async () => {
+  const h = await loadDuplicateGuardHarness();
+  const existing = rent({
+    event_id: "ent20260707-w1ofc-01",
+    id: "ent20260707-w1ofc-01",
+    source_fingerprint: "homelink|334|2026-07-15|2026-08-15|ent20260707-w1ofc-01",
+    room: "334",
+    amount: 700,
+    paid: 700,
+    due: 780,
+    period_due: 780,
+    period_start: "2026-07-15",
+    period_end: "2026-08-15"
+  });
+  const staleIncoming = rent({
+    event_id: "ent20260707-w1ofc-01",
+    id: "ent20260707-w1ofc-01",
+    source_fingerprint: "homelink|334|2026-07-15|2026-08-15|ent20260707-w1ofc-01",
+    room: "334",
+    amount: 700,
+    paid: 700,
+    due: 780,
+    period_due: 780,
+    period_start: "2026-07-15",
+    period_end: "2026-08-15",
+    arrear_handling: "",
+    arrear_promise_date: "",
+    arrear_reason_detail: ""
+  });
+
+  const result = await h.checkEmployeeEntryDuplicates(
+    fakeEnv({
+      txRows: {
+        "ent20260707-w1ofc-01": {
+          id: "ent20260707-w1ofc-01",
+          session_id: "S-w1ofc",
+          created_at: "2026-07-07T10:00:00Z",
+          type: "R"
+        }
+      },
+      sessions: [
+        {
+          id: "S-w1ofc",
+          anchor_id: "EMPV3-20260707-abdul-w1ofc",
+          created_at: "2026-07-07T10:00:00Z",
+          entries_json: JSON.stringify({ entries: [existing] }),
+          export_text: ""
+        }
+      ]
+    }),
+    { corpid: "homelink" },
+    bodyFor([staleIncoming], "S-new", staleIncoming)
+  );
+
+  assert.equal(result.ok, false);
+  assert.match(result.error_code, /DUPLICATE_EVENT_FOUND|DUPLICATE_SOURCE_FINGERPRINT|DUPLICATE_CANONICAL_FINGERPRINT/);
+  assert.notEqual(result.error_code, "ARREAR_TASK_REQUIRED_FOR_SHORTFALL");
+  assert.equal(result.duplicates[0].incoming_event_id, "ent20260707-w1ofc-01");
+});
+
 test("same bed and amount with different rent period is not a duplicate", async () => {
   const h = await loadDuplicateGuardHarness();
   const stored = rent({ event_id: "old-rent", id: "old-rent", period_start: "2026-08-01", period_end: "2026-09-01" });
@@ -324,6 +384,12 @@ test("validate and real upload routes both run duplicate guard before writes", a
   assert.match(worker, /const duplicateGuard=await checkEmployeeEntryDuplicates\(env,user,body,\{event_index:eventIndex\}\)/);
   assert.match(worker, /if\(validationResult\.idempotent\)/);
   assert.match(worker, /no_write:true/);
+  const validatePayloadStart = worker.indexOf("async function validateEmployeeEntryUploadPayload(env,user,body,opts={})");
+  const duplicateGuardStart = worker.indexOf("const duplicateGuard=await checkEmployeeEntryDuplicates(env,user,body,{event_index:eventIndex})", validatePayloadStart);
+  const businessValidationStart = worker.indexOf("const eventFieldValidation=validateEmployeeEntryUploadEventFields", validatePayloadStart);
+  const shortPaidValidationStart = worker.indexOf('employeeEntryValidationFailure("rent_short_paid","ARREAR_TASK_REQUIRED_FOR_SHORTFALL"', validatePayloadStart);
+  assert.ok(duplicateGuardStart > validatePayloadStart && duplicateGuardStart < businessValidationStart, "duplicate preflight must run before event-specific business validation");
+  assert.ok(duplicateGuardStart < shortPaidValidationStart, "duplicate preflight must run before rent short-paid validation");
   const handleStart = worker.indexOf("async function handleEmployeeEntry(request,env,user)");
   const writeStart = worker.indexOf("await empInsertDynamic(env,\"sessions\"", handleStart);
   const validateStart = worker.indexOf("validateEmployeeEntryUploadPayload(env,user,body", handleStart);

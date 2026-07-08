@@ -2078,6 +2078,54 @@ async function validateEmployeeEntryUploadPayload(env,user,body,opts={}){
   }
   const entry=body?.entry||{};
   const session=body?.session||{};
+  const duplicateGuard=await checkEmployeeEntryDuplicates(env,user,body,{event_index:eventIndex});
+  if(!duplicateGuard.ok)return employeeEntryDuplicateValidationFailure(duplicateGuard,eventIndex);
+  if(duplicateGuard.idempotent){
+    return {
+      trace_id:homelinkDiagnosticTraceId("emp-upload"),
+      action:"employee_upload_validation",
+      source:"dry_run",
+      ok:true,
+      stage:"duplicate_preflight",
+      event_index:eventIndex,
+      event_type:entryAnchorEventType(cleanText(entry.type||entry.reason_code||"R",12).toUpperCase()),
+      record_id:cleanText(entry.id||entry.event_id||entry.anchor_id||"",80),
+      error_code:"",
+      message:"Duplicate preflight matched an already synced session; no cloud write is needed.",
+      message_en:"Duplicate preflight matched an already synced session; no cloud write is needed.",
+      message_zh:"重复预检确认该本票已同步，无需再次写入云端。",
+      missing_fields:[],
+      invalid_fields:[],
+      suggested_action_en:"Keep the existing synced session.",
+      suggested_action_zh:"保留已经同步的本票即可。",
+      last_successful_stage:"duplicate_preflight",
+      payload_preview:{
+        session_id:cleanText(session.id||session.session_id||"",80),
+        entries_count:Array.isArray(session.entries)?session.entries.length:1,
+        source:cleanText(session.source||"employee_entry",40)
+      },
+      summary:{cash_handover:0,bank_transfer_total:0,bank_transfer_count:0,gross_received:0,balance_total:0},
+      entries_count:Array.isArray(session.entries)?session.entries.length:1,
+      duplicate_guard:{
+        ok:true,
+        idempotent:true,
+        existing_session_id:duplicateGuard.existing_session_id||"",
+        existing_anchor:duplicateGuard.existing_anchor||"",
+        canonical_fingerprint_persistence:duplicateGuard.canonical_fingerprint_persistence||"PARTIAL"
+      },
+      idempotent:true,
+      existing_session_id:duplicateGuard.existing_session_id||"",
+      existing_anchor:duplicateGuard.existing_anchor||"",
+      validation_trace:[employeeEntryValidationTraceStep("duplicate_preflight",true,{event_index:eventIndex,function_name:"checkEmployeeEntryDuplicates"})],
+      asset_version:HOMELINK_DIAGNOSTIC_ASSET_VERSION,
+      worker_version:HOMELINK_DIAGNOSTIC_WORKER_VERSION,
+      commit_hash:HOMELINK_DIAGNOSTIC_COMMIT_HASH,
+      frontend_asset_version:null,
+      expected_frontend_asset_version:HOMELINK_DIAGNOSTIC_ASSET_VERSION,
+      stale_frontend_asset:false,
+      built_at:HOMELINK_DIAGNOSTIC_BUILT_AT
+    };
+  }
   const type=cleanText(entry.type||entry.reason_code||"R",12).toUpperCase();
   const normalized=normalizeEntryAnchor(entry);
   const anchorPreview={
@@ -2256,8 +2304,6 @@ async function validateEmployeeEntryUploadPayload(env,user,body,opts={}){
   if(type==="CO"&&depositDeduction>depositBalance+0.01){
     return employeeEntryValidationFailure("checkout_validation","DEPOSIT_DEDUCTION_EXCEEDS_BALANCE","Deposit deduction exceeds deposit balance.",{event_index:eventIndex,event_type:"checkout",invalid_fields:["deposit_deduction"],anchor_preview:{...anchorPreview,deposit_balance:depositBalance,deposit_deduction:depositDeduction}});
   }
-  const duplicateGuard=await checkEmployeeEntryDuplicates(env,user,body,{event_index:eventIndex});
-  if(!duplicateGuard.ok)return employeeEntryDuplicateValidationFailure(duplicateGuard,eventIndex);
   const summary={
     cash_handover:Number(String(session.cash_handover||0).replace(/,/g,"")),
     bank_transfer_total:Number(String(session.bank_transfer_total||0).replace(/,/g,"")),
