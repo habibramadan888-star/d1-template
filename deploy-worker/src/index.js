@@ -1930,6 +1930,52 @@ function employeeEntryUploadAmount(value){
   return Number(String(value??0).replace(/,/g,""))||0;
 }
 __name(employeeEntryUploadAmount,"employeeEntryUploadAmount");
+function employeeEntryUploadHasExplicitValue(value){
+  if(value===true||value===false)return true;
+  return String(value??"").trim()!=="";
+}
+__name(employeeEntryUploadHasExplicitValue,"employeeEntryUploadHasExplicitValue");
+function employeeEntryUploadTruthy(value){
+  if(value===true)return true;
+  const raw=cleanText(value,40).toLowerCase();
+  return ["true","yes","y","1","paid","charged","waived","none"].includes(raw);
+}
+__name(employeeEntryUploadTruthy,"employeeEntryUploadTruthy");
+function employeeEntryFirstExplicitAmount(source={},fields=[]){
+  for(const field of fields){
+    if(Object.prototype.hasOwnProperty.call(source,field)&&employeeEntryUploadHasExplicitValue(source[field])){
+      return {provided:true,field,amount:employeeEntryUploadAmount(source[field])};
+    }
+  }
+  return {provided:false,field:"",amount:0};
+}
+__name(employeeEntryFirstExplicitAmount,"employeeEntryFirstExplicitAmount");
+function employeeEntryBedTransferFee(entry={},normalized={}){
+  const rawChoice=cleanText(entry.fee_choice||normalized.fee_choice||entry.fee_status||normalized.fee_status||entry.fee_mode||normalized.fee_mode||"",40).toLowerCase();
+  const amountInfo=employeeEntryFirstExplicitAmount(entry,["fee_amount","transfer_fee","transfer_fee_aed","amount"]);
+  const rawPaid=cleanText(entry.fee_paid,20).toLowerCase();
+  const rawWaived=cleanText(entry.fee_waived,20).toLowerCase();
+  const paidFlag=entry.fee_paid===true||["true","yes","y","1","paid","charged"].includes(rawPaid)||["paid","charged"].includes(rawChoice);
+  const waivedFlag=entry.fee_waived===true||["true","yes","y","1","waived","waive"].includes(rawWaived)||["waived","waive"].includes(rawChoice);
+  const noneFlag=["none","no_fee","nofee","zero","free"].includes(rawChoice);
+  const feeAmount=amountInfo.provided?amountInfo.amount:employeeEntryUploadAmount(normalized.fee_amount||0);
+  let feeChoice="";
+  if(paidFlag||feeAmount>0)feeChoice="paid";
+  else if(waivedFlag)feeChoice="waived";
+  else if(noneFlag||(amountInfo.provided&&feeAmount===0))feeChoice="none";
+  const waiverReason=cleanText(entry.fee_waived_reason||entry.waived_reason||entry.waiver_reason||entry.fee_waiver_reason||entry.custom_reason||entry.note||normalized.waiver_reason||"",240);
+  return {
+    fee_choice:feeChoice,
+    fee_paid:feeChoice==="paid",
+    fee_waived:feeChoice==="waived",
+    fee_amount:feeChoice==="paid"?feeAmount:0,
+    payment_method:entryAnchorPaymentMethod(entry.payment_method||entry.pay_type||normalized.payment_method||""),
+    waiver_reason:waiverReason,
+    amount_field:amountInfo.field,
+    amount_provided:amountInfo.provided
+  };
+}
+__name(employeeEntryBedTransferFee,"employeeEntryBedTransferFee");
 function employeeEntryOccupancyCandidateNoWriteProof(){
   return {
     dry_run:true,
@@ -2206,14 +2252,15 @@ function validateExpenseUploadFields(entry,normalized,eventIndex,anchorPreview){
 __name(validateExpenseUploadFields,"validateExpenseUploadFields");
 function validateBedTransferUploadFields(entry,normalized,eventIndex,anchorPreview){
   const missing=[];
-  const feeStatus=String(normalized.fee_status||entry.fee_status||entry.fee_mode||(entry.fee_paid==="N"?"waived":"paid")).toLowerCase();
+  const fee=employeeEntryBedTransferFee(entry,normalized);
   if(!employeeEntryUploadHasValue(normalized.from_bed||entry.bed_from||entry.room))missing.push("from_bed");
   if(!employeeEntryUploadHasValue(normalized.to_bed||entry.bed_to||entry.roomTo))missing.push("to_bed");
   if(!employeeEntryUploadHasValue(normalized.transfer_date||entry.transfer_date))missing.push("transfer_date");
-  if(!employeeEntryUploadHasValue(feeStatus))missing.push("fee_status");
-  if(!employeeEntryUploadHasValue(normalized.transfer_reason||entry.transfer_reason))missing.push("transfer_reason");
-  if(feeStatus==="waived"&&!employeeEntryUploadHasValue(normalized.waiver_reason||entry.waiver_reason||entry.fee_waiver_reason))missing.push("waiver_reason");
   if(missing.length)return employeeEntryValidationFailure("bed_transfer_event_validation","BED_TRANSFER_REQUIRED_FIELD_MISSING","Bed Transfer entry is missing required fields.",{event_index:eventIndex,event_type:"bed_transfer",missing_fields:missing,anchor_preview:anchorPreview});
+  if(!fee.fee_choice)return employeeEntryValidationFailure("bed_transfer_validation","TRANSFER_FEE_CHOICE_REQUIRED","Bed transfer fee choice is required.",{event_index:eventIndex,event_type:"bed_transfer",missing_fields:["fee_paid"],anchor_preview:anchorPreview});
+  if(fee.fee_choice==="paid"&&fee.fee_amount<=0)return employeeEntryValidationFailure("bed_transfer_validation","BED_TRANSFER_REQUIRED_FIELD_MISSING","Bed Transfer paid fee requires a positive fee amount.",{event_index:eventIndex,event_type:"bed_transfer",missing_fields:["fee_amount"],anchor_preview:anchorPreview});
+  if(fee.fee_choice==="paid"&&!employeeEntryUploadHasValue(fee.payment_method))return employeeEntryValidationFailure("bed_transfer_validation","BED_TRANSFER_REQUIRED_FIELD_MISSING","Bed Transfer paid fee requires payment method.",{event_index:eventIndex,event_type:"bed_transfer",missing_fields:["payment_method"],anchor_preview:anchorPreview});
+  if(fee.fee_choice==="waived"&&!employeeEntryUploadHasValue(fee.waiver_reason))return employeeEntryValidationFailure("bed_transfer_validation","BED_TRANSFER_WAIVER_REASON_REQUIRED","Waiver reason is required.",{event_index:eventIndex,event_type:"bed_transfer",missing_fields:["fee_waiver_reason"],anchor_preview:anchorPreview});
   return null;
 }
 __name(validateBedTransferUploadFields,"validateBedTransferUploadFields");
@@ -2426,10 +2473,12 @@ async function validateEmployeeEntryUploadPayload(env,user,body,opts={}){
       return employeeEntryValidationFailure("rent_validation","EXCESS_TO_REQUIRED","Overpaid rent requires an excess handling choice.",{event_index:eventIndex,event_type:"rent",missing_fields:["excess_to"],anchor_preview:anchorPreview});
     }
   }else if(type==="TF"){
-    const feePaid=cleanText(entry.fee_paid,5);
-    if(!["Y","N"].includes(feePaid))return employeeEntryValidationFailure("bed_transfer_validation","TRANSFER_FEE_CHOICE_REQUIRED","Bed transfer fee choice is required.",{event_index:eventIndex,event_type:"bed_transfer",missing_fields:["fee_paid"],anchor_preview:anchorPreview});
-    if(feePaid==="N"&&!cleanText(entry.fee_waiver_reason||entry.custom_reason||entry.note,240))return employeeEntryValidationFailure("bed_transfer_validation","BED_TRANSFER_WAIVER_REASON_REQUIRED","Waiver reason is required.",{event_index:eventIndex,event_type:"bed_transfer",missing_fields:["fee_waiver_reason"],anchor_preview:anchorPreview});
-    amount=feePaid==="N"?0:50;
+    const fee=employeeEntryBedTransferFee(entry,normalized);
+    if(!fee.fee_choice)return employeeEntryValidationFailure("bed_transfer_validation","TRANSFER_FEE_CHOICE_REQUIRED","Bed transfer fee choice is required.",{event_index:eventIndex,event_type:"bed_transfer",missing_fields:["fee_paid"],anchor_preview:anchorPreview});
+    if(fee.fee_choice==="paid"&&fee.fee_amount<=0)return employeeEntryValidationFailure("bed_transfer_validation","BED_TRANSFER_REQUIRED_FIELD_MISSING","Bed Transfer paid fee requires a positive fee amount.",{event_index:eventIndex,event_type:"bed_transfer",missing_fields:["fee_amount"],anchor_preview:anchorPreview});
+    if(fee.fee_choice==="paid"&&!employeeEntryUploadHasValue(fee.payment_method))return employeeEntryValidationFailure("bed_transfer_validation","BED_TRANSFER_REQUIRED_FIELD_MISSING","Bed Transfer paid fee requires payment method.",{event_index:eventIndex,event_type:"bed_transfer",missing_fields:["payment_method"],anchor_preview:anchorPreview});
+    if(fee.fee_choice==="waived"&&!employeeEntryUploadHasValue(fee.waiver_reason))return employeeEntryValidationFailure("bed_transfer_validation","BED_TRANSFER_WAIVER_REASON_REQUIRED","Waiver reason is required.",{event_index:eventIndex,event_type:"bed_transfer",missing_fields:["fee_waiver_reason"],anchor_preview:anchorPreview});
+    amount=fee.fee_choice==="paid"?fee.fee_amount:0;
     due=amount;
     paid=amount;
     periodDue=0;
@@ -2714,19 +2763,14 @@ async function handleEmployeeEntry(request,env,user){
       if(!["RETURNED","MANAGER"].includes(excessTo))return badRequest("excess_to_required");
     }
   }else if(type==="TF"){
-    const feePaid=cleanText(entry.fee_paid,5);
-    if(!["Y","N"].includes(feePaid))return badRequest("transfer_fee_choice_required");
-    if(feePaid==="N"){
-      const waiverReason=cleanText(entry.fee_waiver_reason||entry.custom_reason||entry.note,240);
-      if(!waiverReason)return badRequest("bed_transfer_waiver_reason_required");
-      amount=0;
-      due=0;
-      paid=0;
-    }else{
-      amount=50;
-      due=50;
-      paid=50;
-    }
+    const fee=employeeEntryBedTransferFee(entry,{});
+    if(!fee.fee_choice)return badRequest("transfer_fee_choice_required");
+    if(fee.fee_choice==="paid"&&fee.fee_amount<=0)return badRequest("bed_transfer_fee_amount_required");
+    if(fee.fee_choice==="paid"&&!employeeEntryUploadHasValue(fee.payment_method))return badRequest("bed_transfer_payment_method_required");
+    if(fee.fee_choice==="waived"&&!employeeEntryUploadHasValue(fee.waiver_reason))return badRequest("bed_transfer_waiver_reason_required");
+    amount=fee.fee_choice==="paid"?fee.fee_amount:0;
+    due=amount;
+    paid=amount;
     periodDue=0;
     listPrice=0;
   }else if(type==="TFF"){
@@ -2816,7 +2860,7 @@ async function handleEmployeeEntry(request,env,user){
     deposit_deduction:depositDeduction,ded_reason:cleanText(entry.ded_reason,80),ded_days:Number(entry.ded_days||0),
     ded_rate:Number(String(entry.ded_rate||40).replace(/,/g,"")),ded_note:cleanText(entry.ded_note,240),early_days:Number(entry.early_days||0),
     arrear_handling:arrearHandling,bed_from:cleanText(entry.bed_from,40),bed_to:cleanText(entry.bed_to,40),
-    fee_paid:cleanText(entry.fee_paid,5),fee_waiver_reason:cleanText(entry.fee_waiver_reason,240),
+    fee_paid:type==="TF"?(employeeEntryBedTransferFee(entry,{}).fee_paid?"Y":"N"):cleanText(entry.fee_paid,5),fee_waiver_reason:type==="TF"?employeeEntryBedTransferFee(entry,{}).waiver_reason:cleanText(entry.fee_waiver_reason,240),
     expense_category:cleanText(entry.expense_category,40),expense_desc:cleanText(entry.expense_desc,240),
     linked_task_id:cleanText(entry.linked_task_id,80),original_period_start:cleanText(entry.original_period_start,20),
     original_period_end:cleanText(entry.original_period_end,20),
@@ -3201,7 +3245,8 @@ function normalizeEntryAnchor(row){
     const ref=anchor.arrears_ref||anchor.original_arrears_id||anchor.linked_task_id||"";
     Object.assign(anchor,{bed:anchor.bed||anchor.room,arrears_ref:ref,original_arrears_id:ref,original_arrears_amount:original,already_paid_amount:already,payment_amount:payment,remaining_arrears:remaining,settlement_status:anchor.settlement_status||(remaining<=0?"settled":"partial")});
   }else if(type==="TF"){
-    Object.assign(anchor,{from_bed:anchor.from_bed||anchor.bed_from||anchor.room||"",to_bed:anchor.to_bed||anchor.bed_to||anchor.room_to||"",transfer_date:anchor.transfer_date||anchor.date||"",fee_amount:entryAnchorMoney(anchor.fee_amount||anchor.amount),fee_status:anchor.fee_status||"paid",waiver_reason:anchor.waiver_reason||anchor.fee_waiver_reason||"",transfer_reason:anchor.transfer_reason||anchor.reason_code||"",old_tenant_context:anchor.old_tenant_context||"",old_ttlock_context:anchor.old_ttlock_context||"",note:anchor.note||""});
+    const fee=employeeEntryBedTransferFee(anchor,{});
+    Object.assign(anchor,{from_bed:anchor.from_bed||anchor.bed_from||anchor.room||"",to_bed:anchor.to_bed||anchor.bed_to||anchor.room_to||"",transfer_date:anchor.transfer_date||anchor.date||"",fee_amount:entryAnchorMoney(fee.fee_amount),fee_status:fee.fee_choice||anchor.fee_status||"",waiver_reason:fee.waiver_reason||anchor.waiver_reason||anchor.fee_waiver_reason||"",transfer_reason:anchor.transfer_reason||anchor.reason_code||anchor.reason||anchor.custom_reason||anchor.note||"transfer",old_tenant_context:anchor.old_tenant_context||"",old_ttlock_context:anchor.old_ttlock_context||"",note:anchor.note||""});
   }else if(type==="D"){
     Object.assign(anchor,{bed:anchor.bed||anchor.room||"",deposit_amount:entryAnchorMoney(anchor.deposit_amount||anchor.amount),linked_tenant:anchor.linked_tenant||anchor.tenant_card_id||anchor.tenant_name||"",note:anchor.note||""});
   }else if(type==="DR"){

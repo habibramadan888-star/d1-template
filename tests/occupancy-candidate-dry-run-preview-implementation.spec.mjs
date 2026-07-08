@@ -68,6 +68,32 @@ async function loadPreviewHarness() {
   return sandbox;
 }
 
+async function loadBedTransferFeeHarness() {
+  const worker = await readFile(workerPath, "utf8");
+  const start = worker.indexOf("function employeeEntryUploadHasExplicitValue");
+  const end = worker.indexOf("function employeeEntryOccupancyCandidateNoWriteProof", start);
+  assert.ok(start > 0 && end > start, "bed transfer fee helper block must exist");
+  const sandbox = {};
+  vm.createContext(sandbox);
+  vm.runInContext(
+    `
+    function __name(fn){ return fn; }
+    function cleanText(value,max=10000){ return Array.from(String(value ?? '')).join('').trim().slice(0,max); }
+    function employeeEntryUploadAmount(value){ return Number(String(value ?? 0).replace(/,/g,''))||0; }
+    function entryAnchorPaymentMethod(value){
+      const raw=String(value||'').trim().toLowerCase();
+      if(raw==='c'||raw==='cash')return 'cash';
+      if(raw==='b'||raw==='bank')return 'bank';
+      return raw||'other';
+    }
+    ${worker.slice(start, end)}
+    globalThis.employeeEntryBedTransferFee = employeeEntryBedTransferFee;
+    `,
+    sandbox
+  );
+  return sandbox;
+}
+
 function sessionBody(entries, entry = entries[0]) {
   return {
     entry,
@@ -235,6 +261,54 @@ test("bed transfer occupied target returns candidate conflict anomaly", async ()
 
   assert.equal(event.occupancy_candidate_status, "candidate_conflict");
   assert.equal(event.anomalies[0].risk_code, "BED_TRANSFER_TO_OCCUPIED_BED");
+});
+
+test("bed transfer fee normalization accepts paid aliases", async () => {
+  const h = await loadBedTransferFeeHarness();
+  const cases = [
+    { fee_paid: true, fee_amount: 50, payment_method: "cash" },
+    { transfer_fee: 50, payment_method: "cash" },
+    { fee_amount: 50, payment_method: "cash" },
+    { type: "TF", amount: 50, payment_method: "cash" }
+  ];
+  for (const fixture of cases) {
+    const fee = h.employeeEntryBedTransferFee(fixture, {});
+    assert.equal(fee.fee_choice, "paid");
+    assert.equal(fee.fee_paid, true);
+    assert.equal(fee.fee_waived, false);
+    assert.equal(fee.fee_amount, 50);
+    assert.equal(fee.payment_method, "cash");
+  }
+});
+
+test("bed transfer fee normalization accepts waived and none aliases", async () => {
+  const h = await loadBedTransferFeeHarness();
+  const waived = h.employeeEntryBedTransferFee({ fee_waived: true, fee_waived_reason: "manager approval" }, {});
+  const choiceWaived = h.employeeEntryBedTransferFee({ fee_choice: "waived", waived_reason: "customer request" }, {});
+  const none = h.employeeEntryBedTransferFee({ fee_choice: "none", transfer_fee: 0 }, {});
+  const missing = h.employeeEntryBedTransferFee({}, {});
+
+  assert.equal(waived.fee_choice, "waived");
+  assert.equal(waived.waiver_reason, "manager approval");
+  assert.equal(choiceWaived.fee_choice, "waived");
+  assert.equal(choiceWaived.waiver_reason, "customer request");
+  assert.equal(none.fee_choice, "none");
+  assert.equal(none.fee_amount, 0);
+  assert.equal(missing.fee_choice, "");
+});
+
+test("bed transfer validation uses canonical fee helper and no rent period fields", async () => {
+  const worker = await readFile(workerPath, "utf8");
+  const validateFields = functionBlock(worker, "validateBedTransferUploadFields");
+  const validatePayload = functionBlock(worker, "validateEmployeeEntryUploadPayload", "async function");
+
+  assert.match(validateFields, /const fee=employeeEntryBedTransferFee\(entry,normalized\)/);
+  assert.match(validateFields, /TRANSFER_FEE_CHOICE_REQUIRED/);
+  assert.match(validateFields, /BED_TRANSFER_WAIVER_REASON_REQUIRED/);
+  assert.match(validateFields, /missing_fields:\["fee_paid"\]/);
+  assert.match(validatePayload, /const fee=employeeEntryBedTransferFee\(entry,normalized\)/);
+  assert.doesNotMatch(validateFields, /rent_period_start|rent_period_end|period_start|period_end/);
+  assert.doesNotMatch(validateFields, /missing\.push\("transfer_reason"\)/);
 });
 
 test("bed transfer dispatch uses event_type before legacy type and never falls through to rent", async () => {
