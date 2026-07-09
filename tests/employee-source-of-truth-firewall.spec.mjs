@@ -151,10 +151,15 @@ test("Deposit firewall passes canonical payload while documenting legacy identit
   const allowed = constBlock(worker, "employeeSourceFirewallAllowedFields");
   const depositIn = allowed.match(/D:\[[^\]]+\]/s)?.[0] || "";
   const depositOut = allowed.match(/DR:\[[^\]]+\]/s)?.[0] || "";
+  const gateway = functionBlock(worker, "canonicalDepositGateway");
+  const handler = functionBlock(worker, "handleEmployeeDeposit");
 
   for (const block of [depositIn, depositOut]) {
     assert.doesNotMatch(block, /tenant_card_id|card_id|old_ttlock_ref/);
   }
-  assert.match(worker, /function empDepositBalance/);
-  assert.match(worker, /WHERE corpid=\? AND tenant_card_id=\?/);
+  assert.match(gateway, /deposit_source:"access_snapshot_remark_D"/);
+  assert.match(gateway, /cloud_deposit_events_role:"audit_supporting_only"/);
+  assert.match(handler, /canonicalDepositGateway\(env,user,\{bed,limit:1000\}\)/);
+  assert.match(handler, /tenant_card_id_identity_allowed:false/);
+  assert.doesNotMatch(handler, /url\.searchParams\.get\("cid"\)|empDepositBalance/);
 });

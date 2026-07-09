@@ -1463,6 +1463,179 @@ async function empDepositBalance(env, corpid, tenantCardId){
   return Number(row?.balance||0);
 }
 __name(empDepositBalance,"empDepositBalance");
+const CANONICAL_DEPOSIT_REQUIRED_TOTAL=200;
+function canonicalDepositMoney(value){
+  const amount=Number(value);
+  return Number.isFinite(amount)?Math.round(amount*100)/100:0;
+}
+__name(canonicalDepositMoney,"canonicalDepositMoney");
+function canonicalDepositUniqueTextParts(parts=[]){
+  const seen=new Set();
+  return (parts||[]).map(value=>cleanText(value??"",1000)).filter(Boolean).filter(value=>{
+    const key=value.toLowerCase();
+    if(seen.has(key))return false;
+    seen.add(key);
+    return true;
+  });
+}
+__name(canonicalDepositUniqueTextParts,"canonicalDepositUniqueTextParts");
+function canonicalDepositRemarkText(card={},lockRoom=""){
+  return canonicalDepositUniqueTextParts([
+    card.remark,
+    card.remarks,
+    card.cardRemark,
+    card.memo,
+    card.note,
+    card.description,
+    card.desc,
+    card.comment,
+    card.cardName,
+    card.identityCardName,
+    card.cardAlias,
+    card.alias,
+    card.name,
+    card.tenant_name,
+    card.tenant,
+    card.userName,
+    card.nickName,
+    card.keyName,
+    card.keyboardPwdName,
+    card.room,
+    lockRoom
+  ]).join(" ");
+}
+__name(canonicalDepositRemarkText,"canonicalDepositRemarkText");
+function canonicalDepositCardMatchesBed(card={},lockRoom="",bed=""){
+  const cleanBed=cleanText(bed,80).replace(/^#/,"");
+  if(!cleanBed)return false;
+  const directBed=cleanText(card.bed||card.room||lockRoom||"",80).replace(/^#/,"");
+  const remark=canonicalDepositRemarkText(card,lockRoom);
+  const snapshot=buildAccessSnapshotDTO(remark,{property_id:"homelink"});
+  return snapshot.bed===cleanBed||directBed===cleanBed;
+}
+__name(canonicalDepositCardMatchesBed,"canonicalDepositCardMatchesBed");
+async function canonicalDepositAccessSnapshotForBed(env,user,bed){
+  const cleanBed=cleanText(bed,80).replace(/^#/,"");
+  if(!cleanBed)return {snapshot:null,card:null,source_status:"missing_bed",warning:"bed_required"};
+  const lockResult=await empLoadLockCardsWithCacheFallback(env,user,{timeoutMs:8000,limit:500}).catch(e=>({error:empTtlockReadErrorCode(e),roomsData:{}}));
+  const candidates=[];
+  for(const [lockRoom,cards] of Object.entries(lockResult?.roomsData||{})){
+    for(const card of cards||[]){
+      if(!canonicalDepositCardMatchesBed(card,lockRoom,cleanBed))continue;
+      const remark=canonicalDepositRemarkText(card,lockRoom);
+      const snapshot=buildAccessSnapshotDTO(remark,{
+        property_id:user?.corpid||"homelink",
+        synced_at:lockResult?.loadedAt||empNow(),
+        provider_metadata:{
+          card_id:card.cardId||card.cardNumber||card.identityCardId||"",
+          tenant_card_id:card.tenant_card_id||card.identityCardId||card.cardId||card.cardNumber||"",
+          provider_phone:card.provider_phone||card.phone||card.mobile||""
+        }
+      });
+      const cardLabel=cleanText(card.cardName||card.identityCardName||card.cardAlias||card.name||card.tenant_name||card.tenant||"",160);
+      const inactive=(typeof empTtlockIsVacant==="function"&&empTtlockIsVacant(cardLabel))||(typeof empTtlockIsStaff==="function"&&empTtlockIsStaff(cardLabel));
+      candidates.push({snapshot,card:{room:cleanText(card.room||lockRoom||"",80),card_name:cardLabel,remark:cleanText(remark,1000)},inactive});
+    }
+  }
+  const chosen=candidates.find(row=>!row.inactive&&row.snapshot?.parsed_deposit_amount!==null)||candidates.find(row=>!row.inactive)||candidates[0]||null;
+  return {
+    snapshot:chosen?.snapshot||null,
+    card:chosen?.card||null,
+    source_status:lockResult?.error?"access_snapshot_unavailable":(chosen?"loaded":"not_found"),
+    warning:lockResult?.error||""
+  };
+}
+__name(canonicalDepositAccessSnapshotForBed,"canonicalDepositAccessSnapshotForBed");
+async function canonicalDepositAuditEventsForBed(env,user,bed,opts={}){
+  const cleanBed=cleanText(bed,80).replace(/^#/,"");
+  if(!cleanBed)return [];
+  const sessions=await cloudArrearsFetchActiveSessionRows(env,user,{limit:opts.limit||1000}).catch(()=>[]);
+  const events=[];
+  for(const session of sessions||[]){
+    const anchors=extractEmployeeEntryAnchorsFromSession(session);
+    for(let index=0;index<anchors.length;index++){
+      const anchor=normalizeEntryAnchor(anchors[index]);
+      const type=entryAnchorType(anchor);
+      if(type!=="D"&&type!=="DR")continue;
+      const anchorBed=cleanText(anchor.bed||anchor.room||"",80).replace(/^#/,"");
+      if(anchorBed!==cleanBed)continue;
+      const amount=type==="D"
+        ?canonicalDepositMoney(anchor.deposit_amount||anchor.amount||anchor.deposit_paid_amount||0)
+        :canonicalDepositMoney(anchor.refund_amount||anchor.actual_refund_amount||anchor.amount||0);
+      events.push({
+        event_type:type==="D"?"deposit_in":"deposit_out",
+        event_id:cleanText(anchor.event_id||anchor.entry_id||anchor.anchor_id||"",120),
+        session_id:cleanText(session.id||session.session_id||"",120),
+        session_anchor:cleanText(session.anchor_id||"",160),
+        date:cleanDate(session.date||anchor.created_at||""),
+        amount,
+        payment_method:entryAnchorPaymentMethod(anchor.payment_method||anchor.pay_type||""),
+        source:"cloud_deposit_event_audit_only"
+      });
+    }
+  }
+  return events;
+}
+__name(canonicalDepositAuditEventsForBed,"canonicalDepositAuditEventsForBed");
+async function canonicalDepositGateway(env,user,opts={}){
+  const bed=cleanText(opts.bed||"",80).replace(/^#/,"");
+  const requiredTotal=canonicalDepositMoney(opts.deposit_required_total||CANONICAL_DEPOSIT_REQUIRED_TOTAL);
+  const access=opts.access_snapshot
+    ?{snapshot:opts.access_snapshot,card:opts.card||null,source_status:"provided"}
+    :await canonicalDepositAccessSnapshotForBed(env,user,bed);
+  const snapshot=access.snapshot||null;
+  const recorded=snapshot&&snapshot.parsed_deposit_amount!==null?canonicalDepositMoney(snapshot.parsed_deposit_amount):null;
+  const remaining=recorded===null?null:Math.max(0,canonicalDepositMoney(requiredTotal-recorded));
+  const auditEvents=Array.isArray(opts.cloud_deposit_events)?opts.cloud_deposit_events:await canonicalDepositAuditEventsForBed(env,user,bed,{limit:opts.limit||1000});
+  const cloudNet=canonicalDepositMoney(auditEvents.reduce((sum,event)=>sum+(event.event_type==="deposit_out"?-canonicalDepositMoney(event.amount):canonicalDepositMoney(event.amount)),0));
+  const warnings=[];
+  let status=recorded===null?"MISSING_D":"RECORDED";
+  if(access.warning)warnings.push(access.warning);
+  if(recorded!==null&&auditEvents.length&&Math.abs(cloudNet-recorded)>0.01){
+    status="NEEDS_RECONCILIATION";
+    warnings.push("DEPOSIT_SOURCE_MISMATCH");
+  }
+  return {
+    ok:true,
+    success:true,
+    gateway:"canonical_deposit_gateway",
+    bed,
+    deposit_required_total:requiredTotal,
+    deposit_recorded_amount:recorded,
+    deposit_remaining:remaining,
+    refundable_baseline:recorded,
+    deposit_source:"access_snapshot_remark_D",
+    deposit_source_status:status,
+    parsed_checkin_mmdd:snapshot?.parsed_checkin_mmdd||"",
+    parsed_valid_until_mmdd:snapshot?.parsed_valid_until_mmdd||"",
+    source_proof:{
+      source_layer:"L0 Access Snapshot",
+      canonical_source:"Access Snapshot parsed D amount",
+      field:"parsed_deposit_amount",
+      raw_source:"access_card_remark",
+      current_balance_source:"access_snapshot_remark_D",
+      cloud_deposit_events_role:"audit_supporting_only",
+      forbidden_identity_excluded:true,
+      forbidden_identity_fields:["tenant_card_id","card_id","old_ttlock_ref","provider_phone","phone_99099"]
+    },
+    access_snapshot:snapshot?{
+      access_snapshot_id:snapshot.access_snapshot_id,
+      bed:snapshot.bed,
+      parsed_deposit_amount:snapshot.parsed_deposit_amount,
+      parsed_checkin_mmdd:snapshot.parsed_checkin_mmdd,
+      parsed_valid_until_mmdd:snapshot.parsed_valid_until_mmdd,
+      parse_status:snapshot.parse_status,
+      warnings:snapshot.warnings||[]
+    }:null,
+    cloud_deposit_events:auditEvents,
+    cloud_deposit_events_role:"audit_supporting_only",
+    cloud_deposit_event_net:cloudNet,
+    reconciliation_warnings:warnings,
+    readonly:true,
+    no_write:true
+  };
+}
+__name(canonicalDepositGateway,"canonicalDepositGateway");
 async function empDepositMove(env,user,move){
   if(move.entry_id){
     const existing=await env.DB.prepare(`SELECT ledger_id,balance_after,delta FROM deposit_ledger
@@ -1690,10 +1863,15 @@ __name(empRentConfigReadOnly,"empRentConfigReadOnly");
 async function handleEmployeeDeposit(request,env,user){
   await empEnsureSchema(env);
   const url=new URL(request.url);
-  const cid=cleanText(url.searchParams.get("cid"),80);
-  if(!cid)return badRequest("cid_required");
-  const balance=await empDepositBalance(env,user.corpid,cid);
-  return success({success:true,tenant_card_id:cid,balance});
+  const bed=cleanText(url.searchParams.get("bed"),80).replace(/^#/,"");
+  if(!bed)return badRequest("bed_required");
+  const gateway=await canonicalDepositGateway(env,user,{bed,limit:1000});
+  return success({
+    ...gateway,
+    balance:gateway.deposit_recorded_amount,
+    balance_source:"access_snapshot_remark_D",
+    tenant_card_id_identity_allowed:false
+  });
 }
 __name(handleEmployeeDeposit,"handleEmployeeDeposit");
 async function handleEmployeeMigrate(request,env,user){

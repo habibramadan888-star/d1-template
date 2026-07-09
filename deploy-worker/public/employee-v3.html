@@ -3225,7 +3225,7 @@ function readSessionId(userid){
   try{return localStorage.getItem(employeeStorageKey('empv3:sessionId',userid))||''}
   catch{return ''}
 }
-const state={lockCards:[],current:null,depositBalance:null,rentConfig:{},rentConfigLoaded:false,drafts:[],tasks:[],closedTasks:[],arrearsTasksLoaded:false,arrearTasksError:null,arrearsGatewaySource:'',arrearsGatewayProof:null,employeeDirectives:[],followupItems:[],systemReminderItems:[],systemReminderStatus:'idle',systemReminderSummary:null,systemReminderSources:null,systemReminderLimit:100,sessionId:'',user:null,ttlockStatus:'idle',ttlockLoadedAt:0,ttlockError:'',ttlockDataSource:''};
+const state={lockCards:[],current:null,depositBalance:null,depositContext:null,rentConfig:{},rentConfigLoaded:false,drafts:[],tasks:[],closedTasks:[],arrearsTasksLoaded:false,arrearTasksError:null,arrearsGatewaySource:'',arrearsGatewayProof:null,employeeDirectives:[],followupItems:[],systemReminderItems:[],systemReminderStatus:'idle',systemReminderSummary:null,systemReminderSources:null,systemReminderLimit:100,sessionId:'',user:null,ttlockStatus:'idle',ttlockLoadedAt:0,ttlockError:'',ttlockDataSource:''};
 const BED_TRANSFER_WRITE_ENABLED=true;
 const BED_TRANSFER_EVENT_LEDGER_MESSAGE='Bed transfer records save event anchors only. This does not directly change bed occupancy, deposit, arrears, or Access Card. 换床记录只保存信息锚点，不会直接改变床位、押金、欠款或门禁卡。';
 const BED_TRANSFER_SUBMITTED_MESSAGE='Bed transfer recorded / 换床记录已保存';
@@ -3669,11 +3669,11 @@ function normalizeCard(raw){
   return {bed,remark_bed:anchors.bed,room,tenant,tenant_card_id:String(cid),deposit,start,start_md:anchors.start_md,end,remark,cardText,vacant,staff_bed,followup_class:staff_bed?'staff':(vacant?'vacant':'customer'),searchText:text,remark_parse_ok:anchors.ok,remark_parse_missing:anchors.missing||[],raw};
 }
 function lookupBed(){
-  const bed=$('bed').value.trim().replace(/^#/,'');if(!bed){state.current=null;renderEmployeeBedInfoStrips();renderContext();return}
+  const bed=$('bed').value.trim().replace(/^#/,'');if(!bed){state.current=null;state.depositBalance=null;state.depositContext=null;renderEmployeeBedInfoStrips();renderContext();return}
   const exact=state.lockCards.filter(c=>String(c.bed)===bed);
   const loose=state.lockCards.filter(c=>new RegExp(`(^|\\D)${bed}(\\D|$)`).test(String(c.searchText||'')));
   if(!exact.length){
-    state.current=null;$('tenantName').value='';$('tenantCardId').value='';state.depositBalance=null;renderEmployeeBedInfoStrips();renderContext();
+    state.current=null;$('tenantName').value='';$('tenantCardId').value='';state.depositBalance=null;state.depositContext=null;renderEmployeeBedInfoStrips();renderContext();
     toast(loose.length?'找到相关文本，但没有可靠的备注床位匹配。请检查门禁卡备注格式：床位 D押金 入住月日。':'未找到该床位的门禁卡，请先刷新或检查备注。',6000);
     syncForm();
     return;
@@ -3686,21 +3686,27 @@ function lookupBed(){
   $('listPrice').value=rent?fmtMoney(rent):'';
   if(c.deposit&&$('entryType').value==='D'&&!$('amount').value)$('amount').value=fmtMoney(c.deposit);
   state.depositBalance=null;
+  state.depositContext=null;
   renderEmployeeBedInfoStrips();
   renderContext();
-  const cid=$('tenantCardId').value.trim()||c.tenant_card_id||'';
-  if(cid)loadDepositBalance(cid);
+  if(bed)loadDepositBalance(bed);
   syncForm();
 }
 function depositHeld(){
-  return state.depositBalance!=null?num(state.depositBalance):num(state.current?.deposit);
+  if(state.depositContext&&state.depositContext.deposit_recorded_amount!=null)return num(state.depositContext.deposit_recorded_amount);
+  if(state.current&&state.current.deposit!==''&&state.current.deposit!=null)return num(state.current.deposit);
+  return 0;
 }
-async function loadDepositBalance(cid){
+async function loadDepositBalance(bed){
   try{
-    const r=await apiFetch('/api/employee/deposit?cid='+encodeURIComponent(cid));
-    const data=r.ok?await r.json():null;
-    state.depositBalance=data&&data.success?num(data.balance):null;
-  }catch{state.depositBalance=null}
+    const cleanBed=String(bed||'').trim().replace(/^#/,'');
+    if(!cleanBed){state.depositBalance=null;state.depositContext=null;renderContext();syncForm();return}
+    const r=await apiFetch('/api/employee/deposit?bed='+encodeURIComponent(cleanBed));
+    const raw=r.ok?await r.json():null;
+    const data=raw?.data||raw||null;
+    state.depositContext=data&&data.success!==false?data:null;
+    state.depositBalance=data&&data.deposit_recorded_amount!=null?num(data.deposit_recorded_amount):null;
+  }catch{state.depositBalance=null;state.depositContext=null}
   renderContext();syncForm();
 }
 function renderContextLegacyGrid(){
@@ -5460,7 +5466,7 @@ async function saveEntryWithTtlockGate(){
   return saveEntryWithoutTtlockGate();
 }
 saveEntry=saveEntryWithTtlockGate;
-function resetForm(){['bed','transferFromBed','bedTo','transferDate','transferReason','amount','due','paid','tenantName','tenantCardId','periodStart','periodEnd','periodDays','periodDue','listPrice','customReason','bankRef','checkoutDate','depositOutBalance','depositOutRefundDate','depositOutDifferenceReason','depositDeduction','depositReturnAmount','overdayDeduction','noNoticeDeduction','otherDeduction','dedNote','leftFormerCustomerName','leftWhatsappPhone','leftContactNote','leftDepositBalance','leftCoverageEndDate','leftArrearsAmount','leftBelongingsNote','leftPromisedPaymentDate','leftPromisedReturnDate','leftConfirmedNotReturningDate','leftGraceDays','expenseDesc','remark','excessTo','arrearAmount','arrearPromiseDate','arrearReasonDetail'].forEach(id=>{if($(id))$(id).value=''});$('leftWithArrearsMode').value='normal';$('leftContactMethod').value='whatsapp';$('leftBelongingsHeld').value='no';$('arrearHandling').value='ARREAR';state.current=null;state.depositBalance=null;renderContext();syncForm();refreshSessionViews()}
+function resetForm(){['bed','transferFromBed','bedTo','transferDate','transferReason','amount','due','paid','tenantName','tenantCardId','periodStart','periodEnd','periodDays','periodDue','listPrice','customReason','bankRef','checkoutDate','depositOutBalance','depositOutRefundDate','depositOutDifferenceReason','depositDeduction','depositReturnAmount','overdayDeduction','noNoticeDeduction','otherDeduction','dedNote','leftFormerCustomerName','leftWhatsappPhone','leftContactNote','leftDepositBalance','leftCoverageEndDate','leftArrearsAmount','leftBelongingsNote','leftPromisedPaymentDate','leftPromisedReturnDate','leftConfirmedNotReturningDate','leftGraceDays','expenseDesc','remark','excessTo','arrearAmount','arrearPromiseDate','arrearReasonDetail'].forEach(id=>{if($(id))$(id).value=''});$('leftWithArrearsMode').value='normal';$('leftContactMethod').value='whatsapp';$('leftBelongingsHeld').value='no';$('arrearHandling').value='ARREAR';state.current=null;state.depositBalance=null;state.depositContext=null;renderContext();syncForm();refreshSessionViews()}
 function hasLocalOnly(){return state.drafts.some(e=>!employeeEntryCloudConfirmed(e))}
 function newSession(){
   if(hasLocalOnly()){toast('仍有云端未确认记录，不能开始新会话');return}
@@ -7872,7 +7878,7 @@ $('linkedTaskId').addEventListener('change',applyLinkedTask);
 $('bed').addEventListener('input',()=>{if($('entryType').value==='TF')$('transferFromBed').value=$('bed').value.trim().replace(/^#/,'');employeeScheduleLookupBed();if($('entryType').value==='AP'){populateTaskSelect();syncForm();}});
 $('transferFromBed').addEventListener('input',()=>{if($('entryType').value==='TF'){$('bed').value=$('transferFromBed').value.trim().replace(/^#/,'');employeeScheduleLookupBed();syncForm();}});
 $('transferFromBed').addEventListener('change',()=>{if($('entryType').value==='TF'){$('bed').value=$('transferFromBed').value.trim().replace(/^#/,'');lookupBed();syncForm();}});
-$('tenantCardId').addEventListener('change',e=>{state.depositBalance=null;if(e.target.value.trim())loadDepositBalance(e.target.value.trim());else renderContext();});$('btnLoadLock').onclick=loadLock;$('btnSaveEntry').onclick=saveEntry;$('btnReset').onclick=()=>{resetForm();showStatus('表单已清空。');toast('表单已清空')};$('btnRefreshTasks').onclick=refreshFollowup;$('btnBuildExport').onclick=commitSessionAndExport;$('btnCopyExport').onclick=async()=>{try{await navigator.clipboard.writeText($('exportText').textContent);showStatus('导出文本已复制。');toast('已复制')}catch{showStatus('复制失败，请手动选择导出文本。','warn');toast('复制失败，请手动选择文本',6000)}};$('btnClearLocal').onclick=()=>{if(hasLocalOnly()){showStatus('仍有云端未确认记录，不能清空。','warn');toast('仍有云端未确认记录，不能清空',6000);return}if(confirm('清空本机草稿？')){state.drafts=[];saveDrafts();buildExport();refreshSessionViews();showStatus('本机草稿已清空。');toast('已清空')}};$('btnNewSessionTop').onclick=newSession;$('btnPreviewSession').onclick=previewSession;$('btnWhatsAppSession').onclick=exportEntrySessionWhatsApp;$('btnExportSession').onclick=commitSessionAndExport;$('operatorId').value=localStorage.getItem('empv3:operator')||'';$('operatorId').onchange=e=>{setOperator(e.target.value.trim());refreshSessionViews();showStatus('员工编号已更新。')};
+$('tenantCardId').addEventListener('change',()=>{state.depositBalance=null;state.depositContext=null;const bed=$('bed')?.value.trim().replace(/^#/,'')||'';if(bed)loadDepositBalance(bed);else renderContext();});$('btnLoadLock').onclick=loadLock;$('btnSaveEntry').onclick=saveEntry;$('btnReset').onclick=()=>{resetForm();showStatus('表单已清空。');toast('表单已清空')};$('btnRefreshTasks').onclick=refreshFollowup;$('btnBuildExport').onclick=commitSessionAndExport;$('btnCopyExport').onclick=async()=>{try{await navigator.clipboard.writeText($('exportText').textContent);showStatus('导出文本已复制。');toast('已复制')}catch{showStatus('复制失败，请手动选择导出文本。','warn');toast('复制失败，请手动选择文本',6000)}};$('btnClearLocal').onclick=()=>{if(hasLocalOnly()){showStatus('仍有云端未确认记录，不能清空。','warn');toast('仍有云端未确认记录，不能清空',6000);return}if(confirm('清空本机草稿？')){state.drafts=[];saveDrafts();buildExport();refreshSessionViews();showStatus('本机草稿已清空。');toast('已清空')}};$('btnNewSessionTop').onclick=newSession;$('btnPreviewSession').onclick=previewSession;$('btnWhatsAppSession').onclick=exportEntrySessionWhatsApp;$('btnExportSession').onclick=commitSessionAndExport;$('operatorId').value=localStorage.getItem('empv3:operator')||'';$('operatorId').onchange=e=>{setOperator(e.target.value.trim());refreshSessionViews();showStatus('员工编号已更新。')};
 $('btnClosePreview').onclick=closePreviewModal;
 $('previewModal').addEventListener('click',e=>{if(e.target===$('previewModal'))closePreviewModal()});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closePreviewModal()});
