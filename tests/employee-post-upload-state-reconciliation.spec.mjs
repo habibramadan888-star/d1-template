@@ -72,7 +72,9 @@ test("session success cannot coexist with active record-level failed state", asy
   );
 
   assert.match(stateBlock, /employeeRecordValidationError\(entry,index\)/);
-  assert.match(stateBlock, /if\(entry\?\.sync_status==='SYNCED'\)return \{key:'SYNCED',label:'Synced'/);
+  assert.match(stateBlock, /if\(entry\?\.sync_status==='SYNCED'\)\{/);
+  assert.match(stateBlock, /cloudStatus==='CLOUD_CONFIRMED'/);
+  assert.match(stateBlock, /return \{key:'SYNCED',label:'Synced'/);
   assert.match(actionBlock, /const uploaded=entrySessionUploaded\(\)/);
   assert.match(actionBlock, /if\(uploaded&&hasRows\)/);
   assert.match(actionBlock, /renderEmployeeButtonLabel\('Done','Upload Complete'\)/);

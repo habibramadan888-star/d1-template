@@ -3558,6 +3558,89 @@ function employeeEntryDuplicateSetFingerprint(keys){
   return keys.map(key=>`${key.event_id}|${key.source_fingerprint}|${key.canonical_fingerprint}`).sort().join("\n");
 }
 __name(employeeEntryDuplicateSetFingerprint,"employeeEntryDuplicateSetFingerprint");
+function employeeEntryCloudSyncMissing(entries,reason="cloud_missing"){
+  return (entries||[]).map((entry,index)=>({
+    index,
+    local_event_id:cleanText(entry?.event_id||entry?.anchor_id||entry?.id||entry?.cloud_entry_id||"",120),
+    status:"cloud_missing",
+    matched:false,
+    reason
+  }));
+}
+__name(employeeEntryCloudSyncMissing,"employeeEntryCloudSyncMissing");
+function employeeEntryCloudSyncKeySet(row,user){
+  const normalized=normalizeEntryAnchor(row||{});
+  const values=[
+    normalized.event_id,
+    normalized.anchor_id,
+    normalized.id,
+    normalized.cloud_entry_id
+  ].map(v=>cleanText(v,160)).filter(Boolean);
+  try{values.push(cleanText(buildCanonicalEventFingerprint(normalized,user),1000));}catch{}
+  return new Set(values.filter(Boolean));
+}
+__name(employeeEntryCloudSyncKeySet,"employeeEntryCloudSyncKeySet");
+async function employeeEntryCloudSyncCorrectionExists(env,user,session){
+  const targetId=cleanText(session?.id||"",160);
+  const targetAnchor=cleanText(session?.anchor_id||"",160);
+  if(!targetId&&!targetAnchor)return null;
+  if(!await empTableExists(env,"sessions").catch(()=>false))return null;
+  const likeId=targetId?`%${targetId}%`:"";
+  const likeAnchor=targetAnchor?`%${targetAnchor}%`:"";
+  return await env.DB.prepare(`SELECT id, anchor_id FROM sessions
+    WHERE corpid=? AND COALESCE(anchor_id,'') LIKE 'CORR-%'
+      AND ((?<>'' AND COALESCE(export_text,'') LIKE ?) OR (?<>'' AND COALESCE(export_text,'') LIKE ?))
+    ORDER BY created_at DESC LIMIT 1`).bind(user.corpid,targetId,likeId,targetAnchor,likeAnchor).first().catch(()=>null);
+}
+__name(employeeEntryCloudSyncCorrectionExists,"employeeEntryCloudSyncCorrectionExists");
+async function handleEmployeeEntrySyncState(request,env,user){
+  let body;
+  try{body=await request.json();}catch{return badRequest("invalid_json");}
+  const localSession=body?.session||{};
+  const entries=Array.isArray(body?.entries)?body.entries:(Array.isArray(localSession.entries)?localSession.entries:[]);
+  const sessionId=cleanId(body?.session_id||body?.sessionId||localSession.id||localSession.session_id||"");
+  const anchorId=cleanText(body?.anchor_id||body?.anchorId||localSession.anchor_id||localSession.anchorId||"",160);
+  const base={ok:true,cloud_authoritative:true,production_write:false,no_write:true,session_id:sessionId,anchor_id:anchorId};
+  if(!sessionId&&!anchorId)return success({...base,session_status:"missing_identifier",entries:employeeEntryCloudSyncMissing(entries,"missing_identifier")});
+  if(!await empTableExists(env,"sessions").catch(()=>false))return success({...base,session_status:"schema_missing",entries:employeeEntryCloudSyncMissing(entries,"schema_missing")});
+  const columns=await empTableColumns(env,"sessions").catch(()=>new Set());
+  const entriesExpr=columns.has("entries_json")?"entries_json":"'' AS entries_json";
+  const summaryExpr=columns.has("summary_json")?"summary_json":"'' AS summary_json";
+  const predicates=[];
+  const params=[user.corpid];
+  if(sessionId){predicates.push("id=?");params.push(sessionId);}
+  if(anchorId){predicates.push("anchor_id=?");params.push(anchorId);}
+  const session=await env.DB.prepare(`SELECT id, anchor_id, date, created_by, operator_id, operator_name, handover_status, voided_at, export_text, source, entries_count, ${entriesExpr}, ${summaryExpr}
+    FROM sessions WHERE corpid=? AND (${predicates.join(" OR ")}) ORDER BY created_at DESC LIMIT 1`).bind(...params).first().catch(()=>null);
+  if(!session)return success({...base,session_status:"cloud_missing",entries:employeeEntryCloudSyncMissing(entries,"session_not_found")});
+  const statusText=String(session.handover_status||"").trim().toUpperCase();
+  const deleted=!!String(session.voided_at||"").trim()||["VOID","VOIDED","DELETED","CANCELLED"].includes(statusText);
+  const correction=deleted?null:await employeeEntryCloudSyncCorrectionExists(env,user,session);
+  const corrected=!!correction;
+  if(deleted||corrected){
+    const status=deleted?"cloud_deleted":"cloud_corrected";
+    return success({...base,session_status:status,cloud_session:{id:session.id,anchor_id:session.anchor_id,handover_status:session.handover_status||"",voided_at:session.voided_at||""},correction_anchor:correction?.anchor_id||"",entries:(entries||[]).map((entry,index)=>({index,local_event_id:cleanText(entry?.event_id||entry?.anchor_id||entry?.id||entry?.cloud_entry_id||"",120),status,matched:false,reason:status}))});
+  }
+  const cloudEntries=extractEmployeeEntryAnchorsFromSession(session);
+  const cloudKeySets=cloudEntries.map(row=>employeeEntryCloudSyncKeySet(row,user));
+  const results=(entries||[]).map((entry,index)=>{
+    const localKeys=employeeEntryCloudSyncKeySet(entry,user);
+    let matchedIndex=-1;
+    for(let i=0;i<cloudKeySets.length;i++){
+      for(const key of localKeys){
+        if(key&&cloudKeySets[i].has(key)){matchedIndex=i;break;}
+      }
+      if(matchedIndex>=0)break;
+    }
+    if(matchedIndex>=0){
+      const matched=cloudEntries[matchedIndex]||{};
+      return {index,local_event_id:cleanText(entry?.event_id||entry?.anchor_id||entry?.id||entry?.cloud_entry_id||"",120),status:"cloud_confirmed",matched:true,matched_event_id:cleanText(matched.event_id||matched.anchor_id||matched.id||"",120),reason:"matched_cloud_anchor"};
+    }
+    return {index,local_event_id:cleanText(entry?.event_id||entry?.anchor_id||entry?.id||entry?.cloud_entry_id||"",120),status:"cloud_mismatch",matched:false,reason:cloudEntries.length?"no_matching_cloud_anchor":"no_cloud_entries"};
+  });
+  return success({...base,session_status:"cloud_active",cloud_session:{id:session.id,anchor_id:session.anchor_id,handover_status:session.handover_status||"",voided_at:session.voided_at||""},entries:results});
+}
+__name(handleEmployeeEntrySyncState,"handleEmployeeEntrySyncState");
 function employeeEntryDuplicateInPayload(keys){
   const seenEvent=new Map();
   const seenSource=new Map();
@@ -7388,6 +7471,7 @@ async function handleEmployeeApi(request,env,user){
   if(path==="/api/employee/lock/cards"&&request.method==="GET")return handleEmployeeLockCards(request,env,user);
   if(path==="/api/employee/deposit"&&request.method==="GET")return handleEmployeeDeposit(request,env,user);
   if(path==="/api/employee/bed-transfers"&&request.method==="POST")return handleEmployeeBedTransferCreate(request,env,user);
+  if(path==="/api/employee/entry/sync-state"&&request.method==="POST")return handleEmployeeEntrySyncState(request,env,user);
   if(path==="/api/employee/entry/validate"&&request.method==="POST")return handleEmployeeEntryValidate(request,env,user);
   if(path==="/api/employee/entry"&&request.method==="POST")return handleEmployeeEntry(request,env,user);
   if(path==="/api/arrear_tasks"&&request.method==="GET")return handleArrearTasks(request,env,user);

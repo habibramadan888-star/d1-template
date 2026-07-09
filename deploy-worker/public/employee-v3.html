@@ -35,7 +35,7 @@ button,input,select,textarea{font:inherit}
 .hint{font-size:14px;color:#566174;line-height:1.75;background:rgba(255,255,255,.75);border:1px dashed #d7e3dd;border-radius:18px;padding:16px 18px;margin-bottom:20px}.ctx{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:20px}.ctx div{background:linear-gradient(180deg,#f9fcfb,#f4f8f6);border:1px solid var(--line);border-radius:17px;padding:14px}.ctx span{display:block;color:#697386;font-size:12px;font-weight:850}.ctx b{display:block;margin-top:6px;font-family:Consolas,"JetBrains Mono",monospace;font-size:13px;word-break:break-all}
 .btn{border:1px solid var(--line);border-radius:17px;padding:16px 20px;font-weight:950;cursor:pointer;background:#fff;color:#263246;box-shadow:0 8px 22px rgba(20,32,51,.07)}.btn.primary{background:linear-gradient(180deg,#10ad5a,#078d42);color:#fff;border-color:transparent}.btn.danger{background:#fff0ee;color:var(--red)}.row{display:flex;gap:12px;flex-wrap:wrap}.row .btn{flex:1}.hidden{display:none!important}.warn{color:var(--orange);font-weight:900}.bad{color:var(--red);font-weight:900}
 .step{border:1px solid rgba(207,216,220,.85);border-radius:24px;padding:20px;margin-bottom:18px;background:rgba(255,255,255,.72)}.step-title{display:flex;align-items:center;gap:10px;margin-bottom:14px;color:#142033;font-size:18px;font-weight:950}.step-title span{display:grid;place-items:center;width:30px;height:30px;border-radius:999px;background:var(--green);color:#fff;font-family:Consolas,monospace;font-size:15px}.event-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.event-chip{border:1.5px solid var(--line);border-radius:18px;padding:18px 14px;background:#fff;color:#263246;font-size:17px;font-weight:950;cursor:pointer;box-shadow:0 8px 20px rgba(20,32,51,.06)}.event-chip.active{background:linear-gradient(180deg,#10ad5a,#078d42);color:#fff;border-color:transparent}.context-note{border:1px solid #dbe7df;border-radius:18px;background:#f8fcfa;padding:14px 16px;margin:0 0 16px;color:#445063;font-size:14px;line-height:1.7}.context-note strong{color:#142033}.kpi-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px}.kpi-card{background:rgba(255,255,255,.88);border:1px solid var(--line);border-radius:20px;padding:18px;box-shadow:0 10px 24px rgba(20,32,51,.06)}.kpi-card span{display:block;color:#516176;font-size:12px;font-weight:950}.kpi-card small{display:block;color:#7b8797;font-family:Consolas,monospace;font-size:10px;margin-top:2px}.kpi-card b{display:block;margin-top:8px;font-family:Consolas,"JetBrains Mono",monospace;font-size:20px;color:var(--green)}.kpi-card b.orange{color:var(--orange)}.kpi-card b.red{color:var(--red)}.kpi-card b.blue{color:var(--blue)}.summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.summary div{border:1px solid var(--line);border-radius:16px;background:#f8fbfa;padding:13px}.summary span{display:block;color:#697386;font-size:12px;font-weight:900}.summary b{display:block;margin-top:5px;font-family:Consolas,"JetBrains Mono",monospace;font-size:14px;word-break:break-word}.diffbox{border-left:5px solid var(--orange);background:#fffaf2}.preview-list{min-height:190px}.preview-empty{height:190px;display:grid;place-items:center;text-align:center;color:#617086}.preview-entry{border:1px solid var(--line);border-radius:18px;padding:14px;margin-bottom:10px;background:#fff;display:grid;grid-template-columns:1fr auto;gap:10px}.preview-entry b{font-family:Consolas,"JetBrains Mono",monospace}.preview-entry .amt{font-family:Consolas,"JetBrains Mono",monospace;font-weight:950;color:var(--green)}.preview-entry .amt.red{color:var(--red)}.preview-tools{display:flex;gap:8px;justify-content:flex-end;align-items:center;margin-top:8px}.mini-btn{border:1px solid var(--line);border-radius:999px;background:#fff;padding:6px 10px;font-size:12px;font-weight:900;color:#435168;cursor:pointer}.mini-btn.danger{color:var(--red);background:#fff7f6}.status-pill{display:inline-block;border-radius:999px;padding:2px 8px;font-size:11px;font-weight:900;background:#eef8f2;color:var(--green2)}.status-pill.local{background:#fff7e8;color:var(--orange)}
-.status-pill.validating{background:#eef4ff;color:#2563eb}.status-pill.uploading{background:#eef4ff;color:#1d4ed8}.status-pill.pending{background:#fff7e8;color:#a16207}.status-pill.failed{background:#fff1f2;color:#dc2626}.status-pill.stale{background:#fff7e8;color:#c2410c}.task{border:1px solid var(--line);border-left:5px solid #aab4c2;border-radius:21px;padding:20px;margin-bottom:14px;background:#fff}.task-top{display:flex;justify-content:space-between;gap:12px}.bed{font-size:24px;font-weight:950;font-family:Consolas,"JetBrains Mono",monospace}.money{font-family:Consolas,"JetBrains Mono",monospace;font-size:20px;font-weight:950;color:var(--orange)}.small{font-size:14px;color:var(--muted);line-height:1.75}.toast{position:fixed;left:24px;right:24px;bottom:22px;background:#142033;color:#fff;padding:17px 20px;border-radius:20px;display:none;z-index:20;font-weight:900;box-shadow:var(--shadow)}
+.status-pill.validating{background:#eef4ff;color:#2563eb}.status-pill.uploading{background:#eef4ff;color:#1d4ed8}.status-pill.pending{background:#fff7e8;color:#a16207}.status-pill.cloud-missing,.status-pill.cloud-mismatch,.status-pill.cloud-deleted{background:#fff7e8;color:#c2410c}.status-pill.failed{background:#fff1f2;color:#dc2626}.status-pill.stale{background:#fff7e8;color:#c2410c}.task{border:1px solid var(--line);border-left:5px solid #aab4c2;border-radius:21px;padding:20px;margin-bottom:14px;background:#fff}.task-top{display:flex;justify-content:space-between;gap:12px}.bed{font-size:24px;font-weight:950;font-family:Consolas,"JetBrains Mono",monospace}.money{font-family:Consolas,"JetBrains Mono",monospace;font-size:20px;font-weight:950;color:var(--orange)}.small{font-size:14px;color:var(--muted);line-height:1.75}.toast{position:fixed;left:24px;right:24px;bottom:22px;background:#142033;color:#fff;padding:17px 20px;border-radius:20px;display:none;z-index:20;font-weight:900;box-shadow:var(--shadow)}
 .preview-modal{position:fixed;inset:0;z-index:40;display:none;align-items:center;justify-content:center;padding:28px;background:rgba(226,236,232,.48);backdrop-filter:blur(26px) saturate(170%);-webkit-backdrop-filter:blur(26px) saturate(170%)}
 .preview-modal.show{display:flex}
 .preview-panel{width:min(1080px,96vw);max-height:88vh;overflow:hidden;border-radius:34px;background:linear-gradient(145deg,rgba(255,255,255,.72),rgba(255,255,255,.42));border:1px solid rgba(255,255,255,.78);box-shadow:0 36px 110px rgba(15,23,42,.20),inset 0 1px 0 rgba(255,255,255,.92)}
@@ -3362,6 +3362,52 @@ function saveDrafts(){
   }
   catch{return false}
 }
+function employeeEntryCloudConfirmed(entry){
+  return entry?.sync_status==='SYNCED'&&String(entry?.cloud_sync_status||'').toUpperCase()==='CLOUD_CONFIRMED';
+}
+function employeeMarkSyncedDraftsCloudChecking(){
+  (state.drafts||[]).forEach(e=>{
+    if(e?.sync_status==='SYNCED'&&String(e.cloud_sync_status||'').toUpperCase()!=='CLOUD_CONFIRMED'){
+      e.cloud_sync_status='CHECKING_CLOUD';
+    }
+  });
+}
+async function reconcileEmployeeCloudSyncState({silent=false}={}){
+  const synced=(state.drafts||[]).filter(e=>e?.sync_status==='SYNCED'||e?.upload_status==='SYNCED');
+  if(!state.user||!synced.length)return {ok:true,skipped:true};
+  const cloudSessionId=state.sessionId||synced.map(e=>String(e.session_id||'').trim()).find(Boolean)||'';
+  const session={id:cloudSessionId,session_id:cloudSessionId,entries:synced};
+  try{
+    const r=await apiFetch('/api/employee/entry/sync-state',{method:'POST',body:JSON.stringify({session_id:cloudSessionId,session,entries:synced,no_write:true})});
+    const data=await r.json();
+    if(!r.ok||data?.ok===false)throw new Error(data?.error_code||data?.message||('sync_state_'+r.status));
+    const byLocal=new Map((data.entries||[]).map(x=>[String(x.local_event_id||''),x]));
+    synced.forEach((entry,index)=>{
+      const localId=String(entry.event_id||entry.anchor_id||entry.id||entry.cloud_entry_id||'');
+      const result=byLocal.get(localId)||(data.entries||[])[index]||null;
+      const status=String(result?.status||data.session_status||'cloud_unknown').toUpperCase();
+      entry.cloud_sync_status=status;
+      entry.cloud_sync_reason=result?.reason||data.session_status||'';
+      entry.cloud_sync_checked_at=nowIso();
+      entry.cloud_matched_event_id=result?.matched_event_id||'';
+      if(status!=='CLOUD_CONFIRMED')entry.upload_status=status;
+    });
+    saveDrafts();
+    refreshSessionViews();
+    return data;
+  }catch(err){
+    synced.forEach(entry=>{
+      entry.cloud_sync_status='CLOUD_UNKNOWN';
+      entry.cloud_sync_reason=String(err?.message||err||'cloud_sync_failed');
+      entry.cloud_sync_checked_at=nowIso();
+      entry.upload_status='CLOUD_UNKNOWN';
+    });
+    saveDrafts();
+    refreshSessionViews();
+    if(!silent)toast('Cloud sync state unavailable / 云端同步状态暂不可用',6000);
+    return {ok:false,error:String(err?.message||err||'cloud_sync_failed')};
+  }
+}
 function currentSessionId(){
   if(!state.user?.userid)return '';
   if(!state.sessionId){
@@ -3433,6 +3479,7 @@ function applyEmployeeUser(user){
   if(user){
     state.drafts=readDrafts(user.userid);
     state.sessionId=readSessionId(user.userid);
+    employeeMarkSyncedDraftsCloudChecking();
     const display=employeeDisplayName(user);
     $('operatorId').value=display;
     $('operatorId').title=user.userid?`employee_id: ${user.userid}`:'';
@@ -3448,6 +3495,7 @@ function applyEmployeeUser(user){
     loadRentConfig();
     loadTasks(false);
     loadEmployeeArrearsDirectives(false);
+    setTimeout(()=>reconcileEmployeeCloudSyncState({silent:true}),0);
     if(!$('view-entry')?.classList.contains('hidden'))ensureEntryTtlockReady({auto:true});
   }else{
     state.drafts=[];
@@ -4829,7 +4877,7 @@ function renderSessionPreview(){
   document.querySelectorAll('[data-undo]').forEach(btn=>btn.onclick=()=>undoDraft(btn.dataset.undo));
 }
 function entrySessionUploaded(){
-  return state.drafts.length>0&&!hasLocalOnly();
+  return state.drafts.length>0&&state.drafts.every(employeeEntryCloudConfirmed);
 }
 function updateEntrySessionActionState(){
   const uploaded=entrySessionUploaded();
@@ -4850,8 +4898,11 @@ function updateEntrySessionActionState(){
 function currentSessionHasUploadBlockingError(){
   return (state.drafts||[]).some((entry,index)=>{
     const key=employeeSessionRecordState(entry,index).key;
-    return key==='VALIDATION_FAILED'||key==='STALE';
+    return key==='VALIDATION_FAILED'||key==='STALE'||key==='CLOUD_MISMATCH'||key==='CLOUD_DELETED'||key==='CLOUD_VOIDED'||key==='CLOUD_CORRECTED';
   });
+}
+function currentSessionHasCloudReviewBlock(){
+  return (state.drafts||[]).some((entry,index)=>['CLOUD_MISMATCH','CLOUD_DELETED','CLOUD_VOIDED','CLOUD_CORRECTED'].includes(employeeSessionRecordState(entry,index).key));
 }
 updateEntrySessionActionState=function(){
   const uploaded=entrySessionUploaded();
@@ -5371,7 +5422,7 @@ async function saveEntryWithTtlockGate(){
 }
 saveEntry=saveEntryWithTtlockGate;
 function resetForm(){['bed','transferFromBed','bedTo','transferDate','transferReason','amount','due','paid','tenantName','tenantCardId','periodStart','periodEnd','periodDays','periodDue','listPrice','customReason','bankRef','checkoutDate','depositOutBalance','depositOutRefundDate','depositOutDifferenceReason','depositDeduction','depositReturnAmount','overdayDeduction','noNoticeDeduction','otherDeduction','dedNote','leftFormerCustomerName','leftWhatsappPhone','leftContactNote','leftDepositBalance','leftCoverageEndDate','leftArrearsAmount','leftBelongingsNote','leftPromisedPaymentDate','leftPromisedReturnDate','leftConfirmedNotReturningDate','leftGraceDays','expenseDesc','remark','excessTo','arrearAmount','arrearPromiseDate','arrearReasonDetail'].forEach(id=>{if($(id))$(id).value=''});$('leftWithArrearsMode').value='normal';$('leftContactMethod').value='whatsapp';$('leftBelongingsHeld').value='no';$('arrearHandling').value='ARREAR';state.current=null;state.depositBalance=null;renderContext();syncForm();refreshSessionViews()}
-function hasLocalOnly(){return state.drafts.some(e=>e.sync_status!=='SYNCED')}
+function hasLocalOnly(){return state.drafts.some(e=>!employeeEntryCloudConfirmed(e))}
 function newSession(){
   if(hasLocalOnly()){toast('仍有云端未确认记录，不能开始新会话');return}
   if(state.drafts.length&&!confirm('开始新会话会清空本机本票草稿，确认？'))return;
@@ -7397,7 +7448,15 @@ function employeeSessionRecordState(entry,index){
       return {key:'STALE',label:'Stale / Needs Refresh',className:'stale',validation:staleResult};
     }
   }
-  if(entry?.sync_status==='SYNCED')return {key:'SYNCED',label:'Synced',className:''};
+  if(entry?.sync_status==='SYNCED'){
+    const cloudStatus=String(entry?.cloud_sync_status||'').trim().toUpperCase();
+    if(cloudStatus==='CLOUD_CONFIRMED')return {key:'SYNCED',label:'Synced',className:''};
+    if(cloudStatus==='CHECKING_CLOUD')return {key:'CHECKING_CLOUD',label:'Checking Cloud',className:'pending'};
+    if(cloudStatus==='CLOUD_MISSING')return {key:'CLOUD_MISSING',label:'Cloud Missing',className:'cloud-missing'};
+    if(cloudStatus==='CLOUD_MISMATCH')return {key:'CLOUD_MISMATCH',label:'Cloud Mismatch / Needs Review',className:'cloud-mismatch'};
+    if(['CLOUD_DELETED','CLOUD_VOIDED','CLOUD_CORRECTED'].includes(cloudStatus))return {key:cloudStatus,label:cloudStatus==='CLOUD_CORRECTED'?'Cloud Corrected':'Deleted from Cloud',className:'cloud-deleted'};
+    return {key:'NEEDS_RECONCILIATION',label:'Needs Reconciliation',className:'pending'};
+  }
   return {key:'LOCAL',label:'Local',className:'local'};
 }
 function renderSessionRecordValidationDetails(result,index){
@@ -7551,6 +7610,19 @@ async function commitSessionAndExport(){
     toast('Current Session has no entries / 当前本票没有流水',6000);
     return;
   }
+  await reconcileEmployeeCloudSyncState({silent:true});
+  if(entrySessionUploaded()){
+    refreshSessionViews();
+    toast('Cloud already confirms this session / 云端已确认本票',5000);
+    updateEntrySessionActionState();
+    return;
+  }
+  if(currentSessionHasCloudReviewBlock()){
+    refreshSessionViews();
+    showStatus('Cloud state changed. Owner review is required before upload. / 云端状态已变化，需要老板复核后再上传','warn');
+    toast('Cloud state changed. Owner review required / 云端状态已变化，需要复核',7000);
+    return;
+  }
   const btns=[$('btnExportSession'),$('btnBuildExport')].filter(Boolean);
   if(btns.some(b=>b.dataset.busy==='1'))return;
   const oldLabels=btns.map(b=>[b,b.innerHTML]);
@@ -7654,6 +7726,8 @@ async function commitSessionAndExport(){
       e.sync_status='SYNCED';
       e.upload_status='SYNCED';
       e.upload_validation_error=null;
+      e.cloud_sync_status='CLOUD_CONFIRMED';
+      e.cloud_sync_checked_at=nowIso();
       e.cloud_entry_id=data?.entry_id||e.cloud_entry_id||'';
       e.sync_error='';
       if(data?.arrear_task)e.cloud_task_id=data.arrear_task.task_id||e.cloud_task_id||'';
@@ -7700,7 +7774,7 @@ async function commitSessionAndExport(){
     updateEntrySessionActionState();
     return;
   }
-  state.drafts=uploadList.map(e=>({...e,sync_status:'SYNCED',upload_status:'SYNCED',upload_validation_error:null,upload_validation_error_code:'',sync_error:''}));
+  state.drafts=uploadList.map(e=>({...e,sync_status:'SYNCED',upload_status:'SYNCED',cloud_sync_status:'CLOUD_CONFIRMED',cloud_sync_checked_at:nowIso(),upload_validation_error:null,upload_validation_error_code:'',sync_error:''}));
   state.sessionId=uploadSessionId;
   state.uploadValidationFailedIndex=null;
   state.uploadValidationFailedMessage='';
