@@ -36,25 +36,35 @@ test("synced records cannot render stale validation errors", async () => {
   assert.ok(failedIndexFallback > syncedGuard, "synced guard must run before stale session-level fallback");
 });
 
-test("full upload success clears stale validation state for every current-session record", async () => {
+test("full upload success clears stale validation state and waits for cloud confirmation", async () => {
   const html = await readFile(employeePath, "utf8");
   const uploadBlock = finalFunctionBlock(
     html,
     "async function commitSessionAndExport()",
     "function normalizeEmployeeView"
   );
-  const successStart = uploadBlock.indexOf("state.drafts=uploadList.map");
+  const helperBlock = functionBlock(
+    html,
+    "function employeeMarkDraftsAwaitingCloudConfirmation(entries,sessionId)",
+    "function employeeMarkSyncedDraftsCloudChecking()"
+  );
+  const successStart = uploadBlock.indexOf("state.drafts=employeeMarkDraftsAwaitingCloudConfirmation");
   const completeStart = uploadBlock.indexOf("setUploadPhase('Upload complete','Done')");
   assert.ok(successStart >= 0 && completeStart > successStart, "full success reconciliation must precede Done state");
   const successBlock = uploadBlock.slice(successStart, completeStart);
 
-  assert.match(successBlock, /sync_status:'SYNCED'/);
-  assert.match(successBlock, /upload_status:'SYNCED'/);
-  assert.match(successBlock, /upload_validation_error:null/);
-  assert.match(successBlock, /upload_validation_error_code:''/);
-  assert.match(successBlock, /sync_error:''/);
+  assert.match(html, /function employeeMarkDraftsAwaitingCloudConfirmation/);
+  assert.match(helperBlock, /sync_status:'SYNCED'/);
+  assert.match(helperBlock, /upload_status:'CHECKING_CLOUD'/);
+  assert.match(helperBlock, /cloud_sync_status:'CHECKING_CLOUD'/);
+  assert.match(helperBlock, /upload_validation_error:null/);
+  assert.match(helperBlock, /upload_validation_error_code:''/);
+  assert.match(helperBlock, /sync_error:''/);
   assert.match(successBlock, /state\.uploadValidationFailedIndex=null/);
   assert.match(successBlock, /state\.uploadValidationFailedMessage=''/);
+  assert.match(successBlock, /await reconcileEmployeeCloudSyncState\(\{silent:true\}\)/);
+  assert.match(successBlock, /const cloudConfirmed=entrySessionUploaded\(\)/);
+  assert.match(successBlock, /if\(!cloudConfirmed\)/);
   assert.match(successBlock, /\$\('validationBox'\)\)\$\('validationBox'\)\.innerHTML=''/);
 });
 

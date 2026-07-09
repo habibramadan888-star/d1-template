@@ -3791,7 +3791,14 @@ function employeeEntryCloudSyncMissing(entries,reason="cloud_missing"){
     index,
     local_event_id:cleanText(entry?.event_id||entry?.anchor_id||entry?.id||entry?.cloud_entry_id||"",120),
     status:"cloud_missing",
+    sync_status:"CLOUD_MISSING",
+    archive_state:"missing",
+    cloud_match:false,
     matched:false,
+    matched_by:"",
+    cloud_record_id:"",
+    source_proof:{source:"canonical_event_archive",reason},
+    allowed_next_action:"server_validation_required",
     reason
   }));
 }
@@ -3828,7 +3835,7 @@ async function handleEmployeeEntrySyncState(request,env,user){
   const entries=Array.isArray(body?.entries)?body.entries:(Array.isArray(localSession.entries)?localSession.entries:[]);
   const sessionId=cleanId(body?.session_id||body?.sessionId||localSession.id||localSession.session_id||"");
   const anchorId=cleanText(body?.anchor_id||body?.anchorId||localSession.anchor_id||localSession.anchorId||"",160);
-  const base={ok:true,cloud_authoritative:true,production_write:false,no_write:true,session_id:sessionId,anchor_id:anchorId};
+  const base={ok:true,gateway:"canonical_sync_state_gateway",cloud_authoritative:true,production_write:false,no_write:true,session_id:sessionId,anchor_id:anchorId};
   if(!sessionId&&!anchorId)return success({...base,session_status:"missing_identifier",entries:employeeEntryCloudSyncMissing(entries,"missing_identifier")});
   if(!await empTableExists(env,"sessions").catch(()=>false))return success({...base,session_status:"schema_missing",entries:employeeEntryCloudSyncMissing(entries,"schema_missing")});
   const columns=await empTableColumns(env,"sessions").catch(()=>new Set());
@@ -3842,12 +3849,15 @@ async function handleEmployeeEntrySyncState(request,env,user){
     FROM sessions WHERE corpid=? AND (${predicates.join(" OR ")}) ORDER BY created_at DESC LIMIT 1`).bind(...params).first().catch(()=>null);
   if(!session)return success({...base,session_status:"cloud_missing",entries:employeeEntryCloudSyncMissing(entries,"session_not_found")});
   const statusText=String(session.handover_status||"").trim().toUpperCase();
-  const deleted=!!String(session.voided_at||"").trim()||["VOID","VOIDED","DELETED","CANCELLED"].includes(statusText);
-  const correction=deleted?null:await employeeEntryCloudSyncCorrectionExists(env,user,session);
+  const voided=!!String(session.voided_at||"").trim()||["VOID","VOIDED"].includes(statusText);
+  const deleted=["DELETED","CANCELLED"].includes(statusText);
+  const correction=(voided||deleted)?null:await employeeEntryCloudSyncCorrectionExists(env,user,session);
   const corrected=!!correction;
-  if(deleted||corrected){
-    const status=deleted?"cloud_deleted":"cloud_corrected";
-    return success({...base,session_status:status,cloud_session:{id:session.id,anchor_id:session.anchor_id,handover_status:session.handover_status||"",voided_at:session.voided_at||""},correction_anchor:correction?.anchor_id||"",entries:(entries||[]).map((entry,index)=>({index,local_event_id:cleanText(entry?.event_id||entry?.anchor_id||entry?.id||entry?.cloud_entry_id||"",120),status,matched:false,reason:status}))});
+  if(voided||deleted||corrected){
+    const status=corrected?"cloud_corrected":(voided?"cloud_voided":"cloud_deleted");
+    const syncStatus=corrected?"CLOUD_CORRECTED":(voided?"CLOUD_VOIDED":"CLOUD_DELETED");
+    const archiveState=corrected?"corrected":(voided?"voided":"deleted");
+    return success({...base,session_status:status,archive_state:archiveState,cloud_session:{id:session.id,anchor_id:session.anchor_id,handover_status:session.handover_status||"",voided_at:session.voided_at||""},correction_anchor:correction?.anchor_id||"",entries:(entries||[]).map((entry,index)=>({index,local_event_id:cleanText(entry?.event_id||entry?.anchor_id||entry?.id||entry?.cloud_entry_id||"",120),status,sync_status:syncStatus,archive_state:archiveState,cloud_match:false,matched:false,matched_by:"",cloud_record_id:cleanText(session.id||"",160),source_proof:{source:"canonical_event_archive",session_id:session.id||"",anchor_id:session.anchor_id||"",correction_anchor:correction?.anchor_id||""},allowed_next_action:"owner_review_required",reason:status}))});
   }
   const cloudEntries=extractEmployeeEntryAnchorsFromSession(session);
   const cloudKeySets=cloudEntries.map(row=>employeeEntryCloudSyncKeySet(row,user));
@@ -3862,11 +3872,11 @@ async function handleEmployeeEntrySyncState(request,env,user){
     }
     if(matchedIndex>=0){
       const matched=cloudEntries[matchedIndex]||{};
-      return {index,local_event_id:cleanText(entry?.event_id||entry?.anchor_id||entry?.id||entry?.cloud_entry_id||"",120),status:"cloud_confirmed",matched:true,matched_event_id:cleanText(matched.event_id||matched.anchor_id||matched.id||"",120),reason:"matched_cloud_anchor"};
+      return {index,local_event_id:cleanText(entry?.event_id||entry?.anchor_id||entry?.id||entry?.cloud_entry_id||"",120),status:"cloud_confirmed",sync_status:"SYNCED",archive_state:"exists_active",cloud_match:true,matched:true,matched_by:"canonical_fingerprint_or_event_id",cloud_record_id:cleanText(session.id||"",160),matched_event_id:cleanText(matched.event_id||matched.anchor_id||matched.id||"",120),source_proof:{source:"canonical_event_archive",session_id:session.id||"",anchor_id:session.anchor_id||""},allowed_next_action:"none",reason:"matched_cloud_anchor"};
     }
-    return {index,local_event_id:cleanText(entry?.event_id||entry?.anchor_id||entry?.id||entry?.cloud_entry_id||"",120),status:"cloud_mismatch",matched:false,reason:cloudEntries.length?"no_matching_cloud_anchor":"no_cloud_entries"};
+    return {index,local_event_id:cleanText(entry?.event_id||entry?.anchor_id||entry?.id||entry?.cloud_entry_id||"",120),status:"cloud_mismatch",sync_status:"CLOUD_MISMATCH",archive_state:"mismatch",cloud_match:false,matched:false,matched_by:"",cloud_record_id:cleanText(session.id||"",160),source_proof:{source:"canonical_event_archive",session_id:session.id||"",anchor_id:session.anchor_id||"",cloud_entries_count:cloudEntries.length},allowed_next_action:"owner_review_required",reason:cloudEntries.length?"no_matching_cloud_anchor":"no_cloud_entries"};
   });
-  return success({...base,session_status:"cloud_active",cloud_session:{id:session.id,anchor_id:session.anchor_id,handover_status:session.handover_status||"",voided_at:session.voided_at||""},entries:results});
+  return success({...base,session_status:"cloud_active",archive_state:"exists_active",cloud_session:{id:session.id,anchor_id:session.anchor_id,handover_status:session.handover_status||"",voided_at:session.voided_at||""},entries:results});
 }
 __name(handleEmployeeEntrySyncState,"handleEmployeeEntrySyncState");
 function employeeEntryDuplicateInPayload(keys){

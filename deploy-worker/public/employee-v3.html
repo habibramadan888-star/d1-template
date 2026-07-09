@@ -3365,6 +3365,20 @@ function saveDrafts(){
 function employeeEntryCloudConfirmed(entry){
   return entry?.sync_status==='SYNCED'&&String(entry?.cloud_sync_status||'').toUpperCase()==='CLOUD_CONFIRMED';
 }
+function employeeMarkDraftsAwaitingCloudConfirmation(entries,sessionId){
+  const checkedAt=nowIso();
+  return (entries||[]).map(e=>({
+    ...e,
+    session_id:sessionId||e.session_id||'',
+    sync_status:'SYNCED',
+    upload_status:'CHECKING_CLOUD',
+    cloud_sync_status:'CHECKING_CLOUD',
+    cloud_sync_checked_at:checkedAt,
+    upload_validation_error:null,
+    upload_validation_error_code:'',
+    sync_error:''
+  }));
+}
 function employeeMarkSyncedDraftsCloudChecking(){
   (state.drafts||[]).forEach(e=>{
     if(e?.sync_status==='SYNCED'&&String(e.cloud_sync_status||'').toUpperCase()!=='CLOUD_CONFIRMED'){
@@ -7505,7 +7519,7 @@ function employeeSessionRecordState(entry,index){
     if(cloudStatus==='CHECKING_CLOUD')return {key:'CHECKING_CLOUD',label:'Checking Cloud',className:'pending'};
     if(cloudStatus==='CLOUD_MISSING')return {key:'CLOUD_MISSING',label:'Cloud Missing',className:'cloud-missing'};
     if(cloudStatus==='CLOUD_MISMATCH')return {key:'CLOUD_MISMATCH',label:'Cloud Mismatch / Needs Review',className:'cloud-mismatch'};
-    if(['CLOUD_DELETED','CLOUD_VOIDED','CLOUD_CORRECTED'].includes(cloudStatus))return {key:cloudStatus,label:cloudStatus==='CLOUD_CORRECTED'?'Cloud Corrected':'Deleted from Cloud',className:'cloud-deleted'};
+    if(['CLOUD_DELETED','CLOUD_VOIDED','CLOUD_CORRECTED'].includes(cloudStatus))return {key:cloudStatus,label:cloudStatus==='CLOUD_CORRECTED'?'Cloud Corrected':(cloudStatus==='CLOUD_VOIDED'?'Cloud Voided':'Deleted from Cloud'),className:'cloud-deleted'};
     return {key:'NEEDS_RECONCILIATION',label:'Needs Reconciliation',className:'pending'};
   }
   return {key:'LOCAL',label:'Local',className:'local'};
@@ -7775,9 +7789,9 @@ async function commitSessionAndExport(){
       if(data?.timing)employeeUploadTimingLog('server',data.timing);
       if(!r.ok||data?.success===false)throw new Error(data?.error||data?.message||raw||('HTTP '+r.status));
       e.sync_status='SYNCED';
-      e.upload_status='SYNCED';
+      e.upload_status='CHECKING_CLOUD';
       e.upload_validation_error=null;
-      e.cloud_sync_status='CLOUD_CONFIRMED';
+      e.cloud_sync_status='CHECKING_CLOUD';
       e.cloud_sync_checked_at=nowIso();
       e.cloud_entry_id=data?.entry_id||e.cloud_entry_id||'';
       e.sync_error='';
@@ -7825,11 +7839,13 @@ async function commitSessionAndExport(){
     updateEntrySessionActionState();
     return;
   }
-  state.drafts=uploadList.map(e=>({...e,sync_status:'SYNCED',upload_status:'SYNCED',cloud_sync_status:'CLOUD_CONFIRMED',cloud_sync_checked_at:nowIso(),upload_validation_error:null,upload_validation_error_code:'',sync_error:''}));
+  state.drafts=employeeMarkDraftsAwaitingCloudConfirmation(uploadList,uploadSessionId);
   state.sessionId=uploadSessionId;
   state.uploadValidationFailedIndex=null;
   state.uploadValidationFailedMessage='';
   saveDrafts();
+  const syncCheck=await reconcileEmployeeCloudSyncState({silent:true});
+  const cloudConfirmed=entrySessionUploaded();
   buildExport();
   refreshSessionViews();
   renderContext();
@@ -7837,6 +7853,14 @@ async function commitSessionAndExport(){
   if(uploadList.some(e=>['R','AP'].includes(e.type)))setTimeout(()=>loadTasks(false),0);
   uploadTiming.total_ms=Math.round(performance.now()-uploadT0);
   employeeUploadTimingLog('client',uploadTiming);
+  if(!cloudConfirmed){
+    setUploadPhase('Checking cloud','Confirming');
+    const reason=syncCheck?.session_status||syncCheck?.error||'cloud_confirmation_pending';
+    showStatus(`Upload accepted, but cloud confirmation is pending: ${reason}. / 上传已接受，但云端确认未完成。`,'warn');
+    toast('Upload accepted; cloud confirmation pending / 上传已接受，等待云端确认',7000);
+    updateEntrySessionActionState();
+    return;
+  }
   setUploadPhase('Upload complete','Done');
   showStatus('Session uploaded to cloud. WhatsApp export is now available. / 本票已上传云端，现在可以导出 WhatsApp。','ok');
   toast('Session uploaded to cloud / 本票已上传云端',6000);

@@ -53,7 +53,7 @@ Everything else is derived: owner history, employee current session display, arr
 | Deposit Gateway | L1 Event Archive + L2 deposit projection | L1 through Deposit In/Out anchors only | expose deposit balance and deposit history | FAIL, legacy tenant_card_id dependency remains |
 | Occupancy Gateway | L1 Event Archive + L2 occupancy projection | L1 through event anchors/corrections only | resolve customer-stay relationship and bed movement | PARTIAL |
 | Upload Gateway | L0 employee draft anchors -> server validation -> L1 archive | L1 accepted sessions | validate and accept employee events | PARTIAL |
-| Sync State Gateway | L1 archive + correction/void/delete state | none | decide Synced / Cloud Missing / Needs Review | PARTIAL |
+| Sync State Gateway | L1 archive + correction/void/delete state | none | decide Synced / Cloud Missing / Cloud Deleted / Cloud Voided / Cloud Corrected / Cloud Mismatch / Needs Review | PASS |
 | Owner History Gateway | L1 archive + L2 correction-aware projections | none | display history/detail without becoming write source | PARTIAL |
 
 ## Feature Dependency Audit
@@ -74,7 +74,7 @@ Everything else is derived: owner history, employee current session display, arr
 | Preview | draft anchors + dry-run preview | no durable write | no | draft only | no | must not | no | no | no | Upload Gateway dry-run | dry-run preview | PASS | keep no-write proof and never use preview as upload truth |
 | WhatsApp Export | canonical normalized anchors after accepted/synced session | clipboard/export text only | no | must not be truth | no | no | no | no | no | L1/L2 display projection | normalized anchors/export compiler | PARTIAL | enable only after upload success/cloud confirmation |
 | Upload Session | draft anchors -> server validation | L1 cloud accepted session | no | no | no | must not | yes | yes | yes | Upload Gateway | server dry-run then upload | PARTIAL | ensure all seven payloads pass firewall and server dry-run before write |
-| Synced state | Sync State Gateway | local status display | no | historical issue: local flag risk | no | no | no | no | yes | L1 cloud confirmation | cloud-authoritative reconciliation | PARTIAL | keep cloud confirmation required and handle hard delete/void/correction |
+| Synced state | Sync State Gateway | local status display | no | local flag is draft/cache only | no | no | no | no | yes | L1 cloud confirmation | Canonical Sync State Gateway | PASS | keep cloud confirmation required and handle hard delete/void/correction |
 | Undo | local draft/cache | local draft/cache | no | draft only | no | no | no | no | yes local only | local draft only | local draft | PASS | never undo accepted cloud facts; use correction/void instead |
 | Remove Invalid Record | local draft/cache | local draft/cache | no | draft only | no | no | no | no | yes local only | local draft only | local draft | PASS | only remove local invalid records before upload |
 | Copy Diagnostic JSON | validation/gateway response | clipboard only | no | no | no | no | no | no | no | diagnostic response | validation response | PASS | redact secrets and keep no-write |
@@ -126,7 +126,7 @@ Everything else is derived: owner history, employee current session display, arr
 | expense evidence | Expense anchor | Expense contract | local attachment label only | PARTIAL | evidence_ref storage gateway later |
 | transfer from_bed/to_bed | Bed Transfer anchor | Bed Transfer contract | old_ttlock_ref | PASS | keep old_ttlock_ref stripped |
 | transfer carryover fields | Occupancy projection + Bed Transfer anchor | contract only | bed-only matching | PARTIAL | Occupancy Gateway |
-| synced status | Sync State Gateway cloud confirmation | reconciliation implemented/tested | localStorage flag | PARTIAL | live verify deletion/reconcile flows |
+| synced status | Sync State Gateway cloud confirmation | Canonical Sync State Gateway implemented/tested | localStorage flag | PASS | live verify deletion/reconcile flows |
 | duplicate status | canonical fingerprint + source/event ids | duplicate guard | UI status/local synced | PARTIAL | keep provider fields excluded |
 | owner history totals | L1/L2 correction-aware projections | sessions/detail projections | parsed display text | PARTIAL | correction-aware totals everywhere |
 | employee handover totals | accepted session anchors/summaries | employee session payload/export | WhatsApp text as truth | PARTIAL | compiler from canonical anchors |
