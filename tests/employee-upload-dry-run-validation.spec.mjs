@@ -150,7 +150,8 @@ test("current session status machine prioritizes validation failed and stale ove
   assert.match(html, /ARREARS_REF_STALE_REFRESH_REQUIRED/);
   assert.match(html, /This arrears item is no longer open\. Please refresh arrears or remove this record\./);
   assert.match(finalRender, /const recordState=employeeSessionRecordState\(e,i\)/);
-  assert.match(finalRender, /recordState\.key!=='SYNCED'/);
+  assert.match(finalRender, /const failed=\['VALIDATION_FAILED','STALE'\]\.includes\(recordState\.key\)/);
+  assert.match(finalRender, /const remove=\['VALIDATION_FAILED','STALE'\]\.includes\(recordState\.key\)/);
   assert.match(finalRender, /renderSessionRecordValidationDetails\(recordState\.validation,i\)/);
   assert.match(finalRender, /data-refresh-arrears-record/);
   assert.match(finalRender, /Refresh Arrears/);
