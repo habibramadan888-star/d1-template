@@ -839,6 +839,7 @@ const state={
   arrearsSourceStatus:{},arrearsPoolResult:null,arrearsSummary:{},arrearsPagination:{},
   arrearsSlowTimer:null,
   overviewComparative:null,overviewComparativeStatus:'idle',overviewComparativeError:'',
+  ownerTodayTodos:null,ownerTodayTodosStatus:'idle',ownerTodayTodosError:'',
   presetPrices:DEFAULT_PRICES,
   customers:[],
   anaOpen:{session:false,finance:false,people:false,continuity:false,tx:false},
@@ -5257,10 +5258,59 @@ function renderOwnerOverview(){
     </div>`;
   ensureOwnerOverviewComparativeAsync();
   ensureOwnerOverviewArrearsAsync();
+  ensureOwnerTodayTodosAsync();
 }
 
 function ownerOverviewCloudData(){
   return state.overviewComparativeStatus==='success'&&state.overviewComparative?state.overviewComparative:{};
+}
+function ownerOverviewTodayTodoData(){
+  return state.ownerTodayTodosStatus==='success'&&state.ownerTodayTodos?state.ownerTodayTodos:{};
+}
+function ownerOverviewTodayTodoRows(){
+  const data=ownerOverviewTodayTodoData();
+  if(Array.isArray(data.todos))return data.todos;
+  if(Array.isArray(data.items))return data.items;
+  return [];
+}
+function ownerOverviewTodayTodoCount(){
+  const data=ownerOverviewTodayTodoData();
+  const summary=data.summary||{};
+  const count=Number(summary.open_count??summary.total_count);
+  if(Number.isFinite(count)&&state.ownerTodayTodosStatus==='success')return count;
+  return ownerOverviewConsoleSotRows().length;
+}
+function ownerOverviewTodayTodoNote(){
+  const data=ownerOverviewTodayTodoData();
+  if(state.ownerTodayTodosStatus==='success'){
+    const summary=data.summary||{};
+    return `High ${Number(summary.high_count||0)} / Reconciliation ${Number(summary.reconciliation_count||0)} / Receivables ${Number(summary.receivables_count||0)}`;
+  }
+  if(state.ownerTodayTodosStatus==='loading')return 'Loading canonical todos';
+  if(state.ownerTodayTodosStatus==='error')return `Todo gateway unavailable: ${state.ownerTodayTodosError||'retry'}`;
+  return 'Canonical todo gateway pending';
+}
+async function loadOwnerTodayTodos(){
+  if(state.ownerTodayTodosStatus==='loading')return false;
+  state.ownerTodayTodosStatus='loading';
+  state.ownerTodayTodosError='';
+  try{
+    const res=await apiFetch('/api/owner/today-todos?limit=200');
+    const data=await res.json();
+    state.ownerTodayTodos=data||{};
+    state.ownerTodayTodosStatus='success';
+    renderOwnerOverview();
+    return true;
+  }catch(e){
+    state.ownerTodayTodosStatus='error';
+    state.ownerTodayTodosError=e?.message||String(e||'');
+    renderOwnerOverview();
+    return false;
+  }
+}
+function ensureOwnerTodayTodosAsync(){
+  if(['loading','success'].includes(state.ownerTodayTodosStatus))return;
+  setTimeout(()=>loadOwnerTodayTodos(),0);
 }
 function ownerOverviewCurrentMonth(){
   return ownerOverviewCloudData().current?.month||ownerOverviewCloudData().quarter_to_date||{};
@@ -5442,6 +5492,34 @@ function ownerOverviewShowOutstandingPreview(){
   showOwnerOverviewPreviewModal('Outstanding Collection','\u5f85\u6536\u5c3e\u6b3e',body,'Total',fmtMoney(total));
 }
 function ownerOverviewShowTodayActionsPreview(){
+  const todoRows=ownerOverviewTodayTodoRows();
+  if(todoRows.length){
+    const groups=['deposit_reconciliation','occupancy_reconciliation','receivables','sync_archive','finance_evidence'];
+    const labels={
+      deposit_reconciliation:'Needs Review: Deposit',
+      occupancy_reconciliation:'Bed Status Issues',
+      receivables:'Receivables',
+      sync_archive:'Cloud State Issues',
+      finance_evidence:'Finance Evidence'
+    };
+    const sections=groups.map(category=>{
+      const items=todoRows.filter(row=>row.category===category);
+      if(!items.length)return '';
+      return `<div class="hist-card" style="margin:0 0 10px"><div class="hist-title">${esc(labels[category]||category)}</div><div class="detail-list">${items.map(row=>`
+        <div class="detail-row owner-mobile-row" style="align-items:flex-start">
+          <div class="room">${esc(row.bed||'-')}</div>
+          <div class="note">
+            <b>${esc(row.title||row.task_type||'-')}</b>
+            <div>${esc(row.description||'')}</div>
+            <div>Action: ${esc(row.recommended_action||'-')}</div>
+            <div>Type: ${esc(row.task_type||'-')} / Source: ${esc(row.source_gateway||'-')}</div>
+          </div>
+          <div class="amount">${esc(row.severity||'-')}<br><span style="font-size:11px;color:var(--color-text-muted)">${esc(row.status||'open')}</span></div>
+        </div>`).join('')}</div></div>`;
+    }).filter(Boolean).join('');
+    showOwnerOverviewPreviewModal('Today Actions','今日待办',sections||ownerOverviewPreviewEmpty(),'Total',String(todoRows.length));
+    return;
+  }
   const rows=ownerOverviewConsoleSotRows();
   const groups=[['overdue','Overdue'],['due today','Due Today'],['due soon','Due Soon'],['required','Required']];
   const sections=groups.map(([key,label])=>{
@@ -5449,7 +5527,8 @@ function ownerOverviewShowTodayActionsPreview(){
     if(!items.length)return '';
     return `<div class="hist-card" style="margin:0 0 10px"><div class="hist-title">${esc(label)}</div><div class="detail-list">${items.map(row=>ownerOverviewPreviewRow(row.bed||row.room_bed||row.room||'-',fmtMoney(ownerOverviewReceivableAmount(row)),label,row.dueDate||row.due_date||row.valid_until||'')).join('')}</div></div>`;
   }).filter(Boolean).join('');
-  showOwnerOverviewPreviewModal('Today Actions','\u4eca\u65e5\u5f85\u529e',sections||ownerOverviewPreviewEmpty(),'Total',String(rows.length));
+  const explicitEmpty=state.ownerTodayTodosStatus==='success'?`<div class="empty-state hl-empty-state"><div class="empty-title">No todo items from canonical gateways</div><div class="empty-text">暂无来自规范网关的待办项目。</div></div>`:ownerOverviewPreviewEmpty();
+  showOwnerOverviewPreviewModal('Today Actions','\u4eca\u65e5\u5f85\u529e',sections||explicitEmpty,'Total',String(rows.length));
 }
 function showOwnerOverviewCardPreview(kind){
   if(kind==='current-period')return ownerOverviewShowCurrentPeriodPreview();
@@ -5636,12 +5715,13 @@ function renderOwnerOverview(){
   const hasConsoleSot=!!consoleSot.summary;
   const outstandingAmount=hasConsoleSot?Number(consoleSummary.outstanding_amount_fils||consoleSummary.total_amount_fils||0)/100:0;
   const outstandingCount=hasConsoleSot?Number(consoleSummary.action_count??consoleSummary.total_count??0):0;
-  const todayTodo=hasConsoleSot?Number(consoleSummary.action_count??0):0;
+  const todayTodo=ownerOverviewTodayTodoCount();
   const consoleRiskNote=`欠款中 ${Number(consoleSummary.overdue_count||0)} / 今天 ${Number(consoleSummary.due_today_count||0)} / 3天内 ${Number(consoleSummary.due_soon_count||0)}`;
+  const todoRiskNote=ownerOverviewTodayTodoNote();
   const periodReceived=Number(currentPeriod.gross_received||0);
   const cloudArrearsRemaining=Number(cloudArrearsCollection.total_remaining||0);
   const kpi=(label,en,value,color='var(--color-primary)',note='',attrs='')=>{
-    if(en==='TODAY ACTIONS'&&hasConsoleSot)note=consoleRiskNote;
+    if(en==='TODAY ACTIONS')note=todoRiskNote||consoleRiskNote;
     const previewKind={
       'OUTSTANDING COLLECTION':'outstanding',
       'TODAY ACTIONS':'today-actions',
@@ -5715,6 +5795,7 @@ function renderOwnerOverview(){
   });
   ensureOwnerOverviewComparativeAsync();
   ensureOwnerOverviewArrearsAsync();
+  ensureOwnerTodayTodosAsync();
 }
 
 /* ── ANALYSIS IMPORT — 双重去重：锚点ID + 内容指纹 ── */

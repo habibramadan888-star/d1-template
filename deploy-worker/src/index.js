@@ -4622,6 +4622,243 @@ async function canonicalOccupancyGateway(env,user,opts={}){
   };
 }
 __name(canonicalOccupancyGateway,"canonicalOccupancyGateway");
+function ownerTodayTodoSlug(value,max=160){
+  return cleanText(value,max).replace(/[^a-zA-Z0-9_-]+/g,"_").replace(/^_+|_+$/g,"").slice(0,max)||"unknown";
+}
+__name(ownerTodayTodoSlug,"ownerTodayTodoSlug");
+function ownerTodayTodoTaskId(type,bed,sourceSessionId,sourceEventId,sourceGateway){
+  return [type,bed||"bed",sourceSessionId||"session",sourceEventId||"event",sourceGateway||"gateway"].map(ownerTodayTodoSlug).join("__");
+}
+__name(ownerTodayTodoTaskId,"ownerTodayTodoTaskId");
+function ownerTodayTodoItem(type,fields={}){
+  const bed=cleanText(fields.bed||"",80).replace(/^#/,"");
+  const sourceGateway=cleanText(fields.source_gateway||"",120);
+  const sessionId=cleanText(fields.session_id||fields.source_session_id||"",120);
+  const eventId=cleanText(fields.event_id||fields.source_event_id||"",120);
+  return {
+    task_id:cleanText(fields.task_id||ownerTodayTodoTaskId(type,bed,sessionId,eventId,sourceGateway),240),
+    task_type:type,
+    category:cleanText(fields.category||"reconciliation",80),
+    severity:cleanText(fields.severity||"medium",40),
+    bed,
+    session_id:sessionId,
+    event_id:eventId,
+    title:cleanText(fields.title||type,200),
+    description:cleanText(fields.description||"",800),
+    source_gateway:sourceGateway,
+    source_proof:fields.source_proof||{},
+    recommended_action:cleanText(fields.recommended_action||"",800),
+    status:fields.status==="resolved_by_source"?"resolved_by_source":"open",
+    created_at:cleanText(fields.created_at||empNow(),80),
+    due_date:cleanDate(fields.due_date||""),
+    auto_resolve_condition:cleanText(fields.auto_resolve_condition||"",500)
+  };
+}
+__name(ownerTodayTodoItem,"ownerTodayTodoItem");
+async function ownerTodayTodoCandidateBeds(env,user,opts={}){
+  const candidates=new Map();
+  const limit=Math.min(Math.max(Number(opts.limit||500),1),1000);
+  const add=(bed,source)=>{
+    const cleanBed=cleanText(bed||"",80).replace(/^#/,"");
+    if(!cleanBed)return;
+    if(!candidates.has(cleanBed))candidates.set(cleanBed,{bed:cleanBed,sources:new Set()});
+    candidates.get(cleanBed).sources.add(source||"unknown");
+  };
+  if(opts.bed)add(opts.bed,"query");
+  const sessions=await cloudArrearsFetchActiveSessionRows(env,user,{limit}).catch(()=>[]);
+  for(const session of sessions||[]){
+    const anchors=extractEmployeeEntryAnchorsFromSession(session);
+    for(const raw of anchors||[]){
+      const anchor=normalizeEntryAnchor(raw);
+      add(anchor.bed||anchor.room,"canonical_event_archive");
+      add(anchor.from_bed,"canonical_event_archive");
+      add(anchor.to_bed,"canonical_event_archive");
+    }
+  }
+  const lockResult=await empLoadLockCardsWithCacheFallback(env,user,{timeoutMs:8000,limit:500}).catch(e=>({roomsData:{},error:empTtlockReadErrorCode(e)}));
+  for(const [lockRoom,cards] of Object.entries(lockResult?.roomsData||{})){
+    for(const card of cards||[]){
+      const remark=canonicalDepositRemarkText(card,lockRoom);
+      const snapshot=buildAccessSnapshotDTO(remark,{property_id:user?.corpid||"homelink"});
+      add(snapshot.bed||card.bed||card.room||lockRoom,"access_snapshot");
+    }
+  }
+  return [...candidates.values()].map(row=>({bed:row.bed,sources:[...row.sources]})).slice(0,limit);
+}
+__name(ownerTodayTodoCandidateBeds,"ownerTodayTodoCandidateBeds");
+function ownerTodayTodoSourceProof(gateway,extra={}){
+  return {
+    gateway,
+    derived_queue:true,
+    source_of_truth:false,
+    canonical_sources:["canonical_deposit_gateway","canonical_occupancy_bed_status_gateway","canonical_arrears_gateway","canonical_event_archive","access_snapshot_context"],
+    forbidden_sources_excluded:["owner_display_text","employee_local_cache","preview_text","whatsapp_export_text","tenant_card_id","card_id","old_ttlock_ref","provider_phone","phone_99099","manual_todo_state"],
+    ...extra
+  };
+}
+__name(ownerTodayTodoSourceProof,"ownerTodayTodoSourceProof");
+function ownerTodayTodoPush(todos,item,filters={}){
+  if(!item)return;
+  if(filters.category&&item.category!==filters.category)return;
+  if(filters.severity&&item.severity!==filters.severity)return;
+  if(!filters.includeResolved&&item.status==="resolved_by_source")return;
+  if(todos.some(existing=>existing.task_id===item.task_id))return;
+  todos.push(item);
+}
+__name(ownerTodayTodoPush,"ownerTodayTodoPush");
+function ownerTodayTodoDepositExpectedAmount(deposit={}){
+  const auditEvents=Array.isArray(deposit.cloud_deposit_events)?deposit.cloud_deposit_events:[];
+  const expectedFromEvents=auditEvents.reduce((max,event)=>Math.max(max,canonicalDepositMoney(event.expected_deposit_after_payment||event.deposit_required_total||0)),0);
+  const depositInNet=auditEvents.reduce((sum,event)=>sum+(event.event_type==="deposit_in"?canonicalDepositMoney(event.amount):0),0);
+  return Math.max(canonicalDepositMoney(deposit.cloud_deposit_expected_after_payment||0),expectedFromEvents,depositInNet);
+}
+__name(ownerTodayTodoDepositExpectedAmount,"ownerTodayTodoDepositExpectedAmount");
+function ownerTodayTodoDepositFirstEvent(deposit={}){
+  return (deposit.cloud_deposit_events||[]).find(event=>event.event_type==="deposit_in")||{};
+}
+__name(ownerTodayTodoDepositFirstEvent,"ownerTodayTodoDepositFirstEvent");
+function ownerTodayTodoBuildDepositAndOccupancy(todos,bed,deposit={},occupancy={},filters={}){
+  const depositEvents=Array.isArray(deposit.cloud_deposit_events)?deposit.cloud_deposit_events:[];
+  const depositInEvents=depositEvents.filter(event=>event.event_type==="deposit_in");
+  const firstDeposit=ownerTodayTodoDepositFirstEvent(deposit);
+  const expectedDeposit=ownerTodayTodoDepositExpectedAmount(deposit);
+  const recorded=deposit.deposit_recorded_amount===null||deposit.deposit_recorded_amount===undefined?null:canonicalDepositMoney(deposit.deposit_recorded_amount);
+  if(depositInEvents.length&&expectedDeposit>0&&(recorded===null||recorded+0.01<expectedDeposit)){
+    ownerTodayTodoPush(todos,ownerTodayTodoItem("DEPOSIT_D_RECONCILIATION_REQUIRED",{
+      category:"deposit_reconciliation",
+      severity:"high",
+      bed,
+      session_id:firstDeposit.session_id,
+      event_id:firstDeposit.event_id,
+      title:`Bed ${bed} deposit D amount needs update`,
+      description:`Deposit In ${expectedDeposit} exists, but TTLock remark does not show D${expectedDeposit}.`,
+      source_gateway:"canonical_deposit_gateway",
+      source_proof:ownerTodayTodoSourceProof("canonical_deposit_gateway",{deposit_recorded_amount:recorded,expected_deposit_amount:expectedDeposit,cloud_deposit_events_count:depositEvents.length}),
+      recommended_action:`Update TTLock remark to include D${expectedDeposit} if the deposit is real, or void/correct the Deposit In if it was a test/error.`,
+      auto_resolve_condition:`Access Snapshot D amount is updated to D${expectedDeposit} or the Deposit In anchor is voided/corrected.`
+    }),filters);
+  }
+  if(depositInEvents.length&&occupancy.physical_bed_status==="vacant"&&occupancy.physical_bed_status_source==="access_snapshot_E_marker"){
+    ownerTodayTodoPush(todos,ownerTodayTodoItem("DEPOSIT_IN_ON_TTLOCK_VACANT_BED",{
+      category:"occupancy_reconciliation",
+      severity:"high",
+      bed,
+      session_id:firstDeposit.session_id,
+      event_id:firstDeposit.event_id,
+      title:`Bed ${bed} deposit collected while TTLock shows vacant`,
+      description:"TTLock still shows this bed as vacant, but Deposit In was recorded.",
+      source_gateway:"canonical_occupancy_bed_status_gateway",
+      source_proof:ownerTodayTodoSourceProof("canonical_occupancy_bed_status_gateway",{physical_bed_status:occupancy.physical_bed_status,physical_bed_status_source:occupancy.physical_bed_status_source,deposit_events_count:depositInEvents.length}),
+      recommended_action:"Verify whether tenant has moved in. If yes, remove E/e and update D amount. If not, void/correct the Deposit In.",
+      auto_resolve_condition:"Access Snapshot E/e vacancy marker is removed or the Deposit In anchor is voided/corrected."
+    }),filters);
+  }
+  const occupancyWarnings=Array.isArray(occupancy.warnings)?occupancy.warnings:[];
+  for(const code of ["TTLOCK_VACANT_WITHOUT_CHECKOUT_EVENT","CHECKOUT_EVENT_WITHOUT_TTLOCK_E","RENT_COVERAGE_CONFLICTS_WITH_TTLOCK_E"]){
+    if(!occupancyWarnings.includes(code))continue;
+    const severity=code==="TTLOCK_VACANT_WITHOUT_CHECKOUT_EVENT"?"medium":"high";
+    ownerTodayTodoPush(todos,ownerTodayTodoItem(code,{
+      category:"occupancy_reconciliation",
+      severity,
+      bed,
+      session_id:occupancy.latest_checkout_event?.session_id||occupancy.latest_rent_event?.session_id||"",
+      event_id:occupancy.latest_checkout_event?.event_id||occupancy.latest_rent_event?.event_id||"",
+      title:`Bed ${bed} ${code.replace(/_/g," ").toLowerCase()}`,
+      description:`Canonical occupancy gateway reported ${code}.`,
+      source_gateway:"canonical_occupancy_bed_status_gateway",
+      source_proof:ownerTodayTodoSourceProof("canonical_occupancy_bed_status_gateway",{warning:code,physical_bed_status:occupancy.physical_bed_status,physical_bed_status_source:occupancy.physical_bed_status_source}),
+      recommended_action:"Review Access Snapshot E/e marker and related employee event anchors, then correct the source record if needed.",
+      auto_resolve_condition:"The canonical occupancy warning disappears after Access Snapshot or archive anchors are corrected."
+    }),filters);
+  }
+}
+__name(ownerTodayTodoBuildDepositAndOccupancy,"ownerTodayTodoBuildDepositAndOccupancy");
+function ownerTodayTodoBuildReceivables(todos,sot={},filters={}){
+  const rows=Array.isArray(sot.all_rows)?sot.all_rows:(Array.isArray(sot.rows)?sot.rows:[]);
+  for(const row of rows){
+    const bed=cleanText(row.bed||row.room_bed||row.room||"",80).replace(/^#/,"");
+    const amountFils=Number(row.amount_fils??row.outstanding_amount_fils??row.remaining_amount_fils||0);
+    const amount=amountFils>0?Math.round(amountFils)/100:cleanMoney(row.remain||row.remaining_arrears||row.amount||0);
+    const status=cleanText(row.status||row.action_status||row.source_label||row.source_type||"required",80).toLowerCase();
+    ownerTodayTodoPush(todos,ownerTodayTodoItem("CURRENT_RECEIVABLE_REQUIRED",{
+      category:"receivables",
+      severity:status.includes("overdue")?"high":(status.includes("today")?"medium":"low"),
+      bed,
+      session_id:cleanText(row.session_id||"",120),
+      event_id:cleanText(row.event_id||row.entry_id||"",120),
+      title:`Bed ${bed||"-"} receivable requires follow-up`,
+      description:`Current receivables SOT shows ${amount} AED requiring follow-up.`,
+      source_gateway:"current_receivables_sot",
+      source_proof:ownerTodayTodoSourceProof("current_receivables_sot",{source:row.source||row.source_type||"",amount}),
+      recommended_action:"Follow up the current receivable or update the canonical source if it is no longer due.",
+      due_date:row.due_date||row.dueDate||row.valid_until||"",
+      auto_resolve_condition:"Receivable disappears from current receivables SOT."
+    }),filters);
+  }
+}
+__name(ownerTodayTodoBuildReceivables,"ownerTodayTodoBuildReceivables");
+async function buildOwnerTodayTodoGateway(env,user,opts={}){
+  const limit=Math.min(Math.max(Number(opts.limit||100),1),500);
+  const includeResolved=opts.include_resolved===true||opts.includeResolved===true;
+  const filters={includeResolved,severity:cleanText(opts.severity||"",40),category:cleanText(opts.category||"",80)};
+  const candidates=await ownerTodayTodoCandidateBeds(env,user,{bed:opts.bed,limit}).catch(()=>[]);
+  const todos=[];
+  const receivables=await resolveConsoleReceivablesSot(env,user,{limit,ttlockTimeoutMs:8000}).catch(()=>null);
+  if(receivables)ownerTodayTodoBuildReceivables(todos,receivables,filters);
+  for(const candidate of candidates){
+    const bed=candidate.bed;
+    if(!bed)continue;
+    const deposit=await canonicalDepositGateway(env,user,{bed,limit:1000}).catch(()=>null);
+    const occupancy=await canonicalOccupancyGateway(env,user,{bed,limit:1000}).catch(()=>null);
+    if(deposit&&occupancy)ownerTodayTodoBuildDepositAndOccupancy(todos,bed,deposit,occupancy,filters);
+  }
+  todos.sort((a,b)=>{
+    const score={high:0,medium:1,low:2};
+    return (score[a.severity]??9)-(score[b.severity]??9)||String(a.bed).localeCompare(String(b.bed))||String(a.task_type).localeCompare(String(b.task_type));
+  });
+  const items=todos.slice(0,limit);
+  const openTodos=items.filter(todo=>todo.status==="open");
+  const summary={
+    total_count:items.length,
+    open_count:openTodos.length,
+    high_count:openTodos.filter(todo=>todo.severity==="high").length,
+    medium_count:openTodos.filter(todo=>todo.severity==="medium").length,
+    low_count:openTodos.filter(todo=>todo.severity==="low").length,
+    category_counts:openTodos.reduce((acc,todo)=>{acc[todo.category]=(acc[todo.category]||0)+1;return acc;},{}),
+    receivables_count:openTodos.filter(todo=>todo.category==="receivables").length,
+    reconciliation_count:openTodos.filter(todo=>todo.category!=="receivables").length
+  };
+  return {
+    ok:true,
+    success:true,
+    gateway:"owner_today_todo_gateway",
+    source:"derived_from_canonical_gateways",
+    date:cleanDate(opts.date||empTodayDubai()),
+    summary,
+    todos:items,
+    items,
+    empty_state:"No todo items from canonical gateways",
+    source_proof:ownerTodayTodoSourceProof("owner_today_todo_gateway",{candidate_beds:candidates.length}),
+    readonly:true,
+    no_write:true,
+    production_cutover:"PRODUCTION_NO_GO"
+  };
+}
+__name(buildOwnerTodayTodoGateway,"buildOwnerTodayTodoGateway");
+async function handleOwnerTodayTodos(request,env,user){
+  if(!canReadOwnerData(user))return forbidden();
+  const url=new URL(request.url);
+  const payload=await buildOwnerTodayTodoGateway(env,user,{
+    date:url.searchParams.get("date")||"",
+    include_resolved:url.searchParams.get("include_resolved")==="1",
+    severity:url.searchParams.get("severity")||"",
+    category:url.searchParams.get("category")||"",
+    bed:url.searchParams.get("bed")||"",
+    limit:url.searchParams.get("limit")||100
+  });
+  return success(payload);
+}
+__name(handleOwnerTodayTodos,"handleOwnerTodayTodos");
 function employeeEntryExportTextWithAnchors(exportText,entries,session){
   const base=String(exportText||"").replace(/\n*==== ENTRY ANCHORS JSON ====\s*[\s\S]*?\s*==== END ENTRY ANCHORS JSON ====\s*$/i,"").trimEnd();
   const normalized=Array.isArray(entries)?entries.map(row=>normalizeEntryAnchor(row)):[];
@@ -9256,6 +9493,7 @@ async function handlePhase0ReadOnlyApi(request,env,user){
     if(path==="/api/owner/bed-transfers")return handleOwnerBedTransfers(request,env,user);
     if(path==="/api/owner/finance/projection")return handleOwnerFinanceProjection(request,env,user);
     if(path==="/api/owner/cloud-arrears/projection")return handleOwnerCloudArrearsProjection(request,env,user);
+    if(path==="/api/owner/today-todos")return handleOwnerTodayTodos(request,env,user);
     if(path==="/api/owner/console-receivables-sot"||path==="/api/owner/current-receivables-sot"){
       const limit=Math.min(Math.max(Number(url.searchParams.get("limit")||500),1),500);
       return success(await resolveConsoleReceivablesSot(env,user,{limit,ttlockTimeoutMs:8000}));
@@ -10452,6 +10690,9 @@ async function handleRequest(request, env, ctx) {
     }
     if (path === "/api/owner/cloud-arrears/projection" && method === "GET") {
       return handleOwnerCloudArrearsProjection(request, env, user);
+    }
+    if (path === "/api/owner/today-todos" && method === "GET") {
+      return handleOwnerTodayTodos(request, env, user);
     }
     if (path === "/api/owner/bed-status" && method === "GET") {
       return handleOwnerBedStatus(request, env, user);
