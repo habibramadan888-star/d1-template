@@ -4777,7 +4777,7 @@ function ownerTodayTodoBuildReceivables(todos,sot={},filters={}){
   const rows=Array.isArray(sot.all_rows)?sot.all_rows:(Array.isArray(sot.rows)?sot.rows:[]);
   for(const row of rows){
     const bed=cleanText(row.bed||row.room_bed||row.room||"",80).replace(/^#/,"");
-    const amountFils=Number(row.amount_fils??row.outstanding_amount_fils??row.remaining_amount_fils||0);
+    const amountFils=Number(row.amount_fils??row.outstanding_amount_fils??row.remaining_amount_fils??0);
     const amount=amountFils>0?Math.round(amountFils)/100:cleanMoney(row.remain||row.remaining_arrears||row.amount||0);
     const status=cleanText(row.status||row.action_status||row.source_label||row.source_type||"required",80).toLowerCase();
     ownerTodayTodoPush(todos,ownerTodayTodoItem("CURRENT_RECEIVABLE_REQUIRED",{
