@@ -22,15 +22,24 @@ function routeBlock(source, marker, nextMarker) {
 test("canonical owner history gateway exposes archive states and source proof", async () => {
   const worker = await readFile(workerPath, "utf8");
   const state = functionBlock(worker, "canonicalOwnerHistoryArchiveState");
+  const summary = functionBlock(worker, "canonicalOwnerHistoryCorrectionSummaryWithArchiveSemantics");
+  const effective = functionBlock(worker, "canonicalOwnerHistoryEffectiveTotalsForState");
   const proof = functionBlock(worker, "canonicalOwnerHistorySourceProof");
   const row = functionBlock(worker, "canonicalOwnerHistorySessionRow");
   const detail = functionBlock(worker, "canonicalOwnerHistoryDetailGatewayFields");
 
+  assert.match(state, /missing/);
   assert.match(state, /REVERSED/);
   assert.match(state, /DELETED/);
   assert.match(state, /VOIDED/);
   assert.match(state, /correction_applied/);
   assert.match(state, /CORR-/);
+  assert.match(effective, /canonicalOwnerHistoryActiveForTotals/);
+  assert.match(effective, /canonicalOwnerHistoryZeroTotals/);
+  assert.match(summary, /corrected_totals/);
+  assert.match(summary, /archive_effective_totals/);
+  assert.match(summary, /active_for_totals/);
+  assert.match(summary, /correction_history_visible/);
 
   assert.match(proof, /L1 Canonical Event Archive/);
   assert.match(proof, /entries_json/);
@@ -48,8 +57,11 @@ test("canonical owner history gateway exposes archive states and source proof", 
 
   assert.match(row, /archive_state/);
   assert.match(row, /active_archive_record/);
-  assert.match(row, /correction_aware_adjusted/);
-  assert.match(row, /raw_session_totals/);
+  assert.match(row, /archive_effective_correction_aware/);
+  assert.match(row, /archive_effective_raw/);
+  assert.match(row, /correction_totals/);
+  assert.match(row, /corrected_totals/);
+  assert.match(row, /archive_effective_totals/);
   assert.match(row, /source_proof/);
 
   assert.match(detail, /archive_gateway/);
@@ -57,6 +69,8 @@ test("canonical owner history gateway exposes archive states and source proof", 
   assert.match(detail, /fallback_parser_display_only/);
   assert.match(detail, /owner_history_write_source:false/);
   assert.match(detail, /provider_identity_used:false/);
+  assert.match(detail, /active_for_totals/);
+  assert.match(detail, /archive_effective_totals/);
 });
 
 test("owner history routes are canonical archive gateway based", async () => {
@@ -66,14 +80,52 @@ test("owner history routes are canonical archive gateway based", async () => {
 
   assert.match(history, /COALESCE\(voided_at,''\)=''/);
   assert.match(history, /COALESCE\(handover_status,''\)<>'VOID'/);
-  assert.match(history, /canonicalOwnerHistorySessionRow\(row\)/);
+  assert.match(history, /canonicalOwnerHistorySessionRowsForList\(env,user,results\|\|\[\]\)/);
   assert.doesNotMatch(history, /parseEmployeeEntryExportRows/);
 
   assert.match(detail, /extractEmployeeEntryAnchorsFromSession\(sessionRow\)/);
   assert.match(detail, /chooseOwnerEmployeeSessionDetailRows/);
   assert.match(detail, /ownerHistoryDetailAdditiveResponse/);
   assert.match(detail, /canonicalOwnerHistoryDetailGatewayFields/);
+  assert.match(detail, /includeVoided\|\|includeCorrections/);
   assert.match(detail, /archive_state:"missing"/);
+});
+
+test("archive correction and void totals expose raw corrected and effective semantics", async () => {
+  const worker = await readFile(workerPath, "utf8");
+  const noCorrection = functionBlock(worker, "ownerHistoryDetailNoCorrectionFields");
+  const failClosed = functionBlock(worker, "ownerHistoryDetailFailClosedCorrectionFields");
+  const direct = functionBlock(worker, "ownerHistoryDetailDirectCorrectionFields");
+  const row = functionBlock(worker, "canonicalOwnerHistorySessionRow");
+  const detail = functionBlock(worker, "canonicalOwnerHistoryDetailGatewayFields");
+
+  assert.match(noCorrection, /canonicalOwnerHistoryCorrectionSummaryWithArchiveSemantics/);
+  assert.match(failClosed, /canonicalOwnerHistoryCorrectionSummaryWithArchiveSemantics/);
+  assert.match(direct, /canonicalOwnerHistoryCorrectionSummaryWithArchiveSemantics/);
+  assert.match(direct, /correction_events_count:correctionEvents\.length/);
+  assert.match(direct, /correction_sessions_count:correctionSessions\.length/);
+  assert.match(row, /active_for_totals/);
+  assert.match(row, /archive_effective_totals/);
+  assert.match(detail, /raw_totals/);
+  assert.match(detail, /correction_totals/);
+  assert.match(detail, /corrected_totals/);
+  assert.match(detail, /archive_effective_totals/);
+});
+
+test("owner history list enriches rows with correction-aware archive effective totals", async () => {
+  const worker = await readFile(workerPath, "utf8");
+  const detailRows = functionBlock(worker, "ownerHistoryArchiveDetailRows");
+  const rowForList = functionBlock(worker, "canonicalOwnerHistorySessionRowForList");
+  const rowsForList = functionBlock(worker, "canonicalOwnerHistorySessionRowsForList");
+
+  assert.match(detailRows, /includeArchiveRows/);
+  assert.match(detailRows, /SELECT \* FROM transactions WHERE session_id=\? AND corpid=\? ORDER BY created_at ASC/);
+  assert.match(detailRows, /extractEmployeeEntryAnchorsFromSession/);
+  assert.match(detailRows, /chooseOwnerEmployeeSessionDetailRows/);
+  assert.match(rowForList, /ownerCorrectionFetchExistingCorrectionSessions/);
+  assert.match(rowForList, /ownerHistoryDetailCorrectionFields/);
+  assert.match(rowForList, /canonicalOwnerHistorySessionRow/);
+  assert.match(rowsForList, /Promise\.all/);
 });
 
 test("entries_json is preferred over display text and fallback is display-only", async () => {

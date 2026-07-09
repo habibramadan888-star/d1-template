@@ -4726,6 +4726,7 @@ function canonicalOwnerHistoryArchiveState(session={},correctionFields=null){
   const status=String(session?.handover_status||session?.status||"").trim().toUpperCase();
   const anchor=String(session?.anchor_id||"").trim().toUpperCase();
   const source=String(session?.source||"").trim().toLowerCase();
+  if(!session||(!session?.id&&!session?.anchor_id&&!status&&!anchor))return "missing";
   if(status==="REVERSED"||status==="REVERSAL"||source.includes("reversal")||anchor.startsWith("REV-"))return "reversed";
   if(status==="DELETED"||status==="CANCELLED")return "deleted";
   if(String(session?.voided_at||"").trim()||["VOID","VOIDED"].includes(status))return "voided";
@@ -4734,6 +4735,37 @@ function canonicalOwnerHistoryArchiveState(session={},correctionFields=null){
   return "active";
 }
 __name(canonicalOwnerHistoryArchiveState,"canonicalOwnerHistoryArchiveState");
+function canonicalOwnerHistoryZeroTotals(){
+  return ownerHistoryDetailNormalizeTotals({});
+}
+__name(canonicalOwnerHistoryZeroTotals,"canonicalOwnerHistoryZeroTotals");
+function canonicalOwnerHistoryActiveForTotals(archiveState){
+  return archiveState==="active"||archiveState==="corrected";
+}
+__name(canonicalOwnerHistoryActiveForTotals,"canonicalOwnerHistoryActiveForTotals");
+function canonicalOwnerHistoryEffectiveTotalsForState(archiveState,correctedTotals={}){
+  return canonicalOwnerHistoryActiveForTotals(archiveState)?ownerHistoryDetailNormalizeTotals(correctedTotals):canonicalOwnerHistoryZeroTotals();
+}
+__name(canonicalOwnerHistoryEffectiveTotalsForState,"canonicalOwnerHistoryEffectiveTotalsForState");
+function canonicalOwnerHistoryCorrectionSummaryWithArchiveSemantics(session={},summary={}){
+  const rawTotals=ownerHistoryDetailNormalizeTotals(summary.raw_totals||{});
+  const correctionTotals=summary.correction_totals||ownerHistoryDetailZeroCorrectionTotals();
+  const correctedTotals=ownerHistoryDetailNormalizeTotals(summary.corrected_totals||summary.adjusted_totals||rawTotals);
+  const archiveState=canonicalOwnerHistoryArchiveState(session,{correction_summary:summary});
+  const archiveEffectiveTotals=canonicalOwnerHistoryEffectiveTotalsForState(archiveState,correctedTotals);
+  return {
+    ...summary,
+    raw_totals:rawTotals,
+    correction_totals:correctionTotals,
+    corrected_totals:correctedTotals,
+    adjusted_totals:correctedTotals,
+    archive_effective_totals:archiveEffectiveTotals,
+    archive_state:archiveState,
+    active_for_totals:canonicalOwnerHistoryActiveForTotals(archiveState),
+    correction_history_visible:Boolean((summary.correction_events_count||0)>0||(summary.correction_sessions_count||0)>0)
+  };
+}
+__name(canonicalOwnerHistoryCorrectionSummaryWithArchiveSemantics,"canonicalOwnerHistoryCorrectionSummaryWithArchiveSemantics");
 function canonicalOwnerHistorySourceProof(session={},detailSource=""){
   return {
     gateway:"canonical_owner_history_archive_gateway",
@@ -4750,15 +4782,20 @@ function canonicalOwnerHistorySourceProof(session={},detailSource=""){
 __name(canonicalOwnerHistorySourceProof,"canonicalOwnerHistorySourceProof");
 function canonicalOwnerHistorySessionRow(session={},correctionFields=null){
   const archiveState=canonicalOwnerHistoryArchiveState(session,correctionFields);
-  const active=archiveState==="active"||archiveState==="corrected";
+  const active=canonicalOwnerHistoryActiveForTotals(archiveState);
+  const summary=correctionFields?.correction_summary||null;
   return {
     ...session,
     archive_state:archiveState,
     canonical_archive_gateway:"canonical_owner_history_archive_gateway",
     active_archive_record:active,
-    totals_mode:correctionFields?.correction_summary?.correction_applied?"correction_aware_adjusted":"raw_session_totals",
-    raw_totals:correctionFields?.correction_summary?.raw_totals||null,
-    adjusted_totals:correctionFields?.correction_summary?.adjusted_totals||null,
+    active_for_totals:active,
+    totals_mode:summary?.correction_applied?"archive_effective_correction_aware":"archive_effective_raw",
+    raw_totals:summary?.raw_totals||null,
+    correction_totals:summary?.correction_totals||null,
+    corrected_totals:summary?.corrected_totals||summary?.adjusted_totals||null,
+    adjusted_totals:summary?.adjusted_totals||summary?.corrected_totals||null,
+    archive_effective_totals:summary?.archive_effective_totals||canonicalOwnerHistoryEffectiveTotalsForState(archiveState,summary?.corrected_totals||summary?.adjusted_totals||summary?.raw_totals||{}),
     source_proof:canonicalOwnerHistorySourceProof(session)
   };
 }
@@ -4779,6 +4816,11 @@ function canonicalOwnerHistoryDetailGatewayFields(session={},rows=[],correctionF
       fallback_parser_display_only:detailSource==="export_text",
       owner_history_write_source:false,
       provider_identity_used:false,
+      active_for_totals:canonicalOwnerHistoryActiveForTotals(archiveState),
+      raw_totals:correctionFields?.correction_summary?.raw_totals||null,
+      correction_totals:correctionFields?.correction_summary?.correction_totals||null,
+      corrected_totals:correctionFields?.correction_summary?.corrected_totals||correctionFields?.correction_summary?.adjusted_totals||null,
+      archive_effective_totals:correctionFields?.correction_summary?.archive_effective_totals||canonicalOwnerHistoryEffectiveTotalsForState(archiveState,correctionFields?.correction_summary?.corrected_totals||correctionFields?.correction_summary?.adjusted_totals||correctionFields?.correction_summary?.raw_totals||{}),
       source_proof:canonicalOwnerHistorySourceProof(session,detailSource),
       warnings:detailSource==="export_text"?["LEGACY_DISPLAY_TEXT_FALLBACK_USED_FOR_DISPLAY_ONLY"]:[]
     }
@@ -7346,6 +7388,39 @@ async function ownerCorrectionFetchExistingCorrectionSessions(env,user,targetAnc
   return rows.results||[];
 }
 __name(ownerCorrectionFetchExistingCorrectionSessions,"ownerCorrectionFetchExistingCorrectionSessions");
+async function ownerHistoryArchiveDetailRows(env,user,sessionRow={},includeArchiveRows=false){
+  if(!sessionRow?.id)return {rows:[],source:"none"};
+  const hasTransactions=await empTableExists(env,"transactions").catch(()=>false);
+  const transactionRows=hasTransactions?(await env.DB.prepare(
+      includeArchiveRows
+        ? "SELECT * FROM transactions WHERE session_id=? AND corpid=? ORDER BY created_at ASC"
+        : "SELECT * FROM transactions WHERE session_id=? AND corpid=? AND COALESCE(voided_at,'')='' AND COALESCE(status,'ACTIVE')<>'VOID' ORDER BY created_at ASC"
+    ).bind(sessionRow.id,user.corpid).all()).results||[]:[];
+  if(isEmployeeEntrySession(sessionRow)){
+    const anchorRows=extractEmployeeEntryAnchorsFromSession(sessionRow);
+    const exportRows=parseEmployeeEntryExportRows(sessionRow);
+    const detailChoice=chooseOwnerEmployeeSessionDetailRows(sessionRow,transactionRows,anchorRows,exportRows);
+    return {rows:detailChoice.rows,source:detailChoice.source};
+  }
+  return {rows:transactionRows,source:"transactions"};
+}
+__name(ownerHistoryArchiveDetailRows,"ownerHistoryArchiveDetailRows");
+async function canonicalOwnerHistorySessionRowForList(env,user,sessionRow={}){
+  try{
+    const detail=await ownerHistoryArchiveDetailRows(env,user,sessionRow,true);
+    const targetAnchor=cleanText(sessionRow?.anchor_id||sessionRow?.id||"",180);
+    const correctionRows=targetAnchor?await ownerCorrectionFetchExistingCorrectionSessions(env,user,targetAnchor):[];
+    const correctionFields=ownerHistoryDetailCorrectionFields(sessionRow,detail.rows,correctionRows);
+    return canonicalOwnerHistorySessionRow(sessionRow,correctionFields);
+  }catch{
+    return canonicalOwnerHistorySessionRow(sessionRow,ownerHistoryDetailFailClosedCorrectionFields(sessionRow,[]));
+  }
+}
+__name(canonicalOwnerHistorySessionRowForList,"canonicalOwnerHistorySessionRowForList");
+async function canonicalOwnerHistorySessionRowsForList(env,user,rows=[]){
+  return Promise.all((rows||[]).map(row=>canonicalOwnerHistorySessionRowForList(env,user,row)));
+}
+__name(canonicalOwnerHistorySessionRowsForList,"canonicalOwnerHistorySessionRowsForList");
 function ownerHistoryDetailZeroCorrectionTotals(){
   return {
     cash_delta:0,
@@ -7513,17 +7588,18 @@ function ownerHistoryDetailSafeRawTotals(session={},rows=[]){
 __name(ownerHistoryDetailSafeRawTotals,"ownerHistoryDetailSafeRawTotals");
 function ownerHistoryDetailFailClosedCorrectionFields(session={},rows=[],warnings=[]){
   const rawTotals=ownerHistoryDetailSafeRawTotals(session,rows);
+  const summary=canonicalOwnerHistoryCorrectionSummaryWithArchiveSemantics(session,{
+    correction_aware:true,
+    correction_applied:false,
+    raw_totals:rawTotals,
+    correction_totals:ownerHistoryDetailZeroCorrectionTotals(),
+    adjusted_totals:rawTotals,
+    correction_events_count:0,
+    invalid_corrections_count:0,
+    warnings
+  });
   return {
-    correction_summary:{
-      correction_aware:true,
-      correction_applied:false,
-      raw_totals:rawTotals,
-      correction_totals:ownerHistoryDetailZeroCorrectionTotals(),
-      adjusted_totals:rawTotals,
-      correction_events_count:0,
-      invalid_corrections_count:0,
-      warnings
-    },
+    correction_summary:summary,
     correction_audit:{
       raw_mode_available:true,
       adjusted_mode_available:true,
@@ -7540,17 +7616,18 @@ function ownerHistoryDetailFailClosedCorrectionFields(session={},rows=[],warning
 __name(ownerHistoryDetailFailClosedCorrectionFields,"ownerHistoryDetailFailClosedCorrectionFields");
 function ownerHistoryDetailNoCorrectionFields(session={},rows=[]){
   const rawTotals=ownerHistoryDetailSafeRawTotals(session,rows);
+  const summary=canonicalOwnerHistoryCorrectionSummaryWithArchiveSemantics(session,{
+    correction_aware:true,
+    correction_applied:false,
+    raw_totals:rawTotals,
+    correction_totals:ownerHistoryDetailZeroCorrectionTotals(),
+    adjusted_totals:rawTotals,
+    correction_events_count:0,
+    invalid_corrections_count:0,
+    warnings:[]
+  });
   return {
-    correction_summary:{
-      correction_aware:true,
-      correction_applied:false,
-      raw_totals:rawTotals,
-      correction_totals:ownerHistoryDetailZeroCorrectionTotals(),
-      adjusted_totals:rawTotals,
-      correction_events_count:0,
-      invalid_corrections_count:0,
-      warnings:[]
-    },
+    correction_summary:summary,
     correction_audit:{
       raw_mode_available:true,
       adjusted_mode_available:true,
@@ -7729,13 +7806,14 @@ function ownerHistoryDetailDirectCorrectionFields(session={},rows=[],correctionR
     correctionSessions.push(sessionView);
   }
   const adjustedTotals=ownerHistoryDetailDirectStage("calculate_correction_totals","ownerHistoryDetailAddTotals",()=>ownerHistoryDetailAddTotals(rawTotals,ownerHistoryDetailDeltaToTotals(correctionTotals)));
-  const correctionSummary=ownerHistoryDetailDirectStage("build_correction_summary","correctionSummary",()=>({
+  const correctionSummary=ownerHistoryDetailDirectStage("build_correction_summary","correctionSummary",()=>canonicalOwnerHistoryCorrectionSummaryWithArchiveSemantics(session,{
     correction_aware:true,
     correction_applied:correctionEvents.length>0,
     raw_totals:rawTotals,
     correction_totals:correctionTotals,
     adjusted_totals:adjustedTotals,
     correction_events_count:correctionEvents.length,
+    correction_sessions_count:correctionSessions.length,
     invalid_corrections_count:invalidCorrections.length,
     warnings:[]
   }));
@@ -9862,12 +9940,12 @@ async function handleRequest(request, env, ctx) {
         : "SELECT * FROM sessions WHERE corpid=? AND COALESCE(voided_at,'')='' AND COALESCE(handover_status,'')<>'VOID' ORDER BY created_at DESC";
       if (limit) {
         const { results } = await env.DB.prepare(`${baseSql} LIMIT ? OFFSET ?`).bind(user.corpid, limit, offset).all();
-        return success((results||[]).map(row=>canonicalOwnerHistorySessionRow(row)));
+        return success(await canonicalOwnerHistorySessionRowsForList(env,user,results||[]));
       }
       const { results } = await env.DB.prepare(
         baseSql
       ).bind(user.corpid).all();
-      return success((results||[]).map(row=>canonicalOwnerHistorySessionRow(row)));
+      return success(await canonicalOwnerHistorySessionRowsForList(env,user,results||[]));
     }
     if (path === "/api/session_detail" && method === "GET") {
       const sid = cleanId(url.searchParams.get("id"));
@@ -9877,7 +9955,7 @@ async function handleRequest(request, env, ctx) {
       const sessionRow=await env.DB.prepare("SELECT * FROM sessions WHERE id=? AND corpid=? LIMIT 1").bind(sid,user.corpid).first();
       const hasTransactions=await empTableExists(env,"transactions");
       const results=hasTransactions?(await env.DB.prepare(
-          includeVoided
+          includeVoided||includeCorrections
             ? "SELECT * FROM transactions WHERE session_id=? AND corpid=? ORDER BY created_at ASC"
             : "SELECT * FROM transactions WHERE session_id=? AND corpid=? AND COALESCE(voided_at,'')='' AND COALESCE(status,'ACTIVE')<>'VOID' ORDER BY created_at ASC"
         ).bind(sid, user.corpid).all()).results||[]:[];
