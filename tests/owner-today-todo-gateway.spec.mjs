@@ -26,6 +26,9 @@ test("owner today todo gateway exists and is read-only", async () => {
   assert.match(gateway, /no_write:true/);
   assert.match(gateway, /production_cutover:"PRODUCTION_NO_GO"/);
   assert.match(handler, /buildOwnerTodayTodoGateway/);
+  assert.match(handler, /TODAY_TODO_GATEWAY_FAILED/);
+  assert.match(handler, /degraded:true/);
+  assert.match(handler, /items:\[\]/);
   assert.match(worker, /path==="?\/api\/owner\/today-todos"?|path === "\/api\/owner\/today-todos"/);
 
   for (const block of [gateway, handler]) {
@@ -39,12 +42,21 @@ test("owner today todo gateway exists and is read-only", async () => {
 test("owner today todo gateway derives from canonical gateways and not forbidden truth sources", async () => {
   const worker = await readFile(workerPath, "utf8");
   const gateway = functionBlock(worker, "buildOwnerTodayTodoGateway");
+  const depositView = functionBlock(worker, "ownerTodayTodoDepositGatewayView");
+  const occupancyView = functionBlock(worker, "ownerTodayTodoOccupancyGatewayView");
   const sourceProof = functionBlock(worker, "ownerTodayTodoSourceProof");
   const candidates = functionBlock(worker, "ownerTodayTodoCandidateBeds");
 
-  assert.match(gateway, /canonicalDepositGateway/);
-  assert.match(gateway, /canonicalOccupancyGateway/);
+  assert.match(gateway, /ownerTodayTodoDepositGatewayView/);
+  assert.match(gateway, /ownerTodayTodoOccupancyGatewayView/);
   assert.match(gateway, /resolveConsoleReceivablesSot/);
+  assert.match(gateway, /cloudArrearsFetchActiveSessionRows/);
+  assert.match(gateway, /empLoadLockCardsWithCacheFallback/);
+  assert.match(gateway, /buildCloudArrearsProjectionFromSessions/);
+  assert.match(depositView, /gateway:"canonical_deposit_gateway"/);
+  assert.match(occupancyView, /gateway:"canonical_occupancy_bed_status_gateway"/);
+  assert.match(occupancyView, /canonicalOccupancyProjectStatus/);
+  assert.match(occupancyView, /canonicalOccupancyConflictWarnings/);
   assert.match(candidates, /cloudArrearsFetchActiveSessionRows/);
   assert.match(candidates, /empLoadLockCardsWithCacheFallback/);
 
@@ -111,7 +123,9 @@ test("owner dashboard calls today todo endpoint and renders returned todos with 
   const load = functionBlock(ui, "loadOwnerTodayTodos");
   const preview = functionBlock(ui, "ownerOverviewShowTodayActionsPreview");
 
-  assert.match(load, /apiFetch\('\/api\/owner\/today-todos\?limit=200'\)/);
+  assert.match(load, /apiFetch\('\/api\/owner\/today-todos\?limit=50'\)/);
+  assert.match(load, /content-type/);
+  assert.match(load, /Todo gateway returned non-JSON HTTP/);
   assert.match(preview, /ownerOverviewTodayTodoRows\(\)/);
   assert.match(preview, /recommended_action/);
   assert.match(preview, /source_gateway/);

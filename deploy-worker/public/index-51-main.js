@@ -5295,8 +5295,11 @@ async function loadOwnerTodayTodos(){
   state.ownerTodayTodosStatus='loading';
   state.ownerTodayTodosError='';
   try{
-    const res=await apiFetch('/api/owner/today-todos?limit=200');
+    const res=await apiFetch('/api/owner/today-todos?limit=50');
+    const contentType=String(res.headers?.get?.('content-type')||'');
+    if(!contentType.toLowerCase().includes('json'))throw new Error(`Todo gateway returned non-JSON HTTP ${res.status||0}`);
     const data=await res.json();
+    if(data?.ok===false||data?.success===false)throw new Error(data.message_en||data.message||data.error_code||'Todo gateway unavailable');
     state.ownerTodayTodos=data||{};
     state.ownerTodayTodosStatus='success';
     renderOwnerOverview();
