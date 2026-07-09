@@ -3225,7 +3225,7 @@ function readSessionId(userid){
   try{return localStorage.getItem(employeeStorageKey('empv3:sessionId',userid))||''}
   catch{return ''}
 }
-const state={lockCards:[],current:null,depositBalance:null,rentConfig:{},rentConfigLoaded:false,drafts:[],tasks:[],closedTasks:[],arrearsTasksLoaded:false,arrearTasksError:null,employeeDirectives:[],followupItems:[],systemReminderItems:[],systemReminderStatus:'idle',systemReminderSummary:null,systemReminderSources:null,systemReminderLimit:100,sessionId:'',user:null,ttlockStatus:'idle',ttlockLoadedAt:0,ttlockError:'',ttlockDataSource:''};
+const state={lockCards:[],current:null,depositBalance:null,rentConfig:{},rentConfigLoaded:false,drafts:[],tasks:[],closedTasks:[],arrearsTasksLoaded:false,arrearTasksError:null,arrearsGatewaySource:'',arrearsGatewayProof:null,employeeDirectives:[],followupItems:[],systemReminderItems:[],systemReminderStatus:'idle',systemReminderSummary:null,systemReminderSources:null,systemReminderLimit:100,sessionId:'',user:null,ttlockStatus:'idle',ttlockLoadedAt:0,ttlockError:'',ttlockDataSource:''};
 const BED_TRANSFER_WRITE_ENABLED=true;
 const BED_TRANSFER_EVENT_LEDGER_MESSAGE='Bed transfer records save event anchors only. This does not directly change bed occupancy, deposit, arrears, or Access Card. 换床记录只保存信息锚点，不会直接改变床位、押金、欠款或门禁卡。';
 const BED_TRANSFER_SUBMITTED_MESSAGE='Bed transfer recorded / 换床记录已保存';
@@ -3842,12 +3842,12 @@ function populateTaskSelect(){
   const bed=$('bed').value.trim().replace(/^#/,'');
   const previous=sel.value||state.selectedArrearsTaskRef||'';
   const open=bed?openTasksForBed():[];
-  sel.innerHTML='<option value="">请选择要偿还的欠款</option>'+open.map(t=>`<option value="${esc(t.task_id)}">#${esc(t.bed||'')} ${esc(t.tenant_name||'-')} · 剩余 ${fmtMoney(taskRemain(t))} AED · 原欠款 ${fmtMoney(num(t.arrear_amount))}</option>`).join('');
-  if($('linkedTaskId').value&&!open.some(t=>t.task_id===$('linkedTaskId').value))$('linkedTaskId').value='';
+  sel.innerHTML='<option value="">请选择要偿还的欠款</option>'+open.map(t=>`<option value="${esc(employeeTaskRef(t))}">#${esc(t.bed||'')} ${esc(t.tenant_name||'-')} · 剩余 ${fmtMoney(taskRemain(t))} AED · 原欠款 ${fmtMoney(num(t.arrear_amount))}</option>`).join('');
+  if($('linkedTaskId').value&&!open.some(t=>employeeTaskRef(t)===$('linkedTaskId').value))$('linkedTaskId').value='';
   renderTaskInfo();
 }
 function selectedTask(){
-  return state.tasks.find(t=>t.task_id===$('linkedTaskId').value)||null;
+  return findEmployeeTaskByRef($('linkedTaskId')?.value||state.selectedArrearsTaskRef)||null;
 }
 function rentShortfall(){
   if($('entryType').value!=='R')return 0;
@@ -3886,8 +3886,8 @@ function syncArrearPlan(){
 }
 function openTasksForBed(){
   const bed=$('bed').value.trim().replace(/^#/,'');
-  const cid=$('tenantCardId').value.trim();
-  return state.tasks.filter(t=>!['PAID','CLEARED','CLOSED','VOID','已结清','结清','作废','WRITTEN_OFF','WAIVED'].includes(String(t.close_status||''))&&taskRemain(t)>0&&((bed&&String(t.bed||'')===bed)||(cid&&String(t.tenant_card_id||'')===cid)));
+  if(!bed)return [];
+  return state.tasks.filter(t=>!['PAID','CLEARED','CLOSED','VOID','已结清','结清','作废','WRITTEN_OFF','WAIVED'].includes(String(t.close_status||''))&&taskRemain(t)>0&&String(t.bed||t.room_bed||t.room||'').replace(/^#/,'')===bed);
 }
 function employeeNormalizeBedValue(value){
   return String(value||'').trim().replace(/^#/,'');
@@ -4057,11 +4057,11 @@ function renderTaskInfo(){
   $('apTaskInfo').innerHTML=bed&&open.length===0?'该床位暂无未清欠款':'输入床位后选择该床位的云端未清欠款；还欠款不使用本期账期。';
 }
 function applyLinkedTask(){
-  const task=state.tasks.find(t=>t.task_id===$('linkedTaskId').value);
+  const task=findEmployeeTaskByRef($('linkedTaskId')?.value);
   if(!task)return;
-  $('bed').value=task.bed||'';
+  $('bed').value=task.bed||task.room_bed||'';
   $('tenantName').value=task.tenant_name||'';
-  $('tenantCardId').value=task.tenant_card_id||'';
+  if($('tenantCardId'))$('tenantCardId').value='';
   const remain=taskRemain(task);
   $('amount').value=fmtMoney(remain);
   $('due').value=fmtMoney(remain);
@@ -4125,7 +4125,7 @@ function applyLinkedTask(taskOverride=null){
   state.selectedArrearsTaskRef=ref;
   $('bed').value=task.bed||task.room_bed||'';
   $('tenantName').value=task.tenant_name||task.customer_name||'';
-  $('tenantCardId').value=task.tenant_card_id||task.customer_code||'';
+  if($('tenantCardId'))$('tenantCardId').value='';
   const remain=taskRemain(task);
   $('amount').value=fmtMoney(remain);
   $('due').value=fmtMoney(remain);
@@ -5494,6 +5494,8 @@ async function loadTasks(render=true){
       state.arrearTasksError=data||{error_code:'ARREAR_TASKS_UNAVAILABLE'};
       state.tasks=[];
       state.closedTasks=[];
+      state.arrearsGatewaySource='';
+      state.arrearsGatewayProof=null;
       populateTaskSelect();
       if(render)$('taskList').innerHTML='<div class="hint">Arrears temporarily unavailable / 欠款信息暂不可用</div>';
       return;
@@ -5501,12 +5503,16 @@ async function loadTasks(render=true){
     state.arrearTasksError=null;
     state.tasks=data.tasks||[];
     state.closedTasks=data.closed_tasks||data.closedTasks||[];
+    state.arrearsGatewaySource=data.gateway||data.source||'';
+    state.arrearsGatewayProof=data.source_proof||null;
     populateTaskSelect();
     if(render)renderTasks();
   }catch{
     state.arrearTasksError={error_code:'ARREAR_TASKS_UNAVAILABLE'};
     state.tasks=[];
     state.closedTasks=[];
+    state.arrearsGatewaySource='';
+    state.arrearsGatewayProof=null;
     populateTaskSelect();
     if(render)$('taskList').textContent='欠款任务加载失败';
   }
@@ -8672,24 +8678,20 @@ function employeeCurrentArrearsBed(){
 }
 function employeeOpenArrearsForBed(bed){
   const clean=String(bed||'').trim().replace(/^#/,'');
-  const cid=String($('tenantCardId')?.value||'').trim();
-  if(!clean&&!cid)return [];
+  if(!clean)return [];
   const closed=new Set(['PAID','CLEARED','CLOSED','VOID','WRITTEN_OFF','WAIVED','\u5df2\u7ed3\u6e05','\u7ed3\u6e05','\u4f5c\u5e9f']);
   return (state.tasks||[]).filter(t=>{
     const status=String(t.close_status||t.status||'').trim();
     const taskBed=String(t.bed||t.room_bed||'').trim().replace(/^#/,'');
-    const taskCid=String(t.tenant_card_id||t.customer_code||'').trim();
-    return !closed.has(status)&&taskRemain(t)>0&&((clean&&taskBed===clean)||(cid&&taskCid===cid));
+    return !closed.has(status)&&taskRemain(t)>0&&taskBed===clean;
   });
 }
 function employeeClosedArrearsForBed(bed){
   const clean=String(bed||'').trim().replace(/^#/,'');
-  const cid=String($('tenantCardId')?.value||'').trim();
-  if(!clean&&!cid)return [];
+  if(!clean)return [];
   return (state.closedTasks||[]).filter(t=>{
     const taskBed=String(t.bed||t.room_bed||'').trim().replace(/^#/,'');
-    const taskCid=String(t.tenant_card_id||t.customer_code||'').trim();
-    return (clean&&taskBed===clean)||(cid&&taskCid===cid);
+    return taskBed===clean;
   });
 }
 function employeeClosedArrearsMessage(bed){

@@ -14,24 +14,21 @@ function functionBlock(source, name) {
   return source.slice(start, end);
 }
 
-test("/api/arrear_tasks supports bed-filtered projection fallback without returning 503", async () => {
+test("/api/arrear_tasks uses canonical arrears gateway without returning 503", async () => {
   const worker = await readFile(workerPath, "utf8");
   const handler = functionBlock(worker, "handleArrearTasks");
 
   assert.match(worker, /function arrearTasksBedFromRequest\(request\)/);
   assert.match(worker, /url\.searchParams\.get\("bed"\)/);
-  assert.match(worker, /function arrearTasksProjectionFallback\(env,user,bed,trace,opts=\{\}\)/);
-  assert.match(worker, /bed\?await rebuildCloudArrearsForBed\(env,user,bed,\{limit:opts\.limit\|\|1000\}\):await rebuildAllCloudArrears/);
-  assert.match(handler, /try\{\s*const detailed=await empListMergedArrearTasksDetailed\(env,user,\{limit:200\}\)/);
-  assert.match(handler, /catch\(e\)\{\s*const code=empReadErrorCode\(e\)/);
-  assert.match(handler, /const fallback=await arrearTasksProjectionFallback\(env,user,bed,trace,\{limit:1000\}\)/);
-  assert.match(handler, /if\(fallback\.ok\)\{/);
-  assert.match(handler, /source=tasks\.length\?"cloud_arrears_projection_fallback":"projection_or_empty"/);
-  assert.match(handler, /return json\(arrearTasksPayload\(tasks,closedTasks,source,trace/);
+  assert.match(worker, /async function canonicalArrearsGateway\(env,user,opts=\{\}\)/);
+  assert.match(worker, /bed\?await rebuildCloudArrearsForBed\(env,user,bed,\{limit\}\):await rebuildAllCloudArrears/);
+  assert.match(handler, /const gateway=await canonicalArrearsGateway\(env,user,\{bed,limit:1000\}\)/);
+  assert.match(handler, /source:"canonical_arrears_gateway"/);
+  assert.match(handler, /return json\(arrearTasksPayload\(gateway\.open_items,gateway\.closed_items,"canonical_arrears_gateway",trace/);
   assert.match(handler, /error_code:"ARREAR_TASKS_UNAVAILABLE"/);
-  assert.match(handler, /root_cause:"PROJECTION_FALLBACK_THROW"/);
-  assert.match(handler, /root_cause:"ARREAR_TASKS_ROUTE_THROW"/);
+  assert.match(handler, /root_cause:"CANONICAL_ARREARS_GATEWAY_FAILED"/);
   assert.match(worker, /diagnostic_trace:trace/);
+  assert.doesNotMatch(handler, /empListMergedArrearTasksDetailed|arrearTasksProjectionFallback|SELECT \* FROM arrear_tasks/i);
   assert.doesNotMatch(handler, /,503\)/);
 });
 

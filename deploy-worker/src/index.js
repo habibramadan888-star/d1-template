@@ -1485,8 +1485,8 @@ __name(empDepositMove,"empDepositMove");
 async function empFindProjectionArrearsForPayment(env,user,taskId,bed=""){
   const cleanTaskId=cleanId(taskId);
   if(!cleanTaskId)return null;
-  const projection=bed?await rebuildCloudArrearsForBed(env,user,bed):await rebuildAllCloudArrears(env,user,{limit:2000});
-  const rows=[...(projection.open_items||[]),...(projection.closed_items||[]),...(projection.all_items||[])];
+  const gateway=await canonicalArrearsGateway(env,user,{bed,arrears_ref:cleanTaskId,limit:2000});
+  const rows=[...(gateway.open_items||[]),...(gateway.closed_items||[]),...(gateway.all_items||[])];
   return rows.find(row=>[row.task_id,row.arrears_ref,row.id,row.source_ref].some(v=>cleanText(v,160)===cleanTaskId))||null;
 }
 __name(empFindProjectionArrearsForPayment,"empFindProjectionArrearsForPayment");
@@ -4100,10 +4100,144 @@ async function rebuildCloudArrearsForBed(env,user,bed,opts={}){
 }
 __name(rebuildCloudArrearsForBed,"rebuildCloudArrearsForBed");
 async function getOpenCloudArrearsForBed(env,user,bed,opts={}){
-  const projection=await rebuildCloudArrearsForBed(env,user,bed,opts);
-  return projection.open_items||[];
+  const gateway=await canonicalArrearsGateway(env,user,{bed,limit:opts.limit||1000});
+  return gateway.open_items||[];
 }
 __name(getOpenCloudArrearsForBed,"getOpenCloudArrearsForBed");
+const canonicalArrearsForbiddenIdentityFields=["tenant_card_id","card_id","cardid","old_ttlock_ref","oldTtlockRef","provider_phone","providerPhone","ttlock_phone","ttlockPhone","phone_99099","phone99099","access_card_phone","accessCardPhone","ttlock_account_phone","ttlockAccountPhone","customer_code","card_code"];
+function canonicalArrearsGatewayCleanItem(item={}){
+  const remaining=entryAnchorMoney(item.remaining_arrears||empTaskRemaining(item));
+  const original=entryAnchorMoney(item.original_arrears_amount||item.arrear_amount||item.original_amount||0);
+  const already=entryAnchorMoney(item.already_paid_amount||item.actual_received||0);
+  const status=remaining<=0?"settled":(["open","partial"].includes(String(item.status||"").toLowerCase())?String(item.status||"").toLowerCase():(already>0?"partial":"open"));
+  const cleaned={
+    task_id:cleanText(item.arrears_ref||item.task_id||item.id||item.source_ref||"",160),
+    id:cleanText(item.arrears_ref||item.task_id||item.id||item.source_ref||"",160),
+    arrears_ref:cleanText(item.arrears_ref||item.task_id||item.id||item.source_ref||"",160),
+    bed:cleanText(item.bed||item.room_bed||item.room||item.bed_no||"",80).replace(/^#/,""),
+    tenant_name:cleanText(item.tenant_name||item.customer_name||item.former_customer_name||item.card_name||"",120),
+    original_arrears_amount:original,
+    original_amount:original,
+    arrear_amount:original,
+    already_paid_amount:already,
+    actual_received:already,
+    remaining_arrears:remaining,
+    status,
+    close_status:status==="settled"?"PAID":"",
+    accounting_status:status==="settled"?"closed":"open",
+    promise_date:cleanDate(item.promise_date||item.due_date||item.promised_payment_date||""),
+    due_date:cleanDate(item.due_date||item.promise_date||item.promised_payment_date||""),
+    original_date:cleanDate(item.original_date||item.created_at||""),
+    original_type:cleanText(item.original_type||item.source_event_type||item.source_type||"cloud_arrears",80),
+    source_session_id:cleanText(item.source_session_id||item.session_id||"",120),
+    source_event_id:cleanText(item.source_event_id||item.entry_id||item.original_entry_id||"",120),
+    source_event_type:cleanText(item.source_event_type||item.original_type||item.source_type||"",80),
+    entry_id:cleanText(item.entry_id||item.source_event_id||item.original_entry_id||"",120),
+    original_entry_id:cleanText(item.original_entry_id||item.source_event_id||item.entry_id||"",120),
+    source_type:cleanText(item.source_type||"cloud_arrears_projection",80),
+    source:"canonical_arrears_gateway",
+    materialized_from:"canonical_event_archive",
+    projection_source:"sessions.entries_json",
+    original_note:cleanText(item.original_note||item.staff_note||item.owner_note||item.arrear_reason||item.note||"",500),
+    staff_note:cleanText(item.staff_note||item.original_note||item.arrear_reason||"",500),
+    linked_repayment_events:Array.isArray(item.linked_repayment_events)?item.linked_repayment_events.map(event=>({
+      event_id:cleanText(event.event_id||"",120),
+      session_id:cleanText(event.session_id||"",120),
+      date:cleanDate(event.date||""),
+      payment_amount:entryAnchorMoney(event.payment_amount||0),
+      payment_method:entryAnchorPaymentMethod(event.payment_method||""),
+      operator:cleanText(event.operator||"",120),
+      note:cleanText(event.note||"",300)
+    })):[],
+    source_proof:{
+      gateway:"Canonical Arrears Gateway",
+      source_layer:"L1 Canonical Event Archive",
+      projection_layer:"L2 Derived Arrears Projection",
+      archive_source:"cloud accepted sessions",
+      anchor_source:"ENTRY ANCHORS JSON",
+      identity:"arrears_ref",
+      context:"bed",
+      forbidden_identity_excluded:true
+    }
+  };
+  canonicalArrearsForbiddenIdentityFields.forEach(field=>delete cleaned[field]);
+  return cleaned;
+}
+__name(canonicalArrearsGatewayCleanItem,"canonicalArrearsGatewayCleanItem");
+async function canonicalArrearsGateway(env,user,opts={}){
+  const bed=cleanText(opts.bed||"",80).replace(/^#/,"");
+  const arrearsRef=cleanText(opts.arrears_ref||opts.task_id||opts.ref||"",160);
+  const limit=Math.min(Math.max(Number(opts.limit||1000),1),2000);
+  const projection=bed?await rebuildCloudArrearsForBed(env,user,bed,{limit}):await rebuildAllCloudArrears(env,user,{limit});
+  let allItems=(projection.all_items&&projection.all_items.length?projection.all_items:[...(projection.open_items||[]),...(projection.closed_items||[])])
+    .map(canonicalArrearsGatewayCleanItem);
+  if(arrearsRef)allItems=allItems.filter(item=>[item.arrears_ref,item.task_id,item.id].some(value=>cleanText(value,160)===arrearsRef));
+  const open_items=allItems.filter(item=>["open","partial"].includes(String(item.status||"").toLowerCase())&&entryAnchorMoney(item.remaining_arrears)>0);
+  const closed_items=allItems.filter(item=>!open_items.includes(item));
+  return {
+    ok:true,
+    success:true,
+    gateway:"canonical_arrears_gateway",
+    source:"canonical_arrears_gateway",
+    source_proof:{
+      source_layer:"L1 Canonical Event Archive",
+      projection_layer:"L2 Derived Arrears Projection",
+      canonical_sources:["cloud accepted sessions","ENTRY ANCHORS JSON","correction/void status via active session filter"],
+      identity:"arrears_ref",
+      context_filter:bed?"bed":"none",
+      forbidden_sources_excluded:["tenant_card_id","card_id","old_ttlock_ref","provider_phone","phone_99099","owner_history_text","local_cache","whatsapp_export_text","preview_text"]
+    },
+    bed,
+    arrears_ref:arrearsRef,
+    items:open_items,
+    tasks:open_items,
+    open_items,
+    closed_items,
+    all_items:allItems,
+    total_remaining:entryAnchorMoney(open_items.reduce((sum,item)=>sum+entryAnchorMoney(item.remaining_arrears),0)),
+    total_count:open_items.length,
+    projection_result:{
+      active_sessions_count:projection.active_sessions_count||0,
+      scanned_anchor_count:projection.scanned_anchor_count||0,
+      materialized_from:projection.materialized_from||"sessions.entries_json",
+      total_remaining:projection.total_remaining||0
+    },
+    readonly:true,
+    no_write:true
+  };
+}
+__name(canonicalArrearsGateway,"canonicalArrearsGateway");
+async function canonicalBedContextGateway(env,user,opts={}){
+  const bed=cleanText(opts.bed||"",80).replace(/^#/,"");
+  const arrears=await canonicalArrearsGateway(env,user,{bed,limit:opts.limit||1000});
+  return {
+    ok:true,
+    success:true,
+    gateway:"canonical_bed_context_gateway",
+    bed,
+    access_snapshot_context:{
+      bed,
+      display_only:true,
+      source_layer:"L0 External Input Source",
+      status:"display_context_not_identity",
+      provider_identity_allowed:false
+    },
+    open_arrears:arrears.open_items,
+    total_remaining:arrears.total_remaining,
+    deposit_status:"DEPOSIT_IDENTITY_PARTIAL",
+    occupancy_status:"PARTIAL",
+    warnings:["deposit_gateway_partial","occupancy_gateway_partial"],
+    source_proof:{
+      bed_context:"Access Snapshot context only",
+      arrears_gateway:"Canonical Arrears Gateway",
+      arrears_source:arrears.source_proof,
+      forbidden_identity_excluded:true
+    },
+    readonly:true,
+    no_write:true
+  };
+}
+__name(canonicalBedContextGateway,"canonicalBedContextGateway");
 function employeeEntryExportTextWithAnchors(exportText,entries,session){
   const base=String(exportText||"").replace(/\n*==== ENTRY ANCHORS JSON ====\s*[\s\S]*?\s*==== END ENTRY ANCHORS JSON ====\s*$/i,"").trimEnd();
   const normalized=Array.isArray(entries)?entries.map(row=>normalizeEntryAnchor(row)):[];
@@ -5748,80 +5882,62 @@ async function handleArrearTasks(request,env,user){
   const trace=[
     arrearTasksDiagnosticTraceStep("auth",true,{function_name:"requireAuth",bed,source:"authenticated_user"})
   ];
-  let tasks=[];
-  let closedTasks=[];
-  let source="arrear_tasks";
-  let fallbackAttempted=false;
-  let projectionResult={ok:false,count:0};
   try{
-    try{
-      const detailed=await empListMergedArrearTasksDetailed(env,user,{limit:200});
-      tasks=arrearTasksFilterByBed(detailed.tasks||[],bed);
-      source="materialized_plus_projection";
-      trace.push(arrearTasksDiagnosticTraceStep("query_arrear_tasks",true,{function_name:"empListMergedArrearTasksDetailed",bed,count:tasks.length,source}));
-      trace.push(arrearTasksDiagnosticTraceStep("merge_materialized_projection",true,{function_name:"empListMergedArrearTasksDetailed",bed,count:tasks.length,source}));
-    }catch(e){
-      const code=empReadErrorCode(e);
-      fallbackAttempted=true;
-      trace.push(arrearTasksDiagnosticTraceStep("merge_materialized_projection",false,{function_name:"empListMergedArrearTasksDetailed",bed,error_code:"MERGE_MATERIALIZED_PROJECTION_FAILED",message:code,source:"materialized_plus_projection"}));
-      const fallback=await arrearTasksProjectionFallback(env,user,bed,trace,{limit:1000});
-      projectionResult={ok:!!fallback.ok,count:(fallback.tasks||[]).length,error_code:fallback.error_code||"",message:fallback.message||""};
-      if(fallback.ok){
-        tasks=arrearTasksFilterByBed(fallback.tasks||[],bed);
-        source=tasks.length?"cloud_arrears_projection_fallback":"projection_or_empty";
-      }else{
-        trace.push(arrearTasksDiagnosticTraceStep("response_mapping",false,{function_name:"handleArrearTasks",bed,error_code:"PROJECTION_FALLBACK_THROW",message:fallback.message||fallback.error_code||"projection_failed",source:"arrear_tasks_failed"}));
-        return json({
-          ...arrearTasksPayload([],[],"arrear_tasks_failed",trace,{
-            success:false,
-            ok:false,
-            error_code:"ARREAR_TASKS_UNAVAILABLE",
-            root_cause:"PROJECTION_FALLBACK_THROW",
-            message:"Arrears temporarily unavailable.",
-            message_en:"Arrears temporarily unavailable.",
-            message_zh:"欠款信息暂不可用。",
-            fallback_attempted:fallbackAttempted,
-            projection_result:projectionResult,
-            materialized_error:code,
-            projection_error:fallback.error_code||fallback.message||"PROJECTION_FALLBACK_FAILED"
-          })
-        },200);
-      }
-    }
-    try{
-      if(await empTableExists(env,"arrear_tasks")){
-        const rows=await env.DB.prepare("SELECT * FROM arrear_tasks WHERE corpid=? ORDER BY COALESCE(updated_at,created_at) DESC LIMIT 200").bind(user.corpid).all();
-        closedTasks=arrearTasksFilterByBed((rows.results||[]).filter(t=>!empCloseStatusIsOpen(t.close_status)||empTaskRemaining(t)<=0),bed).slice(0,100);
-        trace.push(arrearTasksDiagnosticTraceStep("closed_tasks_query",true,{function_name:"handleArrearTasks.closed_tasks",bed,count:closedTasks.length,source:"arrear_tasks"}));
-      }
-    }catch(e){
-      trace.push(arrearTasksDiagnosticTraceStep("closed_tasks_query",false,{function_name:"handleArrearTasks.closed_tasks",bed,error_code:"ARREAR_TASKS_D1_QUERY_FAILED",message:empReadErrorCode(e),source:"arrear_tasks"}));
-      closedTasks=[];
-    }
-    trace.push(arrearTasksDiagnosticTraceStep("response_mapping",true,{function_name:"handleArrearTasks",bed,count:tasks.length,source}));
-    return json(arrearTasksPayload(tasks,closedTasks,source,trace,{
-      fallback_attempted:fallbackAttempted,
-      projection_result:projectionResult
+    const gateway=await canonicalArrearsGateway(env,user,{bed,limit:1000});
+    trace.push(arrearTasksDiagnosticTraceStep("canonical_arrears_gateway",true,{function_name:"canonicalArrearsGateway",bed,count:gateway.open_items.length,source:"canonical_arrears_gateway"}));
+    trace.push(arrearTasksDiagnosticTraceStep("response_mapping",true,{function_name:"handleArrearTasks",bed,count:gateway.open_items.length,source:"canonical_arrears_gateway"}));
+    return json(arrearTasksPayload(gateway.open_items,gateway.closed_items,"canonical_arrears_gateway",trace,{
+      gateway:"canonical_arrears_gateway",
+      source_proof:gateway.source_proof,
+      projection_result:gateway.projection_result,
+      fallback_attempted:false,
+      no_write:true,
+      readonly:true
     }));
   }catch(e){
-    trace.push(arrearTasksDiagnosticTraceStep("response_mapping",false,{function_name:"handleArrearTasks",bed,error_code:"ARREAR_TASKS_ROUTE_THROW",message:empReadErrorCode(e),source:"arrear_tasks_failed"}));
+    trace.push(arrearTasksDiagnosticTraceStep("canonical_arrears_gateway",false,{function_name:"canonicalArrearsGateway",bed,error_code:"CANONICAL_ARREARS_GATEWAY_FAILED",message:empReadErrorCode(e),source:"canonical_arrears_gateway"}));
+    trace.push(arrearTasksDiagnosticTraceStep("response_mapping",false,{function_name:"handleArrearTasks",bed,error_code:"ARREAR_TASKS_UNAVAILABLE",message:empReadErrorCode(e),source:"canonical_arrears_gateway_failed"}));
     return json({
-      ...arrearTasksPayload([],[],"arrear_tasks_failed",trace,{
+      ...arrearTasksPayload([],[],"canonical_arrears_gateway_failed",trace,{
         success:false,
         ok:false,
         error_code:"ARREAR_TASKS_UNAVAILABLE",
-        root_cause:"ARREAR_TASKS_ROUTE_THROW",
+        root_cause:"CANONICAL_ARREARS_GATEWAY_FAILED",
         message:"Arrears temporarily unavailable.",
         message_en:"Arrears temporarily unavailable.",
         message_zh:"欠款信息暂不可用。",
-        fallback_attempted:fallbackAttempted,
-        projection_result:projectionResult,
+        fallback_attempted:false,
+        projection_result:{ok:false,count:0,error_code:"CANONICAL_ARREARS_GATEWAY_FAILED"},
+        no_write:true,
+        readonly:true,
         safe_error:empReadErrorCode(e)
       })
     },200);
   }
 }
 __name(handleArrearTasks,"handleArrearTasks");
+async function handleEmployeeBedContext(request,env,user){
+  const url=new URL(request.url);
+  const bed=cleanText(url.searchParams.get("bed")||"",80).replace(/^#/,"");
+  try{
+    return success(await canonicalBedContextGateway(env,user,{bed,limit:1000}));
+  }catch(e){
+    return json({
+      success:false,
+      ok:false,
+      gateway:"canonical_bed_context_gateway",
+      bed,
+      error_code:"BED_CONTEXT_UNAVAILABLE",
+      message:"Bed context temporarily unavailable.",
+      message_en:"Bed context temporarily unavailable.",
+      message_zh:"床位信息暂不可用。",
+      safe_error:empReadErrorCode(e),
+      no_write:true,
+      readonly:true
+    },200);
+  }
+}
+__name(handleEmployeeBedContext,"handleEmployeeBedContext");
 async function handleArrearTaskDirective(request,env,user){
   if(!requireManager(user))return forbidden();
   await empEnsureSchema(env);
@@ -7519,6 +7635,7 @@ async function handleEmployeeApi(request,env,user){
     return handleEmployeeMigrate(request,env,user);
   }
   if(path==="/api/employee/lock/cards"&&request.method==="GET")return handleEmployeeLockCards(request,env,user);
+  if(path==="/api/employee/bed-context"&&request.method==="GET")return handleEmployeeBedContext(request,env,user);
   if(path==="/api/employee/deposit"&&request.method==="GET")return handleEmployeeDeposit(request,env,user);
   if(path==="/api/employee/bed-transfers"&&request.method==="POST")return handleEmployeeBedTransferCreate(request,env,user);
   if(path==="/api/employee/entry/sync-state"&&request.method==="POST")return handleEmployeeEntrySyncState(request,env,user);
