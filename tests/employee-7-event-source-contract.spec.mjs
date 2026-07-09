@@ -94,7 +94,7 @@ test("runtime anchor contract exposes event-specific required fields from the so
   const requiredByType = {
     R: ["expected_rent", "paid_amount", "rent_period_start", "rent_period_end", "short_paid", "arrears_amount"],
     AP: ["arrears_ref", "original_arrears_amount", "already_paid_amount", "remaining_arrears_before_payment", "remaining_arrears_after_payment", "settlement_status"],
-    D: ["deposit_amount", "deposit_required_total", "deposit_paid_amount", "deposit_remaining"],
+    D: ["deposit_amount", "deposit_required_total", "previous_deposit_recorded_amount", "deposit_paid_amount", "expected_deposit_after_payment", "deposit_remaining_after_payment", "deposit_remaining"],
     DR: ["refund_amount", "refund_reason", "deposit_balance", "owner_override_ref"],
     CO: ["checkout_date", "owner_approval_required", "left_with_arrears", "whatsapp_phone", "promised_payment_date"],
     E: ["expense_amount", "expense_category", "reason", "payment_method", "evidence_ref"],
@@ -197,7 +197,7 @@ test("event-specific business rules are visible in current runtime validation", 
     ["ArrearsPayment.remaining_before", arrears, /remaining_arrears_before_payment/],
     ["ArrearsPayment.status_consistency", arrears, /ARREARS_PAYMENT_REMAINING_STATUS_MISMATCH/],
     ["DepositIn.deposit_required_total", depositIn, /deposit_required_total/],
-    ["DepositIn.deposit_remaining", depositIn, /deposit_remaining/],
+    ["DepositIn.deposit_remaining_after_payment", depositIn, /deposit_remaining_after_payment/],
     ["DepositOut.refund_date", depositOut, /refund_date/],
     ["DepositOut.owner_override_ref", depositOut, /owner_override_ref/],
     ["Checkout.left_with_arrears", checkout, /left_with_arrears/],
@@ -210,7 +210,7 @@ test("event-specific business rules are visible in current runtime validation", 
   assert.deepEqual(missingRuntimeRules, []);
 });
 
-test("Deposit In contract requires total, paid, and remaining fields without routing to Rent", async () => {
+test("Deposit In contract requires total, top-up, paid, and remaining fields without routing to Rent", async () => {
   const worker = await readFile(workerPath, "utf8");
   const validator = functionBlock(worker, "validateDepositInUploadFields");
   const normalize = functionBlock(worker, "normalizeEntryAnchor");
@@ -218,8 +218,10 @@ test("Deposit In contract requires total, paid, and remaining fields without rou
   const contractLine = contract.match(/D:\[[^\]]+\]/)?.[0] || "";
   const correctionTotals = functionBlock(worker, "ownerCorrectionPreviewSessionTotals");
 
-  for (const field of ["deposit_required_total", "deposit_paid_amount", "deposit_remaining"]) {
+  for (const field of ["deposit_required_total", "deposit_paid_amount", "deposit_remaining_after_payment"]) {
     assert.match(validator, new RegExp(field));
+  }
+  for (const field of ["deposit_required_total", "previous_deposit_recorded_amount", "deposit_paid_amount", "expected_deposit_after_payment", "deposit_remaining_after_payment", "deposit_remaining"]) {
     assert.match(normalize, new RegExp(field));
     assert.match(contractLine, new RegExp(field));
   }

@@ -1569,6 +1569,11 @@ async function canonicalDepositAuditEventsForBed(env,user,bed,opts={}){
         session_anchor:cleanText(session.anchor_id||"",160),
         date:cleanDate(session.date||anchor.created_at||""),
         amount,
+        previous_deposit_recorded_amount:canonicalDepositMoney(anchor.previous_deposit_recorded_amount||0),
+        deposit_required_total:canonicalDepositMoney(anchor.deposit_required_total||0),
+        deposit_paid_amount:canonicalDepositMoney(anchor.deposit_paid_amount||amount),
+        expected_deposit_after_payment:canonicalDepositMoney(anchor.expected_deposit_after_payment||0),
+        deposit_remaining_after_payment:canonicalDepositMoney(anchor.deposit_remaining_after_payment ?? anchor.deposit_remaining ?? 0),
         payment_method:entryAnchorPaymentMethod(anchor.payment_method||anchor.pay_type||""),
         source:"cloud_deposit_event_audit_only"
       });
@@ -1588,10 +1593,16 @@ async function canonicalDepositGateway(env,user,opts={}){
   const remaining=recorded===null?null:Math.max(0,canonicalDepositMoney(requiredTotal-recorded));
   const auditEvents=Array.isArray(opts.cloud_deposit_events)?opts.cloud_deposit_events:await canonicalDepositAuditEventsForBed(env,user,bed,{limit:opts.limit||1000});
   const cloudNet=canonicalDepositMoney(auditEvents.reduce((sum,event)=>sum+(event.event_type==="deposit_out"?-canonicalDepositMoney(event.amount):canonicalDepositMoney(event.amount)),0));
+  const expectedAfterPayment=canonicalDepositMoney(auditEvents.reduce((max,event)=>Math.max(max,canonicalDepositMoney(event.expected_deposit_after_payment||0)),0));
   const warnings=[];
   let status=recorded===null?"MISSING_D":"RECORDED";
   if(access.warning)warnings.push(access.warning);
-  if(recorded!==null&&auditEvents.length&&Math.abs(cloudNet-recorded)>0.01){
+  if(recorded===null&&auditEvents.length){
+    status="NEEDS_RECONCILIATION";
+  }else if(recorded!==null&&expectedAfterPayment>0&&recorded+0.01<expectedAfterPayment){
+    status="NEEDS_RECONCILIATION";
+    warnings.push("DEPOSIT_D_RECONCILIATION_REQUIRED");
+  }else if(recorded!==null&&expectedAfterPayment<=0&&auditEvents.length&&Math.abs(cloudNet-recorded)>0.01){
     status="NEEDS_RECONCILIATION";
     warnings.push("DEPOSIT_SOURCE_MISMATCH");
   }
@@ -1630,6 +1641,7 @@ async function canonicalDepositGateway(env,user,opts={}){
     cloud_deposit_events:auditEvents,
     cloud_deposit_events_role:"audit_supporting_only",
     cloud_deposit_event_net:cloudNet,
+    cloud_deposit_expected_after_payment:expectedAfterPayment,
     reconciliation_warnings:warnings,
     readonly:true,
     no_write:true
@@ -2459,12 +2471,12 @@ function validateDepositInUploadFields(entry,normalized,eventIndex,anchorPreview
   const missing=[];
   const depositRequiredTotal=normalized.deposit_required_total ?? entry.deposit_required_total;
   const depositPaidAmount=normalized.deposit_paid_amount ?? entry.deposit_paid_amount ?? normalized.deposit_amount ?? entry.deposit_amount ?? entry.amount;
-  const depositRemaining=normalized.deposit_remaining ?? entry.deposit_remaining;
+  const depositRemaining=normalized.deposit_remaining_after_payment ?? entry.deposit_remaining_after_payment ?? normalized.deposit_remaining ?? entry.deposit_remaining;
   if(!employeeEntryUploadHasValue(normalized.bed||entry.room))missing.push("bed");
   if(employeeEntryUploadAmount(normalized.deposit_amount||entry.deposit_amount||entry.amount)<=0)missing.push("deposit_amount");
   if(!employeeEntryUploadHasValue(depositRequiredTotal))missing.push("deposit_required_total");
   if(!employeeEntryUploadHasValue(depositPaidAmount))missing.push("deposit_paid_amount");
-  if(!employeeEntryUploadHasValue(depositRemaining))missing.push("deposit_remaining");
+  if(!employeeEntryUploadHasValue(depositRemaining))missing.push("deposit_remaining_after_payment");
   if(!employeeEntryUploadHasValue(normalized.payment_method||entry.payment_method||entry.pay_type))missing.push("payment_method");
   if(missing.length)return employeeEntryValidationFailure("deposit_in_event_validation","DEPOSIT_IN_REQUIRED_FIELD_MISSING","Deposit In entry is missing required fields.",{event_index:eventIndex,event_type:"deposit_in",missing_fields:missing,anchor_preview:anchorPreview});
   return null;
@@ -3264,7 +3276,7 @@ __name(handleEmployeeEntry,"handleEmployeeEntry");
 const entryAnchorContract={
   R:["event_type","bed","expected_rent","paid_amount","payment_method","rent_period_start","rent_period_end","arrears_amount","arrears_due_date","arrears_note","short_paid","raw_display_line","operator","created_at","ttlock_context"],
   AP:["event_type","bed","arrears_ref","original_arrears_id","original_arrears_amount","already_paid_amount","payment_amount","remaining_arrears_before_payment","remaining_arrears_after_payment","remaining_arrears","settlement_status","payment_method","note","operator","created_at"],
-  D:["event_type","bed","deposit_amount","deposit_required_total","deposit_paid_amount","deposit_remaining","payment_method","linked_tenant","note","operator","created_at"],
+  D:["event_type","bed","deposit_amount","deposit_required_total","previous_deposit_recorded_amount","deposit_paid_amount","expected_deposit_after_payment","deposit_remaining_after_payment","deposit_remaining","payment_method","linked_tenant","note","operator","created_at"],
   DR:["event_type","bed","deposit_balance","refund_amount","payment_method","refund_method","refund_date","refund_reason","deposit_remaining_after_refund","owner_override_ref","arrears_offset_ref","arrears_offset_amount","checkout_ref","note","operator","created_at"],
   CO:["event_type","bed","checkout_date","deposit_refund","outstanding_arrears","owner_approval_required","owner_approval_status","checkout_mode","left_with_arrears","customer_left","former_customer_name","whatsapp_phone","contact_method","contact_note","arrears_amount","cloud_arrears_ref","belongings_held","belongings_note","promised_payment_date","promised_return_date","deposit_balance","left_status","final_status","final_note","ttlock_context","operator","created_at"],
   E:["event_type","expense_amount","expense_category","target_bed","reason","note","payment_method","evidence_ref","operator","created_at"],
@@ -3274,7 +3286,7 @@ const employeeSourceFirewallForbiddenFields=["card_id","cardid","tenant_card_id"
 const employeeSourceFirewallAllowedFields={
   R:["id","entry_id","event_id","anchor_id","session_id","type","event_type","source","cat","room","bed","amount","due","paid","expected_rent","paid_amount","payment_method","pay_type","bank_ref","deficit","entry_clr","clr","excess","excess_to","list_price","period_start","period_end","rent_period_start","rent_period_end","cycle","period_day_count","period_due","custom_reason","original_period_start","original_period_end","arrear_handling","arrear_promise_date","arrear_reason_detail","arrears_amount","arrears_due_date","arrears_note","arrears_status","short_paid","promise_date","promise_amount","deposit_included_amount","raw_display_line","anchor_contract_version","validation_status","validation_missing_fields","operator","operator_id","operator_name","employee","created_at","ts","note","remark","status","src","sync_status","upload_status","cloud_sync_status","cloud_sync_checked_at","upload_validation_error","upload_validation_error_code","sync_error","cloud_entry_id","upload_attempt_id","idempotency_key","original_local_entry_id","ttlock_context"],
   AP:["id","entry_id","event_id","anchor_id","session_id","type","event_type","source","cat","room","bed","amount","due","paid","payment_amount","paid_amount","payment_method","pay_type","bank_ref","deficit","entry_clr","clr","linked_task_id","arrears_ref","original_arrears_id","original_arrears_ref","original_arrears_amount","already_paid_amount","remaining_arrears_before_payment","remaining_arrears","remaining_arrears_after_payment","settlement_status","raw_display_line","anchor_contract_version","validation_status","validation_missing_fields","operator","operator_id","operator_name","employee","created_at","ts","note","remark","status","src","sync_status","upload_status","cloud_sync_status","cloud_sync_checked_at","upload_validation_error","upload_validation_error_code","sync_error","cloud_entry_id","upload_attempt_id","idempotency_key","original_local_entry_id"],
-  D:["id","entry_id","event_id","anchor_id","session_id","type","event_type","source","cat","room","bed","amount","deposit_amount","deposit_required_total","deposit_paid_amount","deposit_remaining","deposit_ref","promise_date","payment_method","pay_type","bank_ref","linked_tenant","raw_display_line","anchor_contract_version","validation_status","validation_missing_fields","operator","operator_id","operator_name","employee","created_at","ts","note","remark","status","src","sync_status","upload_status","cloud_sync_status","cloud_sync_checked_at","upload_validation_error","upload_validation_error_code","sync_error","cloud_entry_id","upload_attempt_id","idempotency_key","original_local_entry_id"],
+  D:["id","entry_id","event_id","anchor_id","session_id","type","event_type","source","cat","room","bed","amount","deposit_amount","deposit_required_total","previous_deposit_recorded_amount","deposit_paid_amount","expected_deposit_after_payment","deposit_remaining_after_payment","deposit_remaining","deposit_ref","promise_date","payment_method","pay_type","bank_ref","linked_tenant","raw_display_line","anchor_contract_version","validation_status","validation_missing_fields","operator","operator_id","operator_name","employee","created_at","ts","note","remark","status","src","sync_status","upload_status","cloud_sync_status","cloud_sync_checked_at","upload_validation_error","upload_validation_error_code","sync_error","cloud_entry_id","upload_attempt_id","idempotency_key","original_local_entry_id"],
   DR:["id","entry_id","event_id","anchor_id","session_id","type","event_type","source","cat","room","bed","amount","deposit_balance","actual_refund_amount","refund_amount","refund_difference","deposit_remaining_after_refund","payment_method","pay_type","refund_method","refund_date","refund_reason","difference_reason","owner_override_ref","override_reason","arrears_offset_ref","arrears_offset_amount","checkout_ref","open_arrears_amount","outstanding_arrears","owner_approval_required","owner_approval_status","raw_display_line","anchor_contract_version","validation_status","validation_missing_fields","operator","operator_id","operator_name","employee","created_at","ts","note","remark","status","src","sync_status","upload_status","cloud_sync_status","cloud_sync_checked_at","upload_validation_error","upload_validation_error_code","sync_error","cloud_entry_id","upload_attempt_id","idempotency_key","original_local_entry_id"],
   CO:["id","entry_id","event_id","anchor_id","session_id","type","event_type","source","cat","room","bed","amount","checkout_date","checkout_type","deposit_refund","deposit_balance","outstanding_arrears","open_arrears_amount","owner_approval_required","owner_approval_status","checkout_mode","left_with_arrears","customer_left","former_customer_ref","former_customer_name","card_name","whatsapp_phone","former_customer_phone","contact_method","contact_note","arrears_amount","left_arrears_amount","cloud_arrears_ref","belongings_held","belongings_note","coverage_end_date","card_end_date","rent_coverage_end","promised_payment_date","promised_return_date","promise_return_date","left_date","checkout_attempt_date","left_status","final_status","overdue_days","grace_days_after_promise","review_date","confirmed_not_returning_date","confirmed_not_returning_by","confirmation_note","original_session_id","original_event_id","final_note","raw_display_line","anchor_contract_version","validation_status","validation_missing_fields","operator","operator_id","operator_name","employee","created_at","ts","note","remark","status","src","sync_status","upload_status","cloud_sync_status","cloud_sync_checked_at","upload_validation_error","upload_validation_error_code","sync_error","cloud_entry_id","upload_attempt_id","idempotency_key","original_local_entry_id","ttlock_context"],
   E:["id","entry_id","event_id","anchor_id","session_id","type","event_type","source","cat","room","bed","amount","expense_amount","expense_category","target_bed","reason","expense_desc","evidence_ref","receipt_ref","payment_method","pay_type","bank_ref","raw_display_line","anchor_contract_version","validation_status","validation_missing_fields","operator","operator_id","operator_name","employee","created_at","ts","note","remark","status","src","sync_status","upload_status","cloud_sync_status","cloud_sync_checked_at","upload_validation_error","upload_validation_error_code","sync_error","cloud_entry_id","upload_attempt_id","idempotency_key","original_local_entry_id"],
@@ -3610,9 +3622,11 @@ function normalizeEntryAnchor(row){
   }else if(type==="D"){
     const depositAmount=entryAnchorMoney(anchor.deposit_amount||anchor.amount);
     const requiredTotal=entryAnchorMoney(anchor.deposit_required_total||anchor.deposit_total_required||anchor.required_deposit_total||depositAmount);
+    const previousRecorded=entryAnchorMoney(anchor.previous_deposit_recorded_amount);
     const paidAmount=entryAnchorMoney(anchor.deposit_paid_amount||depositAmount);
-    const remaining=entryAnchorMoney(anchor.deposit_remaining ?? Math.max(0,requiredTotal-paidAmount));
-    Object.assign(anchor,{bed:anchor.bed||anchor.room||"",deposit_amount:depositAmount,deposit_required_total:requiredTotal,deposit_paid_amount:paidAmount,deposit_remaining:remaining,promise_date:anchor.promise_date||anchor.deposit_promise_date||"",deposit_ref:anchor.deposit_ref||anchor.occupancy_candidate_id||"",linked_tenant:anchor.linked_tenant||anchor.tenant_card_id||anchor.tenant_name||"",note:anchor.note||""});
+    const expectedAfter=entryAnchorMoney(anchor.expected_deposit_after_payment||Math.min(requiredTotal,previousRecorded+paidAmount));
+    const remaining=entryAnchorMoney(anchor.deposit_remaining_after_payment ?? anchor.deposit_remaining ?? Math.max(0,requiredTotal-expectedAfter));
+    Object.assign(anchor,{bed:anchor.bed||anchor.room||"",deposit_amount:depositAmount,deposit_required_total:requiredTotal,previous_deposit_recorded_amount:previousRecorded,deposit_paid_amount:paidAmount,expected_deposit_after_payment:expectedAfter,deposit_remaining_after_payment:remaining,deposit_remaining:remaining,promise_date:anchor.promise_date||anchor.deposit_promise_date||"",deposit_ref:anchor.deposit_ref||anchor.occupancy_candidate_id||"",linked_tenant:anchor.linked_tenant||anchor.tenant_card_id||anchor.tenant_name||"",note:anchor.note||""});
   }else if(type==="DR"){
     const depositBalance=entryAnchorMoney(anchor.deposit_balance||anchor.deposit_held||0);
     const refundAmount=entryAnchorMoney(anchor.actual_refund_amount||anchor.refund_amount||anchor.amount);

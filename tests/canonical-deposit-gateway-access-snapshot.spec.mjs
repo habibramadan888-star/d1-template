@@ -51,12 +51,37 @@ test("canonical deposit gateway declares Access Snapshot remark D as balance sou
   assert.match(gateway, /recorded===null\?"MISSING_D":"RECORDED"/);
   assert.match(gateway, /status="NEEDS_RECONCILIATION"/);
   assert.match(gateway, /DEPOSIT_SOURCE_MISMATCH/);
+  assert.match(gateway, /expectedAfterPayment/);
+  assert.match(gateway, /DEPOSIT_D_RECONCILIATION_REQUIRED/);
+  assert.match(gateway, /recorded\+0\.01<expectedAfterPayment/);
+  assert.match(gateway, /cloud_deposit_expected_after_payment:expectedAfterPayment/);
   assert.match(gateway, /forbidden_identity_excluded:true/);
 
   assert.match(handler, /url\.searchParams\.get\("bed"\)/);
   assert.match(handler, /canonicalDepositGateway\(env,user,\{bed,limit:1000\}\)/);
   assert.match(handler, /tenant_card_id_identity_allowed:false/);
   assert.doesNotMatch(handler, /url\.searchParams\.get\("cid"\)|empDepositBalance/);
+});
+
+test("Deposit In top-up reconciliation warns before D update and clears after D reaches expected amount", async () => {
+  const worker = await readFile(workerPath, "utf8");
+  const audit = functionBlock(worker, "canonicalDepositAuditEventsForBed");
+  const gateway = functionBlock(worker, "canonicalDepositGateway");
+
+  for (const remark of ["611 D100", "611 D150", "611 D50"]) {
+    const snapshot = buildAccessSnapshotDTO(remark);
+    assert.equal(snapshot.parsed_deposit_amount, Number(remark.match(/D(\d+)/)?.[1]));
+  }
+  assert.equal(buildAccessSnapshotDTO("611 D200").parsed_deposit_amount, 200);
+  assert.equal(buildAccessSnapshotDTO("611").parsed_deposit_amount, null);
+
+  assert.match(audit, /previous_deposit_recorded_amount/);
+  assert.match(audit, /expected_deposit_after_payment/);
+  assert.match(audit, /deposit_remaining_after_payment/);
+  assert.match(gateway, /expectedAfterPayment>0&&recorded\+0\.01<expectedAfterPayment/);
+  assert.match(gateway, /warnings\.push\("DEPOSIT_D_RECONCILIATION_REQUIRED"\)/);
+  assert.match(gateway, /expectedAfterPayment<=0&&auditEvents\.length&&Math\.abs\(cloudNet-recorded\)>0\.01/);
+  assert.match(gateway, /recorded===null&&auditEvents\.length/);
 });
 
 test("cloud Deposit In and Deposit Out events are audit-only support for deposit source", async () => {

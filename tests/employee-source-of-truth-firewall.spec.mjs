@@ -157,6 +157,13 @@ test("Deposit firewall passes canonical payload while documenting legacy identit
   for (const block of [depositIn, depositOut]) {
     assert.doesNotMatch(block, /tenant_card_id|card_id|old_ttlock_ref/);
   }
+  for (const field of [
+    "previous_deposit_recorded_amount",
+    "expected_deposit_after_payment",
+    "deposit_remaining_after_payment"
+  ]) {
+    assert.match(depositIn, new RegExp(field));
+  }
   assert.match(gateway, /deposit_source:"access_snapshot_remark_D"/);
   assert.match(gateway, /cloud_deposit_events_role:"audit_supporting_only"/);
   assert.match(handler, /canonicalDepositGateway\(env,user,\{bed,limit:1000\}\)/);
