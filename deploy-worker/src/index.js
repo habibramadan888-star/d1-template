@@ -4398,25 +4398,23 @@ __name(canonicalArrearsGateway,"canonicalArrearsGateway");
 async function canonicalBedContextGateway(env,user,opts={}){
   const bed=cleanText(opts.bed||"",80).replace(/^#/,"");
   const arrears=await canonicalArrearsGateway(env,user,{bed,limit:opts.limit||1000});
+  const occupancy=await canonicalOccupancyGateway(env,user,{bed,arrears_gateway:arrears,limit:opts.limit||1000});
   return {
     ok:true,
     success:true,
     gateway:"canonical_bed_context_gateway",
     bed,
-    access_snapshot_context:{
-      bed,
-      display_only:true,
-      source_layer:"L0 External Input Source",
-      status:"display_context_not_identity",
-      provider_identity_allowed:false
-    },
+    occupancy_gateway:occupancy,
+    access_snapshot_context:{...(occupancy.access_snapshot_context||{}),display_only:true,provider_identity_allowed:false},
     open_arrears:arrears.open_items,
     total_remaining:arrears.total_remaining,
-    deposit_status:"DEPOSIT_IDENTITY_PARTIAL",
-    occupancy_status:"PARTIAL",
-    warnings:["deposit_gateway_partial","occupancy_gateway_partial"],
+    deposit_status:occupancy.deposit_recorded_amount===null?"MISSING_D":"ACCESS_SNAPSHOT_D",
+    occupancy_status:occupancy.occupancy_status,
+    warnings:occupancy.warnings||[],
     source_proof:{
       bed_context:"Access Snapshot context only",
+      occupancy_gateway:"Canonical Occupancy Gateway",
+      occupancy_source:occupancy.source_proof,
       arrears_gateway:"Canonical Arrears Gateway",
       arrears_source:arrears.source_proof,
       forbidden_identity_excluded:true
@@ -4426,6 +4424,142 @@ async function canonicalBedContextGateway(env,user,opts={}){
   };
 }
 __name(canonicalBedContextGateway,"canonicalBedContextGateway");
+function canonicalOccupancySourceProof(){
+  return {
+    gateway:"canonical_occupancy_bed_status_gateway",
+    source_layer:"L2 Occupancy / Bed Status Projection",
+    allowed_sources:["TTLock / Access Snapshot / card remark context","canonical_event_archive","employee_7_event_anchors","entries_json","correction_anchors","void_anchors","reversal_anchors","canonical_archive_projections"],
+    forbidden_truth_sources:["employee_local_cache","owner_display_text","whatsapp_export_text","preview_text","tenant_card_id","card_id","old_ttlock_ref","provider_phone","phone_99099","ttlock_provider_metadata"],
+    access_snapshot_role:"display_context_and_deposit_D_source_not_identity",
+    archive_identity:"bed_context_and_event_anchor_refs",
+    owner_history_write_source:false
+  };
+}
+__name(canonicalOccupancySourceProof,"canonicalOccupancySourceProof");
+function canonicalOccupancyAnchorDate(anchor={},session={}){
+  return cleanDate(anchor.transfer_date||anchor.checkout_date||anchor.left_date||anchor.rent_period_end||anchor.rent_period_start||anchor.date||session.date||anchor.created_at||session.created_at||"");
+}
+__name(canonicalOccupancyAnchorDate,"canonicalOccupancyAnchorDate");
+function canonicalOccupancyAnchorBed(anchor={}){
+  return cleanText(anchor.bed||anchor.room||anchor.from_bed||anchor.bed_from||anchor.to_bed||anchor.bed_to||"",80).replace(/^#/,"");
+}
+__name(canonicalOccupancyAnchorBed,"canonicalOccupancyAnchorBed");
+function canonicalOccupancyEventView(anchor={},session={}){
+  const type=canonicalFinanceProjectionEventType(anchor);
+  return {
+    event_type:type,
+    event_id:cleanText(anchor.event_id||anchor.anchor_id||anchor.id||anchor.entry_id||"",120),
+    session_id:cleanText(session.id||anchor.session_id||"",120),
+    session_anchor:cleanText(session.anchor_id||"",160),
+    date:canonicalOccupancyAnchorDate(anchor,session),
+    bed:cleanText(anchor.bed||anchor.room||"",80).replace(/^#/,""),
+    from_bed:cleanText(anchor.from_bed||anchor.bed_from||"",80).replace(/^#/,""),
+    to_bed:cleanText(anchor.to_bed||anchor.bed_to||"",80).replace(/^#/,""),
+    rent_period_start:cleanDate(anchor.rent_period_start||anchor.period_start||""),
+    rent_period_end:cleanDate(anchor.rent_period_end||anchor.period_end||anchor.rent_coverage_end||""),
+    rent_coverage_carryover:cleanDate(anchor.rent_coverage_carryover||anchor.rent_coverage_end||anchor.coverage_end_date||anchor.card_end_date||""),
+    arrears_carryover:entryAnchorMoney(anchor.arrears_carryover||anchor.open_arrears_amount||anchor.outstanding_arrears||0),
+    deposit_balance_carryover:entryAnchorMoney(anchor.deposit_balance_carryover||anchor.deposit_balance||0),
+    checkout_date:cleanDate(anchor.checkout_date||anchor.left_date||""),
+    transfer_date:cleanDate(anchor.transfer_date||anchor.date||""),
+    left_with_arrears:type==="left_with_arrears"||!!anchor.left_with_arrears||anchor.checkout_mode==="left_with_arrears",
+    cloud_arrears_ref:cleanText(anchor.cloud_arrears_ref||anchor.arrears_ref||"",160),
+    source:"canonical_event_archive_entries_json"
+  };
+}
+__name(canonicalOccupancyEventView,"canonicalOccupancyEventView");
+function canonicalOccupancyCompareEventDate(left={},right={}){
+  return String(left.date||"").localeCompare(String(right.date||""));
+}
+__name(canonicalOccupancyCompareEventDate,"canonicalOccupancyCompareEventDate");
+async function canonicalOccupancyArchiveEventsForBed(env,user,bed,opts={}){
+  const cleanBed=cleanText(bed,80).replace(/^#/,"");
+  if(!cleanBed)return [];
+  const sessions=await cloudArrearsFetchActiveSessionRows(env,user,{limit:opts.limit||1000}).catch(()=>[]);
+  const events=[];
+  for(const session of sessions||[]){
+    for(const raw of extractEmployeeEntryAnchorsFromSession(session)){
+      const anchor=normalizeEntryAnchor(raw);
+      const type=canonicalFinanceProjectionEventType(anchor);
+      const event=canonicalOccupancyEventView(anchor,session);
+      const bedMatch=event.bed===cleanBed||event.from_bed===cleanBed||event.to_bed===cleanBed;
+      if(!bedMatch)continue;
+      if(["rent","checkout","left_with_arrears","bed_transfer","bed_transfer_fee"].includes(type))events.push(event);
+    }
+  }
+  return events.sort(canonicalOccupancyCompareEventDate);
+}
+__name(canonicalOccupancyArchiveEventsForBed,"canonicalOccupancyArchiveEventsForBed");
+function canonicalOccupancyProjectStatus(bed,events=[],openArrears=[]){
+  const rentEvents=events.filter(event=>event.event_type==="rent"&&event.bed===bed);
+  const checkoutEvents=events.filter(event=>(event.event_type==="checkout"||event.event_type==="left_with_arrears")&&event.bed===bed);
+  const transferOutEvents=events.filter(event=>(event.event_type==="bed_transfer"||event.event_type==="bed_transfer_fee")&&event.from_bed===bed);
+  const transferInEvents=events.filter(event=>(event.event_type==="bed_transfer"||event.event_type==="bed_transfer_fee")&&event.to_bed===bed);
+  const latestRent=rentEvents.at(-1)||null;
+  const latestCheckout=checkoutEvents.at(-1)||null;
+  const latestTransfer=[...transferOutEvents,...transferInEvents].sort(canonicalOccupancyCompareEventDate).at(-1)||null;
+  let occupancy_status=latestRent?"active":"unknown";
+  if(latestCheckout?.left_with_arrears)occupancy_status="left_with_arrears";
+  else if(latestCheckout){
+    occupancy_status=openArrears.length?"checkout_pending":"vacant";
+  }
+  if(latestTransfer){
+    if(latestTransfer.from_bed===bed)occupancy_status="transferred_out";
+    if(latestTransfer.to_bed===bed)occupancy_status="transferred_in";
+  }
+  if(!latestRent&&!latestCheckout&&!latestTransfer&&!openArrears.length)occupancy_status="vacant";
+  return {occupancy_status,latestRent,latestCheckout,latestTransfer};
+}
+__name(canonicalOccupancyProjectStatus,"canonicalOccupancyProjectStatus");
+async function canonicalOccupancyGateway(env,user,opts={}){
+  const bed=cleanText(opts.bed||"",80).replace(/^#/,"");
+  const access=opts.access_snapshot
+    ?{snapshot:opts.access_snapshot,card:opts.card||null,source_status:"provided",warning:""}
+    :await canonicalDepositAccessSnapshotForBed(env,user,bed).catch(e=>({snapshot:null,card:null,source_status:"access_snapshot_unavailable",warning:empReadErrorCode(e)}));
+  const arrears=opts.arrears_gateway||await canonicalArrearsGateway(env,user,{bed,limit:opts.limit||1000});
+  const events=Array.isArray(opts.events)?opts.events:await canonicalOccupancyArchiveEventsForBed(env,user,bed,{limit:opts.limit||1000});
+  const openArrears=Array.isArray(arrears.open_items)?arrears.open_items:[];
+  const {occupancy_status,latestRent,latestCheckout,latestTransfer}=canonicalOccupancyProjectStatus(bed,events,openArrears);
+  const warnings=[];
+  if(access.warning)warnings.push(access.warning);
+  if(access.snapshot&&latestRent?.rent_period_end&&access.snapshot.parsed_valid_until_mmdd&&!String(latestRent.rent_period_end||"").includes(String(access.snapshot.parsed_valid_until_mmdd||"").slice(-2))){
+    warnings.push("NEEDS_RECONCILIATION_ACCESS_SNAPSHOT_RENT_COVERAGE");
+  }
+  return {
+    ok:true,
+    success:true,
+    gateway:"canonical_occupancy_bed_status_gateway",
+    bed,
+    occupancy_status,
+    current_rent_coverage_start:latestTransfer?.to_bed===bed&&latestTransfer?.rent_period_start?latestTransfer.rent_period_start:(latestRent?.rent_period_start||""),
+    current_rent_coverage_end:latestTransfer?.to_bed===bed&&latestTransfer?.rent_period_end?latestTransfer.rent_period_end:(latestTransfer?.rent_coverage_carryover||latestRent?.rent_period_end||""),
+    latest_rent_event:latestRent,
+    latest_checkout_event:latestCheckout,
+    latest_transfer_event:latestTransfer,
+    from_bed:latestTransfer?.from_bed||"",
+    to_bed:latestTransfer?.to_bed||"",
+    deposit_recorded_amount:access.snapshot&&access.snapshot.parsed_deposit_amount!==null?canonicalDepositMoney(access.snapshot.parsed_deposit_amount):null,
+    open_arrears:openArrears,
+    access_snapshot_context:{
+      bed,
+      display_only:true,
+      source_layer:"L0 Access Snapshot",
+      status:access.source_status||"unknown",
+      provider_identity_allowed:false,
+      card_name:cleanText(access.card?.card_name||"",160),
+      parsed_deposit_amount:access.snapshot?.parsed_deposit_amount??null,
+      parsed_checkin_mmdd:access.snapshot?.parsed_checkin_mmdd||"",
+      parsed_valid_until_mmdd:access.snapshot?.parsed_valid_until_mmdd||"",
+      parse_status:access.snapshot?.parse_status||""
+    },
+    source_proof:canonicalOccupancySourceProof(),
+    warnings,
+    anomalies:warnings,
+    readonly:true,
+    no_write:true
+  };
+}
+__name(canonicalOccupancyGateway,"canonicalOccupancyGateway");
 function employeeEntryExportTextWithAnchors(exportText,entries,session){
   const base=String(exportText||"").replace(/\n*==== ENTRY ANCHORS JSON ====\s*[\s\S]*?\s*==== END ENTRY ANCHORS JSON ====\s*$/i,"").trimEnd();
   const normalized=Array.isArray(entries)?entries.map(row=>normalizeEntryAnchor(row)):[];
@@ -6231,6 +6365,29 @@ async function handleEmployeeBedContext(request,env,user){
   }
 }
 __name(handleEmployeeBedContext,"handleEmployeeBedContext");
+async function handleOwnerBedStatus(request,env,user){
+  if(!canReadOwnerData(user))return forbidden();
+  const url=new URL(request.url);
+  const bed=cleanText(url.searchParams.get("bed")||"",80).replace(/^#/,"");
+  try{
+    return success(await canonicalOccupancyGateway(env,user,{bed,limit:1000}));
+  }catch(e){
+    return json({
+      success:false,
+      ok:false,
+      gateway:"canonical_occupancy_bed_status_gateway",
+      bed,
+      error_code:"BED_STATUS_UNAVAILABLE",
+      message:"Bed status temporarily unavailable.",
+      message_en:"Bed status temporarily unavailable.",
+      message_zh:"床位状态暂不可用。",
+      safe_error:empReadErrorCode(e),
+      no_write:true,
+      readonly:true
+    },200);
+  }
+}
+__name(handleOwnerBedStatus,"handleOwnerBedStatus");
 async function handleArrearTaskDirective(request,env,user){
   if(!requireManager(user))return forbidden();
   await empEnsureSchema(env);
@@ -10233,6 +10390,9 @@ async function handleRequest(request, env, ctx) {
     }
     if (path === "/api/owner/cloud-arrears/projection" && method === "GET") {
       return handleOwnerCloudArrearsProjection(request, env, user);
+    }
+    if (path === "/api/owner/bed-status" && method === "GET") {
+      return handleOwnerBedStatus(request, env, user);
     }
     if (path === "/api/history") {
       if(!await empTableExists(env,"sessions"))return success([]);
