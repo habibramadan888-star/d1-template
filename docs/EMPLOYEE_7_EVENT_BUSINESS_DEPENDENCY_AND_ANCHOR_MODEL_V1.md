@@ -25,6 +25,69 @@ These defaults are owner-approved and should guide future implementation and clo
 5. Expense evidence: category, reason, amount, and payment_method are always required. Receipt/evidence is required for expenses `>= 100 AED`; below `100 AED`, reason/category/payment_method are enough.
 6. Bed Transfer timing: transfer_date is the effective date. New bed becomes occupied on transfer_date. Old bed becomes available on transfer_date. deposit_balance, arrears, and rent_coverage carry over to the new bed.
 
+## EMPLOYEE_7_EVENT_SOURCE_OF_TRUTH_CONTRACT_V1
+
+The Homelink runtime has two real source inputs:
+
+1. Access Snapshot / card remark business context.
+2. Employee-entered operational event anchors.
+
+Access Snapshot is context only. It can help explain bed/card status, deposit hints, date hints, and access-card state, but it must not become tenant identity.
+
+Employee-entered operational events are the second source of truth. They create immutable event anchors that drive owner history, financial summaries, arrears projection, deposit projection, occupancy projection, correction/void/reversal expectations, and future WhatsApp/compiler output.
+
+Shared infrastructure is allowed for auth, dry-run wrapper, upload wrapper, money helpers, idempotency helpers, duplicate helpers, response format, and correction utilities. Business event logic must remain event-specific. Rent must not be the fallback validator for unknown, missing, or ambiguous events; unsupported events must reject with UNKNOWN_EVENT_TYPE or equivalent.
+
+### Event Contract Matrix
+
+| Event | Business purpose | Required employee inputs | Optional inputs | Forbidden inputs | Validation rules | Financial effect | Occupancy / bed status effect |
+|---|---|---|---|---|---|---|---|
+| Rent | Record rent income for a defined rent coverage period. | bed, expected_rent, paid_amount, payment_method, rent_period_start, rent_period_end, arrears_due_date and arrears_note when short-paid. | note, explicit linked Deposit In reference if captured in same UI flow. | Deposit amount merged into Rent; card_id, tenant_card_id, old_ttlock_ref, provider phone, 99099 phone as identity. | paid_amount must be positive; period required; short-paid rent must create arrears fields; rent must not include deposit. | paid_amount increases cash/bank and rent income only. | Creates or updates rent_coverage for the same occupancy context. |
+| Arrears Payment | Record repayment against an existing arrears_ref. | bed as context, arrears_ref, original_arrears_amount, already_paid_amount, remaining_arrears_before_payment, payment_amount, remaining_arrears_after_payment, settlement_status, payment_method. | note. | Bed-only repayment; overpayment by default; card_id, tenant_card_id, old_ttlock_ref, provider phone, 99099 phone as matching identity. | arrears_ref required; open/partial arrears only; payment_amount cannot exceed remaining; remaining/status must match. | payment_amount increases cash/bank and reduces arrears; not rent income. | No bed-status change by itself. |
+| Deposit In | Record deposit liability payment. | bed, deposit_amount, deposit_required_total, deposit_paid_amount, deposit_remaining, payment_method, promise_date when remaining deposit is promised. | note, deposit_ref, occupancy_candidate_id, future occupancy_session_id. | Deposit merged into Rent; card_id, tenant_card_id, old_ttlock_ref, provider phone, 99099 phone as deposit identity. | amount and payment method required; deposit top-up must link to deposit/occupancy context; partial deposit must preserve remaining due. | increases cash/bank and deposit liability; not rent income. | No bed-status change by itself; attaches to occupancy/deposit context. |
+| Deposit Out | Record deposit refund, deduction, or explicit offset. | bed, deposit_balance, refund_amount, refund_method, refund_date, refund_reason. | deduction_amount, deduction_reason, difference_reason, owner_override_ref, note. | Refund above balance without owner override; card_id, tenant_card_id, old_ttlock_ref, provider phone, 99099 phone as identity. | refund cannot exceed deposit_balance by default; refund difference requires reason; open arrears require offset or owner approval. | decreases cash/bank and deposit liability. | No bed-status change by itself. |
+| Checkout | Record customer leaving a bed or leaving with arrears. | bed, checkout_date, checkout_type, note; for Left With Arrears: whatsapp_phone/contact, left_date, promised_payment_date, left_arrears_amount, note. | deposit_refund_amount, deduction fields, confirmed_not_returning_date, promised_return_date, belongings fields. | Normal checkout with open arrears; card_id, tenant_card_id, old_ttlock_ref, provider phone, 99099 phone as identity. | open arrears blocks Normal Checkout; Left With Arrears requires contact, left date, promised payment date, arrears amount, note. | may refund/deduct deposit; may preserve or create arrears; does not create rent income. | releases bed for normal checkout or marks customer-left financial state for left-with-arrears. |
+| Expense | Record company/property expense. | target_bed or room, expense_amount, expense_category, reason, payment_method; receipt/evidence if amount >= 100 AED. | receipt/evidence when amount < 100 AED, note. | Treating expense as tenant debt without approved link; card_id, tenant_card_id, old_ttlock_ref, provider phone, 99099 phone as identity. | amount/category/reason/payment_method required; evidence required for expenses >= 100 AED. | cash/bank outflow; owner expense only. | No occupancy or bed-status change by default. |
+| Bed Transfer | Move the same customer stay from old bed to new bed. | from_bed, to_bed, transfer_date, fee option, transfer_reason. | fee_amount, fee_status, fee_payment_method, waiver_reason, note. | Creating duplicate rent/deposit/new customer; card_id, tenant_card_id, old_ttlock_ref, provider phone, 99099 phone as identity. | from_bed and to_bed required; transfer_date effective; fee paid requires method; fee waived requires reason. | optional fee increases cash/bank; waived fee has no receipt. | old bed available and new bed occupied on transfer_date; deposit_balance, arrears, and rent_coverage carry over. |
+
+| Event | Deposit effect | Arrears effect | Access / network / power downstream effect | Required anchor fields | Owner history display expectation | Projection expectation |
+|---|---|---|---|---|---|---|
+| Rent | no deposit effect; any deposit paid at same time must create separate Deposit In anchor. | short-paid rent creates arrears_task/ref; full rent has no arrears effect. | rent coverage can inform future access/network review only. | common fields plus expected_rent, paid_amount, payment_method, rent period, short_paid, arrears fields when short-paid. | show bed, paid, expected, payment method, period, short-paid and note. | finance, rent_coverage, cloud arrears if short-paid. |
+| Arrears Payment | no deposit effect unless future approved offset anchor exists. | reduces open/partial arrears; full payment settles; partial remains open/partial. | may remove financial block for later checkout/deposit release. | common fields plus arrears_ref, original_arrears_id, original amount, already paid, payment, before/after remaining, settlement_status. | show arrears_ref, original amount, payment, remaining before/after, status, method. | arrears ledger/projection update by arrears_ref only. |
+| Deposit In | creates/increases deposit_balance and preserves payment history. | no arrears effect. | no direct effect. | common fields plus deposit_ref if available, deposit_required_total, deposit_paid_amount, deposit_remaining, promise_date if needed. | show deposit amount, required total, paid, remaining, method, date, note. | deposit_balance and deposit payment history. |
+| Deposit Out | reduces/closes deposit_balance; explicit deduction/offset required. | open arrears blocks direct refund unless approved offset/owner approval exists. | no direct effect. | common fields plus deposit_ref, balance before/after, refund amount/method/date/reason, difference/override fields. | show refund, balance before/after, reason, method, approval/offset status. | deposit_balance reduction and any explicit arrears offset. |
+| Checkout | may refund, deduct, or preserve deposit balance by explicit fields. | normal checkout blocked by open arrears; Left With Arrears keeps arrears open/partial and traceable. | creates future access/network/power review context only; provider actions must be separate. | common fields plus checkout_date/type, deposit and arrears fields, approval fields, left-with-arrears fields when applicable. | show checkout type, bed, date, deposit, outstanding arrears, approval status, left-with-arrears detail. | occupancy close/release or left-with-arrears financial state. |
+| Expense | no deposit effect. | no arrears effect unless future approved tenant-linked expense rule exists. | no direct effect. | common fields plus target_bed/room, expense_amount, category, reason, payment_method, evidence_ref if required. | show amount, category, method, target, reason, evidence/note. | owner finance expense only. |
+| Bed Transfer | carries deposit_balance to new bed/occupancy context. | carries open arrears by arrears_ref, not bed-only matching. | old bed expectations end and new bed expectations begin; provider changes are separate operational actions. | common fields plus from_bed, to_bed, transfer_date, fee fields, waiver reason if waived, transfer reason, context snapshots. | show from/to, transfer date, fee/waiver, reason, carried context. | occupancy migration, bed availability, carried deposit/arrears/rent_coverage. |
+
+| Event | Correction / void / reversal expectation | Duplicate / idempotency expectation | Downstream events that depend on it | Current implementation status |
+|---|---|---|---|
+| Rent | additive correction_anchor; original row remains visible; financial delta explicit. | canonical_fingerprint/event_id/idempotency; duplicate rent must not auto-close arrears. | Arrears Payment, Checkout, Bed Transfer, owner history, current-period finance. | PARTIAL_MODULE |
+| Arrears Payment | additive correction/reversal reopens or adjusts arrears projection; original repayment remains visible. | canonical_fingerprint plus arrears_ref; same arrears_ref/payment cannot settle twice. | Checkout, Deposit Out, cloud arrears projection, owner history. | PARTIAL_MODULE |
+| Deposit In | additive correction adjusts deposit_balance projection without mutating original. | canonical_fingerprint plus deposit_ref/occupancy context; top-up must not duplicate first deposit. | Deposit Out, Checkout, Bed Transfer, owner deposit review. | PARTIAL_MODULE |
+| Deposit Out | additive correction restores or adjusts deposit_balance; original refund remains visible. | canonical_fingerprint plus deposit_ref/refund date/reason. | Checkout closeout, owner finance, deposit projection. | PARTIAL_MODULE |
+| Checkout | additive correction can reverse closeout or left-with-arrears state without deleting original. | canonical_fingerprint plus occupancy context and checkout date. | Deposit Out, Arrears Payment, access/network review, owner history. | PARTIAL_MODULE |
+| Expense | additive correction/void adjusts owner finance expense only. | canonical_fingerprint plus evidence/source event. | Owner reporting and correction workflow. | PARTIAL_MODULE |
+| Bed Transfer | additive correction preserves from/to audit trail and reverses/moves state through projection. | canonical_fingerprint plus from_bed/to_bed/transfer_date/occupancy context. | Future Rent, Arrears Payment, Deposit Out, Checkout, access/network review. | PARTIAL_MODULE |
+
+### Forbidden Identity Boundary
+
+These values are allowed only as raw provider metadata or access context. They must not identify a customer, arrears owner, deposit owner, duplicate key, occupancy session, or repayment target:
+
+- card_id
+- tenant_card_id
+- old_ttlock_ref
+- provider phone
+- repeated 99099 phone
+- TTLock provider metadata
+- card owner account phone
+
+Allowed linking fields are event_id, original_event_id, arrears_ref, deposit_ref, occupancy_candidate_id, future occupancy_session_id, and explicit staff-entered customer contact for Left With Arrears. Bed is context only and cannot identify a customer after transfer or checkout.
+
+### Deferred Issue
+
+334 duplicate/alias arrears repair is explicitly deferred. This document defines the seven-event source-of-truth contract and does not repair the existing 334 duplicate/alias state.
+
 ## Core Business Objects
 
 ### occupancy_session
