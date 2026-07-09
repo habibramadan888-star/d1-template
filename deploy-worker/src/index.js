@@ -2279,8 +2279,14 @@ function validateArrearsPaymentUploadFields(entry,normalized,eventIndex,anchorPr
 __name(validateArrearsPaymentUploadFields,"validateArrearsPaymentUploadFields");
 function validateDepositInUploadFields(entry,normalized,eventIndex,anchorPreview){
   const missing=[];
+  const depositRequiredTotal=normalized.deposit_required_total ?? entry.deposit_required_total;
+  const depositPaidAmount=normalized.deposit_paid_amount ?? entry.deposit_paid_amount ?? normalized.deposit_amount ?? entry.deposit_amount ?? entry.amount;
+  const depositRemaining=normalized.deposit_remaining ?? entry.deposit_remaining;
   if(!employeeEntryUploadHasValue(normalized.bed||entry.room))missing.push("bed");
   if(employeeEntryUploadAmount(normalized.deposit_amount||entry.deposit_amount||entry.amount)<=0)missing.push("deposit_amount");
+  if(!employeeEntryUploadHasValue(depositRequiredTotal))missing.push("deposit_required_total");
+  if(!employeeEntryUploadHasValue(depositPaidAmount))missing.push("deposit_paid_amount");
+  if(!employeeEntryUploadHasValue(depositRemaining))missing.push("deposit_remaining");
   if(!employeeEntryUploadHasValue(normalized.payment_method||entry.payment_method||entry.pay_type))missing.push("payment_method");
   if(missing.length)return employeeEntryValidationFailure("deposit_in_event_validation","DEPOSIT_IN_REQUIRED_FIELD_MISSING","Deposit In entry is missing required fields.",{event_index:eventIndex,event_type:"deposit_in",missing_fields:missing,anchor_preview:anchorPreview});
   return null;
@@ -3059,7 +3065,7 @@ __name(handleEmployeeEntry,"handleEmployeeEntry");
 const entryAnchorContract={
   R:["event_type","bed","expected_rent","paid_amount","payment_method","rent_period_start","rent_period_end","arrears_amount","arrears_due_date","arrears_note","short_paid","raw_display_line","operator","created_at","ttlock_context"],
   AP:["event_type","bed","arrears_ref","original_arrears_id","original_arrears_amount","already_paid_amount","payment_amount","remaining_arrears_before_payment","remaining_arrears_after_payment","remaining_arrears","settlement_status","payment_method","note","operator","created_at"],
-  D:["event_type","bed","deposit_amount","payment_method","linked_tenant","note","operator","created_at"],
+  D:["event_type","bed","deposit_amount","deposit_required_total","deposit_paid_amount","deposit_remaining","payment_method","linked_tenant","note","operator","created_at"],
   DR:["event_type","bed","refund_amount","payment_method","refund_reason","checkout_ref","note","operator","created_at"],
   CO:["event_type","bed","checkout_date","deposit_refund","outstanding_arrears","owner_approval_required","owner_approval_status","checkout_mode","left_with_arrears","customer_left","former_customer_name","whatsapp_phone","contact_method","contact_note","arrears_amount","cloud_arrears_ref","belongings_held","belongings_note","promised_payment_date","promised_return_date","deposit_balance","left_status","final_status","final_note","ttlock_context","operator","created_at"],
   E:["event_type","expense_amount","expense_category","target_bed","reason","note","payment_method","operator","created_at"],
@@ -3350,7 +3356,11 @@ function normalizeEntryAnchor(row){
     const fee=employeeEntryBedTransferFee(anchor,{});
     Object.assign(anchor,{from_bed:anchor.from_bed||anchor.bed_from||anchor.room||"",to_bed:anchor.to_bed||anchor.bed_to||anchor.room_to||"",transfer_date:anchor.transfer_date||anchor.date||"",fee_amount:entryAnchorMoney(fee.fee_amount),fee_status:fee.fee_choice||anchor.fee_status||"",waiver_reason:fee.waiver_reason||anchor.waiver_reason||anchor.fee_waiver_reason||"",transfer_reason:anchor.transfer_reason||anchor.reason_code||anchor.reason||anchor.custom_reason||anchor.note||"transfer",old_tenant_context:anchor.old_tenant_context||"",old_ttlock_context:anchor.old_ttlock_context||"",note:anchor.note||""});
   }else if(type==="D"){
-    Object.assign(anchor,{bed:anchor.bed||anchor.room||"",deposit_amount:entryAnchorMoney(anchor.deposit_amount||anchor.amount),linked_tenant:anchor.linked_tenant||anchor.tenant_card_id||anchor.tenant_name||"",note:anchor.note||""});
+    const depositAmount=entryAnchorMoney(anchor.deposit_amount||anchor.amount);
+    const requiredTotal=entryAnchorMoney(anchor.deposit_required_total||anchor.deposit_total_required||anchor.required_deposit_total||depositAmount);
+    const paidAmount=entryAnchorMoney(anchor.deposit_paid_amount||depositAmount);
+    const remaining=entryAnchorMoney(anchor.deposit_remaining ?? Math.max(0,requiredTotal-paidAmount));
+    Object.assign(anchor,{bed:anchor.bed||anchor.room||"",deposit_amount:depositAmount,deposit_required_total:requiredTotal,deposit_paid_amount:paidAmount,deposit_remaining:remaining,promise_date:anchor.promise_date||anchor.deposit_promise_date||"",deposit_ref:anchor.deposit_ref||anchor.occupancy_candidate_id||"",linked_tenant:anchor.linked_tenant||anchor.tenant_card_id||anchor.tenant_name||"",note:anchor.note||""});
   }else if(type==="DR"){
     const depositBalance=entryAnchorMoney(anchor.deposit_balance||anchor.deposit_held||0);
     const refundAmount=entryAnchorMoney(anchor.actual_refund_amount||anchor.refund_amount||anchor.amount);

@@ -209,3 +209,23 @@ test("event-specific business rules are visible in current runtime validation", 
 
   assert.deepEqual(missingRuntimeRules, []);
 });
+
+test("Deposit In contract requires total, paid, and remaining fields without routing to Rent", async () => {
+  const worker = await readFile(workerPath, "utf8");
+  const validator = functionBlock(worker, "validateDepositInUploadFields");
+  const normalize = functionBlock(worker, "normalizeEntryAnchor");
+  const contract = contractBlock(worker);
+  const contractLine = contract.match(/D:\[[^\]]+\]/)?.[0] || "";
+  const correctionTotals = functionBlock(worker, "ownerCorrectionPreviewSessionTotals");
+
+  for (const field of ["deposit_required_total", "deposit_paid_amount", "deposit_remaining"]) {
+    assert.match(validator, new RegExp(field));
+    assert.match(normalize, new RegExp(field));
+    assert.match(contractLine, new RegExp(field));
+  }
+
+  assert.match(validator, /DEPOSIT_IN_REQUIRED_FIELD_MISSING/);
+  assert.doesNotMatch(validator, /RENT_REQUIRED_FIELD_MISSING/);
+  assert.match(correctionTotals, /type==="deposit_in"\)totals\.deposit_liability\+=/);
+  assert.doesNotMatch(correctionTotals, /type==="deposit_in"\)totals\.rent_income/);
+});
