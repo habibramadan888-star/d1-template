@@ -2532,10 +2532,12 @@ function validateExpenseUploadFields(entry,normalized,eventIndex,anchorPreview){
   const missing=[];
   const amount=employeeEntryUploadAmount(normalized.expense_amount||entry.expense_amount||entry.amount);
   const evidenceRef=cleanText(normalized.evidence_ref||entry.evidence_ref||normalized.receipt_ref||entry.receipt_ref||"",160);
+  const rawPaymentMethod=cleanText(entry.payment_method||entry.pay_type||"",40);
+  const rawReason=cleanText(entry.reason||"",500);
   if(amount<=0)missing.push("expense_amount");
   if(!employeeEntryUploadHasValue(normalized.expense_category||entry.expense_category||entry.reason_code))missing.push("expense_category");
-  if(!employeeEntryUploadHasValue(normalized.payment_method||entry.payment_method||entry.pay_type))missing.push("payment_method");
-  if(!employeeEntryUploadHasValue(normalized.reason||entry.reason||entry.expense_desc||entry.note))missing.push("reason");
+  if(!employeeEntryUploadHasValue(rawPaymentMethod))missing.push("payment_method");
+  if(!employeeEntryUploadHasValue(rawReason))missing.push("reason");
   if(missing.length)return employeeEntryValidationFailure("expense_event_validation","EXPENSE_REQUIRED_FIELD_MISSING","Expense entry is missing required fields.",{event_index:eventIndex,event_type:"expense",missing_fields:missing,anchor_preview:anchorPreview});
   if(amount>=100&&!evidenceRef)return employeeEntryValidationFailure("expense_event_validation","EXPENSE_EVIDENCE_REQUIRED","Expense evidence is required for expenses of 100 AED or more.",{event_index:eventIndex,event_type:"expense",missing_fields:["evidence_ref"],invalid_fields:[],anchor_preview:{...anchorPreview,expense_amount:amount}});
   return null;

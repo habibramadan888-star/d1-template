@@ -41,11 +41,29 @@ test("Expense validation enforces evidence threshold and required fields", async
   for (const field of ["expense_amount", "expense_category", "payment_method", "reason"]) {
     assert.match(validator, new RegExp(`missing\\.push\\("${field}"\\)`), `${field} must be required`);
   }
+  assert.match(validator, /const rawPaymentMethod=cleanText\(entry\.payment_method\|\|entry\.pay_type\|\|""/);
+  assert.match(validator, /const rawReason=cleanText\(entry\.reason\|\|""/);
+  assert.doesNotMatch(validator, /normalized\.payment_method\|\|entry\.payment_method\|\|entry\.pay_type/);
+  assert.doesNotMatch(validator, /normalized\.reason\|\|entry\.reason\|\|entry\.expense_desc\|\|entry\.note/);
   assert.match(validator, /amount>=100/);
   assert.match(validator, /evidenceRef/);
   assert.match(validator, /EXPENSE_EVIDENCE_REQUIRED/);
   assert.match(validator, /EXPENSE_REQUIRED_FIELD_MISSING/);
   assert.doesNotMatch(validator, /RENT_REQUIRED_FIELD_MISSING/);
+});
+
+test("Expense missing reason and payment method cannot be hidden by normalization defaults", async () => {
+  const worker = await readFile(workerPath, "utf8");
+  const validator = functionBlock(worker, "validateExpenseUploadFields");
+  const normalizer = functionBlock(worker, "normalizeEntryAnchor");
+
+  assert.match(normalizer, /payment_method=entryAnchorPaymentMethod/);
+  assert.match(normalizer, /reason:anchor\.reason\|\|anchor\.expense_desc/);
+  assert.match(validator, /rawReason/);
+  assert.match(validator, /rawPaymentMethod/);
+  assert.match(validator, /if\(!employeeEntryUploadHasValue\(rawReason\)\)missing\.push\("reason"\)/);
+  assert.match(validator, /if\(!employeeEntryUploadHasValue\(rawPaymentMethod\)\)missing\.push\("payment_method"\)/);
+  assert.doesNotMatch(validator, /entry\.expense_desc\|\|entry\.note/);
 });
 
 test("Employee Expense UI captures evidence_ref and requires it at 100 AED or more", async () => {
