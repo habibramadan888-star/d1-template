@@ -229,3 +229,23 @@ test("Deposit In contract requires total, paid, and remaining fields without rou
   assert.match(correctionTotals, /type==="deposit_in"\)totals\.deposit_liability\+=/);
   assert.doesNotMatch(correctionTotals, /type==="deposit_in"\)totals\.rent_income/);
 });
+
+test("Deposit Out contract preserves balance, override, offset, and refund fields without routing to Rent", async () => {
+  const worker = await readFile(workerPath, "utf8");
+  const validator = functionBlock(worker, "validateDepositOutUploadFields");
+  const normalize = functionBlock(worker, "normalizeEntryAnchor");
+  const contract = contractBlock(worker);
+  const contractLine = contract.match(/DR:\[[^\]]+\]/)?.[0] || "";
+  const correctionTotals = functionBlock(worker, "ownerCorrectionPreviewSessionTotals");
+
+  for (const field of ["deposit_balance", "refund_amount", "refund_method", "refund_date", "refund_reason", "deposit_remaining_after_refund", "owner_override_ref", "arrears_offset_ref", "arrears_offset_amount"]) {
+    assert.match(validator + normalize + contractLine, new RegExp(field));
+  }
+
+  assert.match(validator, /DEPOSIT_OUT_REQUIRED_FIELD_MISSING/);
+  assert.match(validator, /DEPOSIT_OUT_EXCEEDS_BALANCE/);
+  assert.match(validator, /DEPOSIT_OUT_OPEN_ARREARS_REQUIRES_OFFSET_OR_APPROVAL/);
+  assert.doesNotMatch(validator, /RENT_REQUIRED_FIELD_MISSING/);
+  assert.match(correctionTotals, /type==="deposit_out"\)totals\.deposit_liability-=/);
+  assert.doesNotMatch(correctionTotals, /type==="deposit_out"\)totals\.rent_income/);
+});

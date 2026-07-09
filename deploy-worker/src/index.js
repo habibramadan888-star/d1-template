@@ -2297,13 +2297,25 @@ function validateDepositOutUploadFields(entry,normalized,eventIndex,anchorPrevie
   const invalid=[];
   const balance=employeeEntryUploadAmount(normalized.deposit_balance||entry.deposit_balance||entry.deposit_held);
   const refund=employeeEntryUploadAmount(normalized.actual_refund_amount||normalized.refund_amount||entry.actual_refund_amount||entry.refund_amount||entry.amount);
+  const ownerOverrideRef=cleanId(normalized.owner_override_ref||entry.owner_override_ref||"");
+  const overrideReason=cleanText(normalized.override_reason||entry.override_reason||normalized.owner_override_reason||entry.owner_override_reason||"",500);
+  const openArrearsAmount=employeeEntryUploadAmount(normalized.open_arrears_amount||entry.open_arrears_amount||entry.outstanding_arrears);
+  const arrearsOffsetRef=cleanId(normalized.arrears_offset_ref||entry.arrears_offset_ref||"");
+  const arrearsOffsetAmount=employeeEntryUploadAmount(normalized.arrears_offset_amount||entry.arrears_offset_amount);
   if(!employeeEntryUploadHasValue(normalized.bed||entry.room))missing.push("bed");
   if(balance<=0)missing.push("deposit_balance");
   if(refund<=0)missing.push("actual_refund_amount");
   if(!employeeEntryUploadHasValue(normalized.refund_method||entry.refund_method||normalized.payment_method||entry.pay_type))missing.push("refund_method");
   if(!employeeEntryUploadHasValue(normalized.refund_date||entry.refund_date))missing.push("refund_date");
+  if(!employeeEntryUploadHasValue(normalized.refund_reason||entry.refund_reason||entry.reason))missing.push("refund_reason");
   if(Math.abs(refund-balance)>0.01&&!employeeEntryUploadHasValue(normalized.difference_reason||entry.difference_reason||normalized.refund_reason||entry.refund_reason))missing.push("difference_reason");
   if(missing.length||invalid.length)return employeeEntryValidationFailure("deposit_out_event_validation","DEPOSIT_OUT_REQUIRED_FIELD_MISSING","Deposit Out entry is missing required fields.",{event_index:eventIndex,event_type:"deposit_out",missing_fields:missing,invalid_fields:invalid,anchor_preview:anchorPreview});
+  if(refund>balance+0.01&&(!ownerOverrideRef||!overrideReason)){
+    return employeeEntryValidationFailure("deposit_out_validation","DEPOSIT_OUT_EXCEEDS_BALANCE","Deposit refund exceeds deposit balance and requires owner override.",{event_index:eventIndex,event_type:"deposit_out",missing_fields:["owner_override_ref","override_reason"].filter(field=>field==="owner_override_ref"?!ownerOverrideRef:!overrideReason),invalid_fields:["refund_amount"],anchor_preview:{...anchorPreview,deposit_balance:balance,refund_amount:refund}});
+  }
+  if(openArrearsAmount>0&&(!ownerOverrideRef&&(!arrearsOffsetRef||arrearsOffsetAmount<=0))){
+    return employeeEntryValidationFailure("deposit_out_validation","DEPOSIT_OUT_OPEN_ARREARS_REQUIRES_OFFSET_OR_APPROVAL","Open arrears require explicit offset or owner approval before deposit refund.",{event_index:eventIndex,event_type:"deposit_out",missing_fields:["arrears_offset_ref","arrears_offset_amount","owner_override_ref"],invalid_fields:["open_arrears"],anchor_preview:{...anchorPreview,open_arrears_amount:openArrearsAmount}});
+  }
   return null;
 }
 __name(validateDepositOutUploadFields,"validateDepositOutUploadFields");
@@ -3066,7 +3078,7 @@ const entryAnchorContract={
   R:["event_type","bed","expected_rent","paid_amount","payment_method","rent_period_start","rent_period_end","arrears_amount","arrears_due_date","arrears_note","short_paid","raw_display_line","operator","created_at","ttlock_context"],
   AP:["event_type","bed","arrears_ref","original_arrears_id","original_arrears_amount","already_paid_amount","payment_amount","remaining_arrears_before_payment","remaining_arrears_after_payment","remaining_arrears","settlement_status","payment_method","note","operator","created_at"],
   D:["event_type","bed","deposit_amount","deposit_required_total","deposit_paid_amount","deposit_remaining","payment_method","linked_tenant","note","operator","created_at"],
-  DR:["event_type","bed","refund_amount","payment_method","refund_reason","checkout_ref","note","operator","created_at"],
+  DR:["event_type","bed","deposit_balance","refund_amount","payment_method","refund_method","refund_date","refund_reason","deposit_remaining_after_refund","owner_override_ref","arrears_offset_ref","arrears_offset_amount","checkout_ref","note","operator","created_at"],
   CO:["event_type","bed","checkout_date","deposit_refund","outstanding_arrears","owner_approval_required","owner_approval_status","checkout_mode","left_with_arrears","customer_left","former_customer_name","whatsapp_phone","contact_method","contact_note","arrears_amount","cloud_arrears_ref","belongings_held","belongings_note","promised_payment_date","promised_return_date","deposit_balance","left_status","final_status","final_note","ttlock_context","operator","created_at"],
   E:["event_type","expense_amount","expense_category","target_bed","reason","note","payment_method","operator","created_at"],
   TF:["event_type","from_bed","to_bed","transfer_date","fee_amount","fee_status","waiver_reason","transfer_reason","old_tenant_context","old_ttlock_context","note","operator","created_at"]
@@ -3364,7 +3376,8 @@ function normalizeEntryAnchor(row){
   }else if(type==="DR"){
     const depositBalance=entryAnchorMoney(anchor.deposit_balance||anchor.deposit_held||0);
     const refundAmount=entryAnchorMoney(anchor.actual_refund_amount||anchor.refund_amount||anchor.amount);
-    Object.assign(anchor,{bed:anchor.bed||anchor.room||"",deposit_balance:depositBalance,actual_refund_amount:refundAmount,refund_amount:refundAmount,refund_difference:entryAnchorMoney(refundAmount-depositBalance),refund_method:entryAnchorPaymentMethod(anchor.refund_method||anchor.payment_method||anchor.pay_type),payment_method:entryAnchorPaymentMethod(anchor.payment_method||anchor.refund_method||anchor.pay_type),refund_date:cleanDate(anchor.refund_date||anchor.checkout_date||anchor.date||""),refund_reason:anchor.refund_reason||anchor.difference_reason||anchor.ded_reason||anchor.ded_note||anchor.reason||anchor.note||"",difference_reason:anchor.difference_reason||anchor.refund_reason||anchor.ded_note||anchor.note||"",checkout_ref:anchor.checkout_ref||anchor.checkout_date||"",open_arrears_amount:entryAnchorMoney(anchor.open_arrears_amount||anchor.outstanding_arrears||0),owner_approval_required:!!anchor.owner_approval_required,owner_approval_status:anchor.owner_approval_status||"not_required",note:anchor.note||""});
+    const offsetAmount=entryAnchorMoney(anchor.arrears_offset_amount||0);
+    Object.assign(anchor,{bed:anchor.bed||anchor.room||"",deposit_balance:depositBalance,actual_refund_amount:refundAmount,refund_amount:refundAmount,refund_difference:entryAnchorMoney(refundAmount-depositBalance),deposit_remaining_after_refund:entryAnchorMoney(anchor.deposit_remaining_after_refund ?? Math.max(0,depositBalance-refundAmount-offsetAmount)),refund_method:entryAnchorPaymentMethod(anchor.refund_method||anchor.payment_method||anchor.pay_type),payment_method:entryAnchorPaymentMethod(anchor.payment_method||anchor.refund_method||anchor.pay_type),refund_date:cleanDate(anchor.refund_date||anchor.checkout_date||anchor.date||""),refund_reason:anchor.refund_reason||anchor.difference_reason||anchor.ded_reason||anchor.ded_note||anchor.reason||anchor.note||"",difference_reason:anchor.difference_reason||anchor.refund_reason||anchor.ded_note||anchor.note||"",owner_override_ref:anchor.owner_override_ref||"",override_reason:anchor.override_reason||anchor.owner_override_reason||"",arrears_offset_ref:anchor.arrears_offset_ref||"",arrears_offset_amount:offsetAmount,checkout_ref:anchor.checkout_ref||anchor.checkout_date||"",open_arrears_amount:entryAnchorMoney(anchor.open_arrears_amount||anchor.outstanding_arrears||0),owner_approval_required:!!anchor.owner_approval_required,owner_approval_status:anchor.owner_approval_status||"not_required",note:anchor.note||""});
   }else if(type==="CO"){
     const left=!!anchor.left_with_arrears||anchor.checkout_mode==="left_with_arrears";
     const contactSource=anchor.whatsapp_phone_source||anchor.former_customer_phone_source||(left?"left_with_arrears_staff_entered":"");
