@@ -2358,7 +2358,13 @@ function validateEmployeeEntryUploadEventFields(type,entry,normalized,eventIndex
     TF:validateBedTransferUploadFields,
     TFF:validateBedTransferUploadFields
   };
-  const validator=dispatch[type]||validateRentUploadFields;
+  const validator=dispatch[type];
+  if(!validator)return employeeEntryValidationFailure("event_dispatch","UNKNOWN_EVENT_TYPE","Unsupported employee entry event type.",{
+    event_index:eventIndex,
+    event_type:cleanText(entry?.event_type||entryAnchorEventType(type)||"",80),
+    invalid_fields:["event_type"],
+    anchor_preview:anchorPreview
+  });
   return validator(entry,normalized,eventIndex,anchorPreview);
 }
 __name(validateEmployeeEntryUploadEventFields,"validateEmployeeEntryUploadEventFields");
@@ -2366,10 +2372,11 @@ function employeeEntryUploadType(entry={}){
   const event=cleanText(entry.event_type,60).toLowerCase();
   const eventMap={rent:"R",arrears_payment:"AP",deposit_in:"D",deposit_out:"DR",checkout:"CO",left_with_arrears:"CO",expense:"E",bed_transfer:"TF",bed_transfer_fee:"TFF"};
   if(eventMap[event])return eventMap[event];
+  if(event)return "";
   if(cleanId(entry.arrears_ref||entry.linked_task_id||entry.original_arrears_id))return "AP";
-  const raw=cleanText(entry.type||entry.reason_code||"R",12).toUpperCase();
-  const legacyMap={T:"TF",TRANSFER:"TF",BED_TRANSFER:"TF"};
-  return legacyMap[raw]||raw||"R";
+  const raw=cleanText(entry.type||entry.reason_code||"",20).toUpperCase();
+  const legacyMap={R:"R",RENT:"R",SHORT_PAID:"R",AP:"AP",ARREARS_PAYMENT:"AP",D:"D",DEPOSIT:"D",DEPOSIT_IN:"D",DR:"DR",DEPOSIT_OUT:"DR",CO:"CO",CHECKOUT:"CO",E:"E",EXPENSE:"E",TF:"TF",TFF:"TFF",T:"TF",TRANSFER:"TF",BED_TRANSFER:"TF",BED_TRANSFER_FEE:"TFF"};
+  return legacyMap[raw]||"";
 }
 __name(employeeEntryUploadType,"employeeEntryUploadType");
 function employeeEntryValidationEntryFromBody(body={},eventIndex=0){
