@@ -3476,10 +3476,12 @@ function parseAccessCardRemark(rawRemark){
   let parsedCheckinMmdd="";
   let parsedValidUntilMmdd="";
   let parsedBusinessNote="";
+  let parsedVacancyMarker=false;
   const warnings=[];
   for(let i=0;i<tokens.length;i++){
     const token=tokens[i];
     if(!bed)bed=(token.match(/^#?(\d{2,5}[A-Za-z]?)$/)||[])[1]||"";
+    if(/^[Ee]$/.test(token))parsedVacancyMarker=true;
     if(parsedDepositAmount===null){
       const deposit=token.match(/^D(\d{1,5}(?:\.\d{1,2})?)$/i);
       if(deposit)parsedDepositAmount=entryAnchorMoney(deposit[1]);
@@ -3496,6 +3498,7 @@ function parseAccessCardRemark(rawRemark){
     for(let i=0;i<tokens.length;i++){
       const token=tokens[i];
       if(i===0&&bed)continue;
+      if(/^[Ee]$/.test(token))continue;
       if(/^D\d/i.test(token))continue;
       if(/^(exp|until|valid)$/i.test(token)){i++;continue;}
       const md=accessSnapshotMonthDay(token);
@@ -3510,10 +3513,10 @@ function parseAccessCardRemark(rawRemark){
     }
     parsedBusinessNote=cleanText(noteTokens.join(" "),500);
   }
-  if(!raw)return {bed:"",parsed_deposit_amount:null,parsed_checkin_mmdd:"",parsed_valid_until_mmdd:"",parsed_business_note:"",parse_status:"invalid",warnings:["empty_remark"]};
-  if(!bed)return {bed:"",parsed_deposit_amount:parsedDepositAmount,parsed_checkin_mmdd:parsedCheckinMmdd,parsed_valid_until_mmdd:parsedValidUntilMmdd,parsed_business_note:parsedBusinessNote,parse_status:"unparsed",warnings:["missing_bed"]};
+  if(!raw)return {bed:"",parsed_deposit_amount:null,parsed_checkin_mmdd:"",parsed_valid_until_mmdd:"",parsed_vacancy_marker:false,physical_bed_status:"unknown",physical_bed_status_source:"missing_access_snapshot",parsed_business_note:"",parse_status:"invalid",warnings:["empty_remark"]};
+  if(!bed)return {bed:"",parsed_deposit_amount:parsedDepositAmount,parsed_checkin_mmdd:parsedCheckinMmdd,parsed_valid_until_mmdd:parsedValidUntilMmdd,parsed_vacancy_marker:parsedVacancyMarker,physical_bed_status:parsedVacancyMarker?"vacant":"unknown",physical_bed_status_source:parsedVacancyMarker?"access_snapshot_E_marker":"missing_access_snapshot",parsed_business_note:parsedBusinessNote,parse_status:"unparsed",warnings:["missing_bed"]};
   if(parsedDepositAmount===null||!parsedCheckinMmdd)warnings.push("missing_deposit_or_checkin");
-  return {bed,parsed_deposit_amount:parsedDepositAmount,parsed_checkin_mmdd:parsedCheckinMmdd,parsed_valid_until_mmdd:parsedValidUntilMmdd,parsed_business_note:parsedBusinessNote,parse_status:warnings.length?"partial":"parsed",warnings};
+  return {bed,parsed_deposit_amount:parsedDepositAmount,parsed_checkin_mmdd:parsedCheckinMmdd,parsed_valid_until_mmdd:parsedValidUntilMmdd,parsed_vacancy_marker:parsedVacancyMarker,physical_bed_status:parsedVacancyMarker?"vacant":"not_marked_vacant",physical_bed_status_source:parsedVacancyMarker?"access_snapshot_E_marker":"access_snapshot_no_E",parsed_business_note:parsedBusinessNote,parse_status:warnings.length?"partial":"parsed",warnings};
 }
 __name(parseAccessCardRemark,"parseAccessCardRemark");
 function buildAccessSnapshotDTO(rawRemark,opts={}){
@@ -3530,6 +3533,9 @@ function buildAccessSnapshotDTO(rawRemark,opts={}){
     parsed_deposit_amount:parsed.parsed_deposit_amount,
     parsed_checkin_mmdd:parsed.parsed_checkin_mmdd,
     parsed_valid_until_mmdd:parsed.parsed_valid_until_mmdd,
+    parsed_vacancy_marker:parsed.parsed_vacancy_marker,
+    physical_bed_status:parsed.physical_bed_status,
+    physical_bed_status_source:parsed.physical_bed_status_source,
     parsed_business_note:parsed.parsed_business_note,
     parse_status:parsed.parse_status,
     source:"access_card_remark",
@@ -4430,6 +4436,7 @@ function canonicalOccupancySourceProof(){
     source_layer:"L2 Occupancy / Bed Status Projection",
     allowed_sources:["TTLock / Access Snapshot / card remark context","canonical_event_archive","employee_7_event_anchors","entries_json","correction_anchors","void_anchors","reversal_anchors","canonical_archive_projections"],
     forbidden_truth_sources:["employee_local_cache","owner_display_text","whatsapp_export_text","preview_text","tenant_card_id","card_id","old_ttlock_ref","provider_phone","phone_99099","ttlock_provider_metadata"],
+    physical_vacancy_source:"access_snapshot_E_marker",
     access_snapshot_role:"display_context_and_deposit_D_source_not_identity",
     archive_identity:"bed_context_and_event_anchor_refs",
     owner_history_write_source:false
@@ -4511,6 +4518,34 @@ function canonicalOccupancyProjectStatus(bed,events=[],openArrears=[]){
   return {occupancy_status,latestRent,latestCheckout,latestTransfer};
 }
 __name(canonicalOccupancyProjectStatus,"canonicalOccupancyProjectStatus");
+function canonicalOccupancyPhysicalBedStatus(access={}){
+  const snapshot=access.snapshot||null;
+  if(!snapshot)return {physical_bed_status:"unknown",physical_bed_status_source:"missing_access_snapshot",has_vacancy_marker:false};
+  const hasMarker=!!snapshot.parsed_vacancy_marker||snapshot.physical_bed_status_source==="access_snapshot_E_marker";
+  return {
+    physical_bed_status:hasMarker?"vacant":"not_marked_vacant",
+    physical_bed_status_source:hasMarker?"access_snapshot_E_marker":"access_snapshot_no_E",
+    has_vacancy_marker:hasMarker
+  };
+}
+__name(canonicalOccupancyPhysicalBedStatus,"canonicalOccupancyPhysicalBedStatus");
+function canonicalOccupancyResolveStatusFromAccess(physical={},projected={},access={}){
+  if(physical.physical_bed_status==="vacant")return "vacant";
+  if(physical.physical_bed_status_source==="missing_access_snapshot")return "unknown";
+  if(projected.latestCheckout||projected.latestTransfer?.from_bed||projected.openArrears?.length)return "needs_reconciliation";
+  if(access.snapshot)return "active_or_occupied_context";
+  return "unknown";
+}
+__name(canonicalOccupancyResolveStatusFromAccess,"canonicalOccupancyResolveStatusFromAccess");
+function canonicalOccupancyConflictWarnings(physical={},projected={}){
+  const warnings=[];
+  if(physical.physical_bed_status==="vacant"&&!projected.latestCheckout)warnings.push("TTLOCK_VACANT_WITHOUT_CHECKOUT_EVENT");
+  if(projected.latestCheckout&&physical.physical_bed_status!=="vacant")warnings.push("CHECKOUT_EVENT_WITHOUT_TTLOCK_E");
+  if(projected.latestTransfer?.from_bed&&physical.physical_bed_status!=="vacant")warnings.push("TRANSFER_WITHOUT_TTLOCK_E_ON_FROM_BED");
+  if(projected.latestRent&&physical.physical_bed_status==="vacant")warnings.push("RENT_COVERAGE_CONFLICTS_WITH_TTLOCK_E");
+  return warnings;
+}
+__name(canonicalOccupancyConflictWarnings,"canonicalOccupancyConflictWarnings");
 async function canonicalOccupancyGateway(env,user,opts={}){
   const bed=cleanText(opts.bed||"",80).replace(/^#/,"");
   const access=opts.access_snapshot
@@ -4519,9 +4554,14 @@ async function canonicalOccupancyGateway(env,user,opts={}){
   const arrears=opts.arrears_gateway||await canonicalArrearsGateway(env,user,{bed,limit:opts.limit||1000});
   const events=Array.isArray(opts.events)?opts.events:await canonicalOccupancyArchiveEventsForBed(env,user,bed,{limit:opts.limit||1000});
   const openArrears=Array.isArray(arrears.open_items)?arrears.open_items:[];
-  const {occupancy_status,latestRent,latestCheckout,latestTransfer}=canonicalOccupancyProjectStatus(bed,events,openArrears);
+  const projected=canonicalOccupancyProjectStatus(bed,events,openArrears);
+  projected.openArrears=openArrears;
+  const {latestRent,latestCheckout,latestTransfer}=projected;
+  const physical=canonicalOccupancyPhysicalBedStatus(access);
+  const occupancy_status=canonicalOccupancyResolveStatusFromAccess(physical,projected,access);
   const warnings=[];
   if(access.warning)warnings.push(access.warning);
+  warnings.push(...canonicalOccupancyConflictWarnings(physical,projected));
   if(access.snapshot&&latestRent?.rent_period_end&&access.snapshot.parsed_valid_until_mmdd&&!String(latestRent.rent_period_end||"").includes(String(access.snapshot.parsed_valid_until_mmdd||"").slice(-2))){
     warnings.push("NEEDS_RECONCILIATION_ACCESS_SNAPSHOT_RENT_COVERAGE");
   }
@@ -4530,12 +4570,17 @@ async function canonicalOccupancyGateway(env,user,opts={}){
     success:true,
     gateway:"canonical_occupancy_bed_status_gateway",
     bed,
+    physical_bed_status:physical.physical_bed_status,
+    physical_bed_status_source:physical.physical_bed_status_source,
     occupancy_status,
+    projected_event_status:projected.occupancy_status,
     current_rent_coverage_start:latestTransfer?.to_bed===bed&&latestTransfer?.rent_period_start?latestTransfer.rent_period_start:(latestRent?.rent_period_start||""),
     current_rent_coverage_end:latestTransfer?.to_bed===bed&&latestTransfer?.rent_period_end?latestTransfer.rent_period_end:(latestTransfer?.rent_coverage_carryover||latestRent?.rent_period_end||""),
     latest_rent_event:latestRent,
     latest_checkout_event:latestCheckout,
     latest_transfer_event:latestTransfer,
+    checkout_event_status:latestCheckout?projected.occupancy_status:"",
+    transfer_event_status:latestTransfer?projected.occupancy_status:"",
     from_bed:latestTransfer?.from_bed||"",
     to_bed:latestTransfer?.to_bed||"",
     deposit_recorded_amount:access.snapshot&&access.snapshot.parsed_deposit_amount!==null?canonicalDepositMoney(access.snapshot.parsed_deposit_amount):null,
@@ -4550,6 +4595,9 @@ async function canonicalOccupancyGateway(env,user,opts={}){
       parsed_deposit_amount:access.snapshot?.parsed_deposit_amount??null,
       parsed_checkin_mmdd:access.snapshot?.parsed_checkin_mmdd||"",
       parsed_valid_until_mmdd:access.snapshot?.parsed_valid_until_mmdd||"",
+      parsed_vacancy_marker:!!access.snapshot?.parsed_vacancy_marker,
+      physical_bed_status:physical.physical_bed_status,
+      physical_bed_status_source:physical.physical_bed_status_source,
       parse_status:access.snapshot?.parse_status||""
     },
     source_proof:canonicalOccupancySourceProof(),

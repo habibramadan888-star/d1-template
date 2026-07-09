@@ -69,10 +69,12 @@ function parseAccessRemark(rawRemark) {
   let parsedCheckinMmdd = "";
   let parsedValidUntilMmdd = "";
   let parsedBusinessNote = "";
+  let parsedVacancyMarker = false;
 
   for (let i = 0; i < tokens.length; i += 1) {
     const token = tokens[i];
     if (!bed) bed = (token.match(/^#?(\d{2,5}[A-Za-z]?)$/) || [])[1] || "";
+    if (/^[Ee]$/.test(token)) parsedVacancyMarker = true;
     if (parsedDepositAmount === null) {
       const deposit = token.match(/^D(\d{1,5}(?:\.\d{1,2})?)$/i);
       if (deposit) parsedDepositAmount = cleanMoney(deposit[1]);
@@ -94,6 +96,7 @@ function parseAccessRemark(rawRemark) {
     for (let i = 0; i < tokens.length; i += 1) {
       const token = tokens[i];
       if (i === 0 && bed) continue;
+      if (/^[Ee]$/.test(token)) continue;
       if (/^D\d/i.test(token)) continue;
       if (/^(exp|until|valid)$/i.test(token)) {
         i += 1;
@@ -112,11 +115,14 @@ function parseAccessRemark(rawRemark) {
     parsedBusinessNote = cleanText(noteTokens.join(" "), 500);
   }
 
-  if (!raw) return { bed: "", parsedDepositAmount, parsedCheckinMmdd, parsedValidUntilMmdd, parsedBusinessNote, parseStatus: "invalid", warnings: ["empty_remark"] };
-  if (!bed) return { bed: "", parsedDepositAmount, parsedCheckinMmdd, parsedValidUntilMmdd, parsedBusinessNote, parseStatus: "unparsed", warnings: ["missing_bed"] };
+  const vacancyFields = parsedVacancyMarker
+    ? { parsedVacancyMarker, physicalBedStatus: "vacant", physicalBedStatusSource: "access_snapshot_E_marker" }
+    : { parsedVacancyMarker, physicalBedStatus: bed ? "not_marked_vacant" : "unknown", physicalBedStatusSource: bed ? "access_snapshot_no_E" : "missing_access_snapshot" };
+  if (!raw) return { bed: "", parsedDepositAmount, parsedCheckinMmdd, parsedValidUntilMmdd, ...vacancyFields, physicalBedStatus: "unknown", physicalBedStatusSource: "missing_access_snapshot", parsedBusinessNote, parseStatus: "invalid", warnings: ["empty_remark"] };
+  if (!bed) return { bed: "", parsedDepositAmount, parsedCheckinMmdd, parsedValidUntilMmdd, ...vacancyFields, parsedBusinessNote, parseStatus: "unparsed", warnings: ["missing_bed"] };
   if (parsedDepositAmount === null || !parsedCheckinMmdd) warnings.push("missing_deposit_or_checkin");
   const parseStatus = warnings.length ? "partial" : "parsed";
-  return { bed, parsedDepositAmount, parsedCheckinMmdd, parsedValidUntilMmdd, parsedBusinessNote, parseStatus, warnings };
+  return { bed, parsedDepositAmount, parsedCheckinMmdd, parsedValidUntilMmdd, ...vacancyFields, parsedBusinessNote, parseStatus, warnings };
 }
 
 export function buildAccessSnapshotDTO(rawRemark, options = {}) {
@@ -134,6 +140,9 @@ export function buildAccessSnapshotDTO(rawRemark, options = {}) {
     parsed_deposit_amount: parsed.parsedDepositAmount,
     parsed_checkin_mmdd: parsed.parsedCheckinMmdd,
     parsed_valid_until_mmdd: parsed.parsedValidUntilMmdd,
+    parsed_vacancy_marker: parsed.parsedVacancyMarker,
+    physical_bed_status: parsed.physicalBedStatus,
+    physical_bed_status_source: parsed.physicalBedStatusSource,
     parsed_business_note: parsed.parsedBusinessNote,
     parse_status: parsed.parseStatus,
     source: "access_card_remark",
@@ -146,4 +155,3 @@ export function buildAccessSnapshotDTO(rawRemark, options = {}) {
 export function isAccessSnapshotProviderPhoneNonAuthoritative(value, source = "access_card_metadata") {
   return isProviderPhone(value, source);
 }
-

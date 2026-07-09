@@ -36,6 +36,25 @@ test("Access Snapshot parses bed deposit and check-in mmdd", () => {
   assert.match(dto.access_snapshot_id, /^runtime_access_snapshot_/);
 });
 
+test("Access Snapshot parses E marker as canonical vacancy source", () => {
+  const upper = buildAccessSnapshotDTO("611 E");
+  const lower = buildAccessSnapshotDTO("611 e");
+  const withDeposit = buildAccessSnapshotDTO("611 D100 0802 E");
+  const withoutMarker = buildAccessSnapshotDTO("611 D100 0802");
+
+  assert.equal(upper.parsed_vacancy_marker, true);
+  assert.equal(upper.physical_bed_status, "vacant");
+  assert.equal(upper.physical_bed_status_source, "access_snapshot_E_marker");
+  assert.equal(lower.parsed_vacancy_marker, true);
+  assert.equal(lower.physical_bed_status_source, "access_snapshot_E_marker");
+  assert.equal(withDeposit.parsed_deposit_amount, 100);
+  assert.equal(withDeposit.parsed_vacancy_marker, true);
+  assert.equal(withDeposit.physical_bed_status, "vacant");
+  assert.equal(withoutMarker.parsed_vacancy_marker, false);
+  assert.equal(withoutMarker.physical_bed_status, "not_marked_vacant");
+  assert.equal(withoutMarker.physical_bed_status_source, "access_snapshot_no_E");
+});
+
 test("Access Snapshot parses inline business note after check-in mmdd", () => {
   const dto = buildAccessSnapshotDTO("634 D200 0505娈嬬柧浜?");
   assert.equal(dto.bed, "634");
@@ -119,4 +138,3 @@ test("Worker runtime exposes Access Snapshot DTO helper without changing API sha
   assert.equal(dto.non_authoritative_provider_metadata.tenant_card_id, "tenant-card-334");
   assert.equal("customer_phone" in dto, false);
 });
-
