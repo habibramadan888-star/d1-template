@@ -14,6 +14,17 @@ This document defines the business logic, dependency graph, input anchors, outpu
 
 Closed-loop testing should not proceed until this model is reviewed and accepted.
 
+## OWNER_APPROVED_DEFAULT_RULES_V1
+
+These defaults are owner-approved and should guide future implementation and closed-loop tests.
+
+1. Deposit paid with rent: employee UI may allow one combined input, but backend must create two anchors: Rent and Deposit In. Deposit must never count as rent income.
+2. Arrears Payment overpayment: reject by default. If remaining_arrears is `80`, payment above `80` is not allowed unless a future owner-approved excess path is implemented.
+3. Deposit Out refund above balance: reject by default. Owner override with reason is required if this is ever allowed.
+4. Checkout with open arrears: Normal Checkout is not allowed with open arrears. Employee must use Left With Arrears mode and capture required fields.
+5. Expense evidence: category, reason, amount, and payment_method are always required. Receipt/evidence is required for expenses `>= 100 AED`; below `100 AED`, reason/category/payment_method are enough.
+6. Bed Transfer timing: transfer_date is the effective date. New bed becomes occupied on transfer_date. Old bed becomes available on transfer_date. deposit_balance, arrears, and rent_coverage carry over to the new bed.
+
 ## Core Business Objects
 
 ### occupancy_session
@@ -251,6 +262,8 @@ Financial effect:
 - paid_amount increases cash or bank receipts.
 - rent income equals paid rent component.
 - deposit component is not rent income and must be separately anchored if present.
+- If the employee UI accepts rent and deposit in one combined input, backend must create two separate anchors: Rent and Deposit In.
+- Deposit paid with rent must never count as rent income.
 
 Projection effect:
 
@@ -311,7 +324,7 @@ Required variants:
 - Full or partial repayment must be decided from arrears_ref, remaining_arrears_before, payment_amount, and remaining_arrears_after.
 - Full repayment: payment_amount clears remaining_arrears and settlement_status becomes settled.
 - Partial repayment: payment_amount reduces remaining_arrears and settlement_status remains partial.
-- Overpayment handling: payment_amount above remaining_arrears is rejected unless an explicit owner-approved overpayment path exists.
+- Overpayment handling: reject by default. If remaining_arrears is `80`, payment above `80` is not allowed unless a future owner-approved excess path is implemented.
 
 Preconditions:
 
@@ -366,7 +379,7 @@ Invalid/rejected cases:
 - Missing arrears_ref.
 - Linking by bed only.
 - Already-settled or void arrears_ref.
-- Overpayment without owner-approved handling.
+- Overpayment above remaining_arrears by default.
 - Binding to rent period.
 
 Duplicate guard rules:
@@ -541,7 +554,8 @@ Downstream dependencies:
 
 Invalid/rejected cases:
 
-- Refund more than deposit_balance without owner override.
+- Refund more than deposit_balance by default.
+- Refund more than deposit_balance requires owner override with reason if this is ever allowed.
 - Missing difference_reason when refund_amount differs from deposit_balance.
 - Open/partial arrears without approved offset or owner approval.
 - Missing refund method.
@@ -580,7 +594,7 @@ Required variants:
 - Normal checkout: no open arrears and no unresolved owner approval requirement.
 - Checkout with deposit refund: deposit refund is explicit and linked to deposit_balance.
 - Checkout with deduction: deduction amount and deduction reason are explicit.
-- Checkout with unpaid arrears: normal checkout is blocked unless owner approval or Left With Arrears path is selected.
+- Checkout with unpaid arrears: Normal Checkout is not allowed with open arrears. Employee must use Left With Arrears mode and capture required fields.
 - Left With Arrears: customer has left, arrears remains open, and tracking fields are preserved.
 
 Preconditions:
@@ -645,7 +659,7 @@ Downstream dependencies:
 
 Invalid/rejected cases:
 
-- Normal checkout with open/partial arrears and no owner approval.
+- Normal Checkout with open/partial arrears.
 - Deposit refund while arrears exist without approval/offset.
 - Left With Arrears missing WhatsApp phone or promised payment date.
 - Linking left customer only by bed.
@@ -692,10 +706,11 @@ Required employee input fields:
 - expense_category
 - reason
 - payment_method
+- receipt/evidence ref when expense_amount >= 100 AED
 
 Optional fields:
 
-- receipt/evidence ref
+- receipt/evidence ref when expense_amount < 100 AED
 - note
 
 Forbidden identity fields:
@@ -734,6 +749,7 @@ Invalid/rejected cases:
 - Missing amount.
 - Missing category/reason.
 - Missing payment method.
+- Missing receipt/evidence ref when expense_amount >= 100 AED.
 - Treating expense as tenant debt without explicit approved link.
 
 Duplicate guard rules:
@@ -770,6 +786,9 @@ Required carry-forward rule:
 - Bed Transfer must carry open arrears by arrears_ref, not by bed-only matching.
 - Bed Transfer must carry rent coverage without creating duplicate rent.
 - Bed Transfer must not create duplicate deposit or duplicate rent.
+- transfer_date is the effective date.
+- New bed becomes occupied on transfer_date.
+- Old bed becomes available on transfer_date.
 
 Preconditions:
 
