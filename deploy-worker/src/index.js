@@ -8418,6 +8418,260 @@ function ownerOverviewSummarizeTransactions(rows=[]){
   return out;
 }
 __name(ownerOverviewSummarizeTransactions,"ownerOverviewSummarizeTransactions");
+function canonicalFinanceProjectionZeroTotals(){
+  return {
+    cash_received:0,
+    bank_received:0,
+    gross_received:0,
+    rent_income:0,
+    deposit_received:0,
+    deposit_refund:0,
+    arrears_repaid:0,
+    arrears_opened_amount:0,
+    arrears_opened_count:0,
+    expenses:0,
+    bed_transfer_fee:0,
+    cash_out:0,
+    bank_out:0,
+    net_cash:0
+  };
+}
+__name(canonicalFinanceProjectionZeroTotals,"canonicalFinanceProjectionZeroTotals");
+function canonicalFinanceProjectionSourceProof(){
+  return {
+    gateway:"canonical_finance_projection_gateway",
+    source_layer:"L2 Finance Projection",
+    allowed_sources:["canonical_event_archive","entries_json","correction_anchors","void_anchors","reversal_anchors","archive_effective_totals"],
+    forbidden_truth_sources:["owner_display_text","employee_local_cache","preview_text","whatsapp_export_text","tenant_card_id","card_id","old_ttlock_ref","provider_phone","phone_99099","ttlock_provider_metadata"],
+    deposit_current_balance_source:"TTLock / Access Snapshot D amount",
+    deposit_event_role:"financial_movement_and_audit_evidence",
+    owner_history_write_source:false
+  };
+}
+__name(canonicalFinanceProjectionSourceProof,"canonicalFinanceProjectionSourceProof");
+function canonicalFinanceProjectionRoundTotals(totals={}){
+  const out={...totals};
+  for(const key of Object.keys(out)){
+    if(typeof out[key]==="number")out[key]=ownerOverviewMoney(out[key]);
+  }
+  return out;
+}
+__name(canonicalFinanceProjectionRoundTotals,"canonicalFinanceProjectionRoundTotals");
+function canonicalFinanceProjectionPaymentMethod(anchor={}){
+  const method=String(anchor?.payment_method||anchor?.pay_type||anchor?.method||anchor?.cat||"cash").trim().toLowerCase();
+  if(method==="b"||method.includes("bank")||method.includes("transfer")||method.includes("银行"))return "bank";
+  return "cash";
+}
+__name(canonicalFinanceProjectionPaymentMethod,"canonicalFinanceProjectionPaymentMethod");
+function canonicalFinanceProjectionAmount(...values){
+  for(const value of values){
+    const n=ownerOverviewMoney(value);
+    if(n>0)return n;
+  }
+  return 0;
+}
+__name(canonicalFinanceProjectionAmount,"canonicalFinanceProjectionAmount");
+function canonicalFinanceProjectionEventType(anchor={}){
+  return String(anchor?.event_type||entryAnchorEventType(entryAnchorType(anchor))).trim().toLowerCase();
+}
+__name(canonicalFinanceProjectionEventType,"canonicalFinanceProjectionEventType");
+function canonicalFinanceProjectionAddInflow(totals,method,amount){
+  const safeAmount=ownerOverviewMoney(amount);
+  if(safeAmount<=0)return;
+  if(method==="bank")totals.bank_received+=safeAmount;
+  else totals.cash_received+=safeAmount;
+  totals.gross_received+=safeAmount;
+}
+__name(canonicalFinanceProjectionAddInflow,"canonicalFinanceProjectionAddInflow");
+function canonicalFinanceProjectionAddOutflow(totals,method,amount){
+  const safeAmount=ownerOverviewMoney(amount);
+  if(safeAmount<=0)return;
+  if(method==="bank")totals.bank_out+=safeAmount;
+  else totals.cash_out+=safeAmount;
+}
+__name(canonicalFinanceProjectionAddOutflow,"canonicalFinanceProjectionAddOutflow");
+function canonicalFinanceProjectionApplyAnchor(totals,anchor={}){
+  const type=canonicalFinanceProjectionEventType(anchor);
+  const method=canonicalFinanceProjectionPaymentMethod(anchor);
+  if(type==="rent"){
+    const paid=canonicalFinanceProjectionAmount(anchor.paid_amount,anchor.payment_amount,anchor.amount,anchor.paid);
+    const expected=canonicalFinanceProjectionAmount(anchor.expected_rent,anchor.expected_amount,anchor.period_due,anchor.due);
+    const arrears=canonicalFinanceProjectionAmount(anchor.arrears_amount,anchor.short_paid_amount,anchor.remaining_arrears_before_payment,Math.max(0,expected-paid));
+    canonicalFinanceProjectionAddInflow(totals,method,paid);
+    totals.rent_income+=paid;
+    if(arrears>0){
+      totals.arrears_opened_amount+=arrears;
+      totals.arrears_opened_count+=1;
+    }
+  }else if(type==="arrears_payment"){
+    const amount=canonicalFinanceProjectionAmount(anchor.payment_amount,anchor.amount,anchor.paid_amount);
+    canonicalFinanceProjectionAddInflow(totals,method,amount);
+    totals.arrears_repaid+=amount;
+  }else if(type==="deposit_in"){
+    const amount=canonicalFinanceProjectionAmount(anchor.deposit_paid_amount,anchor.deposit_amount,anchor.amount,anchor.paid_amount);
+    canonicalFinanceProjectionAddInflow(totals,method,amount);
+    totals.deposit_received+=amount;
+  }else if(type==="deposit_out"){
+    const amount=canonicalFinanceProjectionAmount(anchor.actual_refund_amount,anchor.refund_amount,anchor.deposit_refund,anchor.amount);
+    canonicalFinanceProjectionAddOutflow(totals,method,amount);
+    totals.deposit_refund+=amount;
+  }else if(type==="expense"){
+    const amount=canonicalFinanceProjectionAmount(anchor.expense_amount,anchor.amount);
+    canonicalFinanceProjectionAddOutflow(totals,method,amount);
+    totals.expenses+=amount;
+  }else if(type==="bed_transfer"||type==="bed_transfer_fee"){
+    const feeStatus=String(anchor?.fee_status||anchor?.fee_choice||anchor?.fee_option||"").toLowerCase();
+    const amount=canonicalFinanceProjectionAmount(anchor.fee_amount,anchor.amount);
+    if(amount>0&&!feeStatus.includes("waiv")){
+      canonicalFinanceProjectionAddInflow(totals,method,amount);
+      totals.bed_transfer_fee+=amount;
+    }
+  }
+}
+__name(canonicalFinanceProjectionApplyAnchor,"canonicalFinanceProjectionApplyAnchor");
+function canonicalFinanceProjectionApplyCorrectionEffectiveTotals(totals,summary={}){
+  const effective=summary.archive_effective_totals||{};
+  totals.cash_received+=ownerOverviewMoney(effective.cash);
+  totals.bank_received+=ownerOverviewMoney(effective.bank);
+  totals.gross_received+=ownerOverviewMoney(effective.gross);
+  totals.rent_income+=ownerOverviewMoney(effective.rent_income);
+  totals.deposit_received+=Math.max(0,ownerOverviewMoney(effective.deposit_liability));
+  totals.deposit_refund+=Math.max(0,-ownerOverviewMoney(effective.deposit_liability));
+  totals.arrears_repaid+=ownerOverviewMoney(effective.arrears_repaid);
+  totals.arrears_opened_amount+=ownerOverviewMoney(effective.arrears_open);
+  if(ownerOverviewMoney(effective.arrears_open)>0)totals.arrears_opened_count+=1;
+  totals.expenses+=ownerOverviewMoney(effective.expense);
+  totals.bed_transfer_fee+=ownerOverviewMoney(effective.transfer_fee);
+}
+__name(canonicalFinanceProjectionApplyCorrectionEffectiveTotals,"canonicalFinanceProjectionApplyCorrectionEffectiveTotals");
+async function canonicalFinanceProjectionFetchSessions(env,user,range={},options={}){
+  if(!await phase0TableExists(env,"sessions"))return [];
+  const includeVoided=options.include_voided!==false;
+  const columns=await empTableColumns(env,"sessions").catch(()=>new Set());
+  const entriesExpr=columns.has("entries_json")?"entries_json":"'' AS entries_json";
+  const exportExpr=columns.has("export_text")?"export_text":"'' AS export_text";
+  const where=includeVoided
+    ? "corpid=? AND substr(COALESCE(date,created_at,''),1,10) BETWEEN ? AND ?"
+    : "corpid=? AND COALESCE(voided_at,'')='' AND COALESCE(handover_status,'')<>'VOID' AND substr(COALESCE(date,created_at,''),1,10) BETWEEN ? AND ?";
+  return phase0All(env,
+    `SELECT id, anchor_id, date, source, entries_count, cash_handover, bank_transfer_total, gross_received, handover_status, voided_at, created_at, ${exportExpr}, ${entriesExpr} FROM sessions WHERE ${where} ORDER BY substr(COALESCE(date,created_at,''),1,10) ASC, created_at ASC LIMIT 1000`,
+    [user.corpid,range.start,range.end]
+  ).catch(()=>[]);
+}
+__name(canonicalFinanceProjectionFetchSessions,"canonicalFinanceProjectionFetchSessions");
+async function canonicalFinanceProjectionBuild(env,user,range={},options={}){
+  const sessions=await canonicalFinanceProjectionFetchSessions(env,user,range,options);
+  const totals=canonicalFinanceProjectionZeroTotals();
+  const excluded_records=[];
+  const reconciliation_warnings=[];
+  const session_details=[];
+  let active_session_count=0;
+  let voided_session_count=0;
+  let corrected_session_count=0;
+  for(const session of sessions){
+    const detail=await ownerHistoryArchiveDetailRows(env,user,session,true).catch(()=>({rows:[],source:"none"}));
+    const targetAnchor=cleanText(session?.anchor_id||session?.id||"",180);
+    const correctionRows=targetAnchor?await ownerCorrectionFetchExistingCorrectionSessions(env,user,targetAnchor).catch(()=>[]):[];
+    const correctionFields=ownerHistoryDetailCorrectionFields(session,detail.rows,correctionRows);
+    const summary=correctionFields.correction_summary||{};
+    const archiveState=summary.archive_state||canonicalOwnerHistoryArchiveState(session,correctionFields);
+    const activeForTotals=summary.active_for_totals!==false&&canonicalOwnerHistoryActiveForTotals(archiveState);
+    if(archiveState==="voided"||archiveState==="deleted"||archiveState==="reversed")voided_session_count+=1;
+    if(summary.correction_applied)corrected_session_count+=1;
+    const anchors=extractEmployeeEntryAnchorsFromSession(session);
+    session_details.push({
+      session_id:cleanText(session?.id||"",160),
+      anchor:targetAnchor,
+      date:cleanText(session?.date||session?.created_at||"",40).slice(0,10),
+      archive_state:archiveState,
+      active_for_totals:activeForTotals,
+      raw_totals:summary.raw_totals||null,
+      correction_totals:summary.correction_totals||null,
+      corrected_totals:summary.corrected_totals||summary.adjusted_totals||null,
+      archive_effective_totals:summary.archive_effective_totals||null,
+      entries_json_anchor_count:anchors.length,
+      source:detail.source
+    });
+    if(!activeForTotals){
+      excluded_records.push({session_id:session.id,anchor:targetAnchor,archive_state:archiveState,reason:"excluded_from_active_finance_totals"});
+      continue;
+    }
+    active_session_count+=1;
+    if(summary.correction_applied){
+      canonicalFinanceProjectionApplyCorrectionEffectiveTotals(totals,summary);
+    }else if(anchors.length){
+      for(const anchor of anchors)canonicalFinanceProjectionApplyAnchor(totals,anchor);
+    }else{
+      reconciliation_warnings.push({code:"CANONICAL_ANCHORS_MISSING",session_id:session.id,anchor:targetAnchor,message:"No entries_json anchors found; session summary used as legacy compatibility only."});
+      totals.cash_received+=ownerOverviewMoney(session.cash_handover);
+      totals.bank_received+=ownerOverviewMoney(session.bank_transfer_total);
+      totals.gross_received+=ownerOverviewMoney(session.gross_received);
+    }
+  }
+  const rounded=canonicalFinanceProjectionRoundTotals(totals);
+  rounded.net_cash=ownerOverviewMoney(rounded.cash_received-rounded.cash_out);
+  return {
+    ...rounded,
+    active_session_count,
+    voided_session_count,
+    corrected_session_count,
+    source_proof:canonicalFinanceProjectionSourceProof(),
+    excluded_records,
+    reconciliation_warnings,
+    sessions:session_details,
+    range,
+    readonly:true,
+    production_cutover:"PRODUCTION_NO_GO"
+  };
+}
+__name(canonicalFinanceProjectionBuild,"canonicalFinanceProjectionBuild");
+function canonicalFinanceProjectionToOverviewSummary(projection={}){
+  return {
+    rows_checked:Number(projection.active_session_count||0)+Number(projection.voided_session_count||0),
+    gross_received:ownerOverviewMoney(projection.gross_received),
+    rent_received:ownerOverviewMoney(projection.rent_income),
+    deposit_received:ownerOverviewMoney(projection.deposit_received),
+    arrears_recovered:ownerOverviewMoney(projection.arrears_repaid),
+    bed_transfer_fee:ownerOverviewMoney(projection.bed_transfer_fee),
+    deposit_refund:ownerOverviewMoney(projection.deposit_refund),
+    expenses:ownerOverviewMoney(projection.expenses),
+    net_cashflow:ownerOverviewMoney(projection.net_cash),
+    cash_received:ownerOverviewMoney(projection.cash_received),
+    bank_received:ownerOverviewMoney(projection.bank_received),
+    cash_handover:ownerOverviewMoney(projection.cash_received),
+    bank_transfer_total:ownerOverviewMoney(projection.bank_received),
+    arrears_opened_amount:ownerOverviewMoney(projection.arrears_opened_amount),
+    arrears_opened_count:Number(projection.arrears_opened_count||0),
+    active_session_count:Number(projection.active_session_count||0),
+    voided_session_count:Number(projection.voided_session_count||0),
+    corrected_session_count:Number(projection.corrected_session_count||0),
+    source_proof:projection.source_proof,
+    excluded_records:projection.excluded_records||[],
+    reconciliation_warnings:projection.reconciliation_warnings||[],
+    sessions:projection.sessions||[],
+    source_table:"canonical_event_archive",
+    rule:"canonical_finance_projection_gateway"
+  };
+}
+__name(canonicalFinanceProjectionToOverviewSummary,"canonicalFinanceProjectionToOverviewSummary");
+async function handleOwnerFinanceProjection(request,env,user){
+  if(!canReadOwnerData(user))return forbidden();
+  const url=new URL(request.url);
+  const today=empTodayDubai();
+  let range={start:url.searchParams.get("start")||"",end:url.searchParams.get("end")||""};
+  if(!range.start||!range.end){
+    const month=url.searchParams.get("month");
+    if(month&&/^\d{4}-\d{2}$/.test(month)){
+      range={start:`${month}-01`,end:empAddDays(ownerOverviewDateFromParts(Number(month.slice(0,4)),Number(month.slice(5,7))+1,1),-1)};
+    }else{
+      range=ownerOverviewBillingPeriodRange(today,0);
+    }
+  }
+  const includeVoided=url.searchParams.get("include_voided")!=="0";
+  const projection=await canonicalFinanceProjectionBuild(env,user,range,{include_voided:includeVoided,include_corrections:url.searchParams.get("include_corrections")!=="0"});
+  return success(projection);
+}
+__name(handleOwnerFinanceProjection,"handleOwnerFinanceProjection");
 function ownerOverviewDelta(current,comparison){
   const currentValue=ownerOverviewMoney(current);
   const comparisonValue=ownerOverviewMoney(comparison);
@@ -8566,6 +8820,7 @@ async function phase0OwnerOverviewComparativeSummary(env,user,url){
   const lastQuarter=ownerOverviewQuarterRange(today,-1);
   const sameQuarterLastYear=ownerOverviewSameQuarterLastYearRange(today);
   const safeRows=(promise)=>promise.catch(()=>[]);
+  const safeFinanceProjection=(range)=>canonicalFinanceProjectionBuild(env,user,range,{include_voided:true,include_corrections:true}).catch(()=>null);
   const [
     monthRows,
     billingPeriodRows,
@@ -8575,6 +8830,13 @@ async function phase0OwnerOverviewComparativeSummary(env,user,url){
     quarterRows,
     lastQuarterRows,
     sameQuarterLastYearRows,
+    monthFinanceProjection,
+    billingPeriodFinanceProjection,
+    lastMonthFinanceProjection,
+    sameMonthLastYearFinanceProjection,
+    quarterFinanceProjection,
+    lastQuarterFinanceProjection,
+    sameQuarterLastYearFinanceProjection,
     currentSot,
     bedTransferReviews
   ]=await Promise.all([
@@ -8586,17 +8848,27 @@ async function phase0OwnerOverviewComparativeSummary(env,user,url){
     safeRows(ownerOverviewFetchTransactions(env,user,currentQuarter)),
     safeRows(ownerOverviewFetchTransactions(env,user,lastQuarter)),
     safeRows(ownerOverviewFetchTransactions(env,user,sameQuarterLastYear)),
+    safeFinanceProjection(currentMonth),
+    safeFinanceProjection(currentBillingPeriod),
+    safeFinanceProjection(lastMonth),
+    safeFinanceProjection(sameMonthLastYear),
+    safeFinanceProjection(currentQuarter),
+    safeFinanceProjection(lastQuarter),
+    safeFinanceProjection(sameQuarterLastYear),
     resolveCurrentReceivablesSot(env,user,{limit:500,ttlockTimeoutMs:8000}).catch(()=>null),
     safeRows(ownerOverviewFetchBedTransferReviews(env,user))
   ]);
-  const month=ownerOverviewSummarizeTransactions(monthRows);
-  const billingPeriod=ownerOverviewSummarizeTransactions(billingPeriodRows);
-  const currentPeriodReceived={...billingPeriodSessionSummary,range:currentBillingPeriod,rule:"billing_period_3_to_2_owner_visible_sessions"};
-  const prevMonth=ownerOverviewSummarizeTransactions(lastMonthRows);
-  const sameLastYear=ownerOverviewSummarizeTransactions(sameMonthLastYearRows);
-  const quarter=ownerOverviewSummarizeTransactions(quarterRows);
-  const prevQuarter=ownerOverviewSummarizeTransactions(lastQuarterRows);
-  const sameQuarterLastYearSummary=ownerOverviewSummarizeTransactions(sameQuarterLastYearRows);
+  const financeOrLegacy=(projection,rows)=>projection?canonicalFinanceProjectionToOverviewSummary(projection):ownerOverviewSummarizeTransactions(rows);
+  const month=financeOrLegacy(monthFinanceProjection,monthRows);
+  const billingPeriod=financeOrLegacy(billingPeriodFinanceProjection,billingPeriodRows);
+  const currentPeriodReceived=billingPeriodFinanceProjection
+    ? {...canonicalFinanceProjectionToOverviewSummary(billingPeriodFinanceProjection),range:currentBillingPeriod,rule:"canonical_finance_projection_gateway_billing_period_3_to_2"}
+    : {...billingPeriodSessionSummary,range:currentBillingPeriod,rule:"billing_period_3_to_2_owner_visible_sessions"};
+  const prevMonth=financeOrLegacy(lastMonthFinanceProjection,lastMonthRows);
+  const sameLastYear=financeOrLegacy(sameMonthLastYearFinanceProjection,sameMonthLastYearRows);
+  const quarter=financeOrLegacy(quarterFinanceProjection,quarterRows);
+  const prevQuarter=financeOrLegacy(lastQuarterFinanceProjection,lastQuarterRows);
+  const sameQuarterLastYearSummary=financeOrLegacy(sameQuarterLastYearFinanceProjection,sameQuarterLastYearRows);
   const arrearRows=currentSot?.all_rows||[];
   const arrears=ownerOverviewArrearsSummary(arrearRows,today);
   const consoleSummary=currentSot?.summary||{};
@@ -8608,10 +8880,10 @@ async function phase0OwnerOverviewComparativeSummary(env,user,url){
     arrears.source_counts.existing_arrears_record=Number(consoleSummary.existing_arrears_count??consoleBreakdown.existing_arrears_count??arrears.source_counts.existing_arrears_record);
   }
   const noData=[];
-  if(!monthRows.length)noData.push("current_month_transactions");
-  if(!billingPeriodSessionSummary.rows_checked)noData.push("current_billing_period_sessions");
-  if(!lastMonthRows.length)noData.push("last_month_transactions");
-  if(!sameMonthLastYearRows.length)noData.push("same_month_last_year_transactions");
+  if(!month.rows_checked)noData.push("current_month_finance_projection");
+  if(!currentPeriodReceived.rows_checked)noData.push("current_billing_period_finance_projection");
+  if(!prevMonth.rows_checked)noData.push("last_month_finance_projection");
+  if(!sameLastYear.rows_checked)noData.push("same_month_last_year_finance_projection");
   if(!arrearRows.length)noData.push("open_arrears");
   return success({
     generated_at:empNow(),
@@ -8691,7 +8963,7 @@ async function phase0OwnerOverviewComparativeSummary(env,user,url){
       needs_review_count:arrears.needs_review_count
     },
     data_quality:{
-      rows_checked:{current_month:month.rows_checked,current_billing_period_transactions:billingPeriod.rows_checked,current_billing_period_sessions:billingPeriodSessionSummary.rows_checked,last_month:prevMonth.rows_checked,same_month_last_year:sameLastYear.rows_checked,current_quarter:quarter.rows_checked,arrears:arrearRows.length},
+      rows_checked:{current_month:month.rows_checked,current_billing_period_transactions:billingPeriod.rows_checked,current_billing_period_sessions:currentPeriodReceived.rows_checked,last_month:prevMonth.rows_checked,same_month_last_year:sameLastYear.rows_checked,current_quarter:quarter.rows_checked,arrears:arrearRows.length},
       no_data:noData,
       warnings:noData.length?["Some comparison windows have no source rows; show no-data instead of fabricating trend."]:[]
     }
@@ -8734,6 +9006,7 @@ async function handlePhase0ReadOnlyApi(request,env,user){
     if(path==="/api/owner/properties")return phase0Properties(env,user,url);
     if(path==="/api/owner/totals")return phase0DashboardTotals(env,user);
     if(path==="/api/owner/bed-transfers")return handleOwnerBedTransfers(request,env,user);
+    if(path==="/api/owner/finance/projection")return handleOwnerFinanceProjection(request,env,user);
     if(path==="/api/owner/cloud-arrears/projection")return handleOwnerCloudArrearsProjection(request,env,user);
     if(path==="/api/owner/console-receivables-sot"||path==="/api/owner/current-receivables-sot"){
       const limit=Math.min(Math.max(Number(url.searchParams.get("limit")||500),1),500);
