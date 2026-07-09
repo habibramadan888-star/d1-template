@@ -249,3 +249,25 @@ test("Deposit Out contract preserves balance, override, offset, and refund field
   assert.match(correctionTotals, /type==="deposit_out"\)totals\.deposit_liability-=/);
   assert.doesNotMatch(correctionTotals, /type==="deposit_out"\)totals\.rent_income/);
 });
+
+test("Expense contract preserves evidence, category, payment method, and cost-only accounting", async () => {
+  const worker = await readFile(workerPath, "utf8");
+  const validator = functionBlock(worker, "validateExpenseUploadFields");
+  const normalize = functionBlock(worker, "normalizeEntryAnchor");
+  const contract = contractBlock(worker);
+  const contractLine = contract.match(/E:\[[^\]]+\]/)?.[0] || "";
+  const correctionTotals = functionBlock(worker, "ownerCorrectionPreviewSessionTotals");
+
+  for (const field of ["expense_amount", "expense_category", "reason", "payment_method", "evidence_ref"]) {
+    assert.match(validator + normalize + contractLine, new RegExp(field));
+  }
+
+  assert.match(validator, /EXPENSE_REQUIRED_FIELD_MISSING/);
+  assert.match(validator, /EXPENSE_EVIDENCE_REQUIRED/);
+  assert.match(validator, /amount>=100/);
+  assert.doesNotMatch(validator, /RENT_REQUIRED_FIELD_MISSING/);
+  assert.doesNotMatch(normalize, /linked_tenant_ref/);
+  assert.match(correctionTotals, /type==="expense"\)totals\.expense\+=/);
+  assert.doesNotMatch(correctionTotals, /type==="expense"\)totals\.rent_income/);
+  assert.doesNotMatch(correctionTotals, /type==="expense"\)totals\.arrears_repaid/);
+});
