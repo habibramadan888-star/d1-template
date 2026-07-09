@@ -101,11 +101,15 @@ test("runtime anchor contract exposes event-specific required fields from the so
     TF: ["from_bed", "to_bed", "transfer_date", "fee_amount", "fee_status", "waiver_reason"]
   };
 
+  const missingRuntimeFields = [];
   for (const [type, fields] of Object.entries(requiredByType)) {
     const line = contract.match(new RegExp(`${type}:\\[[^\\]]+\\]`))?.[0] || "";
     assert.ok(line, `${type} contract line must exist`);
-    for (const field of fields) assert.match(line, new RegExp(field), `${type} must include ${field}`);
+    for (const field of fields) {
+      if (!new RegExp(field).test(line)) missingRuntimeFields.push(`${type}.${field}`);
+    }
   }
+  assert.deepEqual(missingRuntimeFields, []);
 });
 
 test("forbidden provider identity fields cannot become business identity or duplicate matching keys", async () => {
@@ -188,16 +192,20 @@ test("event-specific business rules are visible in current runtime validation", 
   const expense = functionBlock(worker, "validateExpenseUploadFields");
   const transfer = functionBlock(worker, "validateBedTransferUploadFields");
 
-  assert.match(rent, /arrears_due_date/);
-  assert.match(arrears, /remaining_arrears_before_payment/);
-  assert.match(arrears, /ARREARS_PAYMENT_REMAINING_STATUS_MISMATCH/);
-  assert.match(depositIn, /deposit_required_total/);
-  assert.match(depositIn, /deposit_remaining/);
-  assert.match(depositOut, /refund_date/);
-  assert.match(depositOut, /owner_override_ref/);
-  assert.match(checkout, /left_with_arrears/);
-  assert.match(checkout, /promised_payment_date/);
-  assert.match(expense, /evidence_ref/);
-  assert.match(expense, /100/);
-  assert.match(transfer, /fromBed===toBed|from_bed.*to_bed/);
+  const missingRuntimeRules = [
+    ["Rent.short_paid_arrears_due_date", rent, /arrears_due_date/],
+    ["ArrearsPayment.remaining_before", arrears, /remaining_arrears_before_payment/],
+    ["ArrearsPayment.status_consistency", arrears, /ARREARS_PAYMENT_REMAINING_STATUS_MISMATCH/],
+    ["DepositIn.deposit_required_total", depositIn, /deposit_required_total/],
+    ["DepositIn.deposit_remaining", depositIn, /deposit_remaining/],
+    ["DepositOut.refund_date", depositOut, /refund_date/],
+    ["DepositOut.owner_override_ref", depositOut, /owner_override_ref/],
+    ["Checkout.left_with_arrears", checkout, /left_with_arrears/],
+    ["Checkout.promised_payment_date", checkout, /promised_payment_date/],
+    ["Expense.evidence_ref", expense, /evidence_ref/],
+    ["Expense.evidence_threshold_100", expense, /100/],
+    ["BedTransfer.reject_same_bed", transfer, /fromBed===toBed|from_bed.*to_bed/]
+  ].filter(([, block, pattern]) => !pattern.test(block)).map(([name]) => name);
+
+  assert.deepEqual(missingRuntimeRules, []);
 });
