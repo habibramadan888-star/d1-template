@@ -18,7 +18,7 @@ Closed-loop testing should not proceed until this model is reviewed and accepted
 
 These defaults are owner-approved and should guide future implementation and closed-loop tests.
 
-1. Deposit paid with rent: employee UI may allow one combined input, but backend must create two anchors: Rent and Deposit In. Deposit must never count as rent income.
+1. Deposit paid with rent: Deposit In must always be recorded as a separate event anchor. Even if the customer pays rent and deposit at the same time, backend must create separate anchors: Rent and Deposit In. Deposit must never be merged into Rent. Deposit must never count as rent income. Deposit In must support partial deposit and later top-up.
 2. Arrears Payment overpayment: reject by default. If remaining_arrears is `80`, payment above `80` is not allowed unless a future owner-approved excess path is implemented.
 3. Deposit Out refund above balance: reject by default. Owner override with reason is required if this is ever allowed.
 4. Checkout with open arrears: Normal Checkout is not allowed with open arrears. Employee must use Left With Arrears mode and capture required fields.
@@ -179,7 +179,7 @@ Required common fields for all events:
 |---|---|
 | Rent | bed, expected_rent, paid_amount, rent_period_start, rent_period_end, payment_method, short_paid, arrears_amount, arrears_due_date, arrears_note, arrears_status, arrears_ref if short-paid creates debt |
 | Arrears Payment | bed, arrears_ref, original_event_id or original_arrears_id, original_arrears_amount, already_paid_amount, remaining_arrears_before, payment_amount, remaining_arrears_after, settlement_status, payment_method |
-| Deposit In | bed, deposit_ref if available, deposit_amount, payment_method, deposit_paid_with_rent flag if applicable, note |
+| Deposit In | bed, deposit_ref if available, deposit_amount, payment_method, deposit_required_total, deposit_paid_amount, deposit_remaining, promise_date if remaining deposit is promised later, note |
 | Deposit Out | bed, deposit_ref, deposit_balance_before, refund_amount, deduction_amount, deduction_reason, difference_reason, refund_method, refund_date, deposit_balance_after, owner_override_ref if over balance |
 | Checkout | bed, checkout_date, checkout_type, deposit_balance, deposit_refund_amount, outstanding_arrears, owner_approval_required, owner_approval_status, left_with_arrears fields if applicable |
 | Expense | target_bed or room, expense_amount, expense_category, reason, payment_method, evidence_ref if available, note |
@@ -262,7 +262,8 @@ Financial effect:
 - paid_amount increases cash or bank receipts.
 - rent income equals paid rent component.
 - deposit component is not rent income and must be separately anchored if present.
-- If the employee UI accepts rent and deposit in one combined input, backend must create two separate anchors: Rent and Deposit In.
+- If the employee UI captures rent and deposit in the same screen flow, backend must still create two separate anchors: Rent and Deposit In.
+- Deposit must never be merged into Rent.
 - Deposit paid with rent must never count as rent income.
 
 Projection effect:
@@ -413,46 +414,65 @@ Final target:
 
 Business meaning: record deposit received as a liability owed back to the customer.
 
+Required variants:
+
+- First deposit payment: creates the initial deposit liability/payment history.
+- Partial deposit: records a deposit payment below the required deposit amount and preserves remaining deposit due.
+- Deposit top-up: records a later payment against the same deposit context until deposit_remaining reaches zero.
+
 Preconditions:
 
 - Occupancy context exists or can be created.
 - Bed context exists.
 - Deposit amount and payment method are known.
+- deposit_required_total is known or marked needs review.
 
 Required employee input fields:
 
 - bed
 - deposit_amount
+- deposit_required_total
+- deposit_paid_amount
+- deposit_remaining
 - payment_method
+- promise_date if remaining deposit is promised later
 
 Optional fields:
 
 - note
-- deposit_paid_with_rent flag
-- linked rent event if paid with rent
+- linked rent event if entered in the same UI flow, but not merged into the Rent anchor
 
 Forbidden identity fields:
 
 - card_id, tenant_card_id, provider phone, 99099 phone, card owner account phone.
+- deposit top-up must not link by card_id, tenant_card_id, old_ttlock_ref, provider phone, or 99099 phone.
 
 Created anchor fields:
 
 - common fields
 - deposit_ref if available
 - deposit_amount
+- deposit_required_total
+- deposit_paid_amount
+- deposit_remaining
+- promise_date if remaining deposit is promised later
 - payment_method
 - occupancy_candidate_id if available
-- deposit_paid_with_rent flag if applicable
+- future occupancy_session_id if available
+- linked rent event reference if captured in the same UI flow, without merging anchors
 
 Financial effect:
 
 - Increases cash/bank receipts.
 - Creates deposit liability.
 - Cannot be treated as rent income.
+- Deposit paid at the same time as rent still creates a separate Deposit In anchor.
 
 Projection effect:
 
 - Creates or increases deposit_balance.
+- Preserves deposit payment history: amount paid, payment date, remaining deposit due, and final deposit balance.
+- Deposit top-up links to the same occupancy/deposit context through deposit_ref, occupancy_candidate_id, or future occupancy_session_id.
 
 Downstream dependencies:
 
@@ -465,6 +485,8 @@ Invalid/rejected cases:
 - Missing amount.
 - Missing payment method.
 - Treating deposit as rent income without explicit split anchor.
+- Merging deposit into Rent.
+- Deposit top-up linked only by card_id, tenant_card_id, old_ttlock_ref, provider phone, or 99099 phone.
 
 Duplicate guard rules:
 
@@ -477,7 +499,7 @@ Correction/void/reversal requirements:
 
 Owner History representation:
 
-- Show bed, deposit amount, payment method, and note.
+- Show bed, deposit amount, payment method, note, deposit_required_total, deposit_paid_amount, deposit_remaining, payment date, and final deposit balance.
 
 WhatsApp/compiler future representation:
 
@@ -489,7 +511,7 @@ Access/network/door-card implications:
 
 Final target:
 
-- Durable deposit liability created and owner-visible, with no rent income contamination.
+- Durable deposit liability and payment history are owner-visible, with no rent income contamination.
 
 ### 4. Deposit Out
 
