@@ -98,7 +98,7 @@ test("runtime anchor contract exposes event-specific required fields from the so
     DR: ["refund_amount", "refund_reason", "deposit_balance", "owner_override_ref"],
     CO: ["checkout_date", "owner_approval_required", "left_with_arrears", "whatsapp_phone", "promised_payment_date"],
     E: ["expense_amount", "expense_category", "reason", "payment_method", "evidence_ref"],
-    TF: ["from_bed", "to_bed", "transfer_date", "fee_amount", "fee_status", "waiver_reason"]
+    TF: ["from_bed", "to_bed", "transfer_date", "transfer_reason", "deposit_balance_carryover", "arrears_carryover", "rent_coverage_carryover", "fee_amount", "fee_status", "payment_method", "waiver_reason", "fee_waived_reason"]
   };
 
   const missingRuntimeFields = [];
@@ -270,4 +270,26 @@ test("Expense contract preserves evidence, category, payment method, and cost-on
   assert.match(correctionTotals, /type==="expense"\)totals\.expense\+=/);
   assert.doesNotMatch(correctionTotals, /type==="expense"\)totals\.rent_income/);
   assert.doesNotMatch(correctionTotals, /type==="expense"\)totals\.arrears_repaid/);
+});
+
+test("Bed Transfer contract preserves transfer, carryover, and fee rules without routing to Rent", async () => {
+  const worker = await readFile(workerPath, "utf8");
+  const validator = functionBlock(worker, "validateBedTransferUploadFields");
+  const normalize = functionBlock(worker, "normalizeEntryAnchor");
+  const contract = contractBlock(worker);
+  const contractLine = contract.match(/TF:\[[^\]]+\]/)?.[0] || "";
+  const correctionTotals = functionBlock(worker, "ownerCorrectionPreviewSessionTotals");
+
+  for (const field of ["from_bed", "to_bed", "transfer_date", "transfer_reason", "deposit_balance_carryover", "arrears_carryover", "rent_coverage_carryover", "fee_status", "fee_amount", "payment_method", "fee_waived_reason"]) {
+    assert.match(validator + normalize + contractLine, new RegExp(field));
+  }
+
+  assert.match(validator, /BED_TRANSFER_REQUIRED_FIELD_MISSING/);
+  assert.match(validator, /BED_TRANSFER_SAME_BED_NOT_ALLOWED/);
+  assert.match(validator, /fromBed===toBed/);
+  assert.match(validator, /BED_TRANSFER_FEE_FIELD_MISSING/);
+  assert.match(validator, /BED_TRANSFER_WAIVER_REASON_REQUIRED/);
+  assert.doesNotMatch(validator, /RENT_REQUIRED_FIELD_MISSING/);
+  assert.match(correctionTotals, /type==="bed_transfer"\|\|type==="bed_transfer_fee"\)totals\.transfer_fee\+=/);
+  assert.doesNotMatch(correctionTotals, /type==="bed_transfer"\)totals\.rent_income/);
 });
