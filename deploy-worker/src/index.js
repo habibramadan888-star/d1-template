@@ -4722,6 +4722,69 @@ function chooseOwnerEmployeeSessionDetailRows(session,transactionRows=[],anchorR
     })[0];
 }
 __name(chooseOwnerEmployeeSessionDetailRows,"chooseOwnerEmployeeSessionDetailRows");
+function canonicalOwnerHistoryArchiveState(session={},correctionFields=null){
+  const status=String(session?.handover_status||session?.status||"").trim().toUpperCase();
+  const anchor=String(session?.anchor_id||"").trim().toUpperCase();
+  const source=String(session?.source||"").trim().toLowerCase();
+  if(status==="REVERSED"||status==="REVERSAL"||source.includes("reversal")||anchor.startsWith("REV-"))return "reversed";
+  if(status==="DELETED"||status==="CANCELLED")return "deleted";
+  if(String(session?.voided_at||"").trim()||["VOID","VOIDED"].includes(status))return "voided";
+  if(correctionFields?.correction_summary?.correction_applied)return "corrected";
+  if(anchor.startsWith("CORR-")||source.includes("correction"))return "correction_anchor";
+  return "active";
+}
+__name(canonicalOwnerHistoryArchiveState,"canonicalOwnerHistoryArchiveState");
+function canonicalOwnerHistorySourceProof(session={},detailSource=""){
+  return {
+    gateway:"canonical_owner_history_archive_gateway",
+    source_layer:"L1 Canonical Event Archive",
+    canonical_sources:["sessions","entries_json","correction_anchors","void_reversal_anchors","canonical_archive_projections"],
+    preferred_entry_source:"entries_json",
+    detail_source:detailSource||"",
+    fallback_parser_role:"display_only_legacy_compatibility",
+    forbidden_truth_sources:["employee_local_cache","whatsapp_export_text","preview_text","owner_display_text_as_write_source","tenant_card_id","card_id","old_ttlock_ref","provider_phone","phone_99099"],
+    session_id:cleanText(session?.id||"",160),
+    anchor_id:cleanText(session?.anchor_id||"",180)
+  };
+}
+__name(canonicalOwnerHistorySourceProof,"canonicalOwnerHistorySourceProof");
+function canonicalOwnerHistorySessionRow(session={},correctionFields=null){
+  const archiveState=canonicalOwnerHistoryArchiveState(session,correctionFields);
+  const active=archiveState==="active"||archiveState==="corrected";
+  return {
+    ...session,
+    archive_state:archiveState,
+    canonical_archive_gateway:"canonical_owner_history_archive_gateway",
+    active_archive_record:active,
+    totals_mode:correctionFields?.correction_summary?.correction_applied?"correction_aware_adjusted":"raw_session_totals",
+    raw_totals:correctionFields?.correction_summary?.raw_totals||null,
+    adjusted_totals:correctionFields?.correction_summary?.adjusted_totals||null,
+    source_proof:canonicalOwnerHistorySourceProof(session)
+  };
+}
+__name(canonicalOwnerHistorySessionRow,"canonicalOwnerHistorySessionRow");
+function canonicalOwnerHistoryDetailGatewayFields(session={},rows=[],correctionFields=null,detailSource=""){
+  const archiveState=canonicalOwnerHistoryArchiveState(session,correctionFields);
+  const anchors=extractEmployeeEntryAnchorsFromSession(session);
+  return {
+    archive_gateway:{
+      ok:true,
+      gateway:"canonical_owner_history_archive_gateway",
+      archive_state:archiveState,
+      session_id:cleanText(session?.id||"",160),
+      anchor_id:cleanText(session?.anchor_id||"",180),
+      detail_source:detailSource,
+      entries_json_preferred:anchors.length>0,
+      entries_json_anchor_count:anchors.length,
+      fallback_parser_display_only:detailSource==="export_text",
+      owner_history_write_source:false,
+      provider_identity_used:false,
+      source_proof:canonicalOwnerHistorySourceProof(session,detailSource),
+      warnings:detailSource==="export_text"?["LEGACY_DISPLAY_TEXT_FALLBACK_USED_FOR_DISPLAY_ONLY"]:[]
+    }
+  };
+}
+__name(canonicalOwnerHistoryDetailGatewayFields,"canonicalOwnerHistoryDetailGatewayFields");
 function empCloseStatusIsOpen(status){
   const raw=cleanText(status,40);
   const upper=raw.toUpperCase();
@@ -7567,16 +7630,20 @@ async function ownerHistoryDetailAdditiveResponse(env,user,sessionRow,rows=[]){
   }catch(error){
     correctionFields=ownerHistoryDetailFailClosedCorrectionFields(sessionRow,rows,[ownerHistoryDetailSafeWarning(error,error?.safe_code||"CORRECTION_AWARE_DETAIL_FAILED_CLOSED")]);
   }
+  const archiveFields=canonicalOwnerHistoryDetailGatewayFields(sessionRow,rows,correctionFields,"correction_aware_detail");
   try{
     return json({
       ...ok(rows),
-      ...ownerHistoryDetailJsonSafeValue(correctionFields)
+      ...ownerHistoryDetailJsonSafeValue(correctionFields),
+      ...ownerHistoryDetailJsonSafeValue(archiveFields)
     });
   }catch(error){
     const fallback=ownerHistoryDetailFailClosedCorrectionFields(sessionRow,rows,[ownerHistoryDetailSafeWarning(error,"CORRECTION_AWARE_RESPONSE_FAILED_CLOSED")]);
+    const fallbackArchive=canonicalOwnerHistoryDetailGatewayFields(sessionRow,rows,fallback,"correction_aware_detail_failed_closed");
     return json({
       ...ok(rows),
-      ...ownerHistoryDetailJsonSafeValue(fallback)
+      ...ownerHistoryDetailJsonSafeValue(fallback),
+      ...ownerHistoryDetailJsonSafeValue(fallbackArchive)
     });
   }
 }
@@ -9795,12 +9862,12 @@ async function handleRequest(request, env, ctx) {
         : "SELECT * FROM sessions WHERE corpid=? AND COALESCE(voided_at,'')='' AND COALESCE(handover_status,'')<>'VOID' ORDER BY created_at DESC";
       if (limit) {
         const { results } = await env.DB.prepare(`${baseSql} LIMIT ? OFFSET ?`).bind(user.corpid, limit, offset).all();
-        return success(results);
+        return success((results||[]).map(row=>canonicalOwnerHistorySessionRow(row)));
       }
       const { results } = await env.DB.prepare(
         baseSql
       ).bind(user.corpid).all();
-      return success(results);
+      return success((results||[]).map(row=>canonicalOwnerHistorySessionRow(row)));
     }
     if (path === "/api/session_detail" && method === "GET") {
       const sid = cleanId(url.searchParams.get("id"));
@@ -9822,13 +9889,13 @@ async function handleRequest(request, env, ctx) {
           if(includeCorrections){
             return ownerHistoryDetailAdditiveResponse(env,user,sessionRow,detailChoice.rows);
           }
-          return success(detailChoice.rows);
+          return json({...ok(detailChoice.rows),...ownerHistoryDetailJsonSafeValue(canonicalOwnerHistoryDetailGatewayFields(sessionRow,detailChoice.rows,null,detailChoice.source))});
         }
       }
       if(includeCorrections&&sessionRow){
         return ownerHistoryDetailAdditiveResponse(env,user,sessionRow,results);
       }
-      return success(results);
+      return json({...ok(results),...ownerHistoryDetailJsonSafeValue(sessionRow?canonicalOwnerHistoryDetailGatewayFields(sessionRow,results,null,"transactions"): {archive_gateway:{ok:false,gateway:"canonical_owner_history_archive_gateway",archive_state:"missing",source_proof:{gateway:"canonical_owner_history_archive_gateway",source_layer:"L1 Canonical Event Archive"}}})});
     }
     return errorResponse("not_found", 404, "not_found");
   }

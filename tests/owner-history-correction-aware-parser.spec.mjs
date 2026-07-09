@@ -426,7 +426,7 @@ test("parser does not mutate source sessions or original events", () => {
 test("owner history runtime wiring remains detail-only after H4B", async () => {
   const workerText = await readFile("deploy-worker/src/index.js", "utf8");
   assert.doesNotMatch(workerText, /buildCorrectionAwareOwnerHistoryView/);
-  assert.match(workerText, /buildAuditModeView/);
+  assert.match(workerText, /ownerHistoryDetailDirectCorrectionFields/);
   assert.match(workerText, /include_corrections/);
   assert.match(workerText, /if \(path === "\/api\/session_detail" && method === "GET"\)/);
   assert.doesNotMatch(workerText, /path === "\/api\/history"[\s\S]{0,1200}correction_summary/);
