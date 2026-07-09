@@ -2498,7 +2498,7 @@ function validateDepositOutUploadFields(entry,normalized,eventIndex,anchorPrevie
   if(!employeeEntryUploadHasValue(normalized.refund_method||entry.refund_method||normalized.payment_method||entry.pay_type))missing.push("refund_method");
   if(!employeeEntryUploadHasValue(normalized.refund_date||entry.refund_date))missing.push("refund_date");
   if(!employeeEntryUploadHasValue(normalized.refund_reason||entry.refund_reason||entry.reason))missing.push("refund_reason");
-  if(Math.abs(refund-balance)>0.01&&!employeeEntryUploadHasValue(normalized.difference_reason||entry.difference_reason||normalized.refund_reason||entry.refund_reason))missing.push("difference_reason");
+  if(Math.abs(refund-balance)>0.01&&!employeeEntryUploadHasValue(normalized.difference_reason||entry.difference_reason))missing.push("difference_reason");
   if(missing.length||invalid.length)return employeeEntryValidationFailure("deposit_out_event_validation","DEPOSIT_OUT_REQUIRED_FIELD_MISSING","Deposit Out entry is missing required fields.",{event_index:eventIndex,event_type:"deposit_out",missing_fields:missing,invalid_fields:invalid,anchor_preview:anchorPreview});
   if(refund>balance+0.01&&(!ownerOverrideRef||!overrideReason)){
     return employeeEntryValidationFailure("deposit_out_validation","DEPOSIT_OUT_EXCEEDS_BALANCE","Deposit refund exceeds deposit balance and requires owner override.",{event_index:eventIndex,event_type:"deposit_out",missing_fields:["owner_override_ref","override_reason"].filter(field=>field==="owner_override_ref"?!ownerOverrideRef:!overrideReason),invalid_fields:["refund_amount"],anchor_preview:{...anchorPreview,deposit_balance:balance,refund_amount:refund}});
@@ -2833,8 +2833,8 @@ async function validateEmployeeEntryUploadPayload(env,user,body,opts={}){
   if(!tenantCardId&&["DR","CO"].includes(type)&&depositHeldInput>0)depositBalance=depositHeldInput;
   if(type==="DR"){
     const diff=Math.round((amount-depositBalance)*100)/100;
-    const refundReason=cleanText(entry.refund_reason||entry.difference_reason||entry.ded_note||entry.note,500);
-    if(Math.abs(diff)>0.01&&!refundReason){
+    const differenceReason=cleanText(entry.difference_reason||"",500);
+    if(Math.abs(diff)>0.01&&!differenceReason){
       return employeeEntryValidationFailure("deposit_out_validation","DEPOSIT_REFUND_DIFFERENCE_REASON_REQUIRED","Difference Reason is required when actual refund differs from deposit balance.",{event_index:eventIndex,event_type:"deposit_out",missing_fields:["difference_reason"],anchor_preview:{...anchorPreview,deposit_balance:depositBalance,actual_refund_amount:amount,refund_difference:diff}});
     }
   }
