@@ -3099,6 +3099,7 @@ label .label-en{
         <div class="grid" id="expenseFields">
           <div class="field"><label>支出类别</label><select id="expenseCategory"><option value="ROOM">指定房间</option><option value="COMMON">公共区域</option><option value="SUPPLIES">采购耗材</option><option value="OTHER">其他</option></select></div>
           <div class="field"><label>支出说明</label><input id="expenseDesc" placeholder="维修、采购、耗材等"></div>
+          <div class="field"><label>Evidence Ref<span class="label-en">凭证编号</span></label><input id="expenseEvidenceRef" placeholder="receipt/photo/reference for >=100 AED"></div>
         </div>
 
         <div class="grid">
@@ -4454,6 +4455,7 @@ function validateExpenseEntry(){
   employeeRequire(errors,!!employeeTrimField('expenseCategory'),'Expense Category is required.');
   employeeRequire(errors,!!employeePaymentMethodValue(),'Payment Method is required.');
   employeeRequire(errors,!!employeeTrimField('expenseDesc')||!!employeeTrimField('remark'),'Reason or Note is required.');
+  if(num(employeeFieldValue('amount'))>=100&&!employeeTrimField('expenseEvidenceRef'))errors.push('Evidence Ref is required for expenses of 100 AED or more.');
   return employeeValidationResult(errors,warns);
 }
 function validateBedTransferEntry(){
@@ -4554,7 +4556,7 @@ function buildExpenseAnchor(){
   const category=employeeTrimField('expenseCategory');
   const note=employeeTrimField('expenseDesc')||employeeTrimField('remark');
   const targetBed=employeeTrimField('bed').replace(/^#/,'');
-  const payload=employeeBaseEntryPayload('E',{reason_code:category||'E',cat:'expense',room:targetBed,target_bed:targetBed,amount,due:amount,paid:amount,expense_category:category,expense_desc:note,note,remark:note});
+  const payload=employeeBaseEntryPayload('E',{reason_code:category||'E',cat:'expense',room:targetBed,target_bed:targetBed,amount,due:amount,paid:amount,expense_category:category,expense_desc:note,reason:note,note,remark:note,evidence_ref:employeeTrimField('expenseEvidenceRef')});
   return applyEntryAnchors(payload);
 }
 function buildBedTransferAnchor(){
@@ -5488,7 +5490,7 @@ async function saveEntryWithTtlockGate(){
   return saveEntryWithoutTtlockGate();
 }
 saveEntry=saveEntryWithTtlockGate;
-function resetForm(){['bed','transferFromBed','bedTo','transferDate','transferReason','amount','due','paid','tenantName','tenantCardId','periodStart','periodEnd','periodDays','periodDue','listPrice','customReason','bankRef','checkoutDate','depositOutBalance','depositOutRefundDate','depositOutDifferenceReason','depositDeduction','depositReturnAmount','overdayDeduction','noNoticeDeduction','otherDeduction','dedNote','leftFormerCustomerName','leftWhatsappPhone','leftContactNote','leftDepositBalance','leftCoverageEndDate','leftArrearsAmount','leftBelongingsNote','leftPromisedPaymentDate','leftPromisedReturnDate','leftConfirmedNotReturningDate','leftGraceDays','expenseDesc','remark','excessTo','arrearAmount','arrearPromiseDate','arrearReasonDetail'].forEach(id=>{if($(id))$(id).value=''});$('leftWithArrearsMode').value='normal';$('leftContactMethod').value='whatsapp';$('leftBelongingsHeld').value='no';$('arrearHandling').value='ARREAR';state.current=null;state.depositBalance=null;state.depositContext=null;renderContext();syncForm();refreshSessionViews()}
+function resetForm(){['bed','transferFromBed','bedTo','transferDate','transferReason','amount','due','paid','tenantName','tenantCardId','periodStart','periodEnd','periodDays','periodDue','listPrice','customReason','bankRef','checkoutDate','depositOutBalance','depositOutRefundDate','depositOutDifferenceReason','depositDeduction','depositReturnAmount','overdayDeduction','noNoticeDeduction','otherDeduction','dedNote','leftFormerCustomerName','leftWhatsappPhone','leftContactNote','leftDepositBalance','leftCoverageEndDate','leftArrearsAmount','leftBelongingsNote','leftPromisedPaymentDate','leftPromisedReturnDate','leftConfirmedNotReturningDate','leftGraceDays','expenseDesc','expenseEvidenceRef','remark','excessTo','arrearAmount','arrearPromiseDate','arrearReasonDetail'].forEach(id=>{if($(id))$(id).value=''});$('leftWithArrearsMode').value='normal';$('leftContactMethod').value='whatsapp';$('leftBelongingsHeld').value='no';$('arrearHandling').value='ARREAR';state.current=null;state.depositBalance=null;state.depositContext=null;renderContext();syncForm();refreshSessionViews()}
 function hasLocalOnly(){return state.drafts.some(e=>!employeeEntryCloudConfirmed(e))}
 function newSession(){
   if(hasLocalOnly()){toast('仍有云端未确认记录，不能开始新会话');return}
@@ -7995,7 +7997,7 @@ if(location.hash==='#export'){
 showEmployeeView(location.hash||'entry',{pushHash:false});
 document.querySelectorAll('.event-chip').forEach(btn=>btn.addEventListener('click',e=>{e.preventDefault();setEntryType(btn.dataset.type);}));
 document.querySelectorAll('.pay-option').forEach(btn=>btn.addEventListener('click',e=>{e.preventDefault();setPaymentType(btn.dataset.pay);}));
-['entryType','cycle','payType','amount','reasonCode','feePaid','transferWaiverReason','customReason','tenantName','bankRef','periodDays','depositOutRefundDate','depositOutDifferenceReason','depositDeduction','checkoutDate','noNoticeDeduction','otherDeduction','dedNote','leftWithArrearsMode','leftFormerCustomerName','leftWhatsappPhone','leftContactMethod','leftContactNote','leftDepositBalance','leftCoverageEndDate','leftArrearsAmount','leftBelongingsHeld','leftBelongingsNote','leftPromisedPaymentDate','leftPromisedReturnDate','leftConfirmedNotReturningDate','leftGraceDays','excessTo','bedTo','transferDate','transferReason','expenseCategory','expenseDesc','remark','arrearHandling','arrearPromiseDate','arrearReasonDetail'].forEach(id=>$(id).addEventListener('input',syncForm));
+['entryType','cycle','payType','amount','reasonCode','feePaid','transferWaiverReason','customReason','tenantName','bankRef','periodDays','depositOutRefundDate','depositOutDifferenceReason','depositDeduction','checkoutDate','noNoticeDeduction','otherDeduction','dedNote','leftWithArrearsMode','leftFormerCustomerName','leftWhatsappPhone','leftContactMethod','leftContactNote','leftDepositBalance','leftCoverageEndDate','leftArrearsAmount','leftBelongingsHeld','leftBelongingsNote','leftPromisedPaymentDate','leftPromisedReturnDate','leftConfirmedNotReturningDate','leftGraceDays','excessTo','bedTo','transferDate','transferReason','expenseCategory','expenseDesc','expenseEvidenceRef','remark','arrearHandling','arrearPromiseDate','arrearReasonDetail'].forEach(id=>$(id).addEventListener('input',syncForm));
 $('linkedTaskId').addEventListener('change',applyLinkedTask);
 $('bed').addEventListener('input',()=>{if($('entryType').value==='TF')$('transferFromBed').value=$('bed').value.trim().replace(/^#/,'');employeeScheduleLookupBed();if($('entryType').value==='AP'){populateTaskSelect();syncForm();}});
 $('transferFromBed').addEventListener('input',()=>{if($('entryType').value==='TF'){$('bed').value=$('transferFromBed').value.trim().replace(/^#/,'');employeeScheduleLookupBed();syncForm();}});

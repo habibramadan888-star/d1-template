@@ -4819,7 +4819,7 @@ function ownerTodayTodoArchiveContextFromSessions(sessions=[]){
   const ensure=(bed)=>{
     const cleanBed=cleanText(bed||"",80).replace(/^#/,"");
     if(!cleanBed)return null;
-    if(!byBed.has(cleanBed))byBed.set(cleanBed,{bed:cleanBed,deposit_events:[],occupancy_events:[]});
+    if(!byBed.has(cleanBed))byBed.set(cleanBed,{bed:cleanBed,deposit_events:[],occupancy_events:[],expense_events:[]});
     return byBed.get(cleanBed);
   };
   for(const session of sessions||[]){
@@ -4850,6 +4850,24 @@ function ownerTodayTodoArchiveContextFromSessions(sessions=[]){
           deposit_remaining_after_payment:canonicalDepositMoney(anchor.deposit_remaining_after_payment ?? anchor.deposit_remaining ?? 0),
           payment_method:entryAnchorPaymentMethod(anchor.payment_method||anchor.pay_type||""),
           source:"cloud_deposit_event_audit_only"
+        });
+      }
+      if(type==="expense"){
+        const bed=cleanText(anchor.target_bed||anchor.bed||anchor.room||"",80).replace(/^#/,"");
+        const row=ensure(bed);
+        if(!row)continue;
+        row.expense_events.push({
+          event_type:type,
+          event_id:cleanText(anchor.event_id||anchor.entry_id||anchor.anchor_id||"",120),
+          session_id:cleanText(session.id||session.session_id||"",120),
+          session_anchor:cleanText(session.anchor_id||"",160),
+          date:cleanDate(session.date||anchor.created_at||""),
+          amount:entryAnchorMoney(anchor.expense_amount||anchor.amount||0),
+          expense_category:cleanText(anchor.expense_category||"",120),
+          reason:cleanText(anchor.reason||anchor.expense_desc||anchor.note||"",500),
+          payment_method:entryAnchorPaymentMethod(anchor.payment_method||anchor.pay_type||""),
+          evidence_ref:cleanText(anchor.evidence_ref||anchor.receipt_ref||"",160),
+          source:"canonical_event_archive_expense"
         });
       }
       if(["rent","checkout","left_with_arrears","bed_transfer","bed_transfer_fee"].includes(type)){
@@ -4887,6 +4905,26 @@ function ownerTodayTodoDepositGatewayView(bed,accessRow={},archiveRow={}){
   };
 }
 __name(ownerTodayTodoDepositGatewayView,"ownerTodayTodoDepositGatewayView");
+function ownerTodayTodoBuildExpenseEvidence(todos,bed,archiveRow={},filters={}){
+  const expenseEvents=Array.isArray(archiveRow.expense_events)?archiveRow.expense_events:[];
+  for(const event of expenseEvents){
+    if(entryAnchorMoney(event.amount)<100||cleanText(event.evidence_ref||"",160))continue;
+    ownerTodayTodoPush(todos,ownerTodayTodoItem("EXPENSE_EVIDENCE_MISSING",{
+      category:"finance_evidence",
+      severity:"high",
+      bed,
+      session_id:event.session_id,
+      event_id:event.event_id,
+      title:`Bed ${bed} expense evidence is missing`,
+      description:`Expense ${entryAnchorMoney(event.amount).toFixed(2)} AED requires evidence_ref because it is 100 AED or more.`,
+      source_gateway:"canonical_event_archive + canonical_finance_projection_gateway",
+      source_proof:ownerTodayTodoSourceProof("canonical_event_archive + canonical_finance_projection_gateway",{expense_amount:event.amount,evidence_ref:event.evidence_ref||"",expense_category:event.expense_category||""}),
+      recommended_action:"Attach the missing receipt/evidence reference or void/correct the Expense anchor if it was entered in error.",
+      auto_resolve_condition:"The Expense anchor has evidence_ref, or the invalid Expense anchor is voided/corrected."
+    }),filters);
+  }
+}
+__name(ownerTodayTodoBuildExpenseEvidence,"ownerTodayTodoBuildExpenseEvidence");
 function ownerTodayTodoOccupancyGatewayView(bed,accessRow={},archiveRow={},openArrears=[]){
   const access={snapshot:accessRow?.snapshot||null,card:accessRow?.card||null,source_status:accessRow?"loaded":"not_found"};
   const physical=canonicalOccupancyPhysicalBedStatus(access);
@@ -4952,11 +4990,12 @@ async function buildOwnerTodayTodoGateway(env,user,opts={}){
   for(const candidate of candidates){
     const bed=candidate.bed;
     if(!bed)continue;
-    const archiveRow=archiveByBed.get(bed)||{bed,deposit_events:[],occupancy_events:[]};
+    const archiveRow=archiveByBed.get(bed)||{bed,deposit_events:[],occupancy_events:[],expense_events:[]};
     const accessRow=accessByBed.get(bed)||null;
     const deposit=ownerTodayTodoDepositGatewayView(bed,accessRow,archiveRow);
     const occupancy=ownerTodayTodoOccupancyGatewayView(bed,accessRow,archiveRow,openArrearsByBed.get(bed)||[]);
     ownerTodayTodoBuildDepositAndOccupancy(todos,bed,deposit,occupancy,filters);
+    ownerTodayTodoBuildExpenseEvidence(todos,bed,archiveRow,filters);
   }
   todos.sort((a,b)=>{
     const score={high:0,medium:1,low:2};
