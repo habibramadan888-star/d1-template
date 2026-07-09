@@ -2264,6 +2264,11 @@ function validateArrearsPaymentUploadFields(entry,normalized,eventIndex,anchorPr
   if(!employeeEntryUploadHasValue(normalized.remaining_arrears_after_payment||entry.remaining_arrears_after_payment||normalized.remaining_arrears||entry.remaining_arrears))missing.push("remaining_after");
   if(!employeeEntryUploadHasValue(normalized.settlement_status||entry.settlement_status))missing.push("settlement_status");
   if(missing.length||invalid.length)return employeeEntryValidationFailure("arrears_payment_event_validation","ARREARS_PAYMENT_REQUIRED_FIELD_MISSING","Arrears Payment entry is missing required fields.",{event_index:eventIndex,event_type:"arrears_payment",missing_fields:missing,invalid_fields:invalid,anchor_preview:anchorPreview});
+  const remainingAfter=employeeEntryUploadAmount(normalized.remaining_arrears_after_payment||entry.remaining_arrears_after_payment||normalized.remaining_arrears||entry.remaining_arrears);
+  const settlementStatus=cleanText(normalized.settlement_status||entry.settlement_status,40).toLowerCase();
+  if((remainingAfter<=0.01&&settlementStatus!=="settled")||(remainingAfter>0.01&&!["partial","open"].includes(settlementStatus))){
+    return employeeEntryValidationFailure("arrears_payment_event_validation","ARREARS_PAYMENT_REMAINING_STATUS_MISMATCH","Arrears Payment settlement status must match remaining arrears.",{event_index:eventIndex,event_type:"arrears_payment",invalid_fields:["remaining_arrears_after_payment","settlement_status"],anchor_preview:{...anchorPreview,remaining_arrears_after_payment:remainingAfter,settlement_status:settlementStatus}});
+  }
   return null;
 }
 __name(validateArrearsPaymentUploadFields,"validateArrearsPaymentUploadFields");
@@ -3030,7 +3035,7 @@ async function handleEmployeeEntry(request,env,user){
 __name(handleEmployeeEntry,"handleEmployeeEntry");
 const entryAnchorContract={
   R:["event_type","bed","expected_rent","paid_amount","payment_method","rent_period_start","rent_period_end","arrears_amount","arrears_due_date","arrears_note","short_paid","raw_display_line","operator","created_at","ttlock_context"],
-  AP:["event_type","bed","arrears_ref","original_arrears_id","original_arrears_amount","already_paid_amount","payment_amount","remaining_arrears","settlement_status","payment_method","note","operator","created_at"],
+  AP:["event_type","bed","arrears_ref","original_arrears_id","original_arrears_amount","already_paid_amount","payment_amount","remaining_arrears_before_payment","remaining_arrears_after_payment","remaining_arrears","settlement_status","payment_method","note","operator","created_at"],
   D:["event_type","bed","deposit_amount","payment_method","linked_tenant","note","operator","created_at"],
   DR:["event_type","bed","refund_amount","payment_method","refund_reason","checkout_ref","note","operator","created_at"],
   CO:["event_type","bed","checkout_date","deposit_refund","outstanding_arrears","owner_approval_required","owner_approval_status","checkout_mode","left_with_arrears","customer_left","former_customer_name","whatsapp_phone","contact_method","contact_note","arrears_amount","cloud_arrears_ref","belongings_held","belongings_note","promised_payment_date","promised_return_date","deposit_balance","left_status","final_status","final_note","ttlock_context","operator","created_at"],
@@ -3314,9 +3319,10 @@ function normalizeEntryAnchor(row){
     const payment=entryAnchorMoney(anchor.payment_amount||anchor.amount);
     const original=entryAnchorMoney(anchor.original_arrears_amount||anchor.due||anchor.period_due);
     const already=entryAnchorMoney(anchor.already_paid_amount);
-    const remaining=entryAnchorMoney(anchor.remaining_arrears||Math.max(0,original-already-payment));
+    const remainingBefore=entryAnchorMoney(anchor.remaining_arrears_before_payment||Math.max(0,original-already));
+    const remaining=entryAnchorMoney(anchor.remaining_arrears_after_payment||anchor.remaining_arrears||Math.max(0,remainingBefore-payment));
     const ref=anchor.arrears_ref||anchor.original_arrears_id||anchor.linked_task_id||"";
-    Object.assign(anchor,{bed:anchor.bed||anchor.room,arrears_ref:ref,original_arrears_id:ref,original_arrears_amount:original,already_paid_amount:already,payment_amount:payment,remaining_arrears:remaining,settlement_status:anchor.settlement_status||(remaining<=0?"settled":"partial")});
+    Object.assign(anchor,{bed:anchor.bed||anchor.room,arrears_ref:ref,original_arrears_id:ref,original_arrears_amount:original,already_paid_amount:already,payment_amount:payment,remaining_arrears_before_payment:remainingBefore,remaining_arrears_after_payment:remaining,remaining_arrears:remaining,settlement_status:anchor.settlement_status||(remaining<=0?"settled":"partial")});
   }else if(type==="TF"){
     const fee=employeeEntryBedTransferFee(anchor,{});
     Object.assign(anchor,{from_bed:anchor.from_bed||anchor.bed_from||anchor.room||"",to_bed:anchor.to_bed||anchor.bed_to||anchor.room_to||"",transfer_date:anchor.transfer_date||anchor.date||"",fee_amount:entryAnchorMoney(fee.fee_amount),fee_status:fee.fee_choice||anchor.fee_status||"",waiver_reason:fee.waiver_reason||anchor.waiver_reason||anchor.fee_waiver_reason||"",transfer_reason:anchor.transfer_reason||anchor.reason_code||anchor.reason||anchor.custom_reason||anchor.note||"transfer",old_tenant_context:anchor.old_tenant_context||"",old_ttlock_context:anchor.old_ttlock_context||"",note:anchor.note||""});
