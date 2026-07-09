@@ -119,14 +119,20 @@ test("canonical finance gateway uses archive semantics and corrected effective t
   const worker = await readFile(workerPath, "utf8");
   const fetchSessions = asyncFunctionBlock(worker, "canonicalFinanceProjectionFetchSessions");
   const build = asyncFunctionBlock(worker, "canonicalFinanceProjectionBuild");
+  const correctionBatch = asyncFunctionBlock(worker, "ownerCorrectionFetchCorrectionSessionsByTarget");
   const correction = functionBlock(worker, "canonicalFinanceProjectionApplyCorrectionEffectiveTotals");
 
   assert.match(fetchSessions, /empTableColumns\(env,"sessions"\)/);
   assert.match(fetchSessions, /entries_json/);
   assert.match(fetchSessions, /'' AS entries_json/);
   assert.match(fetchSessions, /export_text/);
+  assert.match(correctionBatch, /CORRECTION ANCHORS JSON/);
+  assert.match(correctionBatch, /parseOwnerCorrectionAnchorText/);
+  assert.match(correctionBatch, /byTarget/);
+  assert.match(build, /ownerCorrectionFetchCorrectionSessionsByTarget/);
+  assert.match(build, /extractEmployeeEntryAnchorsFromSession/);
   assert.match(build, /ownerHistoryArchiveDetailRows\(env,user,session,true\)/);
-  assert.match(build, /ownerCorrectionFetchExistingCorrectionSessions/);
+  assert.doesNotMatch(build, /ownerCorrectionFetchExistingCorrectionSessions/);
   assert.match(build, /ownerHistoryDetailCorrectionFields/);
   assert.match(build, /canonicalOwnerHistoryArchiveState/);
   assert.match(build, /canonicalOwnerHistoryActiveForTotals/);
@@ -169,8 +175,21 @@ test("owner finance projection route and overview summaries use the gateway", as
   assert.match(overview, /canonicalFinanceProjectionBuild/);
   assert.match(overview, /canonicalFinanceProjectionToOverviewSummary/);
   assert.match(overview, /canonical_finance_projection_gateway_billing_period_3_to_2/);
-  assert.match(overview, /current_month_finance_projection/);
   assert.match(overview, /current_billing_period_finance_projection/);
+  assert.doesNotMatch(overview, /monthFinanceProjection/);
+  assert.doesNotMatch(overview, /lastMonthFinanceProjection/);
+  assert.doesNotMatch(overview, /quarterFinanceProjection/);
+});
+
+test("live owner read routes expose finance gateway and cap history list scans", async () => {
+  const worker = await readFile(workerPath, "utf8");
+  const liveRoutes = worker.slice(worker.indexOf('if (path === "/api/owner/overview/comparative-summary"'), worker.indexOf('if (path === "/api/session_detail"'));
+
+  assert.match(liveRoutes, /path === "\/api\/owner\/finance\/projection"/);
+  assert.match(liveRoutes, /handleOwnerFinanceProjection\(request, env, user\)/);
+  assert.match(liveRoutes, /Math\.min\(Math\.floor\(rawLimit\), 30\)/);
+  assert.match(liveRoutes, /: 30/);
+  assert.doesNotMatch(liveRoutes, /Math\.min\(Math\.floor\(rawLimit\), 100\)/);
 });
 
 test("canonical finance gateway remains read-only", async () => {

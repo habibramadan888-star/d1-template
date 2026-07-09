@@ -7388,6 +7388,29 @@ async function ownerCorrectionFetchExistingCorrectionSessions(env,user,targetAnc
   return rows.results||[];
 }
 __name(ownerCorrectionFetchExistingCorrectionSessions,"ownerCorrectionFetchExistingCorrectionSessions");
+async function ownerCorrectionFetchCorrectionSessionsByTarget(env,user,targetKeys=[]){
+  const wanted=new Set((targetKeys||[]).map(key=>cleanText(key,180)).filter(Boolean));
+  const byTarget=new Map();
+  if(!wanted.size||!await empTableExists(env,"sessions").catch(()=>false))return byTarget;
+  const rows=await env.DB.prepare(`SELECT id, anchor_id, export_text, source, created_at FROM sessions
+    WHERE corpid=? AND COALESCE(voided_at,'')='' AND COALESCE(handover_status,'')<>'VOID'
+      AND COALESCE(export_text,'') LIKE '%CORRECTION ANCHORS JSON%'
+    ORDER BY created_at DESC LIMIT 1000`).bind(user.corpid).all().catch(()=>({results:[]}));
+  for(const row of rows.results||[]){
+    const parsed=parseOwnerCorrectionAnchorText(row.export_text||"");
+    const correction=parsed?.correction||null;
+    if(!parsed?.found||!correction)continue;
+    for(const key of [correction.target_session_anchor,correction.target_session_id]){
+      const target=cleanText(key,180);
+      if(!target||!wanted.has(target))continue;
+      const list=byTarget.get(target)||[];
+      list.push(row);
+      byTarget.set(target,list);
+    }
+  }
+  return byTarget;
+}
+__name(ownerCorrectionFetchCorrectionSessionsByTarget,"ownerCorrectionFetchCorrectionSessionsByTarget");
 async function ownerHistoryArchiveDetailRows(env,user,sessionRow={},includeArchiveRows=false){
   if(!sessionRow?.id)return {rows:[],source:"none"};
   const hasTransactions=await empTableExists(env,"transactions").catch(()=>false);
@@ -8569,20 +8592,34 @@ async function canonicalFinanceProjectionBuild(env,user,range={},options={}){
   const excluded_records=[];
   const reconciliation_warnings=[];
   const session_details=[];
+  const includeCorrections=options.include_corrections!==false;
+  const correctionTargets=sessions.flatMap(session=>[
+    cleanText(session?.anchor_id||"",180),
+    cleanText(session?.id||"",180)
+  ]).filter(Boolean);
+  const correctionRowsByTarget=includeCorrections
+    ? await ownerCorrectionFetchCorrectionSessionsByTarget(env,user,correctionTargets).catch(()=>new Map())
+    : new Map();
   let active_session_count=0;
   let voided_session_count=0;
   let corrected_session_count=0;
   for(const session of sessions){
-    const detail=await ownerHistoryArchiveDetailRows(env,user,session,true).catch(()=>({rows:[],source:"none"}));
     const targetAnchor=cleanText(session?.anchor_id||session?.id||"",180);
-    const correctionRows=targetAnchor?await ownerCorrectionFetchExistingCorrectionSessions(env,user,targetAnchor).catch(()=>[]):[];
+    const targetId=cleanText(session?.id||"",180);
+    const anchors=extractEmployeeEntryAnchorsFromSession(session);
+    const detail=anchors.length
+      ? {rows:anchors,source:"structured"}
+      : await ownerHistoryArchiveDetailRows(env,user,session,true).catch(()=>({rows:[],source:"none"}));
+    const correctionRows=includeCorrections?[
+      ...(correctionRowsByTarget.get(targetAnchor)||[]),
+      ...(targetId&&targetId!==targetAnchor?(correctionRowsByTarget.get(targetId)||[]):[])
+    ]:[];
     const correctionFields=ownerHistoryDetailCorrectionFields(session,detail.rows,correctionRows);
     const summary=correctionFields.correction_summary||{};
     const archiveState=summary.archive_state||canonicalOwnerHistoryArchiveState(session,correctionFields);
     const activeForTotals=summary.active_for_totals!==false&&canonicalOwnerHistoryActiveForTotals(archiveState);
     if(archiveState==="voided"||archiveState==="deleted"||archiveState==="reversed")voided_session_count+=1;
     if(summary.correction_applied)corrected_session_count+=1;
-    const anchors=extractEmployeeEntryAnchorsFromSession(session);
     session_details.push({
       session_id:cleanText(session?.id||"",160),
       anchor:targetAnchor,
@@ -8834,13 +8871,7 @@ async function phase0OwnerOverviewComparativeSummary(env,user,url){
     quarterRows,
     lastQuarterRows,
     sameQuarterLastYearRows,
-    monthFinanceProjection,
     billingPeriodFinanceProjection,
-    lastMonthFinanceProjection,
-    sameMonthLastYearFinanceProjection,
-    quarterFinanceProjection,
-    lastQuarterFinanceProjection,
-    sameQuarterLastYearFinanceProjection,
     currentSot,
     bedTransferReviews
   ]=await Promise.all([
@@ -8852,27 +8883,21 @@ async function phase0OwnerOverviewComparativeSummary(env,user,url){
     safeRows(ownerOverviewFetchTransactions(env,user,currentQuarter)),
     safeRows(ownerOverviewFetchTransactions(env,user,lastQuarter)),
     safeRows(ownerOverviewFetchTransactions(env,user,sameQuarterLastYear)),
-    safeFinanceProjection(currentMonth),
     safeFinanceProjection(currentBillingPeriod),
-    safeFinanceProjection(lastMonth),
-    safeFinanceProjection(sameMonthLastYear),
-    safeFinanceProjection(currentQuarter),
-    safeFinanceProjection(lastQuarter),
-    safeFinanceProjection(sameQuarterLastYear),
     resolveCurrentReceivablesSot(env,user,{limit:500,ttlockTimeoutMs:8000}).catch(()=>null),
     safeRows(ownerOverviewFetchBedTransferReviews(env,user))
   ]);
   const financeOrLegacy=(projection,rows)=>projection?canonicalFinanceProjectionToOverviewSummary(projection):ownerOverviewSummarizeTransactions(rows);
-  const month=financeOrLegacy(monthFinanceProjection,monthRows);
+  const month=ownerOverviewSummarizeTransactions(monthRows);
   const billingPeriod=financeOrLegacy(billingPeriodFinanceProjection,billingPeriodRows);
   const currentPeriodReceived=billingPeriodFinanceProjection
     ? {...canonicalFinanceProjectionToOverviewSummary(billingPeriodFinanceProjection),range:currentBillingPeriod,rule:"canonical_finance_projection_gateway_billing_period_3_to_2"}
     : {...billingPeriodSessionSummary,range:currentBillingPeriod,rule:"billing_period_3_to_2_owner_visible_sessions"};
-  const prevMonth=financeOrLegacy(lastMonthFinanceProjection,lastMonthRows);
-  const sameLastYear=financeOrLegacy(sameMonthLastYearFinanceProjection,sameMonthLastYearRows);
-  const quarter=financeOrLegacy(quarterFinanceProjection,quarterRows);
-  const prevQuarter=financeOrLegacy(lastQuarterFinanceProjection,lastQuarterRows);
-  const sameQuarterLastYearSummary=financeOrLegacy(sameQuarterLastYearFinanceProjection,sameQuarterLastYearRows);
+  const prevMonth=ownerOverviewSummarizeTransactions(lastMonthRows);
+  const sameLastYear=ownerOverviewSummarizeTransactions(sameMonthLastYearRows);
+  const quarter=ownerOverviewSummarizeTransactions(quarterRows);
+  const prevQuarter=ownerOverviewSummarizeTransactions(lastQuarterRows);
+  const sameQuarterLastYearSummary=ownerOverviewSummarizeTransactions(sameQuarterLastYearRows);
   const arrearRows=currentSot?.all_rows||[];
   const arrears=ownerOverviewArrearsSummary(arrearRows,today);
   const consoleSummary=currentSot?.summary||{};
@@ -8884,10 +8909,10 @@ async function phase0OwnerOverviewComparativeSummary(env,user,url){
     arrears.source_counts.existing_arrears_record=Number(consoleSummary.existing_arrears_count??consoleBreakdown.existing_arrears_count??arrears.source_counts.existing_arrears_record);
   }
   const noData=[];
-  if(!month.rows_checked)noData.push("current_month_finance_projection");
+  if(!month.rows_checked)noData.push("current_month_transactions");
   if(!currentPeriodReceived.rows_checked)noData.push("current_billing_period_finance_projection");
-  if(!prevMonth.rows_checked)noData.push("last_month_finance_projection");
-  if(!sameLastYear.rows_checked)noData.push("same_month_last_year_finance_projection");
+  if(!prevMonth.rows_checked)noData.push("last_month_transactions");
+  if(!sameLastYear.rows_checked)noData.push("same_month_last_year_transactions");
   if(!arrearRows.length)noData.push("open_arrears");
   return success({
     generated_at:empNow(),
@@ -10202,6 +10227,10 @@ async function handleRequest(request, env, ctx) {
       if (!canReadOwnerData(user)) return forbidden();
       return phase0OwnerOverviewComparativeSummary(env,user,url);
     }
+    if (path === "/api/owner/finance/projection" && method === "GET") {
+      if (!canReadOwnerData(user)) return forbidden();
+      return handleOwnerFinanceProjection(request, env, user);
+    }
     if (path === "/api/owner/cloud-arrears/projection" && method === "GET") {
       return handleOwnerCloudArrearsProjection(request, env, user);
     }
@@ -10210,7 +10239,7 @@ async function handleRequest(request, env, ctx) {
       const includeVoided = url.searchParams.get("include_voided") === "1";
       const rawLimit = Number(url.searchParams.get("limit") || 0);
       const rawOffset = Number(url.searchParams.get("offset") || 0);
-      const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(Math.floor(rawLimit), 100) : 0;
+      const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(Math.floor(rawLimit), 30) : 30;
       const offset = Number.isFinite(rawOffset) && rawOffset > 0 ? Math.floor(rawOffset) : 0;
       const baseSql = includeVoided
         ? "SELECT * FROM sessions WHERE corpid=? ORDER BY created_at DESC"
