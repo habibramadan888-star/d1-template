@@ -91,6 +91,25 @@ test("session success cannot coexist with active record-level failed state", asy
   assert.match(actionBlock, /whats\.disabled=!uploaded\|\|blocked/);
 });
 
+test("synced arrears payment is not revalidated against current open arrears", async () => {
+  const html = await readFile(employeePath, "utf8");
+  const stateBlock = functionBlock(
+    html,
+    "function employeeSessionRecordState(entry,index)",
+    "function renderSessionRecordValidationDetails(result,index)"
+  );
+  const syncCheck = stateBlock.indexOf("if(entry?.sync_status==='SYNCED')");
+  const staleCheck = stateBlock.indexOf("if(entry?.type==='AP')");
+  const staleCode = stateBlock.indexOf("ARREARS_REF_STALE_REFRESH_REQUIRED", staleCheck);
+
+  assert.ok(syncCheck >= 0, "synced cloud archive state branch must exist");
+  assert.ok(staleCheck > syncCheck, "AP stale open-arrears check must only run after synced branch");
+  assert.ok(staleCode > staleCheck, "unsynced AP stale detection must remain present");
+  assert.match(stateBlock, /cloudStatus==='CLOUD_CONFIRMED'\)return \{key:'SYNCED',label:'Synced'/);
+  assert.match(stateBlock, /if\(entry\?\.type==='AP'\)/);
+  assert.match(stateBlock, /state\.arrearsTasksLoaded&&!openRefs\.has\(ref\)/);
+});
+
 test("server dry-run required renders as pending, not validation failed", async () => {
   const html = await readFile(employeePath, "utf8");
   const stateBlock = functionBlock(

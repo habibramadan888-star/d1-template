@@ -7580,6 +7580,15 @@ function employeeSessionRecordState(entry,index){
   const status=String(entry?.upload_status||'').trim().toUpperCase();
   if(status==='VALIDATING')return {key:'VALIDATING',label:'Validating',className:'validating'};
   if(status==='UPLOADING')return {key:'UPLOADING',label:'Uploading',className:'uploading'};
+  if(entry?.sync_status==='SYNCED'){
+    const cloudStatus=String(entry?.cloud_sync_status||'').trim().toUpperCase();
+    if(cloudStatus==='CLOUD_CONFIRMED')return {key:'SYNCED',label:'Synced',className:''};
+    if(cloudStatus==='CHECKING_CLOUD')return {key:'CHECKING_CLOUD',label:'Checking Cloud',className:'pending'};
+    if(cloudStatus==='CLOUD_MISSING')return {key:'CLOUD_MISSING',label:'Cloud Missing',className:'cloud-missing'};
+    if(cloudStatus==='CLOUD_MISMATCH')return {key:'CLOUD_MISMATCH',label:'Cloud Mismatch / Needs Review',className:'cloud-mismatch'};
+    if(['CLOUD_DELETED','CLOUD_VOIDED','CLOUD_CORRECTED'].includes(cloudStatus))return {key:cloudStatus,label:cloudStatus==='CLOUD_CORRECTED'?'Cloud Corrected':(cloudStatus==='CLOUD_VOIDED'?'Cloud Voided':'Deleted from Cloud'),className:'cloud-deleted'};
+    return {key:'NEEDS_RECONCILIATION',label:'Needs Reconciliation',className:'pending'};
+  }
   if(entry?.type==='AP'){
     const ref=employeeEntryArrearsRef(entry);
     const openRefs=employeeOpenTaskRefSet();
@@ -7605,15 +7614,6 @@ function employeeSessionRecordState(entry,index){
       },index);
       return {key:'STALE',label:'Stale / Needs Refresh',className:'stale',validation:staleResult};
     }
-  }
-  if(entry?.sync_status==='SYNCED'){
-    const cloudStatus=String(entry?.cloud_sync_status||'').trim().toUpperCase();
-    if(cloudStatus==='CLOUD_CONFIRMED')return {key:'SYNCED',label:'Synced',className:''};
-    if(cloudStatus==='CHECKING_CLOUD')return {key:'CHECKING_CLOUD',label:'Checking Cloud',className:'pending'};
-    if(cloudStatus==='CLOUD_MISSING')return {key:'CLOUD_MISSING',label:'Cloud Missing',className:'cloud-missing'};
-    if(cloudStatus==='CLOUD_MISMATCH')return {key:'CLOUD_MISMATCH',label:'Cloud Mismatch / Needs Review',className:'cloud-mismatch'};
-    if(['CLOUD_DELETED','CLOUD_VOIDED','CLOUD_CORRECTED'].includes(cloudStatus))return {key:cloudStatus,label:cloudStatus==='CLOUD_CORRECTED'?'Cloud Corrected':(cloudStatus==='CLOUD_VOIDED'?'Cloud Voided':'Deleted from Cloud'),className:'cloud-deleted'};
-    return {key:'NEEDS_RECONCILIATION',label:'Needs Reconciliation',className:'pending'};
   }
   return {key:'LOCAL',label:'Local',className:'local'};
 }
