@@ -315,22 +315,22 @@ test("runtime AP validator accepts zero remaining_after and rejects forbidden id
 
 test("employee AP upload sanitizer strips provider identity fields from canonical payloads", async () => {
   const html = await readFile(employeePath, "utf8");
-  const sanitizerStart = html.indexOf("const EMPLOYEE_AP_FORBIDDEN_IDENTITY_FIELDS=");
-  const sanitizerEnd = html.indexOf("function employeeValidateCommonAmount", sanitizerStart);
-  const sanitizerBlock = html.slice(sanitizerStart, sanitizerEnd);
+  const firewallStart = html.indexOf("const EMPLOYEE_SOURCE_FIREWALL_FORBIDDEN_FIELDS=");
+  const firewallEnd = html.indexOf("function employeeValidateCommonAmount", firewallStart);
+  const firewallBlock = html.slice(firewallStart, firewallEnd);
   const applyStart = html.indexOf("function applyEntryAnchors");
   const applyEnd = html.indexOf("function normalizeEntryAnchor", applyStart);
   const applyBlock = html.slice(applyStart, applyEnd);
 
-  assert.match(sanitizerBlock, /EMPLOYEE_AP_FORBIDDEN_IDENTITY_FIELDS/);
-  assert.match(sanitizerBlock, /delete entry\[field\]/);
-  assert.match(sanitizerBlock, /type==='AP'/);
-  assert.match(sanitizerBlock, /eventType==='arrears_payment'/);
-  assert.match(sanitizerBlock, /entry\.arrears_ref\|\|entry\.linked_task_id\|\|entry\.original_arrears_id/);
+  assert.match(firewallBlock, /EMPLOYEE_SOURCE_FIREWALL_FORBIDDEN_FIELDS/);
+  assert.match(firewallBlock, /EMPLOYEE_SOURCE_FIREWALL_ALLOWED_FIELDS/);
+  assert.match(firewallBlock, /function sanitizeCanonicalEmployeeEntry/);
+  assert.match(firewallBlock, /delete entry\[field\]/);
+  assert.match(firewallBlock, /function employeeSanitizeArrearsPaymentEntry\(entry\)\{return sanitizeCanonicalEmployeeEntry\('arrears_payment',entry\);\}/);
   for (const field of ["card_id", "tenant_card_id", "old_ttlock_ref", "provider_phone", "phone_99099"]) {
-    assert.match(sanitizerBlock, new RegExp(field));
+    assert.match(firewallBlock, new RegExp(field));
   }
-  assert.match(applyBlock, /employeeSanitizeArrearsPaymentEntry\(e\)/);
+  assert.match(applyBlock, /sanitizeCanonicalEmployeeEntry\(entryEventType\(type\),e\)/);
 });
 
 test("frontend AP builder uses selected arrears ref without spreading selected task context", async () => {
@@ -355,10 +355,17 @@ test("Worker normalized AP anchor removes forbidden identity fields from ENTRY A
   const normalizeStart = worker.indexOf("function normalizeEntryAnchor");
   const normalizeEnd = worker.indexOf("__name(normalizeEntryAnchor", normalizeStart);
   const normalizeBlock = worker.slice(normalizeStart, normalizeEnd);
+  const firewallStart = worker.indexOf("function applyEmployeeEntrySourceFirewall");
+  const firewallEnd = worker.indexOf("__name(applyEmployeeEntrySourceFirewall", firewallStart);
+  const firewallBlock = worker.slice(firewallStart, firewallEnd);
+  const forbiddenStart = worker.indexOf("const employeeSourceFirewallForbiddenFields=");
+  const forbiddenEnd = worker.indexOf("const employeeSourceFirewallAllowedFields=", forbiddenStart);
+  const forbiddenBlock = worker.slice(forbiddenStart, forbiddenEnd);
 
   assert.match(normalizeBlock, /type==="AP"/);
-  assert.match(normalizeBlock, /\.forEach\(field=>delete anchor\[field\]\)/);
+  assert.match(normalizeBlock, /applyEmployeeEntrySourceFirewall\(type,anchor\)/);
+  assert.match(firewallBlock, /if\(!\(field in sanitized\)\)delete entry\[field\]/);
   for (const field of ["card_id", "tenant_card_id", "old_ttlock_ref", "provider_phone", "phone_99099"]) {
-    assert.match(normalizeBlock, new RegExp(field));
+    assert.match(forbiddenBlock, new RegExp(field));
   }
 });

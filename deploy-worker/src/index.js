@@ -2439,6 +2439,7 @@ async function empFindOpenArrearTaskForPaymentReadOnly(env,user,taskId,bed=""){
 }
 __name(empFindOpenArrearTaskForPaymentReadOnly,"empFindOpenArrearTaskForPaymentReadOnly");
 async function validateEmployeeEntryUploadPayload(env,user,body,opts={}){
+  body=normalizeEmployeeEntryBodyForValidation(body||{});
   const eventIndex=Number(opts.event_index ?? body?.event_index ?? 0)||0;
   if(!await empTableExists(env,"sessions")||!await empTableExists(env,"transactions")){
     return employeeEntryValidationFailure("schema","employee_entry_schema_not_ready","employee_entry_schema_not_ready",{event_index:eventIndex});
@@ -2771,6 +2772,7 @@ async function handleEmployeeEntry(request,env,user){
   if(!await empTableExists(env,"sessions")||!await empTableExists(env,"transactions"))return errorResponse("employee_entry_schema_not_ready",503,"employee_entry_schema_not_ready");
   let body;
   try{body=await request.json();}catch{return badRequest("invalid_json");}
+  body=normalizeEmployeeEntryBodyForValidation(body||{});
   const validationResult=await validateEmployeeEntryUploadPayload(env,user,body,{event_index:body?.event_index});
   if(!validationResult.ok)return json({success:false,...validationResult},422);
   if(validationResult.idempotent){
@@ -3090,6 +3092,16 @@ const entryAnchorContract={
   E:["event_type","expense_amount","expense_category","target_bed","reason","note","payment_method","evidence_ref","operator","created_at"],
   TF:["event_type","from_bed","to_bed","transfer_date","transfer_reason","deposit_balance_carryover","arrears_carryover","rent_coverage_carryover","fee_amount","fee_status","payment_method","waiver_reason","fee_waived_reason","old_tenant_context","old_ttlock_context","note","operator","created_at"]
 };
+const employeeSourceFirewallForbiddenFields=["card_id","cardid","tenant_card_id","tenantCardId","old_ttlock_ref","oldTtlockRef","provider_phone","providerPhone","ttlock_phone","ttlockPhone","phone_99099","phone99099","access_card_phone","accessCardPhone","ttlock_account_phone","ttlockAccountPhone","ttlock_context","old_ttlock_context","provider_metadata","ttlock_metadata","card_provider_metadata"];
+const employeeSourceFirewallAllowedFields={
+  R:["id","entry_id","event_id","anchor_id","session_id","type","event_type","source","cat","room","bed","amount","due","paid","expected_rent","paid_amount","payment_method","pay_type","bank_ref","deficit","entry_clr","clr","excess","excess_to","list_price","period_start","period_end","rent_period_start","rent_period_end","cycle","period_day_count","period_due","custom_reason","original_period_start","original_period_end","arrear_handling","arrear_promise_date","arrear_reason_detail","arrears_amount","arrears_due_date","arrears_note","arrears_status","short_paid","promise_date","promise_amount","deposit_included_amount","raw_display_line","anchor_contract_version","validation_status","validation_missing_fields","operator","operator_id","operator_name","employee","created_at","ts","note","remark","status","src","sync_status","upload_status","cloud_sync_status","cloud_sync_checked_at","upload_validation_error","upload_validation_error_code","sync_error","cloud_entry_id","upload_attempt_id","idempotency_key","original_local_entry_id","ttlock_context"],
+  AP:["id","entry_id","event_id","anchor_id","session_id","type","event_type","source","cat","room","bed","amount","due","paid","payment_amount","paid_amount","payment_method","pay_type","bank_ref","deficit","entry_clr","clr","linked_task_id","arrears_ref","original_arrears_id","original_arrears_ref","original_arrears_amount","already_paid_amount","remaining_arrears_before_payment","remaining_arrears","remaining_arrears_after_payment","settlement_status","raw_display_line","anchor_contract_version","validation_status","validation_missing_fields","operator","operator_id","operator_name","employee","created_at","ts","note","remark","status","src","sync_status","upload_status","cloud_sync_status","cloud_sync_checked_at","upload_validation_error","upload_validation_error_code","sync_error","cloud_entry_id","upload_attempt_id","idempotency_key","original_local_entry_id"],
+  D:["id","entry_id","event_id","anchor_id","session_id","type","event_type","source","cat","room","bed","amount","deposit_amount","deposit_required_total","deposit_paid_amount","deposit_remaining","deposit_ref","promise_date","payment_method","pay_type","bank_ref","linked_tenant","raw_display_line","anchor_contract_version","validation_status","validation_missing_fields","operator","operator_id","operator_name","employee","created_at","ts","note","remark","status","src","sync_status","upload_status","cloud_sync_status","cloud_sync_checked_at","upload_validation_error","upload_validation_error_code","sync_error","cloud_entry_id","upload_attempt_id","idempotency_key","original_local_entry_id"],
+  DR:["id","entry_id","event_id","anchor_id","session_id","type","event_type","source","cat","room","bed","amount","deposit_balance","actual_refund_amount","refund_amount","refund_difference","deposit_remaining_after_refund","payment_method","pay_type","refund_method","refund_date","refund_reason","difference_reason","owner_override_ref","override_reason","arrears_offset_ref","arrears_offset_amount","checkout_ref","open_arrears_amount","outstanding_arrears","owner_approval_required","owner_approval_status","raw_display_line","anchor_contract_version","validation_status","validation_missing_fields","operator","operator_id","operator_name","employee","created_at","ts","note","remark","status","src","sync_status","upload_status","cloud_sync_status","cloud_sync_checked_at","upload_validation_error","upload_validation_error_code","sync_error","cloud_entry_id","upload_attempt_id","idempotency_key","original_local_entry_id"],
+  CO:["id","entry_id","event_id","anchor_id","session_id","type","event_type","source","cat","room","bed","amount","checkout_date","checkout_type","deposit_refund","deposit_balance","outstanding_arrears","open_arrears_amount","owner_approval_required","owner_approval_status","checkout_mode","left_with_arrears","customer_left","former_customer_ref","former_customer_name","card_name","whatsapp_phone","former_customer_phone","contact_method","contact_note","arrears_amount","left_arrears_amount","cloud_arrears_ref","belongings_held","belongings_note","coverage_end_date","card_end_date","rent_coverage_end","promised_payment_date","promised_return_date","promise_return_date","left_date","checkout_attempt_date","left_status","final_status","overdue_days","grace_days_after_promise","review_date","confirmed_not_returning_date","confirmed_not_returning_by","confirmation_note","original_session_id","original_event_id","final_note","raw_display_line","anchor_contract_version","validation_status","validation_missing_fields","operator","operator_id","operator_name","employee","created_at","ts","note","remark","status","src","sync_status","upload_status","cloud_sync_status","cloud_sync_checked_at","upload_validation_error","upload_validation_error_code","sync_error","cloud_entry_id","upload_attempt_id","idempotency_key","original_local_entry_id","ttlock_context"],
+  E:["id","entry_id","event_id","anchor_id","session_id","type","event_type","source","cat","room","bed","amount","expense_amount","expense_category","target_bed","reason","expense_desc","evidence_ref","receipt_ref","payment_method","pay_type","bank_ref","raw_display_line","anchor_contract_version","validation_status","validation_missing_fields","operator","operator_id","operator_name","employee","created_at","ts","note","remark","status","src","sync_status","upload_status","cloud_sync_status","cloud_sync_checked_at","upload_validation_error","upload_validation_error_code","sync_error","cloud_entry_id","upload_attempt_id","idempotency_key","original_local_entry_id"],
+  TF:["id","entry_id","event_id","anchor_id","session_id","type","event_type","source","cat","room","bed","roomTo","room_to","bed_from","bed_to","from_bed","to_bed","amount","fee_amount","fee_status","fee_paid","fee_mode","payment_method","pay_type","bank_ref","waiver_reason","fee_waiver_reason","fee_waived_reason","transfer_date","transfer_reason","transfer_validation_status","deposit_balance_carryover","deposit_carried","arrears_carryover","carry_over_arrears","rent_coverage_carryover","rent_difference","old_tenant_context","old_ttlock_context","raw_display_line","anchor_contract_version","validation_status","validation_missing_fields","operator","operator_id","operator_name","employee","created_at","ts","note","remark","status","src","sync_status","upload_status","cloud_sync_status","cloud_sync_checked_at","upload_validation_error","upload_validation_error_code","sync_error","cloud_entry_id","upload_attempt_id","idempotency_key","original_local_entry_id"]
+};
 function entryAnchorType(row){
   const raw=String(row?.type||"").trim().toUpperCase();
   if(entryAnchorContract[raw])return raw;
@@ -3098,6 +3110,43 @@ function entryAnchorType(row){
   return {rent:"R",arrears_payment:"AP",deposit_in:"D",deposit_out:"DR",checkout:"CO",left_with_arrears:"CO",expense:"E",bed_transfer:"TF",bed_transfer_fee:"TFF"}[event]||raw;
 }
 __name(entryAnchorType,"entryAnchorType");
+function normalizeEmployeeEntryForValidation(eventType,entry){
+  if(!entry||typeof entry!=="object")return entry||{};
+  const copy={...entry};
+  const type=entryAnchorType({type:eventType,event_type:eventType,...copy});
+  const allowed=new Set(employeeSourceFirewallAllowedFields[type]||[]);
+  employeeSourceFirewallForbiddenFields.forEach(field=>delete copy[field]);
+  Object.keys(copy).forEach(field=>{
+    const lower=String(field||"").toLowerCase();
+    const providerLike=lower.includes("ttlock")||lower.includes("provider")||lower.includes("card_id")||lower.includes("tenantcard")||lower.includes("99099");
+    if(providerLike&&!allowed.has(field))delete copy[field];
+  });
+  if(type==="R"||type==="CO")copy.ttlock_context="";
+  if(type==="TF")copy.old_ttlock_context="";
+  return copy;
+}
+__name(normalizeEmployeeEntryForValidation,"normalizeEmployeeEntryForValidation");
+function applyEmployeeEntrySourceFirewall(eventType,entry){
+  if(!entry||typeof entry!=="object")return entry||{};
+  const sanitized=normalizeEmployeeEntryForValidation(eventType,entry);
+  Object.keys(entry).forEach(field=>{
+    if(!(field in sanitized))delete entry[field];
+  });
+  Object.assign(entry,sanitized);
+  return entry;
+}
+__name(applyEmployeeEntrySourceFirewall,"applyEmployeeEntrySourceFirewall");
+function normalizeEmployeeEntryBodyForValidation(body={}){
+  const clone={...(body||{})};
+  if(clone.entry)clone.entry=normalizeEmployeeEntryForValidation(clone.entry.event_type||clone.entry.type,clone.entry);
+  if(Array.isArray(clone.entries))clone.entries=clone.entries.map(row=>normalizeEmployeeEntryForValidation(row?.event_type||row?.type,row));
+  if(clone.session&&typeof clone.session==="object"){
+    clone.session={...clone.session};
+    if(Array.isArray(clone.session.entries))clone.session.entries=clone.session.entries.map(row=>normalizeEmployeeEntryForValidation(row?.event_type||row?.type,row));
+  }
+  return clone;
+}
+__name(normalizeEmployeeEntryBodyForValidation,"normalizeEmployeeEntryBodyForValidation");
 function entryAnchorEventType(type){
   return {R:"rent",AP:"arrears_payment",D:"deposit_in",DR:"deposit_out",CO:"checkout",E:"expense",TF:"bed_transfer",TFF:"bed_transfer_fee"}[type]||String(type||"entry").toLowerCase();
 }
@@ -3370,7 +3419,6 @@ function normalizeEntryAnchor(row){
     const remainingBefore=entryAnchorMoney(anchor.remaining_arrears_before_payment||Math.max(0,original-already));
     const remaining=entryAnchorMoney(anchor.remaining_arrears_after_payment||anchor.remaining_arrears||Math.max(0,remainingBefore-payment));
     const ref=anchor.arrears_ref||anchor.original_arrears_id||anchor.linked_task_id||"";
-    ["card_id","cardid","tenant_card_id","tenantCardId","old_ttlock_ref","oldTtlockRef","provider_phone","providerPhone","ttlock_phone","ttlockPhone","phone_99099","phone99099","access_card_phone","accessCardPhone","ttlock_account_phone","ttlockAccountPhone","ttlock_context","old_ttlock_context"].forEach(field=>delete anchor[field]);
     Object.assign(anchor,{bed:anchor.bed||anchor.room,arrears_ref:ref,original_arrears_id:ref,original_arrears_amount:original,already_paid_amount:already,payment_amount:payment,remaining_arrears_before_payment:remainingBefore,remaining_arrears_after_payment:remaining,remaining_arrears:remaining,settlement_status:anchor.settlement_status||(remaining<=0?"settled":"partial")});
   }else if(type==="TF"){
     const fee=employeeEntryBedTransferFee(anchor,{});
@@ -3394,8 +3442,9 @@ function normalizeEntryAnchor(row){
   }else if(type==="E"){
     Object.assign(anchor,{expense_amount:entryAnchorMoney(anchor.expense_amount||anchor.amount),expense_category:anchor.expense_category||anchor.reason_code||"",target_bed:anchor.target_bed||anchor.room||"",reason:anchor.reason||anchor.expense_desc||anchor.custom_reason||"",payment_method:entryAnchorPaymentMethod(anchor.payment_method||anchor.pay_type),evidence_ref:anchor.evidence_ref||anchor.receipt_ref||"",note:anchor.note||anchor.expense_desc||""});
   }
-  anchor.ttlock_context=anchor.ttlock_context||anchor.old_ttlock_context||"";
+  applyEmployeeEntrySourceFirewall(type,anchor);
   anchor.raw_display_line=anchor.raw_display_line||renderEntryAnchorForOwner(anchor);
+  applyEmployeeEntrySourceFirewall(type,anchor);
   anchor.anchor_contract_version="employee_entry_anchor_v1";
   const validation=validateEntryAnchor(anchor);
   anchor.validation_status=validation.ok?"valid":"missing_required_fields";
