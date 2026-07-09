@@ -4627,7 +4627,7 @@ function ownerTodayTodoSlug(value,max=160){
 }
 __name(ownerTodayTodoSlug,"ownerTodayTodoSlug");
 function ownerTodayTodoTaskId(type,bed,sourceSessionId,sourceEventId,sourceGateway){
-  return [type,bed||"bed",sourceSessionId||"session",sourceEventId||"event",sourceGateway||"gateway"].map(ownerTodayTodoSlug).join("__");
+  return [type,bed||"bed",sourceSessionId||"session",sourceEventId||"event",sourceGateway||"gateway"].map(value=>ownerTodayTodoSlug(value)).join("__");
 }
 __name(ownerTodayTodoTaskId,"ownerTodayTodoTaskId");
 function ownerTodayTodoItem(type,fields={}){
@@ -4746,11 +4746,11 @@ function ownerTodayTodoBuildDepositAndOccupancy(todos,bed,deposit={},occupancy={
       session_id:firstDeposit.session_id,
       event_id:firstDeposit.event_id,
       title:`Bed ${bed} deposit collected while TTLock shows vacant`,
-      description:"TTLock still shows this bed as vacant, but Deposit In was recorded.",
-      source_gateway:"canonical_occupancy_bed_status_gateway",
-      source_proof:ownerTodayTodoSourceProof("canonical_occupancy_bed_status_gateway",{physical_bed_status:occupancy.physical_bed_status,physical_bed_status_source:occupancy.physical_bed_status_source,deposit_events_count:depositInEvents.length}),
-      recommended_action:"Verify whether tenant has moved in. If yes, remove E/e and update D amount. If not, void/correct the Deposit In.",
-      auto_resolve_condition:"Access Snapshot E/e vacancy marker is removed or the Deposit In anchor is voided/corrected."
+      description:`Deposit In ${expectedDeposit} exists, but TTLock still marks bed ${bed} as vacant.`,
+      source_gateway:"canonical_deposit_gateway + canonical_occupancy_bed_status_gateway",
+      source_proof:ownerTodayTodoSourceProof("canonical_deposit_gateway + canonical_occupancy_bed_status_gateway",{physical_bed_status:occupancy.physical_bed_status,physical_bed_status_source:occupancy.physical_bed_status_source,deposit_events_count:depositInEvents.length,expected_deposit_amount:expectedDeposit}),
+      recommended_action:`Verify whether the tenant has moved in. If yes, remove E/e and update TTLock remark to D${expectedDeposit}. If this was a test or error, void/correct the Deposit In.`,
+      auto_resolve_condition:"The todo resolves when TTLock no longer shows E/e and D is updated correctly, or the Deposit In record is voided/corrected."
     }),filters);
   }
   const occupancyWarnings=Array.isArray(occupancy.warnings)?occupancy.warnings:[];

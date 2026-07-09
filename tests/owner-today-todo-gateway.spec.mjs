@@ -98,6 +98,10 @@ test("deposit and occupancy reconciliation todos are generated with deterministi
   assert.match(build, /DEPOSIT_IN_ON_TTLOCK_VACANT_BED/);
   assert.match(build, /physical_bed_status==="vacant"/);
   assert.match(build, /physical_bed_status_source==="access_snapshot_E_marker"/);
+  assert.match(build, /canonical_deposit_gateway \+ canonical_occupancy_bed_status_gateway/);
+  assert.match(build, /Deposit In \$\{expectedDeposit\} exists, but TTLock still marks bed \$\{bed\} as vacant/);
+  assert.match(build, /remove E\/e and update TTLock remark to D\$\{expectedDeposit\}/);
+  assert.match(build, /The todo resolves when TTLock no longer shows E\/e and D is updated correctly/);
   assert.match(build, /TTLOCK_VACANT_WITHOUT_CHECKOUT_EVENT/);
   assert.match(build, /CHECKOUT_EVENT_WITHOUT_TTLOCK_E/);
   assert.match(build, /RENT_COVERAGE_CONFLICTS_WITH_TTLOCK_E/);
@@ -105,6 +109,17 @@ test("deposit and occupancy reconciliation todos are generated with deterministi
   assert.match(build, /auto_resolve_condition/);
   assert.match(item, /task_type:type/);
   assert.match(taskId, /type,bed\|\|"bed",sourceSessionId/);
+  assert.match(taskId, /map\(value=>ownerTodayTodoSlug\(value\)\)/);
+  assert.doesNotMatch(taskId, /map\(ownerTodayTodoSlug\)/);
+  const readableId = [
+    "DEPOSIT_IN_ON_TTLOCK_VACANT_BED",
+    "111",
+    "S20260709-q3ub6",
+    "ent20260709-q3ub6-01",
+    "canonical_deposit_gateway + canonical_occupancy_bed_status_gateway"
+  ].map(value => String(value).replace(/[^a-zA-Z0-9_-]+/g, "_").replace(/^_+|_+$/g, "")).join("__");
+  assert.match(readableId, /DEPOSIT_IN_ON_TTLOCK_VACANT_BED__111__S20260709-q3ub6__ent20260709-q3ub6-01/);
+  assert.doesNotMatch(readableId, /unknown__1__S2__ent__cano/);
 });
 
 test("todo deduplication and auto-resolve behavior are encoded", async () => {
