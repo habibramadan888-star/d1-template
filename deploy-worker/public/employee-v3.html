@@ -4440,12 +4440,10 @@ function validateCheckoutEntry(){
   if(!left&&openTasksForBed().some(t=>taskRemain(t)>0))errors.push('Open Arrears Found: This customer has unpaid arrears. Normal checkout is not allowed. / 发现未清欠款：该客户存在未清欠款，不能直接正常退房。');
   if(left){
     employeeRequire(errors,!!employeeFieldValue('checkoutDate'),'Left Date is required for Left With Arrears.');
-    employeeRequire(errors,!!employeeTrimField('leftWhatsappPhone'),'WhatsApp Phone is required for Left With Arrears.');
-    employeeRequire(errors,!!employeeFieldValue('leftConfirmedNotReturningDate'),'Confirmed Not Returning Date is required.');
+    employeeRequire(errors,!!(employeeTrimField('leftWhatsappPhone')||employeeFieldValue('leftContactMethod')),'Phone or Contact Method is required for Left With Arrears.');
     employeeRequire(errors,!!employeeFieldValue('leftPromisedPaymentDate'),'Promised Payment Date is required.');
     employeeRequire(errors,num(employeeFieldValue('leftArrearsAmount'))>0,'Left Arrears Amount is required.');
-    employeeRequire(errors,!!employeeFieldValue('leftBelongingsHeld'),'Belongings Held must be selected.');
-    if(employeeFieldValue('leftBelongingsHeld')==='yes')employeeRequire(errors,!!employeeTrimField('leftBelongingsNote'),'Belongings Note is required when belongings are held.');
+    employeeRequire(errors,!!employeeTrimField('remark'),'Note is required for Left With Arrears.');
   }
   return employeeValidationResult(errors,warns);
 }
@@ -4546,7 +4544,8 @@ function buildCheckoutAnchor(){
     left_date:left?employeeFieldValue('checkoutDate'):'',checkout_attempt_date:left?employeeFieldValue('checkoutDate'):'',
     left_status:left?'left_pending_return':'',final_status:left?'left_pending_return':'',status:left?'left_pending_return':'',confirmed_not_returning_date:left?employeeFieldValue('leftConfirmedNotReturningDate'):'',
     overdue_days:left?Math.max(0,daysBetween(employeeFieldValue('leftCoverageEndDate')||today(),today())):0,
-    original_session_id:left?(leftTask?.session_id||leftTask?.original_session_id||''):'',original_event_id:left?(leftTask?.entry_id||leftTask?.original_entry_id||leftTask?.original_event_id||leftTask?.task_id||''):''
+    original_session_id:left?(leftTask?.session_id||leftTask?.original_session_id||''):'',original_event_id:left?(leftTask?.entry_id||leftTask?.original_entry_id||leftTask?.original_event_id||leftTask?.task_id||''):'',
+    note:employeeTrimField('remark'),final_note:employeeTrimField('remark')
   });
   return applyEntryAnchors(payload);
 }
@@ -9181,6 +9180,13 @@ validate=function(){
     if(!($('leftConfirmedNotReturningDate')?.value||''))addError('Confirmed Not Returning Date is required. / 确认不再回来日期必填。');
     if(($('leftFinalStatus')?.value||$('leftStatus')?.value||'')==='abandoned_confirmed'&&!($('leftConfirmedNotReturningDate')?.value||''))addError('Confirmed Not Returning Date is required when abandoned is confirmed. / 确认不再回来时必须填写确认日期。');
     if(belongingsHeld&&!($('leftBelongingsNote')?.value||'').trim())addError('Belongings Note is required when belongings are held. / 物品留存时必须填写物品说明。');
+  }
+  if(leftMode){
+    result.errors=result.errors.filter(msg=>!/WhatsApp phone is required|Confirmed Not Returning Date is required\.|Belongings Note is required when belongings are held/.test(msg));
+    const contact=($('leftWhatsappPhone')?.value||$('leftContactMethod')?.value||'').trim();
+    const addError=msg=>{if(!result.errors.includes(msg))result.errors.push(msg);};
+    if(!contact)addError('Phone or Contact Method is required for Left With Arrears. / 离店未清欠款必须填写联系方式。');
+    if(!($('remark')?.value||'').trim())addError('Note is required for Left With Arrears. / 离店未清欠款必须填写备注。');
   }
   const blocked=['CO','DR'].includes(type)&&openTasksForBed().length>0;
   if(blocked&&!(type==='CO'&&leftMode)){

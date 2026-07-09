@@ -2519,13 +2519,10 @@ function validateCheckoutUploadFields(entry,normalized,eventIndex,anchorPreview)
   if(!left&&!employeeEntryUploadHasValue(normalized.checkout_date||entry.checkout_date))missing.push("checkout_date");
   if(left){
     if(!employeeEntryUploadHasValue(normalized.left_date||entry.left_date||normalized.checkout_date||entry.checkout_date))missing.push("left_date");
-    if(!employeeEntryUploadHasValue(normalized.whatsapp_phone||entry.whatsapp_phone||entry.former_customer_phone))missing.push("whatsapp_phone");
-    if(!employeeEntryUploadHasValue(normalized.confirmed_not_returning_date||entry.confirmed_not_returning_date))missing.push("confirmed_not_returning_date");
+    if(!employeeEntryUploadHasValue(normalized.whatsapp_phone||entry.whatsapp_phone||entry.former_customer_phone||normalized.contact_method||entry.contact_method))missing.push("contact_phone_or_method");
     if(!employeeEntryUploadHasValue(normalized.promised_payment_date||entry.promised_payment_date||entry.promise_date))missing.push("promised_payment_date");
     if(employeeEntryUploadAmount(normalized.left_arrears_amount||normalized.arrears_amount||entry.left_arrears_amount||entry.arrears_amount)<=0)missing.push("left_arrears_amount");
-    if(!employeeEntryUploadHasValue(normalized.belongings_held||entry.belongings_held))missing.push("belongings_held");
-    const held=normalized.belongings_held===true||String(entry.belongings_held??normalized.belongings_held).toLowerCase()==="yes";
-    if(held&&!employeeEntryUploadHasValue(normalized.belongings_note||entry.belongings_note))missing.push("belongings_note");
+    if(!employeeEntryUploadHasValue(normalized.final_note||entry.final_note||normalized.note||entry.note))missing.push("note");
   }
   if(missing.length||invalid.length)return employeeEntryValidationFailure(left?"left_with_arrears_event_validation":"checkout_event_validation",left?"LEFT_WITH_ARREARS_REQUIRED_FIELDS_MISSING":"CHECKOUT_REQUIRED_FIELD_MISSING",left?"Left With Arrears is missing required fields.":"Checkout entry is missing required fields.",{event_index:eventIndex,event_type:eventType,missing_fields:missing,invalid_fields:invalid,anchor_preview:anchorPreview});
   return null;
@@ -2846,14 +2843,11 @@ async function validateEmployeeEntryUploadPayload(env,user,body,opts={}){
   }
   if(type==="CO"&&entry.left_with_arrears){
     const missing=[];
-    if(!cleanText(entry.whatsapp_phone||entry.former_customer_phone,80))missing.push("whatsapp_phone");
+    if(!cleanText(entry.whatsapp_phone||entry.former_customer_phone||entry.contact_method,80))missing.push("contact_phone_or_method");
     if(!cleanDate(entry.left_date||entry.checkout_date||entry.checkout_attempt_date||""))missing.push("left_date");
-    if(!cleanDate(entry.confirmed_not_returning_date||""))missing.push("confirmed_not_returning_date");
     if(!cleanDate(entry.promised_payment_date||entry.promise_date||""))missing.push("promised_payment_date");
     if(cleanMoney(entry.left_arrears_amount||entry.arrears_amount||entry.outstanding_arrears||0)<=0)missing.push("left_arrears_amount");
-    if(typeof entry.belongings_held==="undefined"&&String(entry.belongings_held||"")==="")missing.push("belongings_held");
-    const held=entry.belongings_held===true||String(entry.belongings_held||"").toLowerCase()==="yes";
-    if(held&&!cleanText(entry.belongings_note,500))missing.push("belongings_note");
+    if(!cleanText(entry.final_note||entry.note,500))missing.push("note");
     if(missing.length){
       return employeeEntryValidationFailure("left_with_arrears_validation","LEFT_WITH_ARREARS_REQUIRED_FIELDS_MISSING","Left With Arrears is missing required fields.",{event_index:eventIndex,event_type:"left_with_arrears",missing_fields:missing,anchor_preview:anchorPreview});
     }
