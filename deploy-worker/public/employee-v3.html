@@ -4305,6 +4305,21 @@ function employeeValidationResult(errors,warns){
   return {errors,warns};
 }
 function employeeRequire(errors,condition,message){if(!condition)errors.push(message);}
+const EMPLOYEE_AP_FORBIDDEN_IDENTITY_FIELDS=[
+  'card_id','cardid','tenant_card_id','tenantCardId','old_ttlock_ref','oldTtlockRef',
+  'provider_phone','providerPhone','ttlock_phone','ttlockPhone','phone_99099','phone99099',
+  'access_card_phone','accessCardPhone','ttlock_account_phone','ttlockAccountPhone',
+  'ttlock_context','old_ttlock_context'
+];
+function employeeSanitizeArrearsPaymentEntry(entry){
+  if(!entry||typeof entry!=='object')return entry;
+  const type=String(entry.type||'').trim().toUpperCase();
+  const eventType=String(entry.event_type||'').trim().toLowerCase();
+  const isAp=type==='AP'||eventType==='arrears_payment'||String(entry.reason_code||'').trim().toUpperCase()==='AP'||!!(entry.arrears_ref||entry.linked_task_id||entry.original_arrears_id);
+  if(!isAp)return entry;
+  EMPLOYEE_AP_FORBIDDEN_IDENTITY_FIELDS.forEach(field=>{delete entry[field];});
+  return entry;
+}
 function employeeValidateCommonAmount(errors,{optional=false,label='Amount'}={}){
   const amt=num(employeeFieldValue('amount'));
   if(!optional&&(!amt||amt<=0))errors.push(`${label} must be greater than 0.`);
@@ -4715,6 +4730,7 @@ function validateEntryAnchor(e){
   return {ok:missing.length===0,missing};
 }
 function applyEntryAnchors(e){
+  if(typeof employeeSanitizeArrearsPaymentEntry==='function')employeeSanitizeArrearsPaymentEntry(e);
   const type=e.type;
   const tail=type==='R'?Math.max(0,num(e.period_due||e.due)-num(e.paid||e.amount)):0;
   const method=paymentMethodLabel(e.pay_type||e.payment_method);

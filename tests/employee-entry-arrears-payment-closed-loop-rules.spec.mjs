@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const workerPath = new URL("../deploy-worker/src/index.js", import.meta.url);
+const employeePath = new URL("../deploy-worker/public/employee-v3.html", import.meta.url);
 
 function money(value) {
   return Math.round((Number(value) || 0) * 100) / 100;
@@ -16,7 +17,9 @@ function validateArrearsPaymentFixture(entry) {
     "tenant_card_id",
     "old_ttlock_ref",
     "provider_phone",
-    "phone_99099"
+    "phone_99099",
+    "ttlock_context",
+    "old_ttlock_context"
   ];
   const forbiddenUsed = forbiddenIdentityFields.filter((field) => entry[field]);
 
@@ -220,11 +223,13 @@ test("forbidden identity fields are rejected for Arrears Payment matching", () =
     tenant_card_id: "tenant-card-334",
     old_ttlock_ref: "lock-334",
     provider_phone: "+971525199099",
-    phone_99099: "+9715011199099"
+    phone_99099: "+9715011199099",
+    ttlock_context: "lock-334",
+    old_ttlock_context: "lock-334"
   });
 
   assert.equal(result.ok, false);
-  for (const field of ["card_id", "tenant_card_id", "old_ttlock_ref", "provider_phone", "phone_99099"]) {
+  for (const field of ["card_id", "tenant_card_id", "old_ttlock_ref", "provider_phone", "phone_99099", "ttlock_context", "old_ttlock_context"]) {
     assert.ok(result.invalid_fields.includes(field));
   }
 });
@@ -303,7 +308,57 @@ test("runtime AP validator accepts zero remaining_after and rejects forbidden id
   assert.match(validationBlock, /employeeEntryUploadHasValue\(remainingAfterValue\)/);
   assert.doesNotMatch(validationBlock, /normalized\.remaining_arrears_after_payment\|\|entry\.remaining_arrears_after_payment/);
   assert.match(validationBlock, /ARREARS_PAYMENT_FORBIDDEN_IDENTITY_FIELD/);
-  for (const field of ["card_id", "tenant_card_id", "old_ttlock_ref", "provider_phone", "phone_99099"]) {
+  for (const field of ["card_id", "tenant_card_id", "old_ttlock_ref", "provider_phone", "phone_99099", "ttlock_context", "old_ttlock_context"]) {
     assert.match(validationBlock, new RegExp(field));
+  }
+});
+
+test("employee AP upload sanitizer strips provider identity fields from canonical payloads", async () => {
+  const html = await readFile(employeePath, "utf8");
+  const sanitizerStart = html.indexOf("const EMPLOYEE_AP_FORBIDDEN_IDENTITY_FIELDS=");
+  const sanitizerEnd = html.indexOf("function employeeValidateCommonAmount", sanitizerStart);
+  const sanitizerBlock = html.slice(sanitizerStart, sanitizerEnd);
+  const applyStart = html.indexOf("function applyEntryAnchors");
+  const applyEnd = html.indexOf("function normalizeEntryAnchor", applyStart);
+  const applyBlock = html.slice(applyStart, applyEnd);
+
+  assert.match(sanitizerBlock, /EMPLOYEE_AP_FORBIDDEN_IDENTITY_FIELDS/);
+  assert.match(sanitizerBlock, /delete entry\[field\]/);
+  assert.match(sanitizerBlock, /type==='AP'/);
+  assert.match(sanitizerBlock, /eventType==='arrears_payment'/);
+  assert.match(sanitizerBlock, /entry\.arrears_ref\|\|entry\.linked_task_id\|\|entry\.original_arrears_id/);
+  for (const field of ["card_id", "tenant_card_id", "old_ttlock_ref", "provider_phone", "phone_99099"]) {
+    assert.match(sanitizerBlock, new RegExp(field));
+  }
+  assert.match(applyBlock, /employeeSanitizeArrearsPaymentEntry\(e\)/);
+});
+
+test("frontend AP builder uses selected arrears ref without spreading selected task context", async () => {
+  const html = await readFile(employeePath, "utf8");
+  const builderStart = html.indexOf("function buildArrearsPaymentAnchor");
+  const builderEnd = html.indexOf("function buildDepositInAnchor", builderStart);
+  const builderBlock = html.slice(builderStart, builderEnd);
+  const taskInfoStart = html.indexOf("function renderTaskInfo");
+  const taskInfoEnd = html.indexOf("function applyLinkedTask", taskInfoStart);
+  const taskInfoBlock = html.slice(taskInfoStart, taskInfoEnd);
+
+  assert.match(builderBlock, /const ref=employeeFieldValue\('linkedTaskId'\)/);
+  assert.match(builderBlock, /linked_task_id:ref/);
+  assert.match(builderBlock, /arrears_ref:ref/);
+  assert.match(builderBlock, /original_arrears_id:ref/);
+  assert.doesNotMatch(builderBlock, /\.\.\.task/);
+  assert.doesNotMatch(taskInfoBlock, /tenant_card_id|old_ttlock_ref|provider_phone|phone_99099/);
+});
+
+test("Worker normalized AP anchor removes forbidden identity fields from ENTRY ANCHORS JSON", async () => {
+  const worker = await readFile(workerPath, "utf8");
+  const normalizeStart = worker.indexOf("function normalizeEntryAnchor");
+  const normalizeEnd = worker.indexOf("__name(normalizeEntryAnchor", normalizeStart);
+  const normalizeBlock = worker.slice(normalizeStart, normalizeEnd);
+
+  assert.match(normalizeBlock, /type==="AP"/);
+  assert.match(normalizeBlock, /\.forEach\(field=>delete anchor\[field\]\)/);
+  for (const field of ["card_id", "tenant_card_id", "old_ttlock_ref", "provider_phone", "phone_99099"]) {
+    assert.match(normalizeBlock, new RegExp(field));
   }
 });

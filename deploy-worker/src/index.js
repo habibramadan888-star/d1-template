@@ -2258,7 +2258,7 @@ function validateArrearsPaymentUploadFields(entry,normalized,eventIndex,anchorPr
   const invalid=[];
   const remainingBeforeValue=normalized.remaining_arrears_before_payment ?? entry.remaining_arrears_before_payment;
   const remainingAfterValue=normalized.remaining_arrears_after_payment ?? entry.remaining_arrears_after_payment ?? normalized.remaining_arrears ?? entry.remaining_arrears;
-  const forbiddenIdentityFields=["card_id","tenant_card_id","old_ttlock_ref","provider_phone","phone_99099"];
+  const forbiddenIdentityFields=["card_id","tenant_card_id","old_ttlock_ref","provider_phone","phone_99099","ttlock_context","old_ttlock_context"];
   const forbiddenUsed=forbiddenIdentityFields.filter(field=>employeeEntryUploadHasValue(entry[field] ?? normalized[field]));
   if(!employeeEntryUploadHasValue(normalized.bed||entry.room))missing.push("bed");
   if(!employeeEntryUploadHasValue(normalized.arrears_ref||entry.arrears_ref||entry.original_arrears_id||entry.linked_task_id))missing.push("arrears_ref");
@@ -3370,6 +3370,7 @@ function normalizeEntryAnchor(row){
     const remainingBefore=entryAnchorMoney(anchor.remaining_arrears_before_payment||Math.max(0,original-already));
     const remaining=entryAnchorMoney(anchor.remaining_arrears_after_payment||anchor.remaining_arrears||Math.max(0,remainingBefore-payment));
     const ref=anchor.arrears_ref||anchor.original_arrears_id||anchor.linked_task_id||"";
+    ["card_id","cardid","tenant_card_id","tenantCardId","old_ttlock_ref","oldTtlockRef","provider_phone","providerPhone","ttlock_phone","ttlockPhone","phone_99099","phone99099","access_card_phone","accessCardPhone","ttlock_account_phone","ttlockAccountPhone","ttlock_context","old_ttlock_context"].forEach(field=>delete anchor[field]);
     Object.assign(anchor,{bed:anchor.bed||anchor.room,arrears_ref:ref,original_arrears_id:ref,original_arrears_amount:original,already_paid_amount:already,payment_amount:payment,remaining_arrears_before_payment:remainingBefore,remaining_arrears_after_payment:remaining,remaining_arrears:remaining,settlement_status:anchor.settlement_status||(remaining<=0?"settled":"partial")});
   }else if(type==="TF"){
     const fee=employeeEntryBedTransferFee(anchor,{});
