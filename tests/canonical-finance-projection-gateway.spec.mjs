@@ -150,6 +150,8 @@ test("canonical finance gateway uses archive semantics and corrected effective t
   ]) {
     assert.match(correction, new RegExp(field), `${field} effective total must be read`);
   }
+  assert.match(correction, /depositRefund/);
+  assert.match(correction, /totals\.cash_out\+=depositRefund\+expense/);
 });
 
 test("owner finance projection route and overview summaries use the gateway", async () => {

@@ -8531,16 +8531,20 @@ function canonicalFinanceProjectionApplyAnchor(totals,anchor={}){
 __name(canonicalFinanceProjectionApplyAnchor,"canonicalFinanceProjectionApplyAnchor");
 function canonicalFinanceProjectionApplyCorrectionEffectiveTotals(totals,summary={}){
   const effective=summary.archive_effective_totals||{};
+  const depositLiability=ownerOverviewMoney(effective.deposit_liability);
+  const depositRefund=Math.max(0,-depositLiability);
+  const expense=ownerOverviewMoney(effective.expense);
   totals.cash_received+=ownerOverviewMoney(effective.cash);
   totals.bank_received+=ownerOverviewMoney(effective.bank);
   totals.gross_received+=ownerOverviewMoney(effective.gross);
   totals.rent_income+=ownerOverviewMoney(effective.rent_income);
-  totals.deposit_received+=Math.max(0,ownerOverviewMoney(effective.deposit_liability));
-  totals.deposit_refund+=Math.max(0,-ownerOverviewMoney(effective.deposit_liability));
+  totals.deposit_received+=Math.max(0,depositLiability);
+  totals.deposit_refund+=depositRefund;
   totals.arrears_repaid+=ownerOverviewMoney(effective.arrears_repaid);
   totals.arrears_opened_amount+=ownerOverviewMoney(effective.arrears_open);
   if(ownerOverviewMoney(effective.arrears_open)>0)totals.arrears_opened_count+=1;
-  totals.expenses+=ownerOverviewMoney(effective.expense);
+  totals.expenses+=expense;
+  totals.cash_out+=depositRefund+expense;
   totals.bed_transfer_fee+=ownerOverviewMoney(effective.transfer_fee);
 }
 __name(canonicalFinanceProjectionApplyCorrectionEffectiveTotals,"canonicalFinanceProjectionApplyCorrectionEffectiveTotals");
