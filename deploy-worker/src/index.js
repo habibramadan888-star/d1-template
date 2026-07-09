@@ -2256,15 +2256,20 @@ __name(validateRentUploadFields,"validateRentUploadFields");
 function validateArrearsPaymentUploadFields(entry,normalized,eventIndex,anchorPreview){
   const missing=[];
   const invalid=[];
+  const remainingBeforeValue=normalized.remaining_arrears_before_payment ?? entry.remaining_arrears_before_payment;
+  const remainingAfterValue=normalized.remaining_arrears_after_payment ?? entry.remaining_arrears_after_payment ?? normalized.remaining_arrears ?? entry.remaining_arrears;
+  const forbiddenIdentityFields=["card_id","tenant_card_id","old_ttlock_ref","provider_phone","phone_99099"];
+  const forbiddenUsed=forbiddenIdentityFields.filter(field=>employeeEntryUploadHasValue(entry[field] ?? normalized[field]));
   if(!employeeEntryUploadHasValue(normalized.bed||entry.room))missing.push("bed");
   if(!employeeEntryUploadHasValue(normalized.arrears_ref||entry.arrears_ref||entry.original_arrears_id||entry.linked_task_id))missing.push("arrears_ref");
   if(employeeEntryUploadAmount(normalized.payment_amount||entry.payment_amount||entry.amount)<=0)missing.push("payment_amount");
   if(!employeeEntryUploadHasValue(normalized.payment_method||entry.payment_method||entry.pay_type))missing.push("payment_method");
-  if(!employeeEntryUploadHasValue(normalized.remaining_arrears_before_payment||entry.remaining_arrears_before_payment))missing.push("remaining_before");
-  if(!employeeEntryUploadHasValue(normalized.remaining_arrears_after_payment||entry.remaining_arrears_after_payment||normalized.remaining_arrears||entry.remaining_arrears))missing.push("remaining_after");
+  if(!employeeEntryUploadHasValue(remainingBeforeValue))missing.push("remaining_before");
+  if(!employeeEntryUploadHasValue(remainingAfterValue))missing.push("remaining_after");
   if(!employeeEntryUploadHasValue(normalized.settlement_status||entry.settlement_status))missing.push("settlement_status");
   if(missing.length||invalid.length)return employeeEntryValidationFailure("arrears_payment_event_validation","ARREARS_PAYMENT_REQUIRED_FIELD_MISSING","Arrears Payment entry is missing required fields.",{event_index:eventIndex,event_type:"arrears_payment",missing_fields:missing,invalid_fields:invalid,anchor_preview:anchorPreview});
-  const remainingAfter=employeeEntryUploadAmount(normalized.remaining_arrears_after_payment||entry.remaining_arrears_after_payment||normalized.remaining_arrears||entry.remaining_arrears);
+  if(forbiddenUsed.length)return employeeEntryValidationFailure("arrears_payment_event_validation","ARREARS_PAYMENT_FORBIDDEN_IDENTITY_FIELD","Arrears Payment must match by arrears_ref, not provider identity fields.",{event_index:eventIndex,event_type:"arrears_payment",invalid_fields:forbiddenUsed,anchor_preview:anchorPreview});
+  const remainingAfter=employeeEntryUploadAmount(remainingAfterValue);
   const settlementStatus=cleanText(normalized.settlement_status||entry.settlement_status,40).toLowerCase();
   if((remainingAfter<=0.01&&settlementStatus!=="settled")||(remainingAfter>0.01&&!["partial","open"].includes(settlementStatus))){
     return employeeEntryValidationFailure("arrears_payment_event_validation","ARREARS_PAYMENT_REMAINING_STATUS_MISMATCH","Arrears Payment settlement status must match remaining arrears.",{event_index:eventIndex,event_type:"arrears_payment",invalid_fields:["remaining_arrears_after_payment","settlement_status"],anchor_preview:{...anchorPreview,remaining_arrears_after_payment:remainingAfter,settlement_status:settlementStatus}});
@@ -2361,11 +2366,21 @@ function employeeEntryUploadType(entry={}){
   const event=cleanText(entry.event_type,60).toLowerCase();
   const eventMap={rent:"R",arrears_payment:"AP",deposit_in:"D",deposit_out:"DR",checkout:"CO",left_with_arrears:"CO",expense:"E",bed_transfer:"TF",bed_transfer_fee:"TFF"};
   if(eventMap[event])return eventMap[event];
+  if(cleanId(entry.arrears_ref||entry.linked_task_id||entry.original_arrears_id))return "AP";
   const raw=cleanText(entry.type||entry.reason_code||"R",12).toUpperCase();
   const legacyMap={T:"TF",TRANSFER:"TF",BED_TRANSFER:"TF"};
   return legacyMap[raw]||raw||"R";
 }
 __name(employeeEntryUploadType,"employeeEntryUploadType");
+function employeeEntryValidationEntryFromBody(body={},eventIndex=0){
+  if(body?.entry&&typeof body.entry==="object"&&Object.keys(body.entry).length)return body.entry;
+  const sessionEntries=Array.isArray(body?.session?.entries)?body.session.entries:[];
+  const bodyEntries=Array.isArray(body?.entries)?body.entries:[];
+  const entries=sessionEntries.length?sessionEntries:bodyEntries;
+  const index=Number.isInteger(Number(eventIndex))?Math.max(0,Number(eventIndex)):0;
+  return entries[index]||entries[0]||{};
+}
+__name(employeeEntryValidationEntryFromBody,"employeeEntryValidationEntryFromBody");
 async function empFindOpenArrearTaskForPaymentReadOnly(env,user,taskId,bed=""){
   const cleanTaskId=cleanId(taskId);
   if(!cleanTaskId)return null;
@@ -2396,8 +2411,8 @@ async function validateEmployeeEntryUploadPayload(env,user,body,opts={}){
   if(!await empTableExists(env,"sessions")||!await empTableExists(env,"transactions")){
     return employeeEntryValidationFailure("schema","employee_entry_schema_not_ready","employee_entry_schema_not_ready",{event_index:eventIndex});
   }
-  const entry=body?.entry||{};
   const session=body?.session||{};
+  const entry=employeeEntryValidationEntryFromBody(body,eventIndex);
   const duplicateGuard=await checkEmployeeEntryDuplicates(env,user,body,{event_index:eventIndex});
   if(!duplicateGuard.ok)return employeeEntryDuplicateValidationFailure(duplicateGuard,eventIndex);
   if(duplicateGuard.idempotent){
@@ -2464,7 +2479,8 @@ async function validateEmployeeEntryUploadPayload(env,user,body,opts={}){
       anchor_preview:anchorPreview
     });
   }
-  const sessionAnchorEntries=Array.isArray(session.entries)?session.entries.map(row=>normalizeEntryAnchor(row)):[];
+  const rawSessionEntries=Array.isArray(session.entries)?session.entries:(Array.isArray(body?.entries)?body.entries:[]);
+  const sessionAnchorEntries=rawSessionEntries.map(row=>normalizeEntryAnchor(row));
   for(let i=0;i<sessionAnchorEntries.length;i++){
     const row=sessionAnchorEntries[i];
     if(row.validation_status!=="valid"){
@@ -2489,8 +2505,8 @@ async function validateEmployeeEntryUploadPayload(env,user,body,opts={}){
       event_index:eventIndex,event_type:normalized.event_type||entryAnchorEventType(type),anchor_preview:anchorPreview
     });
   }
-  let amount=Number(String(entry.amount||0).replace(/,/g,""));
-  const room=cleanText(entry.room||(type==="E"?entry.expense_category:""),40).replace(/^#+/,"");
+  let amount=Number(String((type==="AP"?(entry.amount||entry.payment_amount||normalized.payment_amount):entry.amount)||0).replace(/,/g,""));
+  const room=cleanText(entry.room||entry.bed||normalized.bed||(type==="E"?entry.expense_category:""),40).replace(/^#+/,"");
   const amountOptional=type==="CO"||type==="TF";
   if(!room||!Number.isFinite(amount)||(!amountOptional&&amount<=0)){
     return employeeEntryValidationFailure("basic_fields","ROOM_AMOUNT_REQUIRED","Room and amount are required.",{
@@ -3497,7 +3513,7 @@ function employeeEntryDuplicateValidationFailure(result,eventIndex=0){
 __name(employeeEntryDuplicateValidationFailure,"employeeEntryDuplicateValidationFailure");
 function employeeEntryDuplicateIncomingRows(body){
   const session=body?.session||{};
-  const rows=Array.isArray(session.entries)&&session.entries.length?session.entries:[body?.entry||{}];
+  const rows=Array.isArray(session.entries)&&session.entries.length?session.entries:(Array.isArray(body?.entries)&&body.entries.length?body.entries:[body?.entry||{}]);
   return rows.map(row=>normalizeEntryAnchor(row));
 }
 __name(employeeEntryDuplicateIncomingRows,"employeeEntryDuplicateIncomingRows");

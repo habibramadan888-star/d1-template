@@ -267,3 +267,43 @@ test("runtime Arrears Payment validator and anchor contract expose the closed-lo
     assert.match(contractLine, new RegExp(field));
   }
 });
+
+test("runtime dry-run dispatch reads AP rows from session/top-level entries instead of defaulting to rent", async () => {
+  const worker = await readFile(workerPath, "utf8");
+  const entrySelectorStart = worker.indexOf("function employeeEntryValidationEntryFromBody");
+  const entrySelectorEnd = worker.indexOf("__name(employeeEntryValidationEntryFromBody", entrySelectorStart);
+  const entrySelectorBlock = worker.slice(entrySelectorStart, entrySelectorEnd);
+  const validateStart = worker.indexOf("async function validateEmployeeEntryUploadPayload");
+  const validateEnd = worker.indexOf("__name(validateEmployeeEntryUploadPayload", validateStart);
+  const validateBlock = worker.slice(validateStart, validateEnd);
+  const duplicateStart = worker.indexOf("function employeeEntryDuplicateIncomingRows");
+  const duplicateEnd = worker.indexOf("__name(employeeEntryDuplicateIncomingRows", duplicateStart);
+  const duplicateBlock = worker.slice(duplicateStart, duplicateEnd);
+  const typeStart = worker.indexOf("function employeeEntryUploadType");
+  const typeEnd = worker.indexOf("__name(employeeEntryUploadType", typeStart);
+  const typeBlock = worker.slice(typeStart, typeEnd);
+
+  assert.match(entrySelectorBlock, /body\?\.session\?\.entries/);
+  assert.match(entrySelectorBlock, /body\?\.entries/);
+  assert.match(entrySelectorBlock, /return entries\[index\]\|\|entries\[0\]\|\|\{\}/);
+  assert.match(duplicateBlock, /Array\.isArray\(body\?\.entries\)&&body\.entries\.length\?body\.entries/);
+  assert.match(validateBlock, /const entry=employeeEntryValidationEntryFromBody\(body,eventIndex\)/);
+  assert.match(validateBlock, /const rawSessionEntries=Array\.isArray\(session\.entries\)\?session\.entries:\(Array\.isArray\(body\?\.entries\)\?body\.entries:\[\]\)/);
+  assert.match(typeBlock, /if\(cleanId\(entry\.arrears_ref\|\|entry\.linked_task_id\|\|entry\.original_arrears_id\)\)return "AP"/);
+  assert.match(typeBlock, /arrears_payment:"AP"/);
+});
+
+test("runtime AP validator accepts zero remaining_after and rejects forbidden identity fields", async () => {
+  const worker = await readFile(workerPath, "utf8");
+  const validationStart = worker.indexOf("function validateArrearsPaymentUploadFields");
+  const validationEnd = worker.indexOf("__name(validateArrearsPaymentUploadFields", validationStart);
+  const validationBlock = worker.slice(validationStart, validationEnd);
+
+  assert.match(validationBlock, /const remainingAfterValue=normalized\.remaining_arrears_after_payment \?\? entry\.remaining_arrears_after_payment \?\? normalized\.remaining_arrears \?\? entry\.remaining_arrears/);
+  assert.match(validationBlock, /employeeEntryUploadHasValue\(remainingAfterValue\)/);
+  assert.doesNotMatch(validationBlock, /normalized\.remaining_arrears_after_payment\|\|entry\.remaining_arrears_after_payment/);
+  assert.match(validationBlock, /ARREARS_PAYMENT_FORBIDDEN_IDENTITY_FIELD/);
+  for (const field of ["card_id", "tenant_card_id", "old_ttlock_ref", "provider_phone", "phone_99099"]) {
+    assert.match(validationBlock, new RegExp(field));
+  }
+});
