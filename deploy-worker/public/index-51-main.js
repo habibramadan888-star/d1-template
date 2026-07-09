@@ -719,6 +719,42 @@ function historyDetailMismatchHtml(session,renderedCount){
   </div>`;
 }
 
+function ownerArchiveTotalsValue(totals,key){
+  const value=Number(totals?.[key]??0);
+  return Number.isFinite(value)?value:0;
+}
+
+function ownerArchiveVoidedTotalsHtml(session,t){
+  if(!session?._voided)return '';
+  const raw=session?.raw_totals||{};
+  const effective=session?.archive_effective_totals||{};
+  const rawGross=ownerArchiveTotalsValue(raw,'gross')||Number(session?.gross_received||0)||Number(t?.total||0);
+  const effectiveGross=ownerArchiveTotalsValue(effective,'gross');
+  return `<div data-owner-voided-effective-label="true" style="font-size:11px;color:var(--red);line-height:1.55;margin-top:7px;background:rgba(217,48,37,.08);border:1px solid rgba(217,48,37,.18);border-radius:8px;padding:7px">
+    <div>原始流水金额，不计入有效收入 · Raw/original total: <b class="mono">${fmtMoney(rawGross)}</b></div>
+    <div>当前有效金额：0 · Effective total: <b class="mono">${fmtMoney(effectiveGross)}</b></div>
+    <div>已删除/已作废，不计入总收入 · Deleted/voided, excluded from active income</div>
+  </div>`;
+}
+
+function ownerArchiveVoidedDetailHtml(session){
+  if(!session?._voided)return '';
+  const summary=session?.correction_summary||{};
+  const raw=summary.raw_totals||session?.raw_totals||{};
+  const corrected=summary.corrected_totals||summary.adjusted_totals||session?.corrected_totals||{};
+  const effective=summary.archive_effective_totals||session?.archive_effective_totals||{};
+  const hasCorrection=summary.correction_history_visible||Number(summary.correction_events_count||0)>0||Number(summary.correction_sessions_count||0)>0;
+  const correctionNote=hasCorrection
+    ? '修正历史仍保留；作废只影响当前有效金额。Correction history remains visible; void affects effective totals only.'
+    : 'No correction anchor found / 修正记录不存在';
+  return `<div data-owner-voided-detail-label="true" class="card-sub" style="margin-top:8px;color:var(--red);line-height:1.65;background:rgba(217,48,37,.08);border:1px solid rgba(217,48,37,.18);border-radius:8px;padding:8px">
+    <div>原始流水金额，不计入有效收入 · Raw/original gross: <b class="mono">${fmtMoney(ownerArchiveTotalsValue(raw,'gross'))}</b></div>
+    <div>修正后金额 · Corrected gross: <b class="mono">${fmtMoney(ownerArchiveTotalsValue(corrected,'gross'))}</b></div>
+    <div>当前有效金额：0 · Effective gross: <b class="mono">${fmtMoney(ownerArchiveTotalsValue(effective,'gross'))}</b></div>
+    <div>已删除/已作废，不计入总收入 · ${correctionNote}</div>
+  </div>`;
+}
+
 function ledgerSessionRawText(s){
   return String(s?.export_text||s?.exportText||s?.raw_text||s?.rawText||s?.txt||'');
 }
@@ -2697,14 +2733,26 @@ async function renderHistory(){
     if(s._cloud&&(!s.entries||!s.entries.length)&&(!ledgerSessionRawText(s)||s._voided||Number(s.entriesCount||s.entries_count||0))){
       wrap.innerHTML='<div style="text-align:center;padding:40px;color:var(--text3)">加载中...</div>';
       try{
-        const detailUrl=`/api/session_detail?id=${encodeURIComponent(s.id)}${s._voided?'&include_voided=1':''}`;
+        const detailUrl=`/api/session_detail?id=${encodeURIComponent(s.id)}${s._voided?'&include_voided=1&include_corrections=1':''}`;
         const r=await apiFetchWithTimeout(detailUrl);
         if(r.status===401){showAuthExpired();wrap.innerHTML='<div class="card" style="padding:24px;text-align:center;color:var(--red)">登录已过期，请重新登录后查看历史</div>';return;}
         if(r.status===403){wrap.innerHTML='<div class="card" style="padding:24px;text-align:center;color:var(--red)">老板账户才能查看历史详情</div>';return;}
         if(!r.ok){wrap.innerHTML=`<div class="card" style="padding:24px;text-align:center;color:var(--red)">历史详情加载失败：${r.status}</div>`;return;}
-        const rows=await r.json();
+        const detailPayload=await r.json();
+        const rows=Array.isArray(detailPayload)?detailPayload:(Array.isArray(detailPayload?.data)?detailPayload.data:[]);
         if(!Array.isArray(rows)){wrap.innerHTML='<div class="card" style="padding:24px;text-align:center;color:var(--red)">历史详情格式异常</div>';return;}
-        s=normalizeLedgerSession({...s,entries:rows.map(tx=>{
+        s=normalizeLedgerSession({...s,
+          archive_gateway:detailPayload?.archive_gateway||s.archive_gateway||null,
+          archive_state:detailPayload?.archive_gateway?.archive_state||detailPayload?.correction_summary?.archive_state||s.archive_state||'',
+          correction_summary:detailPayload?.correction_summary||s.correction_summary||null,
+          correction_audit:detailPayload?.correction_audit||s.correction_audit||null,
+          raw_totals:detailPayload?.correction_summary?.raw_totals||detailPayload?.archive_gateway?.raw_totals||s.raw_totals||null,
+          correction_totals:detailPayload?.correction_summary?.correction_totals||detailPayload?.archive_gateway?.correction_totals||s.correction_totals||null,
+          corrected_totals:detailPayload?.correction_summary?.corrected_totals||detailPayload?.archive_gateway?.corrected_totals||s.corrected_totals||null,
+          archive_effective_totals:detailPayload?.correction_summary?.archive_effective_totals||detailPayload?.archive_gateway?.archive_effective_totals||s.archive_effective_totals||null,
+          active_for_totals:detailPayload?.correction_summary?.active_for_totals??detailPayload?.archive_gateway?.active_for_totals??s.active_for_totals,
+          correction_history_visible:detailPayload?.correction_summary?.correction_history_visible??s.correction_history_visible,
+          entries:rows.map(tx=>{
           const eventType=tx.event_type||tx.type||tx.reason_code||'';
           const canonicalType=tx.type||tx.reason_code||({
             rent:'R',arrears_payment:'AP',deposit_in:'D',deposit_out:'DR',checkout:'CO',expense:'E',bed_transfer:'TF'
@@ -2776,8 +2824,9 @@ async function renderHistory(){
     const cnt=s.entries?s.entries.length:0;
     const countWarning=historyDetailMismatchHtml(s,cnt);
     const deletedMeta=s._voided?`<div class="card-sub" style="margin-top:8px;color:var(--red);line-height:1.6">已删除/已作废记录 · 删除人：${esc(s.voidedBy||s.voided_by||'未知')} · 时间：${esc(s.voidedAt||s.voided_at||'未知')}</div>`:'';
+    const deletedTotals=ownerArchiveVoidedDetailHtml(s);
     wrap.innerHTML=`<button class="btn btn-ghost" id="btnHistBack" style="margin-bottom:14px"><svg class="ico"><use href="#i-back"/></svg>返回历史</button>
-    <div class="card"><div class="card-head"><div>${s.anchorId?`<div class="card-sub" style="color:var(--accent);margin-bottom:3px">🔐 ${esc(s.anchorId)}</div>`:''}<div class="card-title">${esc((s.date||'').slice(0,10))}</div><div class="card-sub">${cnt} 笔记录</div>${deletedMeta}${countWarning}</div><div style="display:flex;gap:7px"><button class="btn btn-ghost" id="btnHistCopy"><svg class="ico"><use href="#i-copy"/></svg>复制</button><button class="btn btn-primary" id="btnHistDl"><svg class="ico"><use href="#i-download"/></svg>下载</button></div></div><div class="card-body"><pre style="background:var(--surface2);padding:14px;border-radius:8px;max-height:60vh;overflow:auto;line-height:1.7;font-size:12px;color:var(--text2);border:1px solid var(--border)">${esc(txt)}</pre></div></div>`;
+    <div class="card"><div class="card-head"><div>${s.anchorId?`<div class="card-sub" style="color:var(--accent);margin-bottom:3px">🔐 ${esc(s.anchorId)}</div>`:''}<div class="card-title">${esc((s.date||'').slice(0,10))}</div><div class="card-sub">${cnt} 笔记录</div>${deletedMeta}${deletedTotals}${countWarning}</div><div style="display:flex;gap:7px"><button class="btn btn-ghost" id="btnHistCopy"><svg class="ico"><use href="#i-copy"/></svg>复制</button><button class="btn btn-primary" id="btnHistDl"><svg class="ico"><use href="#i-download"/></svg>下载</button></div></div><div class="card-body"><pre style="background:var(--surface2);padding:14px;border-radius:8px;max-height:60vh;overflow:auto;line-height:1.7;font-size:12px;color:var(--text2);border:1px solid var(--border)">${esc(txt)}</pre></div></div>`;
     document.getElementById('btnHistBack').onclick=()=>{state.historyViewing=null;renderHistory();};
     document.getElementById('btnHistCopy').onclick=async()=>{try{await navigator.clipboard.writeText(txt);toast('已复制');}catch{toast('复制失败','err');}};
     document.getElementById('btnHistDl').onclick=()=>{const blob=new Blob([txt],{type:'text/plain;charset=utf-8'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`财务交接_${(s.date||'').split(' ')[0].replace(/-/g,'')}.txt`;a.click();URL.revokeObjectURL(url);};
@@ -2812,10 +2861,13 @@ async function renderHistory(){
   }
   const cloudIds=new Set(cloud.map(s=>s.id));
   const localOnly=state.showDeletedHistory?[]:state.saved.filter(s=>!cloudIds.has(s.id));
-  const isVoidedHistorySession=s=>!!(s.voided_at||s.voidedAt||String(s.handover_status||'').toUpperCase()==='VOID');
+  const isVoidedHistorySession=s=>{
+    const archiveState=String(s.archive_state||'').toLowerCase();
+    return !!(s.voided_at||s.voidedAt||String(s.handover_status||'').toUpperCase()==='VOID'||['voided','deleted','reversed'].includes(archiveState));
+  };
   const visibleCloud=state.showDeletedHistory?cloud.filter(isVoidedHistorySession):cloud;
   const all=normalizeLedgerSessions([
-    ...visibleCloud.map(s=>({id:s.id,date:s.date,anchorId:s.anchor_id,entries:[],entriesCount:s.entries_count,export_text:s.export_text||'',_cloud:true,_voided:isVoidedHistorySession(s),createdBy:(s.source==='employee_entry'||s.source==='EMP')?'staff':(s.created_by||''),operatorName:s.operator_name||'',operatorId:s.operator_id||'',source:s.source||'',cash_handover:s.cash_handover,bank_transfer_total:s.bank_transfer_total,gross_received:s.gross_received,voidedAt:s.voided_at||'',voidedBy:s.voided_by||'',voidReason:s.void_reason||'',voidSource:s.void_source||'',handover_status:s.handover_status||''})),
+    ...visibleCloud.map(s=>({id:s.id,date:s.date,anchorId:s.anchor_id,entries:[],entriesCount:s.entries_count,export_text:s.export_text||'',_cloud:true,_voided:isVoidedHistorySession(s),createdBy:(s.source==='employee_entry'||s.source==='EMP')?'staff':(s.created_by||''),operatorName:s.operator_name||'',operatorId:s.operator_id||'',source:s.source||'',cash_handover:s.cash_handover,bank_transfer_total:s.bank_transfer_total,gross_received:s.gross_received,voidedAt:s.voided_at||'',voidedBy:s.voided_by||'',voidReason:s.void_reason||'',voidSource:s.void_source||'',handover_status:s.handover_status||'',archive_state:s.archive_state||'',raw_totals:s.raw_totals||null,correction_totals:s.correction_totals||null,corrected_totals:s.corrected_totals||null,archive_effective_totals:s.archive_effective_totals||null,active_for_totals:s.active_for_totals,correction_history_visible:s.correction_history_visible,source_proof:s.source_proof||null,totals_mode:s.totals_mode||''})),
     ...localOnly
   ]).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   const hasMoreCloud=cloud.length>=limit;
@@ -2855,6 +2907,8 @@ async function renderHistory(){
     const uploader=s.source==='employee_entry'||s.source==='EMP'||s.createdBy==='staff'||(s.createdBy&&s.createdBy!=='manager')?`员工上传 ${esc(s.operatorName||s.createdBy||s.operatorId||'')}`:(s.createdBy==='manager'?'老板上传':'');
     const mismatch=Number(s.entriesCount||0)&&hasEntries&&Number(s.entriesCount||0)!==s.entries.length;
     const deleted=s._voided;
+    const grossLabel=deleted?'原始流水金额，不计入有效收入':'总收入';
+    const deletedTotals=ownerArchiveVoidedTotalsHtml(s,t);
     return `<div class="hist-card" data-id="${s.id}">
       <div class="hist-date">${esc((s.date||'').slice(0,10))}</div>
       <div class="hist-anchor">${esc(s.anchorId||'—')}</div>
@@ -2865,8 +2919,10 @@ async function renderHistory(){
         <div class="hist-stat"><span style="color:var(--text2)">现金收入</span><span class="mono" style="color:#c8902a">${fmtMoney(t.cashIn)}</span></div>
         <div class="hist-stat"><span style="color:var(--text2)">银行收入</span><span class="mono" style="color:#1a8a4a">${fmtMoney(t.bankIn)}</span></div>
         <div class="hist-stat"><span style="color:var(--text2)">支出</span><span class="mono" style="color:#d93025">-${fmtMoney(t.expOut+t.refundOut)}</span></div>
-        <div class="hist-stat"><span>总收入</span><span class="mono">${fmtMoney(t.total)}</span></div>
+        <div class="hist-stat"><span>${grossLabel}</span><span class="mono">${fmtMoney(t.total)}</span></div>
+        ${deleted?`<div class="hist-stat"><span>当前有效金额：0</span><span class="mono">${fmtMoney(ownerArchiveTotalsValue(s.archive_effective_totals,'gross'))}</span></div>`:''}
       `:`<div class="hist-stat" style="justify-content:center;color:var(--text3);font-size:11px">${cnt}笔 · 点击查看详情</div>`}
+      ${deletedTotals}
       <div class="hist-actions">
         <button class="btn btn-ghost" data-act="view"><svg class="ico"><use href="#i-eye"/></svg>查看</button>
         ${isOwnerWriteRole()&&!deleted?`<button class="btn btn-danger" data-act="del"><svg class="ico"><use href="#i-trash"/></svg></button>`:''}

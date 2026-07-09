@@ -26,7 +26,35 @@ test("deleted trace can view voided session detail without changing active histo
   assert.match(worker, /const includeVoided = url\.searchParams\.get\("include_voided"\) === "1"/);
   assert.match(worker, /SELECT \* FROM sessions WHERE corpid=\? ORDER BY created_at DESC/);
   assert.match(worker, /SELECT \* FROM transactions WHERE session_id=\? AND corpid=\? ORDER BY created_at ASC/);
-  assert.match(main, /const detailUrl=`\/api\/session_detail\?id=\$\{encodeURIComponent\(s\.id\)\}\$\{s\._voided\?'&include_voided=1':''\}`/);
+  assert.match(main, /const detailUrl=`\/api\/session_detail\?id=\$\{encodeURIComponent\(s\.id\)\}\$\{s\._voided\?'&include_voided=1&include_corrections=1':''\}`/);
+  assert.match(main, /const rows=Array\.isArray\(detailPayload\)\?detailPayload:\(Array\.isArray\(detailPayload\?\.data\)\?detailPayload\.data:\[\]\)/);
+});
+
+test("deleted or voided cards label raw totals separately from active income", async () => {
+  const main = await readFile(ownerMainPath, "utf8");
+
+  assert.match(main, /function ownerArchiveVoidedTotalsHtml\(session,t\)/);
+  assert.match(main, /function ownerArchiveVoidedDetailHtml\(session\)/);
+  assert.match(main, /原始流水金额，不计入有效收入/);
+  assert.match(main, /当前有效金额：0/);
+  assert.match(main, /已删除\/已作废，不计入总收入/);
+  assert.match(main, /Deleted\/voided, excluded from active income/);
+  assert.match(main, /No correction anchor found \/ 修正记录不存在/);
+  assert.match(main, /修正历史仍保留；作废只影响当前有效金额/);
+});
+
+test("history list preserves archive metadata for deleted or voided display semantics", async () => {
+  const main = await readFile(ownerMainPath, "utf8");
+
+  assert.match(main, /async function renderHistory\(\)/);
+  assert.match(main, /archive_state:s\.archive_state/);
+  assert.match(main, /raw_totals:s\.raw_totals/);
+  assert.match(main, /correction_totals:s\.correction_totals/);
+  assert.match(main, /corrected_totals:s\.corrected_totals/);
+  assert.match(main, /archive_effective_totals:s\.archive_effective_totals/);
+  assert.match(main, /active_for_totals:s\.active_for_totals/);
+  assert.match(main, /grossLabel=deleted\?'原始流水金额，不计入有效收入':'总收入'/);
+  assert.match(main, /ownerArchiveVoidedTotalsHtml\(s,t\)/);
 });
 
 test("history detail warns when saved entry count differs from transaction rows", async () => {
