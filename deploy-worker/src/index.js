@@ -2,6 +2,7 @@
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 
 import { createEmployeeEntryLiveWriteAdapterDraft } from "../../modules/worker/employee-entry-live-write-adapter.mjs";
+import { validateBedTransferPhase1Contract } from "../../modules/employees/bed-transfer-phase1-contract.mjs";
 import {
   buildCorrectionRequestFingerprint,
   buildOwnerCorrectionDryRunPreview,
@@ -1514,10 +1515,11 @@ function canonicalDepositCardMatchesBed(card={},lockRoom="",bed=""){
   return snapshot.bed===cleanBed||directBed===cleanBed;
 }
 __name(canonicalDepositCardMatchesBed,"canonicalDepositCardMatchesBed");
-async function canonicalDepositAccessSnapshotForBed(env,user,bed){
+async function canonicalDepositAccessSnapshotForBed(env,user,bed,opts={}){
   const cleanBed=cleanText(bed,80).replace(/^#/,"");
   if(!cleanBed)return {snapshot:null,card:null,source_status:"missing_bed",warning:"bed_required"};
-  const lockResult=await empLoadLockCardsWithCacheFallback(env,user,{timeoutMs:8000,limit:500}).catch(e=>({error:empTtlockReadErrorCode(e),roomsData:{}}));
+  const strict=opts.strict_access_snapshot===true;
+  const lockResult=await empLoadLockCardsWithCacheFallback(env,user,{timeoutMs:8000,limit:500,strict_access_snapshot:strict}).catch(e=>({error:empTtlockReadErrorCode(e),roomsData:{},data_source:"live_api",fallback:false,strict_access_snapshot:strict}));
   const candidates=[];
   for(const [lockRoom,cards] of Object.entries(lockResult?.roomsData||{})){
     for(const card of cards||[]){
@@ -1537,12 +1539,27 @@ async function canonicalDepositAccessSnapshotForBed(env,user,bed){
       candidates.push({snapshot,card:{room:cleanText(card.room||lockRoom||"",80),card_name:cardLabel,remark:cleanText(remark,1000)},inactive});
     }
   }
+  const candidateCount=candidates.length;
+  const ambiguous=candidateCount!==1;
+  const conflict=candidateCount>1;
+  const fallback=lockResult?.fallback===true;
+  const stale=lockResult?.stale===true||String(lockResult?.source_status||"").toLowerCase()==="stale";
+  const metadata={data_source:cleanText(lockResult?.data_source||"unknown",80),fallback,candidate_count:candidateCount,ambiguous,conflict,stale,strict_access_snapshot:strict,fallback_rejected:strict&&fallback};
+  if(strict&&(lockResult?.error||fallback||ambiguous||conflict))return {
+    snapshot:null,
+    card:null,
+    source_status:lockResult?.error?"access_snapshot_unavailable":"strict_access_snapshot_unavailable",
+    warning:lockResult?.error||"strict_access_snapshot_candidate_invalid",
+    error:lockResult?.error||"strict_access_snapshot_candidate_invalid",
+    ...metadata
+  };
   const chosen=candidates.find(row=>!row.inactive&&row.snapshot?.parsed_deposit_amount!==null)||candidates.find(row=>!row.inactive)||candidates[0]||null;
   return {
     snapshot:chosen?.snapshot||null,
     card:chosen?.card||null,
     source_status:lockResult?.error?"access_snapshot_unavailable":(chosen?"loaded":"not_found"),
-    warning:lockResult?.error||""
+    warning:lockResult?.error||"",
+    ...metadata
   };
 }
 __name(canonicalDepositAccessSnapshotForBed,"canonicalDepositAccessSnapshotForBed");
@@ -2561,6 +2578,66 @@ function validateBedTransferUploadFields(entry,normalized,eventIndex,anchorPrevi
   return null;
 }
 __name(validateBedTransferUploadFields,"validateBedTransferUploadFields");
+function employeeBedTransferPhase1GatewayContext(gateway,companyScope){
+  const occupancy=gateway?.occupancy_gateway||{};
+  const access=gateway?.access_snapshot_context||occupancy.access_snapshot_context||{};
+  return {
+    company_scope:companyScope,
+    property_id:cleanText(access.property_id||"",120),
+    physical_bed_status:cleanText(occupancy.physical_bed_status||"",40),
+    physical_bed_status_source:cleanText(occupancy.physical_bed_status_source||"",80),
+    parsed_vacancy_marker:access.parsed_vacancy_marker===true,
+    data_source:cleanText(access.data_source||"",80),
+    fallback:access.fallback===true,
+    candidate_count:access.candidate_count,
+    ambiguous:access.ambiguous===true,
+    conflict:access.conflict===true,
+    stale:access.stale===true,
+    parse_status:cleanText(access.parse_status||"",40),
+    error:cleanText(access.error||gateway?.error||"",120),
+    parsed_deposit_amount:occupancy.deposit_recorded_amount??access.parsed_deposit_amount??null,
+    deposit_recorded_amount:occupancy.deposit_recorded_amount??null,
+    current_rent_coverage_start:cleanDate(occupancy.current_rent_coverage_start||""),
+    current_rent_coverage_end:cleanDate(occupancy.current_rent_coverage_end||""),
+    open_arrears:Array.isArray(gateway?.open_arrears)?gateway.open_arrears:[]
+  };
+}
+__name(employeeBedTransferPhase1GatewayContext,"employeeBedTransferPhase1GatewayContext");
+async function validateEmployeeBedTransferPhase1(env,user,entry={},normalized={}){
+  const fromBed=cleanText(normalized.from_bed||entry.from_bed||entry.bed_from||entry.room||"",40).replace(/^#+/,"");
+  const toBed=cleanText(normalized.to_bed||entry.to_bed||entry.bed_to||entry.roomTo||"",40).replace(/^#+/,"");
+  const companyScope=cleanText(user?.corpid||"",120);
+  let sourceGateway;
+  let targetGateway;
+  try{
+    [sourceGateway,targetGateway]=await Promise.all([
+      canonicalBedContextGateway(env,user,{bed:fromBed,limit:1000,strict_access_snapshot:true}),
+      canonicalBedContextGateway(env,user,{bed:toBed,limit:1000,strict_access_snapshot:true})
+    ]);
+  }catch(error){
+    return {ok:false,error_code:"BED_TRANSFER_ACCESS_SNAPSHOT_UNAVAILABLE",message:"Strict Access Snapshot data could not be loaded.",invalid_fields:["source_context","target_context"],source_error:cleanText(error?.message||error||"",160)};
+  }
+  const fee=employeeEntryBedTransferFee(entry,normalized);
+  const feeAmountAed=fee.fee_amount;
+  const contractResult=validateBedTransferPhase1Contract({
+    from_bed:fromBed,
+    to_bed:toBed,
+    fee_choice:fee.fee_choice==="paid"?"charged":fee.fee_choice,
+    fee_amount_aed:feeAmountAed,
+    fee_amount_fils:entry.fee_amount_fils??normalized.fee_amount_fils??Math.round(feeAmountAed*100),
+    payment_method:fee.payment_method,
+    waiver_reason:fee.waiver_reason,
+    transfer_reason:normalized.transfer_reason||entry.transfer_reason||entry.reason||entry.custom_reason||entry.note||"",
+    source_context:employeeBedTransferPhase1GatewayContext(sourceGateway,companyScope),
+    target_context:employeeBedTransferPhase1GatewayContext(targetGateway,companyScope),
+    cloud_arrears_ref:entry.cloud_arrears_ref||entry.arrears_ref||entry.linked_task_id||entry.original_arrears_id||"",
+    arrears_carryover:entry.arrears_carryover===true,
+    carried_arrears_amount:entry.carried_arrears_amount??entry.carry_over_arrears??0,
+    company_scope:companyScope
+  });
+  return contractResult;
+}
+__name(validateEmployeeBedTransferPhase1,"validateEmployeeBedTransferPhase1");
 function validateEmployeeEntryUploadEventFields(type,entry,normalized,eventIndex,anchorPreview){
   const dispatch={
     R:validateRentUploadFields,
@@ -2692,8 +2769,14 @@ async function validateEmployeeEntryUploadPayload(env,user,body,opts={}){
     bed:normalized.bed||normalized.room||entry.room||"",
     amount:entryAnchorMoney(normalized.amount||normalized.payment_amount||normalized.paid_amount||entry.amount)
   };
+  let bedTransferPhase1Preview=null;
   const eventFieldValidation=validateEmployeeEntryUploadEventFields(type,entry,normalized,eventIndex,anchorPreview);
   if(eventFieldValidation)return eventFieldValidation;
+  if(type==="TF"||type==="TFF"){
+    const phase1=await validateEmployeeBedTransferPhase1(env,user,entry,normalized);
+    if(!phase1.ok)return employeeEntryValidationFailure("bed_transfer_phase1_contract",phase1.error_code,phase1.message||"Bed Transfer Phase 1 contract rejected the dry-run payload.",{event_index:eventIndex,event_type:"bed_transfer",missing_fields:phase1.missing_fields||[],invalid_fields:phase1.invalid_fields||[],anchor_preview:{...anchorPreview,phase1_contract:phase1}});
+    bedTransferPhase1Preview=phase1;
+  }
   if(normalized.validation_status!=="valid"){
     return employeeEntryValidationFailure("anchor_validation","ANCHOR_CONTRACT_MISSING_FIELDS","Entry anchor is missing required fields.",{
       event_index:eventIndex,event_type:normalized.event_type||entryAnchorEventType(type),
@@ -2896,6 +2979,7 @@ async function validateEmployeeEntryUploadPayload(env,user,body,opts={}){
     export_text_preview:String(sessionExportText||"").slice(0,1000),
     anchor_types:sessionAnchorEntries.map(row=>row.event_type||entryAnchorEventType(entryAnchorType(row))),
     anchor_preview:anchorPreview,
+    bed_transfer_phase1_preview:bedTransferPhase1Preview,
     normalized_entry:normalized,
     duplicate_guard:{
       ok:true,
@@ -4417,7 +4501,7 @@ __name(canonicalArrearsGateway,"canonicalArrearsGateway");
 async function canonicalBedContextGateway(env,user,opts={}){
   const bed=cleanText(opts.bed||"",80).replace(/^#/,"");
   const arrears=await canonicalArrearsGateway(env,user,{bed,limit:opts.limit||1000});
-  const occupancy=await canonicalOccupancyGateway(env,user,{bed,arrears_gateway:arrears,limit:opts.limit||1000});
+  const occupancy=await canonicalOccupancyGateway(env,user,{bed,arrears_gateway:arrears,limit:opts.limit||1000,strict_access_snapshot:opts.strict_access_snapshot===true});
   return {
     ok:true,
     success:true,
@@ -4563,7 +4647,7 @@ async function canonicalOccupancyGateway(env,user,opts={}){
   const bed=cleanText(opts.bed||"",80).replace(/^#/,"");
   const access=opts.access_snapshot
     ?{snapshot:opts.access_snapshot,card:opts.card||null,source_status:"provided",warning:""}
-    :await canonicalDepositAccessSnapshotForBed(env,user,bed).catch(e=>({snapshot:null,card:null,source_status:"access_snapshot_unavailable",warning:empReadErrorCode(e)}));
+    :await canonicalDepositAccessSnapshotForBed(env,user,bed,{strict_access_snapshot:opts.strict_access_snapshot===true}).catch(e=>({snapshot:null,card:null,source_status:"access_snapshot_unavailable",warning:empReadErrorCode(e),error:empReadErrorCode(e),data_source:"live_api",fallback:false,candidate_count:0,ambiguous:false,conflict:false,stale:false}));
   const arrears=opts.arrears_gateway||await canonicalArrearsGateway(env,user,{bed,limit:opts.limit||1000});
   const events=Array.isArray(opts.events)?opts.events:await canonicalOccupancyArchiveEventsForBed(env,user,bed,{limit:opts.limit||1000});
   const openArrears=Array.isArray(arrears.open_items)?arrears.open_items:[];
@@ -4603,6 +4687,13 @@ async function canonicalOccupancyGateway(env,user,opts={}){
       display_only:true,
       source_layer:"L0 Access Snapshot",
       status:access.source_status||"unknown",
+      data_source:access.data_source||"unknown",
+      fallback:access.fallback===true,
+      candidate_count:access.candidate_count??null,
+      ambiguous:access.ambiguous===true,
+      conflict:access.conflict===true,
+      stale:access.stale===true,
+      error:access.error||"",
       provider_identity_allowed:false,
       card_name:cleanText(access.card?.card_name||"",160),
       parsed_deposit_amount:access.snapshot?.parsed_deposit_amount??null,
@@ -5603,9 +5694,11 @@ function empCachedTtlockRoomsDataFromTasks(rows){
 }
 __name(empCachedTtlockRoomsDataFromTasks,"empCachedTtlockRoomsDataFromTasks");
 async function empLoadLockCardsWithCacheFallback(env,user,opts={}){
+  const strict=opts.strict_access_snapshot===true;
   try{
     const live=await empWithTimeout(loadLockCards(env),opts.timeoutMs||8000,"ttlock_api");
-    if(!live?.error)return {...live,data_source:"live_api",fallback:false};
+    if(!live?.error)return {...live,data_source:"live_api",fallback:false,strict_access_snapshot:strict};
+    if(strict)return {...live,data_source:"live_api",fallback:false,strict_access_snapshot:true,fallback_rejected:true,candidate_count:0,ambiguous:false,conflict:false};
     const cached=await empCachedTtlockTaskRows(env,user,opts.limit||500);
     if(cached.length)return {
       roomsData:empCachedTtlockRoomsDataFromTasks(cached),
@@ -5618,6 +5711,7 @@ async function empLoadLockCardsWithCacheFallback(env,user,opts={}){
     };
     return live;
   }catch(e){
+    if(strict)return {error:empTtlockReadErrorCode(e),status:503,roomsData:{},locksCount:0,data_source:"live_api",fallback:false,strict_access_snapshot:true,fallback_rejected:true,candidate_count:0,ambiguous:false,conflict:false};
     const cached=await empCachedTtlockTaskRows(env,user,opts.limit||500).catch(()=>[]);
     if(cached.length)return {
       roomsData:empCachedTtlockRoomsDataFromTasks(cached),
