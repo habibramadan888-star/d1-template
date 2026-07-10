@@ -44,10 +44,10 @@ test("Bed Transfer validation blocks missing or equal from/to beds", async () =>
   assert.match(html, /from_bed_no_active_tenant/);
 });
 
-test("Bed Transfer event-ledger write is wired in the UI", async () => {
+test("Bed Transfer event-ledger write is disabled in the UI", async () => {
   const html = await readFile(htmlPath, "utf8");
 
-  assert.match(html, /const BED_TRANSFER_WRITE_ENABLED=true/);
+  assert.match(html, /const BED_TRANSFER_WRITE_ENABLED=false/);
   assert.match(html, /function isBedTransferWriteGated/);
   assert.match(html, /async function submitBedTransferEvent\(\)/);
   assert.match(html, /\/api\/employee\/bed-transfers/);

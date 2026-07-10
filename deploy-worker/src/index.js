@@ -2955,9 +2955,12 @@ __name(handleEmployeeEntryValidate,"handleEmployeeEntryValidate");
 async function handleEmployeeEntry(request,env,user){
   const timingEnabled=request.headers.get("X-Employee-Entry-Timing")==="1";
   const timing={started_at:Date.now(),d1_write_ms:0,total_ms:0};
-  if(!await empTableExists(env,"sessions")||!await empTableExists(env,"transactions"))return errorResponse("employee_entry_schema_not_ready",503,"employee_entry_schema_not_ready");
   let body;
   try{body=await request.json();}catch{return badRequest("invalid_json");}
+  const entryForWriteGate=employeeEntryValidationEntryFromBody(body||{});
+  const writeGateType=employeeEntryUploadType(entryForWriteGate);
+  if(["TF","TFF"].includes(writeGateType)&&!bedTransferWriteApproved(env))return bedTransferWriteDisabledResponse();
+  if(!await empTableExists(env,"sessions")||!await empTableExists(env,"transactions"))return errorResponse("employee_entry_schema_not_ready",503,"employee_entry_schema_not_ready");
   body=normalizeEmployeeEntryBodyForValidation(body||{});
   const validationResult=await validateEmployeeEntryUploadPayload(env,user,body,{event_index:body?.event_index});
   if(!validationResult.ok)return json({success:false,...validationResult},422);
@@ -7603,7 +7606,23 @@ function bedTransferEventView(row){
   };
 }
 __name(bedTransferEventView,"bedTransferEventView");
+function bedTransferWriteApproved(env={}){
+  return String(env?.BED_TRANSFER_WRITE_APPROVED??"").trim()==="true";
+}
+__name(bedTransferWriteApproved,"bedTransferWriteApproved");
+function bedTransferWriteDisabledResponse(){
+  return json({
+    success:false,
+    ok:false,
+    error:"bed_transfer_write_disabled_phase1_safety",
+    dry_run_only:true,
+    validate_endpoint:"/api/employee/entry/validate",
+    production_cutover:"PRODUCTION_NO_GO"
+  },409);
+}
+__name(bedTransferWriteDisabledResponse,"bedTransferWriteDisabledResponse");
 async function handleEmployeeBedTransferCreate(request,env,user){
+  if(!bedTransferWriteApproved(env))return bedTransferWriteDisabledResponse();
   if(!isStaffRoleValue(user?.role))return forbidden();
   const tableState=await bedTransferRequiredTablesReady(env);
   if(!tableState.ready)return errorResponse("bed_transfer_schema_missing",503,void 0,{missing_tables:tableState.missing});

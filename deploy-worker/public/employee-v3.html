@@ -3227,7 +3227,7 @@ function readSessionId(userid){
   catch{return ''}
 }
 const state={lockCards:[],current:null,depositBalance:null,depositContext:null,rentConfig:{},rentConfigLoaded:false,drafts:[],tasks:[],closedTasks:[],arrearsTasksLoaded:false,arrearTasksError:null,arrearsGatewaySource:'',arrearsGatewayProof:null,employeeDirectives:[],followupItems:[],systemReminderItems:[],systemReminderStatus:'idle',systemReminderSummary:null,systemReminderSources:null,systemReminderLimit:100,sessionId:'',user:null,ttlockStatus:'idle',ttlockLoadedAt:0,ttlockError:'',ttlockDataSource:''};
-const BED_TRANSFER_WRITE_ENABLED=true;
+const BED_TRANSFER_WRITE_ENABLED=false;
 const BED_TRANSFER_EVENT_LEDGER_MESSAGE='Bed transfer records save event anchors only. This does not directly change bed occupancy, deposit, arrears, or Access Card. 换床记录只保存信息锚点，不会直接改变床位、押金、欠款或门禁卡。';
 const BED_TRANSFER_SUBMITTED_MESSAGE='Bed transfer recorded / 换床记录已保存';
 const BED_TRANSFER_WRITE_DISABLED_MESSAGE='换床事件账本写入不可用，请稍后重试。 Bed transfer event-ledger write is unavailable.';
@@ -5369,6 +5369,11 @@ function appendSyncedBedTransferSessionEntry(entry){
   saveDrafts();
 }
 async function submitBedTransferEvent(){
+  if(isBedTransferWriteGated('TF')){
+    $('validationBox').innerHTML=bedTransferWriteGateHtml();
+    toast(BED_TRANSFER_WRITE_DISABLED_MESSAGE,6000);
+    return false;
+  }
   let e;
   try{e=entryPayload();}catch(err){
     console.error('bed transfer payload failed',err);
@@ -5451,17 +5456,17 @@ function exportLine(e){
   return `#${e.room||e.expense_category} ${fmtMoney(e.amount)} AED ${e.pay_type} ${e.expense_desc||e.note||''}\n  EID ${e.id}`;
 }
 async function saveEntry(){
+  if(isBedTransferWriteGated()){
+    $('validationBox').innerHTML=bedTransferWriteGateHtml();
+    toast(BED_TRANSFER_WRITE_DISABLED_MESSAGE,6000);
+    return false;
+  }
   if(!state.user){applyEmployeeUser(null);toast('请先登录员工账号',6000);return}
   const btn=$('btnSaveEntry');
   if(btn?.dataset.busy==='1')return;
   const v=validate();if(v.errors.length){toast('请先处理阻断校验');return}
   if($('entryType').value==='TF'){
     await submitBedTransferEvent();
-    return;
-  }
-  if(isBedTransferWriteGated()){
-    $('validationBox').innerHTML=bedTransferWriteGateHtml();
-    toast(BED_TRANSFER_WRITE_DISABLED_MESSAGE,6000);
     return;
   }
   let e;
