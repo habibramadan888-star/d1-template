@@ -452,3 +452,11 @@ Migration status: created locally and not applied. Runtime wiring has not been i
 - Voided, deleted, and reversed genesis facts are excluded. Multiple active stay IDs for one bed fail closed as a conflict.
 - TTLock E/e remains physical-vacancy context only and cannot create, select, or delete durable stay identity.
 - The gateway is read-only, excludes provider/card identity, performs no schema mutation, and is verified locally only.
+
+### Legacy Stay Bootstrap Candidate Preview Status
+
+- A local pure preview now classifies legacy occupied-bed evidence as `eligible_for_owner_review`, `blocked`, or `already_has_stay_context`.
+- Eligibility requires matching company scope, a non-E/e Access Snapshot, valid MMDD context, a complete expiry value, one active canonical Rent or Deposit In source anchor, and no stay registry conflict.
+- Access Snapshot D is optional deposit context: a missing D value produces a warning and is never converted to zero or used as identity.
+- Bed 334, conflicting canonical candidates, provider-only clues, missing canonical anchors, and invalid access facts fail closed.
+- The preview creates no stay ID, anchor, session, entry, or registry row. No HTTP route, owner approval UI, production backfill, or bootstrap write path is implemented.
