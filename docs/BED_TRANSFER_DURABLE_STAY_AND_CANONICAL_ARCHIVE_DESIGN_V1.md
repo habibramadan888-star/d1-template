@@ -412,3 +412,16 @@ CREATE INDEX IF NOT EXISTS idx_stay_event_links_event_type
 ```
 
 Migration status: created locally and not applied. Runtime wiring has not been implemented.
+
+## Durable Stay Genesis Trigger Contract
+
+- `stay_action=start` is the only explicit durable-stay genesis trigger.
+- The trigger applies only to Rent (`event_type=rent`) and Deposit In (`event_type=deposit_in`).
+- A missing `stay_action` does not request or create a stay.
+- TTLock E/e, D, MMDD, expiry, bed/room, Rent reason codes, deposit amounts, provider identity, local cache, Preview, WhatsApp, and UI text must not infer genesis.
+- `stay_context_id` and `stay_event_link_id` are server-generated identifiers and are forbidden in client input.
+- Canonical genesis must first enter `sessions.entries_json` as the accepted event/anchor fact.
+- `stay_contexts` and `stay_event_links` are rebuildable materialized registries derived from the canonical archive.
+- A registry write failure must not rewrite or delete the canonical archive.
+- `legacy_bootstrap` persistence remains not implemented.
+- Runtime wiring, UI integration, feature flag, and schema migration application remain not completed.
