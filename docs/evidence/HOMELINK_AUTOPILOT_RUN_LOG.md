@@ -58,3 +58,32 @@ Full-suite tests were not run because the first-run boundary permits only tests 
 - Bed Transfer write enabled: no
 - Bed Transfer status: `NOT_VERIFIED / REQUIREMENTS_REVIEW`
 - production cutover: `PRODUCTION_NO_GO`
+
+## Run 3 — 2026-07-12
+
+- task: `CLOSE_INDEPENDENT_BED_TRANSFER_WRITE_PATH_AND_KEEP_SINGLE_CANONICAL_ENTRY_PATH`
+- HEAD before change: `bebb722cf28e63f35a8b0d9cd0fcbe17fbcacd63`
+- milestone result: `SINGLE_CANONICAL_BED_TRANSFER_WRITE_PATH_CLOSED`
+- controller status: `READY_FOR_NEXT_MINIMAL_TASK`
+- human gate: `NONE`
+- verification level: `TEST_PASS`
+- independent route: deterministic HTTP 409 `BED_TRANSFER_LEGACY_WRITE_PATH_DISABLED`
+- independent route business writes: 0
+- independent route TTLock calls: 0
+- canonical `/api/employee/entry/validate`: preserved, no-write
+- canonical `/api/employee/entry`: preserved behind the closed Bed Transfer write gate
+- canonical destination: `sessions.entries_json`
+- historical `bed_transfer_events`: retained for read-only audit
+- targeted tests: 47 passed, 0 failed
+- secret hygiene: PASS
+- database schema changed: no
+- historical data deleted: no
+- production called: no
+- production business data changed: no
+- staging migration applied: no
+- production migration applied: no
+- deployment: no
+- Bed Transfer write enabled: no
+- Bed Transfer status: `NOT_VERIFIED / REQUIREMENTS_REVIEW`
+- production cutover: `PRODUCTION_NO_GO`
+- recommended next task: `DEFINE_DURABLE_STAY_CONTEXT_ID_AND_CANONICAL_TRANSFER_LINEAGE_CONTRACT_ONLY`

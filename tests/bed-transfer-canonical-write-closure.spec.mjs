@@ -17,7 +17,7 @@ async function readWorker() {
   return readFile(workerPath, "utf8");
 }
 
-test("canonical-path-required response is fixed HTTP 409 JSON", async () => {
+test("legacy write path disabled response is fixed HTTP 409 JSON", async () => {
   const source = await readWorker();
   const block = functionBlock(source, "bedTransferCanonicalPathRequiredResponse");
   const context = { json: (body, status) => ({ body, status }) };
@@ -26,37 +26,44 @@ test("canonical-path-required response is fixed HTTP 409 JSON", async () => {
 
   assert.equal(context.result.status, 409);
   assert.deepEqual(JSON.parse(JSON.stringify(context.result.body)), {
+    success: false,
     ok: false,
-    error_code: "BED_TRANSFER_CANONICAL_PATH_REQUIRED",
+    error_code: "BED_TRANSFER_LEGACY_WRITE_PATH_DISABLED",
     event_type: "bed_transfer",
+    canonical_write_endpoint: "/api/employee/entry",
+    validate_endpoint: "/api/employee/entry/validate",
+    bed_transfer_write_enabled: false,
     write_attempted: false,
+    business_data_written: false,
+    message: "Use the canonical employee entry path. Bed Transfer writing remains disabled; no business data was written.",
     production_cutover: "PRODUCTION_NO_GO"
   });
 });
 
-test("direct route rejects even when approval is true and before D1 work", async () => {
+test("direct route rejects before request parsing, auth, schema, TTLock, idempotency, or writes", async () => {
   const source = await readWorker();
   const handler = functionBlock(source, "handleEmployeeBedTransferCreate");
-  assert.match(handler, /^function handleEmployeeBedTransferCreate\(request,env,user\)\{\s*return bedTransferCanonicalPathRequiredResponse\(\);/);
-  assert.ok(
-    handler.indexOf("bedTransferCanonicalPathRequiredResponse()") <
-      handler.indexOf("bedTransferRequiredTablesReady(env)"),
-    "direct route must reject before schema inspection"
-  );
-  assert.ok(
-    handler.indexOf("bedTransferCanonicalPathRequiredResponse()") <
-      handler.indexOf("env.DB.batch"),
-    "direct route must reject before D1 writes"
-  );
+  assert.match(handler, /^function handleEmployeeBedTransferCreate\(request,env,user\)\{\s*return bedTransferCanonicalPathRequiredResponse\(\);\s*\}\s*$/);
+  assert.doesNotMatch(handler, /request\.json|requireManager|isStaffRoleValue|empTableExists|bedTransferRequiredTablesReady/);
+  assert.doesNotMatch(handler, /env\.DB|\.prepare\(|\.run\(|\.batch\(|empInsertDynamic/);
+  assert.doesNotMatch(handler, /bed_transfer_events|entry_events|sessions|transactions|arrears|finance|deposit|occupancy|today.?todo/i);
+  assert.doesNotMatch(handler, /ttlock|lock\/cards|empLoadLockCards|idempotency/i);
+  assert.doesNotMatch(handler, /tenant_card_id|card_id|old_ttlock_ref|provider|phone|99099|creation_time/i);
 
+  const touched = [];
+  const trap = (name) => new Proxy({}, { get(){ touched.push(name); throw new Error(`${name} touched`); } });
   const context = {
-    bedTransferCanonicalPathRequiredResponse: () => ({ status: 409, approval: true }),
-    writeTouched: false
+    bedTransferCanonicalPathRequiredResponse: () => ({ status: 409, error_code: "BED_TRANSFER_LEGACY_WRITE_PATH_DISABLED" })
   };
   vm.createContext(context);
-  vm.runInContext(`async ${handler}\nresult=handleEmployeeBedTransferCreate({}, { BED_TRANSFER_WRITE_APPROVED: "true", DB: new Proxy({}, { get(){ writeTouched=true; throw new Error("D1 touched"); } }) }, {});`, context);
-  assert.deepEqual(await context.result, { status: 409, approval: true });
-  assert.equal(context.writeTouched, false);
+  vm.runInContext(`async ${handler}`, context);
+  const result = await context.handleEmployeeBedTransferCreate(
+    trap("request"),
+    { BED_TRANSFER_WRITE_APPROVED: "true", DB: trap("DB"), TTLOCK: trap("TTLock"), ACCESS: trap("Access") },
+    trap("user")
+  );
+  assert.deepEqual(result, { status: 409, error_code: "BED_TRANSFER_LEGACY_WRITE_PATH_DISABLED" });
+  assert.deepEqual(touched, []);
 });
 
 test("save_session classifier rejects all Bed Transfer representations only", async () => {
@@ -120,6 +127,36 @@ test("canonical employee entry Bed Transfer write gate remains fail closed", asy
     handler.indexOf("bedTransferWriteDisabledResponse()") < handler.indexOf('empTableExists(env,"sessions")'),
     "canonical employee entry gate must remain before D1 schema inspection"
   );
+});
+
+test("canonical validate and employee entry routes remain the only Phase 1 path", async () => {
+  const source = await readWorker();
+  assert.match(source, /path==="\/api\/employee\/entry\/validate"&&request\.method==="POST"\)return handleEmployeeEntryValidate\(request,env,user\)/);
+  assert.match(source, /path==="\/api\/employee\/entry"&&request\.method==="POST"\)return handleEmployeeEntry\(request,env,user\)/);
+  assert.match(source, /path==="\/api\/employee\/bed-transfers"&&request\.method==="POST"\)return handleEmployeeBedTransferCreate\(request,env,user\)/);
+
+  const validateHandler = functionBlock(source, "handleEmployeeEntryValidate");
+  const validatePayload = functionBlock(source, "validateEmployeeEntryUploadPayload");
+  const entryHandler = functionBlock(source, "handleEmployeeEntry");
+  const classifier = functionBlock(source, "employeeEntryUploadType");
+  const dispatch = functionBlock(source, "validateEmployeeEntryUploadEventFields");
+
+  assert.doesNotMatch(validateHandler, /\.run\(|\.batch\(|empInsertDynamic/);
+  assert.match(classifier, /bed_transfer:"TF"/);
+  assert.match(dispatch, /TF:validateBedTransferUploadFields/);
+  assert.match(validatePayload, /validateEmployeeBedTransferPhase1\(env,user,entry,normalized\)/);
+  assert.match(validatePayload, /const sessionEntriesJson=JSON\.stringify/);
+  assert.match(validatePayload, /employeeEntryExportTextWithAnchors/);
+  assert.match(entryHandler, /entries_json:cleanText\(sessionEntriesJson,50000\)/);
+  assert.match(entryHandler, /\["TF","TFF"\]\.includes\(writeGateType\)&&!bedTransferWriteApproved\(env\)/);
+});
+
+test("historical Bed Transfer table remains read-only and is not deleted", async () => {
+  const source = await readWorker();
+  const ownerRead = functionBlock(source, "handleOwnerBedTransfers");
+  assert.match(ownerRead, /SELECT \* FROM bed_transfer_events/);
+  assert.doesNotMatch(ownerRead, /INSERT|UPDATE|DELETE|DROP|ALTER/i);
+  assert.doesNotMatch(source, /DROP TABLE(?: IF EXISTS)? bed_transfer_events/i);
 });
 
 test("no new Bed Transfer write route is introduced", async () => {

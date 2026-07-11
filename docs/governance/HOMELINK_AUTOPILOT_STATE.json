@@ -1,19 +1,19 @@
 {
   "schema_version": 1,
-  "run_number": 2,
+  "run_number": 3,
   "repository_root": "C:/Users/Chinalink/Desktop/软件迭代-worktrees/bed-transfer-canonical-write-closure",
   "branch": "fix/bed-transfer-canonical-write-closure",
   "expected_head": "341c1315060185624e698b283c683124df74183d",
-  "last_verified_head": "bf0fac137323d1fd6d9dace63bd787afbe7f039e",
+  "last_verified_head": "bebb722cf28e63f35a8b0d9cd0fcbe17fbcacd63",
   "controller_status": "READY_FOR_NEXT_MINIMAL_TASK",
-  "current_milestone": "SIMPLIFIED_PHASE1_CANONICAL_BED_TRANSFER_WRITE_CLOSURE",
-  "last_result": "HUMAN_DECISION_RECORDED",
-  "verification_level": "BUG_FOUND",
+  "current_milestone": "SINGLE_CANONICAL_BED_TRANSFER_WRITE_PATH_CLOSED",
+  "last_result": "TEST_PASS",
+  "verification_level": "TEST_PASS",
   "human_gate": "NONE",
   "previous_human_gate": "OWNER_CONTROLLED_LEGACY_BOOTSTRAP_WRITE_CONTRACT_REVIEW",
   "previous_human_gate_resolution": "REJECTED_FOR_PHASE1",
   "legacy_bootstrap_phase1": "REJECTED",
-  "recommended_next_task": "CLOSE_INDEPENDENT_BED_TRANSFER_WRITE_PATH_AND_KEEP_SINGLE_CANONICAL_ENTRY_PATH",
+  "recommended_next_task": "DEFINE_DURABLE_STAY_CONTEXT_ID_AND_CANONICAL_TRANSFER_LINEAGE_CONTRACT_ONLY",
   "production_called": false,
   "production_business_data_changed": false,
   "migration_applied_to_staging": false,
@@ -22,5 +22,5 @@
   "bed_transfer_write_enabled": false,
   "bed_transfer_status": "NOT_VERIFIED / REQUIREMENTS_REVIEW",
   "production_cutover": "PRODUCTION_NO_GO",
-  "updated_at": "2026-07-12T00:30:36+04:00"
+  "updated_at": "2026-07-12T00:38:41+04:00"
 }

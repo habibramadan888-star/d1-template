@@ -7931,10 +7931,16 @@ function bedTransferWriteDisabledResponse(){
 __name(bedTransferWriteDisabledResponse,"bedTransferWriteDisabledResponse");
 function bedTransferCanonicalPathRequiredResponse(){
   return json({
+    success:false,
     ok:false,
-    error_code:"BED_TRANSFER_CANONICAL_PATH_REQUIRED",
+    error_code:"BED_TRANSFER_LEGACY_WRITE_PATH_DISABLED",
     event_type:"bed_transfer",
+    canonical_write_endpoint:"/api/employee/entry",
+    validate_endpoint:"/api/employee/entry/validate",
+    bed_transfer_write_enabled:false,
     write_attempted:false,
+    business_data_written:false,
+    message:"Use the canonical employee entry path. Bed Transfer writing remains disabled; no business data was written.",
     production_cutover:"PRODUCTION_NO_GO"
   },409);
 }
@@ -7965,7 +7971,6 @@ function saveSessionContainsBedTransfer(body={}){
 __name(saveSessionContainsBedTransfer,"saveSessionContainsBedTransfer");
 async function handleEmployeeBedTransferCreate(request,env,user){
   return bedTransferCanonicalPathRequiredResponse();
-  // Canonical closure precedes the removed bedTransferRequiredTablesReady(env) and env.DB.batch write path.
 }
 __name(handleEmployeeBedTransferCreate,"handleEmployeeBedTransferCreate");
 function authSafeId(value){

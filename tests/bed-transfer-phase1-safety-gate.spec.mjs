@@ -41,12 +41,8 @@ test("both Bed Transfer routes fail closed before D1 work", async () => {
   const directHandler = functionBlock(source, "handleEmployeeBedTransferCreate");
   const entryHandler = functionBlock(source, "handleEmployeeEntry");
 
-  assert.match(directHandler, /return bedTransferCanonicalPathRequiredResponse\(\);/);
-  assert.ok(
-    directHandler.indexOf("bedTransferCanonicalPathRequiredResponse()") <
-      directHandler.indexOf("bedTransferRequiredTablesReady(env)"),
-    "direct Bed Transfer canonical-path closure must precede schema inspection"
-  );
+  assert.match(directHandler, /^function handleEmployeeBedTransferCreate\(request,env,user\)\{\s*return bedTransferCanonicalPathRequiredResponse\(\);\s*\}\s*$/);
+  assert.doesNotMatch(directHandler, /bedTransferRequiredTablesReady|env\.DB|\.prepare\(|\.run\(|\.batch\(|empInsertDynamic/);
 
   assert.match(entryHandler, /const writeGateType=employeeEntryUploadType\(entryForWriteGate\);/);
   assert.match(entryHandler, /\["TF","TFF"\]\.includes\(writeGateType\)&&!bedTransferWriteApproved\(env\)/);
