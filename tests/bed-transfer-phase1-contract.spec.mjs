@@ -136,7 +136,8 @@ test("different properties pass within the same company scope", () => {
 
 test("provider identity is rejected and never returned", () => {
   const result = assertReject({ tenant_card_id: "provider-only" }, "BED_TRANSFER_FORBIDDEN_IDENTITY_FIELD");
-  assert.equal(JSON.stringify(result).includes("tenant_card_id"), false);
+  assert.deepEqual(result.forbidden_fields, ["tenant_card_id"]);
+  assert.equal(JSON.stringify(result).includes("provider-only"), false);
   assert.equal(JSON.stringify(assertPass()).includes("card_id"), false);
 });
 

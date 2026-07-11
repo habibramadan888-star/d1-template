@@ -1,12 +1,13 @@
 const FORBIDDEN_IDENTITY_KEYS = new Set([
-  "card_id",
-  "tenant_card_id",
-  "old_ttlock_ref",
-  "provider_phone",
-  "phone_99099",
-  "provider_metadata",
-  "ttlock_provider_metadata",
-  "ttlock_context"
+  "cardid",
+  "tenantcardid",
+  "oldttlockref",
+  "providerphone",
+  "phone99099",
+  "creatorphone",
+  "cardcreationtime",
+  "providermetadata",
+  "ttlockprovidermetadata"
 ]);
 
 function text(value) {
@@ -40,13 +41,43 @@ function failure(error_code, message, invalid_fields = [], missing_fields = []) 
   };
 }
 
-function containsForbiddenIdentity(value, seen = new Set()) {
-  if (!value || typeof value !== "object" || seen.has(value)) return false;
+function normalizedIdentityKey(value) {
+  return String(value ?? "").replace(/[^a-z0-9]/gi, "").toLowerCase();
+}
+
+function collectForbiddenIdentityFields(value, fields = new Set(), seen = new Set()) {
+  if (!value || typeof value !== "object" || seen.has(value)) return fields;
   seen.add(value);
-  if (Array.isArray(value)) return value.some(item => containsForbiddenIdentity(item, seen));
-  return Object.entries(value).some(([key, child]) => {
-    return FORBIDDEN_IDENTITY_KEYS.has(String(key).toLowerCase()) || containsForbiddenIdentity(child, seen);
+  if (Array.isArray(value)) {
+    value.forEach(item => collectForbiddenIdentityFields(item, fields, seen));
+    return fields;
+  }
+  Object.entries(value).forEach(([key, child]) => {
+    if (FORBIDDEN_IDENTITY_KEYS.has(normalizedIdentityKey(key))) fields.add(String(key));
+    collectForbiddenIdentityFields(child, fields, seen);
   });
+  return fields;
+}
+
+export function findBedTransferForbiddenIdentityFields(value) {
+  return [...collectForbiddenIdentityFields(value)].sort((a, b) => a.localeCompare(b));
+}
+
+export function sanitizeBedTransferIdentityFields(value, seen = new Map()) {
+  if (!value || typeof value !== "object") return value;
+  if (seen.has(value)) return seen.get(value);
+  const output = Array.isArray(value) ? [] : {};
+  seen.set(value, output);
+  if (Array.isArray(value)) {
+    value.forEach(item => output.push(sanitizeBedTransferIdentityFields(item, seen)));
+    return output;
+  }
+  Object.entries(value).forEach(([key, child]) => {
+    if (!FORBIDDEN_IDENTITY_KEYS.has(normalizedIdentityKey(key))) {
+      output[key] = sanitizeBedTransferIdentityFields(child, seen);
+    }
+  });
+  return output;
 }
 
 function contextSnapshot(context = {}) {
@@ -88,8 +119,13 @@ function contextPreview(context = {}) {
 }
 
 export function validateBedTransferPhase1Contract(input = {}) {
-  if (containsForbiddenIdentity(input)) {
-    return failure("BED_TRANSFER_FORBIDDEN_IDENTITY_FIELD", "Provider identity fields are not accepted for Bed Transfer.", ["forbidden_identity"]);
+  const forbiddenFields = findBedTransferForbiddenIdentityFields(input);
+  if (forbiddenFields.length) {
+    return {
+      ...failure("BED_TRANSFER_FORBIDDEN_IDENTITY_FIELD", "Provider identity fields are not accepted for Bed Transfer.", forbiddenFields),
+      forbidden_fields: forbiddenFields,
+      write_attempted: false
+    };
   }
 
   const fromBed = bed(input.from_bed);

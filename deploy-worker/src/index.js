@@ -2,7 +2,11 @@
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 
 import { createEmployeeEntryLiveWriteAdapterDraft } from "../../modules/worker/employee-entry-live-write-adapter.mjs";
-import { validateBedTransferPhase1Contract } from "../../modules/employees/bed-transfer-phase1-contract.mjs";
+import {
+  findBedTransferForbiddenIdentityFields,
+  sanitizeBedTransferIdentityFields,
+  validateBedTransferPhase1Contract
+} from "../../modules/employees/bed-transfer-phase1-contract.mjs";
 import {
   buildCorrectionRequestFingerprint,
   buildOwnerCorrectionDryRunPreview,
@@ -2679,6 +2683,45 @@ function employeeEntryValidationEntryFromBody(body={},eventIndex=0){
   return entries[index]||entries[0]||{};
 }
 __name(employeeEntryValidationEntryFromBody,"employeeEntryValidationEntryFromBody");
+function employeeEntryBedTransferInputRows(body={}){
+  const rows=[
+    body,
+    body?.entry,
+    ...(Array.isArray(body?.entries)?body.entries:[]),
+    ...(Array.isArray(body?.session?.entries)?body.session.entries:[])
+  ];
+  return rows.filter(row=>row&&typeof row==="object"&&["TF","TFF"].includes(employeeEntryUploadType(row)));
+}
+__name(employeeEntryBedTransferInputRows,"employeeEntryBedTransferInputRows");
+function bedTransferForbiddenIdentityFieldsFromBody(body={}){
+  const transferRows=employeeEntryBedTransferInputRows(body);
+  if(!transferRows.length)return [];
+  const topLevel={};
+  Object.entries(body||{}).forEach(([key,value])=>{
+    if(!["entry","entries","session"].includes(key))topLevel[key]=value;
+  });
+  return findBedTransferForbiddenIdentityFields([topLevel,...transferRows]);
+}
+__name(bedTransferForbiddenIdentityFieldsFromBody,"bedTransferForbiddenIdentityFieldsFromBody");
+function bedTransferForbiddenIdentityFailure(body={},eventIndex=0){
+  const forbiddenFields=bedTransferForbiddenIdentityFieldsFromBody(body);
+  if(!forbiddenFields.length)return null;
+  return {
+    ok:false,
+    stage:"bed_transfer_source_of_truth_firewall",
+    event_index:Number(eventIndex||0),
+    event_type:"bed_transfer",
+    error_code:"BED_TRANSFER_FORBIDDEN_IDENTITY_FIELD",
+    message:"Bed Transfer provider/card identity fields are forbidden.",
+    message_en:"Bed Transfer provider/card identity fields are forbidden.",
+    message_zh:"换床请求不得包含供应商或门禁卡身份字段。",
+    missing_fields:[],
+    invalid_fields:forbiddenFields,
+    forbidden_fields:forbiddenFields,
+    write_attempted:false
+  };
+}
+__name(bedTransferForbiddenIdentityFailure,"bedTransferForbiddenIdentityFailure");
 async function empFindOpenArrearTaskForPaymentReadOnly(env,user,taskId,bed=""){
   const cleanTaskId=cleanId(taskId);
   if(!cleanTaskId)return null;
@@ -2705,6 +2748,8 @@ async function empFindOpenArrearTaskForPaymentReadOnly(env,user,taskId,bed=""){
 }
 __name(empFindOpenArrearTaskForPaymentReadOnly,"empFindOpenArrearTaskForPaymentReadOnly");
 async function validateEmployeeEntryUploadPayload(env,user,body,opts={}){
+  const firewallFailure=bedTransferForbiddenIdentityFailure(body||{},opts.event_index??body?.event_index??0);
+  if(firewallFailure)return firewallFailure;
   body=normalizeEmployeeEntryBodyForValidation(body||{});
   const eventIndex=Number(opts.event_index ?? body?.event_index ?? 0)||0;
   if(!await empTableExists(env,"sessions")||!await empTableExists(env,"transactions")){
@@ -3041,6 +3086,8 @@ async function handleEmployeeEntry(request,env,user){
   const timing={started_at:Date.now(),d1_write_ms:0,total_ms:0};
   let body;
   try{body=await request.json();}catch{return badRequest("invalid_json");}
+  const firewallFailure=bedTransferForbiddenIdentityFailure(body||{},body?.event_index??0);
+  if(firewallFailure)return json({success:false,...firewallFailure},422);
   const entryForWriteGate=employeeEntryValidationEntryFromBody(body||{});
   const writeGateType=employeeEntryUploadType(entryForWriteGate);
   if(["TF","TFF"].includes(writeGateType)&&!bedTransferWriteApproved(env))return bedTransferWriteDisabledResponse();
@@ -3385,8 +3432,8 @@ function entryAnchorType(row){
 __name(entryAnchorType,"entryAnchorType");
 function normalizeEmployeeEntryForValidation(eventType,entry){
   if(!entry||typeof entry!=="object")return entry||{};
-  const copy={...entry};
-  const type=entryAnchorType({type:eventType,event_type:eventType,...copy});
+  const type=entryAnchorType({type:eventType,event_type:eventType,...entry});
+  const copy={...(["TF","TFF"].includes(type)?sanitizeBedTransferIdentityFields(entry):entry)};
   const allowed=new Set(employeeSourceFirewallAllowedFields[type]||[]);
   employeeSourceFirewallForbiddenFields.forEach(field=>delete copy[field]);
   Object.keys(copy).forEach(field=>{
@@ -7569,50 +7616,6 @@ async function bedTransferRequiredTablesReady(env){
   return {ready:missing.length===0,missing};
 }
 __name(bedTransferRequiredTablesReady,"bedTransferRequiredTablesReady");
-async function bedTransferActiveTenantSnapshot(env,user,fromBed){
-  const snapshot={
-    customer_id:"",
-    customer_code:"",
-    customer_display_name:"",
-    original_checkin_date:"",
-    original_rent_period_start:"",
-    original_rent_period_end:"",
-    old_ttlock_ref:""
-  };
-  if(await empTableExists(env,"transactions").catch(()=>false)){
-    const tx=await env.DB.prepare(`SELECT * FROM transactions
-      WHERE corpid=? AND (room=? OR bed_from=? OR room_to=?)
-        AND COALESCE(voided_at,'')=''
-        AND COALESCE(status,'ACTIVE')<>'VOID'
-      ORDER BY CASE WHEN COALESCE(tenant_card_id,'')<>'' THEN 0 ELSE 1 END, created_at DESC
-      LIMIT 1`).bind(user.corpid,fromBed,fromBed,fromBed).first().catch(()=>null);
-    if(tx){
-      snapshot.customer_id=cleanText(tx.tenant_card_id||"",80);
-      snapshot.customer_code=cleanText(tx.tenant_card_id||"",80);
-      snapshot.customer_display_name=cleanText(tx.tenant_name||tx.operator_name||"",120);
-      snapshot.original_checkin_date=cleanDate(tx.start_date||tx.period_start||"");
-      snapshot.original_rent_period_start=cleanDate(tx.period_start||"");
-      snapshot.original_rent_period_end=cleanDate(tx.period_end||"");
-      snapshot.old_ttlock_ref=cleanText(tx.tenant_card_id||"",80);
-    }
-  }
-  if(await empTableExists(env,"arrear_tasks").catch(()=>false)){
-    const task=await env.DB.prepare(`SELECT * FROM arrear_tasks
-      WHERE corpid=? AND bed=?
-      ORDER BY updated_at DESC, created_at DESC
-      LIMIT 1`).bind(user.corpid,fromBed).first().catch(()=>null);
-    if(task){
-      snapshot.customer_id=snapshot.customer_id||cleanText(task.tenant_card_id||"",80);
-      snapshot.customer_code=snapshot.customer_code||cleanText(task.tenant_card_id||"",80);
-      snapshot.customer_display_name=snapshot.customer_display_name||cleanText(task.tenant_name||"",120);
-      snapshot.original_rent_period_start=snapshot.original_rent_period_start||cleanDate(task.original_period_start||"");
-      snapshot.original_rent_period_end=snapshot.original_rent_period_end||cleanDate(task.original_period_end||"");
-      snapshot.old_ttlock_ref=snapshot.old_ttlock_ref||cleanText(task.tenant_card_id||"",80);
-    }
-  }
-  return snapshot;
-}
-__name(bedTransferActiveTenantSnapshot,"bedTransferActiveTenantSnapshot");
 async function bedTransferOpenArrearsAed(env,user,fromBed){
   const projectionRows=await getOpenCloudArrearsForBed(env,user,fromBed,{limit:1000}).catch(()=>[]);
   if(projectionRows.length)return projectionRows.reduce((sum,row)=>sum+entryAnchorMoney(row.remaining_arrears||empTaskRemaining(row)),0);
@@ -7629,26 +7632,6 @@ async function bedTransferOpenArrearsAed(env,user,fromBed){
   },0);
 }
 __name(bedTransferOpenArrearsAed,"bedTransferOpenArrearsAed");
-async function bedTransferEventSnapshot(env,user,fromBed,toBed,body){
-  const tenant=await bedTransferActiveTenantSnapshot(env,user,fromBed);
-  const oldRef=cleanText(body?.old_ttlock_ref||body?.old_lock_ref||tenant.old_ttlock_ref||"",80);
-  const currentRent=await empRentForBed(env,user.corpid,fromBed).catch(()=>0);
-  const newRent=await empRentForBed(env,user.corpid,toBed).catch(()=>0);
-  const depositAed=oldRef?await empDepositBalance(env,user.corpid,oldRef).catch(()=>0):0;
-  const arrearsAed=await bedTransferOpenArrearsAed(env,user,fromBed).catch(()=>0);
-  return {
-    ...tenant,
-    old_ttlock_ref:oldRef,
-    old_lock_valid_from:cleanDate(body?.old_lock_valid_from||tenant.original_rent_period_start||""),
-    old_lock_valid_until:cleanDate(body?.old_lock_valid_until||tenant.original_rent_period_end||""),
-    original_deposit_amount_fils:bedTransferAedToFils(depositAed),
-    current_rent_amount_fils:bedTransferAedToFils(currentRent),
-    new_bed_rent_amount_fils:bedTransferAedToFils(newRent),
-    rent_difference_fils:bedTransferAedToFils(newRent-currentRent),
-    carry_over_arrears_fils:bedTransferAedToFils(arrearsAed)
-  };
-}
-__name(bedTransferEventSnapshot,"bedTransferEventSnapshot");
 async function bedTransferRequestHash(payload){
   return hscSha256(JSON.stringify(hscStableValue(payload)));
 }
@@ -7751,188 +7734,7 @@ function saveSessionContainsBedTransfer(body={}){
 __name(saveSessionContainsBedTransfer,"saveSessionContainsBedTransfer");
 async function handleEmployeeBedTransferCreate(request,env,user){
   return bedTransferCanonicalPathRequiredResponse();
-  if(!bedTransferWriteApproved(env))return bedTransferWriteDisabledResponse();
-  if(!isStaffRoleValue(user?.role))return forbidden();
-  const tableState=await bedTransferRequiredTablesReady(env);
-  if(!tableState.ready)return errorResponse("bed_transfer_schema_missing",503,void 0,{missing_tables:tableState.missing});
-  let body;
-  try{body=await request.json();}catch{return badRequest("invalid_json");}
-  const fromBed=bedTransferCleanBed(body?.from_bed||body?.bed_from||body?.fromBed||body?.room);
-  const toBed=bedTransferCleanBed(body?.to_bed||body?.bed_to||body?.toBed||body?.room_to);
-  const transferDate=empCleanIsoDate(body?.transfer_date||body?.transferDate||"");
-  const reason=cleanText(body?.reason||body?.transfer_reason||body?.transferReason||"customer_request",120);
-  const waiverReason=cleanText(body?.waiver_reason||body?.fee_waiver_reason||body?.waiverReason||"",240);
-  const note=cleanText(body?.note||body?.remark||body?.transfer_note||reason||waiverReason||"bed_transfer",500);
-  const idempotencyKey=cleanText(body?.idempotency_key||body?.idempotencyKey||request.headers.get("Idempotency-Key")||"",160);
-  if(!fromBed)return badRequest("from_bed_required");
-  if(!toBed)return badRequest("to_bed_required");
-  if(fromBed===toBed)return badRequest("from_bed_must_differ_from_to_bed");
-  if(!transferDate)return badRequest("transfer_date_required");
-  if(!idempotencyKey)return badRequest("idempotency_key_required");
-  const rawFeeInput=cleanText(body?.fee_status||body?.feeStatus||body?.fee_mode||body?.feeMode||"",20).toLowerCase();
-  const rawFeeMode=rawFeeInput==="paid"?"charged":rawFeeInput;
-  const rawAmountFils=Number(body?.amount_fils ?? body?.transfer_fee_fils ?? NaN);
-  const legacyFeeAed=Number(String(body?.transfer_fee ?? body?.transfer_fee_aed ?? "").replace(/,/g,""));
-  const legacyFeeFils=Number.isFinite(legacyFeeAed)?bedTransferAedToFils(legacyFeeAed):NaN;
-  const inferredAmountFils=Number.isFinite(rawAmountFils)?rawAmountFils:(Number.isFinite(legacyFeeFils)?legacyFeeFils:5000);
-  const feeMode=rawFeeMode||((inferredAmountFils===0)?"waived":"charged");
-  if(!["charged","waived"].includes(feeMode))return badRequest("bed_transfer_fee_mode_invalid");
-  if(feeMode==="waived"&&!waiverReason)return badRequest("bed_transfer_waiver_reason_required");
-  const feeStatus=feeMode==="waived"?"waived":"paid";
-  const rawPaymentMethod=cleanText(body?.payment_method||body?.paymentMethod||body?.pay_type||body?.payType||"",20).toLowerCase();
-  const paymentMethod=feeStatus==="waived"?"none":({c:"cash",cash:"cash",b:"bank",bank:"bank"}[rawPaymentMethod]||rawPaymentMethod);
-  if(feeStatus==="paid"&&!["cash","bank","other"].includes(paymentMethod))return badRequest("payment_method_required");
-  const amountFils=feeMode==="waived"?0:5000;
-  const category="bed_transfer_fee";
-  const reviewFlags=Array.isArray(body?.review_flags)
-    ? body.review_flags.map((x)=>cleanText(x,80)).filter(Boolean).slice(0,12)
-    : [];
-  const requestPayload={corp_id:user.corpid,actor:user.userid,from_bed:fromBed,to_bed:toBed,transfer_date:transferDate,fee_status:feeStatus,fee_mode:feeMode,payment_method:paymentMethod,amount_fils:amountFils,waiver_reason:waiverReason,reason,note,category,review_flags:reviewFlags};
-  const requestHash=await bedTransferRequestHash(requestPayload);
-  const idemOptions={
-    scope:`${user.corpid}:bed_transfer_events`,
-    action:"employee.bed_transfer.create",
-    idempotencyKey,
-    actorUserId:user.userid,
-    actorRole:user.role,
-    requestHash,
-    resourceType:"bed_transfer_event"
-  };
-  const replay=await arrearsDirectiveIdempotencyReplay(env,idemOptions).catch((err)=>{throw err;});
-  if(replay)return replay;
-  const now=empNow();
-  const id=empId("bt");
-  const transferId=cleanText(body?.transfer_id||`bt-${now.slice(0,10).replaceAll("-","")}-${fromBed}-${toBed}-${crypto.randomUUID().slice(0,8)}`,100);
-  const auditId=empId("audit");
-  const traceId=empId("trace");
-  const entryEventId=traceId;
-  const snapshot=await bedTransferEventSnapshot(env,user,fromBed,toBed,body);
-  const eventValues={
-    id,
-    transfer_id:transferId,
-    corp_id:user.corpid,
-    tenant_scope:user.corpid,
-    from_bed:fromBed,
-    to_bed:toBed,
-    transfer_date:transferDate,
-    effective_date:transferDate,
-    customer_id:snapshot.customer_id,
-    customer_code:snapshot.customer_code,
-    customer_display_name:snapshot.customer_display_name,
-    original_checkin_date:snapshot.original_checkin_date,
-    original_rent_period_start:snapshot.original_rent_period_start,
-    original_rent_period_end:snapshot.original_rent_period_end,
-    original_deposit_amount_fils:snapshot.original_deposit_amount_fils,
-    current_rent_amount_fils:snapshot.current_rent_amount_fils,
-    new_bed_rent_amount_fils:snapshot.new_bed_rent_amount_fils,
-    rent_difference_fils:snapshot.rent_difference_fils,
-    transfer_fee_fils:amountFils,
-    amount_fils:amountFils,
-    fee_mode:feeMode,
-    fee_status:feeStatus,
-    payment_method:paymentMethod,
-    waiver_reason:waiverReason,
-    category,
-    review_flags:JSON.stringify(reviewFlags),
-    carry_over_arrears_fils:snapshot.carry_over_arrears_fils,
-    old_ttlock_ref:snapshot.old_ttlock_ref,
-    new_ttlock_ref:"",
-    old_lock_valid_from:snapshot.old_lock_valid_from,
-    old_lock_valid_until:snapshot.old_lock_valid_until,
-    new_lock_valid_from:"",
-    new_lock_valid_until:"",
-    reason,
-    note,
-    operator_employee:user.userid,
-    status:"recorded",
-    audit_id:auditId,
-    trace_id:traceId,
-    entry_event_id:entryEventId,
-    qa_tag:cleanText(body?.qa_tag||"",120),
-    created_at:now,
-    updated_at:now
-  };
-  const sessionEntry={
-    id:entryEventId,
-    cloud_entry_id:entryEventId,
-    transfer_id:transferId,
-    entry_event_id:entryEventId,
-    type:"TF",
-    event_type:"bed_transfer",
-    category,
-    room:fromBed,
-    roomTo:toBed,
-    bed_from:fromBed,
-    bed_to:toBed,
-    tenant_name:snapshot.customer_display_name,
-    tenant_card_id:snapshot.customer_code,
-    amount:bedTransferFilsToAed(amountFils),
-    amount_fils:amountFils,
-    due:bedTransferFilsToAed(amountFils),
-    paid:bedTransferFilsToAed(amountFils),
-    pay_type:paymentMethod==="bank"?"B":(paymentMethod==="cash"?"C":""),
-    payment_method:paymentMethod,
-    fee_status:feeStatus,
-    fee_mode:feeMode,
-    fee_paid:feeStatus==="waived"?"N":"Y",
-    fee_waiver_reason:waiverReason,
-    waiver_reason:waiverReason,
-    transfer_date:transferDate,
-    transfer_reason:reason,
-    reason,
-    note,
-    remark:note,
-    review_flags:reviewFlags,
-    operator_id:user.userid,
-    operator_name:user.employee_name||user.userid,
-    sync_status:"SYNCED",
-    status:"RECORDED",
-    created_at:now,
-    ts:now
-  };
-  const responseData={
-    success:true,
-    transfer_id:transferId,
-    status:"recorded",
-    from_bed:fromBed,
-    to_bed:toBed,
-    transfer_date:transferDate,
-    review_required:false,
-    audit_id:authSafeId(auditId),
-    trace_id:authSafeId(traceId),
-    deposit_carried_fils:eventValues.original_deposit_amount_fils,
-    carry_over_arrears_fils:eventValues.carry_over_arrears_fils,
-    old_ttlock_ref:eventValues.old_ttlock_ref,
-    amount_fils:amountFils,
-    amount_aed:bedTransferFilsToAed(amountFils),
-    event_type:"bed_transfer",
-    fee_status:feeStatus,
-    fee_mode:feeMode,
-    payment_method:paymentMethod,
-    waiver_reason:waiverReason,
-    category,
-    review_flags:reviewFlags,
-    entry_event_id:authSafeId(entryEventId),
-    session_entry:sessionEntry,
-    message:feeMode==="waived"?"Bed transfer recorded. Fee waived / 换床记录已保存，费用已豁免。":"Bed transfer recorded. Fee: 50 AED / 换床记录已保存，已记录 50 AED 换床费。",
-    idempotency_status:"NEW"
-  };
-  const responseBody=ok(responseData);
-  const bedTransferColumns=await empTableColumns(env,"bed_transfer_events").catch(()=>new Set(BED_TRANSFER_EVENT_COLUMNS));
-  const insertColumns=BED_TRANSFER_EVENT_COLUMNS.filter((key)=>bedTransferColumns.has(key));
-  if(!insertColumns.length)return errorResponse("bed_transfer_schema_missing",503,void 0,{missing_columns:["bed_transfer_events"]});
-  await env.DB.batch([
-    env.DB.prepare(`INSERT INTO entry_events
-      (event_id, corpid, userid, ref_id, ref_type, event_type, field_name, old_value, new_value, operator_id, ts)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-      .bind(entryEventId,user.corpid,user.userid,transferId,"bed_transfer_event","bed_transfer","bed_transfer_fee","",JSON.stringify({status:"recorded",event_type:"bed_transfer",category,amount_fils:amountFils,fee_status:feeStatus,fee_mode:feeMode,payment_method:paymentMethod,waiver_reason:waiverReason,review_flags:reviewFlags,from_bed:fromBed,to_bed:toBed,transfer_date:transferDate,reason,note,session_entry:sessionEntry}),user.userid,now),
-    env.DB.prepare(`INSERT INTO bed_transfer_events (${insertColumns.join(",")})
-      VALUES (${insertColumns.map(()=>"?").join(",")})`)
-      .bind(...insertColumns.map((key)=>eventValues[key]))
-  ]);
-  await audit(env,user,"employee.bed_transfer.create",transferId,{from_bed:fromBed,to_bed:toBed,status:"recorded",category,amount_fils:amountFils,fee_status:feeStatus,fee_mode:feeMode,payment_method:paymentMethod,waiver_reason:waiverReason,review_flags:reviewFlags,audit_id:auditId,trace_id:traceId,entry_event_id:entryEventId}).catch(()=>{});
-  await arrearsDirectiveRecordIdempotency(env,{...idemOptions,resourceId:transferId,status:"RECORDED"},responseBody);
-  return json(responseBody,201);
+  // Canonical closure precedes the removed bedTransferRequiredTablesReady(env) and env.DB.batch write path.
 }
 __name(handleEmployeeBedTransferCreate,"handleEmployeeBedTransferCreate");
 function authSafeId(value){
