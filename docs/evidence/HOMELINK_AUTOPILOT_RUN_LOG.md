@@ -39,3 +39,22 @@ node --test --test-concurrency=1 tests/canonical-stay-bed-context.spec.mjs tests
 Result: `66 passed / 0 failed`.
 
 Full-suite tests were not run because the first-run boundary permits only tests directly related to canonical stay context, legacy bootstrap candidate, durable stay schema/persistence, source-of-truth firewall, and Bed Transfer canonical write closure.
+
+## Run 2 — 2026-07-12
+
+- task: `HOMELINK_RESOLVE_LEGACY_BOOTSTRAP_HUMAN_GATE_AND_SIMPLIFY_PHASE1`
+- human decision: `LEGACY_BOOTSTRAP = REJECTED_FOR_PHASE1`
+- previous gate: `OWNER_CONTROLLED_LEGACY_BOOTSTRAP_WRITE_CONTRACT_REVIEW = REJECTED_FOR_PHASE1`
+- current human gate: `NONE`
+- controller status: `READY_FOR_NEXT_MINIMAL_TASK`
+- current milestone: `SIMPLIFIED_PHASE1_CANONICAL_BED_TRANSFER_WRITE_CLOSURE`
+- recommended next task: `CLOSE_INDEPENDENT_BED_TRANSFER_WRITE_PATH_AND_KEEP_SINGLE_CANONICAL_ENTRY_PATH`
+- runtime code changed: no
+- validators/schema/migrations changed: no
+- tests run: no, prohibited by the human decision task
+- production called: no
+- production business data changed: no
+- deployment: no
+- Bed Transfer write enabled: no
+- Bed Transfer status: `NOT_VERIFIED / REQUIREMENTS_REVIEW`
+- production cutover: `PRODUCTION_NO_GO`

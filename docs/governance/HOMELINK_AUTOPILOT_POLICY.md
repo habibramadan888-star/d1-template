@@ -47,3 +47,20 @@ Human approval is required for unclear business rules, new or changed facts of r
 ## Verification levels
 
 The controller uses only `TEST_PASS`, `PARTIAL_PASS`, `BUG_FOUND`, `BLOCKED`, `PRODUCTION_DRY_RUN_VERIFIED`, `PRODUCTION_READ_VERIFIED`, and `LIVE_VERIFIED`. Local source and local tests can establish only the first four. Deployment is not business verification, dry-run is not live verification, and a script rollup failure is not automatically a runtime failure.
+
+## Phase 1 legacy bootstrap decision
+
+- Human decision: `LEGACY_BOOTSTRAP = REJECTED_FOR_PHASE1`.
+- Previous human gate: `OWNER_CONTROLLED_LEGACY_BOOTSTRAP_WRITE_CONTRACT_REVIEW = REJECTED_FOR_PHASE1`.
+- Bed Transfer Phase 1 handles only new Bed Transfer events created after the feature is enabled.
+- Phase 1 does not reconstruct old resident identities, backfill historical transfers, create legacy stay contexts, migrate old Bed Transfer records, infer resident identity from bed/provider/card/phone metadata, automatically merge old bed history, or introduce owner-controlled legacy bootstrap writes.
+- Legacy or uncertain historical context remains `UNKNOWN` or `OWNER_REVIEW_REQUIRED` and does not authorize legacy writes.
+- The single canonical write path is `POST /api/employee/entry` with `event_type = bed_transfer`, writing to `sessions.entries_json`.
+- `POST /api/employee/bed-transfers` remains disabled or fail-closed.
+- TTLock changes remain manual: source becomes E/e; target receives source D, MMDD, and expiry.
+- A Bed Transfer event itself creates no Rent income, Deposit In, Deposit Out, Arrears repayment, or Expense.
+- Original historical events remain immutable; bed 334 remains deferred and excluded.
+- Bed Transfer writes remain disabled, status remains `NOT_VERIFIED / REQUIREMENTS_REVIEW`, and production cutover remains `PRODUCTION_NO_GO`.
+- Explicitly authorized ready status after this decision: `READY_FOR_NEXT_MINIMAL_TASK`.
+- Current milestone: `SIMPLIFIED_PHASE1_CANONICAL_BED_TRANSFER_WRITE_CLOSURE`.
+- Next minimal runtime task: `CLOSE_INDEPENDENT_BED_TRANSFER_WRITE_PATH_AND_KEEP_SINGLE_CANONICAL_ENTRY_PATH`.

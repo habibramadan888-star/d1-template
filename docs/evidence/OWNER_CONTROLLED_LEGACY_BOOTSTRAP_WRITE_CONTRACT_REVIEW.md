@@ -138,3 +138,32 @@ No recommendation in this section is treated as a confirmed decision.
 - production cutover: `PRODUCTION_NO_GO`
 
 The review is complete, but implementation is not authorized. The controller stops after the governance commit.
+
+## M. HUMAN_DECISION_RESOLUTION
+
+- decision: `LEGACY_BOOTSTRAP = REJECTED_FOR_PHASE1`
+- previous human gate: `OWNER_CONTROLLED_LEGACY_BOOTSTRAP_WRITE_CONTRACT_REVIEW`
+- gate resolution: `REJECTED_FOR_PHASE1`
+- current human gate: `NONE`
+- controller status: `READY_FOR_NEXT_MINIMAL_TASK`
+- current milestone: `SIMPLIFIED_PHASE1_CANONICAL_BED_TRANSFER_WRITE_CLOSURE`
+
+The owner rejected legacy bootstrap for Bed Transfer Phase 1. Phase 1 handles only new Bed Transfer events created after the feature is enabled. It does not reconstruct old resident identities, backfill historical transfers, create legacy stay contexts, migrate old Bed Transfer records, guess identity from bed/provider/card/phone metadata, automatically merge old bed history, or introduce owner-controlled legacy bootstrap writes.
+
+Legacy or uncertain historical context remains `UNKNOWN` or `OWNER_REVIEW_REQUIRED`; it does not block implementation of simple new Bed Transfer events and does not authorize any legacy write.
+
+The simplified Phase 1 contract is:
+
+1. Preserve only `POST /api/employee/entry` with `event_type = bed_transfer` as the canonical write path to `sessions.entries_json`.
+2. Keep `POST /api/employee/bed-transfers` disabled or fail-closed.
+3. Perform no legacy migration or backfill.
+4. Keep Bed Transfer writes disabled until the simplified path is implemented and verified.
+5. Keep TTLock changes manual: source bed becomes E/e; target bed receives source D, MMDD, and expiry.
+6. A Bed Transfer event itself creates no Rent income, Deposit In, Deposit Out, Arrears repayment, or Expense.
+7. Never rewrite original historical events.
+8. Keep uncertain historical lineage `UNKNOWN`.
+9. Keep bed 334 deferred and excluded.
+
+Recommended next task: `CLOSE_INDEPENDENT_BED_TRANSFER_WRITE_PATH_AND_KEEP_SINGLE_CANONICAL_ENTRY_PATH`.
+
+This decision records governance only. It makes no runtime, validator, schema, migration, deployment, production, feature-gate, or Bed Transfer write change. Bed Transfer remains `NOT_VERIFIED / REQUIREMENTS_REVIEW` and `PRODUCTION_NO_GO`.
