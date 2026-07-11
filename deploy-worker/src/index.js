@@ -7,6 +7,7 @@ import {
   sanitizeBedTransferIdentityFields,
   validateBedTransferPhase1Contract
 } from "../../modules/employees/bed-transfer-phase1-contract.mjs";
+import { evaluateStayGenesisTrigger } from "../../modules/employees/durable-stay-genesis-trigger.mjs";
 import {
   buildCorrectionRequestFingerprint,
   buildOwnerCorrectionDryRunPreview,
@@ -2683,6 +2684,66 @@ function employeeEntryValidationEntryFromBody(body={},eventIndex=0){
   return entries[index]||entries[0]||{};
 }
 __name(employeeEntryValidationEntryFromBody,"employeeEntryValidationEntryFromBody");
+function employeeEntryStayGenesisRows(body={},eventIndex=0){
+  const index=Number.isInteger(Number(eventIndex))?Math.max(0,Number(eventIndex)):0;
+  const rows=[
+    body?.entry,
+    Array.isArray(body?.entries)?body.entries[index]:null,
+    Array.isArray(body?.session?.entries)?body.session.entries[index]:null
+  ].filter(row=>row&&typeof row==="object"&&!Array.isArray(row));
+  return rows.filter((row,rowIndex)=>rows.indexOf(row)===rowIndex);
+}
+__name(employeeEntryStayGenesisRows,"employeeEntryStayGenesisRows");
+function evaluateEmployeeEntryStayGenesis(body={},eventIndex=0){
+  const rows=employeeEntryStayGenesisRows(body,eventIndex);
+  const serverManagedFields=["stay_context_id","stay_event_link_id","lifecycle_status","genesis_anchor_id"];
+  const forbiddenFields=[...new Set(rows.flatMap(row=>serverManagedFields.filter(field=>Object.hasOwn(row,field))))].sort((a,b)=>a.localeCompare(b));
+  const selected=employeeEntryValidationEntryFromBody(body,eventIndex);
+  const eventType=Object.hasOwn(selected,"event_type")?selected.event_type:undefined;
+  if(forbiddenFields.length){
+    return evaluateStayGenesisTrigger({event_type:eventType,stay_action:selected.stay_action,...Object.fromEntries(forbiddenFields.map(field=>[field,true]))});
+  }
+  const actions=rows.filter(row=>Object.hasOwn(row,"stay_action")).map(row=>row.stay_action);
+  if(actions.length>1&&!actions.every(value=>Object.is(value,actions[0]))){
+    return {error_code:"STAY_TRIGGER_CONFLICT",forbidden_fields:[]};
+  }
+  const triggerInput={event_type:eventType};
+  if(actions.length)triggerInput.stay_action=actions[0];
+  return evaluateStayGenesisTrigger(triggerInput);
+}
+__name(evaluateEmployeeEntryStayGenesis,"evaluateEmployeeEntryStayGenesis");
+function employeeEntryStayGenesisStartRequested(body={},eventIndex=0){
+  const actions=employeeEntryStayGenesisRows(body,eventIndex).filter(row=>Object.hasOwn(row,"stay_action")).map(row=>row.stay_action);
+  return actions.length>0&&actions.every(value=>value==="start");
+}
+__name(employeeEntryStayGenesisStartRequested,"employeeEntryStayGenesisStartRequested");
+function employeeEntryStayGenesisFailure(result,eventIndex=0,eventType=""){
+  const forbiddenFields=Array.isArray(result?.forbidden_fields)?[...new Set(result.forbidden_fields)].sort((a,b)=>a.localeCompare(b)):[];
+  return {
+    ...employeeEntryValidationFailure("stay_genesis_trigger",result?.error_code||"STAY_ACTION_INVALID","Durable stay genesis trigger validation failed.",{
+      event_index:Number(eventIndex||0),
+      event_type:typeof eventType==="string"?eventType:"",
+      invalid_fields:forbiddenFields
+    }),
+    forbidden_fields:forbiddenFields,
+    write_attempted:false,
+    stay_identity_created:false,
+    persistence_adapter_called:false
+  };
+}
+__name(employeeEntryStayGenesisFailure,"employeeEntryStayGenesisFailure");
+function stayGenesisWriteNotEnabledResponse(){
+  return json({
+    success:false,
+    ok:false,
+    error_code:"STAY_GENESIS_WRITE_NOT_ENABLED",
+    write_attempted:false,
+    stay_identity_created:false,
+    persistence_adapter_called:false,
+    migration_required:true
+  },503);
+}
+__name(stayGenesisWriteNotEnabledResponse,"stayGenesisWriteNotEnabledResponse");
 function employeeEntryBedTransferInputRows(body={}){
   const rows=[
     body,
@@ -2748,7 +2809,11 @@ async function empFindOpenArrearTaskForPaymentReadOnly(env,user,taskId,bed=""){
 }
 __name(empFindOpenArrearTaskForPaymentReadOnly,"empFindOpenArrearTaskForPaymentReadOnly");
 async function validateEmployeeEntryUploadPayload(env,user,body,opts={}){
-  const firewallFailure=bedTransferForbiddenIdentityFailure(body||{},opts.event_index??body?.event_index??0);
+  const rawEventIndex=Number(opts.event_index??body?.event_index??0)||0;
+  const stayGenesis=evaluateEmployeeEntryStayGenesis(body||{},rawEventIndex);
+  const stayGenesisEntry=employeeEntryValidationEntryFromBody(body||{},rawEventIndex);
+  if(stayGenesis.error_code)return employeeEntryStayGenesisFailure(stayGenesis,rawEventIndex,stayGenesisEntry?.event_type);
+  const firewallFailure=bedTransferForbiddenIdentityFailure(body||{},rawEventIndex);
   if(firewallFailure)return firewallFailure;
   body=normalizeEmployeeEntryBodyForValidation(body||{});
   const eventIndex=Number(opts.event_index ?? body?.event_index ?? 0)||0;
@@ -2796,6 +2861,12 @@ async function validateEmployeeEntryUploadPayload(env,user,body,opts={}){
       existing_session_id:duplicateGuard.existing_session_id||"",
       existing_anchor:duplicateGuard.existing_anchor||"",
       validation_trace:[employeeEntryValidationTraceStep("duplicate_preflight",true,{event_index:eventIndex,function_name:"checkEmployeeEntryDuplicates"})],
+      ...(stayGenesis.requested?{
+        stay_genesis:{requested:true,genesis_event_type:stayGenesis.genesis_event_type,write_enabled:false},
+        write_attempted:false,
+        stay_identity_created:false,
+        persistence_adapter_called:false
+      }:{}),
       asset_version:HOMELINK_DIAGNOSTIC_ASSET_VERSION,
       worker_version:HOMELINK_DIAGNOSTIC_WORKER_VERSION,
       commit_hash:HOMELINK_DIAGNOSTIC_COMMIT_HASH,
@@ -3026,6 +3097,12 @@ async function validateEmployeeEntryUploadPayload(env,user,body,opts={}){
     anchor_preview:anchorPreview,
     bed_transfer_phase1_preview:bedTransferPhase1Preview,
     normalized_entry:normalized,
+    ...(stayGenesis.requested?{
+      stay_genesis:{requested:true,genesis_event_type:stayGenesis.genesis_event_type,write_enabled:false},
+      write_attempted:false,
+      stay_identity_created:false,
+      persistence_adapter_called:false
+    }:{}),
     duplicate_guard:{
       ok:true,
       idempotent:!!duplicateGuard.idempotent,
@@ -3086,6 +3163,11 @@ async function handleEmployeeEntry(request,env,user){
   const timing={started_at:Date.now(),d1_write_ms:0,total_ms:0};
   let body;
   try{body=await request.json();}catch{return badRequest("invalid_json");}
+  const stayGenesis=evaluateEmployeeEntryStayGenesis(body||{},body?.event_index??0);
+  const stayGenesisEntry=employeeEntryValidationEntryFromBody(body||{},body?.event_index??0);
+  const stayGenesisStartRequested=employeeEntryStayGenesisStartRequested(body||{},body?.event_index??0);
+  if(stayGenesisStartRequested&&!["STAY_SERVER_MANAGED_FIELD_FORBIDDEN","STAY_TRIGGER_CONFLICT"].includes(stayGenesis.error_code))return stayGenesisWriteNotEnabledResponse();
+  if(stayGenesis.error_code)return json({success:false,...employeeEntryStayGenesisFailure(stayGenesis,body?.event_index??0,stayGenesisEntry?.event_type)},422);
   const firewallFailure=bedTransferForbiddenIdentityFailure(body||{},body?.event_index??0);
   if(firewallFailure)return json({success:false,...firewallFailure},422);
   const entryForWriteGate=employeeEntryValidationEntryFromBody(body||{});
