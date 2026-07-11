@@ -12,6 +12,7 @@ import {
   materializePreparedStayGenesis,
   prepareStayGenesis
 } from "../../modules/employees/durable-stay-persistence.mjs";
+import { buildCanonicalStayBedContext } from "../../modules/employees/canonical-stay-bed-context.mjs";
 import {
   buildCorrectionRequestFingerprint,
   buildOwnerCorrectionDryRunPreview,
@@ -4745,6 +4746,7 @@ async function canonicalBedContextGateway(env,user,opts={}){
   const bed=cleanText(opts.bed||"",80).replace(/^#/,"");
   const arrears=await canonicalArrearsGateway(env,user,{bed,limit:opts.limit||1000});
   const occupancy=await canonicalOccupancyGateway(env,user,{bed,arrears_gateway:arrears,limit:opts.limit||1000,strict_access_snapshot:opts.strict_access_snapshot===true});
+  const stayContext=await canonicalStayBedContextGateway(env,user,{bed,limit:opts.limit||500});
   return {
     ok:true,
     success:true,
@@ -4756,6 +4758,7 @@ async function canonicalBedContextGateway(env,user,opts={}){
     total_remaining:arrears.total_remaining,
     deposit_status:occupancy.deposit_recorded_amount===null?"MISSING_D":"ACCESS_SNAPSHOT_D",
     occupancy_status:occupancy.occupancy_status,
+    stay_context:stayContext,
     warnings:occupancy.warnings||[],
     source_proof:{
       bed_context:"Access Snapshot context only",
@@ -4763,6 +4766,8 @@ async function canonicalBedContextGateway(env,user,opts={}){
       occupancy_source:occupancy.source_proof,
       arrears_gateway:"Canonical Arrears Gateway",
       arrears_source:arrears.source_proof,
+      stay_context_gateway:"Canonical Stay Bed Context Gateway",
+      stay_context_sources:["sessions.entries_json","stay_contexts","stay_event_links"],
       forbidden_identity_excluded:true
     },
     readonly:true,
@@ -4770,6 +4775,36 @@ async function canonicalBedContextGateway(env,user,opts={}){
   };
 }
 __name(canonicalBedContextGateway,"canonicalBedContextGateway");
+async function canonicalStayBedContextGateway(env,user,opts={}){
+  const bed=cleanText(opts.bed||"",80).replace(/^#/,"");
+  const limit=Math.min(Math.max(Number(opts.limit||500),1),1000);
+  const sessions=await cloudArrearsFetchActiveSessionRows(env,user,{limit}).catch(()=>[]);
+  let stayContexts=[];
+  let stayEventLinks=[];
+  if(await empTableExists(env,"stay_contexts").catch(()=>false)){
+    const rows=await env.DB.prepare(`SELECT stay_context_id, corpid, lifecycle_status, genesis_event_type,
+      genesis_session_id, genesis_entry_id, genesis_anchor_id, started_at
+      FROM stay_contexts WHERE corpid=? AND lifecycle_status='active' LIMIT ?`)
+      .bind(user.corpid,limit).all().catch(()=>({results:[]}));
+    stayContexts=rows.results||[];
+  }
+  if(await empTableExists(env,"stay_event_links").catch(()=>false)){
+    const rows=await env.DB.prepare(`SELECT stay_event_link_id, corpid, stay_context_id, session_id,
+      entry_id, anchor_id, event_type, link_role, occurred_at
+      FROM stay_event_links WHERE corpid=? AND link_role='genesis' LIMIT ?`)
+      .bind(user.corpid,limit).all().catch(()=>({results:[]}));
+    stayEventLinks=rows.results||[];
+  }
+  return buildCanonicalStayBedContext({
+    corpid:user.corpid,
+    bed,
+    sessions,
+    stay_contexts:stayContexts,
+    stay_event_links:stayEventLinks,
+    limit
+  });
+}
+__name(canonicalStayBedContextGateway,"canonicalStayBedContextGateway");
 function canonicalOccupancySourceProof(){
   return {
     gateway:"canonical_occupancy_bed_status_gateway",

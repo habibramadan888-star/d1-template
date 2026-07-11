@@ -444,3 +444,11 @@ Migration status: created locally and not applied. Runtime wiring has not been i
 - If the canonical archive is accepted but registry materialization is temporarily unavailable or conflicting, the local HTTP contract returns `202` with `pending_rebuild` or `conflict`; it does not delete or rewrite the canonical archive.
 - This vertical slice is verified only against an isolated local test database. Employee UI integration and a registry rebuild worker remain unimplemented.
 - Migration `008_durable_stay_context.sql` has not been applied to staging or production, and Bed Transfer writes remain disabled.
+
+### Canonical Stay Identity Bed Context Read Status
+
+- The local Bed Context read path now derives durable stay identity from bounded active `sessions.entries_json` scanning and verifies it against `stay_contexts` / `stay_event_links` when available.
+- Read status is limited to `confirmed`, `canonical_only_pending_registry`, `registry_conflict`, or `missing`; canonical/registry disagreement never selects an arbitrary ID.
+- Voided, deleted, and reversed genesis facts are excluded. Multiple active stay IDs for one bed fail closed as a conflict.
+- TTLock E/e remains physical-vacancy context only and cannot create, select, or delete durable stay identity.
+- The gateway is read-only, excludes provider/card identity, performs no schema mutation, and is verified locally only.
