@@ -7715,7 +7715,42 @@ function bedTransferWriteDisabledResponse(){
   },409);
 }
 __name(bedTransferWriteDisabledResponse,"bedTransferWriteDisabledResponse");
+function bedTransferCanonicalPathRequiredResponse(){
+  return json({
+    ok:false,
+    error_code:"BED_TRANSFER_CANONICAL_PATH_REQUIRED",
+    event_type:"bed_transfer",
+    write_attempted:false,
+    production_cutover:"PRODUCTION_NO_GO"
+  },409);
+}
+__name(bedTransferCanonicalPathRequiredResponse,"bedTransferCanonicalPathRequiredResponse");
+function isBedTransferSaveSessionEntry(entry){
+  if(!entry||typeof entry!=="object"||Array.isArray(entry))return false;
+  const eventType=cleanText(entry.event_type||entry.eventType||"",60).toLowerCase();
+  if(eventType==="bed_transfer"||eventType==="bed_transfer_fee")return true;
+  const legacyType=cleanText(entry.type||entry.reason_code||"",20).toUpperCase();
+  if(["TF","TFF","T","TRANSFER","BED_TRANSFER","BED_TRANSFER_FEE"].includes(legacyType))return true;
+  if(cleanText(entry.tag||"",40).toLowerCase()==="transfer")return true;
+  return ["TF","TFF"].includes(employeeEntryUploadType(entry));
+}
+__name(isBedTransferSaveSessionEntry,"isBedTransferSaveSessionEntry");
+function saveSessionContainsBedTransfer(body={}){
+  const candidates=[
+    body?.entry,
+    body?.transaction,
+    body?.session?.entry,
+    body?.session,
+    ...(Array.isArray(body?.entries)?body.entries:[]),
+    ...(Array.isArray(body?.transactions)?body.transactions:[]),
+    ...(Array.isArray(body?.session?.entries)?body.session.entries:[]),
+    ...(Array.isArray(body?.session?.transactions)?body.session.transactions:[])
+  ];
+  return candidates.some(isBedTransferSaveSessionEntry);
+}
+__name(saveSessionContainsBedTransfer,"saveSessionContainsBedTransfer");
 async function handleEmployeeBedTransferCreate(request,env,user){
+  return bedTransferCanonicalPathRequiredResponse();
   if(!bedTransferWriteApproved(env))return bedTransferWriteDisabledResponse();
   if(!isStaffRoleValue(user?.role))return forbidden();
   const tableState=await bedTransferRequiredTablesReady(env);
@@ -10791,13 +10826,14 @@ async function handleRequest(request, env, ctx) {
     }
     if (path === "/api/save_session" && method === "POST") {
       if (!requireManager(user)) return forbidden();
-      await empEnsureSchema(env);
       let body;
       try {
         body = await request.json();
       } catch {
         return badRequest("invalid_json");
       }
+      if(saveSessionContainsBedTransfer(body))return bedTransferCanonicalPathRequiredResponse();
+      await empEnsureSchema(env);
       const { session, arrears: sa } = body || {};
       if (!session || typeof session !== "object" || !Array.isArray(session.entries)) {
         return badRequest("bad_request");

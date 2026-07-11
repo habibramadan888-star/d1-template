@@ -36,16 +36,16 @@ test("bedTransferWriteApproved is exact true after trimming", async () => {
   }
 });
 
-test("both real Bed Transfer write handlers fail closed before D1 work", async () => {
+test("both Bed Transfer routes fail closed before D1 work", async () => {
   const source = await readWorker();
   const directHandler = functionBlock(source, "handleEmployeeBedTransferCreate");
   const entryHandler = functionBlock(source, "handleEmployeeEntry");
 
-  assert.match(directHandler, /if\(!bedTransferWriteApproved\(env\)\)return bedTransferWriteDisabledResponse\(\);/);
+  assert.match(directHandler, /return bedTransferCanonicalPathRequiredResponse\(\);/);
   assert.ok(
-    directHandler.indexOf("bedTransferWriteDisabledResponse()") <
+    directHandler.indexOf("bedTransferCanonicalPathRequiredResponse()") <
       directHandler.indexOf("bedTransferRequiredTablesReady(env)"),
-    "direct Bed Transfer gate must precede schema inspection"
+    "direct Bed Transfer canonical-path closure must precede schema inspection"
   );
 
   assert.match(entryHandler, /const writeGateType=employeeEntryUploadType\(entryForWriteGate\);/);
