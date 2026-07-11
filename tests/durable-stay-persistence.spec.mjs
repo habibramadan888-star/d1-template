@@ -3,7 +3,8 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import {
   createOpaqueStayContextId,
-  persistStayGenesis,
+  persistPreparedStayGenesis,
+  prepareStayGenesis,
   validateStayGenesisInput
 } from "../modules/employees/durable-stay-persistence.mjs";
 
@@ -19,6 +20,15 @@ function genesis(overrides = {}) {
     genesis_entry_id: "entry-1",
     genesis_anchor_id: "anchor-1",
     started_at: "2026-07-11T12:00:00+04:00",
+    ...overrides
+  };
+}
+
+function prepared(overrides = {}) {
+  return {
+    stay_context_id: STAY_UUID,
+    ...genesis(),
+    lifecycle_status: "active",
     ...overrides
   };
 }
@@ -59,13 +69,15 @@ function uuidSequence(values = [STAY_UUID, LINK_UUID]) {
   };
 }
 
-test("module exports only the three persistence contract interfaces", async () => {
+test("module exports only the canonical-first persistence interfaces", async () => {
   const exports = await import(modulePath);
   assert.deepEqual(Object.keys(exports).sort(), [
     "createOpaqueStayContextId",
-    "persistStayGenesis",
+    "persistPreparedStayGenesis",
+    "prepareStayGenesis",
     "validateStayGenesisInput"
   ]);
+  assert.equal("persistStayGenesis" in exports, false);
 });
 
 test("opaque IDs come only from the supplied randomUUID function", () => {
@@ -86,63 +98,80 @@ test("Rent and Deposit In genesis validation accepts exact contract fields", () 
   assert.deepEqual(validateStayGenesisInput(legacy), legacy);
 });
 
-test("required genesis fields fail closed", () => {
+test("required and extra genesis fields fail closed", () => {
   errorCode(() => validateStayGenesisInput(genesis({ corpid: "" })), "STAY_GENESIS_CORPID_REQUIRED");
   errorCode(() => validateStayGenesisInput(genesis({ genesis_anchor_id: "" })), "STAY_GENESIS_ANCHOR_REQUIRED");
   errorCode(() => validateStayGenesisInput(genesis({ genesis_session_id: null })), "STAY_GENESIS_SESSION_REQUIRED");
   errorCode(() => validateStayGenesisInput(genesis({ genesis_event_type: "deposit_in", genesis_entry_id: null })), "STAY_GENESIS_ENTRY_REQUIRED");
-});
-
-test("every field outside the allowlist is rejected without echoing values", () => {
-  const forbiddenFields = [
-    "bed", "room", "current_bed", "original_bed", "tenant_card_id", "tenantCardId", "card_id",
-    "cardId", "old_ttlock_ref", "oldTtlockRef", "provider_phone", "providerPhone", "phone_99099",
-    "phone99099", "creator_phone", "creatorPhone", "card_creation_time", "cardCreationTime",
-    "customer_id", "customer_code", "ttlock_d", "ttlock_e", "ttlock_mmdd", "ttlock_expiry",
-    "ttlock_provider_metadata", "ttlockProviderMetadata", "provider_metadata", "providerMetadata"
-  ];
-  for (const field of forbiddenFields) {
-    const value = `sensitive-${field}`;
-    assert.throws(
-      () => validateStayGenesisInput({ ...genesis(), [field]: value }),
-      error => error?.code === "STAY_GENESIS_EXTRA_FIELD" && !String(error?.message).includes(value),
-      field
-    );
-  }
   errorCode(() => validateStayGenesisInput({ ...genesis(), arbitrary_extra: "x" }), "STAY_GENESIS_EXTRA_FIELD");
 });
 
-test("validation and legacy-bootstrap rejection perform no database work", async () => {
-  const invalid = mockDb();
-  await assert.rejects(
-    persistStayGenesis(invalid.db, genesis({ corpid: "" }), { randomUUID: () => STAY_UUID, createdAt: "2026-07-11" }),
-    error => error?.code === "STAY_GENESIS_CORPID_REQUIRED"
-  );
-  assert.equal(invalid.calls.prepare.length, 0);
-  assert.equal(invalid.calls.batch.length, 0);
+test("prepare creates one canonical stay UUID without DB access or input mutation", () => {
+  for (const genesis_event_type of ["rent", "deposit_in"]) {
+    const input = Object.freeze(genesis({ genesis_event_type }));
+    const before = structuredClone(input);
+    const ids = uuidSequence([STAY_UUID]);
+    const result = prepareStayGenesis(input, { randomUUID: ids.randomUUID });
 
-  const legacy = mockDb();
-  const ids = uuidSequence();
-  await assert.rejects(
-    persistStayGenesis(legacy.db, genesis({ genesis_event_type: "legacy_bootstrap", genesis_session_id: null, genesis_entry_id: null }), { randomUUID: ids.randomUUID, createdAt: "2026-07-11" }),
-    error => error?.code === "LEGACY_BOOTSTRAP_PERSISTENCE_NOT_IMPLEMENTED"
-  );
-  assert.equal(ids.calls.length, 0);
-  assert.equal(legacy.calls.prepare.length, 0);
-  assert.equal(legacy.calls.batch.length, 0);
+    assert.deepEqual(ids.calls, [0]);
+    assert.deepEqual(input, before);
+    assert.deepEqual(result, {
+      stay_context_id: STAY_UUID,
+      ...before,
+      lifecycle_status: "active"
+    });
+  }
+});
+
+test("prepare failures and legacy bootstrap generate no ID", () => {
+  for (const input of [
+    genesis({ corpid: "" }),
+    genesis({ genesis_event_type: "legacy_bootstrap", genesis_session_id: null, genesis_entry_id: null })
+  ]) {
+    const ids = uuidSequence([STAY_UUID]);
+    assert.throws(
+      () => prepareStayGenesis(input, { randomUUID: ids.randomUUID }),
+      error => ["STAY_GENESIS_CORPID_REQUIRED", "LEGACY_BOOTSTRAP_PERSISTENCE_NOT_IMPLEMENTED"].includes(error?.code)
+    );
+    assert.equal(ids.calls.length, 0);
+  }
+});
+
+test("prepared contract rejects invalid ID, lifecycle, unknown, and provider fields before DB or UUID", async () => {
+  const cases = [
+    [prepared({ stay_context_id: "not-a-uuid" }), "STAY_PREPARED_STAY_ID_INVALID"],
+    [prepared({ lifecycle_status: "closed" }), "STAY_PREPARED_LIFECYCLE_INVALID"],
+    [prepared({ unknown_field: "secret" }), "STAY_PREPARED_GENESIS_EXTRA_FIELD"],
+    [prepared({ bed: "611" }), "STAY_PREPARED_GENESIS_EXTRA_FIELD"],
+    [prepared({ card_id: "secret-card" }), "STAY_PREPARED_GENESIS_EXTRA_FIELD"],
+    [prepared({ provider_metadata: { secret: true } }), "STAY_PREPARED_GENESIS_EXTRA_FIELD"]
+  ];
+  for (const [input, code] of cases) {
+    const { db, calls } = mockDb();
+    const ids = uuidSequence([LINK_UUID]);
+    await assert.rejects(
+      persistPreparedStayGenesis(db, input, { randomUUID: ids.randomUUID, createdAt: "2026-07-11" }),
+      error => error?.code === code && !String(error?.message).includes("secret")
+    );
+    assert.equal(ids.calls.length, 0);
+    assert.equal(calls.prepare.length, 0);
+    assert.equal(calls.batch.length, 0);
+  }
 });
 
 for (const genesisEventType of ["rent", "deposit_in"]) {
-  test(`${genesisEventType} persistence batches exactly two linked statements`, async () => {
+  test(`${genesisEventType} canonical-first flow reuses one stay ID and batches two linked statements`, async () => {
     const { db, calls } = mockDb();
-    const ids = uuidSequence();
+    const ids = uuidSequence([STAY_UUID, LINK_UUID]);
     const input = genesis({ genesis_event_type: genesisEventType });
-    const result = await persistStayGenesis(db, input, {
+    const canonicalPrepared = prepareStayGenesis(input, { randomUUID: ids.randomUUID });
+    const result = await persistPreparedStayGenesis(db, canonicalPrepared, {
       randomUUID: ids.randomUUID,
       createdAt: "2026-07-11T13:00:00+04:00"
     });
 
     assert.deepEqual(ids.calls, [0, 1]);
+    assert.notEqual(canonicalPrepared.stay_context_id, result.stay_event_link_id);
     assert.equal(calls.prepare.length, 2);
     assert.equal(calls.batch.length, 1);
     assert.equal(calls.batch[0].length, 2);
@@ -151,15 +180,15 @@ for (const genesisEventType of ["rent", "deposit_in"]) {
     assert.match(stay.sql, /'active'/);
     assert.match(link.sql, /INSERT INTO stay_event_links/);
     assert.match(link.sql, /'genesis'/);
-    assert.equal(stay.values[0], STAY_UUID);
+    assert.equal(stay.values[0], canonicalPrepared.stay_context_id);
     assert.equal(link.values[0], LINK_UUID);
+    assert.equal(link.values[2], canonicalPrepared.stay_context_id);
     assert.equal(stay.values[1], input.corpid);
     assert.equal(link.values[1], input.corpid);
-    assert.equal(link.values[2], STAY_UUID);
     assert.equal(stay.values[5], input.genesis_anchor_id);
     assert.equal(link.values[5], input.genesis_anchor_id);
     assert.deepEqual(result, {
-      stay_context_id: STAY_UUID,
+      stay_context_id: canonicalPrepared.stay_context_id,
       stay_event_link_id: LINK_UUID,
       lifecycle_status: "active",
       genesis_event_type: genesisEventType,
@@ -168,34 +197,35 @@ for (const genesisEventType of ["rent", "deposit_in"]) {
   });
 }
 
-test("identical generated IDs fail before database preparation and are not retried", async () => {
+test("link ID collision fails once before database preparation and never replaces the stay ID", async () => {
   const { db, calls } = mockDb();
-  const ids = uuidSequence([STAY_UUID, STAY_UUID, LINK_UUID]);
+  const ids = uuidSequence([STAY_UUID, LINK_UUID]);
   await assert.rejects(
-    persistStayGenesis(db, genesis(), { randomUUID: ids.randomUUID, createdAt: "2026-07-11" }),
+    persistPreparedStayGenesis(db, prepared(), { randomUUID: ids.randomUUID, createdAt: "2026-07-11" }),
     error => error?.code === "STAY_GENESIS_IDS_MUST_DIFFER"
   );
-  assert.equal(ids.calls.length, 2);
+  assert.deepEqual(ids.calls, [0]);
   assert.equal(calls.prepare.length, 0);
   assert.equal(calls.batch.length, 0);
 });
 
-test("database errors propagate without retry or duplicate success", async () => {
+test("database constraint errors propagate without retry or stay ID replacement", async () => {
   const duplicate = Object.assign(new Error("constraint category"), { code: "SQLITE_CONSTRAINT_UNIQUE" });
   const { db, calls } = mockDb({ batchError: duplicate });
-  const ids = uuidSequence();
+  const ids = uuidSequence([LINK_UUID, "33333333-3333-4333-a333-333333333333"]);
   await assert.rejects(
-    persistStayGenesis(db, genesis(), { randomUUID: ids.randomUUID, createdAt: "2026-07-11" }),
+    persistPreparedStayGenesis(db, prepared(), { randomUUID: ids.randomUUID, createdAt: "2026-07-11" }),
     error => error === duplicate
   );
-  assert.equal(ids.calls.length, 2);
+  assert.deepEqual(ids.calls, [0]);
   assert.equal(calls.prepare.length, 2);
   assert.equal(calls.batch.length, 1);
 });
 
-test("module source has no fallback identity or nondeterministic ID source", async () => {
+test("module source has no fallback identity, time read, or provider identity source", async () => {
   const source = await readFile(modulePath, "utf8");
-  assert.doesNotMatch(source, /Date\.now|Math\.random/);
+  assert.doesNotMatch(source, /Date\.now|new Date|Math\.random/);
   assert.doesNotMatch(source, /tenant_card_id|card_id|old_ttlock_ref|provider_phone|phone_99099|customer_id|customer_code/i);
+  assert.doesNotMatch(source, /export async function persistStayGenesis/);
   assert.doesNotMatch(source, /\.run\s*\(/);
 });

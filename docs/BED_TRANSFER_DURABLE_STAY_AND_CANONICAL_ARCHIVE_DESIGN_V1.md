@@ -425,3 +425,12 @@ Migration status: created locally and not applied. Runtime wiring has not been i
 - A registry write failure must not rewrite or delete the canonical archive.
 - `legacy_bootstrap` persistence remains not implemented.
 - Runtime wiring, UI integration, feature flag, and schema migration application remain not completed.
+
+### Canonical-First Genesis Persistence Order
+
+- The server must generate `stay_context_id` before writing the canonical archive.
+- The canonical entry in `sessions.entries_json` must store that generated `stay_context_id`.
+- A later registry materializer must reuse the exact canonical `stay_context_id`; it must not generate a replacement stay ID.
+- `stay_contexts` and `stay_event_links` remain rebuildable materialized registries, not independent fact sources.
+- If the canonical archive succeeds and registry materialization fails, the canonical `stay_context_id` remains valid and the registry must be rebuildable later from the canonical archive.
+- Runtime wiring and the registry rebuild worker remain not implemented.

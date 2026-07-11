@@ -8,6 +8,16 @@ const GENESIS_FIELDS = new Set([
   "started_at"
 ]);
 const GENESIS_EVENT_TYPES = new Set(["rent", "deposit_in", "legacy_bootstrap"]);
+const PREPARED_GENESIS_FIELDS = new Set([
+  "stay_context_id",
+  "corpid",
+  "genesis_event_type",
+  "genesis_session_id",
+  "genesis_entry_id",
+  "genesis_anchor_id",
+  "started_at",
+  "lifecycle_status"
+]);
 
 function fail(code, message) {
   const error = new Error(message);
@@ -76,18 +86,58 @@ export function validateStayGenesisInput(input) {
   };
 }
 
-export async function persistStayGenesis(db, input, options = {}) {
+export function prepareStayGenesis(input, options = {}) {
   const validated = validateStayGenesisInput(input);
   if (validated.genesis_event_type === "legacy_bootstrap") {
     fail("LEGACY_BOOTSTRAP_PERSISTENCE_NOT_IMPLEMENTED", "Legacy bootstrap persistence is not implemented.");
   }
+  return {
+    stay_context_id: createOpaqueStayContextId(options.randomUUID),
+    ...validated,
+    lifecycle_status: "active"
+  };
+}
+
+function validatePreparedStayGenesis(prepared) {
+  if (!prepared || typeof prepared !== "object" || Array.isArray(prepared)) {
+    fail("STAY_PREPARED_GENESIS_REQUIRED", "Prepared stay genesis must be an object.");
+  }
+  const extraFields = Object.keys(prepared).filter(field => !PREPARED_GENESIS_FIELDS.has(field));
+  if (extraFields.length) {
+    fail("STAY_PREPARED_GENESIS_EXTRA_FIELD", "Prepared stay genesis contains fields outside the contract.");
+  }
+  if (typeof prepared.stay_context_id !== "string" || !UUID_V4_PATTERN.test(prepared.stay_context_id)) {
+    fail("STAY_PREPARED_STAY_ID_INVALID", "Prepared stay_context_id must be a valid UUID v4.");
+  }
+  if (prepared.lifecycle_status !== "active") {
+    fail("STAY_PREPARED_LIFECYCLE_INVALID", "Prepared stay genesis lifecycle_status must be active.");
+  }
+  const validated = validateStayGenesisInput({
+    corpid: prepared.corpid,
+    genesis_event_type: prepared.genesis_event_type,
+    genesis_session_id: prepared.genesis_session_id,
+    genesis_entry_id: prepared.genesis_entry_id,
+    genesis_anchor_id: prepared.genesis_anchor_id,
+    started_at: prepared.started_at
+  });
+  if (validated.genesis_event_type === "legacy_bootstrap") {
+    fail("LEGACY_BOOTSTRAP_PERSISTENCE_NOT_IMPLEMENTED", "Legacy bootstrap persistence is not implemented.");
+  }
+  return {
+    stay_context_id: prepared.stay_context_id,
+    ...validated,
+    lifecycle_status: "active"
+  };
+}
+
+export async function persistPreparedStayGenesis(db, prepared, options = {}) {
+  const validated = validatePreparedStayGenesis(prepared);
   if (!db || typeof db.prepare !== "function" || typeof db.batch !== "function") {
     fail("STAY_GENESIS_DATABASE_REQUIRED", "A D1-compatible database is required.");
   }
   const createdAt = requiredText(options.createdAt, "STAY_GENESIS_CREATED_AT_REQUIRED", "Stay genesis persistence requires createdAt.");
-  const stayContextId = createOpaqueStayContextId(options.randomUUID);
   const stayEventLinkId = createOpaqueStayContextId(options.randomUUID);
-  if (stayContextId === stayEventLinkId) {
+  if (validated.stay_context_id === stayEventLinkId) {
     fail("STAY_GENESIS_IDS_MUST_DIFFER", "Stay context and event link IDs must differ.");
   }
 
@@ -102,7 +152,7 @@ export async function persistStayGenesis(db, input, options = {}) {
     started_at
   ) VALUES (?, ?, 'active', ?, ?, ?, ?, ?)`)
     .bind(
-      stayContextId,
+      validated.stay_context_id,
       validated.corpid,
       validated.genesis_event_type,
       validated.genesis_session_id,
@@ -126,7 +176,7 @@ export async function persistStayGenesis(db, input, options = {}) {
     .bind(
       stayEventLinkId,
       validated.corpid,
-      stayContextId,
+      validated.stay_context_id,
       validated.genesis_session_id,
       validated.genesis_entry_id,
       validated.genesis_anchor_id,
@@ -137,7 +187,7 @@ export async function persistStayGenesis(db, input, options = {}) {
 
   await db.batch([stayStatement, linkStatement]);
   return {
-    stay_context_id: stayContextId,
+    stay_context_id: validated.stay_context_id,
     stay_event_link_id: stayEventLinkId,
     lifecycle_status: "active",
     genesis_event_type: validated.genesis_event_type,
