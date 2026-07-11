@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "run_number": 1,
+  "repository_root": "C:/Users/Chinalink/Desktop/软件迭代-worktrees/bed-transfer-canonical-write-closure",
+  "branch": "fix/bed-transfer-canonical-write-closure",
+  "expected_head": "341c1315060185624e698b283c683124df74183d",
+  "last_verified_head": "341c1315060185624e698b283c683124df74183d",
+  "controller_status": "HUMAN_REVIEW_REQUIRED",
+  "current_milestone": "OWNER_CONTROLLED_LEGACY_BOOTSTRAP_WRITE_CONTRACT_REVIEW_ONLY",
+  "last_result": "BUG_FOUND",
+  "verification_level": "BUG_FOUND",
+  "human_gate": "OWNER_CONTROLLED_LEGACY_BOOTSTRAP_WRITE_CONTRACT_REVIEW",
+  "production_called": false,
+  "production_business_data_changed": false,
+  "migration_applied_to_staging": false,
+  "migration_applied_to_production": false,
+  "deployment": false,
+  "bed_transfer_write_enabled": false,
+  "bed_transfer_status": "NOT_VERIFIED / REQUIREMENTS_REVIEW",
+  "production_cutover": "PRODUCTION_NO_GO",
+  "updated_at": "2026-07-11T18:32:08+04:00"
+}
