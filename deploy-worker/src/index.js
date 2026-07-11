@@ -9,6 +9,10 @@ import {
 } from "../../modules/employees/bed-transfer-phase1-contract.mjs";
 import { evaluateStayGenesisTrigger } from "../../modules/employees/durable-stay-genesis-trigger.mjs";
 import {
+  materializePreparedStayGenesis,
+  prepareStayGenesis
+} from "../../modules/employees/durable-stay-persistence.mjs";
+import {
   buildCorrectionRequestFingerprint,
   buildOwnerCorrectionDryRunPreview,
   buildOwnerCorrectionPreviewHash,
@@ -2694,19 +2698,27 @@ function employeeEntryStayGenesisRows(body={},eventIndex=0){
   return rows.filter((row,rowIndex)=>rows.indexOf(row)===rowIndex);
 }
 __name(employeeEntryStayGenesisRows,"employeeEntryStayGenesisRows");
-function evaluateEmployeeEntryStayGenesis(body={},eventIndex=0){
+function employeeEntryStayGenesisEnvelopeFailure(body={},eventIndex=0){
   const rows=employeeEntryStayGenesisRows(body,eventIndex);
   const serverManagedFields=["stay_context_id","stay_event_link_id","lifecycle_status","genesis_anchor_id"];
   const forbiddenFields=[...new Set(rows.flatMap(row=>serverManagedFields.filter(field=>Object.hasOwn(row,field))))].sort((a,b)=>a.localeCompare(b));
-  const selected=employeeEntryValidationEntryFromBody(body,eventIndex);
-  const eventType=Object.hasOwn(selected,"event_type")?selected.event_type:undefined;
   if(forbiddenFields.length){
-    return evaluateStayGenesisTrigger({event_type:eventType,stay_action:selected.stay_action,...Object.fromEntries(forbiddenFields.map(field=>[field,true]))});
+    return {error_code:"STAY_SERVER_MANAGED_FIELD_FORBIDDEN",forbidden_fields:forbiddenFields};
   }
   const actions=rows.filter(row=>Object.hasOwn(row,"stay_action")).map(row=>row.stay_action);
   if(actions.length>1&&!actions.every(value=>Object.is(value,actions[0]))){
     return {error_code:"STAY_TRIGGER_CONFLICT",forbidden_fields:[]};
   }
+  return null;
+}
+__name(employeeEntryStayGenesisEnvelopeFailure,"employeeEntryStayGenesisEnvelopeFailure");
+function evaluateEmployeeEntryStayGenesis(body={},eventIndex=0){
+  const envelopeFailure=employeeEntryStayGenesisEnvelopeFailure(body,eventIndex);
+  if(envelopeFailure)return envelopeFailure;
+  const rows=employeeEntryStayGenesisRows(body,eventIndex);
+  const selected=employeeEntryValidationEntryFromBody(body,eventIndex);
+  const eventType=Object.hasOwn(selected,"event_type")?selected.event_type:undefined;
+  const actions=rows.filter(row=>Object.hasOwn(row,"stay_action")).map(row=>row.stay_action);
   const triggerInput={event_type:eventType};
   if(actions.length)triggerInput.stay_action=actions[0];
   return evaluateStayGenesisTrigger(triggerInput);
@@ -2717,6 +2729,21 @@ function employeeEntryStayGenesisStartRequested(body={},eventIndex=0){
   return actions.length>0&&actions.every(value=>value==="start");
 }
 __name(employeeEntryStayGenesisStartRequested,"employeeEntryStayGenesisStartRequested");
+function validateEmployeeEntryStayGenesisBusinessFields(body={},eventIndex=0){
+  const entry=employeeEntryValidationEntryFromBody(body,eventIndex);
+  const type=employeeEntryUploadType(entry);
+  if(!["R","D"].includes(type))return null;
+  const normalized=normalizeEntryAnchor(entry);
+  const anchorPreview={
+    id:cleanText(normalized.id||normalized.event_id||normalized.anchor_id,80),
+    type,
+    event_type:normalized.event_type||entryAnchorEventType(type),
+    bed:normalized.bed||normalized.room||entry.room||"",
+    amount:entryAnchorMoney(normalized.amount||normalized.payment_amount||normalized.paid_amount||entry.amount)
+  };
+  return validateEmployeeEntryUploadEventFields(type,entry,normalized,eventIndex,anchorPreview);
+}
+__name(validateEmployeeEntryStayGenesisBusinessFields,"validateEmployeeEntryStayGenesisBusinessFields");
 function employeeEntryStayGenesisFailure(result,eventIndex=0,eventType=""){
   const forbiddenFields=Array.isArray(result?.forbidden_fields)?[...new Set(result.forbidden_fields)].sort((a,b)=>a.localeCompare(b)):[];
   return {
@@ -2744,6 +2771,44 @@ function stayGenesisWriteNotEnabledResponse(){
   },503);
 }
 __name(stayGenesisWriteNotEnabledResponse,"stayGenesisWriteNotEnabledResponse");
+function durableStayWriteApproved(env={}){
+  return env?.DURABLE_STAY_WRITE_APPROVED==="true";
+}
+__name(durableStayWriteApproved,"durableStayWriteApproved");
+async function durableStayMissingTables(env){
+  const required=["stay_contexts","stay_event_links"];
+  const results=await Promise.all(required.map(async table=>[table,await empTableExists(env,table)]));
+  return results.filter(([,exists])=>!exists).map(([table])=>table).sort((a,b)=>a.localeCompare(b));
+}
+__name(durableStayMissingTables,"durableStayMissingTables");
+function stayGenesisSchemaNotReadyResponse(missingTables=[]){
+  return json({
+    success:false,
+    ok:false,
+    error_code:"STAY_GENESIS_SCHEMA_NOT_READY",
+    write_attempted:false,
+    stay_identity_created:false,
+    missing_tables:[...new Set(missingTables)].sort((a,b)=>a.localeCompare(b))
+  },503);
+}
+__name(stayGenesisSchemaNotReadyResponse,"stayGenesisSchemaNotReadyResponse");
+function employeeEntryCanonicalGenesisEntries(session={},entry={},prepared,eventIndex=0){
+  const source=Array.isArray(session?.entries)&&session.entries.length?session.entries:[entry];
+  const index=Math.min(Math.max(0,Number(eventIndex)||0),Math.max(0,source.length-1));
+  return source.map((row,rowIndex)=>rowIndex===index?{
+    ...(row||{}),
+    id:prepared.genesis_entry_id,
+    entry_id:prepared.genesis_entry_id,
+    event_id:prepared.genesis_anchor_id,
+    anchor_id:prepared.genesis_anchor_id,
+    session_id:prepared.genesis_session_id,
+    event_type:prepared.genesis_event_type,
+    stay_action:"start",
+    stay_context_id:prepared.stay_context_id,
+    stay_lifecycle_action:"genesis"
+  }:row);
+}
+__name(employeeEntryCanonicalGenesisEntries,"employeeEntryCanonicalGenesisEntries");
 function employeeEntryBedTransferInputRows(body={}){
   const rows=[
     body,
@@ -3163,11 +3228,21 @@ async function handleEmployeeEntry(request,env,user){
   const timing={started_at:Date.now(),d1_write_ms:0,total_ms:0};
   let body;
   try{body=await request.json();}catch{return badRequest("invalid_json");}
-  const stayGenesis=evaluateEmployeeEntryStayGenesis(body||{},body?.event_index??0);
+  const stayGenesisEnvelopeFailure=employeeEntryStayGenesisEnvelopeFailure(body||{},body?.event_index??0);
   const stayGenesisEntry=employeeEntryValidationEntryFromBody(body||{},body?.event_index??0);
   const stayGenesisStartRequested=employeeEntryStayGenesisStartRequested(body||{},body?.event_index??0);
-  if(stayGenesisStartRequested&&!["STAY_SERVER_MANAGED_FIELD_FORBIDDEN","STAY_TRIGGER_CONFLICT"].includes(stayGenesis.error_code))return stayGenesisWriteNotEnabledResponse();
+  if(stayGenesisEnvelopeFailure)return json({success:false,...employeeEntryStayGenesisFailure(stayGenesisEnvelopeFailure,body?.event_index??0,stayGenesisEntry?.event_type)},422);
+  if(stayGenesisStartRequested){
+    const stayGenesisBusinessFailure=validateEmployeeEntryStayGenesisBusinessFields(body||{},body?.event_index??0);
+    if(stayGenesisBusinessFailure)return json({success:false,...stayGenesisBusinessFailure},422);
+  }
+  const stayGenesis=evaluateEmployeeEntryStayGenesis(body||{},body?.event_index??0);
   if(stayGenesis.error_code)return json({success:false,...employeeEntryStayGenesisFailure(stayGenesis,body?.event_index??0,stayGenesisEntry?.event_type)},422);
+  if(stayGenesisStartRequested&&!durableStayWriteApproved(env))return stayGenesisWriteNotEnabledResponse();
+  if(stayGenesis.requested){
+    const missingStayTables=await durableStayMissingTables(env);
+    if(missingStayTables.length)return stayGenesisSchemaNotReadyResponse(missingStayTables);
+  }
   const firewallFailure=bedTransferForbiddenIdentityFailure(body||{},body?.event_index??0);
   if(firewallFailure)return json({success:false,...firewallFailure},422);
   const entryForWriteGate=employeeEntryValidationEntryFromBody(body||{});
@@ -3191,7 +3266,7 @@ async function handleEmployeeEntry(request,env,user){
       duplicate_guard:validationResult.duplicate_guard||{ok:true,idempotent:true,canonical_fingerprint_persistence:"PARTIAL"}
     });
   }
-  const entry=body?.entry||{};
+  const entry=stayGenesis.requested?employeeEntryValidationEntryFromBody(body||{},body?.event_index??0):(body?.entry||{});
   const session=body?.session||{};
   const liveRouteGate=eeaLiveRouteGate(env);
   let liveRouteAdapterDraft=null;
@@ -3221,6 +3296,7 @@ async function handleEmployeeEntry(request,env,user){
   const entryId=cleanId(entry.id)||empId("ent");
   const sessionId=cleanId(session.id)||empId("emp");
   const now=cleanText(entry.created_at,40)||empNow();
+  const entryAnchorId=cleanId(entry.anchor_id||entry.event_id||entry.id)||entryId;
   const authOperatorId=cleanText(user.userid,80);
   const operatorName=cleanText(user.employee_name||user.userid,120);
   const existingTx=await env.DB.prepare("SELECT id,session_id,type,linked_task_id FROM transactions WHERE id=? AND corpid=? LIMIT 1").bind(entryId,user.corpid).first();
@@ -3342,8 +3418,19 @@ async function handleEmployeeEntry(request,env,user){
     if(openArrears.length)return badRequest(type==="DR"?"deposit_refund_open_arrears_owner_approval_required":"checkout_open_arrears_owner_approval_required");
   }
   if(type==="CO"&&depositDeduction>depositBalance+0.01)return badRequest("deposit_deduction_exceeds_balance");
+  const preparedStayGenesis=stayGenesis.requested?prepareStayGenesis({
+    corpid:cleanText(user.corpid,120),
+    genesis_event_type:stayGenesis.genesis_event_type,
+    genesis_session_id:sessionId,
+    genesis_entry_id:entryId,
+    genesis_anchor_id:entryAnchorId,
+    started_at:now
+  },{randomUUID:()=>crypto.randomUUID()}):null;
   const d1WriteStart=Date.now();
-  const sessionAnchorEntries=Array.isArray(session.entries)?buildEmployeeEntryEntriesWithOccupancyCandidateMetadata(user,body,session.entries):[];
+  const canonicalInputEntries=preparedStayGenesis
+    ?employeeEntryCanonicalGenesisEntries(session,entry,preparedStayGenesis,body?.event_index??0)
+    :(Array.isArray(session.entries)?session.entries:[]);
+  const sessionAnchorEntries=buildEmployeeEntryEntriesWithOccupancyCandidateMetadata(user,body,canonicalInputEntries);
   const sessionEntriesJson=JSON.stringify({anchor_contract_version:"employee_entry_anchor_v1",entries:sessionAnchorEntries});
   const sessionSummaryJson=JSON.stringify({
     cash_handover:Number(String(session.cash_handover||0).replace(/,/g,"")),
@@ -3470,6 +3557,26 @@ async function handleEmployeeEntry(request,env,user){
   };
   await empEvent(env,user,{ref_id:entryId,ref_type:"transaction",event_type:"create",field_name:"*",new_value:JSON.stringify(finalEntryForAudit),operator_id:authOperatorId,ts:now});
   await audit(env,user,"employee.entry.create",entryId,{room,amount}).catch(()=>{});
+  let stayRegistryResult=null;
+  if(preparedStayGenesis){
+    try{
+      stayRegistryResult=await materializePreparedStayGenesis(env.DB,preparedStayGenesis,{randomUUID:()=>crypto.randomUUID(),createdAt:now});
+    }catch(error){
+      const conflict=["STAY_GENESIS_ANCHOR_CONFLICT","STAY_REGISTRY_ORPHAN_LINK_CONFLICT"].includes(error?.code);
+      return json({
+        success:true,
+        ok:true,
+        entry_id:entryId,
+        session_id:sessionId,
+        canonical_write_status:"accepted",
+        stay_registry_status:conflict?"conflict":"pending_rebuild",
+        ...(conflict?{error_code:"STAY_GENESIS_ANCHOR_CONFLICT"}:{}),
+        stay_context_id:preparedStayGenesis.stay_context_id,
+        write_attempted:true,
+        owner_review_required:true
+      },202);
+    }
+  }
   timing.d1_write_ms=Date.now()-d1WriteStart;
   timing.total_ms=Date.now()-timing.started_at;
   return success({
@@ -3481,6 +3588,13 @@ async function handleEmployeeEntry(request,env,user){
     arrear_task:arrearTask,
     left_with_arrears_task:leftWithArrearsTask,
     deposit_ledger:depositLedger,
+    ...(preparedStayGenesis?{stay_genesis:{
+      requested:true,
+      stay_context_id:preparedStayGenesis.stay_context_id,
+      lifecycle_status:"active",
+      canonical_write_status:"accepted",
+      registry_status:stayRegistryResult?.status||"pending_rebuild"
+    }}:{}),
     ...(liveRouteAdapterDraft?{adapter_live_route_rehearsal:eeaLiveRouteSummary(liveRouteAdapterDraft,liveRouteGate,{legacyWriteContinued:true})}: {})
   });
 }

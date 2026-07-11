@@ -130,12 +130,78 @@ function validatePreparedStayGenesis(prepared) {
   };
 }
 
-export async function persistPreparedStayGenesis(db, prepared, options = {}) {
+function registryConflict(code) {
+  fail(code, "Durable stay registry conflicts with the canonical genesis anchor.");
+}
+
+function contextMatches(row, prepared) {
+  return !!row &&
+    row.stay_context_id === prepared.stay_context_id &&
+    row.corpid === prepared.corpid &&
+    row.lifecycle_status === "active" &&
+    row.genesis_event_type === prepared.genesis_event_type &&
+    row.genesis_session_id === prepared.genesis_session_id &&
+    row.genesis_entry_id === prepared.genesis_entry_id &&
+    row.genesis_anchor_id === prepared.genesis_anchor_id &&
+    row.started_at === prepared.started_at;
+}
+
+function linkMatches(row, prepared) {
+  return !!row &&
+    row.corpid === prepared.corpid &&
+    row.stay_context_id === prepared.stay_context_id &&
+    row.session_id === prepared.genesis_session_id &&
+    row.entry_id === prepared.genesis_entry_id &&
+    row.anchor_id === prepared.genesis_anchor_id &&
+    row.event_type === prepared.genesis_event_type &&
+    row.link_role === "genesis" &&
+    row.occurred_at === prepared.started_at;
+}
+
+async function readRegistryByGenesisAnchor(db, prepared) {
+  const context = await db.prepare(`SELECT
+    stay_context_id, corpid, lifecycle_status, genesis_event_type,
+    genesis_session_id, genesis_entry_id, genesis_anchor_id, started_at
+    FROM stay_contexts WHERE corpid=? AND genesis_anchor_id=? LIMIT 1`)
+    .bind(prepared.corpid, prepared.genesis_anchor_id).first();
+  const link = await db.prepare(`SELECT
+    stay_event_link_id, corpid, stay_context_id, session_id, entry_id,
+    anchor_id, event_type, link_role, occurred_at
+    FROM stay_event_links WHERE corpid=? AND anchor_id=? LIMIT 1`)
+    .bind(prepared.corpid, prepared.genesis_anchor_id).first();
+  return { context, link };
+}
+
+function classifyRegistry(existing, prepared) {
+  if (!existing.context && existing.link) registryConflict("STAY_REGISTRY_ORPHAN_LINK_CONFLICT");
+  if (existing.context && !contextMatches(existing.context, prepared)) registryConflict("STAY_GENESIS_ANCHOR_CONFLICT");
+  if (existing.link && !linkMatches(existing.link, prepared)) registryConflict("STAY_GENESIS_ANCHOR_CONFLICT");
+  if (existing.context && existing.link) return "already_materialized";
+  if (existing.context) return "link_repaired";
+  return "created";
+}
+
+function isConstraintError(error) {
+  return /constraint|unique/i.test(`${error?.code || ""} ${error?.message || ""}`);
+}
+
+export async function materializePreparedStayGenesis(db, prepared, options = {}) {
   const validated = validatePreparedStayGenesis(prepared);
   if (!db || typeof db.prepare !== "function" || typeof db.batch !== "function") {
     fail("STAY_GENESIS_DATABASE_REQUIRED", "A D1-compatible database is required.");
   }
   const createdAt = requiredText(options.createdAt, "STAY_GENESIS_CREATED_AT_REQUIRED", "Stay genesis persistence requires createdAt.");
+  const initial = await readRegistryByGenesisAnchor(db, validated);
+  const initialStatus = classifyRegistry(initial, validated);
+  if (initialStatus === "already_materialized") {
+    return {
+      stay_context_id: validated.stay_context_id,
+      lifecycle_status: "active",
+      genesis_event_type: validated.genesis_event_type,
+      status: "already_materialized",
+      write_attempted: false
+    };
+  }
   const stayEventLinkId = createOpaqueStayContextId(options.randomUUID);
   if (validated.stay_context_id === stayEventLinkId) {
     fail("STAY_GENESIS_IDS_MUST_DIFFER", "Stay context and event link IDs must differ.");
@@ -185,12 +251,27 @@ export async function persistPreparedStayGenesis(db, prepared, options = {}) {
       createdAt
     );
 
-  await db.batch([stayStatement, linkStatement]);
+  const statements = initialStatus === "link_repaired" ? [linkStatement] : [stayStatement, linkStatement];
+  try {
+    await db.batch(statements);
+  } catch (error) {
+    if (!isConstraintError(error)) throw error;
+    const raced = await readRegistryByGenesisAnchor(db, validated);
+    const racedStatus = classifyRegistry(raced, validated);
+    if (racedStatus !== "already_materialized") registryConflict("STAY_GENESIS_ANCHOR_CONFLICT");
+    return {
+      stay_context_id: validated.stay_context_id,
+      lifecycle_status: "active",
+      genesis_event_type: validated.genesis_event_type,
+      status: "already_materialized",
+      write_attempted: false
+    };
+  }
   return {
     stay_context_id: validated.stay_context_id,
-    stay_event_link_id: stayEventLinkId,
     lifecycle_status: "active",
     genesis_event_type: validated.genesis_event_type,
+    status: initialStatus,
     write_attempted: true
   };
 }

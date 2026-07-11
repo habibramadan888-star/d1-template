@@ -33,10 +33,12 @@ async function loadHarness() {
   vm.runInContext([
     functionBlock(source, "employeeEntryValidationEntryFromBody"),
     functionBlock(source, "employeeEntryStayGenesisRows"),
+    functionBlock(source, "employeeEntryStayGenesisEnvelopeFailure"),
     functionBlock(source, "evaluateEmployeeEntryStayGenesis"),
     functionBlock(source, "employeeEntryStayGenesisStartRequested"),
     functionBlock(source, "employeeEntryStayGenesisFailure"),
-    functionBlock(source, "stayGenesisWriteNotEnabledResponse")
+    functionBlock(source, "stayGenesisWriteNotEnabledResponse"),
+    functionBlock(source, "durableStayWriteApproved")
   ].join("\n"), context);
   return { source, context };
 }
@@ -125,40 +127,39 @@ test("forbidden fields are sorted and deduplicated in integration errors", async
   assert.doesNotMatch(JSON.stringify(result), /secret-/);
 });
 
-test("real write handler rejects start for all seven events with fixed 503 before every DB access despite env values", async () => {
+test("real write handler accepts only exact durable stay flag and rejects before every DB access", async () => {
   const { source, context } = await loadHarness();
   const handler = functionBlock(source, "handleEmployeeEntry");
   context.bedTransferForbiddenIdentityFailure = () => { throw new Error("unexpected later guard"); };
+  context.validateEmployeeEntryStayGenesisBusinessFields = () => null;
   context.Date = Date;
   vm.runInContext(handler, context);
 
-  for (const event_type of ["rent", "arrears_payment", "deposit_in", "deposit_out", "checkout", "expense", "bed_transfer"]) {
-    let dbAccessed = false;
-    const request = {
-      headers: { get: () => null },
-      json: async () => wrapped({ event_type, stay_action: "start" })
-    };
-    const env = {
-      STAY_GENESIS_WRITE_ENABLED: "true",
-      DURABLE_STAY_WRITE_APPROVED: "true",
-      DB: new Proxy({}, { get() { dbAccessed = true; throw new Error("DB accessed"); } })
-    };
-    const response = await context.handleEmployeeEntry(request, env, {});
-    assert.equal(response.status, 503);
-    assert.deepEqual(JSON.parse(JSON.stringify(response.body)), {
-      success: false,
-      ok: false,
-      error_code: "STAY_GENESIS_WRITE_NOT_ENABLED",
-      write_attempted: false,
-      stay_identity_created: false,
-      persistence_adapter_called: false,
-      migration_required: true
-    });
-    assert.equal(dbAccessed, false);
+  for (const event_type of ["rent", "deposit_in"]) {
+    for (const flag of [undefined, "false", "TRUE", "1", "yes", true]) {
+      let dbAccessed = false;
+      const request = {
+        headers: { get: () => null },
+        json: async () => wrapped({ event_type, stay_action: "start" })
+      };
+      const env = {
+        DURABLE_STAY_WRITE_APPROVED: flag,
+        STAY_GENESIS_WRITE_ENABLED: "true",
+        DURABLE_STAY_WRITE_ENABLED: "true",
+        DB: new Proxy({}, { get() { dbAccessed = true; throw new Error("DB accessed"); } })
+      };
+      const response = await context.handleEmployeeEntry(request, env, {});
+      assert.equal(response.status, 503);
+      assert.equal(response.body.error_code, "STAY_GENESIS_WRITE_NOT_ENABLED");
+      assert.equal(response.body.write_attempted, false);
+      assert.equal(response.body.stay_identity_created, false);
+      assert.equal(dbAccessed, false);
+    }
   }
+  assert.equal(context.durableStayWriteApproved({ DURABLE_STAY_WRITE_APPROVED: "true" }), true);
 });
 
-test("Worker integration adds validate-only proof and never imports persistence or UUID generation", async () => {
+test("validate-only integration adds proof without invoking persistence or UUID generation", async () => {
   const { source } = await loadHarness();
   const validator = functionBlock(source, "validateEmployeeEntryUploadPayload");
   const validateHandler = functionBlock(source, "handleEmployeeEntryValidate");
@@ -171,9 +172,12 @@ test("Worker integration adds validate-only proof and never imports persistence 
   assert.match(validator, /stay_identity_created:false/);
   assert.match(validator, /persistence_adapter_called:false/);
   assert.match(validateHandler, /validateEmployeeEntryUploadPayload/);
+  assert.doesNotMatch(validator, /prepareStayGenesis|materializePreparedStayGenesis|randomUUID/);
+  assert.doesNotMatch(validateHandler, /prepareStayGenesis|materializePreparedStayGenesis|randomUUID/);
   assert.ok(writer.indexOf("evaluateEmployeeEntryStayGenesis") < writer.indexOf('empTableExists(env,"sessions")'));
-  assert.doesNotMatch(source.slice(0, source.indexOf("// src/lib/jwt.js")), /durable-stay-persistence|persistStayGenesis/);
-  assert.doesNotMatch(writer.slice(0, writer.indexOf("const firewallFailure")), /randomUUID|empId\(|persistStayGenesis|stay_contexts/);
+  assert.match(source, /materializePreparedStayGenesis/);
+  assert.match(source, /prepareStayGenesis/);
+  assert.ok(writer.indexOf("validateEmployeeEntryStayGenesisBusinessFields") < writer.indexOf("durableStayWriteApproved"));
 });
 
 test("existing Bed Transfer gates and canonical write closures remain present", async () => {

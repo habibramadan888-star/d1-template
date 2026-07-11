@@ -434,3 +434,13 @@ Migration status: created locally and not applied. Runtime wiring has not been i
 - `stay_contexts` and `stay_event_links` remain rebuildable materialized registries, not independent fact sources.
 - If the canonical archive succeeds and registry materialization fails, the canonical `stay_context_id` remains valid and the registry must be rebuildable later from the canonical archive.
 - Runtime wiring and the registry rebuild worker remain not implemented.
+
+### Local Durable Stay Genesis Vertical Slice Status
+
+- Local runtime integration uses only the strict `DURABLE_STAY_WRITE_APPROVED="true"` feature flag.
+- Before genesis business writes, the runtime requires both `stay_contexts` and `stay_event_links`; it does not create or alter schema at runtime.
+- The server prepares one canonical `stay_context_id`, injects it into the selected `sessions.entries_json` genesis entry, completes the existing event writes, and then materializes the registry with that same ID.
+- Registry materialization is idempotent by `(corpid, genesis_anchor_id)`, supports exact no-write convergence and missing-link repair, and fails closed on orphan or canonical-field conflicts.
+- If the canonical archive is accepted but registry materialization is temporarily unavailable or conflicting, the local HTTP contract returns `202` with `pending_rebuild` or `conflict`; it does not delete or rewrite the canonical archive.
+- This vertical slice is verified only against an isolated local test database. Employee UI integration and a registry rebuild worker remain unimplemented.
+- Migration `008_durable_stay_context.sql` has not been applied to staging or production, and Bed Transfer writes remain disabled.
