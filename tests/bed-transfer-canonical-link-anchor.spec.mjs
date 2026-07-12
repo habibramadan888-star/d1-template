@@ -4,7 +4,7 @@ import { buildBedTransferCanonicalLinkAnchor } from '../modules/employees/bed-tr
 
 const source = (extra={}) => ({corpid:'corp',physical_bed_status:'not_marked_vacant',parsed_vacancy_marker:false,resolution_status:'confirmed',candidate_count:1,source_context_anchor_refs:['rent-anchor-0001'],rent_coverage_ref:'rent-coverage-0001',deposit_context_ref:'deposit-context-0001',expiry_context_ref:'expiry-context-0001',open_arrears:[],...extra});
 const target = (extra={}) => ({corpid:'corp',physical_bed_status:'vacant',parsed_vacancy_marker:true,...extra});
-const base = (extra={}) => ({client_payload:{event_type:'bed_transfer'},from_bed:'A',to_bed:'B',transfer_at:'2026-07-12T12:00:00+04:00',corpid:'corp',canonical_source_context:source(),canonical_target_context:target(),fee_mode:'paid',fee_amount_aed:50,...extra});
+const base = (extra={}) => ({client_payload:{event_type:'bed_transfer'},from_bed:'A',to_bed:'B',transfer_at:'2026-07-12T12:00:00+04:00',transfer_reason:'approved move',payment_method:'cash',corpid:'corp',canonical_source_context:source(),canonical_target_context:target(),fee_mode:'paid',fee_amount_aed:50,...extra});
 const ids = name => name === 'transfer_lineage_id' ? 'lineage-opaque-0001' : 'anchor-opaque-0001';
 
 test('first A to B builds server IDs and exact canonical fields',()=>{const r=buildBedTransferCanonicalLinkAnchor(base(),{idFactory:ids});assert.equal(r.ok,true);assert.equal(r.previous_transfer_anchor_id,null);assert.equal(r.transfer_lineage_id,'lineage-opaque-0001');assert.deepEqual(r.finance_effect,{rent_income:0,deposit_received:0,deposit_refund:0,arrears_repaid:0,expense:0});});

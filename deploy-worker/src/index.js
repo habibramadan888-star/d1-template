@@ -11,6 +11,7 @@ import {
   buildBedTransferCanonicalLinkAnchor
 } from "../../modules/employees/bed-transfer-canonical-link-anchor.mjs";
 import { resolveBedTransferSourceContext } from "../../modules/employees/bed-transfer-source-context-resolver.mjs";
+import { classifyExistingCanonicalTransfer, prepareCanonicalTransferArchiveWrite } from "../../modules/employees/bed-transfer-canonical-archive-write.mjs";
 import { evaluateStayGenesisTrigger } from "../../modules/employees/durable-stay-genesis-trigger.mjs";
 import {
   materializePreparedStayGenesis,
@@ -2693,6 +2694,7 @@ async function validateEmployeeBedTransferCanonicalLink(env,user,entry={},normal
     fee_mode:entry.fee_mode||fee.fee_choice,
     fee_amount_aed:entry.fee_amount_aed??fee.fee_amount,
     fee_due_date:entry.fee_due_date||"",fee_waiver_reason:entry.fee_waiver_reason||fee.waiver_reason||""
+    ,transfer_reason:normalized.transfer_reason||entry.transfer_reason||entry.reason||"",payment_method:fee.payment_method||entry.payment_method||""
   });
 }
 __name(validateEmployeeBedTransferCanonicalLink,"validateEmployeeBedTransferCanonicalLink");
@@ -3274,6 +3276,27 @@ async function handleEmployeeEntryValidate(request,env,user){
   return success({...result,occupancy_candidate_preview:buildEmployeeEntryOccupancyCandidatePreview(user,body)});
 }
 __name(handleEmployeeEntryValidate,"handleEmployeeEntryValidate");
+function employeeBedTransferSingleEntryFailure(body={}){
+  const rows=Array.isArray(body?.session?.entries)&&body.session.entries.length?body.session.entries:(Array.isArray(body?.entries)&&body.entries.length?body.entries:(body?.entry?[body.entry]:[]));
+  if(rows.length!==1||employeeEntryUploadType(rows[0])!=='TF')return employeeEntryValidationFailure('bed_transfer_session_boundary','BED_TRANSFER_SESSION_MUST_BE_SINGLE_ENTRY','Bed Transfer must be the only entry in its canonical session.',{invalid_fields:['session.entries']});
+  return null;
+}
+__name(employeeBedTransferSingleEntryFailure,"employeeBedTransferSingleEntryFailure");
+async function persistEmployeeBedTransferCanonicalArchive(env,user,body,validationResult){
+  const session=body?.session||{},sessionId=cleanId(session.id||session.session_id);
+  const preview=validationResult?.bed_transfer_phase1_preview||{};
+  const base=prepareCanonicalTransferArchiveWrite({validated_anchor:preview,session_id:sessionId,accepted_at:empNow(),operator_reference:cleanText(user?.userid||'',120)});
+  if(!base.ok)return json({success:false,ok:false,error_code:base.error_code,no_write:true},422);
+  const readExisting=()=>env.DB.prepare('SELECT id, entries_json FROM sessions WHERE id=? AND corpid=? LIMIT 1').bind(sessionId,user.corpid).first().catch(()=>null);
+  const existing=await readExisting();
+  if(existing){const classified=classifyExistingCanonicalTransfer(existing.entries_json,base.request_fingerprint);if(classified.status==='conflict')return json({success:false,ok:false,error_code:classified.error_code,no_write:true},409);return success({success:true,ok:true,idempotent:true,already_accepted:true,session_id:sessionId,canonical_entry:classified.entry});}
+  const prepared=prepareCanonicalTransferArchiveWrite({validated_anchor:preview,session_id:sessionId,accepted_at:empNow(),operator_reference:cleanText(user?.userid||'',120)},{idFactory:()=>crypto.randomUUID()});
+  try{
+    await empInsertDynamicMode(env,'sessions',{id:sessionId,corpid:user.corpid,anchor_id:cleanText(session.anchorId||session.anchor_id||prepared.entry.transfer_anchor_id,160),date:cleanDate(session.date||prepared.entry.canonical_accepted_at),entries_count:1,created_by:user.userid,created_at:prepared.entry.canonical_accepted_at,operator_id:user.userid,operator_name:cleanText(user.employee_name||user.userid,120),cash_handover:0,bank_transfer_total:0,bank_transfer_count:0,gross_received:0,handover_status:'COMPLETED',exported_at:prepared.entry.canonical_accepted_at,export_text:'',source:'employee_entry',entries_json:prepared.entries_json,summary_json:JSON.stringify({cash_handover:0,bank_transfer_total:0,bank_transfer_count:0,gross_received:0,balance_total:0})},EMP_SESSION_COLUMNS,'INSERT');
+  }catch(error){const raced=await readExisting();if(!raced)throw error;const classified=classifyExistingCanonicalTransfer(raced.entries_json,base.request_fingerprint);if(classified.status==='conflict')return json({success:false,ok:false,error_code:classified.error_code,no_write:true},409);return success({success:true,ok:true,idempotent:true,already_accepted:true,session_id:sessionId,canonical_entry:classified.entry});}
+  return success({success:true,ok:true,idempotent:false,canonical_write_status:'accepted',session_id:sessionId,canonical_entry:prepared.entry});
+}
+__name(persistEmployeeBedTransferCanonicalArchive,"persistEmployeeBedTransferCanonicalArchive");
 async function handleEmployeeEntry(request,env,user){
   const timingEnabled=request.headers.get("X-Employee-Entry-Timing")==="1";
   const timing={started_at:Date.now(),d1_write_ms:0,total_ms:0};
@@ -3299,9 +3322,13 @@ async function handleEmployeeEntry(request,env,user){
   const entryForWriteGate=employeeEntryValidationEntryFromBody(body||{});
   const writeGateType=employeeEntryUploadType(entryForWriteGate);
   if(["TF","TFF"].includes(writeGateType)&&!bedTransferWriteApproved(env))return bedTransferWriteDisabledResponse();
+  if(["TF","TFF"].includes(writeGateType)){
+    const boundaryFailure=employeeBedTransferSingleEntryFailure(body||{});
+    if(boundaryFailure)return json({success:false,...boundaryFailure},422);
+  }
   if(!await empTableExists(env,"sessions")||!await empTableExists(env,"transactions"))return errorResponse("employee_entry_schema_not_ready",503,"employee_entry_schema_not_ready");
   body=normalizeEmployeeEntryBodyForValidation(body||{});
-  const validationResult=await validateEmployeeEntryUploadPayload(env,user,body,{event_index:body?.event_index});
+  const validationResult=await validateEmployeeEntryUploadPayload(env,user,body,{event_index:body?.event_index,canonical_transfer_link_anchor:["TF","TFF"].includes(writeGateType)});
   if(!validationResult.ok)return json({success:false,...validationResult},422);
   if(validationResult.idempotent){
     const entry=body?.entry||{};
@@ -3628,6 +3655,7 @@ async function handleEmployeeEntry(request,env,user){
       },202);
     }
   }
+  if(["TF","TFF"].includes(writeGateType))return persistEmployeeBedTransferCanonicalArchive(env,user,body,validationResult);
   timing.d1_write_ms=Date.now()-d1WriteStart;
   timing.total_ms=Date.now()-timing.started_at;
   return success({

@@ -39,6 +39,7 @@ function validateFee(input) {
   const amount = money(input.fee_amount_aed);
   if (!['paid', 'waived', 'unpaid'].includes(mode)) return fail('BED_TRANSFER_FEE_MODE_INVALID', ['fee_mode']);
   if (mode === 'paid' && amount !== 50) return fail('BED_TRANSFER_FEE_AMOUNT_INVALID', ['fee_amount_aed']);
+  if (mode === 'paid' && !clean(input.payment_method)) return fail('BED_TRANSFER_PAYMENT_METHOD_REQUIRED', [], ['payment_method']);
   if (mode === 'waived' && amount !== 0) return fail('BED_TRANSFER_FEE_AMOUNT_INVALID', ['fee_amount_aed']);
   if (mode === 'waived' && !clean(input.fee_waiver_reason)) return fail('BED_TRANSFER_FEE_WAIVER_REASON_REQUIRED', [], ['fee_waiver_reason']);
   if (mode === 'unpaid' && amount !== 50) return fail('BED_TRANSFER_FEE_AMOUNT_INVALID', ['fee_amount_aed']);
@@ -69,6 +70,7 @@ export function buildBedTransferCanonicalLinkAnchor(input = {}, options = {}) {
   if (carried.some(ref => !ref) || unique(carried).length !== carried.length) return fail('BED_TRANSFER_ARREARS_REFS_INVALID', ['open_arrears']);
   const fee = validateFee(input);
   if (!fee.ok) return fee;
+  if (!clean(input.transfer_reason)) return fail('BED_TRANSFER_REASON_REQUIRED', [], ['transfer_reason']);
   const active = input.active_lineage || null;
   if (active && bed(active.current_bed) !== fromBed) return fail('BED_TRANSFER_LINEAGE_DISCONTINUOUS', ['from_bed']);
   if (active && (!exactOpaque(active.transfer_lineage_id) || !exactOpaque(active.last_active_transfer_anchor_id))) return fail('BED_TRANSFER_PREVIOUS_ANCHOR_INVALID', ['active_lineage']);
@@ -89,6 +91,8 @@ export function buildBedTransferCanonicalLinkAnchor(input = {}, options = {}) {
     fee_mode: fee.mode, fee_amount_aed: fee.amount,
     fee_due_date: fee.mode === 'unpaid' ? clean(input.fee_due_date) : '',
     fee_waiver_reason: fee.mode === 'waived' ? clean(input.fee_waiver_reason) : '',
+    transfer_reason: clean(input.transfer_reason), payment_method: clean(input.payment_method),
+    snapshot_fingerprint: clean(source.snapshot_fingerprint),
     finance_effect: { rent_income: 0, deposit_received: 0, deposit_refund: 0, arrears_repaid: 0, expense: 0 },
     id_generation: transferAnchorId && lineageId ? 'server_generated_preview' : 'server_generated_on_write',
     readonly: true, no_write: true
