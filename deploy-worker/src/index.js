@@ -8199,6 +8199,17 @@ function bedTransferWriteApproved(env={}){
   return String(env?.BED_TRANSFER_WRITE_APPROVED??"").trim()==="true";
 }
 __name(bedTransferWriteApproved,"bedTransferWriteApproved");
+function bedTransferDeploymentCapabilities(env={}){
+  return {
+    bed_transfer_validate_enabled:true,
+    bed_transfer_write_enabled:bedTransferWriteApproved(env),
+    owner_waiver_ack_enabled:ownerTodayTodoAcknowledgmentWriteEnabled(env),
+    canonical_write_path:"/api/employee/entry",
+    production_cutover:"PRODUCTION_NO_GO",
+    app_version:cleanText(env.APP_VERSION||"",40)
+  };
+}
+__name(bedTransferDeploymentCapabilities,"bedTransferDeploymentCapabilities");
 function bedTransferWriteDisabledResponse(){
   return json({
     success:false,
@@ -10976,6 +10987,9 @@ async function handleRequest(request, env, ctx) {
       return authFailureResponse(auth);
     }
     const user = auth.payload;
+    if(path==="/api/capabilities"&&method==="GET"){
+      return success(bedTransferDeploymentCapabilities(env));
+    }
     if (path === "/api/owner/corrections/preview" && method === "POST") {
       return handleOwnerCorrectionPreview(request, env, user);
     }
@@ -11612,4 +11626,3 @@ var index_default = {
 export {
   index_default as default
 };
-//# sourceMappingURL=index.js.map

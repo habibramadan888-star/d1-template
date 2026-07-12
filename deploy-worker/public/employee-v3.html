@@ -3229,7 +3229,7 @@ function readSessionId(userid){
   try{return localStorage.getItem(employeeStorageKey('empv3:sessionId',userid))||''}
   catch{return ''}
 }
-const state={lockCards:[],current:null,depositBalance:null,depositContext:null,rentConfig:{},rentConfigLoaded:false,drafts:[],tasks:[],closedTasks:[],arrearsTasksLoaded:false,arrearTasksError:null,arrearsGatewaySource:'',arrearsGatewayProof:null,employeeDirectives:[],followupItems:[],systemReminderItems:[],systemReminderStatus:'idle',systemReminderSummary:null,systemReminderSources:null,systemReminderLimit:100,sessionId:'',user:null,ttlockStatus:'idle',ttlockLoadedAt:0,ttlockError:'',ttlockDataSource:'',bedTransferContext:{status:'idle',source:null,target:null,requestKey:'',serverValidation:null}};
+const state={lockCards:[],current:null,depositBalance:null,depositContext:null,rentConfig:{},rentConfigLoaded:false,drafts:[],tasks:[],closedTasks:[],arrearsTasksLoaded:false,arrearTasksError:null,arrearsGatewaySource:'',arrearsGatewayProof:null,employeeDirectives:[],followupItems:[],systemReminderItems:[],systemReminderStatus:'idle',systemReminderSummary:null,systemReminderSources:null,systemReminderLimit:100,sessionId:'',user:null,ttlockStatus:'idle',ttlockLoadedAt:0,ttlockError:'',ttlockDataSource:'',bedTransferCapabilities:{status:'idle',bed_transfer_validate_enabled:false,bed_transfer_write_enabled:false,owner_waiver_ack_enabled:false,canonical_write_path:'/api/employee/entry',production_cutover:'PRODUCTION_NO_GO'},bedTransferContext:{status:'idle',source:null,target:null,requestKey:'',serverValidation:null}};
 const BED_TRANSFER_WRITE_ENABLED=false;
 const BED_TRANSFER_EVENT_LEDGER_MESSAGE='Bed transfer records save event anchors only. This does not directly change bed occupancy, deposit, arrears, or Access Card. 换床记录只保存信息锚点，不会直接改变床位、押金、欠款或门禁卡。';
 const BED_TRANSFER_SUBMITTED_MESSAGE='Bed transfer recorded / 换床记录已保存';
@@ -3269,6 +3269,23 @@ async function fetchCurrentAuthUser(){
   if(r.status===401||r.status===403)return null;
   if(!r.ok)throw new Error('me_failed_'+r.status);
   return unwrapStandardResponse(await r.json());
+}
+function employeeBedTransferWriteEnabled(){
+  return state.bedTransferCapabilities?.status==='success'&&state.bedTransferCapabilities?.bed_transfer_write_enabled===true;
+}
+async function employeeLoadBedTransferCapabilities(){
+  state.bedTransferCapabilities={...state.bedTransferCapabilities,status:'loading',bed_transfer_write_enabled:false};
+  try{
+    const r=await apiFetch('/api/capabilities',{method:'GET'});
+    const data=r.ok?unwrapStandardResponse(await r.json()):null;
+    if(!data||typeof data.bed_transfer_write_enabled!=='boolean')throw new Error('CAPABILITY_RESPONSE_INVALID');
+    state.bedTransferCapabilities={status:'success',bed_transfer_validate_enabled:data.bed_transfer_validate_enabled===true,bed_transfer_write_enabled:data.bed_transfer_write_enabled===true,owner_waiver_ack_enabled:data.owner_waiver_ack_enabled===true,canonical_write_path:String(data.canonical_write_path||'/api/employee/entry'),production_cutover:String(data.production_cutover||'PRODUCTION_NO_GO')};
+  }catch{
+    state.bedTransferCapabilities={...state.bedTransferCapabilities,status:'error',bed_transfer_write_enabled:false,owner_waiver_ack_enabled:false,production_cutover:'PRODUCTION_NO_GO'};
+  }
+  updateEntrySessionActionState();
+  validate();
+  return state.bedTransferCapabilities;
 }
 function clearEmployeeLegacyAuthState(){
   ['empv3:user','empv3:operator','homelink:cloud_token','homelink:role','homelink:user','owner:role','owner:user'].forEach(k=>{
@@ -3320,7 +3337,7 @@ function employeeDisplayName(user){
 }
 function toast(msg,duration=2600){const el=$('toast');el.textContent=msg;el.style.display='block';clearTimeout(window.__toast);window.__toast=setTimeout(()=>el.style.display='none',duration)}
 function isBedTransferWriteGated(type=$('entryType')?.value){
-  return type==='TF'&&!BED_TRANSFER_WRITE_ENABLED;
+  return type==='TF'&&!employeeBedTransferWriteEnabled();
 }
 function bedTransferWriteGateHtml(){
   return `<div class="warn">${esc(BED_TRANSFER_WRITE_DISABLED_MESSAGE)}</div>`;
@@ -3516,6 +3533,7 @@ function applyEmployeeUser(user){
     loadRentConfig();
     loadTasks(false);
     loadEmployeeArrearsDirectives(false);
+    employeeLoadBedTransferCapabilities();
     setTimeout(()=>reconcileEmployeeCloudSyncState({silent:true}),0);
     if(!$('view-entry')?.classList.contains('hidden'))ensureEntryTtlockReady({auto:true});
   }else{
@@ -5076,6 +5094,14 @@ updateEntrySessionActionState=function(){
   }
   const exportBtn=$('btnExportSession');
   if(exportBtn&&exportBtn.dataset.busy!=='1'){
+    const transferWriteBlocked=state.drafts.some(entry=>entry.type==='TF'&&!employeeEntryCloudConfirmed(entry))&&!employeeBedTransferWriteEnabled();
+    if(transferWriteBlocked){
+      exportBtn.innerHTML=renderEmployeeButtonLabel('Upload Disabled','Bed Transfer validation only');
+      exportBtn.disabled=true;
+      exportBtn.classList.add('disabled');
+      exportBtn.title=BED_TRANSFER_WRITE_DISABLED_MESSAGE;
+      return;
+    }
     if(uploaded&&hasRows){
       exportBtn.innerHTML=renderEmployeeButtonLabel('Done','Upload Complete');
       exportBtn.disabled=true;
@@ -7910,6 +7936,12 @@ async function commitSessionAndExport(){
   if(!state.drafts.length){
     showStatus('Current Session has no entries. Upload is not available. / 当前本票没有流水，不能上传。','warn');
     toast('Current Session has no entries / 当前本票没有流水',6000);
+    return;
+  }
+  if(state.drafts.some(entry=>entry.type==='TF'&&!employeeEntryCloudConfirmed(entry))&&!employeeBedTransferWriteEnabled()){
+    showStatus(BED_TRANSFER_WRITE_DISABLED_MESSAGE,'warn');
+    toast(BED_TRANSFER_WRITE_DISABLED_MESSAGE,7000);
+    updateEntrySessionActionState();
     return;
   }
   await reconcileEmployeeCloudSyncState({silent:true});

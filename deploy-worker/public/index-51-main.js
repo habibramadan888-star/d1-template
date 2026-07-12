@@ -126,6 +126,18 @@ async function fetchCurrentAuthUser(){
   if(!r.ok)throw new Error('me_failed_'+r.status);
   return unwrapStandardResponse(await r.json());
 }
+function ownerWaiverAckCapabilityEnabled(){return state.ownerCapabilities?.status==='success'&&state.ownerCapabilities?.owner_waiver_ack_enabled===true;}
+async function loadOwnerCapabilities(){
+  state.ownerCapabilities={...state.ownerCapabilities,status:'loading',owner_waiver_ack_enabled:false};
+  try{
+    const data=await ownerGatewayJson('/api/capabilities',{method:'GET'},8000);
+    if(!data||typeof data.owner_waiver_ack_enabled!=='boolean')throw new Error('CAPABILITY_RESPONSE_INVALID');
+    state.ownerCapabilities={status:'success',owner_waiver_ack_enabled:data.owner_waiver_ack_enabled===true,bed_transfer_write_enabled:data.bed_transfer_write_enabled===true,production_cutover:String(data.production_cutover||'PRODUCTION_NO_GO')};
+  }catch{
+    state.ownerCapabilities={status:'error',owner_waiver_ack_enabled:false,bed_transfer_write_enabled:false,production_cutover:'PRODUCTION_NO_GO'};
+  }
+  return state.ownerCapabilities;
+}
 function ownerAuthElements(){
   return {
     overlay:document.getElementById('lockOverlay'),
@@ -310,6 +322,7 @@ async function submitCode(){
 async function enterAs(r){
   role=toOwnerSpaRole(r);
   showOwnerAppShell(role);
+  await loadOwnerCapabilities();
   const initialView=defaultViewForRole();
   try{switchView(initialView);}catch(e){console.error('[OwnerBootstrap] initial shell render failed:',e);}
   try{
@@ -854,7 +867,7 @@ const state={
   arrearsSourceStatus:{},arrearsPoolResult:null,arrearsSummary:{},arrearsPagination:{},
   arrearsSlowTimer:null,
   overviewComparative:null,overviewComparativeStatus:'idle',overviewComparativeError:'',ownerFinance:null,ownerFinanceStatus:'idle',ownerFinanceError:'',
-  ownerTodayTodos:null,ownerTodayTodosStatus:'idle',ownerTodayTodosError:'',
+  ownerTodayTodos:null,ownerTodayTodosStatus:'idle',ownerTodayTodosError:'',ownerCapabilities:{status:'idle',owner_waiver_ack_enabled:false,bed_transfer_write_enabled:false,production_cutover:'PRODUCTION_NO_GO'},
   presetPrices:DEFAULT_PRICES,
   customers:[],
   anaOpen:{session:false,finance:false,people:false,continuity:false,tx:false},
@@ -5376,12 +5389,13 @@ function ownerBedTransferTodoRowHtml(row){
   const code=String(row?.task_type||'');
   const transfer=`${row?.from_bed||'-'} → ${row?.to_bed||'-'}`;
   if(code==='BED_TRANSFER_TTLOCK_MOVE_REQUIRED')return `<div class="hist-card" data-owner-bed-transfer-todo="ttlock"><div class="hist-title">TTLock 换床移动待办 · ${esc(transfer)}</div><div class="hist-stat"><span>员工提交时间</span><b>${esc(row.transfer_at||'-')}</b></div><div class="hist-stat"><span>来源床当前状态</span><span>${esc(ownerTodoPhysicalSummary(row.current_source_physical_state||{}))}</span></div><div class="hist-stat"><span>目标床当前状态</span><span>${esc(ownerTodoPhysicalSummary(row.current_target_physical_state||{}))}</span></div><div class="hist-anchor">请老板将 TTLock 信息从 ${esc(row.from_bed||'-')} 移到 ${esc(row.to_bed||'-')}。${(row.warnings||[]).length?` Warning: ${esc(row.warnings.join(' · '))}`:''}</div></div>`;
-  if(code==='BED_TRANSFER_FEE_WAIVER_REVIEW_REQUIRED')return `<div class="hist-card" data-owner-bed-transfer-todo="waiver"><div class="hist-title">换床费免责声明已读 · ${esc(transfer)}</div><div class="hist-stat"><span>免责声明原因</span><b>${esc(row.fee_waiver_reason||'-')}</b></div><div class="hist-stat"><span>员工 / Operator</span><span>${esc(row.operator_reference||'-')}</span></div><div class="hist-stat"><span>时间</span><span>${esc(row.transfer_at||'-')}</span></div>${isOwnerWriteRole()?`<button class="btn btn-primary" type="button" data-owner-waiver-ack="${esc(row.transfer_anchor_id||'')}">已读</button>`:'<div class="hist-anchor">只读账号不能确认已读。</div>'}</div>`;
+  if(code==='BED_TRANSFER_FEE_WAIVER_REVIEW_REQUIRED')return `<div class="hist-card" data-owner-bed-transfer-todo="waiver"><div class="hist-title">换床费免责声明已读 · ${esc(transfer)}</div><div class="hist-stat"><span>免责声明原因</span><b>${esc(row.fee_waiver_reason||'-')}</b></div><div class="hist-stat"><span>员工 / Operator</span><span>${esc(row.operator_reference||'-')}</span></div><div class="hist-stat"><span>时间</span><span>${esc(row.transfer_at||'-')}</span></div>${isOwnerWriteRole()&&ownerWaiverAckCapabilityEnabled()?`<button class="btn btn-primary" type="button" data-owner-waiver-ack="${esc(row.transfer_anchor_id||'')}">已读</button>`:'<div class="hist-anchor">已读确认写入未启用；当前只读。</div>'}</div>`;
   if(code==='BED_TRANSFER_VOID_FINANCIAL_RECONCILIATION_REQUIRED')return `<div class="hist-card" data-owner-bed-transfer-todo="financial" style="border-color:var(--red)"><div class="hist-title">⚠ 原换床票已 void · ${esc(transfer)}</div><div class="hist-stat"><span>Effective income</span><b>${fmtMoney(row.effective_income_amount||0)} AED</b></div><div class="hist-anchor">系统 effective income 已归零；现金退款/核对尚未确认。不会自动退款，也不会由 UI 标记 resolved。</div></div>`;
   return `<div class="detail-row owner-mobile-row"><div class="room">${esc(row.bed||'-')}</div><div class="note"><b>${esc(row.title||row.task_type||'-')}</b><div>${esc(row.description||'')}</div><div>Action: ${esc(row.recommended_action||'-')}</div><div>Type: ${esc(row.task_type||'-')} / Source: ${esc(row.source_gateway||'-')}</div></div><div class="amount">${esc(row.severity||'-')}<br><span style="font-size:11px;color:var(--color-text-muted)">${esc(row.status||'open')}</span></div></div>`;
 }
 function bindOwnerWaiverAckButtons(){document.querySelectorAll('[data-owner-waiver-ack]').forEach(button=>button.onclick=()=>acknowledgeOwnerBedTransferWaiver(button.dataset.ownerWaiverAck));}
 async function acknowledgeOwnerBedTransferWaiver(transferAnchorId){
+  if(!ownerWaiverAckCapabilityEnabled()){toast('老板已读写入尚未启用','err',7000);return false;}
   if(state.ownerTodayTodosStatus!=='success'){toast('待办数据不是最新状态，不能确认已读。','err',7000);return false;}
   const id=String(transferAnchorId||'').trim();if(!id)return false;
   const button=[...document.querySelectorAll('[data-owner-waiver-ack]')].find(node=>node.dataset.ownerWaiverAck===id);if(button){button.disabled=true;button.textContent='提交中...';}

@@ -47,7 +47,9 @@ const replacement = `  if (env.ASSETS) {
   if (embeddedResponse) return embeddedResponse;
   return new Response("Homelink Finance API is running. Use /auth/login for authentication.", {`;
 
-const generated = embeddedHelper + original.replace(marker, replacement);
+const sourceMarker = original.includes(marker) ? marker : marker.replace(/\n/g, "\r\n");
+const sourceReplacement = sourceMarker === marker ? replacement : replacement.replace(/\n/g, "\r\n");
+const generated = embeddedHelper + original.replace(sourceMarker, sourceReplacement);
 if (!generated.includes("const embeddedResponse = embeddedAssetResponse(path);")) {
   throw new Error("embedded fallback injection failed");
 }
