@@ -4,7 +4,7 @@ import test from "node:test";
 
 const htmlPath = "deploy-worker/public/employee-v3.html";
 
-test("Bed Transfer UI exposes explicit from/to/date/reason fields", async () => {
+test("Bed Transfer UI exposes explicit from/to/reason fields without editable time", async () => {
   const html = await readFile(htmlPath, "utf8");
 
   assert.match(html, /data-type="TF"/);
@@ -12,27 +12,24 @@ test("Bed Transfer UI exposes explicit from/to/date/reason fields", async () => 
   assert.match(html, /data-bed-transfer-from="true"/);
   assert.match(html, /id="bedTo"/);
   assert.match(html, /data-bed-transfer-to="true"/);
-  assert.match(html, /id="transferDate"/);
-  assert.match(html, /data-bed-transfer-date="true"/);
+  assert.doesNotMatch(html, /id="transferDate"/);
+  assert.doesNotMatch(html, /data-bed-transfer-date="true"/);
   assert.match(html, /id="transferReason"/);
   assert.match(html, /data-bed-transfer-reason="true"/);
   assert.match(html, /id="transferReviewPanel"/);
 });
 
-test("Bed Transfer payload carries accounting and trace anchors", async () => {
+test("Bed Transfer payload carries only employee business fields", async () => {
   const html = await readFile(htmlPath, "utf8");
-
-  assert.match(
-    html,
-    /bed_from:\(\$\(\'transferFromBed\'\)\.value\.trim\(\)\|\|\$\(\'bed\'\)\.value\.trim\(\)\)/
-  );
-  assert.match(html, /bed_to:\$\(\'bedTo\'\)\.value\.trim\(\)/);
-  assert.match(html, /transfer_date:\$\(\'transferDate\'\)\.value/);
-  assert.match(html, /transfer_reason:\$\(\'transferReason\'\)\.value/);
-  assert.match(html, /carry_over_arrears/);
-  assert.match(html, /deposit_carried/);
-  assert.match(html, /old_ttlock_ref/);
-  assert.match(html, /rent_difference/);
+  const start = html.indexOf("function buildBedTransferAnchor");
+  const end = html.indexOf("\nfunction ", start + 10);
+  const builder = html.slice(start, end);
+  assert.match(builder, /from_bed:from/);
+  assert.match(builder, /to_bed:to/);
+  assert.match(builder, /transfer_reason:employeeTrimField\('transferReason'\)/);
+  assert.match(builder, /fee_mode:feeMode/);
+  assert.match(builder, /bed_price_difference_mode:differenceMode/);
+  assert.doesNotMatch(builder, /transfer_date|carry_over_arrears|deposit_carried|old_ttlock_ref|rent_difference/);
 });
 
 test("Bed Transfer validation blocks missing or equal from/to beds", async () => {

@@ -2588,7 +2588,6 @@ function validateBedTransferUploadFields(entry,normalized,eventIndex,anchorPrevi
   const toBed=cleanText(normalized.to_bed||entry.to_bed||entry.bed_to||entry.roomTo||"",40).replace(/^#+/,"");
   if(!employeeEntryUploadHasValue(fromBed))missing.push("from_bed");
   if(!employeeEntryUploadHasValue(toBed))missing.push("to_bed");
-  if(!employeeEntryUploadHasValue(normalized.transfer_date||entry.transfer_date))missing.push("transfer_date");
   if(!employeeEntryUploadHasValue(normalized.transfer_reason||entry.transfer_reason||entry.reason||entry.custom_reason||entry.note))missing.push("transfer_reason");
   if(missing.length)return employeeEntryValidationFailure("bed_transfer_event_validation","BED_TRANSFER_REQUIRED_FIELD_MISSING","Bed Transfer entry is missing required fields.",{event_index:eventIndex,event_type:"bed_transfer",missing_fields:missing,anchor_preview:anchorPreview});
   if(fromBed===toBed)return employeeEntryValidationFailure("bed_transfer_validation","BED_TRANSFER_SAME_BED_NOT_ALLOWED","From Bed and To Bed must be different.",{event_index:eventIndex,event_type:"bed_transfer",invalid_fields:["from_bed","to_bed"],anchor_preview:{...anchorPreview,from_bed:fromBed,to_bed:toBed}});
@@ -2701,7 +2700,7 @@ async function validateEmployeeBedTransferCanonicalLink(env,user,entry={},normal
   const target={corpid:user?.corpid||"",physical_bed_status:targetGateway?.occupancy_gateway?.physical_bed_status||"unknown",parsed_vacancy_marker:targetAccess.parsed_vacancy_marker===true,snapshot_fingerprint:targetAccess.snapshot_fingerprint,candidate_count:targetAccess.candidate_count??1,ambiguous:targetAccess.ambiguous===true,conflict:targetAccess.conflict===true,stale:targetAccess.stale===true,parse_status:targetAccess.parse_status||"parsed",parsed_deposit_amount:targetAccess.parsed_deposit_amount,parsed_checkin_mmdd:targetAccess.parsed_checkin_mmdd,parsed_valid_until_mmdd:targetAccess.parsed_valid_until_mmdd,normalized_expiry_value:targetAccess.normalized_expiry_value};
   return buildBedTransferCanonicalLinkAnchor({
     client_payload:entry,from_bed:fromBed,to_bed:toBed,
-    transfer_at:normalized.transfer_date||entry.transfer_date||entry.transfer_at||"",
+    transfer_at:empNow(),
     corpid:user?.corpid||"",canonical_source_context:source,canonical_target_context:target,
     active_lineage:source.active_lineage||null,
     fee_mode:entry.fee_mode||fee.fee_choice,
@@ -2895,7 +2894,15 @@ function bedTransferForbiddenIdentityFieldsFromBody(body={}){
   Object.entries(body||{}).forEach(([key,value])=>{
     if(!["entry","entries","session"].includes(key))topLevel[key]=value;
   });
-  return findBedTransferForbiddenIdentityFields([topLevel,...transferRows]);
+  const timestampKeys=new Set(["transferat","transferdate","canonicalacceptedat","acceptedat"]),timestamps=new Set(),seen=new Set();
+  const collectTimestamps=value=>{
+    if(!value||typeof value!=="object"||seen.has(value))return;
+    seen.add(value);
+    if(Array.isArray(value))value.forEach(collectTimestamps);
+    else Object.entries(value).forEach(([field,child])=>{if(timestampKeys.has(String(field||"").replace(/[^a-z0-9]/gi,"").toLowerCase()))timestamps.add(field);collectTimestamps(child);});
+  };
+  collectTimestamps(body);
+  return [...new Set([...findBedTransferForbiddenIdentityFields([topLevel,...transferRows]),...timestamps])].sort((a,b)=>a.localeCompare(b));
 }
 __name(bedTransferForbiddenIdentityFieldsFromBody,"bedTransferForbiddenIdentityFieldsFromBody");
 function bedTransferForbiddenIdentityFailure(body={},eventIndex=0){
@@ -3283,6 +3290,8 @@ async function validateEmployeeEntryUploadPayload(env,user,body,opts={}){
     anchor_types:sessionAnchorEntries.map(row=>row.event_type||entryAnchorEventType(entryAnchorType(row))),
     anchor_preview:anchorPreview,
     bed_transfer_phase1_preview:bedTransferPhase1Preview,
+    no_write_requested:["TF","TFF"].includes(type),
+    write_attempted:false,
     normalized_entry:normalized,
     derived_arrears_payment:derivedArrearsPayment,
     ...(stayGenesis.requested?{
@@ -3764,7 +3773,7 @@ const entryAnchorContract={
   DR:["event_type","bed","deposit_balance","refund_amount","payment_method","refund_method","refund_date","refund_reason","deposit_remaining_after_refund","owner_override_ref","arrears_offset_ref","arrears_offset_amount","checkout_ref","note","operator","created_at"],
   CO:["event_type","bed","checkout_date","deposit_refund","outstanding_arrears","owner_approval_required","owner_approval_status","checkout_mode","left_with_arrears","customer_left","former_customer_name","whatsapp_phone","contact_method","contact_note","arrears_amount","cloud_arrears_ref","belongings_held","belongings_note","promised_payment_date","promised_return_date","deposit_balance","left_status","final_status","final_note","ttlock_context","operator","created_at"],
   E:["event_type","expense_amount","expense_category","target_bed","reason","note","payment_method","evidence_ref","operator","created_at"],
-  TF:["event_type","from_bed","to_bed","transfer_date","transfer_reason","deposit_balance_carryover","arrears_carryover","rent_coverage_carryover","fee_amount","fee_amount_aed","fee_status","fee_mode","fee_due_date","payment_method","waiver_reason","fee_waiver_reason","fee_waived_reason","bed_price_difference_mode","bed_price_difference_amount_aed","bed_price_difference_due_date","bed_price_difference_payment_method","bed_price_difference_reason","old_tenant_context","old_ttlock_context","note","operator","created_at"]
+  TF:["event_type","from_bed","to_bed","transfer_reason","fee_amount_aed","fee_mode","fee_due_date","payment_method","fee_waiver_reason","bed_price_difference_mode","bed_price_difference_amount_aed","bed_price_difference_due_date","bed_price_difference_payment_method","bed_price_difference_reason","note","operator","created_at"]
 };
 const employeeSourceFirewallForbiddenFields=["card_id","cardid","tenant_card_id","tenantCardId","old_ttlock_ref","oldTtlockRef","provider_phone","providerPhone","ttlock_phone","ttlockPhone","phone_99099","phone99099","access_card_phone","accessCardPhone","ttlock_account_phone","ttlockAccountPhone","ttlock_context","old_ttlock_context","provider_metadata","ttlock_metadata","card_provider_metadata"];
 const employeeSourceFirewallAllowedFields={
@@ -3774,7 +3783,7 @@ const employeeSourceFirewallAllowedFields={
   DR:["id","entry_id","event_id","anchor_id","session_id","type","event_type","source","cat","room","bed","amount","deposit_balance","actual_refund_amount","refund_amount","refund_difference","deposit_remaining_after_refund","payment_method","pay_type","refund_method","refund_date","refund_reason","difference_reason","owner_override_ref","override_reason","arrears_offset_ref","arrears_offset_amount","checkout_ref","open_arrears_amount","outstanding_arrears","owner_approval_required","owner_approval_status","raw_display_line","anchor_contract_version","validation_status","validation_missing_fields","operator","operator_id","operator_name","employee","created_at","ts","note","remark","status","src","sync_status","upload_status","cloud_sync_status","cloud_sync_checked_at","upload_validation_error","upload_validation_error_code","sync_error","cloud_entry_id","upload_attempt_id","idempotency_key","original_local_entry_id"],
   CO:["id","entry_id","event_id","anchor_id","session_id","type","event_type","source","cat","room","bed","amount","checkout_date","checkout_type","deposit_refund","deposit_balance","outstanding_arrears","open_arrears_amount","owner_approval_required","owner_approval_status","checkout_mode","left_with_arrears","customer_left","former_customer_ref","former_customer_name","card_name","whatsapp_phone","former_customer_phone","contact_method","contact_note","arrears_amount","left_arrears_amount","cloud_arrears_ref","belongings_held","belongings_note","coverage_end_date","card_end_date","rent_coverage_end","promised_payment_date","promised_return_date","promise_return_date","left_date","checkout_attempt_date","left_status","final_status","overdue_days","grace_days_after_promise","review_date","confirmed_not_returning_date","confirmed_not_returning_by","confirmation_note","original_session_id","original_event_id","final_note","raw_display_line","anchor_contract_version","validation_status","validation_missing_fields","operator","operator_id","operator_name","employee","created_at","ts","note","remark","status","src","sync_status","upload_status","cloud_sync_status","cloud_sync_checked_at","upload_validation_error","upload_validation_error_code","sync_error","cloud_entry_id","upload_attempt_id","idempotency_key","original_local_entry_id","ttlock_context"],
   E:["id","entry_id","event_id","anchor_id","session_id","type","event_type","source","cat","room","bed","amount","expense_amount","expense_category","target_bed","reason","expense_desc","evidence_ref","receipt_ref","payment_method","pay_type","bank_ref","raw_display_line","anchor_contract_version","validation_status","validation_missing_fields","operator","operator_id","operator_name","employee","created_at","ts","note","remark","status","src","sync_status","upload_status","cloud_sync_status","cloud_sync_checked_at","upload_validation_error","upload_validation_error_code","sync_error","cloud_entry_id","upload_attempt_id","idempotency_key","original_local_entry_id"],
-  TF:["id","entry_id","event_id","anchor_id","session_id","type","event_type","source","cat","room","bed","roomTo","room_to","bed_from","bed_to","from_bed","to_bed","amount","fee_amount","fee_amount_aed","fee_status","fee_paid","fee_mode","fee_due_date","payment_method","pay_type","bank_ref","waiver_reason","fee_waiver_reason","fee_waived_reason","bed_price_difference_mode","bed_price_difference_amount_aed","bed_price_difference_due_date","bed_price_difference_payment_method","bed_price_difference_reason","transfer_date","transfer_reason","transfer_validation_status","deposit_balance_carryover","deposit_carried","arrears_carryover","carry_over_arrears","rent_coverage_carryover","rent_difference","old_tenant_context","old_ttlock_context","raw_display_line","anchor_contract_version","validation_status","validation_missing_fields","operator","operator_id","operator_name","employee","created_at","ts","note","remark","status","src","sync_status","upload_status","cloud_sync_status","cloud_sync_checked_at","upload_validation_error","upload_validation_error_code","sync_error","cloud_entry_id","upload_attempt_id","idempotency_key","original_local_entry_id"]
+  TF:["id","entry_id","event_id","anchor_id","session_id","type","event_type","source","from_bed","to_bed","transfer_reason","fee_amount_aed","fee_amount_fils","fee_mode","fee_due_date","payment_method","fee_waiver_reason","bed_price_difference_mode","bed_price_difference_amount_aed","bed_price_difference_due_date","bed_price_difference_payment_method","bed_price_difference_reason","operator","operator_id","operator_name","employee","created_at","note","remark","sync_status","upload_status","cloud_sync_status","cloud_sync_checked_at","upload_validation_error","upload_validation_error_code","sync_error","cloud_entry_id","upload_attempt_id","idempotency_key","original_local_entry_id","anchor_contract_version","validation_status","validation_missing_fields","raw_display_line"]
 };
 function entryAnchorType(row){
   const raw=String(row?.type||"").trim().toUpperCase();
@@ -3793,10 +3802,9 @@ function normalizeEmployeeEntryForValidation(eventType,entry){
   Object.keys(copy).forEach(field=>{
     const lower=String(field||"").toLowerCase();
     const providerLike=lower.includes("ttlock")||lower.includes("provider")||lower.includes("card_id")||lower.includes("tenantcard")||lower.includes("99099");
-    if(providerLike&&!allowed.has(field))delete copy[field];
+    if((type==="TF"&&!allowed.has(field))||(providerLike&&!allowed.has(field)))delete copy[field];
   });
   if(type==="R"||type==="CO")copy.ttlock_context="";
-  if(type==="TF")copy.old_ttlock_context="";
   return copy;
 }
 __name(normalizeEmployeeEntryForValidation,"normalizeEmployeeEntryForValidation");
@@ -8195,7 +8203,12 @@ function bedTransferWriteDisabledResponse(){
   return json({
     success:false,
     ok:false,
+    error_code:"BED_TRANSFER_WRITE_NOT_ENABLED",
+    event_type:"bed_transfer",
     error:"bed_transfer_write_disabled_phase1_safety",
+    message:"Formal Bed Transfer upload is not enabled.",
+    message_zh:"换床正式上传尚未启用。",
+    write_attempted:false,
     dry_run_only:true,
     validate_endpoint:"/api/employee/entry/validate",
     production_cutover:"PRODUCTION_NO_GO"
