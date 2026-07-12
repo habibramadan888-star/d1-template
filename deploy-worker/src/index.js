@@ -12,6 +12,7 @@ import {
 } from "../../modules/employees/bed-transfer-canonical-link-anchor.mjs";
 import { resolveBedTransferSourceContext } from "../../modules/employees/bed-transfer-source-context-resolver.mjs";
 import { classifyExistingCanonicalTransfer, prepareCanonicalTransferArchiveWrite } from "../../modules/employees/bed-transfer-canonical-archive-write.mjs";
+import { projectOwnerHistoryTransferLineage } from "../../modules/owner-history/bed-transfer-lineage-projection.mjs";
 import { evaluateStayGenesisTrigger } from "../../modules/employees/durable-stay-genesis-trigger.mjs";
 import {
   materializePreparedStayGenesis,
@@ -8382,6 +8383,78 @@ async function canonicalOwnerHistorySessionRowsForList(env,user,rows=[]){
   return Promise.all((rows||[]).map(row=>canonicalOwnerHistorySessionRowForList(env,user,row)));
 }
 __name(canonicalOwnerHistorySessionRowsForList,"canonicalOwnerHistorySessionRowsForList");
+function ownerHistoryTransferLineageRequestedBed(url){
+  return cleanText(url?.searchParams?.get("requested_bed")||url?.searchParams?.get("bed")||"",160);
+}
+__name(ownerHistoryTransferLineageRequestedBed,"ownerHistoryTransferLineageRequestedBed");
+function ownerHistoryTransferLineageAnchorRef(row={}){
+  return cleanText(row.transfer_anchor_id||row.anchor_ref||row.anchor_id||row.event_id||row.entry_ref||row.entry_id||row.id||"",180);
+}
+__name(ownerHistoryTransferLineageAnchorRef,"ownerHistoryTransferLineageAnchorRef");
+function ownerHistoryTransferLineageArchiveEntries(sessions=[],corpid=""){
+  const entries=[];
+  for(const session of sessions||[]){
+    const archiveState=canonicalOwnerHistoryArchiveState(session);
+    for(const anchor of extractEmployeeEntryAnchorsFromSession(session)){
+      entries.push({
+        ...anchor,
+        corpid:cleanText(session.corpid||corpid,120),
+        property_id:cleanText(session.property_id||anchor.property_id||"",120),
+        session_ref:cleanText(session.id||"",160),
+        entry_ref:cleanText(anchor.entry_id||anchor.event_id||anchor.id||"",180),
+        anchor_ref:ownerHistoryTransferLineageAnchorRef(anchor),
+        original_bed:cleanText(anchor.original_bed||anchor.bed||anchor.room||anchor.to_bed||"",160),
+        canonical_accepted_at:cleanText(anchor.canonical_accepted_at||anchor.accepted_at||anchor.transfer_at||session.created_at||"",80),
+        effective_status:archiveState==="active"?cleanText(anchor.effective_status||anchor.archive_state||anchor.status||"active",40):archiveState
+      });
+    }
+    const parsed=parseOwnerCorrectionAnchorText(session.export_text||"");
+    const correction=parsed?.found&&parsed?.ok&&parsed?.correction?parsed.correction:null;
+    if(!correction)continue;
+    for(const event of correction.correction_events||[]){
+      const replacement=event.replacement_transfer_anchor||event.replacement_event||null;
+      if(replacement&&typeof replacement==="object"){
+        entries.push({
+          ...replacement,
+          corpid:cleanText(session.corpid||corpid,120),
+          session_ref:cleanText(session.id||"",160),
+          entry_ref:cleanText(replacement.entry_id||replacement.event_id||replacement.id||"",180),
+          anchor_ref:ownerHistoryTransferLineageAnchorRef(replacement),
+          replacement_for_transfer_anchor_id:cleanText(replacement.replacement_for_transfer_anchor_id||event.original_event_id||"",180),
+          canonical_accepted_at:cleanText(replacement.canonical_accepted_at||replacement.accepted_at||session.created_at||"",80),
+          effective_status:cleanText(event.status||correction.status||"",40)==="applied"?"corrected":"inactive"
+        });
+      }
+      entries.push({
+        ...event,
+        corpid:cleanText(session.corpid||corpid,120),
+        session_ref:cleanText(session.id||"",160),
+        entry_ref:cleanText(event.correction_event_id||event.event_id||event.id||"",180),
+        anchor_ref:cleanText(event.correction_event_id||event.event_id||event.id||session.anchor_id||session.id||"",180),
+        event_type:cleanText(event.event_type||event.correction_action||"correction",80),
+        target_transfer_anchor_id:cleanText(event.target_transfer_anchor_id||event.original_event_id||"",180),
+        canonical_accepted_at:cleanText(event.canonical_accepted_at||event.accepted_at||session.created_at||"",80),
+        effective_status:cleanText(event.status||correction.status||"",40)==="applied"?"active":"inactive"
+      });
+    }
+  }
+  return entries;
+}
+__name(ownerHistoryTransferLineageArchiveEntries,"ownerHistoryTransferLineageArchiveEntries");
+async function ownerHistoryTransferLineageForRequest(env,user,url){
+  const requestedBed=ownerHistoryTransferLineageRequestedBed(url);
+  if(!requestedBed)return null;
+  const requestedLineageId=cleanText(url.searchParams.get("transfer_lineage_id")||"",180);
+  const rows=await env.DB.prepare("SELECT * FROM sessions WHERE corpid=? ORDER BY created_at ASC LIMIT 1000").bind(user.corpid).all();
+  const archiveEntries=ownerHistoryTransferLineageArchiveEntries(rows.results||[],user.corpid);
+  return projectOwnerHistoryTransferLineage({
+    corpid:user.corpid,
+    requested_bed:requestedBed,
+    transfer_lineage_id:requestedLineageId,
+    archive_entries:archiveEntries
+  });
+}
+__name(ownerHistoryTransferLineageForRequest,"ownerHistoryTransferLineageForRequest");
 function ownerHistoryDetailZeroCorrectionTotals(){
   return {
     cash_delta:0,
@@ -8657,7 +8730,7 @@ function ownerHistoryDetailSafeWarning(error,code="CORRECTION_AWARE_DETAIL_FAILE
   };
 }
 __name(ownerHistoryDetailSafeWarning,"ownerHistoryDetailSafeWarning");
-async function ownerHistoryDetailAdditiveResponse(env,user,sessionRow,rows=[]){
+async function ownerHistoryDetailAdditiveResponse(env,user,sessionRow,rows=[],extraFields={}){
   let correctionFields;
   try{
     const targetAnchor=cleanText(sessionRow?.anchor_id||sessionRow?.id||"",180);
@@ -8673,7 +8746,8 @@ async function ownerHistoryDetailAdditiveResponse(env,user,sessionRow,rows=[]){
     return json({
       ...ok(rows),
       ...ownerHistoryDetailJsonSafeValue(correctionFields),
-      ...ownerHistoryDetailJsonSafeValue(archiveFields)
+      ...ownerHistoryDetailJsonSafeValue(archiveFields),
+      ...ownerHistoryDetailJsonSafeValue(extraFields)
     });
   }catch(error){
     const fallback=ownerHistoryDetailFailClosedCorrectionFields(sessionRow,rows,[ownerHistoryDetailSafeWarning(error,"CORRECTION_AWARE_RESPONSE_FAILED_CLOSED")]);
@@ -8681,7 +8755,8 @@ async function ownerHistoryDetailAdditiveResponse(env,user,sessionRow,rows=[]){
     return json({
       ...ok(rows),
       ...ownerHistoryDetailJsonSafeValue(fallback),
-      ...ownerHistoryDetailJsonSafeValue(fallbackArchive)
+      ...ownerHistoryDetailJsonSafeValue(fallbackArchive),
+      ...ownerHistoryDetailJsonSafeValue(extraFields)
     });
   }
 }
@@ -11181,7 +11256,13 @@ async function handleRequest(request, env, ctx) {
       return handleOwnerBedStatus(request, env, user);
     }
     if (path === "/api/history") {
-      if(!await empTableExists(env,"sessions"))return success([]);
+      const requestedBed=ownerHistoryTransferLineageRequestedBed(url);
+      if(requestedBed&&!canReadOwnerData(user))return forbidden();
+      if(!await empTableExists(env,"sessions")){
+        const data=[];
+        const transferLineage=requestedBed?projectOwnerHistoryTransferLineage({corpid:user.corpid,requested_bed:requestedBed,archive_entries:[]}):null;
+        return transferLineage?json({...ok(data),transfer_lineage:transferLineage}):success(data);
+      }
       const includeVoided = url.searchParams.get("include_voided") === "1";
       const rawLimit = Number(url.searchParams.get("limit") || 0);
       const rawOffset = Number(url.searchParams.get("offset") || 0);
@@ -11192,19 +11273,27 @@ async function handleRequest(request, env, ctx) {
         : "SELECT * FROM sessions WHERE corpid=? AND COALESCE(voided_at,'')='' AND COALESCE(handover_status,'')<>'VOID' ORDER BY created_at DESC";
       if (limit) {
         const { results } = await env.DB.prepare(`${baseSql} LIMIT ? OFFSET ?`).bind(user.corpid, limit, offset).all();
-        return success(await canonicalOwnerHistorySessionRowsForList(env,user,results||[]));
+        const data=await canonicalOwnerHistorySessionRowsForList(env,user,results||[]);
+        const transferLineage=requestedBed?await ownerHistoryTransferLineageForRequest(env,user,url):null;
+        return transferLineage?json({...ok(data),transfer_lineage:transferLineage}):success(data);
       }
       const { results } = await env.DB.prepare(
         baseSql
       ).bind(user.corpid).all();
-      return success(await canonicalOwnerHistorySessionRowsForList(env,user,results||[]));
+      const data=await canonicalOwnerHistorySessionRowsForList(env,user,results||[]);
+      const transferLineage=requestedBed?await ownerHistoryTransferLineageForRequest(env,user,url):null;
+      return transferLineage?json({...ok(data),transfer_lineage:transferLineage}):success(data);
     }
     if (path === "/api/session_detail" && method === "GET") {
+      const requestedBed=ownerHistoryTransferLineageRequestedBed(url);
+      if(requestedBed&&!canReadOwnerData(user))return forbidden();
       const sid = cleanId(url.searchParams.get("id"));
       if (!sid) return badRequest("bad_request");
       const includeVoided = url.searchParams.get("include_voided") === "1";
       const includeCorrections = ["1","true","yes","on"].includes(String(url.searchParams.get("include_corrections")||"").trim().toLowerCase());
       const sessionRow=await env.DB.prepare("SELECT * FROM sessions WHERE id=? AND corpid=? LIMIT 1").bind(sid,user.corpid).first();
+      const transferLineage=requestedBed?await ownerHistoryTransferLineageForRequest(env,user,url):null;
+      const lineageFields=transferLineage?{transfer_lineage:transferLineage}:{};
       const hasTransactions=await empTableExists(env,"transactions");
       const results=hasTransactions?(await env.DB.prepare(
           includeVoided||includeCorrections
@@ -11217,15 +11306,15 @@ async function handleRequest(request, env, ctx) {
         const detailChoice=chooseOwnerEmployeeSessionDetailRows(sessionRow,results,anchorRows,exportRows);
         if(detailChoice.rows.length){
           if(includeCorrections){
-            return ownerHistoryDetailAdditiveResponse(env,user,sessionRow,detailChoice.rows);
+            return ownerHistoryDetailAdditiveResponse(env,user,sessionRow,detailChoice.rows,lineageFields);
           }
-          return json({...ok(detailChoice.rows),...ownerHistoryDetailJsonSafeValue(canonicalOwnerHistoryDetailGatewayFields(sessionRow,detailChoice.rows,null,detailChoice.source))});
+          return json({...ok(detailChoice.rows),...ownerHistoryDetailJsonSafeValue(canonicalOwnerHistoryDetailGatewayFields(sessionRow,detailChoice.rows,null,detailChoice.source)),...ownerHistoryDetailJsonSafeValue(lineageFields)});
         }
       }
       if(includeCorrections&&sessionRow){
-        return ownerHistoryDetailAdditiveResponse(env,user,sessionRow,results);
+        return ownerHistoryDetailAdditiveResponse(env,user,sessionRow,results,lineageFields);
       }
-      return json({...ok(results),...ownerHistoryDetailJsonSafeValue(sessionRow?canonicalOwnerHistoryDetailGatewayFields(sessionRow,results,null,"transactions"): {archive_gateway:{ok:false,gateway:"canonical_owner_history_archive_gateway",archive_state:"missing",source_proof:{gateway:"canonical_owner_history_archive_gateway",source_layer:"L1 Canonical Event Archive"}}})});
+      return json({...ok(results),...ownerHistoryDetailJsonSafeValue(sessionRow?canonicalOwnerHistoryDetailGatewayFields(sessionRow,results,null,"transactions"): {archive_gateway:{ok:false,gateway:"canonical_owner_history_archive_gateway",archive_state:"missing",source_proof:{gateway:"canonical_owner_history_archive_gateway",source_layer:"L1 Canonical Event Archive"}}}),...ownerHistoryDetailJsonSafeValue(lineageFields)});
     }
     return errorResponse("not_found", 404, "not_found");
   }
