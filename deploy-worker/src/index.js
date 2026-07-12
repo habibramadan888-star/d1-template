@@ -323,15 +323,7 @@ function requestOrigin(request) {
 __name(requestOrigin, "requestOrigin");
 function configuredOrigins(request, env = {}) {
   const current = requestOrigin(request);
-  const explicit = String(env.ALLOWED_ORIGINS || "").split(",").map((v) => v.trim()).filter(Boolean);
-  const host = String(env.ALLOWED_HOST || "").trim();
-  const fromHost = host ? [`https://${host}`] : [];
-  return new Set([
-    current,
-    "https://homelink-finance.habibramadan888.workers.dev",
-    ...fromHost,
-    ...explicit
-  ].filter(Boolean));
+  return new Set([current].filter(Boolean));
 }
 __name(configuredOrigins, "configuredOrigins");
 function isOriginValueAllowed(origin, request, env = {}) {
@@ -372,8 +364,7 @@ function makeNonce() {
 __name(makeNonce, "makeNonce");
 function securityHeaders(request, env = {}, nonce = "") {
   const origin = requestOrigin(request);
-  const apiOrigin = String(env.CLOUD_API_ORIGIN || "https://homelink-finance.habibramadan888.workers.dev").trim();
-  const connect = Array.from(new Set(["'self'", origin, apiOrigin].filter(Boolean))).join(" ");
+  const connect = Array.from(new Set(["'self'", origin].filter(Boolean))).join(" ");
   const scriptSrc = nonce ? `script-src 'self' 'nonce-${nonce}' https://cdnjs.cloudflare.com` : "script-src 'self' https://cdnjs.cloudflare.com";
   return {
     "Content-Security-Policy": [

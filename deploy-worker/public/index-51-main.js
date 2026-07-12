@@ -36,12 +36,15 @@ const OWNER_CORE_HISTORY_AUTOLOAD_LIMIT=40;
 
 /* ── CLOUD AUTH ── */
 /* window.authToken 已移除：Token 存于 httpOnly Cookie，JS 不可读取 */
-const CLOUD_API_ORIGIN='https://homelink-finance.habibramadan888.workers.dev';
 const UNIFIED_LOGIN_DESTINATION='/';
 function apiUrl(url){
-  if(/^https?:\/\//i.test(url))return url;
-  const sameWorker=location.protocol!=='file:'&&location.host==='homelink-finance.habibramadan888.workers.dev';
-  return sameWorker?url:CLOUD_API_ORIGIN+url;
+  const raw=String(url||'').trim();
+  if(/^https?:\/\//i.test(raw)){
+    const target=new URL(raw,location.origin);
+    if(target.origin!==location.origin)throw new Error('cross_origin_api_url_blocked');
+    return target.pathname+target.search+target.hash;
+  }
+  return raw.startsWith('/')?raw:`/${raw.replace(/^\/+/, '')}`;
 }
 async function apiFetch(url, opts = {}) {
   const headers={ 'Content-Type':'application/json', ...(opts.headers||{}) };

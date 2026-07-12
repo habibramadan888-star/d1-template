@@ -3188,7 +3188,6 @@ label .label-en{
   </div>
 </div>
 <script>
-const API_ORIGIN='https://homelink-finance.habibramadan888.workers.dev';
 const EMPLOYEE_ASSET_DIAGNOSTIC={
   employee_asset_version:'upload-diagnostic-trace-20260707-001',
   frontend_asset_version:'upload-diagnostic-trace-20260707-001',
@@ -3252,7 +3251,15 @@ function bedTransferReviewLabel(code){
     rent_difference_review:'Rent difference review'
   }[String(code||'')]||String(code||'Review required');
 }
-function apiUrl(path){return location.protocol!=='file:'&&location.host.includes('workers.dev')?path:API_ORIGIN+path}
+function apiUrl(path){
+  const raw=String(path||'').trim();
+  if(/^https?:\/\//i.test(raw)){
+    const target=new URL(raw,location.origin);
+    if(target.origin!==location.origin)throw new Error('cross_origin_api_url_blocked');
+    return target.pathname+target.search+target.hash;
+  }
+  return raw.startsWith('/')?raw:`/${raw.replace(/^\/+/, '')}`;
+}
 async function apiFetch(path,opts={}){return wrapStandardJsonResponse(await fetch(apiUrl(path),{credentials:'include',...opts,headers:{'Content-Type':'application/json',...(opts.headers||{})}}))}
 function wrapStandardJsonResponse(response){
   const originalJson=response.json.bind(response);
