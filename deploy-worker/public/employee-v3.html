@@ -4813,7 +4813,7 @@ const employeeEntryTemplates=entryTemplates;
 const employeeEntryTemplateNodes=[
   'selectedEventWrap','genericBedFieldWrap','paymentStep','amount','listPrice','periodStep','arrearPlan','apFields','arrearsPaymentCorePanel',
   'depositOutFields','checkoutFields','leftWithArrearsMode','checkoutDate','leftWithArrearsFields',
-  'transferFields','transferFromBed','bedTo','feePaid','transferReason','transferWaiverReasonWrap','transferFeePaymentMethodWrap','transferFeeDueDateWrap','bedDifferenceMode','bedDifferenceAmountWrap','bedDifferencePaymentMethodWrap','bedDifferenceDueDateWrap','bedDifferenceReasonWrap',
+  'transferFields',
   'expenseFields','remark'
 ];
 function employeeTemplateNode(id){
@@ -5282,7 +5282,6 @@ function renderSummary(){
   $('entrySummary').innerHTML=items.map(([k,v])=>`<div><span>${esc(k)}</span><b>${esc(v)}</b></div>`).join('');
 }
 function syncForm(){
-  ensureBedTransferStep2Mount();
   const type=$('entryType').value, c=state.current||{};
   const hasPeriod=['R','TFF'].includes(type);
   const rent=rentForBed();
