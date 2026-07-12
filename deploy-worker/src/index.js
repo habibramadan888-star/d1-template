@@ -7,6 +7,9 @@ import {
   sanitizeBedTransferIdentityFields,
   validateBedTransferPhase1Contract
 } from "../../modules/employees/bed-transfer-phase1-contract.mjs";
+import {
+  buildBedTransferCanonicalLinkAnchor
+} from "../../modules/employees/bed-transfer-canonical-link-anchor.mjs";
 import { evaluateStayGenesisTrigger } from "../../modules/employees/durable-stay-genesis-trigger.mjs";
 import {
   materializePreparedStayGenesis,
@@ -2648,6 +2651,54 @@ async function validateEmployeeBedTransferPhase1(env,user,entry={},normalized={}
   return contractResult;
 }
 __name(validateEmployeeBedTransferPhase1,"validateEmployeeBedTransferPhase1");
+function employeeBedTransferCanonicalLinkContext(gateway={},companyScope=""){
+  if(gateway?.transfer_link_context)return gateway.transfer_link_context;
+  const occupancy=gateway?.occupancy_gateway||{};
+  const access=gateway?.access_snapshot_context||{};
+  const transfer=occupancy.latest_transfer_event||null;
+  const rent=occupancy.latest_rent_event||null;
+  const transferredContext=transfer&&transfer.to_bed===gateway.bed&&transfer.transfer_lineage_id&&transfer.transfer_anchor_id;
+  const sourceRefs=transferredContext&&Array.isArray(transfer.source_context_anchor_refs)
+    ?transfer.source_context_anchor_refs
+    :(rent?.event_id&&rent?.session_id?[`${rent.session_id}:${rent.event_id}`]:[]);
+  const fingerprint=cleanText(access.snapshot_fingerprint||"",160);
+  const contextRef=fingerprint?`access_snapshot:${fingerprint}`:"";
+  return {
+    corpid:companyScope,current_bed:gateway.bed||"",
+    physical_bed_status:occupancy.physical_bed_status||access.physical_bed_status||"unknown",
+    parsed_vacancy_marker:access.parsed_vacancy_marker===true,
+    resolution_status:sourceRefs.length===1||transferredContext?"confirmed":"ambiguous",
+    candidate_count:sourceRefs.length===1||transferredContext?1:0,
+    source_context_anchor_refs:sourceRefs,
+    rent_coverage_ref:transferredContext?transfer.rent_coverage_ref:(rent?.event_id&&rent?.session_id?`${rent.session_id}:${rent.event_id}`:""),
+    deposit_context_ref:contextRef?`${contextRef}:D`:"",
+    expiry_context_ref:contextRef?`${contextRef}:expiry`:"",
+    open_arrears:Array.isArray(gateway.open_arrears)?gateway.open_arrears:[],
+    active_lineage:transferredContext?{current_bed:gateway.bed,transfer_lineage_id:transfer.transfer_lineage_id,last_active_transfer_anchor_id:transfer.transfer_anchor_id}:null
+  };
+}
+__name(employeeBedTransferCanonicalLinkContext,"employeeBedTransferCanonicalLinkContext");
+async function validateEmployeeBedTransferCanonicalLink(env,user,entry={},normalized={}){
+  const fromBed=cleanText(normalized.from_bed||entry.from_bed||entry.bed_from||entry.room||"",40).replace(/^#+/,"");
+  const toBed=cleanText(normalized.to_bed||entry.to_bed||entry.bed_to||entry.roomTo||"",40).replace(/^#+/,"");
+  const [sourceGateway,targetGateway]=await Promise.all([
+    canonicalBedContextGateway(env,user,{bed:fromBed,limit:1000,strict_access_snapshot:true}),
+    canonicalBedContextGateway(env,user,{bed:toBed,limit:1000,strict_access_snapshot:true})
+  ]);
+  const fee=employeeEntryBedTransferFee(entry,normalized);
+  const source=employeeBedTransferCanonicalLinkContext(sourceGateway,user?.corpid||"");
+  const target=employeeBedTransferCanonicalLinkContext(targetGateway,user?.corpid||"");
+  return buildBedTransferCanonicalLinkAnchor({
+    client_payload:entry,from_bed:fromBed,to_bed:toBed,
+    transfer_at:normalized.transfer_date||entry.transfer_date||entry.transfer_at||"",
+    corpid:user?.corpid||"",canonical_source_context:source,canonical_target_context:target,
+    active_lineage:source.active_lineage||null,
+    fee_mode:entry.fee_mode||fee.fee_choice,
+    fee_amount_aed:entry.fee_amount_aed??fee.fee_amount,
+    fee_due_date:entry.fee_due_date||"",fee_waiver_reason:entry.fee_waiver_reason||fee.waiver_reason||""
+  });
+}
+__name(validateEmployeeBedTransferCanonicalLink,"validateEmployeeBedTransferCanonicalLink");
 function validateEmployeeEntryUploadEventFields(type,entry,normalized,eventIndex,anchorPreview){
   const dispatch={
     R:validateRentUploadFields,
@@ -2955,7 +3006,9 @@ async function validateEmployeeEntryUploadPayload(env,user,body,opts={}){
   const eventFieldValidation=validateEmployeeEntryUploadEventFields(type,entry,normalized,eventIndex,anchorPreview);
   if(eventFieldValidation)return eventFieldValidation;
   if(type==="TF"||type==="TFF"){
-    const phase1=await validateEmployeeBedTransferPhase1(env,user,entry,normalized);
+    const phase1=opts.canonical_transfer_link_anchor===true
+      ?await validateEmployeeBedTransferCanonicalLink(env,user,entry,normalized)
+      :await validateEmployeeBedTransferPhase1(env,user,entry,normalized);
     if(!phase1.ok)return employeeEntryValidationFailure("bed_transfer_phase1_contract",phase1.error_code,phase1.message||"Bed Transfer Phase 1 contract rejected the dry-run payload.",{event_index:eventIndex,event_type:"bed_transfer",missing_fields:phase1.missing_fields||[],invalid_fields:phase1.invalid_fields||[],anchor_preview:{...anchorPreview,phase1_contract:phase1}});
     bedTransferPhase1Preview=phase1;
   }
@@ -3204,7 +3257,7 @@ async function handleEmployeeEntryValidate(request,env,user){
   const assetInfo=employeeEntryDiagnosticAssetInfo(body);
   let result;
   try{
-    result=await validateEmployeeEntryUploadPayload(env,user,body,{event_index:body?.event_index});
+    result=await validateEmployeeEntryUploadPayload(env,user,body,{event_index:body?.event_index,canonical_transfer_link_anchor:true});
   }catch(err){
     const eventIndex=Number(body?.event_index||0)||0;
     const eventType=entryAnchorEventType(cleanText(body?.entry?.type||body?.entry?.reason_code||"R",12).toUpperCase());
@@ -4846,6 +4899,12 @@ function canonicalOccupancyEventView(anchor={},session={}){
     transfer_date:cleanDate(anchor.transfer_date||anchor.date||""),
     left_with_arrears:type==="left_with_arrears"||!!anchor.left_with_arrears||anchor.checkout_mode==="left_with_arrears",
     cloud_arrears_ref:cleanText(anchor.cloud_arrears_ref||anchor.arrears_ref||"",160),
+    transfer_anchor_id:cleanText(anchor.transfer_anchor_id||"",160),
+    transfer_lineage_id:cleanText(anchor.transfer_lineage_id||"",160),
+    previous_transfer_anchor_id:cleanText(anchor.previous_transfer_anchor_id||"",160)||null,
+    source_context_anchor_refs:Array.isArray(anchor.source_context_anchor_refs)?anchor.source_context_anchor_refs:[],
+    carried_arrears_refs:Array.isArray(anchor.carried_arrears_refs)?anchor.carried_arrears_refs:[],
+    rent_coverage_ref:cleanText(anchor.rent_coverage_ref||"",160),
     source:"canonical_event_archive_entries_json"
   };
 }
@@ -4978,6 +5037,7 @@ async function canonicalOccupancyGateway(env,user,opts={}){
       parsed_checkin_mmdd:access.snapshot?.parsed_checkin_mmdd||"",
       parsed_valid_until_mmdd:access.snapshot?.parsed_valid_until_mmdd||"",
       parsed_vacancy_marker:!!access.snapshot?.parsed_vacancy_marker,
+      snapshot_fingerprint:cleanText(access.snapshot?.snapshot_fingerprint||access.snapshot?.fingerprint||"",160),
       physical_bed_status:physical.physical_bed_status,
       physical_bed_status_source:physical.physical_bed_status_source,
       parse_status:access.snapshot?.parse_status||""

@@ -7,7 +7,14 @@ const FORBIDDEN_IDENTITY_KEYS = new Set([
   "creatorphone",
   "cardcreationtime",
   "providermetadata",
-  "ttlockprovidermetadata"
+  "ttlockprovidermetadata",
+  "transferanchorid",
+  "transferlineageid",
+  "previoustransferanchorid",
+  "localcache",
+  "uitext",
+  "preview",
+  "whatsapptext"
 ]);
 
 function text(value) {

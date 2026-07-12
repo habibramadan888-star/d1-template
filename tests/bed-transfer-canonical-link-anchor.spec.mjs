@@ -1,0 +1,23 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { buildBedTransferCanonicalLinkAnchor } from '../modules/employees/bed-transfer-canonical-link-anchor.mjs';
+
+const source = (extra={}) => ({corpid:'corp',physical_bed_status:'not_marked_vacant',parsed_vacancy_marker:false,resolution_status:'confirmed',candidate_count:1,source_context_anchor_refs:['rent-anchor-0001'],rent_coverage_ref:'rent-coverage-0001',deposit_context_ref:'deposit-context-0001',expiry_context_ref:'expiry-context-0001',open_arrears:[],...extra});
+const target = (extra={}) => ({corpid:'corp',physical_bed_status:'vacant',parsed_vacancy_marker:true,...extra});
+const base = (extra={}) => ({client_payload:{event_type:'bed_transfer'},from_bed:'A',to_bed:'B',transfer_at:'2026-07-12T12:00:00+04:00',corpid:'corp',canonical_source_context:source(),canonical_target_context:target(),fee_mode:'paid',fee_amount_aed:50,...extra});
+const ids = name => name === 'transfer_lineage_id' ? 'lineage-opaque-0001' : 'anchor-opaque-0001';
+
+test('first A to B builds server IDs and exact canonical fields',()=>{const r=buildBedTransferCanonicalLinkAnchor(base(),{idFactory:ids});assert.equal(r.ok,true);assert.equal(r.previous_transfer_anchor_id,null);assert.equal(r.transfer_lineage_id,'lineage-opaque-0001');assert.deepEqual(r.finance_effect,{rent_income:0,deposit_received:0,deposit_refund:0,arrears_repaid:0,expense:0});});
+test('B to C reuses lineage and requires active previous anchor',()=>{const r=buildBedTransferCanonicalLinkAnchor(base({from_bed:'B',to_bed:'C',active_lineage:{current_bed:'B',transfer_lineage_id:'lineage-opaque-0001',last_active_transfer_anchor_id:'anchor-opaque-0001'}}),{idFactory:()=> 'anchor-opaque-0002'});assert.equal(r.ok,true);assert.equal(r.transfer_lineage_id,'lineage-opaque-0001');assert.equal(r.previous_transfer_anchor_id,'anchor-opaque-0001');});
+for(const [name,patch,code] of [
+ ['same bed',{to_bed:'A'},'BED_TRANSFER_SAME_BED_NOT_ALLOWED'],
+ ['334',{to_bed:'334'},'BED_TRANSFER_334_FORBIDDEN'],
+ ['source E',{canonical_source_context:source({physical_bed_status:'vacant',parsed_vacancy_marker:true})},'BED_TRANSFER_SOURCE_ALREADY_TTLOCK_VACANT'],
+ ['target no E',{canonical_target_context:target({physical_bed_status:'not_marked_vacant',parsed_vacancy_marker:false})},'BED_TRANSFER_TARGET_NOT_TTLOCK_VACANT'],
+ ['corpid',{canonical_target_context:target({corpid:'other'})},'BED_TRANSFER_COMPANY_SCOPE_MISMATCH'],
+ ['ambiguous',{canonical_source_context:source({candidate_count:2})},'BED_TRANSFER_SOURCE_CONTEXT_AMBIGUOUS'],
+ ['discontinuous',{active_lineage:{current_bed:'X',transfer_lineage_id:'lineage-opaque-0001',last_active_transfer_anchor_id:'anchor-opaque-0001'}},'BED_TRANSFER_LINEAGE_DISCONTINUOUS']
+]) test(`${name} fails closed`,()=>assert.equal(buildBedTransferCanonicalLinkAnchor(base(patch)).error_code,code));
+test('server-managed and provider aliases reject before DB',()=>{for(const field of ['transfer_lineage_id','transfer_anchor_id','previous_transfer_anchor_id','tenant_card_id','providerPhone','phone_99099','local_cache','ui_text','preview','whatsapp_text']){const r=buildBedTransferCanonicalLinkAnchor(base({client_payload:{event_type:'bed_transfer',[field]:'x'}}));assert.equal(r.ok,false,field);assert.equal(r.before_db,true,field);}});
+test('all arrears refs are preserved in order',()=>{const r=buildBedTransferCanonicalLinkAnchor(base({canonical_source_context:source({open_arrears:[{arrears_ref:'arr-1'},{arrears_ref:'arr-2'}]})}),{idFactory:ids});assert.deepEqual(r.carried_arrears_refs,['arr-1','arr-2']);});
+test('fee modes enforce exact 50, due date, waiver reason, and no partial pay',()=>{assert.equal(buildBedTransferCanonicalLinkAnchor(base({fee_amount_aed:25})).error_code,'BED_TRANSFER_FEE_AMOUNT_INVALID');assert.equal(buildBedTransferCanonicalLinkAnchor(base({fee_mode:'unpaid',fee_amount_aed:50})).error_code,'BED_TRANSFER_FEE_DUE_DATE_REQUIRED');assert.equal(buildBedTransferCanonicalLinkAnchor(base({fee_mode:'waived',fee_amount_aed:0})).error_code,'BED_TRANSFER_FEE_WAIVER_REASON_REQUIRED');assert.equal(buildBedTransferCanonicalLinkAnchor(base({fee_mode:'unpaid',fee_amount_aed:50,fee_due_date:'2026-08-01'}),{idFactory:ids}).ok,true);});
