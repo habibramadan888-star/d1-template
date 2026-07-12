@@ -26,7 +26,7 @@ test("Bed Transfer production dry-run document exists and has the required safet
 
 test("script includes all required safe dry-run cases and blocks write calls in executable code", async () => {
   const doc = await readFile(docPath, "utf8");
-  const script = doc.match(/```js\n([\s\S]*?)\n```/)?.[1] || "";
+  const script = doc.match(/```js\r?\n([\s\S]*?)\r?\n```/)?.[1] || "";
   assert.ok(script, "browser-console script must be present");
   for (const caseName of [
     "146 -> 111 charged 50 AED",

@@ -26,7 +26,7 @@ test("deleted trace can view voided session detail without changing active histo
   assert.match(worker, /const includeVoided = url\.searchParams\.get\("include_voided"\) === "1"/);
   assert.match(worker, /SELECT \* FROM sessions WHERE corpid=\? ORDER BY created_at DESC/);
   assert.match(worker, /SELECT \* FROM transactions WHERE session_id=\? AND corpid=\? ORDER BY created_at ASC/);
-  assert.match(main, /const detailUrl=`\/api\/session_detail\?id=\$\{encodeURIComponent\(s\.id\)\}\$\{s\._voided\?'&include_voided=1&include_corrections=1':''\}`/);
+  assert.match(main, /const detailUrl=`\/api\/session_detail\?id=\$\{encodeURIComponent\(s\.id\)\}\$\{s\._voided\?'&include_voided=1&include_corrections=1':''\}\$\{state\.historyBedQuery\?/);
   assert.match(main, /const rows=Array\.isArray\(detailPayload\)\?detailPayload:\(Array\.isArray\(detailPayload\?\.data\)\?detailPayload\.data:\[\]\)/);
 });
 

@@ -2,13 +2,14 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import vm from "node:vm";
+import { sanitizeBedTransferIdentityFields } from "../modules/employees/bed-transfer-phase1-contract.mjs";
 
 async function loadWorkerAnchorHarness() {
   const worker = await readFile("deploy-worker/src/index.js", "utf8");
-  const start = worker.indexOf("const entryAnchorContract");
+  const start = worker.indexOf("function employeeEntryUploadAmount");
   const end = worker.indexOf("function empCloseStatusIsOpen", start);
   assert.ok(start > 0 && end > start);
-  const sandbox = {};
+  const sandbox = { sanitizeBedTransferIdentityFields };
   vm.createContext(sandbox);
   vm.runInContext(
     `
@@ -93,13 +94,11 @@ const sevenAnchors = [
   {
     type: "TF",
     event_type: "bed_transfer",
-    room: "112",
-    room_to: "111",
-    bed_from: "112",
-    bed_to: "111",
-    amount: 50,
-    pay_type: "C",
-    transfer_date: "2026-07-05",
+    from_bed: "112",
+    to_bed: "111",
+    fee_amount_aed: 50,
+    fee_mode: "paid",
+    payment_method: "C",
     transfer_reason: "customer_request"
   }
 ];
@@ -158,7 +157,7 @@ test("worker extracts canonical structured employee anchors before legacy export
   assert.equal(rows[5].expense_category, "maintenance");
   assert.equal(rows[6].from_bed, "112");
   assert.equal(rows[6].to_bed, "111");
-  assert.equal(rows[6].fee_amount, 50);
+  assert.equal(rows[6].fee_amount_aed, 50);
   assert.equal(rows[6].transfer_reason, "customer_request");
 });
 

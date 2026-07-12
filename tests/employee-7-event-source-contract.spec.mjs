@@ -98,7 +98,7 @@ test("runtime anchor contract exposes event-specific required fields from the so
     DR: ["refund_amount", "refund_reason", "deposit_balance", "owner_override_ref"],
     CO: ["checkout_date", "owner_approval_required", "left_with_arrears", "whatsapp_phone", "promised_payment_date"],
     E: ["expense_amount", "expense_category", "reason", "payment_method", "evidence_ref"],
-    TF: ["from_bed", "to_bed", "transfer_date", "transfer_reason", "deposit_balance_carryover", "arrears_carryover", "rent_coverage_carryover", "fee_amount", "fee_status", "payment_method", "waiver_reason", "fee_waived_reason"]
+    TF: ["from_bed", "to_bed", "transfer_reason", "fee_amount_aed", "fee_mode", "fee_due_date", "payment_method", "fee_waiver_reason", "bed_price_difference_mode", "bed_price_difference_amount_aed"]
   };
 
   const missingRuntimeFields = [];

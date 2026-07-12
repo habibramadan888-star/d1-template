@@ -15,7 +15,7 @@ function extractLastFunction(source, name) {
   throw new Error(`Could not extract ${name}`);
 }
 
-test("send directive UI no longer depends on requested date input", async () => {
+test("send directive UI uses the approved persisted dispatch contract without requested date input", async () => {
   const js = await readFile("deploy-worker/public/index-51-main.js", "utf8");
   const controls = extractLastFunction(js, "renderOwnerArrearsControls");
   const send = extractLastFunction(js, "sendArrearDirectives");
@@ -23,16 +23,17 @@ test("send directive UI no longer depends on requested date input", async () => 
   assert.doesNotMatch(controls, /arrearDirectiveDue/);
   assert.doesNotMatch(send, /arrearDirectiveDue|prompt\(/);
   assert.match(send, /请先选择要下发的欠款/);
-  assert.match(send, /dry-run/);
-  assert.doesNotMatch(send, /apiFetch\(|\/api\/arrear_tasks\/directive/);
+  assert.match(send, /apiFetch\('\/api\/boss\/arrears\/directives'/);
+  assert.match(send, /Idempotency-Key/);
+  assert.doesNotMatch(send, /\/api\/arrear_tasks\/directive/);
 });
 
-test("send directive generates an employee execution list without writes", async () => {
+test("send directive performs the gated write and refreshes canonical arrears state", async () => {
   const js = await readFile("deploy-worker/public/index-51-main.js", "utf8");
   const send = extractLastFunction(js, "sendArrearDirectives");
 
-  assert.match(send, /ownerArrearsSelectedRows\(\)/);
-  assert.match(send, /buildArrearsWhatsAppText/);
-  assert.match(send, /showArrearsWhatsAppFallback/);
-  assert.doesNotMatch(send, /method:\s*['"]POST['"]/);
+  assert.match(send, /method:'POST'/);
+  assert.match(send, /assigned_employee_id/);
+  assert.match(send, /approval_required/);
+  assert.match(send, /loadArrearsForOwner/);
 });

@@ -19,7 +19,7 @@ test("owner comparative panel is Chinese-first and mobile-card based", async () 
   const ui = await readFile("deploy-worker/public/index-51-main.js", "utf8");
   const render = extractLastFunction(ui, "renderOwnerOverviewComparativePanel");
 
-  for (const label of ["经营对比", "本月实收", "租金收入", "净现金流", "欠款回收", "会计口径", "入住净变化", "欠款与回收", "待办与风险"]) {
+  for (const label of ["经营对比", "当前账期实收", "租金收入", "净现金流", "欠款回收", "会计口径", "Cloud Arrears Collection", "欠款与回收", "待办与风险"]) {
     assert.match(render, new RegExp(label));
   }
   assert.match(render, /hist-card/);

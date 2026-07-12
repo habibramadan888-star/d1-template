@@ -47,8 +47,9 @@ test("all seven employee Entry templates require bed context", async () => {
   assert.doesNotMatch(expense, /forbidden_fields:\[[^\]]*'genericBedFieldWrap'/, "expense must not forbid Bed field");
 
   const transfer = templateBlock(html, "bed_transfer");
-  assert.match(transfer, /required_fields:\['from_bed','to_bed','transfer_date','fee_option','transfer_reason'\]/);
-  assert.match(transfer, /fields:\['selectedEventWrap','transferFromBed','bedTo'/);
+  assert.match(transfer, /required_fields:\['from_bed','to_bed','fee_mode','transfer_reason'\]/);
+  assert.match(transfer, /fields:\['selectedEventWrap','transferFields','remark'\]/);
+  assert.doesNotMatch(transfer, /transfer_date|fee_option/);
 });
 
 test("bed info strip is mounted below Bed and From Bed inputs", async () => {

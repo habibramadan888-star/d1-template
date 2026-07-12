@@ -200,7 +200,7 @@ test("event-specific logic requirements are present", async () => {
     "Deposit liability",
     "Cannot be treated as rent income",
     "difference_reason",
-    "refund more than deposit_balance without owner override",
+    "refund cannot exceed deposit_balance by default",
     "left_with_arrears",
     "bed availability",
     "cash/bank outflow",

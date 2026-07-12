@@ -57,7 +57,7 @@ test("frontend source-of-truth firewall defines all seven event whitelists and f
   assert.match(sanitizer, /delete entry\[field\]/);
   assert.match(sanitizer, /providerLike/);
   assert.match(sanitizer, /ttlock_context=''/);
-  assert.match(sanitizer, /old_ttlock_context=''/);
+  assert.doesNotMatch(sanitizer, /old_ttlock_context/);
 });
 
 test("server source-of-truth firewall normalizes all employee validation bodies", async () => {
@@ -139,9 +139,10 @@ test("Bed Transfer firewall strips old access-card identity while preserving tra
     const tfLine = block.match(/TF:\[[^\]]+\]/s)?.[0] || "";
     assert.match(tfLine, /from_bed/);
     assert.match(tfLine, /to_bed/);
-    assert.match(tfLine, /transfer_date/);
-    assert.match(tfLine, /deposit_balance_carryover/);
-    assert.match(tfLine, /arrears_carryover/);
+    assert.match(tfLine, /transfer_reason/);
+    assert.match(tfLine, /fee_mode/);
+    assert.match(tfLine, /bed_price_difference_mode/);
+    assert.doesNotMatch(tfLine, /transfer_date|deposit_balance_carryover|arrears_carryover/);
     assert.doesNotMatch(tfLine, /old_ttlock_ref|tenant_card_id|card_id/);
   }
 });

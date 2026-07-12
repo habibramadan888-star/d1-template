@@ -308,7 +308,7 @@ test("bed transfer validation uses canonical fee helper and no rent period field
   assert.match(validateFields, /missing_fields:\["fee_paid"\]/);
   assert.match(validatePayload, /const fee=employeeEntryBedTransferFee\(entry,normalized\)/);
   assert.doesNotMatch(validateFields, /rent_period_start|rent_period_end|period_start|period_end/);
-  assert.doesNotMatch(validateFields, /missing\.push\("transfer_reason"\)/);
+  assert.match(validateFields, /missing\.push\("transfer_reason"\)/);
 });
 
 test("bed transfer dispatch uses event_type before legacy type and never falls through to rent", async () => {

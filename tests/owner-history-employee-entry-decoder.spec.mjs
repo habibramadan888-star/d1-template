@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import vm from "node:vm";
 import { loadLedgerHarness, readOwnerMain } from "./helpers/ledger-history-test-utils.mjs";
+import { sanitizeBedTransferIdentityFields } from "../modules/employees/bed-transfer-phase1-contract.mjs";
 
 const employeeExportText = `HOMELINK LEDGER
 Property HL-009  Staff 阿布杜 / abdul  2026-07-03  Session S20260703-amv7l
@@ -81,7 +82,7 @@ test("employee export detail decoder returns the four expected owner detail rows
   const start = worker.indexOf("const entryAnchorContract");
   const end = worker.indexOf("function empCloseStatusIsOpen", start);
   assert.ok(start > 0 && end > start);
-  const sandbox = {};
+  const sandbox = { sanitizeBedTransferIdentityFields };
   vm.createContext(sandbox);
   vm.runInContext(
     `
@@ -114,7 +115,7 @@ test("employee export detail decoder returns the four expected owner detail rows
     JSON.stringify([
       ["employee_entry", "rent", "valid"],
       ["employee_entry", "rent", "valid"],
-      ["employee_entry", "bed_transfer", "valid"],
+      ["employee_entry", "bed_transfer", "missing_required_fields"],
       ["employee_entry", "arrears_payment", "valid"]
     ])
   );
@@ -123,7 +124,7 @@ test("employee export detail decoder returns the four expected owner detail rows
     JSON.stringify([
       ["R", "146", "", 700],
       ["R", "144", "", 700],
-      ["TF", "112", "111", 50],
+      ["TF", null, "", null],
       ["AP", "144", "", 70]
     ])
   );
@@ -134,7 +135,7 @@ test("owner parser reads WhatsApp-friendly employee statement without changing d
   const start = worker.indexOf("const entryAnchorContract");
   const end = worker.indexOf("function empCloseStatusIsOpen", start);
   assert.ok(start > 0 && end > start);
-  const sandbox = {};
+  const sandbox = { sanitizeBedTransferIdentityFields };
   vm.createContext(sandbox);
   vm.runInContext(
     `
@@ -212,8 +213,9 @@ test("owner parser reads WhatsApp-friendly employee statement without changing d
   assert.equal(rows[0].amount, 700);
   assert.equal(rows[0].deficit, 80);
   assert.equal(rows[0].arrear_promise_date, "0710");
-  assert.equal(rows[4].room, "112");
-  assert.equal(rows[4].room_to, "111");
+  assert.equal(rows[4].event_type, "bed_transfer");
+  assert.equal(rows[4].validation_status, "missing_required_fields");
+  assert.equal(Array.isArray(rows[4].validation_missing_fields), true);
 });
 
 test("owner session detail chooses complete transaction rows over partial export parser", async () => {
@@ -221,7 +223,7 @@ test("owner session detail chooses complete transaction rows over partial export
   const start = worker.indexOf("const entryAnchorContract");
   const end = worker.indexOf("function empCloseStatusIsOpen", start);
   assert.ok(start > 0 && end > start);
-  const sandbox = {};
+  const sandbox = { sanitizeBedTransferIdentityFields };
   vm.createContext(sandbox);
   vm.runInContext(
     `

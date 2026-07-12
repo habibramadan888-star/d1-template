@@ -107,7 +107,7 @@ test("real upload wiring attaches metadata after validation and before entries_j
   const worker = await readFile(workerPath, "utf8");
   const uploadBlock = functionBlock(worker, "handleEmployeeEntry", "async function");
   const validateIndex = uploadBlock.indexOf("const validationResult=await validateEmployeeEntryUploadPayload");
-  const metadataIndex = uploadBlock.indexOf("buildEmployeeEntryEntriesWithOccupancyCandidateMetadata(user,body,session.entries)");
+  const metadataIndex = uploadBlock.indexOf("buildEmployeeEntryEntriesWithOccupancyCandidateMetadata(user,body,canonicalInputEntries)");
   const entriesJsonIndex = uploadBlock.indexOf("const sessionEntriesJson=JSON.stringify");
   const writeIndex = uploadBlock.indexOf('await empInsertDynamic(env,"sessions"');
 
@@ -121,7 +121,7 @@ test("dry-run validation keeps structured entries without persisted metadata", a
   const worker = await readFile(workerPath, "utf8");
   const validateBlock = functionBlock(worker, "validateEmployeeEntryUploadPayload", "async function");
 
-  assert.match(validateBlock, /session\.entries\.map\(row=>normalizeEntryAnchor\(row\)\)/);
+  assert.match(validateBlock, /rawSessionEntries\.map\(row=>normalizeEntryAnchor\(row\)\)/);
   assert.doesNotMatch(validateBlock, /buildEmployeeEntryEntriesWithOccupancyCandidateMetadata/);
 });
 

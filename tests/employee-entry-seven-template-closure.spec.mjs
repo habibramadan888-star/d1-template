@@ -67,7 +67,7 @@ const events = [
     validator: "validateBedTransferEntry",
     builder: "buildBedTransferAnchor",
     uploadValidator: "validateBedTransferUploadFields",
-    mustHave: ["bed_from", "bed_to", "fee_waiver_reason", "transfer_reason"],
+    mustHave: ["from_bed", "to_bed", "fee_waiver_reason", "transfer_reason"],
     forbidden: ["periodStep", "linkedTaskId", "depositOutFields", "checkoutFields", "listPrice", "arrearsPaymentCorePanel"]
   }
 ];
@@ -187,7 +187,8 @@ test("owner detail decoder reads structured anchors for every employee event typ
   const owner = await readFile(ownerPath, "utf8");
 
   assert.match(worker, /const anchorRows=extractEmployeeEntryAnchorsFromSession\(sessionRow\)/);
-  assert.match(worker, /if\(anchorRows\.length\)return success\(anchorRows\)/);
+  assert.match(worker, /const detailChoice=chooseOwnerEmployeeSessionDetailRows\(sessionRow,results,anchorRows,exportRows\)/);
+  assert.match(worker, /if\(detailChoice\.rows\.length\)/);
   assert.match(worker, /parseEmployeeEntryAnchorJson/);
 
   for (const eventType of [

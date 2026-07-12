@@ -67,7 +67,9 @@ test("templates keep event-specific forbidden fields out of the active main flow
   assert.match(expense, /forbidden_fields:\['periodStep','linkedTaskId','depositOutFields','checkoutFields','transferFields','listPrice'\]/);
 
   const transfer = templateBlock(html, "bed_transfer");
-  assert.match(transfer, /fields:\['selectedEventWrap','transferFromBed','bedTo','transferDate','feePaid','transferReason','transferWaiverReasonWrap','remark'\]/);
+  assert.match(transfer, /fields:\['selectedEventWrap','transferFields','remark'\]/);
+  assert.match(transfer, /required_fields:\['from_bed','to_bed','fee_mode','transfer_reason'\]/);
+  assert.doesNotMatch(transfer, /transferDate/);
   assert.match(transfer, /forbidden_fields:\['genericBedFieldWrap','periodStep','linkedTaskId','depositOutFields','checkoutFields','expenseFields','listPrice','arrearsPaymentCorePanel'\]/);
 });
 
