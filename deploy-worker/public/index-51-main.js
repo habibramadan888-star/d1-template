@@ -104,7 +104,22 @@ function redirectToUnifiedLogin(reason=''){
   const target=UNIFIED_LOGIN_DESTINATION+(reason?`?reason=${encodeURIComponent(reason)}`:'');
   location.replace(target);
 }
-function unwrapStandardResponse(body){return body&&body.code===0&&Object.prototype.hasOwnProperty.call(body,'data')?body.data:body}
+function unwrapStandardResponse(body){
+  if(!(body&&body.code===0&&Object.prototype.hasOwnProperty.call(body,'data')))return body;
+  if(Array.isArray(body.data)&&body.transfer_lineage){const rows=[...body.data];rows.transfer_lineage=body.transfer_lineage;return rows;}
+  return body.data;
+}
+async function ownerGatewayJson(url,opts={},timeoutMs=HISTORY_FETCH_TIMEOUT_MS){
+  const response=await apiFetchWithTimeout(url,opts,timeoutMs);
+  const contentType=String(response.headers?.get?.('content-type')||'').toLowerCase();
+  if(!contentType.includes('json'))throw new Error(`OWNER_GATEWAY_NON_JSON_HTTP_${response.status||0}`);
+  let data;
+  try{data=await response.json();}catch{throw new Error(`OWNER_GATEWAY_INVALID_JSON_HTTP_${response.status||0}`);}
+  if(response.status===401||response.status===403)throw Object.assign(new Error(`OWNER_GATEWAY_AUTH_${response.status}`),{authFailure:true,status:response.status});
+  if(!response.ok)throw Object.assign(new Error(data?.message_en||data?.message||data?.error_code||`OWNER_GATEWAY_HTTP_${response.status}`),{status:response.status,payload:data});
+  if(data?.ok===false||data?.success===false)throw Object.assign(new Error(data?.error_code||data?.message||'OWNER_GATEWAY_FAILED_CLOSED'),{payload:data});
+  return data;
+}
 async function fetchCurrentAuthUser(){
   const r=await apiFetch('/api/me',{method:'GET'});
   if(r.status===401||r.status===403)return null;
@@ -831,14 +846,14 @@ const state={
   activeCat:'cash',formTag:'Old',formPayType:null,
   analysisSessions:[],
   dateMode:'all',month:(()=>{const d=new Date();return `${d.getFullYear()}-${pad(d.getMonth()+1)}`;})(),
-  from:'',to:'',txCatFilter:'all',txSearch:'',historyViewing:null,historyLimit:HISTORY_PAGE_SIZE,showDeletedHistory:false,
-  arrears:[], // [{id,room,roomTo?,totalRent,paid,remain,dueDate,sessionId,cleared}]
+  from:'',to:'',txCatFilter:'all',txSearch:'',historyViewing:null,historyLimit:HISTORY_PAGE_SIZE,showDeletedHistory:false,historyBedQuery:'',ownerHistoryTransferLineage:null,
+  arrears:[],arrearsClosed:[], // canonical Gateway rows; never reconstructed from UI text
   arrearFilter:'all',
   arrearsLimit:ARREARS_PAGE_SIZE,arrearsLoading:false,arrearsLoadSeq:0,
   arrearsStatus:'idle',arrearsError:'',arrearsSlow:false,arrearsExpanded:false,
   arrearsSourceStatus:{},arrearsPoolResult:null,arrearsSummary:{},arrearsPagination:{},
   arrearsSlowTimer:null,
-  overviewComparative:null,overviewComparativeStatus:'idle',overviewComparativeError:'',
+  overviewComparative:null,overviewComparativeStatus:'idle',overviewComparativeError:'',ownerFinance:null,ownerFinanceStatus:'idle',ownerFinanceError:'',
   ownerTodayTodos:null,ownerTodayTodosStatus:'idle',ownerTodayTodosError:'',
   presetPrices:DEFAULT_PRICES,
   customers:[],
@@ -1164,12 +1179,15 @@ function normalizeArrearFromCloud(a){
     id:a.id||a.task_id,
     taskId:a.task_id||a.id,
     sourceType,
-    sourceRef:a.source_ref||a.sourceRef||a.task_id||a.id||'',
-    roomBed:a.room_bed||a.roomBed||a.room||a.bed||a.bed_no||a.bedNo||a.room_no||a.roomNo||'',
+    sourceRef:a.arrears_ref||a.source_ref||a.sourceRef||a.task_id||a.id||'',
+    arrearsRef:a.arrears_ref||a.task_id||a.id||a.source_ref||'',
+    originalBed:a.original_bed||a.bed||a.room||'',
+    effectiveCurrentBed:a.effective_current_bed||a.current_display_bed||a.bed||a.room_bed||'',
+    roomBed:a.effective_current_bed||a.current_display_bed||a.room_bed||a.roomBed||a.room||a.bed||a.bed_no||a.bedNo||a.room_no||a.roomNo||'',
     bedNo:a.bed_no||a.bedNo||'',
     roomNo:a.room_no||a.roomNo||'',
-    customerCode:a.customer_code||a.customerCode||a.tenant_card_id||a.tenantCardId||a.tenant_name||'',
-    cardCode:a.card_code||a.cardCode||a.tenant_card_id||a.tenantCardId||'',
+    customerCode:a.customer_code||a.customerCode||a.tenant_name||'',
+    cardCode:'',
     packageCode:a.package_code||a.packageCode||a.type||'rent',
     amountAuthorityStatus:a.amount_authority_status||a.amountAuthorityStatus||(remain==null?'unknown':'known'),
     accountingStatus:a.accounting_status||a.accountingStatus||'open',
@@ -1203,6 +1221,10 @@ function normalizeArrearFromCloud(a){
     staffPromisedAt:a.staff_promised_at||'',
     isOverdue:!!a.is_overdue,
     closeStatus:a.close_status||a.closeStatus||''
+    ,originalAmount:Number(a.original_amount??a.original_arrears_amount??a.arrear_amount??a.amount??0),
+    paymentPolicy:a.payment_policy||'',partialPaymentAllowed:a.partial_payment_allowed===true,
+    transferLineageId:a.transfer_lineage_id||a.carried_by_transfer_lineage_id||'',
+    projectionStatus:a.status||a.accounting_status||'open'
   };
 }
 function rowsFromApiPayload(payload,keys=[]){
@@ -1224,11 +1246,14 @@ function normalizeArrearsSourceType(source){
   const raw=String(source||'existing_arrears_record').trim().toLowerCase();
   if(['arrears','arrear','arrear_tasks','historical_arrears','existing_arrears','legacy_arrears','existing_arrears_record'].includes(raw))return 'existing_arrears_record';
   if(['ttlock','ttlock_expired','ttlock_expired_card','ttlock_expired_unpaid'].includes(raw))return 'ttlock_expired_unpaid';
+  if(['employee_entry_short_paid','rent_short_paid','left_with_arrears'].includes(raw))return 'rent_arrears';
+  if(raw==='bed_transfer_fee_unpaid')return 'bed_transfer_fee_unpaid';
+  if(raw==='bed_price_difference_unpaid')return 'bed_price_difference_unpaid';
   return 'unsupported_arrears_source';
 }
 function isAllowedArrearsSource(row){
   const source=normalizeArrearsSourceType(row?.sourceType||row?.source_type||row?.source);
-  return source==='existing_arrears_record'||source==='ttlock_expired_unpaid';
+  return ['existing_arrears_record','ttlock_expired_unpaid','rent_arrears','bed_transfer_fee_unpaid','bed_price_difference_unpaid'].includes(source);
 }
 function unwrapArrearsSotPayload(payload){
   if(payload&&payload.data&&typeof payload.data==='object'&&!Array.isArray(payload.data))return payload.data;
@@ -1297,13 +1322,18 @@ function isArrearTaskOpen(a){
 }
 async function loadExistingArrearsForOwner({limit=ARREARS_PAGE_SIZE,timeoutMs=ARREARS_FETCH_TIMEOUT_MS}={}){
   const safeLimit=Math.min(Math.max(Number(limit)||ARREARS_PAGE_SIZE,1),100);
-  const response=await apiFetchWithTimeout(`/api/boss/arrears/followup-tasks?limit=${safeLimit}`,{},timeoutMs);
-  const payload=await response.json().catch(()=>({}));
-  if(!response.ok){
-    throw new Error(payload?.message||('HTTP '+response.status));
-  }
-  const data=unwrapArrearsSotPayload(payload);
-  return {rows:buildArrearsFollowupPool(data),meta:data,payload:data};
+  const [legacy,projection]=await Promise.all([
+    ownerGatewayJson(`/api/boss/arrears/followup-tasks?limit=${safeLimit}`,{},timeoutMs),
+    ownerGatewayJson('/api/owner/cloud-arrears/projection',{},timeoutMs)
+  ]);
+  const legacyData=unwrapArrearsSotPayload(legacy);
+  const projectedOpen=Array.isArray(projection?.open_items)?projection.open_items:[];
+  const projectedClosed=Array.isArray(projection?.closed_items)?projection.closed_items:[];
+  const refs=new Set(projectedOpen.map(row=>String(row.arrears_ref||row.task_id||row.id||'')));
+  const legacyRows=buildArrearsFollowupPool(legacyData).filter(row=>!refs.has(String(row.arrearsRef||row.sourceRef||row.taskId||row.id||'')));
+  const rows=[...projectedOpen.map(normalizeArrearFromCloud),...legacyRows];
+  const payload={...legacyData,tasks:rows,all_tasks:rows,preview_tasks:rows.slice(0,ARREARS_OVERVIEW_PAGE_SIZE),canonical_projection:projection,summary:{...(legacyData.summary||{}),canonical_projection_total_remaining:projection.total_remaining,canonical_projection_open_count:projection.open_count,canonical_projection_partial_count:projection.partial_count}};
+  return {rows,meta:payload,payload,closedRows:projectedClosed.map(normalizeArrearFromCloud)};
 }
 async function loadHistoricalArrearsForOwner(opts={}){
   return (await loadExistingArrearsForOwner(opts)).rows;
@@ -1311,7 +1341,10 @@ async function loadHistoricalArrearsForOwner(opts={}){
 function arrearSourceLabel(a){
   return {
     existing_arrears_record:'系统已有欠款',
-    ttlock_expired_unpaid:'门禁卡到期未付'
+    ttlock_expired_unpaid:'门禁卡到期未付',
+    rent_arrears:'租金欠款',
+    bed_transfer_fee_unpaid:'换床费欠款',
+    bed_price_difference_unpaid:'床价差欠款'
   }[normalizeArrearsSourceType(a?.sourceType)]||'不显示';
 }
 function arrearDirectiveStatus(a){
@@ -1438,12 +1471,22 @@ function renderOwnerArrearsTaskCard(a,today){
   const businessStatus=esc(arrearBusinessState(a)||statusLabel);
   const promiseDate=esc(arrearPromiseDateLabel(a));
   const note=esc(arrearFollowupNoteLabel(a));
+  const sourceType=normalizeArrearsSourceType(a?.sourceType);
+  const transferDebt=['bed_transfer_fee_unpaid','bed_price_difference_unpaid'].includes(sourceType);
+  const originalBed=esc(a?.originalBed||a?.roomBed||'-');
+  const currentBed=esc(a?.effectiveCurrentBed||a?.roomBed||'-');
+  const originalAmount=esc(`${fmtMoney(a?.originalAmount||0)} AED`);
+  const policy=String(a?.paymentPolicy||'').toUpperCase()==='FULL_PAYMENT_ONLY'?'只允许一次性还清 / FULL PAYMENT ONLY':'按 Gateway payment policy';
   return `<article class="hist-card owner-arrears-task-card ${overdue?'is-overdue':''}" data-owner-arrear-task-card="true" data-arrear-pool-kind="${esc(normalizeArrearsSourceType(a?.sourceType))}">
     <div class="owner-arrears-card-top">
       ${isOwnerWriteRole()?`<input class="arrear-task-select" type="checkbox" data-arrear-select value="${taskId}" aria-label="选择欠款任务 ${bed} ${amount}">`:''}
       <div class="owner-arrears-identity" data-owner-arrears-business-title="true"><strong>${bed}</strong><b>｜${amount}</b></div>
     </div>
     <div class="hist-anchor owner-arrears-due-line">${source}｜${dueLine}</div>
+    <div class="hist-stat"><span>原床位 / 当前显示床位</span><span class="mono">${originalBed} / ${currentBed}</span></div>
+    <div class="hist-stat"><span>原始金额 / 剩余金额</span><span class="mono">${originalAmount} / ${amount}</span></div>
+    <div class="hist-stat"><span>状态</span><span>${esc(a?.projectionStatus||'open')}</span></div>
+    ${transferDebt?`<div class="hist-stat" data-owner-transfer-arrears-policy="true"><span>付款规则</span><b>${esc(policy)}</b></div><div class="hist-anchor">Arrears ref: ${esc(a?.arrearsRef||a?.sourceRef||'-')} · Lineage: ${esc(a?.transferLineageId||'-')}</div>`:''}
     <div class="hist-stat"><span>承诺日期</span><span class="mono">${promiseDate}</span></div>
     <div class="hist-stat"><span>备注</span><span>${note}</span></div>
     <div class="hist-stat"><span>状态</span><span class="owner-arrears-status-pill" style="color:${statusColor};background:${statusBg}">${businessStatus}</span></div>
@@ -1975,10 +2018,10 @@ async function loadArrearsForOwner({showLoading=false,limit=ARREARS_PAGE_SIZE}={
     });
     state.arrearsSourceStatus=state.arrearsPoolResult.sources||{};
     state.arrears=state.arrearsPoolResult.all_tasks;
+    state.arrearsClosed=Array.isArray(result.closedRows)?result.closedRows:[];
     state.arrearsSummary=state.arrearsPoolResult.summary||{};
     state.arrearsPagination=state.arrearsPoolResult.pagination||{};
     state.arrearsLoadedFull=!state.arrearsPoolResult.has_more;
-    saveArrears();
     state.arrearsStatus=state.arrears.length?'success':'empty';
     state.arrearsError='';
     renderArrearsPanel();
@@ -1986,17 +2029,8 @@ async function loadArrearsForOwner({showLoading=false,limit=ARREARS_PAGE_SIZE}={
     return true;
   }catch(e){
     console.warn('loadArrearsForOwner:',e);
-    try{
-      const cached=LS.get(ARREARS_KEY);
-      if(cached){
-        state.arrears=JSON.parse(cached)||[];
-        state.arrearsStatus=state.arrears.length?'success':'empty';
-        renderArrearsPanel();
-        renderOwnerOverviewArrearsPanel();
-        if(showLoading)toast('欠款接口暂不可用，已显示本地缓存。','err');
-        return false;
-      }
-    }catch{}
+    state.arrears=[];state.arrearsClosed=[];state.arrearsPoolResult=null;state.arrearsSummary={};state.arrearsPagination={};
+    if(e?.authFailure)clearLegacyAuthStorage();
     if(isAbortLikeError(e)){
       if(loadSeq!==state.arrearsLoadSeq)return false;
       state.arrearsStatus='timeout';
@@ -2088,7 +2122,10 @@ function renderOwnerArrearsControls(){
   const sourceOptions=[
     ['all','全部'],
     ['ttlock_expired_unpaid','门禁卡已过期'],
-    ['existing_arrears_record','系统已有欠款']
+    ['existing_arrears_record','系统已有欠款'],
+    ['rent_arrears','租金欠款'],
+    ['bed_transfer_fee_unpaid','换床费欠款'],
+    ['bed_price_difference_unpaid','床价差欠款']
   ];
   return `<div class="owner-arrears-controls" data-owner-arrears-actions="true">
     ${isOwnerWriteRole()?`<label class="owner-arrears-select-all"><input id="arrearSelectAll" type="checkbox" onchange="toggleArrearSelectAll(this.checked)"> 全选</label>
@@ -2196,6 +2233,7 @@ function renderArrearsPanel(){
     <div class="hist-grid owner-arrears-list" data-owner-arrears-card-list="true">
       ${pageRows.map(a=>renderOwnerArrearsTaskCard(a,today)).join('')}
     </div>
+    ${state.arrearsClosed?.length?`<div class="hist-title" style="margin-top:16px">已结清 / CLOSED</div><div class="hist-grid" data-owner-arrears-closed-list="true">${state.arrearsClosed.map(a=>renderOwnerArrearsTaskCard(a,today)).join('')}</div>`:''}
     ${hasMore?`<button class="btn btn-primary btn-block" id="btnArrearsLoadMore" type="button" style="margin-top:14px">加载更多欠款</button>`:''}
   </div>`;
   updateArrearDirectiveButtonState();
@@ -2724,6 +2762,26 @@ function showModal(title,sub,html,actions=[]){
 }
 
 /* ── HISTORY（从云端 D1 加载）── */
+function ownerHistoryBedControlsHtml(){
+  return `<div class="hist-toolbar" data-owner-history-bed-query="true"><label>当前床位 <input class="inp" id="ownerHistoryBedInput" value="${esc(state.historyBedQuery||'')}" placeholder="例如 B / C" style="width:130px"></label><button class="btn btn-primary" id="btnOwnerHistoryBedQuery" type="button">读取换床链路</button>${state.historyBedQuery?'<button class="btn btn-ghost" id="btnOwnerHistoryBedClear" type="button">清除床位筛选</button>':''}<span class="hist-order">SERVER LINEAGE ONLY</span></div>`;
+}
+function bindOwnerHistoryBedControls(){
+  const run=()=>{state.historyBedQuery=String(document.getElementById('ownerHistoryBedInput')?.value||'').trim().replace(/^#/,'');state.historyViewing=null;state.ownerHistoryTransferLineage=null;renderHistory();};
+  const button=document.getElementById('btnOwnerHistoryBedQuery');if(button)button.onclick=run;
+  const input=document.getElementById('ownerHistoryBedInput');if(input)input.onkeydown=event=>{if(event.key==='Enter')run();};
+  const clear=document.getElementById('btnOwnerHistoryBedClear');if(clear)clear.onclick=()=>{state.historyBedQuery='';state.ownerHistoryTransferLineage=null;state.historyViewing=null;renderHistory();};
+}
+function ownerHistoryLineageEventHtml(event,scope){
+  return `<div class="detail-row owner-mobile-row" data-owner-history-lineage-event="${esc(scope)}"><div class="room">${esc(event.from_bed&&event.to_bed?`${event.from_bed} → ${event.to_bed}`:(event.original_bed||'-'))}</div><div class="note">Original bed: ${esc(event.original_bed||'-')} · ${esc(event.event_type||'-')}<div class="hist-anchor">${esc(event.canonical_accepted_at||'-')} · ${esc(event.anchor_ref||event.transfer_anchor_id||event.entry_ref||'-')}</div></div><div class="amount">${esc(event.effective_status||scope)}</div></div>`;
+}
+function ownerHistoryTransferLineageHtml(lineage){
+  if(!lineage||lineage.status==='not_applicable')return '';
+  if(lineage.ok===false||lineage.status==='fail_closed')return `<div class="card" data-owner-history-lineage-review="true" style="padding:18px;border-color:var(--orange)"><div class="card-title">换床链路需要老板复核</div><div class="card-sub">${esc(lineage.error_code||'OWNER_HISTORY_TRANSFER_LINEAGE_REVIEW_REQUIRED')}</div><div class="hist-anchor">${esc((lineage.warnings||[]).join(' · '))}</div></div>`;
+  const raw=Array.isArray(lineage.raw_transfer_events)?lineage.raw_transfer_events:[];
+  const effective=Array.isArray(lineage.effective_transfer_events)?lineage.effective_transfer_events:[];
+  const canonical=Array.isArray(lineage.canonical_history_entries)?lineage.canonical_history_entries:[];
+  return `<section class="card" data-owner-history-transfer-lineage="true" style="margin-bottom:14px"><div class="card-head"><div><div class="card-title">换床链路</div><div class="card-sub">CANONICAL GATEWAY · READ ONLY</div></div><span class="hist-order">${esc(lineage.status||'projected')}</span></div><div class="card-body"><div class="hist-grid"><div class="hist-card"><div class="hist-stat"><span>历史床位顺序</span><b>${esc((lineage.historical_beds||[]).join(' → '))}</b></div><div class="hist-stat"><span>Original bed</span><b>${esc(lineage.historical_beds?.[0]||'-')}</b></div><div class="hist-stat"><span>当前显示床位</span><b>${esc(lineage.lineage_display_current_bed||lineage.effective_current_bed||'-')}</b></div><div class="hist-stat"><span>Lineage</span><b>${esc(lineage.transfer_lineage_id||'-')}</b></div></div><div class="hist-card"><div class="hist-title">Raw / Effective</div><div class="hist-stat"><span>Raw transfers</span><b>${raw.length}</b></div><div class="hist-stat"><span>Effective transfers</span><b>${effective.length}</b></div><div class="hist-anchor">voided / corrected / reversed anchors remain visible in Raw; only Gateway effective events define current bed.</div></div></div><div class="hist-title" style="margin-top:12px">Transfer timeline</div><div class="detail-list">${raw.map(row=>ownerHistoryLineageEventHtml(row,'raw')).join('')||'<div class="empty-text">No raw transfer events</div>'}</div><div class="hist-title" style="margin-top:12px">Canonical event history</div><div class="detail-list">${canonical.map(row=>ownerHistoryLineageEventHtml(row,'canonical')).join('')||'<div class="empty-text">No canonical history entries</div>'}</div></div></section>`;
+}
 async function renderHistory(){
   const wrap=document.getElementById('historyContent');
 
@@ -2734,15 +2792,12 @@ async function renderHistory(){
     if(s._cloud&&(!s.entries||!s.entries.length)&&(!ledgerSessionRawText(s)||s._voided||Number(s.entriesCount||s.entries_count||0))){
       wrap.innerHTML='<div style="text-align:center;padding:40px;color:var(--text3)">加载中...</div>';
       try{
-        const detailUrl=`/api/session_detail?id=${encodeURIComponent(s.id)}${s._voided?'&include_voided=1&include_corrections=1':''}`;
-        const r=await apiFetchWithTimeout(detailUrl);
-        if(r.status===401){showAuthExpired();wrap.innerHTML='<div class="card" style="padding:24px;text-align:center;color:var(--red)">登录已过期，请重新登录后查看历史</div>';return;}
-        if(r.status===403){wrap.innerHTML='<div class="card" style="padding:24px;text-align:center;color:var(--red)">老板账户才能查看历史详情</div>';return;}
-        if(!r.ok){wrap.innerHTML=`<div class="card" style="padding:24px;text-align:center;color:var(--red)">历史详情加载失败：${r.status}</div>`;return;}
-        const detailPayload=await r.json();
+        const detailUrl=`/api/session_detail?id=${encodeURIComponent(s.id)}${s._voided?'&include_voided=1&include_corrections=1':''}${state.historyBedQuery?`&bed=${encodeURIComponent(state.historyBedQuery)}`:''}`;
+        const detailPayload=await ownerGatewayJson(detailUrl,{},HISTORY_FETCH_TIMEOUT_MS);
         const rows=Array.isArray(detailPayload)?detailPayload:(Array.isArray(detailPayload?.data)?detailPayload.data:[]);
         if(!Array.isArray(rows)){wrap.innerHTML='<div class="card" style="padding:24px;text-align:center;color:var(--red)">历史详情格式异常</div>';return;}
         s=normalizeLedgerSession({...s,
+          transfer_lineage:detailPayload?.transfer_lineage||s.transfer_lineage||null,
           archive_gateway:detailPayload?.archive_gateway||s.archive_gateway||null,
           archive_state:detailPayload?.archive_gateway?.archive_state||detailPayload?.correction_summary?.archive_state||s.archive_state||'',
           correction_summary:detailPayload?.correction_summary||s.correction_summary||null,
@@ -2826,7 +2881,7 @@ async function renderHistory(){
     const countWarning=historyDetailMismatchHtml(s,cnt);
     const deletedMeta=s._voided?`<div class="card-sub" style="margin-top:8px;color:var(--red);line-height:1.6">已删除/已作废记录 · 删除人：${esc(s.voidedBy||s.voided_by||'未知')} · 时间：${esc(s.voidedAt||s.voided_at||'未知')}</div>`:'';
     const deletedTotals=ownerArchiveVoidedDetailHtml(s);
-    wrap.innerHTML=`<button class="btn btn-ghost" id="btnHistBack" style="margin-bottom:14px"><svg class="ico"><use href="#i-back"/></svg>返回历史</button>
+    wrap.innerHTML=`${ownerHistoryTransferLineageHtml(s.transfer_lineage||state.ownerHistoryTransferLineage)}<button class="btn btn-ghost" id="btnHistBack" style="margin-bottom:14px"><svg class="ico"><use href="#i-back"/></svg>返回历史</button>
     <div class="card"><div class="card-head"><div>${s.anchorId?`<div class="card-sub" style="color:var(--accent);margin-bottom:3px">🔐 ${esc(s.anchorId)}</div>`:''}<div class="card-title">${esc((s.date||'').slice(0,10))}</div><div class="card-sub">${cnt} 笔记录</div>${deletedMeta}${deletedTotals}${countWarning}</div><div style="display:flex;gap:7px"><button class="btn btn-ghost" id="btnHistCopy"><svg class="ico"><use href="#i-copy"/></svg>复制</button><button class="btn btn-primary" id="btnHistDl"><svg class="ico"><use href="#i-download"/></svg>下载</button></div></div><div class="card-body"><pre style="background:var(--surface2);padding:14px;border-radius:8px;max-height:60vh;overflow:auto;line-height:1.7;font-size:12px;color:var(--text2);border:1px solid var(--border)">${esc(txt)}</pre></div></div>`;
     document.getElementById('btnHistBack').onclick=()=>{state.historyViewing=null;renderHistory();};
     document.getElementById('btnHistCopy').onclick=async()=>{try{await navigator.clipboard.writeText(txt);toast('已复制');}catch{toast('复制失败','err');}};
@@ -2836,7 +2891,7 @@ async function renderHistory(){
 
   // 会话列表：云端 + 本地合并。先显示骨架，避免历史页 15-20 秒空白。
   const limit=state.historyLimit||HISTORY_PAGE_SIZE;
-  wrap.innerHTML=`<div class="owner-history-skeleton history-skeleton card" style="padding:18px">
+  wrap.innerHTML=`${ownerHistoryBedControlsHtml()}<div class="owner-history-skeleton history-skeleton card" style="padding:18px">
     <div class="hist-toolbar"><span>正在加载最近 ${limit} 条历史...</span><span class="hist-order">LOADING</span></div>
     <div class="hist-grid">
       ${Array.from({length:Math.min(6,limit)}).map(()=>'<div class="hist-card skeleton-card" style="min-height:118px;background:linear-gradient(90deg,rgba(255,255,255,.58),rgba(226,239,233,.72),rgba(255,255,255,.58));background-size:220% 100%;animation:pulse 1.2s ease-in-out infinite"></div>').join('')}
@@ -2844,12 +2899,13 @@ async function renderHistory(){
   </div>`;
   let cloud=[];
   try{
-    const historyUrl=`/api/history?limit=${encodeURIComponent(limit)}${state.showDeletedHistory?'&include_voided=1':''}`;
-    const r=await apiFetchWithTimeout(historyUrl);
-    if(r.status===401){showAuthExpired();wrap.innerHTML='<div class="card" style="padding:24px;text-align:center;color:var(--red)">登录已过期，请重新登录后查看历史</div>';return;}
-    if(r.ok)cloud=await r.json();
-    else{wrap.innerHTML=`<div class="card" style="padding:24px;text-align:center;color:var(--red)">历史记录加载失败：${r.status}</div>`;return;}
+    const historyUrl=`/api/history?limit=${encodeURIComponent(limit)}${state.showDeletedHistory?'&include_voided=1':''}${state.historyBedQuery?`&bed=${encodeURIComponent(state.historyBedQuery)}`:''}`;
+    cloud=await ownerGatewayJson(historyUrl,{},HISTORY_FETCH_TIMEOUT_MS);
+    if(!Array.isArray(cloud))throw new Error('OWNER_HISTORY_GATEWAY_SHAPE_INVALID');
+    state.ownerHistoryTransferLineage=state.historyBedQuery?(cloud?.transfer_lineage||null):null;
   }catch(e){
+    state.ownerHistoryTransferLineage=null;
+    if(e?.authFailure)clearLegacyAuthStorage();
     const timedOut=e?.name==='AbortError';
     wrap.innerHTML=`<div class="card owner-history-timeout" style="padding:24px;text-align:center;color:var(--red)">
       <div style="font-weight:800;margin-bottom:8px">${timedOut?'历史记录加载超时':'历史记录加载失败'}</div>
@@ -2861,7 +2917,7 @@ async function renderHistory(){
     return;
   }
   const cloudIds=new Set(cloud.map(s=>s.id));
-  const localOnly=state.showDeletedHistory?[]:state.saved.filter(s=>!cloudIds.has(s.id));
+  const localOnly=state.showDeletedHistory||state.historyBedQuery?[]:state.saved.filter(s=>!cloudIds.has(s.id));
   const isVoidedHistorySession=s=>{
     const archiveState=String(s.archive_state||'').toLowerCase();
     return !!(s.voided_at||s.voidedAt||String(s.handover_status||'').toUpperCase()==='VOID'||['voided','deleted','reversed'].includes(archiveState));
@@ -2892,7 +2948,7 @@ async function renderHistory(){
   });
 
   document.getElementById('historyCount').textContent=state.showDeletedHistory?`已删除/已作废记录 · ${all.length} 条 · 只读`:`流水档案 · 已加载最近 ${all.length} 条 · ${groups.length} 个月 · 新 → 旧`;
-  if(!all.length){wrap.innerHTML=`<div class="hist-toolbar"><span>${state.showDeletedHistory?'当前没有已删除/已作废记录':'按月份归类，优先显示最近记录'}</span><button class="btn btn-ghost" id="btnHistoryDeletedToggle" type="button">${state.showDeletedHistory?'返回正常历史':'已删除/已作废记录'}</button></div><div class="empty-state card" style="padding:44px"><div class="empty-ico">📄</div><div class="empty-title">${state.showDeletedHistory?'没有已删除/已作废记录':'还没有保存过会话'}</div><div class="empty-text">${state.showDeletedHistory?'这里仅用于只读追踪，不提供批量恢复。':'录入记录后点击"导出交接"即可保存'}</div></div>`;document.getElementById('btnHistoryDeletedToggle').onclick=()=>{state.showDeletedHistory=!state.showDeletedHistory;state.historyViewing=null;renderHistory();};return;}
+  if(!all.length){wrap.innerHTML=`${ownerHistoryBedControlsHtml()}${ownerHistoryTransferLineageHtml(state.ownerHistoryTransferLineage)}<div class="hist-toolbar"><span>${state.showDeletedHistory?'当前没有已删除/已作废记录':'按月份归类，优先显示最近记录'}</span><button class="btn btn-ghost" id="btnHistoryDeletedToggle" type="button">${state.showDeletedHistory?'返回正常历史':'已删除/已作废记录'}</button></div><div class="empty-state card" style="padding:44px"><div class="empty-ico">📄</div><div class="empty-title">${state.showDeletedHistory?'没有已删除/已作废记录':'还没有保存过会话'}</div><div class="empty-text">${state.showDeletedHistory?'这里仅用于只读追踪，不提供批量恢复。':'录入记录后点击"导出交接"即可保存'}</div></div>`;bindOwnerHistoryBedControls();document.getElementById('btnHistoryDeletedToggle').onclick=()=>{state.showDeletedHistory=!state.showDeletedHistory;state.historyViewing=null;renderHistory();};return;}
 
   const cardHtml=s=>{
     const hasEntries=s.entries&&s.entries.length>0;
@@ -2930,7 +2986,7 @@ async function renderHistory(){
       </div>
     </div>`;
   };
-  wrap.innerHTML=`<div class="hist-toolbar"><span>${state.showDeletedHistory?'已删除/已作废记录 · 只读追踪':'按月份归类，优先显示最近记录'}</span><button class="btn btn-ghost" id="btnHistoryDeletedToggle" type="button">${state.showDeletedHistory?'返回正常历史':'已删除/已作废记录'}</button><span class="hist-order">${state.showDeletedHistory?'VOIDED · READ ONLY':'RECENT · FIRST'}</span></div>`+
+  wrap.innerHTML=ownerHistoryBedControlsHtml()+ownerHistoryTransferLineageHtml(state.ownerHistoryTransferLineage)+`<div class="hist-toolbar"><span>${state.showDeletedHistory?'已删除/已作废记录 · 只读追踪':'按月份归类，优先显示最近记录'}</span><button class="btn btn-ghost" id="btnHistoryDeletedToggle" type="button">${state.showDeletedHistory?'返回正常历史':'已删除/已作废记录'}</button><span class="hist-order">${state.showDeletedHistory?'VOIDED · READ ONLY':'RECENT · FIRST'}</span></div>`+
     groups.map(([key,items],idx)=>{
       const totalEntries=items.reduce((sum,s)=>sum+(s.entries?s.entries.length:(s.entriesCount||0)),0);
       const from=(items[0]?.date||'').slice(0,10)||'--';
@@ -2953,6 +3009,7 @@ async function renderHistory(){
     }).join('')+
     (hasMoreCloud?`<button class="btn btn-primary btn-block" id="btnHistoryLoadMore" type="button" style="margin-top:14px">加载更多历史</button>`:'');
 
+  bindOwnerHistoryBedControls();
   const deletedToggle=document.getElementById('btnHistoryDeletedToggle');
   if(deletedToggle)deletedToggle.onclick=()=>{state.showDeletedHistory=!state.showDeletedHistory;state.historyViewing=null;renderHistory();};
   wrap.querySelectorAll('[data-month-toggle]').forEach(btn=>{
@@ -5294,19 +5351,18 @@ async function loadOwnerTodayTodos(){
   if(state.ownerTodayTodosStatus==='loading')return false;
   state.ownerTodayTodosStatus='loading';
   state.ownerTodayTodosError='';
+  state.ownerTodayTodos=null;
   try{
-    const res=await apiFetch('/api/owner/today-todos?limit=50');
-    const contentType=String(res.headers?.get?.('content-type')||'');
-    if(!contentType.toLowerCase().includes('json'))throw new Error(`Todo gateway returned non-JSON HTTP ${res.status||0}`);
-    const data=await res.json();
-    if(data?.ok===false||data?.success===false)throw new Error(data.message_en||data.message||data.error_code||'Todo gateway unavailable');
+    const data=await ownerGatewayJson('/api/owner/today-todos?limit=50',{},10000);
     state.ownerTodayTodos=data||{};
     state.ownerTodayTodosStatus='success';
     renderOwnerOverview();
     return true;
   }catch(e){
+    state.ownerTodayTodos=null;
     state.ownerTodayTodosStatus='error';
     state.ownerTodayTodosError=e?.message||String(e||'');
+    if(e?.authFailure)clearLegacyAuthStorage();
     renderOwnerOverview();
     return false;
   }
@@ -5314,6 +5370,33 @@ async function loadOwnerTodayTodos(){
 function ensureOwnerTodayTodosAsync(){
   if(['loading','success'].includes(state.ownerTodayTodosStatus))return;
   setTimeout(()=>loadOwnerTodayTodos(),0);
+}
+function ownerTodoPhysicalSummary(value={}){return `${value.physical_bed_status||'unknown'} · D ${value.parsed_deposit_amount??'missing'} · MMDD ${value.parsed_checkin_mmdd||'missing'} · expiry ${value.normalized_expiry_value||'missing'}`;}
+function ownerBedTransferTodoRowHtml(row){
+  const code=String(row?.task_type||'');
+  const transfer=`${row?.from_bed||'-'} → ${row?.to_bed||'-'}`;
+  if(code==='BED_TRANSFER_TTLOCK_MOVE_REQUIRED')return `<div class="hist-card" data-owner-bed-transfer-todo="ttlock"><div class="hist-title">TTLock 换床移动待办 · ${esc(transfer)}</div><div class="hist-stat"><span>员工提交时间</span><b>${esc(row.transfer_at||'-')}</b></div><div class="hist-stat"><span>来源床当前状态</span><span>${esc(ownerTodoPhysicalSummary(row.current_source_physical_state||{}))}</span></div><div class="hist-stat"><span>目标床当前状态</span><span>${esc(ownerTodoPhysicalSummary(row.current_target_physical_state||{}))}</span></div><div class="hist-anchor">请老板将 TTLock 信息从 ${esc(row.from_bed||'-')} 移到 ${esc(row.to_bed||'-')}。${(row.warnings||[]).length?` Warning: ${esc(row.warnings.join(' · '))}`:''}</div></div>`;
+  if(code==='BED_TRANSFER_FEE_WAIVER_REVIEW_REQUIRED')return `<div class="hist-card" data-owner-bed-transfer-todo="waiver"><div class="hist-title">换床费免责声明已读 · ${esc(transfer)}</div><div class="hist-stat"><span>免责声明原因</span><b>${esc(row.fee_waiver_reason||'-')}</b></div><div class="hist-stat"><span>员工 / Operator</span><span>${esc(row.operator_reference||'-')}</span></div><div class="hist-stat"><span>时间</span><span>${esc(row.transfer_at||'-')}</span></div>${isOwnerWriteRole()?`<button class="btn btn-primary" type="button" data-owner-waiver-ack="${esc(row.transfer_anchor_id||'')}">已读</button>`:'<div class="hist-anchor">只读账号不能确认已读。</div>'}</div>`;
+  if(code==='BED_TRANSFER_VOID_FINANCIAL_RECONCILIATION_REQUIRED')return `<div class="hist-card" data-owner-bed-transfer-todo="financial" style="border-color:var(--red)"><div class="hist-title">⚠ 原换床票已 void · ${esc(transfer)}</div><div class="hist-stat"><span>Effective income</span><b>${fmtMoney(row.effective_income_amount||0)} AED</b></div><div class="hist-anchor">系统 effective income 已归零；现金退款/核对尚未确认。不会自动退款，也不会由 UI 标记 resolved。</div></div>`;
+  return `<div class="detail-row owner-mobile-row"><div class="room">${esc(row.bed||'-')}</div><div class="note"><b>${esc(row.title||row.task_type||'-')}</b><div>${esc(row.description||'')}</div><div>Action: ${esc(row.recommended_action||'-')}</div><div>Type: ${esc(row.task_type||'-')} / Source: ${esc(row.source_gateway||'-')}</div></div><div class="amount">${esc(row.severity||'-')}<br><span style="font-size:11px;color:var(--color-text-muted)">${esc(row.status||'open')}</span></div></div>`;
+}
+function bindOwnerWaiverAckButtons(){document.querySelectorAll('[data-owner-waiver-ack]').forEach(button=>button.onclick=()=>acknowledgeOwnerBedTransferWaiver(button.dataset.ownerWaiverAck));}
+async function acknowledgeOwnerBedTransferWaiver(transferAnchorId){
+  if(state.ownerTodayTodosStatus!=='success'){toast('待办数据不是最新状态，不能确认已读。','err',7000);return false;}
+  const id=String(transferAnchorId||'').trim();if(!id)return false;
+  const button=[...document.querySelectorAll('[data-owner-waiver-ack]')].find(node=>node.dataset.ownerWaiverAck===id);if(button){button.disabled=true;button.textContent='提交中...';}
+  try{
+    await ownerGatewayJson('/api/owner/today-todos/acknowledge',{method:'POST',body:JSON.stringify({transfer_anchor_id:id,review_code:'BED_TRANSFER_FEE_WAIVER_REVIEW_REQUIRED',action:'acknowledged'})},10000);
+    toast('已读确认已由 Gateway 接受');
+    await loadOwnerTodayTodos();
+    ownerOverviewShowTodayActionsPreview();
+    return true;
+  }catch(error){
+    const code=error?.payload?.error_code||'';
+    toast(code==='OWNER_TODAY_TODO_ACK_DISABLED'?'老板已读写入尚未启用':`已读确认失败：${code||error?.message||error}`,'err',7000);
+    if(button){button.disabled=false;button.textContent='已读';}
+    return false;
+  }
 }
 function ownerOverviewCurrentMonth(){
   return ownerOverviewCloudData().current?.month||ownerOverviewCloudData().quarter_to_date||{};
@@ -5497,30 +5580,24 @@ function ownerOverviewShowOutstandingPreview(){
 function ownerOverviewShowTodayActionsPreview(){
   const todoRows=ownerOverviewTodayTodoRows();
   if(todoRows.length){
-    const groups=['deposit_reconciliation','occupancy_reconciliation','receivables','sync_archive','finance_evidence'];
+    const groups=['bed_transfer_reconciliation','owner_review','finance_reconciliation','deposit_reconciliation','occupancy_reconciliation','receivables','sync_archive','finance_evidence'];
     const labels={
       deposit_reconciliation:'Needs Review: Deposit',
       occupancy_reconciliation:'Bed Status Issues',
       receivables:'Receivables',
       sync_archive:'Cloud State Issues',
-      finance_evidence:'Finance Evidence'
+      finance_evidence:'Finance Evidence',
+      bed_transfer_reconciliation:'Bed Transfer TTLock',
+      owner_review:'Bed Transfer Owner Review',
+      finance_reconciliation:'Bed Transfer Financial Reconciliation'
     };
     const sections=groups.map(category=>{
       const items=todoRows.filter(row=>row.category===category);
       if(!items.length)return '';
-      return `<div class="hist-card" style="margin:0 0 10px"><div class="hist-title">${esc(labels[category]||category)}</div><div class="detail-list">${items.map(row=>`
-        <div class="detail-row owner-mobile-row" style="align-items:flex-start">
-          <div class="room">${esc(row.bed||'-')}</div>
-          <div class="note">
-            <b>${esc(row.title||row.task_type||'-')}</b>
-            <div>${esc(row.description||'')}</div>
-            <div>Action: ${esc(row.recommended_action||'-')}</div>
-            <div>Type: ${esc(row.task_type||'-')} / Source: ${esc(row.source_gateway||'-')}</div>
-          </div>
-          <div class="amount">${esc(row.severity||'-')}<br><span style="font-size:11px;color:var(--color-text-muted)">${esc(row.status||'open')}</span></div>
-        </div>`).join('')}</div></div>`;
+      return `<div class="hist-card" style="margin:0 0 10px"><div class="hist-title">${esc(labels[category]||category)}</div><div class="detail-list">${items.map(ownerBedTransferTodoRowHtml).join('')}</div></div>`;
     }).filter(Boolean).join('');
     showOwnerOverviewPreviewModal('Today Actions','今日待办',sections||ownerOverviewPreviewEmpty(),'Total',String(todoRows.length));
+    bindOwnerWaiverAckButtons();
     return;
   }
   const rows=ownerOverviewConsoleSotRows();
@@ -5697,6 +5774,28 @@ function ensureOwnerOverviewComparativeAsync(){
   if(['loading','success'].includes(state.overviewComparativeStatus))return;
   setTimeout(()=>loadOwnerOverviewComparativeSummary(),0);
 }
+function ownerFinanceSessionGross(totals){return Number(totals?.gross_received??totals?.gross??totals?.total??0);}
+function renderOwnerFinancePanel(){
+  const panel=document.getElementById('ownerFinanceProjectionPanel');
+  if(!panel)return;
+  const status=state.ownerFinanceStatus||'idle';
+  if(status==='idle'||status==='loading'){panel.innerHTML='<div class="empty-state"><div class="empty-title">Loading canonical Finance Gateway</div><div class="empty-text">正在读取规范财务投影。</div></div>';return;}
+  if(status==='error'){panel.innerHTML=`<div class="empty-state" data-owner-finance-error="true"><div class="empty-title">Finance Gateway 读取失败</div><div class="empty-text">${esc(state.ownerFinanceError||'安全停止，未显示旧成功数据')}</div><button class="btn btn-ghost" type="button" onclick="loadOwnerFinanceProjection()">重试</button></div>`;return;}
+  const data=state.ownerFinance||{};
+  const transfer=data.bed_transfer_projection||{};
+  const warnings=Array.isArray(data.reconciliation_warnings)?data.reconciliation_warnings:[];
+  const raw=Array.isArray(transfer.raw_transfer_events)?transfer.raw_transfer_events:[];
+  const effective=Array.isArray(transfer.effective_transfer_events)?transfer.effective_transfer_events:[];
+  const sessions=Array.isArray(data.sessions)?data.sessions:[];
+  panel.innerHTML=`<div data-owner-finance-projection="true"><div class="hist-grid"><div class="hist-card"><div class="hist-title">Gateway effective totals</div><div class="hist-stat"><span>Rent income</span><b>${fmtMoney(data.rent_income||0)}</b></div><div class="hist-stat" data-finance-transfer-fee="true"><span>换床费收入</span><b>${fmtMoney(data.bed_transfer_fee_income||0)}</b></div><div class="hist-stat" data-finance-bed-difference="true"><span>床价差收入</span><b>${fmtMoney(data.bed_price_difference_income||0)}</b></div><div class="hist-stat"><span>Generic arrears repaid</span><b>${fmtMoney(data.arrears_repaid||0)}</b></div><div class="hist-anchor">Component repayment categories below are classification detail only and are not added again to total income.</div><div class="hist-stat"><span>换床费欠款还款</span><b>${fmtMoney(data.bed_transfer_fee_arrears_repaid||0)}</b></div><div class="hist-stat"><span>床价差欠款还款</span><b>${fmtMoney(data.bed_price_difference_arrears_repaid||0)}</b></div></div><div class="hist-card"><div class="hist-title">Raw / Effective transfer audit</div><div class="hist-stat"><span>Raw events</span><b>${raw.length}</b></div><div class="hist-stat"><span>Effective events</span><b>${effective.length}</b></div><div class="hist-stat"><span>Projection status</span><b>${esc(transfer.status||'-')}</b></div><div class="hist-anchor">Raw amounts remain audit-visible; effective totals come only from the Gateway.</div></div></div>${warnings.length?`<div class="card" data-owner-finance-reconciliation-warning="true" style="margin-top:12px;padding:14px;border-color:var(--orange)"><b>需要老板复核</b><div class="hist-anchor">${warnings.map(row=>esc(row.code||row.message||row)).join(' · ')}</div></div>`:''}<div class="hist-title" style="margin-top:12px">Transfer raw/effective events</div><div class="detail-list">${raw.map(row=>`<div class="detail-row owner-mobile-row"><div class="room">${esc(row.from_bed||'-')} → ${esc(row.to_bed||'-')}</div><div class="note">raw fee ${fmtMoney(row.fee_amount_aed||0)} · raw difference ${fmtMoney(row.bed_price_difference_amount_aed||0)}<div class="hist-anchor">${esc(row.transfer_anchor_id||'-')} · ${esc(row.canonical_accepted_at||'-')}</div></div><div class="amount">${row.effective?'effective':'raw only'}</div></div>`).join('')||'<div class="empty-text">No Bed Transfer finance events</div>'}</div><div class="hist-title" style="margin-top:12px">Session raw / effective totals</div><div class="detail-list">${sessions.slice(0,12).map(row=>`<div class="detail-row owner-mobile-row" data-owner-finance-raw-effective="true"><div class="room">${esc(row.session_id||row.anchor||'-')}</div><div class="note">Raw ${fmtMoney(ownerFinanceSessionGross(row.raw_totals))} · Effective ${fmtMoney(ownerFinanceSessionGross(row.archive_effective_totals))}</div><div class="amount">${esc(row.archive_state||'-')}</div></div>`).join('')||'<div class="empty-text">No session audit rows</div>'}</div></div>`;
+}
+async function loadOwnerFinanceProjection(){
+  if(state.ownerFinanceStatus==='loading')return false;
+  state.ownerFinanceStatus='loading';state.ownerFinanceError='';state.ownerFinance=null;renderOwnerFinancePanel();
+  try{state.ownerFinance=await ownerGatewayJson('/api/owner/finance/projection',{},10000);state.ownerFinanceStatus='success';renderOwnerFinancePanel();return true;}
+  catch(error){state.ownerFinance=null;state.ownerFinanceStatus='error';state.ownerFinanceError=error?.message||String(error||'');if(error?.authFailure)clearLegacyAuthStorage();renderOwnerFinancePanel();return false;}
+}
+function ensureOwnerFinanceAsync(){renderOwnerFinancePanel();if(['loading','success'].includes(state.ownerFinanceStatus))return;setTimeout(()=>loadOwnerFinanceProjection(),0);}
 function renderOwnerOverview(){
   const wrap=document.getElementById('ownerOverviewContent');
   if(!wrap)return;
@@ -5771,6 +5870,10 @@ function renderOwnerOverview(){
       <div class="card-body"><div id="ownerOverviewComparativePanel" data-owner-overview-comparative-section="true"></div></div>
     </div>
     <div class="card hl-card owner-overview-section" style="margin-top:16px">
+      <div class="card-head"><div><div class="card-title">换床财务生命周期</div><div class="card-sub">CANONICAL FINANCE PROJECTION</div></div></div>
+      <div class="card-body"><div id="ownerFinanceProjectionPanel"></div></div>
+    </div>
+    <div class="card hl-card owner-overview-section" style="margin-top:16px">
       <div class="card-head"><div><div class="card-title">欠款跟进</div><div class="card-sub">ARREARS FOLLOW-UP · ASYNC</div></div></div>
       <div class="card-body"><div id="ownerOverviewArrearsPanel" data-owner-overview-arrears-section="true"></div></div>
     </div>
@@ -5797,6 +5900,7 @@ function renderOwnerOverview(){
     });
   });
   ensureOwnerOverviewComparativeAsync();
+  ensureOwnerFinanceAsync();
   ensureOwnerOverviewArrearsAsync();
   ensureOwnerTodayTodosAsync();
 }

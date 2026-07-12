@@ -136,14 +136,18 @@ test("todo deduplication and auto-resolve behavior are encoded", async () => {
 test("owner dashboard calls today todo endpoint and renders returned todos with explicit empty state", async () => {
   const ui = await readFile(ownerUiPath, "utf8");
   const load = functionBlock(ui, "loadOwnerTodayTodos");
+  const guard = functionBlock(ui, "ownerGatewayJson");
   const preview = functionBlock(ui, "ownerOverviewShowTodayActionsPreview");
+  const row = functionBlock(ui, "ownerBedTransferTodoRowHtml");
 
-  assert.match(load, /apiFetch\('\/api\/owner\/today-todos\?limit=50'\)/);
-  assert.match(load, /content-type/);
-  assert.match(load, /Todo gateway returned non-JSON HTTP/);
+  assert.match(load, /ownerGatewayJson\('\/api\/owner\/today-todos\?limit=50'/);
+  assert.match(guard, /content-type/);
+  assert.match(guard, /NON_JSON/);
+  assert.match(load, /state\.ownerTodayTodos=null/);
   assert.match(preview, /ownerOverviewTodayTodoRows\(\)/);
-  assert.match(preview, /recommended_action/);
-  assert.match(preview, /source_gateway/);
+  assert.match(preview, /ownerBedTransferTodoRowHtml/);
+  assert.match(row, /recommended_action/);
+  assert.match(row, /source_gateway/);
   assert.match(preview, /No todo items from canonical gateways/);
   assert.match(ui, /ownerOverviewTodayTodoCount\(\)/);
   assert.match(ui, /ownerOverviewTodayTodoNote\(\)/);
