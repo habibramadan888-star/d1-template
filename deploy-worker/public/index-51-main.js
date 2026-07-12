@@ -1172,7 +1172,7 @@ function buildInstallSection(){
 }
 /* onDepositInput removed - deposit uses fDepDue/fDepPaid */
 function normalizeArrearFromCloud(a){
-  const rawRemain=a.remain??a.remaining??a.remaining_amount??null;
+  const rawRemain=a.remaining_arrears??a.remain??a.remaining??a.remaining_amount??null;
   const remain=rawRemain===null||rawRemain===undefined||rawRemain===''?null:parseMoney(rawRemain);
   const sourceType=normalizeArrearsSourceType(a.source_type||a.sourceType||a.source);
   return {

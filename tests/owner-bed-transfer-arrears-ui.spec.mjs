@@ -47,6 +47,6 @@ test('multiple and closed debts render as separate Gateway rows',()=>{
 
 test('remaining amount is copied from Gateway and never recalculated',()=>{
   const normalize=block('normalizeArrearFromCloud');
-  assert.match(normalize,/rawRemain=a\.remain\?\?a\.remaining\?\?a\.remaining_amount/);
+  assert.match(normalize,/rawRemain=a\.remaining_arrears\?\?a\.remain\?\?a\.remaining\?\?a\.remaining_amount/);
   assert.doesNotMatch(normalize,/originalAmount\s*-|arrear_amount\s*-/);
 });
