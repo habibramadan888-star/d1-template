@@ -1516,6 +1516,15 @@ function canonicalDepositRemarkText(card={},lockRoom=""){
   ]).join(" ");
 }
 __name(canonicalDepositRemarkText,"canonicalDepositRemarkText");
+function canonicalAccessCardExpiryValue(card={}){
+  const raw=card?.endDate;
+  if(raw===null||raw===undefined||raw==="")return "";
+  const milliseconds=Number(raw);
+  if(!Number.isFinite(milliseconds)||milliseconds<=0)return "";
+  const date=new Date(milliseconds);
+  return Number.isNaN(date.getTime())?"":date.toISOString();
+}
+__name(canonicalAccessCardExpiryValue,"canonicalAccessCardExpiryValue");
 function canonicalDepositCardMatchesBed(card={},lockRoom="",bed=""){
   const cleanBed=cleanText(bed,80).replace(/^#/,"");
   if(!cleanBed)return false;
@@ -1544,6 +1553,7 @@ async function canonicalDepositAccessSnapshotForBed(env,user,bed,opts={}){
           provider_phone:card.provider_phone||card.phone||card.mobile||""
         }
       });
+      snapshot.normalized_expiry_value=canonicalAccessCardExpiryValue(card);
       const cardLabel=cleanText(card.cardName||card.identityCardName||card.cardAlias||card.name||card.tenant_name||card.tenant||"",160);
       const inactive=(typeof empTtlockIsVacant==="function"&&empTtlockIsVacant(cardLabel))||(typeof empTtlockIsStaff==="function"&&empTtlockIsStaff(cardLabel));
       candidates.push({snapshot,card:{room:cleanText(card.room||lockRoom||"",80),card_name:cardLabel,remark:cleanText(remark,1000)},inactive});
@@ -4836,6 +4846,28 @@ async function getOpenCloudArrearsForBed(env,user,bed,opts={}){
 }
 __name(getOpenCloudArrearsForBed,"getOpenCloudArrearsForBed");
 const canonicalArrearsForbiddenIdentityFields=["tenant_card_id","card_id","cardid","old_ttlock_ref","oldTtlockRef","provider_phone","providerPhone","ttlock_phone","ttlockPhone","phone_99099","phone99099","access_card_phone","accessCardPhone","ttlock_account_phone","ttlockAccountPhone","customer_code","card_code"];
+const providerIdentityResponseForbiddenKeys=new Set([
+  "tenantcardid","cardid","oldttlockref","providerphone","phone99099",
+  "creatorphone","creatortime","cardcreationtime","providermetadata",
+  "ttlockprovidermetadata","customerid","customercode"
+]);
+function providerIdentityResponseKey(value){
+  return String(value||"").replace(/[^a-z0-9]/gi,"").toLowerCase();
+}
+__name(providerIdentityResponseKey,"providerIdentityResponseKey");
+function providerIdentityResponseFirewall(value,seen=new WeakMap()){
+  if(Array.isArray(value))return value.map(item=>providerIdentityResponseFirewall(item,seen));
+  if(!value||typeof value!=="object")return value;
+  if(seen.has(value))return seen.get(value);
+  const clean={};
+  seen.set(value,clean);
+  for(const [key,child] of Object.entries(value)){
+    if(providerIdentityResponseForbiddenKeys.has(providerIdentityResponseKey(key)))continue;
+    clean[key]=providerIdentityResponseFirewall(child,seen);
+  }
+  return clean;
+}
+__name(providerIdentityResponseFirewall,"providerIdentityResponseFirewall");
 function canonicalArrearsGatewayCleanItem(item={}){
   const remaining=entryAnchorMoney(item.remaining_arrears||empTaskRemaining(item));
   const original=entryAnchorMoney(item.original_arrears_amount||item.arrear_amount||item.original_amount||0);
@@ -5185,6 +5217,7 @@ async function canonicalOccupancyGateway(env,user,opts={}){
       parsed_deposit_amount:access.snapshot?.parsed_deposit_amount??null,
       parsed_checkin_mmdd:access.snapshot?.parsed_checkin_mmdd||"",
       parsed_valid_until_mmdd:access.snapshot?.parsed_valid_until_mmdd||"",
+      normalized_expiry_value:access.snapshot?.normalized_expiry_value||"",
       parsed_vacancy_marker:!!access.snapshot?.parsed_vacancy_marker,
       snapshot_fingerprint:cleanText(access.snapshot?.snapshot_fingerprint||access.snapshot?.fingerprint||"",160),
       physical_bed_status:physical.physical_bed_status,
@@ -8308,7 +8341,7 @@ async function handleOwnerCloudArrearsProjection(request,env,user){
     : bed
       ? await rebuildCloudArrearsForBed(env,user,bed,{limit})
       : await rebuildAllCloudArrears(env,user,{limit});
-  return success({
+  return success(providerIdentityResponseFirewall({
     success:true,
     projection,
     open_items:projection.open_items||[],
@@ -8317,7 +8350,7 @@ async function handleOwnerCloudArrearsProjection(request,env,user){
     materialized_from:"sessions.entries_json",
     readonly:true,
     production_cutover:"PRODUCTION_NO_GO"
-  });
+  }));
 }
 __name(handleOwnerCloudArrearsProjection,"handleOwnerCloudArrearsProjection");
 function ownerCorrectionPreviewMoney(value){
