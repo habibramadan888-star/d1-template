@@ -3233,7 +3233,7 @@ function readSessionId(userid){
   try{return localStorage.getItem(employeeStorageKey('empv3:sessionId',userid))||''}
   catch{return ''}
 }
-const state={lockCards:[],current:null,depositBalance:null,depositContext:null,rentConfig:{},rentConfigLoaded:false,drafts:[],tasks:[],closedTasks:[],arrearsTasksLoaded:false,arrearTasksError:null,arrearsGatewaySource:'',arrearsGatewayProof:null,employeeDirectives:[],followupItems:[],systemReminderItems:[],systemReminderStatus:'idle',systemReminderSummary:null,systemReminderSources:null,systemReminderLimit:100,sessionId:'',user:null,ttlockStatus:'idle',ttlockLoadedAt:0,ttlockError:'',ttlockDataSource:'',bedTransferCapabilities:{status:'idle',bed_transfer_validate_enabled:false,bed_transfer_write_enabled:false,owner_waiver_ack_enabled:false,canonical_write_path:'/api/employee/entry',production_cutover:'PRODUCTION_NO_GO'},bedTransferContext:{status:'idle',source:null,target:null,requestKey:'',serverValidation:null}};
+const state={lockCards:[],current:null,depositBalance:null,depositContext:null,rentConfig:{},rentConfigLoaded:false,drafts:[],tasks:[],closedTasks:[],arrearsTasksLoaded:false,arrearTasksError:null,arrearsGatewaySource:'',arrearsGatewayProof:null,employeeDirectives:[],followupItems:[],systemReminderItems:[],systemReminderStatus:'idle',systemReminderSummary:null,systemReminderSources:null,systemReminderLimit:100,sessionId:'',user:null,ttlockStatus:'idle',ttlockLoadedAt:0,ttlockError:'',ttlockDataSource:'',bedTransferCapabilities:{status:'idle',bed_transfer_validate_enabled:false,bed_transfer_write_enabled:false,owner_waiver_ack_enabled:false,controlled_beta_preview:false,canonical_write_path:'/api/employee/entry',production_cutover:'PRODUCTION_NO_GO'},bedTransferContext:{status:'idle',source:null,target:null,requestKey:'',serverValidation:null,validatedRecord:null,recordedResult:null}};
 const BED_TRANSFER_WRITE_ENABLED=false;
 const BED_TRANSFER_EVENT_LEDGER_MESSAGE='Bed transfer records save event anchors only. This does not directly change bed occupancy, deposit, arrears, or Access Card. 换床记录只保存信息锚点，不会直接改变床位、押金、欠款或门禁卡。';
 const BED_TRANSFER_SUBMITTED_MESSAGE='Bed transfer recorded / 换床记录已保存';
@@ -3302,8 +3302,10 @@ function applyEmployeeBedTransferUiGate(){
   const validateButton=$('btnValidateBedTransfer');
   if(validateButton){validateButton.disabled=!gate.validate_enabled;validateButton.setAttribute('aria-disabled',String(!gate.validate_enabled));}
   const recordButton=$('btnRecordBedTransfer');
-  const recordEnabled=gate.final_upload_enabled&&state.bedTransferContext?.serverValidation?.ok===true;
+  const recordEnabled=gate.final_upload_enabled&&state.bedTransferContext?.serverValidation?.ok===true&&!!state.bedTransferContext?.validatedRecord&&!state.bedTransferContext?.recordedResult;
   if(recordButton){recordButton.disabled=!recordEnabled;recordButton.setAttribute('aria-disabled',String(!recordEnabled));recordButton.title=recordEnabled?'':'正式换床上传尚未启用';}
+  const notice=$('bedTransferWriteDisabledNotice');
+  if(notice){notice.textContent=!gate.final_upload_enabled?'正式换床上传尚未启用。':(!state.bedTransferContext?.validatedRecord?'请先验证换床信息。':(state.bedTransferContext?.recordedResult?'Canonical transfer accepted.':'验证通过，可以记录换床。'));}
   return gate;
 }
 async function employeeLoadBedTransferCapabilities(){
@@ -3312,7 +3314,7 @@ async function employeeLoadBedTransferCapabilities(){
     const r=await apiFetch('/api/capabilities',{method:'GET'});
     const data=r.ok?unwrapStandardResponse(await r.json()):null;
     if(!data||typeof data.bed_transfer_validate_enabled!=='boolean'||typeof data.bed_transfer_write_enabled!=='boolean')throw new Error('CAPABILITY_RESPONSE_INVALID');
-    state.bedTransferCapabilities={status:'success',bed_transfer_validate_enabled:data.bed_transfer_validate_enabled===true,bed_transfer_write_enabled:data.bed_transfer_write_enabled===true,owner_waiver_ack_enabled:data.owner_waiver_ack_enabled===true,canonical_write_path:String(data.canonical_write_path||'/api/employee/entry'),production_cutover:String(data.production_cutover||'PRODUCTION_NO_GO')};
+    state.bedTransferCapabilities={status:'success',bed_transfer_validate_enabled:data.bed_transfer_validate_enabled===true,bed_transfer_write_enabled:data.bed_transfer_write_enabled===true,owner_waiver_ack_enabled:data.owner_waiver_ack_enabled===true,controlled_beta_preview:data.controlled_beta_preview===true,canonical_write_path:String(data.canonical_write_path||'/api/employee/entry'),production_cutover:String(data.production_cutover||'PRODUCTION_NO_GO')};
   }catch{
     state.bedTransferCapabilities={...state.bedTransferCapabilities,status:'error',bed_transfer_validate_enabled:false,bed_transfer_write_enabled:false,owner_waiver_ack_enabled:false,production_cutover:'PRODUCTION_NO_GO'};
   }
@@ -4618,8 +4620,21 @@ function employeeRenderBedTransferServerValidation(result){
 function employeeBedTransferValidatePayload(entry={},session={}){
   const allowed=['event_type','type','source','from_bed','to_bed','transfer_reason','fee_mode','fee_amount_aed','payment_method','fee_waiver_reason','fee_due_date','bed_price_difference_mode','bed_price_difference_amount_aed','bed_price_difference_due_date','bed_price_difference_payment_method','bed_price_difference_reason','note'];
   const clean=Object.fromEntries(allowed.filter(field=>entry[field]!==undefined).map(field=>[field,entry[field]]));
+  if(state.bedTransferCapabilities?.controlled_beta_preview===true&&!String(clean.transfer_reason||'').includes('CONTROLLED_BETA_TEST'))clean.transfer_reason=`CONTROLLED_BETA_TEST|${String(clean.transfer_reason||'employee_beta').slice(0,180)}`;
   const safeSession={id:String(session.id||''),source:'employee_entry',entries:[clean]};
   return {dry_run:true,validate_only:true,no_write:true,event_index:0,entry:clean,entries:[clean],session:safeSession};
+}
+function employeeBedTransferRecordPayload(validated={}){
+  const entry=validated.entry||{},session=validated.session||{};
+  return {event_index:0,entry,entries:[entry],session:{id:String(session.id||''),source:'employee_entry',entries:[entry]}};
+}
+function employeeInvalidateBedTransferValidation(){
+  if(!state.bedTransferContext)return;
+  state.bedTransferContext.serverValidation=null;
+  state.bedTransferContext.validatedRecord=null;
+  state.bedTransferContext.recordedResult=null;
+  if($('bedTransferServerValidation'))$('bedTransferServerValidation').textContent='Server validation not run.';
+  applyEmployeeBedTransferUiGate();
 }
 function buildRentAnchor(){
   const amount=num(employeeFieldValue('amount'));
@@ -5651,6 +5666,8 @@ async function saveCanonicalBedTransferDraft(){
     const requestPayload=employeeBedTransferValidatePayload(canonicalEntry,session);
     const result=await validateEmployeeUploadDryRun(requestPayload.entry,requestPayload.session,0,{requestPayload});
     if(result?.ok!==true||result?.event_type!=='bed_transfer'||result?.no_write_requested!==true)throw new Error('BED_TRANSFER_VALIDATE_ONLY_RESPONSE_INVALID');
+    state.bedTransferContext.validatedRecord=employeeBedTransferRecordPayload(requestPayload);
+    state.bedTransferContext.recordedResult=null;
     employeeRenderBedTransferServerValidation(result);
     entry.upload_status='VALIDATED_NO_WRITE';
     state.drafts=[entry];
@@ -5674,14 +5691,40 @@ async function saveCanonicalBedTransferDraft(){
     if(button){button.dataset.busy='0';button.disabled=!employeeBedTransferValidateEnabled();button.innerHTML=old||renderEmployeeButtonLabel('Validate & Add Draft','校验并加入草稿');}
   }
 }
+async function recordCanonicalBedTransfer(){
+  const button=$('btnRecordBedTransfer');
+  if(button?.dataset.busy==='1'||state.bedTransferContext?.recordedResult)return false;
+  const validated=state.bedTransferContext?.validatedRecord;
+  if(!validated||state.bedTransferContext?.serverValidation?.ok!==true){showStatus('请先验证换床信息。','warn');applyEmployeeBedTransferUiGate();return false;}
+  await employeeLoadBedTransferCapabilities();
+  if(!employeeBedTransferWriteEnabled()){showStatus(BED_TRANSFER_WRITE_DISABLED_MESSAGE,'warn');applyEmployeeBedTransferUiGate();return false;}
+  if(!String(validated.entry?.transfer_reason||'').includes('CONTROLLED_BETA_TEST')&&state.bedTransferCapabilities?.controlled_beta_preview===true){showStatus('CONTROLLED_BETA_TEST_MARKER_REQUIRED','warn');return false;}
+  if(button){button.dataset.busy='1';button.disabled=true;button.setAttribute('aria-disabled','true');button.textContent='Recording / 记录中';}
+  try{
+    const response=await apiFetch('/api/employee/entry',{method:'POST',body:JSON.stringify(validated)});
+    const body=await response.json().catch(()=>({})),data=unwrapStandardResponse(body)||{};
+    if(!response.ok||data.ok!==true)throw Object.assign(new Error(data.error_code||body.error_code||`RECORD_FAILED_${response.status}`),{recordResult:data});
+    const canonical=data.canonical_entry||{};
+    state.bedTransferContext.recordedResult={ok:true,idempotent:data.idempotent===true,session_id:data.session_id||'',transfer_anchor_id:canonical.transfer_anchor_id||'',transfer_lineage_id:canonical.transfer_lineage_id||''};
+    $('validationBox').innerHTML=`<div>Canonical transfer accepted · session ${esc(state.bedTransferContext.recordedResult.session_id)} · anchor ${esc(state.bedTransferContext.recordedResult.transfer_anchor_id)} · lineage ${esc(state.bedTransferContext.recordedResult.transfer_lineage_id)}</div>`;
+    if($('bedTransferServerValidation'))$('bedTransferServerValidation').textContent=`Canonical accepted · idempotent=${state.bedTransferContext.recordedResult.idempotent}`;
+    applyEmployeeBedTransferUiGate();
+    return true;
+  }catch(error){
+    $('validationBox').innerHTML=`<div class="bad">${esc(error?.message||error)} · draft retained</div>`;
+    if($('bedTransferServerValidation'))$('bedTransferServerValidation').textContent=`${error?.message||'RECORD_FAILED'} · draft retained`;
+    return false;
+  }finally{
+    if(button){button.dataset.busy='0';button.textContent='Record Transfer / 记录换床';}
+    applyEmployeeBedTransferUiGate();
+  }
+}
 async function saveEntry(){
   if(!state.user){applyEmployeeUser(null);toast('请先登录员工账号',6000);return}
+  if($('entryType').value==='TF'){showStatus('Use Validate Transfer, then Record Transfer.','warn');return false;}
   const btn=$('btnSaveEntry');
   if(btn?.dataset.busy==='1')return;
   const v=validate();if(v.errors.length){toast('请先处理阻断校验');return}
-  if($('entryType').value==='TF'){
-    return saveCanonicalBedTransferDraft();
-  }
   let e;
   try{e=entryPayload();}catch(err){
     console.error('entryPayload failed',err);
@@ -8223,7 +8266,8 @@ if(location.hash==='#export'){
 showEmployeeView(location.hash||'entry',{pushHash:false});
 document.querySelectorAll('.event-chip').forEach(btn=>btn.addEventListener('click',e=>{e.preventDefault();setEntryType(btn.dataset.type);}));
 if($('btnValidateBedTransfer'))$('btnValidateBedTransfer').addEventListener('click',e=>{e.preventDefault();saveCanonicalBedTransferDraft();});
-if($('btnRecordBedTransfer'))$('btnRecordBedTransfer').addEventListener('click',e=>{e.preventDefault();if(!employeeBedTransferWriteEnabled()){showStatus(BED_TRANSFER_WRITE_DISABLED_MESSAGE,'warn');return false;}});
+if($('btnRecordBedTransfer'))$('btnRecordBedTransfer').addEventListener('click',e=>{e.preventDefault();recordCanonicalBedTransfer();});
+document.querySelectorAll('#transferFields input,#transferFields select,#transferFields textarea').forEach(control=>control.addEventListener('input',employeeInvalidateBedTransferValidation));
 document.querySelectorAll('.pay-option').forEach(btn=>btn.addEventListener('click',e=>{e.preventDefault();setPaymentType(btn.dataset.pay);}));
 ['entryType','cycle','payType','amount','reasonCode','feePaid','transferWaiverReason','transferFeePaymentMethod','transferFeeDueDate','bedDifferenceMode','bedDifferenceAmount','bedDifferencePaymentMethod','bedDifferenceDueDate','bedDifferenceReason','customReason','tenantName','bankRef','periodDays','depositOutRefundDate','depositOutDifferenceReason','depositDeduction','checkoutDate','noNoticeDeduction','otherDeduction','dedNote','leftWithArrearsMode','leftFormerCustomerName','leftWhatsappPhone','leftContactMethod','leftContactNote','leftDepositBalance','leftCoverageEndDate','leftArrearsAmount','leftBelongingsHeld','leftBelongingsNote','leftPromisedPaymentDate','leftPromisedReturnDate','leftConfirmedNotReturningDate','leftGraceDays','excessTo','bedTo','transferReason','expenseCategory','expenseDesc','expenseEvidenceRef','remark','arrearHandling','arrearPromiseDate','arrearReasonDetail'].forEach(id=>$(id).addEventListener('input',syncForm));
 $('linkedTaskId').addEventListener('change',applyLinkedTask);

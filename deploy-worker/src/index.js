@@ -5715,7 +5715,7 @@ async function handleOwnerTodayTodos(request,env,user){
 }
 __name(handleOwnerTodayTodos,"handleOwnerTodayTodos");
 function ownerTodayTodoAcknowledgmentWriteEnabled(env={}){
-  return ["1","true","yes","on"].includes(String(env.OWNER_TODAY_TODO_ACK_ENABLED||"").trim().toLowerCase())&&["development","dev","local","test"].includes(String(env.APP_ENV||"").trim().toLowerCase());
+  return ["1","true","yes","on"].includes(String(env.OWNER_TODAY_TODO_ACK_ENABLED||"").trim().toLowerCase())&&["development","dev","local","test","beta_preview"].includes(String(env.APP_ENV||"").trim().toLowerCase());
 }
 __name(ownerTodayTodoAcknowledgmentWriteEnabled,"ownerTodayTodoAcknowledgmentWriteEnabled");
 async function handleOwnerTodayTodoAcknowledgment(request,env,user){
@@ -8239,6 +8239,7 @@ function bedTransferDeploymentCapabilities(env={}){
     bed_transfer_validate_enabled:true,
     bed_transfer_write_enabled:bedTransferWriteApproved(env),
     owner_waiver_ack_enabled:ownerTodayTodoAcknowledgmentWriteEnabled(env),
+    controlled_beta_preview:String(env.APP_ENV||"").trim().toLowerCase()==="beta_preview",
     canonical_write_path:"/api/employee/entry",
     production_cutover:"PRODUCTION_NO_GO",
     app_version:cleanText(env.APP_VERSION||"",40)
