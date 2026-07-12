@@ -80,7 +80,7 @@ test("waived zero fee with reason passes", () => {
 });
 
 test("invalid fee choices and amounts reject", () => {
-  for (const fee_choice of ["none", "free", "no_fee", "1", "49", "51", "partial", "unpaid"]) {
+  for (const fee_choice of ["none", "free", "no_fee", "1", "49", "51", "partial"]) {
     assertReject({ fee_choice }, "BED_TRANSFER_FEE_CHOICE_INVALID");
   }
   assertReject({ fee_amount_aed: 49, fee_amount_fils: 4900 }, "BED_TRANSFER_FEE_AMOUNT_INVALID");
@@ -139,6 +139,21 @@ test("provider identity is rejected and never returned", () => {
   assert.deepEqual(result.forbidden_fields, ["tenant_card_id"]);
   assert.equal(JSON.stringify(result).includes("provider-only"), false);
   assert.equal(JSON.stringify(assertPass()).includes("card_id"), false);
+});
+
+test("unpaid fee requires exact 50 and due date without immediate payment", () => {
+  const result = assertPass({ fee_choice: "unpaid", fee_amount_aed: 50, fee_amount_fils: 5000, payment_method: "", fee_due_date: "2026-08-01" });
+  assert.equal(result.fee_mode, "unpaid");
+  assert.equal(result.payment_method, "none");
+  assertReject({ fee_choice: "unpaid", fee_amount_aed: 50, fee_amount_fils: 5000, payment_method: "", fee_due_date: "" }, "BED_TRANSFER_FEE_DUE_DATE_REQUIRED");
+});
+
+test("bed difference validates none paid and unpaid without calculating a price", () => {
+  assertPass({ bed_price_difference_mode: "none", bed_price_difference_amount_aed: 0 });
+  const paid = assertPass({ bed_price_difference_mode: "paid", bed_price_difference_amount_aed: 120, bed_price_difference_payment_method: "cash" });
+  assert.equal(paid.bed_price_difference_amount_aed, 120);
+  assertPass({ bed_price_difference_mode: "unpaid", bed_price_difference_amount_aed: 120, bed_price_difference_due_date: "2026-08-02" });
+  assertReject({ bed_price_difference_mode: "unpaid", bed_price_difference_amount_aed: 120 }, "BED_PRICE_DIFFERENCE_DUE_DATE_REQUIRED");
 });
 
 test("rent coverage requires absolute start and end dates", () => {

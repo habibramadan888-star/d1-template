@@ -20,6 +20,12 @@ const FORBIDDEN_IDENTITY_KEYS = new Set([
   ,"lifecycle","lifecyclestatus","status","void","voided","voidedat","voidstatus","reversalstatus"
   ,"ttlocksequence","sourcesnapshotfingerprint","targetsnapshotfingerprint","ttlockobservationat","physicalstatebeforesubmission","continuitychecks","reconciliationrequired"
 ]);
+const SERVER_CONTEXT_KEYS = new Set([
+  "sourcecontextanchorrefs","carriedarrearsrefs","rentcoverageref","depositcontextref","expirycontextref",
+  "snapshotfingerprint","snapshotprovenance","currentbed","corpid","companyscope","staycontextid",
+  "lifecycle","lifecyclestatus","status","void","voided","voidedat","voidstatus","reversalstatus",
+  "ttlocksequence","sourcesnapshotfingerprint","targetsnapshotfingerprint","ttlockobservationat","physicalstatebeforesubmission","continuitychecks","reconciliationrequired"
+]);
 
 function text(value) {
   return String(value ?? "").trim();
@@ -72,6 +78,14 @@ function collectForbiddenIdentityFields(value, fields = new Set(), seen = new Se
 
 export function findBedTransferForbiddenIdentityFields(value) {
   return [...collectForbiddenIdentityFields(value)].sort((a, b) => a.localeCompare(b));
+}
+
+function omitServerContextFields(value) {
+  if (Array.isArray(value)) return value.map(omitServerContextFields);
+  if (!value || typeof value !== "object") return value;
+  return Object.fromEntries(Object.entries(value)
+    .filter(([name]) => !SERVER_CONTEXT_KEYS.has(normalizedIdentityKey(name)))
+    .map(([name, child]) => [name, omitServerContextFields(child)]));
 }
 
 export function sanitizeBedTransferIdentityFields(value, seen = new Map()) {
@@ -130,7 +144,12 @@ function contextPreview(context = {}) {
 }
 
 export function validateBedTransferPhase1Contract(input = {}) {
-  const forbiddenFields = findBedTransferForbiddenIdentityFields(input);
+  const validationInput = { ...input };
+  delete validationInput.corpid;
+  delete validationInput.company_scope;
+  validationInput.source_context = omitServerContextFields(input.source_context);
+  validationInput.target_context = omitServerContextFields(input.target_context);
+  const forbiddenFields = findBedTransferForbiddenIdentityFields(validationInput);
   if (forbiddenFields.length) {
     return {
       ...failure("BED_TRANSFER_FORBIDDEN_IDENTITY_FIELD", "Provider identity fields are not accepted for Bed Transfer.", forbiddenFields),
@@ -148,26 +167,49 @@ export function validateBedTransferPhase1Contract(input = {}) {
   if (fromBed === "334" || toBed === "334") return failure("BED_TRANSFER_334_FORBIDDEN", "Bed 334 is excluded from Phase 1 Bed Transfer validation.", ["from_bed", "to_bed"]);
   if (fromBed === toBed) return failure("BED_TRANSFER_SAME_BED_NOT_ALLOWED", "From Bed and To Bed must be different.", ["from_bed", "to_bed"]);
 
-  const feeChoice = text(input.fee_choice).toLowerCase();
+  const feeChoice = text(input.fee_mode || input.fee_choice).toLowerCase();
+  const feeMode = feeChoice === "charged" ? "paid" : feeChoice;
   const feeAed = amount(input.fee_amount_aed);
   const feeFils = amount(input.fee_amount_fils);
   const feeAedExact = feeAed !== null && feeAed === 50;
   const feeFilsExact = feeFils !== null && feeFils === 5000;
-  if (!["charged", "waived"].includes(feeChoice)) {
-    return failure("BED_TRANSFER_FEE_CHOICE_INVALID", "Only charged or waived Bed Transfer fees are allowed.", ["fee_choice"]);
+  if (!["paid", "waived", "unpaid"].includes(feeMode)) {
+    return failure("BED_TRANSFER_FEE_CHOICE_INVALID", "Only paid, waived, or unpaid Bed Transfer fees are allowed.", ["fee_choice"]);
   }
-  if (feeChoice === "charged" && (!feeAedExact || !feeFilsExact)) {
+  if (feeMode === "paid" && (!feeAedExact || !feeFilsExact)) {
     return failure("BED_TRANSFER_FEE_AMOUNT_INVALID", "Charged Bed Transfer fee must be exactly 50 AED / 5000 fils.", ["fee_amount_aed", "fee_amount_fils"]);
   }
-  if (feeChoice === "charged" && !text(input.payment_method)) {
+  if (feeMode === "paid" && !text(input.payment_method)) {
     return failure("BED_TRANSFER_PAYMENT_METHOD_REQUIRED", "Charged Bed Transfer fee requires payment_method.", [], ["payment_method"]);
   }
-  if (feeChoice === "waived" && (feeAed !== 0 || feeFils !== 0)) {
+  if (feeMode === "waived" && (feeAed !== 0 || feeFils !== 0)) {
     return failure("BED_TRANSFER_FEE_AMOUNT_INVALID", "Waived Bed Transfer fee must be exactly 0 AED / 0 fils.", ["fee_amount_aed", "fee_amount_fils"]);
   }
-  if (feeChoice === "waived" && !text(input.waiver_reason)) {
+  if (feeMode === "waived" && !text(input.waiver_reason)) {
     return failure("BED_TRANSFER_WAIVER_REASON_REQUIRED", "Waived Bed Transfer fee requires waiver_reason.", [], ["waiver_reason"]);
   }
+  if (feeMode === "unpaid" && (!feeAedExact || !feeFilsExact)) {
+    return failure("BED_TRANSFER_FEE_AMOUNT_INVALID", "Unpaid Bed Transfer fee must be exactly 50 AED / 5000 fils.", ["fee_amount_aed", "fee_amount_fils"]);
+  }
+  if (feeMode === "unpaid" && !/^\d{4}-\d{2}-\d{2}$/.test(text(input.fee_due_date))) {
+    return failure("BED_TRANSFER_FEE_DUE_DATE_REQUIRED", "Unpaid Bed Transfer fee requires fee_due_date.", [], ["fee_due_date"]);
+  }
+  if (feeMode === "unpaid" && text(input.payment_method) && text(input.payment_method).toLowerCase() !== "none") {
+    return failure("BED_TRANSFER_FEE_MODE_CONFLICT", "Unpaid Bed Transfer fee cannot include an immediate payment method.", ["payment_method"]);
+  }
+
+  const differenceMode = text(input.bed_price_difference_mode || "none").toLowerCase();
+  const differenceAmount = amount(input.bed_price_difference_amount_aed ?? 0);
+  const differenceDueDate = text(input.bed_price_difference_due_date);
+  const differencePaymentMethod = text(input.bed_price_difference_payment_method);
+  if (!["none", "paid", "unpaid"].includes(differenceMode)) return failure("BED_PRICE_DIFFERENCE_MODE_INVALID", "Bed price difference mode is invalid.", ["bed_price_difference_mode"]);
+  if (differenceMode === "none" && (differenceAmount !== 0 || differenceDueDate || differencePaymentMethod)) return failure("BED_PRICE_DIFFERENCE_MODE_CONFLICT", "No bed price difference must have zero amount and no payment fields.", ["bed_price_difference_mode"]);
+  if (differenceMode === "paid" && !(differenceAmount > 0)) return failure("BED_PRICE_DIFFERENCE_AMOUNT_INVALID", "Paid bed price difference requires a positive employee-entered amount.", ["bed_price_difference_amount_aed"]);
+  if (differenceMode === "paid" && !differencePaymentMethod) return failure("BED_PRICE_DIFFERENCE_PAYMENT_METHOD_REQUIRED", "Paid bed price difference requires payment method.", [], ["bed_price_difference_payment_method"]);
+  if (differenceMode === "paid" && differenceDueDate) return failure("BED_PRICE_DIFFERENCE_MODE_CONFLICT", "Paid bed price difference cannot include a due date.", ["bed_price_difference_due_date"]);
+  if (differenceMode === "unpaid" && !(differenceAmount > 0)) return failure("BED_PRICE_DIFFERENCE_AMOUNT_INVALID", "Unpaid bed price difference requires a positive employee-entered amount.", ["bed_price_difference_amount_aed"]);
+  if (differenceMode === "unpaid" && !/^\d{4}-\d{2}-\d{2}$/.test(differenceDueDate)) return failure("BED_PRICE_DIFFERENCE_DUE_DATE_REQUIRED", "Unpaid bed price difference requires due date.", [], ["bed_price_difference_due_date"]);
+  if (differenceMode === "unpaid" && differencePaymentMethod) return failure("BED_PRICE_DIFFERENCE_MODE_CONFLICT", "Unpaid bed price difference cannot include a payment method.", ["bed_price_difference_payment_method"]);
   if (!text(input.transfer_reason)) return failure("BED_TRANSFER_REASON_REQUIRED", "Bed Transfer requires transfer_reason.", [], ["transfer_reason"]);
 
   const source = input.source_context && typeof input.source_context === "object" ? input.source_context : {};
@@ -226,10 +268,17 @@ export function validateBedTransferPhase1Contract(input = {}) {
     from_bed: fromBed,
     to_bed: toBed,
     fee_choice: feeChoice,
-    fee_amount_aed: feeChoice === "charged" ? 50 : 0,
-    fee_amount_fils: feeChoice === "charged" ? 5000 : 0,
-    payment_method: feeChoice === "charged" ? text(input.payment_method) : "none",
-    waiver_reason: feeChoice === "waived" ? text(input.waiver_reason) : "",
+    fee_mode: feeMode,
+    fee_amount_aed: feeMode === "waived" ? 0 : 50,
+    fee_amount_fils: feeMode === "waived" ? 0 : 5000,
+    payment_method: feeMode === "paid" ? text(input.payment_method) : "none",
+    fee_due_date: feeMode === "unpaid" ? text(input.fee_due_date) : "",
+    waiver_reason: feeMode === "waived" ? text(input.waiver_reason) : "",
+    bed_price_difference_mode: differenceMode,
+    bed_price_difference_amount_aed: differenceAmount,
+    bed_price_difference_due_date: differenceMode === "unpaid" ? differenceDueDate : "",
+    bed_price_difference_payment_method: differenceMode === "paid" ? differencePaymentMethod : "",
+    bed_price_difference_reason: text(input.bed_price_difference_reason),
     transfer_reason: text(input.transfer_reason),
     company_scope: companyScope,
     rent_coverage: { start: coverageStart, end: coverageEnd },

@@ -41,11 +41,31 @@ function validateFee(input) {
   if (!['paid', 'waived', 'unpaid'].includes(mode)) return fail('BED_TRANSFER_FEE_MODE_INVALID', ['fee_mode']);
   if (mode === 'paid' && amount !== 50) return fail('BED_TRANSFER_FEE_AMOUNT_INVALID', ['fee_amount_aed']);
   if (mode === 'paid' && !clean(input.payment_method)) return fail('BED_TRANSFER_PAYMENT_METHOD_REQUIRED', [], ['payment_method']);
+  if (mode === 'paid' && clean(input.fee_due_date)) return fail('BED_TRANSFER_FEE_MODE_CONFLICT', ['fee_due_date']);
   if (mode === 'waived' && amount !== 0) return fail('BED_TRANSFER_FEE_AMOUNT_INVALID', ['fee_amount_aed']);
   if (mode === 'waived' && !clean(input.fee_waiver_reason)) return fail('BED_TRANSFER_FEE_WAIVER_REASON_REQUIRED', [], ['fee_waiver_reason']);
   if (mode === 'unpaid' && amount !== 50) return fail('BED_TRANSFER_FEE_AMOUNT_INVALID', ['fee_amount_aed']);
   if (mode === 'unpaid' && !/^\d{4}-\d{2}-\d{2}$/.test(clean(input.fee_due_date))) return fail('BED_TRANSFER_FEE_DUE_DATE_REQUIRED', [], ['fee_due_date']);
+  if (mode === 'unpaid' && clean(input.payment_method) && clean(input.payment_method).toLowerCase() !== 'none') return fail('BED_TRANSFER_FEE_MODE_CONFLICT', ['payment_method']);
+  if (money(input.fee_paid_amount_aed ?? input.fee_partial_amount_aed ?? 0) > 0) return fail('BED_TRANSFER_FEE_PARTIAL_PAYMENT_FORBIDDEN', ['fee_paid_amount_aed', 'fee_partial_amount_aed']);
   return { ok: true, mode, amount };
+}
+
+function validateBedPriceDifference(input) {
+  const mode = clean(input.bed_price_difference_mode || 'none').toLowerCase();
+  const amount = money(input.bed_price_difference_amount_aed ?? 0);
+  const dueDate = clean(input.bed_price_difference_due_date);
+  const paymentMethod = clean(input.bed_price_difference_payment_method);
+  if (!['none', 'paid', 'unpaid'].includes(mode)) return fail('BED_PRICE_DIFFERENCE_MODE_INVALID', ['bed_price_difference_mode']);
+  if (mode === 'none' && (amount !== 0 || dueDate || paymentMethod)) return fail('BED_PRICE_DIFFERENCE_MODE_CONFLICT', ['bed_price_difference_mode']);
+  if (mode === 'paid' && !(amount > 0)) return fail('BED_PRICE_DIFFERENCE_AMOUNT_INVALID', ['bed_price_difference_amount_aed']);
+  if (mode === 'paid' && !paymentMethod) return fail('BED_PRICE_DIFFERENCE_PAYMENT_METHOD_REQUIRED', [], ['bed_price_difference_payment_method']);
+  if (mode === 'paid' && dueDate) return fail('BED_PRICE_DIFFERENCE_MODE_CONFLICT', ['bed_price_difference_due_date']);
+  if (mode === 'unpaid' && !(amount > 0)) return fail('BED_PRICE_DIFFERENCE_AMOUNT_INVALID', ['bed_price_difference_amount_aed']);
+  if (mode === 'unpaid' && !/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) return fail('BED_PRICE_DIFFERENCE_DUE_DATE_REQUIRED', [], ['bed_price_difference_due_date']);
+  if (mode === 'unpaid' && paymentMethod) return fail('BED_PRICE_DIFFERENCE_MODE_CONFLICT', ['bed_price_difference_payment_method']);
+  if (money(input.bed_price_difference_paid_amount_aed ?? input.bed_price_difference_unpaid_amount_aed ?? 0) > 0) return fail('BED_PRICE_DIFFERENCE_PARTIAL_PAYMENT_FORBIDDEN', ['bed_price_difference_paid_amount_aed', 'bed_price_difference_unpaid_amount_aed']);
+  return { ok: true, mode, amount, dueDate, paymentMethod, reason: clean(input.bed_price_difference_reason) };
 }
 
 export function buildBedTransferCanonicalLinkAnchor(input = {}, options = {}) {
@@ -69,6 +89,8 @@ export function buildBedTransferCanonicalLinkAnchor(input = {}, options = {}) {
   if (carried.some(ref => !ref) || unique(carried).length !== carried.length) return fail('BED_TRANSFER_ARREARS_REFS_INVALID', ['open_arrears']);
   const fee = validateFee(input);
   if (!fee.ok) return fee;
+  const bedDifference = validateBedPriceDifference(input);
+  if (!bedDifference.ok) return bedDifference;
   if (!clean(input.transfer_reason)) return fail('BED_TRANSFER_REASON_REQUIRED', [], ['transfer_reason']);
   const active = input.active_lineage || null;
   if (active && bed(active.current_bed) !== fromBed) return fail('BED_TRANSFER_LINEAGE_DISCONTINUOUS', ['from_bed']);
@@ -92,6 +114,11 @@ export function buildBedTransferCanonicalLinkAnchor(input = {}, options = {}) {
     fee_mode: fee.mode, fee_amount_aed: fee.amount,
     fee_due_date: fee.mode === 'unpaid' ? clean(input.fee_due_date) : '',
     fee_waiver_reason: fee.mode === 'waived' ? clean(input.fee_waiver_reason) : '',
+    bed_price_difference_mode: bedDifference.mode,
+    bed_price_difference_amount_aed: bedDifference.amount,
+    bed_price_difference_due_date: bedDifference.mode === 'unpaid' ? bedDifference.dueDate : '',
+    bed_price_difference_payment_method: bedDifference.mode === 'paid' ? bedDifference.paymentMethod : '',
+    bed_price_difference_reason: bedDifference.reason,
     transfer_reason: clean(input.transfer_reason), payment_method: clean(input.payment_method),
     snapshot_fingerprint: clean(source.snapshot_fingerprint),
     ttlock_sequence:sequence.ttlock_sequence,source_snapshot_fingerprint:sequence.source_snapshot_fingerprint,target_snapshot_fingerprint:sequence.target_snapshot_fingerprint,ttlock_observation_at:sequence.ttlock_observation_at,physical_state_before_submission:sequence.physical_state_before_submission,continuity_checks:sequence.continuity_checks,reconciliation_required:sequence.reconciliation_required,

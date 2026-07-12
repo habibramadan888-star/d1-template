@@ -13,6 +13,7 @@ import {
 import { resolveBedTransferSourceContext } from "../../modules/employees/bed-transfer-source-context-resolver.mjs";
 import { classifyExistingCanonicalTransfer, prepareCanonicalTransferArchiveWrite } from "../../modules/employees/bed-transfer-canonical-archive-write.mjs";
 import { projectOwnerHistoryTransferLineage } from "../../modules/owner-history/bed-transfer-lineage-projection.mjs";
+import { projectBedTransferFinanceAndArrears } from "../../modules/finance/bed-transfer-finance-arrears-projection.mjs";
 import { evaluateStayGenesisTrigger } from "../../modules/employees/durable-stay-genesis-trigger.mjs";
 import {
   materializePreparedStayGenesis,
@@ -2185,15 +2186,17 @@ function employeeEntryFirstExplicitAmount(source={},fields=[]){
 __name(employeeEntryFirstExplicitAmount,"employeeEntryFirstExplicitAmount");
 function employeeEntryBedTransferFee(entry={},normalized={}){
   const rawChoice=cleanText(entry.fee_choice||normalized.fee_choice||entry.fee_status||normalized.fee_status||entry.fee_mode||normalized.fee_mode||"",40).toLowerCase();
-  const amountInfo=employeeEntryFirstExplicitAmount(entry,["fee_amount","transfer_fee","transfer_fee_aed","amount"]);
+  const amountInfo=employeeEntryFirstExplicitAmount(entry,["fee_amount_aed","fee_amount","transfer_fee","transfer_fee_aed","amount"]);
   const rawPaid=cleanText(entry.fee_paid,20).toLowerCase();
   const rawWaived=cleanText(entry.fee_waived,20).toLowerCase();
   const paidFlag=entry.fee_paid===true||["true","yes","y","1","paid","charged"].includes(rawPaid)||["paid","charged"].includes(rawChoice);
   const waivedFlag=entry.fee_waived===true||["true","yes","y","1","waived","waive"].includes(rawWaived)||["waived","waive"].includes(rawChoice);
+  const unpaidFlag=rawChoice==="unpaid";
   const noneFlag=["none","no_fee","nofee","zero","free"].includes(rawChoice);
   const feeAmount=amountInfo.provided?amountInfo.amount:employeeEntryUploadAmount(normalized.fee_amount||0);
   let feeChoice="";
-  if(paidFlag||feeAmount>0)feeChoice="paid";
+  if(unpaidFlag)feeChoice="unpaid";
+  else if(paidFlag||feeAmount>0)feeChoice="paid";
   else if(waivedFlag)feeChoice="waived";
   else if(noneFlag||(amountInfo.provided&&feeAmount===0))feeChoice="none";
   const waiverReason=cleanText(entry.fee_waived_reason||entry.waived_reason||entry.waiver_reason||entry.fee_waiver_reason||entry.custom_reason||entry.note||normalized.waiver_reason||"",240);
@@ -2201,8 +2204,8 @@ function employeeEntryBedTransferFee(entry={},normalized={}){
     fee_choice:feeChoice,
     fee_paid:feeChoice==="paid",
     fee_waived:feeChoice==="waived",
-    fee_amount:feeChoice==="paid"?feeAmount:0,
-    payment_method:entryAnchorPaymentMethod(entry.payment_method||entry.pay_type||normalized.payment_method||""),
+    fee_amount:["paid","unpaid"].includes(feeChoice)?feeAmount:0,
+    payment_method:feeChoice==="unpaid"?"":entryAnchorPaymentMethod(entry.payment_method||entry.pay_type||normalized.payment_method||""),
     waiver_reason:waiverReason,
     amount_field:amountInfo.field,
     amount_provided:amountInfo.provided
@@ -2643,6 +2646,12 @@ async function validateEmployeeBedTransferPhase1(env,user,entry={},normalized={}
     fee_amount_fils:entry.fee_amount_fils??normalized.fee_amount_fils??Math.round(feeAmountAed*100),
     payment_method:fee.payment_method,
     waiver_reason:fee.waiver_reason,
+    fee_due_date:entry.fee_due_date||normalized.fee_due_date||"",
+    bed_price_difference_mode:entry.bed_price_difference_mode||normalized.bed_price_difference_mode||"none",
+    bed_price_difference_amount_aed:entry.bed_price_difference_amount_aed??normalized.bed_price_difference_amount_aed??0,
+    bed_price_difference_due_date:entry.bed_price_difference_due_date||normalized.bed_price_difference_due_date||"",
+    bed_price_difference_payment_method:entry.bed_price_difference_payment_method||normalized.bed_price_difference_payment_method||"",
+    bed_price_difference_reason:entry.bed_price_difference_reason||normalized.bed_price_difference_reason||"",
     transfer_reason:normalized.transfer_reason||entry.transfer_reason||entry.reason||entry.custom_reason||entry.note||"",
     source_context:employeeBedTransferPhase1GatewayContext(sourceGateway,companyScope),
     target_context:employeeBedTransferPhase1GatewayContext(targetGateway,companyScope),
@@ -2695,8 +2704,13 @@ async function validateEmployeeBedTransferCanonicalLink(env,user,entry={},normal
     active_lineage:source.active_lineage||null,
     fee_mode:entry.fee_mode||fee.fee_choice,
     fee_amount_aed:entry.fee_amount_aed??fee.fee_amount,
-    fee_due_date:entry.fee_due_date||"",fee_waiver_reason:entry.fee_waiver_reason||fee.waiver_reason||""
-    ,transfer_reason:normalized.transfer_reason||entry.transfer_reason||entry.reason||"",payment_method:fee.payment_method||entry.payment_method||"",ttlock_observation_at:empNow()
+    fee_due_date:entry.fee_due_date||"",fee_waiver_reason:entry.fee_waiver_reason||fee.waiver_reason||"",
+    bed_price_difference_mode:entry.bed_price_difference_mode||"none",
+    bed_price_difference_amount_aed:entry.bed_price_difference_amount_aed??0,
+    bed_price_difference_due_date:entry.bed_price_difference_due_date||"",
+    bed_price_difference_payment_method:entry.bed_price_difference_payment_method||"",
+    bed_price_difference_reason:entry.bed_price_difference_reason||"",
+    transfer_reason:normalized.transfer_reason||entry.transfer_reason||entry.reason||"",payment_method:fee.payment_method||entry.payment_method||"",ttlock_observation_at:empNow()
   });
 }
 __name(validateEmployeeBedTransferCanonicalLink,"validateEmployeeBedTransferCanonicalLink");
@@ -3687,7 +3701,7 @@ const entryAnchorContract={
   DR:["event_type","bed","deposit_balance","refund_amount","payment_method","refund_method","refund_date","refund_reason","deposit_remaining_after_refund","owner_override_ref","arrears_offset_ref","arrears_offset_amount","checkout_ref","note","operator","created_at"],
   CO:["event_type","bed","checkout_date","deposit_refund","outstanding_arrears","owner_approval_required","owner_approval_status","checkout_mode","left_with_arrears","customer_left","former_customer_name","whatsapp_phone","contact_method","contact_note","arrears_amount","cloud_arrears_ref","belongings_held","belongings_note","promised_payment_date","promised_return_date","deposit_balance","left_status","final_status","final_note","ttlock_context","operator","created_at"],
   E:["event_type","expense_amount","expense_category","target_bed","reason","note","payment_method","evidence_ref","operator","created_at"],
-  TF:["event_type","from_bed","to_bed","transfer_date","transfer_reason","deposit_balance_carryover","arrears_carryover","rent_coverage_carryover","fee_amount","fee_status","payment_method","waiver_reason","fee_waived_reason","old_tenant_context","old_ttlock_context","note","operator","created_at"]
+  TF:["event_type","from_bed","to_bed","transfer_date","transfer_reason","deposit_balance_carryover","arrears_carryover","rent_coverage_carryover","fee_amount","fee_amount_aed","fee_status","fee_mode","fee_due_date","payment_method","waiver_reason","fee_waiver_reason","fee_waived_reason","bed_price_difference_mode","bed_price_difference_amount_aed","bed_price_difference_due_date","bed_price_difference_payment_method","bed_price_difference_reason","old_tenant_context","old_ttlock_context","note","operator","created_at"]
 };
 const employeeSourceFirewallForbiddenFields=["card_id","cardid","tenant_card_id","tenantCardId","old_ttlock_ref","oldTtlockRef","provider_phone","providerPhone","ttlock_phone","ttlockPhone","phone_99099","phone99099","access_card_phone","accessCardPhone","ttlock_account_phone","ttlockAccountPhone","ttlock_context","old_ttlock_context","provider_metadata","ttlock_metadata","card_provider_metadata"];
 const employeeSourceFirewallAllowedFields={
@@ -3697,7 +3711,7 @@ const employeeSourceFirewallAllowedFields={
   DR:["id","entry_id","event_id","anchor_id","session_id","type","event_type","source","cat","room","bed","amount","deposit_balance","actual_refund_amount","refund_amount","refund_difference","deposit_remaining_after_refund","payment_method","pay_type","refund_method","refund_date","refund_reason","difference_reason","owner_override_ref","override_reason","arrears_offset_ref","arrears_offset_amount","checkout_ref","open_arrears_amount","outstanding_arrears","owner_approval_required","owner_approval_status","raw_display_line","anchor_contract_version","validation_status","validation_missing_fields","operator","operator_id","operator_name","employee","created_at","ts","note","remark","status","src","sync_status","upload_status","cloud_sync_status","cloud_sync_checked_at","upload_validation_error","upload_validation_error_code","sync_error","cloud_entry_id","upload_attempt_id","idempotency_key","original_local_entry_id"],
   CO:["id","entry_id","event_id","anchor_id","session_id","type","event_type","source","cat","room","bed","amount","checkout_date","checkout_type","deposit_refund","deposit_balance","outstanding_arrears","open_arrears_amount","owner_approval_required","owner_approval_status","checkout_mode","left_with_arrears","customer_left","former_customer_ref","former_customer_name","card_name","whatsapp_phone","former_customer_phone","contact_method","contact_note","arrears_amount","left_arrears_amount","cloud_arrears_ref","belongings_held","belongings_note","coverage_end_date","card_end_date","rent_coverage_end","promised_payment_date","promised_return_date","promise_return_date","left_date","checkout_attempt_date","left_status","final_status","overdue_days","grace_days_after_promise","review_date","confirmed_not_returning_date","confirmed_not_returning_by","confirmation_note","original_session_id","original_event_id","final_note","raw_display_line","anchor_contract_version","validation_status","validation_missing_fields","operator","operator_id","operator_name","employee","created_at","ts","note","remark","status","src","sync_status","upload_status","cloud_sync_status","cloud_sync_checked_at","upload_validation_error","upload_validation_error_code","sync_error","cloud_entry_id","upload_attempt_id","idempotency_key","original_local_entry_id","ttlock_context"],
   E:["id","entry_id","event_id","anchor_id","session_id","type","event_type","source","cat","room","bed","amount","expense_amount","expense_category","target_bed","reason","expense_desc","evidence_ref","receipt_ref","payment_method","pay_type","bank_ref","raw_display_line","anchor_contract_version","validation_status","validation_missing_fields","operator","operator_id","operator_name","employee","created_at","ts","note","remark","status","src","sync_status","upload_status","cloud_sync_status","cloud_sync_checked_at","upload_validation_error","upload_validation_error_code","sync_error","cloud_entry_id","upload_attempt_id","idempotency_key","original_local_entry_id"],
-  TF:["id","entry_id","event_id","anchor_id","session_id","type","event_type","source","cat","room","bed","roomTo","room_to","bed_from","bed_to","from_bed","to_bed","amount","fee_amount","fee_status","fee_paid","fee_mode","payment_method","pay_type","bank_ref","waiver_reason","fee_waiver_reason","fee_waived_reason","transfer_date","transfer_reason","transfer_validation_status","deposit_balance_carryover","deposit_carried","arrears_carryover","carry_over_arrears","rent_coverage_carryover","rent_difference","old_tenant_context","old_ttlock_context","raw_display_line","anchor_contract_version","validation_status","validation_missing_fields","operator","operator_id","operator_name","employee","created_at","ts","note","remark","status","src","sync_status","upload_status","cloud_sync_status","cloud_sync_checked_at","upload_validation_error","upload_validation_error_code","sync_error","cloud_entry_id","upload_attempt_id","idempotency_key","original_local_entry_id"]
+  TF:["id","entry_id","event_id","anchor_id","session_id","type","event_type","source","cat","room","bed","roomTo","room_to","bed_from","bed_to","from_bed","to_bed","amount","fee_amount","fee_amount_aed","fee_status","fee_paid","fee_mode","fee_due_date","payment_method","pay_type","bank_ref","waiver_reason","fee_waiver_reason","fee_waived_reason","bed_price_difference_mode","bed_price_difference_amount_aed","bed_price_difference_due_date","bed_price_difference_payment_method","bed_price_difference_reason","transfer_date","transfer_reason","transfer_validation_status","deposit_balance_carryover","deposit_carried","arrears_carryover","carry_over_arrears","rent_coverage_carryover","rent_difference","old_tenant_context","old_ttlock_context","raw_display_line","anchor_contract_version","validation_status","validation_missing_fields","operator","operator_id","operator_name","employee","created_at","ts","note","remark","status","src","sync_status","upload_status","cloud_sync_status","cloud_sync_checked_at","upload_validation_error","upload_validation_error_code","sync_error","cloud_entry_id","upload_attempt_id","idempotency_key","original_local_entry_id"]
 };
 function entryAnchorType(row){
   const raw=String(row?.type||"").trim().toUpperCase();
@@ -4633,6 +4647,15 @@ function buildCloudArrearsProjectionFromSessions(sessions=[],opts={}){
       }
     }
   }
+  const transferProjection=projectBedTransferFinanceAndArrears({
+    corpid:cleanText(opts.corpid||sessions.find(row=>row?.corpid)?.corpid||"",120),
+    archive_entries:ownerHistoryTransferLineageArchiveEntries(sessions,cleanText(opts.corpid||sessions.find(row=>row?.corpid)?.corpid||"",120)),
+    existing_arrears:[...itemsByRef.values()]
+  });
+  if(transferProjection.ok){
+    for(const item of transferProjection.derived_arrears||[])if(!itemsByRef.has(item.arrears_ref))itemsByRef.set(item.arrears_ref,item);
+    for(const item of transferProjection.carried_arrears||[])itemsByRef.set(item.arrears_ref,{...itemsByRef.get(item.arrears_ref),...item});
+  }
   for(const payment of payments){
     const item=itemsByRef.get(payment.ref);
     if(!item)continue;
@@ -4658,8 +4681,8 @@ function buildCloudArrearsProjectionFromSessions(sessions=[],opts={}){
   const open_items=all_items.filter(item=>["open","partial"].includes(item.status)&&entryAnchorMoney(item.remaining_arrears)>0);
   const closed_items=all_items.filter(item=>!open_items.includes(item));
   const bed=cleanText(opts.bed||"",80).replace(/^#/,"");
-  const filteredOpen=bed?open_items.filter(item=>item.bed===bed):open_items;
-  const filteredClosed=bed?closed_items.filter(item=>item.bed===bed):closed_items;
+  const filteredOpen=bed?open_items.filter(item=>item.bed===bed||item.effective_current_bed===bed):open_items;
+  const filteredClosed=bed?closed_items.filter(item=>item.bed===bed||item.effective_current_bed===bed):closed_items;
   return {
     source:"cloud_arrears_projection",
     materialized_from:"sessions.entries_json",
@@ -4672,7 +4695,9 @@ function buildCloudArrearsProjectionFromSessions(sessions=[],opts={}){
     total_remaining:entryAnchorMoney(filteredOpen.reduce((sum,item)=>sum+entryAnchorMoney(item.remaining_arrears),0)),
     open_count:filteredOpen.filter(item=>item.status==="open").length,
     partial_count:filteredOpen.filter(item=>item.status==="partial").length,
-    settled_count:filteredClosed.filter(item=>item.status==="settled").length
+    settled_count:filteredClosed.filter(item=>item.status==="settled").length,
+    transfer_projection_status:transferProjection.ok?"projected":"fail_closed",
+    reconciliation_warnings:[...(transferProjection.reconciliation_warnings||[]),...(!transferProjection.ok?[{code:transferProjection.error_code||"BED_TRANSFER_ARREARS_PROJECTION_FAILED_CLOSED"}]:[])]
   };
 }
 __name(buildCloudArrearsProjectionFromSessions,"buildCloudArrearsProjectionFromSessions");
@@ -4684,8 +4709,12 @@ async function cloudArrearsFetchActiveSessionRows(env,user,opts={}){
   const hasEntriesJson=columns.has("entries_json");
   const hasSummaryJson=columns.has("summary_json");
   const params=[user.corpid];
-  let where="corpid=? AND COALESCE(voided_at,'')='' AND COALESCE(handover_status,'')<>'VOID' AND ";
+  const includeArchive=opts.include_archive!==false;
+  let where=includeArchive?"corpid=? AND ":"corpid=? AND COALESCE(voided_at,'')='' AND COALESCE(handover_status,'')<>'VOID' AND ";
   where+=hasEntriesJson?"(COALESCE(entries_json,'')<>'' OR COALESCE(export_text,'') LIKE '%ENTRY ANCHORS JSON%')":"COALESCE(export_text,'') LIKE '%ENTRY ANCHORS JSON%'";
+  if(includeArchive)where=hasEntriesJson
+    ? "corpid=? AND (COALESCE(entries_json,'')<>'' OR COALESCE(export_text,'') LIKE '%ENTRY ANCHORS JSON%' OR COALESCE(export_text,'') LIKE '%CORRECTION ANCHORS JSON%')"
+    : "corpid=? AND (COALESCE(export_text,'') LIKE '%ENTRY ANCHORS JSON%' OR COALESCE(export_text,'') LIKE '%CORRECTION ANCHORS JSON%')";
   if(sessionId){
     where+=" AND id=?";
     params.push(sessionId);
@@ -4702,12 +4731,12 @@ async function cloudArrearsFetchActiveSessionRows(env,user,opts={}){
 __name(cloudArrearsFetchActiveSessionRows,"cloudArrearsFetchActiveSessionRows");
 async function rebuildAllCloudArrears(env,user,opts={}){
   const sessions=await cloudArrearsFetchActiveSessionRows(env,user,opts);
-  return buildCloudArrearsProjectionFromSessions(sessions,opts);
+  return buildCloudArrearsProjectionFromSessions(sessions,{...opts,corpid:user.corpid});
 }
 __name(rebuildAllCloudArrears,"rebuildAllCloudArrears");
 async function updateCloudArrearsProjectionForSession(env,user,sessionId,opts={}){
   const sessions=await cloudArrearsFetchActiveSessionRows(env,user,{...opts,session_id:sessionId});
-  return buildCloudArrearsProjectionFromSessions(sessions,opts);
+  return buildCloudArrearsProjectionFromSessions(sessions,{...opts,corpid:user.corpid});
 }
 __name(updateCloudArrearsProjectionForSession,"updateCloudArrearsProjectionForSession");
 async function rebuildCloudArrearsForBed(env,user,bed,opts={}){
@@ -4729,7 +4758,10 @@ function canonicalArrearsGatewayCleanItem(item={}){
     task_id:cleanText(item.arrears_ref||item.task_id||item.id||item.source_ref||"",160),
     id:cleanText(item.arrears_ref||item.task_id||item.id||item.source_ref||"",160),
     arrears_ref:cleanText(item.arrears_ref||item.task_id||item.id||item.source_ref||"",160),
+    corpid:cleanText(item.corpid||"",120),
     bed:cleanText(item.bed||item.room_bed||item.room||item.bed_no||"",80).replace(/^#/,""),
+    original_bed:cleanText(item.original_bed||item.bed||item.room_bed||item.room||item.bed_no||"",80).replace(/^#/,""),
+    effective_current_bed:cleanText(item.effective_current_bed||item.bed||item.room_bed||item.room||item.bed_no||"",80).replace(/^#/,""),
     tenant_name:cleanText(item.tenant_name||item.customer_name||item.former_customer_name||item.card_name||"",120),
     original_arrears_amount:original,
     original_amount:original,
@@ -4747,12 +4779,15 @@ function canonicalArrearsGatewayCleanItem(item={}){
     source_session_id:cleanText(item.source_session_id||item.session_id||"",120),
     source_event_id:cleanText(item.source_event_id||item.entry_id||item.original_entry_id||"",120),
     source_event_type:cleanText(item.source_event_type||item.original_type||item.source_type||"",80),
+    source_anchor_ref:cleanText(item.source_anchor_ref||item.source_event_id||item.entry_id||item.original_entry_id||"",180),
+    transfer_lineage_id:cleanText(item.transfer_lineage_id||item.carried_by_transfer_lineage_id||"",180),
     entry_id:cleanText(item.entry_id||item.source_event_id||item.original_entry_id||"",120),
     original_entry_id:cleanText(item.original_entry_id||item.source_event_id||item.entry_id||"",120),
     source_type:cleanText(item.source_type||"cloud_arrears_projection",80),
     source:"canonical_arrears_gateway",
     materialized_from:"canonical_event_archive",
     projection_source:"sessions.entries_json",
+    payment_policy:cleanText(item.payment_policy||"",80),
     original_note:cleanText(item.original_note||item.staff_note||item.owner_note||item.arrear_reason||item.note||"",500),
     staff_note:cleanText(item.staff_note||item.original_note||item.arrear_reason||"",500),
     linked_repayment_events:Array.isArray(item.linked_repayment_events)?item.linked_repayment_events.map(event=>({
@@ -9467,6 +9502,8 @@ function canonicalFinanceProjectionZeroTotals(){
     arrears_opened_count:0,
     expenses:0,
     bed_transfer_fee:0,
+    bed_transfer_fee_income:0,
+    bed_price_difference_income:0,
     cash_out:0,
     bank_out:0,
     net_cash:0
@@ -9613,6 +9650,12 @@ async function canonicalFinanceProjectionBuild(env,user,range={},options={}){
   const correctionRowsByTarget=includeCorrections
     ? await ownerCorrectionFetchCorrectionSessionsByTarget(env,user,correctionTargets).catch(()=>new Map())
     : new Map();
+  const correctionSessions=[...new Map([...correctionRowsByTarget.values()].flat().map(row=>[cleanText(row?.id||row?.anchor_id||"",180),row])).values()];
+  const transferProjection=projectBedTransferFinanceAndArrears({
+    corpid:user.corpid,
+    archive_entries:ownerHistoryTransferLineageArchiveEntries([...sessions,...correctionSessions],user.corpid),
+    existing_arrears:[]
+  });
   let active_session_count=0;
   let voided_session_count=0;
   let corrected_session_count=0;
@@ -9651,16 +9694,31 @@ async function canonicalFinanceProjectionBuild(env,user,range={},options={}){
       continue;
     }
     active_session_count+=1;
-    if(summary.correction_applied){
+    const hasCanonicalTransfer=anchors.some(anchor=>canonicalFinanceProjectionEventType(anchor)==="bed_transfer");
+    if(summary.correction_applied&&!hasCanonicalTransfer){
       canonicalFinanceProjectionApplyCorrectionEffectiveTotals(totals,summary);
     }else if(anchors.length){
-      for(const anchor of anchors)canonicalFinanceProjectionApplyAnchor(totals,anchor);
+      for(const anchor of anchors)if(canonicalFinanceProjectionEventType(anchor)!=="bed_transfer")canonicalFinanceProjectionApplyAnchor(totals,anchor);
     }else{
       reconciliation_warnings.push({code:"CANONICAL_ANCHORS_MISSING",session_id:session.id,anchor:targetAnchor,message:"No entries_json anchors found; session summary used as legacy compatibility only."});
       totals.cash_received+=ownerOverviewMoney(session.cash_handover);
       totals.bank_received+=ownerOverviewMoney(session.bank_transfer_total);
       totals.gross_received+=ownerOverviewMoney(session.gross_received);
     }
+  }
+  if(transferProjection.ok){
+    const transferFinance=transferProjection.finance||{};
+    totals.cash_received+=ownerOverviewMoney(transferFinance.cash_received);
+    totals.bank_received+=ownerOverviewMoney(transferFinance.bank_received);
+    totals.gross_received+=ownerOverviewMoney(transferFinance.gross_received);
+    totals.bed_transfer_fee_income+=ownerOverviewMoney(transferFinance.bed_transfer_fee_income);
+    totals.bed_transfer_fee+=ownerOverviewMoney(transferFinance.bed_transfer_fee_income);
+    totals.bed_price_difference_income+=ownerOverviewMoney(transferFinance.bed_price_difference_income);
+    totals.arrears_opened_amount+=ownerOverviewMoney(transferFinance.arrears_opened_amount);
+    totals.arrears_opened_count+=Number(transferFinance.arrears_opened_count||0);
+    reconciliation_warnings.push(...(transferProjection.reconciliation_warnings||[]));
+  }else{
+    reconciliation_warnings.push({code:transferProjection.error_code||"BED_TRANSFER_FINANCE_PROJECTION_FAILED_CLOSED",message:"Canonical Bed Transfer finance projection failed closed; no transfer income or derived arrears were counted."});
   }
   const rounded=canonicalFinanceProjectionRoundTotals(totals);
   rounded.net_cash=ownerOverviewMoney(rounded.cash_received-rounded.cash_out);
@@ -9672,6 +9730,15 @@ async function canonicalFinanceProjectionBuild(env,user,range={},options={}){
     source_proof:canonicalFinanceProjectionSourceProof(),
     excluded_records,
     reconciliation_warnings,
+    bed_transfer_projection:{
+      status:transferProjection.ok?"projected":"fail_closed",
+      raw_transfer_count:(transferProjection.raw_transfer_events||[]).length,
+      effective_transfer_count:(transferProjection.effective_transfer_events||[]).length,
+      derived_arrears:(transferProjection.derived_arrears||[]),
+      raw_transfer_events:(transferProjection.raw_transfer_events||[]),
+      effective_transfer_events:(transferProjection.effective_transfer_events||[]),
+      canonical_anchor_dedup_count:transferProjection.canonical_anchor_dedup_count||0
+    },
     sessions:session_details,
     range,
     readonly:true,
@@ -9687,6 +9754,8 @@ function canonicalFinanceProjectionToOverviewSummary(projection={}){
     deposit_received:ownerOverviewMoney(projection.deposit_received),
     arrears_recovered:ownerOverviewMoney(projection.arrears_repaid),
     bed_transfer_fee:ownerOverviewMoney(projection.bed_transfer_fee),
+    bed_transfer_fee_income:ownerOverviewMoney(projection.bed_transfer_fee_income),
+    bed_price_difference_income:ownerOverviewMoney(projection.bed_price_difference_income),
     deposit_refund:ownerOverviewMoney(projection.deposit_refund),
     expenses:ownerOverviewMoney(projection.expenses),
     net_cashflow:ownerOverviewMoney(projection.net_cash),
