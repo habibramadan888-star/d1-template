@@ -3097,6 +3097,11 @@ label .label-en{
             </div>
             <div id="bedTransferSequenceResult" class="context-note">TTLock sequence is decided by server validation.</div>
             <div id="bedTransferServerValidation" class="context-note">Server validation not run.</div>
+            <div class="row" id="bedTransferActions" data-bed-transfer-actions="true">
+              <button class="btn primary" id="btnValidateBedTransfer" type="button">Validate Transfer / 验证换床</button>
+              <button class="btn" id="btnRecordBedTransfer" type="button" disabled aria-disabled="true" title="正式换床上传尚未启用">Record Transfer / 记录换床</button>
+            </div>
+            <div class="warn" id="bedTransferWriteDisabledNotice">正式换床上传尚未启用</div>
           </div>
         </div>
         <div class="grid" id="expenseFields">
@@ -3294,6 +3299,11 @@ function applyEmployeeBedTransferUiGate(){
   document.querySelectorAll('#transferFields input,#transferFields select,#transferFields textarea').forEach(control=>{control.disabled=!gate.fields_enabled});
   const chip=document.querySelector('.event-chip[data-type="TF"]');
   if(chip){chip.disabled=!gate.validate_enabled;chip.title=gate.validate_enabled?'':gate.error_code;}
+  const validateButton=$('btnValidateBedTransfer');
+  if(validateButton){validateButton.disabled=!gate.validate_enabled;validateButton.setAttribute('aria-disabled',String(!gate.validate_enabled));}
+  const recordButton=$('btnRecordBedTransfer');
+  const recordEnabled=gate.final_upload_enabled&&state.bedTransferContext?.serverValidation?.ok===true;
+  if(recordButton){recordButton.disabled=!recordEnabled;recordButton.setAttribute('aria-disabled',String(!recordEnabled));recordButton.title=recordEnabled?'':'正式换床上传尚未启用';}
   return gate;
 }
 async function employeeLoadBedTransferCapabilities(){
@@ -4029,8 +4039,9 @@ function employeeRenderBedInfoStrip(el,bedValue,{label='Bed',labelZh='床位'}={
 }
 let employeeBedInfoStripTimer=null;
 function renderEmployeeBedInfoStrips(){
-  employeeRenderBedInfoStrip($('employeeBedInfoStrip'),$('bed')?.value,{label:$('entryType')?.value==='E'?'Target Bed / Room':'Bed',labelZh:$('entryType')?.value==='E'?'目标床位 / 房间':'床位'});
-  employeeRenderBedInfoStrip($('employeeTransferFromBedInfoStrip'),$('transferFromBed')?.value,{label:'From Bed',labelZh:'原床位'});
+  const transfer=$('entryType')?.value==='TF';
+  employeeRenderBedInfoStrip($('employeeBedInfoStrip'),transfer?'':$('bed')?.value,{label:$('entryType')?.value==='E'?'Target Bed / Room':'Bed',labelZh:$('entryType')?.value==='E'?'目标床位 / 房间':'床位'});
+  employeeRenderBedInfoStrip($('employeeTransferFromBedInfoStrip'),transfer?'':$('transferFromBed')?.value,{label:'From Bed',labelZh:'原床位'});
 }
 function employeeScheduleBedInfoStrip(){
   if(employeeBedInfoStripTimer)clearTimeout(employeeBedInfoStripTimer);
@@ -4572,7 +4583,8 @@ async function employeeLoadBedTransferContexts(){
       apiFetch(`/api/employee/bed-context?bed=${encodeURIComponent(to)}`,{method:'GET'})
     ]);
     if(!sourceResponse.ok||!targetResponse.ok)throw new Error('BED_TRANSFER_BED_CONTEXT_UNAVAILABLE');
-    const [sourceData,targetData]=await Promise.all([sourceResponse.json(),targetResponse.json()]);
+    const [sourceBody,targetBody]=await Promise.all([sourceResponse.json(),targetResponse.json()]);
+    const sourceData=unwrapStandardResponse(sourceBody),targetData=unwrapStandardResponse(targetBody);
     if(state.bedTransferContext.requestKey!==requestKey)throw new Error('BED_TRANSFER_CONTEXT_CHANGED');
     const source=employeeBedTransferSafeContext('source',from,sourceData);
     const target=employeeBedTransferSafeContext('target',to,targetData);
@@ -4591,6 +4603,7 @@ function employeeRenderBedTransferServerValidation(result){
   state.bedTransferContext.serverValidation=result||null;
   const preview=result?.bed_transfer_phase1_preview||{};
   const sequence=preview.ttlock_sequence||'';
+  const warnings=[...(result?.warnings||[]),...(preview.warnings||[])].map(String).slice(0,8);
   const message=sequence==='employee_first_pre_move'
     ?'换床记录提交后，请老板将通通锁信息从来源床移动到目标床。'
     :sequence==='owner_first_post_move'
@@ -4598,8 +4611,15 @@ function employeeRenderBedTransferServerValidation(result){
       :(sequence?`Blocked: ${sequence}`:'TTLock sequence is decided by server validation.');
   if($('bedTransferSequenceResult'))$('bedTransferSequenceResult').textContent=message;
   if($('bedTransferServerValidation'))$('bedTransferServerValidation').textContent=result?.ok===true&&result?.event_type==='bed_transfer'&&result?.no_write_requested===true
-    ?`Validated without write · fee ${preview.fee_mode||'-'} ${preview.fee_amount_aed??'-'} AED · difference ${preview.bed_price_difference_mode||'none'} ${preview.bed_price_difference_amount_aed??0} AED`
-    :'Server validation not passed.';
+    ?`Validation passed · sequence ${sequence||'unknown'} · no_write=true${warnings.length?` · warnings ${warnings.join(' | ')}`:''} · 正式上传尚未启用`
+    :`${result?.error_code||'VALIDATION_FAILED'} · missing_fields ${(result?.missing_fields||[]).join(', ')||'none'}${warnings.length?` · warnings ${warnings.join(' | ')}`:''} · draft retained`;
+  applyEmployeeBedTransferUiGate();
+}
+function employeeBedTransferValidatePayload(entry={},session={}){
+  const allowed=['event_type','type','source','from_bed','to_bed','transfer_reason','fee_mode','fee_amount_aed','payment_method','fee_waiver_reason','fee_due_date','bed_price_difference_mode','bed_price_difference_amount_aed','bed_price_difference_due_date','bed_price_difference_payment_method','bed_price_difference_reason','note'];
+  const clean=Object.fromEntries(allowed.filter(field=>entry[field]!==undefined).map(field=>[field,entry[field]]));
+  const safeSession={id:String(session.id||''),source:'employee_entry',entries:[clean]};
+  return {dry_run:true,validate_only:true,no_write:true,event_index:0,entry:clean,entries:[clean],session:safeSession};
 }
 function buildRentAnchor(){
   const amount=num(employeeFieldValue('amount'));
@@ -5327,6 +5347,7 @@ function syncForm(){
   renderTaskInfo();
   employeeApplyArrearsPaymentLayout(type);
   employeeMountEntryTemplate(type);
+  visible(['btnSaveEntry'],type!=='TF');
   applyEmployeeBedTransferUiGate();
   renderContext();
   renderContextNotice();
@@ -5612,7 +5633,7 @@ async function saveCanonicalBedTransferDraft(){
   }
   const first=validateBedTransferEntry();
   if(first.errors.length)return false;
-  const button=$('btnSaveEntry');
+  const button=$('btnValidateBedTransfer');
   const old=button?.innerHTML;
   if(button){button.dataset.busy='1';button.disabled=true;button.innerHTML=renderEmployeeButtonLabel('Loading Context','加载床位事实');}
   try{
@@ -5627,7 +5648,8 @@ async function saveCanonicalBedTransferDraft(){
     const entries=[canonicalEntry];
     const session={id:currentSessionId(),date:today(),operator_id:operatorId(),operator_name:operatorName(),source:'employee_entry',handover_status:'EXPORTING',entries,entries_json:JSON.stringify({anchor_contract_version:'employee_entry_anchor_v1',entries})};
     if(button)button.innerHTML=renderEmployeeButtonLabel('Server Validating','服务器校验');
-    const result=await validateEmployeeUploadDryRun(canonicalEntry,session,0);
+    const requestPayload=employeeBedTransferValidatePayload(canonicalEntry,session);
+    const result=await validateEmployeeUploadDryRun(requestPayload.entry,requestPayload.session,0,{requestPayload});
     if(result?.ok!==true||result?.event_type!=='bed_transfer'||result?.no_write_requested!==true)throw new Error('BED_TRANSFER_VALIDATE_ONLY_RESPONSE_INVALID');
     employeeRenderBedTransferServerValidation(result);
     entry.upload_status='VALIDATED_NO_WRITE';
@@ -7854,10 +7876,11 @@ renderSessionRecordValidationDetails=function(result,index){
     <div><button class="mini-btn" data-copy-diagnostic-json="${esc(String(index))}">${renderEmployeeButtonLabel('Copy Diagnostic JSON','复制诊断 JSON')}</button></div>
   </div>`;
 };
-async function validateEmployeeUploadDryRun(entry,sessionForEntry,index){
+async function validateEmployeeUploadDryRun(entry,sessionForEntry,index,options={}){
   let r;
   try{
-    r=await apiFetch('/api/employee/entry/validate',{method:'POST',body:JSON.stringify({entry,session:sessionForEntry,event_index:index,diagnostic:employeeDiagnosticAssetMeta()})});
+    const requestPayload=options.requestPayload||{entry,session:sessionForEntry,event_index:index,diagnostic:employeeDiagnosticAssetMeta()};
+    r=await apiFetch('/api/employee/entry/validate',{method:'POST',body:JSON.stringify(requestPayload)});
   }catch(err){
     const result=normalizeEmployeeUploadDryRunError({
       source:'network_error',
@@ -8199,6 +8222,8 @@ if(location.hash==='#export'){
 }
 showEmployeeView(location.hash||'entry',{pushHash:false});
 document.querySelectorAll('.event-chip').forEach(btn=>btn.addEventListener('click',e=>{e.preventDefault();setEntryType(btn.dataset.type);}));
+if($('btnValidateBedTransfer'))$('btnValidateBedTransfer').addEventListener('click',e=>{e.preventDefault();saveCanonicalBedTransferDraft();});
+if($('btnRecordBedTransfer'))$('btnRecordBedTransfer').addEventListener('click',e=>{e.preventDefault();if(!employeeBedTransferWriteEnabled()){showStatus(BED_TRANSFER_WRITE_DISABLED_MESSAGE,'warn');return false;}});
 document.querySelectorAll('.pay-option').forEach(btn=>btn.addEventListener('click',e=>{e.preventDefault();setPaymentType(btn.dataset.pay);}));
 ['entryType','cycle','payType','amount','reasonCode','feePaid','transferWaiverReason','transferFeePaymentMethod','transferFeeDueDate','bedDifferenceMode','bedDifferenceAmount','bedDifferencePaymentMethod','bedDifferenceDueDate','bedDifferenceReason','customReason','tenantName','bankRef','periodDays','depositOutRefundDate','depositOutDifferenceReason','depositDeduction','checkoutDate','noNoticeDeduction','otherDeduction','dedNote','leftWithArrearsMode','leftFormerCustomerName','leftWhatsappPhone','leftContactMethod','leftContactNote','leftDepositBalance','leftCoverageEndDate','leftArrearsAmount','leftBelongingsHeld','leftBelongingsNote','leftPromisedPaymentDate','leftPromisedReturnDate','leftConfirmedNotReturningDate','leftGraceDays','excessTo','bedTo','transferReason','expenseCategory','expenseDesc','expenseEvidenceRef','remark','arrearHandling','arrearPromiseDate','arrearReasonDetail'].forEach(id=>$(id).addEventListener('input',syncForm));
 $('linkedTaskId').addEventListener('change',applyLinkedTask);

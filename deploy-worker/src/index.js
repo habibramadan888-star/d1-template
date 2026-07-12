@@ -7537,7 +7537,7 @@ async function handleEmployeeBedContext(request,env,user){
   const url=new URL(request.url);
   const bed=cleanText(url.searchParams.get("bed")||"",80).replace(/^#/,"");
   try{
-    return success(await canonicalBedContextGateway(env,user,{bed,limit:1000}));
+    return success(employeeBedTransferSafeContextDto(await canonicalBedContextGateway(env,user,{bed,limit:1000})));
   }catch(e){
     return json({
       success:false,
@@ -7555,6 +7555,16 @@ async function handleEmployeeBedContext(request,env,user){
   }
 }
 __name(handleEmployeeBedContext,"handleEmployeeBedContext");
+function employeeBedTransferSafeContextDto(gateway={}){
+  const occupancy=gateway.occupancy_gateway||{},access=gateway.access_snapshot_context||{};
+  const warnings=(Array.isArray(gateway.warnings)?gateway.warnings:[]).map(value=>cleanText(value,120)).filter(value=>/^[A-Z0-9_:-]+$/.test(value)).slice(0,20);
+  return {ok:gateway.ok===true,success:gateway.success===true,gateway:"canonical_bed_context_gateway",bed:cleanText(gateway.bed||"",80),
+    occupancy_gateway:{physical_bed_status:cleanText(occupancy.physical_bed_status||"unknown",60),occupancy_status:cleanText(occupancy.occupancy_status||gateway.occupancy_status||"unknown",60),deposit_recorded_amount:occupancy.deposit_recorded_amount??null,current_rent_coverage_start:cleanDate(occupancy.current_rent_coverage_start||""),current_rent_coverage_end:cleanDate(occupancy.current_rent_coverage_end||""),readonly:true,no_write:true},
+    access_snapshot_context:{status:cleanText(access.status||"unknown",60),candidate_count:access.candidate_count??null,ambiguous:access.ambiguous===true,conflict:access.conflict===true,stale:access.stale===true,parsed_deposit_amount:access.parsed_deposit_amount??null,parsed_checkin_mmdd:cleanText(access.parsed_checkin_mmdd||"",20),parsed_valid_until_mmdd:cleanText(access.parsed_valid_until_mmdd||"",20),normalized_expiry_value:cleanText(access.normalized_expiry_value||"",80),parsed_vacancy_marker:access.parsed_vacancy_marker===true,physical_bed_status:cleanText(access.physical_bed_status||occupancy.physical_bed_status||"unknown",60),parse_status:cleanText(access.parse_status||"",60),display_only:true,provider_identity_allowed:false},
+    open_arrears:(Array.isArray(gateway.open_arrears)?gateway.open_arrears:[]).map(row=>({remaining_arrears:entryAnchorMoney(row?.remaining_arrears??row?.remaining_amount??row?.arrear_amount),status:cleanText(row?.status||row?.close_status||"open",40)})),
+    deposit_status:gateway.deposit_status==="ACCESS_SNAPSHOT_D"?"ACCESS_SNAPSHOT_D":"MISSING_D",occupancy_status:cleanText(gateway.occupancy_status||occupancy.occupancy_status||"unknown",60),warnings,readonly:true,no_write:true};
+}
+__name(employeeBedTransferSafeContextDto,"employeeBedTransferSafeContextDto");
 async function handleOwnerBedStatus(request,env,user){
   if(!canReadOwnerData(user))return forbidden();
   const url=new URL(request.url);

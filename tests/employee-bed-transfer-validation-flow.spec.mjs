@@ -60,6 +60,7 @@ test('Bed Transfer retry identity is stable across validate and final upload', (
   assert.equal((builder.match(/const id=uid\('E'\)/g) || []).length, 1);
   const flow = block(html, 'saveCanonicalBedTransferDraft', true);
   assert.match(flow, /const entry=buildBedTransferAnchor\(\)/);
-  assert.match(flow, /validateEmployeeUploadDryRun\(canonicalEntry,session,0\)/);
+  assert.match(flow, /employeeBedTransferValidatePayload\(canonicalEntry,session\)/);
+  assert.match(flow, /validateEmployeeUploadDryRun\(requestPayload\.entry,requestPayload\.session,0,\{requestPayload\}\)/);
   assert.match(flow, /state\.drafts=\[entry\]/);
 });
