@@ -14,6 +14,7 @@ import { resolveBedTransferSourceContext } from "../../modules/employees/bed-tra
 import { classifyExistingCanonicalTransfer, prepareCanonicalTransferArchiveWrite } from "../../modules/employees/bed-transfer-canonical-archive-write.mjs";
 import { projectOwnerHistoryTransferLineage } from "../../modules/owner-history/bed-transfer-lineage-projection.mjs";
 import { projectBedTransferFinanceAndArrears } from "../../modules/finance/bed-transfer-finance-arrears-projection.mjs";
+import { findDerivedArrearsPaymentForbiddenFields, parseBedTransferDerivedArrearsRef, prepareDerivedArrearsPayment } from "../../modules/finance/bed-transfer-derived-arrears-payment.mjs";
 import { evaluateStayGenesisTrigger } from "../../modules/employees/durable-stay-genesis-trigger.mjs";
 import {
   materializePreparedStayGenesis,
@@ -2915,6 +2916,49 @@ function bedTransferForbiddenIdentityFailure(body={},eventIndex=0){
   };
 }
 __name(bedTransferForbiddenIdentityFailure,"bedTransferForbiddenIdentityFailure");
+function arrearsPaymentInputRows(body={}){
+  return [body?.entry,...(Array.isArray(body?.entries)?body.entries:[]),...(Array.isArray(body?.session?.entries)?body.session.entries:[])]
+    .filter(row=>row&&typeof row==="object"&&employeeEntryUploadType(row)==="AP");
+}
+__name(arrearsPaymentInputRows,"arrearsPaymentInputRows");
+function arrearsPaymentForbiddenServerFieldFailure(body={},eventIndex=0){
+  const rows=arrearsPaymentInputRows(body);
+  if(!rows.length)return null;
+  const envelope={};
+  Object.entries(body||{}).forEach(([field,value])=>{if(!["entry","entries","session"].includes(field))envelope[field]=value;});
+  const sessionEnvelope={};
+  Object.entries(body?.session||{}).forEach(([field,value])=>{if(field!=="entries")sessionEnvelope[field]=value;});
+  const invalid=findDerivedArrearsPaymentForbiddenFields([envelope,sessionEnvelope,...rows]);
+  if(!invalid.length)return null;
+  return employeeEntryValidationFailure("arrears_payment_source_of_truth_firewall","ARREARS_PAYMENT_SERVER_FIELD_INJECTION","Arrears Payment source and lineage fields are server controlled.",{event_index:eventIndex,event_type:"arrears_payment",invalid_fields:invalid,write_attempted:false});
+}
+__name(arrearsPaymentForbiddenServerFieldFailure,"arrearsPaymentForbiddenServerFieldFailure");
+async function resolveDerivedArrearsPaymentForEntry(env,user,entry={}){
+  const ref=cleanId(entry.arrears_ref||entry.cloud_arrears_ref||entry.linked_task_id||entry.original_arrears_id||"");
+  const parsed=parseBedTransferDerivedArrearsRef(ref);
+  if(!parsed)return {ok:true,derived:false,server_fields:{}};
+  const gateway=await canonicalArrearsGateway(env,user,{arrears_ref:ref,limit:2000});
+  const item=[...(gateway.open_items||[]),...(gateway.closed_items||[]),...(gateway.all_items||[])].find(row=>cleanText(row.arrears_ref||row.task_id||row.id,160)===ref);
+  if(!item){
+    const projection=await rebuildAllCloudArrears(env,user,{limit:2000});
+    const raw=(projection.transfer_raw_events||[]).some(row=>cleanText(row.transfer_anchor_id,180)===parsed.source_anchor_ref);
+    const effective=(projection.transfer_effective_events||[]).some(row=>cleanText(row.transfer_anchor_id,180)===parsed.source_anchor_ref);
+    return {ok:false,error_code:raw&&!effective?"ARREARS_SOURCE_VOIDED":"ARREARS_REF_NOT_OPEN"};
+  }
+  return prepareDerivedArrearsPayment({
+    corpid:user.corpid,
+    arrears_ref:ref,
+    arrears_item:item,
+    source_effective:true,
+    payment_amount:entry.payment_amount||entry.paid_amount||entry.amount,
+    payment_method:entry.payment_method||entry.pay_type,
+    payment_date:entry.payment_date||entry.created_at,
+    accepted_at:empNow(),
+    operator_reference:user.userid,
+    event_id:entry.event_id||entry.anchor_id||entry.id
+  });
+}
+__name(resolveDerivedArrearsPaymentForEntry,"resolveDerivedArrearsPaymentForEntry");
 async function empFindOpenArrearTaskForPaymentReadOnly(env,user,taskId,bed=""){
   const cleanTaskId=cleanId(taskId);
   if(!cleanTaskId)return null;
@@ -2947,6 +2991,8 @@ async function validateEmployeeEntryUploadPayload(env,user,body,opts={}){
   if(stayGenesis.error_code)return employeeEntryStayGenesisFailure(stayGenesis,rawEventIndex,stayGenesisEntry?.event_type);
   const firewallFailure=bedTransferForbiddenIdentityFailure(body||{},rawEventIndex);
   if(firewallFailure)return firewallFailure;
+  const apFirewallFailure=arrearsPaymentForbiddenServerFieldFailure(body||{},rawEventIndex);
+  if(apFirewallFailure)return apFirewallFailure;
   body=normalizeEmployeeEntryBodyForValidation(body||{});
   const eventIndex=Number(opts.event_index ?? body?.event_index ?? 0)||0;
   if(!await empTableExists(env,"sessions")||!await empTableExists(env,"transactions")){
@@ -3009,6 +3055,12 @@ async function validateEmployeeEntryUploadPayload(env,user,body,opts={}){
     };
   }
   const type=employeeEntryUploadType(entry);
+  let derivedArrearsPayment=null;
+  if(type==="AP"){
+    derivedArrearsPayment=await resolveDerivedArrearsPaymentForEntry(env,user,entry);
+    if(!derivedArrearsPayment.ok)return employeeEntryValidationFailure("arrears_payment_ref",derivedArrearsPayment.error_code,"Canonical derived arrears payment was rejected.",{event_index:eventIndex,event_type:"arrears_payment",invalid_fields:["payment_amount"],anchor_preview:{arrears_ref:cleanId(entry.arrears_ref||entry.linked_task_id||entry.cloud_arrears_ref||"")}});
+    if(derivedArrearsPayment.derived)Object.assign(entry,derivedArrearsPayment.server_fields);
+  }
   const normalized=normalizeEntryAnchor(entry);
   const anchorPreview={
     id:cleanText(normalized.id||normalized.event_id||normalized.anchor_id,80),
@@ -3231,6 +3283,7 @@ async function validateEmployeeEntryUploadPayload(env,user,body,opts={}){
     anchor_preview:anchorPreview,
     bed_transfer_phase1_preview:bedTransferPhase1Preview,
     normalized_entry:normalized,
+    derived_arrears_payment:derivedArrearsPayment,
     ...(stayGenesis.requested?{
       stay_genesis:{requested:true,genesis_event_type:stayGenesis.genesis_event_type,write_enabled:false},
       write_attempted:false,
@@ -3335,6 +3388,8 @@ async function handleEmployeeEntry(request,env,user){
   }
   const firewallFailure=bedTransferForbiddenIdentityFailure(body||{},body?.event_index??0);
   if(firewallFailure)return json({success:false,...firewallFailure},422);
+  const apFirewallFailure=arrearsPaymentForbiddenServerFieldFailure(body||{},body?.event_index??0);
+  if(apFirewallFailure)return json({success:false,...apFirewallFailure},422);
   const entryForWriteGate=employeeEntryValidationEntryFromBody(body||{});
   const writeGateType=employeeEntryUploadType(entryForWriteGate);
   if(["TF","TFF"].includes(writeGateType)&&!bedTransferWriteApproved(env))return bedTransferWriteDisabledResponse();
@@ -3359,6 +3414,13 @@ async function handleEmployeeEntry(request,env,user){
       existing_anchor:validationResult.existing_anchor||"",
       duplicate_guard:validationResult.duplicate_guard||{ok:true,idempotent:true,canonical_fingerprint_persistence:"PARTIAL"}
     });
+  }
+  if(validationResult.derived_arrears_payment?.derived){
+    const fields=validationResult.derived_arrears_payment.server_fields||{};
+    if(body.entry)Object.assign(body.entry,fields);
+    const eventIndex=Number(body?.event_index||0)||0;
+    if(Array.isArray(body?.session?.entries)&&body.session.entries[eventIndex])Object.assign(body.session.entries[eventIndex],fields);
+    if(Array.isArray(body?.entries)&&body.entries[eventIndex])Object.assign(body.entries[eventIndex],fields);
   }
   const entry=stayGenesis.requested?employeeEntryValidationEntryFromBody(body||{},body?.event_index??0):(body?.entry||{});
   const session=body?.session||{};
@@ -4302,6 +4364,11 @@ async function handleEmployeeEntrySyncState(request,env,user){
   }
   const cloudEntries=extractEmployeeEntryAnchorsFromSession(session);
   const cloudKeySets=cloudEntries.map(row=>employeeEntryCloudSyncKeySet(row,user));
+  let effectiveTransferAnchorIds=null;
+  if(cloudEntries.some(row=>parseBedTransferDerivedArrearsRef(row?.arrears_ref||row?.original_arrears_id||""))){
+    const projection=await rebuildAllCloudArrears(env,user,{limit:2000});
+    effectiveTransferAnchorIds=new Set((projection.transfer_effective_events||[]).map(row=>cleanText(row.transfer_anchor_id,180)));
+  }
   const results=(entries||[]).map((entry,index)=>{
     const localKeys=employeeEntryCloudSyncKeySet(entry,user);
     let matchedIndex=-1;
@@ -4313,6 +4380,10 @@ async function handleEmployeeEntrySyncState(request,env,user){
     }
     if(matchedIndex>=0){
       const matched=cloudEntries[matchedIndex]||{};
+      const parsed=parseBedTransferDerivedArrearsRef(matched.arrears_ref||matched.original_arrears_id||"");
+      if(parsed&&effectiveTransferAnchorIds&&!effectiveTransferAnchorIds.has(cleanText(matched.source_anchor_ref||parsed.source_anchor_ref,180))){
+        return {index,local_event_id:cleanText(entry?.event_id||entry?.anchor_id||entry?.id||entry?.cloud_entry_id||"",120),status:"cloud_source_reconciliation",sync_status:"OWNER_REVIEW_REQUIRED",archive_state:"source_transfer_voided",cloud_match:true,matched:true,matched_by:"canonical_fingerprint_or_event_id",cloud_record_id:cleanText(session.id||"",160),matched_event_id:cleanText(matched.event_id||matched.anchor_id||matched.id||"",120),source_proof:{source:"canonical_event_archive",session_id:session.id||"",anchor_id:session.anchor_id||"",source_anchor_ref:matched.source_anchor_ref||parsed.source_anchor_ref},allowed_next_action:"owner_review_required",reason:"source_transfer_voided_reconciliation_required"};
+      }
       return {index,local_event_id:cleanText(entry?.event_id||entry?.anchor_id||entry?.id||entry?.cloud_entry_id||"",120),status:"cloud_confirmed",sync_status:"SYNCED",archive_state:"exists_active",cloud_match:true,matched:true,matched_by:"canonical_fingerprint_or_event_id",cloud_record_id:cleanText(session.id||"",160),matched_event_id:cleanText(matched.event_id||matched.anchor_id||matched.id||"",120),source_proof:{source:"canonical_event_archive",session_id:session.id||"",anchor_id:session.anchor_id||""},allowed_next_action:"none",reason:"matched_cloud_anchor"};
     }
     return {index,local_event_id:cleanText(entry?.event_id||entry?.anchor_id||entry?.id||entry?.cloud_entry_id||"",120),status:"cloud_mismatch",sync_status:"CLOUD_MISMATCH",archive_state:"mismatch",cloud_match:false,matched:false,matched_by:"",cloud_record_id:cleanText(session.id||"",160),source_proof:{source:"canonical_event_archive",session_id:session.id||"",anchor_id:session.anchor_id||"",cloud_entries_count:cloudEntries.length},allowed_next_action:"owner_review_required",reason:cloudEntries.length?"no_matching_cloud_anchor":"no_cloud_entries"};
@@ -4656,9 +4727,23 @@ function buildCloudArrearsProjectionFromSessions(sessions=[],opts={}){
     for(const item of transferProjection.derived_arrears||[])if(!itemsByRef.has(item.arrears_ref))itemsByRef.set(item.arrears_ref,item);
     for(const item of transferProjection.carried_arrears||[])itemsByRef.set(item.arrears_ref,{...itemsByRef.get(item.arrears_ref),...item});
   }
+  const appliedFullPaymentEvents=new Set();
+  payments.sort((a,b)=>String(a.date||"").localeCompare(String(b.date||""))||String(a.event_id||"").localeCompare(String(b.event_id||"")));
   for(const payment of payments){
     const item=itemsByRef.get(payment.ref);
     if(!item)continue;
+    if(String(item.payment_policy||"").toUpperCase()==="FULL_PAYMENT_ONLY"){
+      if(appliedFullPaymentEvents.has(payment.event_id))continue;
+      if(item.linked_repayment_events.length){
+        transferProjection.reconciliation_warnings.push({code:"FULL_PAYMENT_ARREARS_MULTIPLE_ACTIVE_AP_CONFLICT",arrears_ref:payment.ref,payment_anchor_ref:payment.event_id});
+        continue;
+      }
+      if(entryAnchorMoney(payment.payment_amount)!==entryAnchorMoney(item.remaining_arrears)){
+        transferProjection.reconciliation_warnings.push({code:"FULL_PAYMENT_ARREARS_AMOUNT_CONFLICT",arrears_ref:payment.ref,payment_anchor_ref:payment.event_id});
+        continue;
+      }
+      appliedFullPaymentEvents.add(payment.event_id);
+    }
     item.linked_repayment_events.push(payment);
     item.actual_received=entryAnchorMoney(Number(item.actual_received||0)+payment.payment_amount);
     item.already_paid_amount=item.actual_received;
@@ -4697,6 +4782,8 @@ function buildCloudArrearsProjectionFromSessions(sessions=[],opts={}){
     partial_count:filteredOpen.filter(item=>item.status==="partial").length,
     settled_count:filteredClosed.filter(item=>item.status==="settled").length,
     transfer_projection_status:transferProjection.ok?"projected":"fail_closed",
+    transfer_raw_events:transferProjection.raw_transfer_events||[],
+    transfer_effective_events:transferProjection.effective_transfer_events||[],
     reconciliation_warnings:[...(transferProjection.reconciliation_warnings||[]),...(!transferProjection.ok?[{code:transferProjection.error_code||"BED_TRANSFER_ARREARS_PROJECTION_FAILED_CLOSED"}]:[])]
   };
 }
@@ -9498,6 +9585,8 @@ function canonicalFinanceProjectionZeroTotals(){
     deposit_received:0,
     deposit_refund:0,
     arrears_repaid:0,
+    bed_transfer_fee_arrears_repaid:0,
+    bed_price_difference_arrears_repaid:0,
     arrears_opened_amount:0,
     arrears_opened_count:0,
     expenses:0,
@@ -9580,6 +9669,9 @@ function canonicalFinanceProjectionApplyAnchor(totals,anchor={}){
     const amount=canonicalFinanceProjectionAmount(anchor.payment_amount,anchor.amount,anchor.paid_amount);
     canonicalFinanceProjectionAddInflow(totals,method,amount);
     totals.arrears_repaid+=amount;
+    const sourceType=String(anchor.source_arrears_type||anchor.source_event_type||"").toLowerCase();
+    if(sourceType==="bed_transfer_fee_unpaid")totals.bed_transfer_fee_arrears_repaid+=amount;
+    if(sourceType==="bed_price_difference_unpaid")totals.bed_price_difference_arrears_repaid+=amount;
   }else if(type==="deposit_in"){
     const amount=canonicalFinanceProjectionAmount(anchor.deposit_paid_amount,anchor.deposit_amount,anchor.amount,anchor.paid_amount);
     canonicalFinanceProjectionAddInflow(totals,method,amount);
@@ -9656,6 +9748,8 @@ async function canonicalFinanceProjectionBuild(env,user,range={},options={}){
     archive_entries:ownerHistoryTransferLineageArchiveEntries([...sessions,...correctionSessions],user.corpid),
     existing_arrears:[]
   });
+  const effectiveTransferAnchorIds=new Set((transferProjection.effective_transfer_events||[]).map(row=>cleanText(row.transfer_anchor_id,180)));
+  const appliedDerivedRepaymentRefs=new Set();
   let active_session_count=0;
   let voided_session_count=0;
   let corrected_session_count=0;
@@ -9698,7 +9792,21 @@ async function canonicalFinanceProjectionBuild(env,user,range={},options={}){
     if(summary.correction_applied&&!hasCanonicalTransfer){
       canonicalFinanceProjectionApplyCorrectionEffectiveTotals(totals,summary);
     }else if(anchors.length){
-      for(const anchor of anchors)if(canonicalFinanceProjectionEventType(anchor)!=="bed_transfer")canonicalFinanceProjectionApplyAnchor(totals,anchor);
+      for(const anchor of anchors)if(canonicalFinanceProjectionEventType(anchor)!=="bed_transfer"){
+        const sourceType=String(anchor?.source_arrears_type||"").toLowerCase();
+        const derivedRepayment=["bed_transfer_fee_unpaid","bed_price_difference_unpaid"].includes(sourceType);
+        if(derivedRepayment&&!effectiveTransferAnchorIds.has(cleanText(anchor?.source_anchor_ref||"",180))){
+          reconciliation_warnings.push({code:"ARREARS_REPAYMENT_SOURCE_VOID_RECONCILIATION_REQUIRED",payment_anchor_ref:cleanText(anchor?.event_id||anchor?.anchor_id||anchor?.id||"",180),source_anchor_ref:cleanText(anchor?.source_anchor_ref||"",180)});
+          continue;
+        }
+        const repaymentRef=cleanText(anchor?.arrears_ref||anchor?.original_arrears_id||"",180);
+        if(derivedRepayment&&appliedDerivedRepaymentRefs.has(repaymentRef)){
+          reconciliation_warnings.push({code:"FULL_PAYMENT_ARREARS_MULTIPLE_ACTIVE_AP_CONFLICT",arrears_ref:repaymentRef,payment_anchor_ref:cleanText(anchor?.event_id||anchor?.anchor_id||anchor?.id||"",180)});
+          continue;
+        }
+        if(derivedRepayment)appliedDerivedRepaymentRefs.add(repaymentRef);
+        canonicalFinanceProjectionApplyAnchor(totals,anchor);
+      }
     }else{
       reconciliation_warnings.push({code:"CANONICAL_ANCHORS_MISSING",session_id:session.id,anchor:targetAnchor,message:"No entries_json anchors found; session summary used as legacy compatibility only."});
       totals.cash_received+=ownerOverviewMoney(session.cash_handover);
