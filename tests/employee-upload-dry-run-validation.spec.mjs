@@ -77,16 +77,17 @@ test("deposit out dry-run enforces difference reason only when refund differs", 
 test("left with arrears dry-run returns required missing fields", async () => {
   const worker = await readFile(workerPath, "utf8");
   const validateBlock = functionBlock(worker, "validateEmployeeEntryUploadPayload");
+  const checkoutValidator = functionBlock(worker, "validateCheckoutUploadFields");
 
   assert.match(validateBlock, /LEFT_WITH_ARREARS_REQUIRED_FIELDS_MISSING/);
-  assert.match(validateBlock, /missing\.push\(\"whatsapp_phone\"\)/);
-  assert.match(validateBlock, /missing\.push\(\"left_date\"\)/);
-  assert.doesNotMatch(validateBlock, /missing\.push\(\"coverage_end_date\"\)/);
-  assert.match(validateBlock, /missing\.push\(\"confirmed_not_returning_date\"\)/);
-  assert.match(validateBlock, /missing\.push\(\"promised_payment_date\"\)/);
-  assert.match(validateBlock, /missing\.push\(\"left_arrears_amount\"\)/);
-  assert.match(validateBlock, /missing\.push\(\"belongings_held\"\)/);
-  assert.match(validateBlock, /missing\.push\(\"belongings_note\"\)/);
+  assert.match(checkoutValidator, /missing\.push\(\"contact_phone_or_method\"\)/);
+  assert.match(checkoutValidator, /missing\.push\(\"left_date\"\)/);
+  assert.match(checkoutValidator, /missing\.push\(\"promised_payment_date\"\)/);
+  assert.match(checkoutValidator, /missing\.push\(\"left_arrears_amount\"\)/);
+  assert.match(checkoutValidator, /missing\.push\(\"note\"\)/);
+  assert.doesNotMatch(checkoutValidator, /missing\.push\(\"coverage_end_date\"\)/);
+  assert.doesNotMatch(checkoutValidator, /missing\.push\(\"confirmed_not_returning_date\"\)/);
+  assert.doesNotMatch(checkoutValidator, /missing\.push\(\"belongings_held\"\)/);
 });
 
 test("employee UI runs dry-run validation before real upload and surfaces backend fields", async () => {
@@ -133,7 +134,9 @@ test("employee UI runs dry-run validation before real upload and surfaces backen
   assert.match(commitBlock, /uploadList\.forEach\(e=>\{e\.upload_status='VALIDATING';e\.upload_validation_error=null;\}\)/);
   assert.match(commitBlock, /originalDrafts\[failedIndex\]\.upload_status=firstDryRunFailure\.result\?\.error_code==='ARREARS_REF_STALE_REFRESH_REQUIRED'\?'STALE':'VALIDATION_FAILED'/);
   assert.match(commitBlock, /e\.upload_status='UPLOADING'/);
-  assert.match(commitBlock, /upload_status:'SYNCED'/);
+  assert.match(commitBlock, /e\.sync_status='SYNCED'/);
+  assert.match(commitBlock, /e\.upload_status='CHECKING_CLOUD'/);
+  assert.match(commitBlock, /e\.cloud_sync_status='CHECKING_CLOUD'/);
   assert.doesNotMatch(html, /renderEmployeeButtonLabel\('Upload Failed','\\u4e0a\\u4f20\\u5931\\u8d25'\)/);
   assert.match(html, /exportBtn\.disabled=!hasRows/);
   assert.match(html, /renderEmployeeButtonLabel\('Done','Upload Complete'\)/);
@@ -167,8 +170,9 @@ test("validation failure does not restore done or uploaded success state", async
   const commitBlock = html.slice(commitStart);
   const failureStart = commitBlock.indexOf("if(dryRunFailed.length)");
   const uploadStart = commitBlock.indexOf("showStatus(`Uploading confirmed session");
-  const successStart = commitBlock.indexOf("state.drafts=uploadList.map");
+  const successStart = commitBlock.indexOf("setUploadPhase('Upload complete','Done')");
   assert.ok(failureStart > 0 && uploadStart > failureStart, "dry-run failure branch must precede real upload");
+  assert.ok(successStart > uploadStart, "success state must occur only after upload and cloud confirmation");
   const failureBranch = commitBlock.slice(failureStart, uploadStart);
   const successBranch = commitBlock.slice(successStart);
 
