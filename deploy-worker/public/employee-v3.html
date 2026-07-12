@@ -3280,16 +3280,33 @@ async function fetchCurrentAuthUser(){
 function employeeBedTransferWriteEnabled(){
   return state.bedTransferCapabilities?.status==='success'&&state.bedTransferCapabilities?.bed_transfer_write_enabled===true;
 }
+function employeeBedTransferValidateEnabled(){
+  return state.bedTransferCapabilities?.status==='success'&&state.bedTransferCapabilities?.bed_transfer_validate_enabled===true;
+}
+function employeeBedTransferUiGateState(capabilities=state.bedTransferCapabilities){
+  const ready=capabilities?.status==='success';
+  const validate=ready&&capabilities?.bed_transfer_validate_enabled===true;
+  const write=ready&&capabilities?.bed_transfer_write_enabled===true;
+  return {fields_enabled:validate,context_loading_enabled:validate,validate_enabled:validate,final_upload_enabled:validate&&write,error_code:validate?'':(capabilities?.status==='error'?'BED_TRANSFER_CAPABILITY_UNAVAILABLE':'BED_TRANSFER_VALIDATE_NOT_ENABLED')};
+}
+function applyEmployeeBedTransferUiGate(){
+  const gate=employeeBedTransferUiGateState();
+  document.querySelectorAll('#transferFields input,#transferFields select,#transferFields textarea').forEach(control=>{control.disabled=!gate.fields_enabled});
+  const chip=document.querySelector('.event-chip[data-type="TF"]');
+  if(chip){chip.disabled=!gate.validate_enabled;chip.title=gate.validate_enabled?'':gate.error_code;}
+  return gate;
+}
 async function employeeLoadBedTransferCapabilities(){
-  state.bedTransferCapabilities={...state.bedTransferCapabilities,status:'loading',bed_transfer_write_enabled:false};
+  state.bedTransferCapabilities={...state.bedTransferCapabilities,status:'loading',bed_transfer_validate_enabled:false,bed_transfer_write_enabled:false};
   try{
     const r=await apiFetch('/api/capabilities',{method:'GET'});
     const data=r.ok?unwrapStandardResponse(await r.json()):null;
-    if(!data||typeof data.bed_transfer_write_enabled!=='boolean')throw new Error('CAPABILITY_RESPONSE_INVALID');
+    if(!data||typeof data.bed_transfer_validate_enabled!=='boolean'||typeof data.bed_transfer_write_enabled!=='boolean')throw new Error('CAPABILITY_RESPONSE_INVALID');
     state.bedTransferCapabilities={status:'success',bed_transfer_validate_enabled:data.bed_transfer_validate_enabled===true,bed_transfer_write_enabled:data.bed_transfer_write_enabled===true,owner_waiver_ack_enabled:data.owner_waiver_ack_enabled===true,canonical_write_path:String(data.canonical_write_path||'/api/employee/entry'),production_cutover:String(data.production_cutover||'PRODUCTION_NO_GO')};
   }catch{
-    state.bedTransferCapabilities={...state.bedTransferCapabilities,status:'error',bed_transfer_write_enabled:false,owner_waiver_ack_enabled:false,production_cutover:'PRODUCTION_NO_GO'};
+    state.bedTransferCapabilities={...state.bedTransferCapabilities,status:'error',bed_transfer_validate_enabled:false,bed_transfer_write_enabled:false,owner_waiver_ack_enabled:false,production_cutover:'PRODUCTION_NO_GO'};
   }
+  applyEmployeeBedTransferUiGate();
   updateEntrySessionActionState();
   validate();
   return state.bedTransferCapabilities;
@@ -3798,10 +3815,11 @@ function renderEntryTtlockStatus(){
   }
   const save=$('btnSaveEntry');
   if(save){
-    const blocked=!ttlockCacheReady();
+    const isTransfer=$('entryType')?.value==='TF';
+    const blocked=isTransfer?!employeeBedTransferValidateEnabled():!ttlockCacheReady();
     save.disabled=blocked;
     save.classList.toggle('disabled',blocked);
-    save.title=blocked?'Load Cards before formal entry / 请先加载卡片':'';
+    save.title=blocked?(isTransfer?employeeBedTransferUiGateState().error_code:'Load Cards before formal entry / 请先加载卡片'):'';
   }
 }
 async function ensureEntryTtlockReady(opts={}){
@@ -4487,6 +4505,8 @@ function validateExpenseEntry(){
 }
 function validateBedTransferEntry(){
   const errors=[],warns=[];
+  const capabilityGate=employeeBedTransferUiGateState();
+  if(!capabilityGate.validate_enabled)errors.push(capabilityGate.error_code);
   const from=employeeTrimField('transferFromBed').replace(/^#/,'')||employeeTrimField('bed').replace(/^#/,'');
   const to=employeeTrimField('bedTo').replace(/^#/,'');
   const feeMode=employeeFieldValue('feePaid');
@@ -4537,6 +4557,7 @@ function employeeRenderBedTransferContext(){
   if($('bedTransferTargetContext'))$('bedTransferTargetContext').textContent=line(ctx.target);
 }
 async function employeeLoadBedTransferContexts(){
+  if(!employeeBedTransferValidateEnabled())throw new Error(employeeBedTransferUiGateState().error_code);
   const from=employeeBedTransferBed(employeeFieldValue('transferFromBed'));
   const to=employeeBedTransferBed(employeeFieldValue('bedTo'));
   if(!from||!to)throw new Error('BED_TRANSFER_BED_CONTEXT_REQUIRED');
@@ -5306,6 +5327,7 @@ function syncForm(){
   renderTaskInfo();
   employeeApplyArrearsPaymentLayout(type);
   employeeMountEntryTemplate(type);
+  applyEmployeeBedTransferUiGate();
   renderContext();
   renderContextNotice();
   updateBedTransferReviewPanel();
@@ -5577,6 +5599,11 @@ function exportLine(e){
   return `#${e.room||e.expense_category} ${fmtMoney(e.amount)} AED ${e.pay_type} ${e.expense_desc||e.note||''}\n  EID ${e.id}`;
 }
 async function saveCanonicalBedTransferDraft(){
+  if(!employeeBedTransferValidateEnabled()){
+    const message=employeeBedTransferUiGateState().error_code;
+    showStatus(message,'warn');
+    return false;
+  }
   if(state.drafts.length){
     const message='BED_TRANSFER_SESSION_MUST_BE_SINGLE_ENTRY: finish or clear the current session first.';
     $('validationBox').innerHTML=`<div class="bad">${esc(message)}</div>`;
@@ -5622,7 +5649,7 @@ async function saveCanonicalBedTransferDraft(){
     toast(`Bed Transfer validation failed: ${result?.error_code||error?.message||error}`,7000);
     return false;
   }finally{
-    if(button){button.dataset.busy='0';button.disabled=false;button.innerHTML=old||renderEmployeeButtonLabel('Validate & Add Draft','校验并加入草稿');}
+    if(button){button.dataset.busy='0';button.disabled=!employeeBedTransferValidateEnabled();button.innerHTML=old||renderEmployeeButtonLabel('Validate & Add Draft','校验并加入草稿');}
   }
 }
 async function saveEntry(){
