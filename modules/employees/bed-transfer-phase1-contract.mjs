@@ -18,6 +18,7 @@ const FORBIDDEN_IDENTITY_KEYS = new Set([
   ,"sourcecontextanchorrefs","carriedarrearsrefs","rentcoverageref","depositcontextref","expirycontextref"
   ,"snapshotfingerprint","snapshotprovenance","currentbed","corpid","companyscope","staycontextid"
   ,"lifecycle","lifecyclestatus","status","void","voided","voidedat","voidstatus","reversalstatus"
+  ,"ttlocksequence","sourcesnapshotfingerprint","targetsnapshotfingerprint","ttlockobservationat","physicalstatebeforesubmission","continuitychecks","reconciliationrequired"
 ]);
 
 function text(value) {

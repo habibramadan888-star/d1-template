@@ -16,7 +16,7 @@ function finish(method,input,entries,genesis,options={}){
   const snapshot=contextRefsFromSnapshot(input.access_snapshot||{});
   const rents=entries.filter(e=>eventType(e)==='rent');
   const rent=rents.at(-1)||genesis;
-  return{resolution_status:'resolved',resolution_method:method,corpid:clean(input.corpid),from_bed:bed(input.from_bed),active_transfer_lineage_id:options.lineage_id||null,previous_transfer_anchor_id:options.previous_anchor_id||null,genesis_anchor_ref:ref(genesis),source_context_anchor_refs:contextRefs(entries),carried_arrears_refs:arrearsRefs(input.open_arrears||[]),rent_coverage_ref:clean(rent?.rent_coverage_ref)||ref(rent),deposit_context_ref:snapshot.deposit_context_ref,expiry_context_ref:snapshot.expiry_context_ref,snapshot_fingerprint:snapshot.snapshot_fingerprint,candidate_group_count:1,ambiguity_reasons:[]};
+  return{resolution_status:'resolved',resolution_method:method,corpid:clean(input.corpid),from_bed:bed(input.from_bed),active_transfer_lineage_id:options.lineage_id||null,previous_transfer_anchor_id:options.previous_anchor_id||null,genesis_anchor_ref:ref(genesis),source_context_anchor_refs:contextRefs(entries),carried_arrears_refs:arrearsRefs(input.open_arrears||[]),rent_coverage_ref:clean(rent?.rent_coverage_ref)||ref(rent),deposit_context_ref:snapshot.deposit_context_ref,expiry_context_ref:snapshot.expiry_context_ref,snapshot_fingerprint:snapshot.snapshot_fingerprint,expected_checkin_mmdd:clean(genesis?.checkin_mmdd||genesis?.parsed_checkin_mmdd),candidate_group_count:1,ambiguity_reasons:[]};
 }
 
 function resolveLineage(input,transfers,voided){

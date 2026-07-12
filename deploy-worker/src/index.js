@@ -2684,8 +2684,9 @@ async function validateEmployeeBedTransferCanonicalLink(env,user,entry={},normal
   const fee=employeeEntryBedTransferFee(entry,normalized);
   const resolved=await resolveEmployeeBedTransferSourceContext(env,user,fromBed,sourceGateway);
   if(resolved.resolution_status!=="resolved")return {ok:false,error_code:resolved.error_code||"BED_TRANSFER_SOURCE_CONTEXT_AMBIGUOUS",message:"Canonical source context could not be resolved.",invalid_fields:["source_context"],source_context_resolution:resolved};
-  const source={...resolved,corpid:user?.corpid||"",physical_bed_status:sourceGateway?.occupancy_gateway?.physical_bed_status||"unknown",parsed_vacancy_marker:sourceGateway?.access_snapshot_context?.parsed_vacancy_marker===true,active_lineage:resolved.active_transfer_lineage_id?{current_bed:fromBed,transfer_lineage_id:resolved.active_transfer_lineage_id,last_active_transfer_anchor_id:resolved.previous_transfer_anchor_id}:null};
-  const target={corpid:user?.corpid||"",physical_bed_status:targetGateway?.occupancy_gateway?.physical_bed_status||"unknown",parsed_vacancy_marker:targetGateway?.access_snapshot_context?.parsed_vacancy_marker===true};
+  const sourceAccess=sourceGateway?.access_snapshot_context||{},targetAccess=targetGateway?.access_snapshot_context||{};
+  const source={...resolved,corpid:user?.corpid||"",physical_bed_status:sourceGateway?.occupancy_gateway?.physical_bed_status||"unknown",parsed_vacancy_marker:sourceAccess.parsed_vacancy_marker===true,snapshot_fingerprint:sourceAccess.snapshot_fingerprint||resolved.snapshot_fingerprint,candidate_count:sourceAccess.candidate_count??1,ambiguous:sourceAccess.ambiguous===true,conflict:sourceAccess.conflict===true,stale:sourceAccess.stale===true,parse_status:sourceAccess.parse_status||"parsed",parsed_deposit_amount:sourceAccess.parsed_deposit_amount,parsed_checkin_mmdd:sourceAccess.parsed_checkin_mmdd,parsed_valid_until_mmdd:sourceAccess.parsed_valid_until_mmdd,active_lineage:resolved.active_transfer_lineage_id?{current_bed:fromBed,transfer_lineage_id:resolved.active_transfer_lineage_id,last_active_transfer_anchor_id:resolved.previous_transfer_anchor_id}:null};
+  const target={corpid:user?.corpid||"",physical_bed_status:targetGateway?.occupancy_gateway?.physical_bed_status||"unknown",parsed_vacancy_marker:targetAccess.parsed_vacancy_marker===true,snapshot_fingerprint:targetAccess.snapshot_fingerprint,candidate_count:targetAccess.candidate_count??1,ambiguous:targetAccess.ambiguous===true,conflict:targetAccess.conflict===true,stale:targetAccess.stale===true,parse_status:targetAccess.parse_status||"parsed",parsed_deposit_amount:targetAccess.parsed_deposit_amount,parsed_checkin_mmdd:targetAccess.parsed_checkin_mmdd,parsed_valid_until_mmdd:targetAccess.parsed_valid_until_mmdd,normalized_expiry_value:targetAccess.normalized_expiry_value};
   return buildBedTransferCanonicalLinkAnchor({
     client_payload:entry,from_bed:fromBed,to_bed:toBed,
     transfer_at:normalized.transfer_date||entry.transfer_date||entry.transfer_at||"",
@@ -2694,7 +2695,7 @@ async function validateEmployeeBedTransferCanonicalLink(env,user,entry={},normal
     fee_mode:entry.fee_mode||fee.fee_choice,
     fee_amount_aed:entry.fee_amount_aed??fee.fee_amount,
     fee_due_date:entry.fee_due_date||"",fee_waiver_reason:entry.fee_waiver_reason||fee.waiver_reason||""
-    ,transfer_reason:normalized.transfer_reason||entry.transfer_reason||entry.reason||"",payment_method:fee.payment_method||entry.payment_method||""
+    ,transfer_reason:normalized.transfer_reason||entry.transfer_reason||entry.reason||"",payment_method:fee.payment_method||entry.payment_method||"",ttlock_observation_at:empNow()
   });
 }
 __name(validateEmployeeBedTransferCanonicalLink,"validateEmployeeBedTransferCanonicalLink");

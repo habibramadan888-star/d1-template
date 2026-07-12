@@ -1,4 +1,5 @@
-const SERVER_FIELDS = new Set(["transferanchorid", "transferlineageid", "previoustransferanchorid", "sourcecontextanchorrefs", "carriedarrearsrefs", "rentcoverageref", "depositcontextref", "expirycontextref", "snapshotfingerprint", "snapshotprovenance", "currentbed", "corpid", "companyscope", "staycontextid", "lifecycle", "lifecyclestatus", "status", "void", "voided", "voidedat", "voidstatus", "reversalstatus"]);
+import { classifyBedTransferTtlockSequence } from './bed-transfer-ttlock-sequence.mjs';
+const SERVER_FIELDS = new Set(["transferanchorid", "transferlineageid", "previoustransferanchorid", "sourcecontextanchorrefs", "carriedarrearsrefs", "rentcoverageref", "depositcontextref", "expirycontextref", "snapshotfingerprint", "snapshotprovenance", "currentbed", "corpid", "companyscope", "staycontextid", "lifecycle", "lifecyclestatus", "status", "void", "voided", "voidedat", "voidstatus", "reversalstatus", "ttlocksequence", "sourcesnapshotfingerprint", "targetsnapshotfingerprint", "ttlockobservationat", "physicalstatebeforesubmission", "continuitychecks", "reconciliationrequired"]);
 const IDENTITY_FIELDS = new Set([
   "tenantcardid", "cardid", "oldttlockref", "providerphone", "phone99099",
   "creatorphone", "creatortime", "cardcreationtime", "providermetadata",
@@ -59,8 +60,6 @@ export function buildBedTransferCanonicalLinkAnchor(input = {}, options = {}) {
   const source = input.canonical_source_context || {};
   const target = input.canonical_target_context || {};
   if (!corpid || clean(source.corpid) !== corpid || clean(target.corpid) !== corpid) return fail('BED_TRANSFER_COMPANY_SCOPE_MISMATCH', ['corpid']);
-  if (source.physical_bed_status === 'vacant' || source.parsed_vacancy_marker === true) return fail('BED_TRANSFER_SOURCE_ALREADY_TTLOCK_VACANT', ['canonical_source_context']);
-  if (target.physical_bed_status !== 'vacant' || target.parsed_vacancy_marker !== true) return fail('BED_TRANSFER_TARGET_NOT_TTLOCK_VACANT', ['canonical_target_context']);
   if (!['confirmed','resolved'].includes(source.resolution_status) || Number(source.candidate_count??source.candidate_group_count) !== 1) return fail('BED_TRANSFER_SOURCE_CONTEXT_AMBIGUOUS', ['canonical_source_context']);
   const refs = unique(source.source_context_anchor_refs);
   if (!refs.length || refs.length !== (source.source_context_anchor_refs || []).length) return fail('BED_TRANSFER_SOURCE_CONTEXT_AMBIGUOUS', ['source_context_anchor_refs']);
@@ -75,6 +74,8 @@ export function buildBedTransferCanonicalLinkAnchor(input = {}, options = {}) {
   if (active && bed(active.current_bed) !== fromBed) return fail('BED_TRANSFER_LINEAGE_DISCONTINUOUS', ['from_bed']);
   if (active && (!exactOpaque(active.transfer_lineage_id) || !exactOpaque(active.last_active_transfer_anchor_id))) return fail('BED_TRANSFER_PREVIOUS_ANCHOR_INVALID', ['active_lineage']);
   const idFactory = options.idFactory || (() => null);
+  const sequence=classifyBedTransferTtlockSequence({corpid,from_bed:fromBed,to_bed:toBed,source_resolution:source,source_snapshot:source,target_snapshot:target,observation_at:input.ttlock_observation_at||input.transfer_at});
+  if(sequence.status==='invalid_state')return fail(sequence.error_code,['ttlock_context']);
   const transferAnchorId = idFactory('transfer_anchor_id');
   const lineageId = active ? clean(active.transfer_lineage_id) : idFactory('transfer_lineage_id');
   return {
@@ -86,13 +87,14 @@ export function buildBedTransferCanonicalLinkAnchor(input = {}, options = {}) {
     source_context_anchor_refs: refs,
     carried_arrears_refs: carried,
     rent_coverage_ref: clean(source.rent_coverage_ref),
-    deposit_context_ref: clean(source.deposit_context_ref),
-    expiry_context_ref: clean(source.expiry_context_ref),
+    deposit_context_ref: clean(sequence.deposit_context_ref),
+    expiry_context_ref: clean(sequence.expiry_context_ref),
     fee_mode: fee.mode, fee_amount_aed: fee.amount,
     fee_due_date: fee.mode === 'unpaid' ? clean(input.fee_due_date) : '',
     fee_waiver_reason: fee.mode === 'waived' ? clean(input.fee_waiver_reason) : '',
     transfer_reason: clean(input.transfer_reason), payment_method: clean(input.payment_method),
     snapshot_fingerprint: clean(source.snapshot_fingerprint),
+    ttlock_sequence:sequence.ttlock_sequence,source_snapshot_fingerprint:sequence.source_snapshot_fingerprint,target_snapshot_fingerprint:sequence.target_snapshot_fingerprint,ttlock_observation_at:sequence.ttlock_observation_at,physical_state_before_submission:sequence.physical_state_before_submission,continuity_checks:sequence.continuity_checks,reconciliation_required:sequence.reconciliation_required,
     finance_effect: { rent_income: 0, deposit_received: 0, deposit_refund: 0, arrears_repaid: 0, expense: 0 },
     id_generation: transferAnchorId && lineageId ? 'server_generated_preview' : 'server_generated_on_write',
     readonly: true, no_write: true
