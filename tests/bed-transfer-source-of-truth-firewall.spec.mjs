@@ -76,7 +76,7 @@ test("snake_case and camelCase aliases are rejected with sorted deduplicated nam
   assert.equal(JSON.stringify(result).includes('"x"'), false);
 });
 
-test("legal physical and canonical context survives defense-in-depth sanitizer", () => {
+test("legal physical context survives while server-managed context is removed", () => {
   const legal = {
     event_type: "bed_transfer",
     from_bed: "146",
@@ -101,7 +101,9 @@ test("legal physical and canonical context survives defense-in-depth sanitizer",
   };
   const sanitized = sanitizeBedTransferIdentityFields(legal);
   assert.equal(sanitized.providerMetadata, undefined);
-  for (const key of Object.keys(legal).filter(key => key !== "providerMetadata")) {
+  for (const key of ["corpid", "company_scope", "snapshot_fingerprint", "snapshot_provenance"]) assert.equal(sanitized[key], undefined);
+  const removed = new Set(["providerMetadata", "corpid", "company_scope", "snapshot_fingerprint", "snapshot_provenance"]);
+  for (const key of Object.keys(legal).filter(key => !removed.has(key))) {
     assert.deepEqual(sanitized[key], legal[key], key);
   }
   assert.deepEqual(findBedTransferForbiddenIdentityFields(sanitized), []);

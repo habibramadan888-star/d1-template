@@ -1,4 +1,4 @@
-const SERVER_FIELDS = new Set(["transferanchorid", "transferlineageid", "previoustransferanchorid"]);
+const SERVER_FIELDS = new Set(["transferanchorid", "transferlineageid", "previoustransferanchorid", "sourcecontextanchorrefs", "carriedarrearsrefs", "rentcoverageref", "depositcontextref", "expirycontextref", "snapshotfingerprint", "snapshotprovenance", "currentbed", "corpid", "companyscope", "staycontextid", "lifecycle", "lifecyclestatus", "status", "void", "voided", "voidedat", "voidstatus", "reversalstatus"]);
 const IDENTITY_FIELDS = new Set([
   "tenantcardid", "cardid", "oldttlockref", "providerphone", "phone99099",
   "creatorphone", "creatortime", "cardcreationtime", "providermetadata",
@@ -60,7 +60,7 @@ export function buildBedTransferCanonicalLinkAnchor(input = {}, options = {}) {
   if (!corpid || clean(source.corpid) !== corpid || clean(target.corpid) !== corpid) return fail('BED_TRANSFER_COMPANY_SCOPE_MISMATCH', ['corpid']);
   if (source.physical_bed_status === 'vacant' || source.parsed_vacancy_marker === true) return fail('BED_TRANSFER_SOURCE_ALREADY_TTLOCK_VACANT', ['canonical_source_context']);
   if (target.physical_bed_status !== 'vacant' || target.parsed_vacancy_marker !== true) return fail('BED_TRANSFER_TARGET_NOT_TTLOCK_VACANT', ['canonical_target_context']);
-  if (source.resolution_status !== 'confirmed' || Number(source.candidate_count) !== 1) return fail('BED_TRANSFER_SOURCE_CONTEXT_AMBIGUOUS', ['canonical_source_context']);
+  if (!['confirmed','resolved'].includes(source.resolution_status) || Number(source.candidate_count??source.candidate_group_count) !== 1) return fail('BED_TRANSFER_SOURCE_CONTEXT_AMBIGUOUS', ['canonical_source_context']);
   const refs = unique(source.source_context_anchor_refs);
   if (!refs.length || refs.length !== (source.source_context_anchor_refs || []).length) return fail('BED_TRANSFER_SOURCE_CONTEXT_AMBIGUOUS', ['source_context_anchor_refs']);
   for (const field of ['rent_coverage_ref', 'deposit_context_ref', 'expiry_context_ref']) if (!exactOpaque(source[field])) return fail(`BED_TRANSFER_${field.toUpperCase()}_UNAVAILABLE`, [field]);

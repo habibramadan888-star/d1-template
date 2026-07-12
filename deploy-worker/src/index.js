@@ -10,6 +10,7 @@ import {
 import {
   buildBedTransferCanonicalLinkAnchor
 } from "../../modules/employees/bed-transfer-canonical-link-anchor.mjs";
+import { resolveBedTransferSourceContext } from "../../modules/employees/bed-transfer-source-context-resolver.mjs";
 import { evaluateStayGenesisTrigger } from "../../modules/employees/durable-stay-genesis-trigger.mjs";
 import {
   materializePreparedStayGenesis,
@@ -2651,33 +2652,27 @@ async function validateEmployeeBedTransferPhase1(env,user,entry={},normalized={}
   return contractResult;
 }
 __name(validateEmployeeBedTransferPhase1,"validateEmployeeBedTransferPhase1");
-function employeeBedTransferCanonicalLinkContext(gateway={},companyScope=""){
-  if(gateway?.transfer_link_context)return gateway.transfer_link_context;
-  const occupancy=gateway?.occupancy_gateway||{};
+async function resolveEmployeeBedTransferSourceContext(env,user,fromBed,gateway={}){
+  const sessions=await cloudArrearsFetchActiveSessionRows(env,user,{limit:1000});
+  const archiveEntries=[];
+  for(const session of sessions||[])for(const raw of extractEmployeeEntryAnchorsFromSession(session)){
+    const anchor=normalizeEntryAnchor(raw),eventType=canonicalFinanceProjectionEventType(anchor);
+    archiveEntries.push({
+      event_type:eventType,anchor_ref:cleanText(anchor.anchor_id||anchor.event_id||anchor.id||anchor.entry_id||"",160),
+      anchor_id:cleanText(anchor.anchor_id||anchor.event_id||anchor.id||anchor.entry_id||"",160),session_id:cleanText(session.id||anchor.session_id||"",160),
+      bed:cleanText(anchor.bed||anchor.room||"",80).replace(/^#/,""),from_bed:cleanText(anchor.from_bed||anchor.bed_from||"",80).replace(/^#/,""),to_bed:cleanText(anchor.to_bed||anchor.bed_to||"",80).replace(/^#/,""),
+      accepted_at:cleanText(anchor.transfer_at||anchor.transfer_date||anchor.checkout_date||anchor.created_at||session.created_at||session.date||"",80),
+      effective_status:cleanText(anchor.archive_state||anchor.status||"active",40),voided_at:cleanText(anchor.voided_at||session.voided_at||"",80),
+      stay_action:anchor.stay_action,genesis_candidate:anchor.genesis_candidate===true,genesis_group_id:cleanText(anchor.genesis_group_id||"",160),
+      checkin_mmdd:cleanText(anchor.checkin_mmdd||anchor.parsed_checkin_mmdd||"",20),rent_coverage_ref:cleanText(anchor.rent_coverage_ref||"",160),
+      transfer_anchor_id:cleanText(anchor.transfer_anchor_id||"",160),transfer_lineage_id:cleanText(anchor.transfer_lineage_id||"",160),previous_transfer_anchor_id:cleanText(anchor.previous_transfer_anchor_id||"",160)||null,
+      source_context_anchor_refs:Array.isArray(anchor.source_context_anchor_refs)?anchor.source_context_anchor_refs:[]
+    });
+  }
   const access=gateway?.access_snapshot_context||{};
-  const transfer=occupancy.latest_transfer_event||null;
-  const rent=occupancy.latest_rent_event||null;
-  const transferredContext=transfer&&transfer.to_bed===gateway.bed&&transfer.transfer_lineage_id&&transfer.transfer_anchor_id;
-  const sourceRefs=transferredContext&&Array.isArray(transfer.source_context_anchor_refs)
-    ?transfer.source_context_anchor_refs
-    :(rent?.event_id&&rent?.session_id?[`${rent.session_id}:${rent.event_id}`]:[]);
-  const fingerprint=cleanText(access.snapshot_fingerprint||"",160);
-  const contextRef=fingerprint?`access_snapshot:${fingerprint}`:"";
-  return {
-    corpid:companyScope,current_bed:gateway.bed||"",
-    physical_bed_status:occupancy.physical_bed_status||access.physical_bed_status||"unknown",
-    parsed_vacancy_marker:access.parsed_vacancy_marker===true,
-    resolution_status:sourceRefs.length===1||transferredContext?"confirmed":"ambiguous",
-    candidate_count:sourceRefs.length===1||transferredContext?1:0,
-    source_context_anchor_refs:sourceRefs,
-    rent_coverage_ref:transferredContext?transfer.rent_coverage_ref:(rent?.event_id&&rent?.session_id?`${rent.session_id}:${rent.event_id}`:""),
-    deposit_context_ref:contextRef?`${contextRef}:D`:"",
-    expiry_context_ref:contextRef?`${contextRef}:expiry`:"",
-    open_arrears:Array.isArray(gateway.open_arrears)?gateway.open_arrears:[],
-    active_lineage:transferredContext?{current_bed:gateway.bed,transfer_lineage_id:transfer.transfer_lineage_id,last_active_transfer_anchor_id:transfer.transfer_anchor_id}:null
-  };
+  return resolveBedTransferSourceContext({corpid:user?.corpid||"",from_bed:fromBed,archive_entries:archiveEntries,transfer_anchors:archiveEntries.filter(row=>row.event_type==="bed_transfer"),void_anchors:archiveEntries.filter(row=>row.event_type==="void_transfer"),open_arrears:gateway?.open_arrears||[],access_snapshot:{parsed_checkin_mmdd:access.parsed_checkin_mmdd,snapshot_fingerprint:access.snapshot_fingerprint}});
 }
-__name(employeeBedTransferCanonicalLinkContext,"employeeBedTransferCanonicalLinkContext");
+__name(resolveEmployeeBedTransferSourceContext,"resolveEmployeeBedTransferSourceContext");
 async function validateEmployeeBedTransferCanonicalLink(env,user,entry={},normalized={}){
   const fromBed=cleanText(normalized.from_bed||entry.from_bed||entry.bed_from||entry.room||"",40).replace(/^#+/,"");
   const toBed=cleanText(normalized.to_bed||entry.to_bed||entry.bed_to||entry.roomTo||"",40).replace(/^#+/,"");
@@ -2686,8 +2681,10 @@ async function validateEmployeeBedTransferCanonicalLink(env,user,entry={},normal
     canonicalBedContextGateway(env,user,{bed:toBed,limit:1000,strict_access_snapshot:true})
   ]);
   const fee=employeeEntryBedTransferFee(entry,normalized);
-  const source=employeeBedTransferCanonicalLinkContext(sourceGateway,user?.corpid||"");
-  const target=employeeBedTransferCanonicalLinkContext(targetGateway,user?.corpid||"");
+  const resolved=await resolveEmployeeBedTransferSourceContext(env,user,fromBed,sourceGateway);
+  if(resolved.resolution_status!=="resolved")return {ok:false,error_code:resolved.error_code||"BED_TRANSFER_SOURCE_CONTEXT_AMBIGUOUS",message:"Canonical source context could not be resolved.",invalid_fields:["source_context"],source_context_resolution:resolved};
+  const source={...resolved,corpid:user?.corpid||"",physical_bed_status:sourceGateway?.occupancy_gateway?.physical_bed_status||"unknown",parsed_vacancy_marker:sourceGateway?.access_snapshot_context?.parsed_vacancy_marker===true,active_lineage:resolved.active_transfer_lineage_id?{current_bed:fromBed,transfer_lineage_id:resolved.active_transfer_lineage_id,last_active_transfer_anchor_id:resolved.previous_transfer_anchor_id}:null};
+  const target={corpid:user?.corpid||"",physical_bed_status:targetGateway?.occupancy_gateway?.physical_bed_status||"unknown",parsed_vacancy_marker:targetGateway?.access_snapshot_context?.parsed_vacancy_marker===true};
   return buildBedTransferCanonicalLinkAnchor({
     client_payload:entry,from_bed:fromBed,to_bed:toBed,
     transfer_at:normalized.transfer_date||entry.transfer_date||entry.transfer_at||"",

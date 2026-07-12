@@ -15,6 +15,9 @@ const FORBIDDEN_IDENTITY_KEYS = new Set([
   "uitext",
   "preview",
   "whatsapptext"
+  ,"sourcecontextanchorrefs","carriedarrearsrefs","rentcoverageref","depositcontextref","expirycontextref"
+  ,"snapshotfingerprint","snapshotprovenance","currentbed","corpid","companyscope","staycontextid"
+  ,"lifecycle","lifecyclestatus","status","void","voided","voidedat","voidstatus","reversalstatus"
 ]);
 
 function text(value) {
