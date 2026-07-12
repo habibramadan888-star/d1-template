@@ -673,7 +673,8 @@ async function handleLogin(request, env) {
     sid,
     employee_name: typeof resolved === "string" ? userid : resolved.employee_name || userid
   }, env.JWT_SECRET);
-  return new Response(JSON.stringify({ role, userid, employee_name: typeof resolved === "string" ? userid : resolved.employee_name || userid }), {
+  const next_path=canReadOwnerData({role})?"/owner":(isStaffRoleValue(role)?"/employee":"/");
+  return new Response(JSON.stringify({ role, userid, employee_name: typeof resolved === "string" ? userid : resolved.employee_name || userid, next_path }), {
     status: 200,
     headers: {
       "Content-Type": "application/json; charset=utf-8",

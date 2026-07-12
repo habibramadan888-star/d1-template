@@ -192,6 +192,11 @@ function routeFromMe(me){
   if(!target){setStatus("此账号暂不能进入系统","error");return}
   location.replace(target);
 }
+function ownerPostLoginPath(me,authBody){
+  const roleTarget=destinationForRole(me?.role);
+  const serverTarget=String(authBody?.next_path||"").trim();
+  return roleTarget==="/owner"&&serverTarget==="/owner"?"/owner":null;
+}
 async function checkExistingSession(){
   setStatus("Checking session...");
   try{
@@ -251,6 +256,12 @@ async function signIn(event){
     const me=await fetchMe();
     if(!me)throw new Error("session_missing");
     passwordInput.value="";
+    if(selectedPortal==="owner"){
+      const ownerTarget=ownerPostLoginPath(me,auth.body);
+      if(!ownerTarget)throw new Error("owner_post_login_path_invalid");
+      location.replace(ownerTarget);
+      return;
+    }
     routeFromMe(me);
   }catch{
     setStatus("用户名或密码错误","error");
