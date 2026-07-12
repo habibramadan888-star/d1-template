@@ -15,6 +15,7 @@ import { classifyExistingCanonicalTransfer, prepareCanonicalTransferArchiveWrite
 import { projectOwnerHistoryTransferLineage } from "../../modules/owner-history/bed-transfer-lineage-projection.mjs";
 import { projectBedTransferFinanceAndArrears } from "../../modules/finance/bed-transfer-finance-arrears-projection.mjs";
 import { findDerivedArrearsPaymentForbiddenFields, parseBedTransferDerivedArrearsRef, prepareDerivedArrearsPayment } from "../../modules/finance/bed-transfer-derived-arrears-payment.mjs";
+import { BED_TRANSFER_TODO_CODES, findEffectiveBedTransferAnchor, findOwnerReviewAcknowledgmentForbiddenFields, prepareOwnerReviewAcknowledgment, projectBedTransferOwnerTodos } from "../../modules/owner-todo/bed-transfer-owner-todo.mjs";
 import { evaluateStayGenesisTrigger } from "../../modules/employees/durable-stay-genesis-trigger.mjs";
 import {
   materializePreparedStayGenesis,
@@ -5384,19 +5385,45 @@ function ownerTodayTodoAccessCandidates(lockResult={},user={}){
       if(!bed)continue;
       const cardLabel=cleanText(card.cardName||card.identityCardName||card.cardAlias||card.name||card.tenant_name||card.tenant||"",160);
       const inactive=(typeof empTtlockIsVacant==="function"&&empTtlockIsVacant(cardLabel))||(typeof empTtlockIsStaff==="function"&&empTtlockIsStaff(cardLabel));
-      const row={snapshot,card:{room:cleanText(card.room||lockRoom||"",80),card_name:cardLabel,remark:cleanText(remark,1000)},inactive};
+      const relevantCandidate=!inactive||snapshot.parsed_vacancy_marker===true;
+      const row={snapshot,card:{room:cleanText(card.room||lockRoom||"",80),card_name:cardLabel,remark:cleanText(remark,1000)},inactive,candidate_count:relevantCandidate?1:0,ambiguous:false};
       const existing=byBed.get(bed);
+      const candidateCount=Number(existing?.candidate_count||0)+(relevantCandidate?1:0);
+      row.candidate_count=candidateCount;
+      row.ambiguous=candidateCount>1;
       if(!existing
         ||(!row.inactive&&existing.inactive)
         ||(!row.inactive&&row.snapshot?.parsed_deposit_amount!==null&&existing.snapshot?.parsed_deposit_amount===null)
         ||(row.snapshot?.parsed_vacancy_marker&&!existing.snapshot?.parsed_vacancy_marker)){
         byBed.set(bed,row);
+      }else{
+        existing.candidate_count=candidateCount;
+        existing.ambiguous=candidateCount>1;
       }
     }
   }
   return byBed;
 }
 __name(ownerTodayTodoAccessCandidates,"ownerTodayTodoAccessCandidates");
+function ownerTodayTodoSafeTransferSnapshot(bedValue,row={},user={}){
+  const snapshot=row?.snapshot||{};
+  const safe={
+    bed:cleanText(bedValue||snapshot.bed||"",80).replace(/^#/,""),
+    parsed_deposit_amount:snapshot.parsed_deposit_amount??null,
+    parsed_checkin_mmdd:cleanText(snapshot.parsed_checkin_mmdd||"",20),
+    parsed_valid_until_mmdd:cleanText(snapshot.parsed_valid_until_mmdd||"",40),
+    normalized_expiry_value:cleanText(snapshot.normalized_expiry_value||snapshot.parsed_valid_until_mmdd||"",40),
+    parsed_vacancy_marker:snapshot.parsed_vacancy_marker===true,
+    physical_bed_status:cleanText(snapshot.physical_bed_status||"unknown",60),
+    parse_status:cleanText(snapshot.parse_status||"missing",60),
+    warnings:Array.isArray(snapshot.warnings)?snapshot.warnings.map(value=>cleanText(value,120)).filter(Boolean):[]
+  };
+  safe.candidate_count=Number(row?.candidate_count||1);
+  safe.ambiguous=row?.ambiguous===true||safe.candidate_count!==1;
+  safe.snapshot_fingerprint=`todo_access_${accessSnapshotRuntimeHash([cleanText(user?.corpid||"",120),safe.bed,safe.parsed_deposit_amount??"missing",safe.parsed_checkin_mmdd,safe.parsed_valid_until_mmdd,safe.parsed_vacancy_marker,safe.physical_bed_status,safe.parse_status].join("|"))}`;
+  return safe;
+}
+__name(ownerTodayTodoSafeTransferSnapshot,"ownerTodayTodoSafeTransferSnapshot");
 function ownerTodayTodoArchiveContextFromSessions(sessions=[]){
   const byBed=new Map();
   const ensure=(bed)=>{
@@ -5550,6 +5577,9 @@ async function buildOwnerTodayTodoGateway(env,user,opts={}){
   const archiveByBed=ownerTodayTodoArchiveContextFromSessions(sessions);
   const lockResult=await empLoadLockCardsWithCacheFallback(env,user,{timeoutMs:6000,limit:500}).catch(e=>({roomsData:{},error:empTtlockReadErrorCode(e)}));
   const accessByBed=ownerTodayTodoAccessCandidates(lockResult,user);
+  const archiveEntries=ownerHistoryTransferLineageArchiveEntries(sessions,user.corpid);
+  const transferSnapshots=Object.fromEntries([...accessByBed.entries()].map(([bedValue,row])=>[bedValue,ownerTodayTodoSafeTransferSnapshot(bedValue,row,user)]));
+  const transferTodos=projectBedTransferOwnerTodos({corpid:user.corpid,archive_entries:archiveEntries,access_snapshots:transferSnapshots});
   let arrearsProjection={open_items:[]};
   try{
     arrearsProjection=buildCloudArrearsProjectionFromSessions(sessions,{limit:Math.min(limit,500)})||{open_items:[]};
@@ -5568,6 +5598,7 @@ async function buildOwnerTodayTodoGateway(env,user,opts={}){
   if(opts.bed)candidateBedSet.add(cleanText(opts.bed,80).replace(/^#/,""));
   const candidates=[...candidateBedSet].filter(Boolean).slice(0,limit).map(bed=>({bed}));
   const todos=[];
+  if(transferTodos.ok)for(const todo of transferTodos.todos||[])ownerTodayTodoPush(todos,todo,filters);
   const receivables=await resolveConsoleReceivablesSot(env,user,{limit:Math.min(limit,100),ttlockTimeoutMs:6000}).catch(()=>null);
   if(receivables)ownerTodayTodoBuildReceivables(todos,receivables,filters);
   for(const candidate of candidates){
@@ -5606,7 +5637,7 @@ async function buildOwnerTodayTodoGateway(env,user,opts={}){
     todos:items,
     items,
     empty_state:"No todo items from canonical gateways",
-    source_proof:ownerTodayTodoSourceProof("owner_today_todo_gateway",{candidate_beds:candidates.length,active_sessions_scanned:sessions.length,access_snapshot_loaded:!lockResult?.error,duration_ms:Date.now()-started}),
+    source_proof:ownerTodayTodoSourceProof("owner_today_todo_gateway",{candidate_beds:candidates.length,active_sessions_scanned:sessions.length,access_snapshot_loaded:!lockResult?.error,bed_transfer_projection_status:transferTodos.ok?"projected":"fail_closed",bounded_session_limit:Math.min(limit,500),duration_ms:Date.now()-started}),
     readonly:true,
     no_write:true,
     production_cutover:"PRODUCTION_NO_GO"
@@ -5650,6 +5681,39 @@ async function handleOwnerTodayTodos(request,env,user){
   }
 }
 __name(handleOwnerTodayTodos,"handleOwnerTodayTodos");
+function ownerTodayTodoAcknowledgmentWriteEnabled(env={}){
+  return ["1","true","yes","on"].includes(String(env.OWNER_TODAY_TODO_ACK_ENABLED||"").trim().toLowerCase())&&["development","dev","local","test"].includes(String(env.APP_ENV||"").trim().toLowerCase());
+}
+__name(ownerTodayTodoAcknowledgmentWriteEnabled,"ownerTodayTodoAcknowledgmentWriteEnabled");
+async function handleOwnerTodayTodoAcknowledgment(request,env,user){
+  if(!canWriteOwnerData(user))return forbidden();
+  if(request.method!=="POST")return errorResponse("method_not_allowed",405,"METHOD_NOT_ALLOWED");
+  let body;
+  try{body=await request.json();}catch{return json({ok:false,error_code:"INVALID_JSON",no_write:true},400);}
+  const forbiddenFields=findOwnerReviewAcknowledgmentForbiddenFields(body||{});
+  if(forbiddenFields.length)return json({ok:false,error_code:"OWNER_REVIEW_ACK_SERVER_FIELD_FORBIDDEN",invalid_fields:forbiddenFields,no_write:true,before_db:true},422);
+  if(!ownerTodayTodoAcknowledgmentWriteEnabled(env))return json({ok:false,error_code:"OWNER_TODAY_TODO_ACK_DISABLED",no_write:true,production_write:false,production_cutover:"PRODUCTION_NO_GO"},409);
+  if(!await empTableExists(env,"sessions").catch(()=>false))return json({ok:false,error_code:"SESSIONS_TABLE_NOT_READY",no_write:true},503);
+  const sessions=await cloudArrearsFetchActiveSessionRows(env,user,{limit:500,include_archive:true});
+  const archiveEntries=ownerHistoryTransferLineageArchiveEntries(sessions,user.corpid);
+  const targetId=cleanText(body?.transfer_anchor_id||"",180);
+  const existing=archiveEntries.find(row=>String(row?.event_type||"").toLowerCase()==="owner_review_acknowledgment"&&cleanText(row?.target_transfer_anchor_id||"",180)===targetId&&cleanText(row?.review_code||"",120)===BED_TRANSFER_TODO_CODES.WAIVER&&cleanText(row?.action||"",40)==="acknowledged");
+  if(existing)return success({ok:true,idempotent:true,no_write:true,acknowledgment_anchor_id:cleanText(existing.acknowledgment_anchor_id||existing.anchor_id||existing.event_id||"",180),target_transfer_anchor_id:targetId,review_code:BED_TRANSFER_TODO_CODES.WAIVER,action:"acknowledged"});
+  const effectiveTransfer=findEffectiveBedTransferAnchor(archiveEntries,targetId);
+  const acceptedAt=empNow();
+  const deterministic=accessSnapshotRuntimeHash([user.corpid,targetId,BED_TRANSFER_TODO_CODES.WAIVER,"acknowledged"].join("|"));
+  const prepared=prepareOwnerReviewAcknowledgment({request:body,effective_transfer:effectiveTransfer,corpid:user.corpid,accepted_at:acceptedAt,owner_reference:user.userid},{idFactory:kind=>`${kind==="acknowledgment_session_id"?"owner-ack-session":"owner-ack-anchor"}-${deterministic}`});
+  if(!prepared.ok)return json({...prepared,production_write:false,production_cutover:"PRODUCTION_NO_GO"},422);
+  try{
+    await empInsertDynamicMode(env,"sessions",{id:prepared.acknowledgment_session_id,corpid:user.corpid,anchor_id:prepared.acknowledgment_anchor_id,date:acceptedAt.slice(0,10),entries_count:1,created_by:user.userid,created_at:acceptedAt,operator_id:user.userid,operator_name:cleanText(user.employee_name||user.userid,120),cash_handover:0,bank_transfer_total:0,bank_transfer_count:0,gross_received:0,handover_status:"OWNER_ACKNOWLEDGED",exported_at:acceptedAt,export_text:"",source:"owner_review_acknowledgment",entries_json:prepared.entries_json,summary_json:JSON.stringify({cash_handover:0,bank_transfer_total:0,bank_transfer_count:0,gross_received:0,balance_total:0})},EMP_SESSION_COLUMNS,"INSERT");
+  }catch(error){
+    const raced=await env.DB.prepare("SELECT id FROM sessions WHERE id=? AND corpid=? LIMIT 1").bind(prepared.acknowledgment_session_id,user.corpid).first().catch(()=>null);
+    if(!raced)throw error;
+    return success({ok:true,idempotent:true,no_write:true,acknowledgment_anchor_id:prepared.acknowledgment_anchor_id,target_transfer_anchor_id:targetId,review_code:BED_TRANSFER_TODO_CODES.WAIVER,action:"acknowledged"});
+  }
+  return json({ok:true,idempotent:false,acknowledgment_anchor_id:prepared.acknowledgment_anchor_id,acknowledgment_session_id:prepared.acknowledgment_session_id,target_transfer_anchor_id:targetId,review_code:BED_TRANSFER_TODO_CODES.WAIVER,action:"acknowledged",original_transfer_mutated:false,finance_mutated:false,production_write:false,production_cutover:"PRODUCTION_NO_GO"},201);
+}
+__name(handleOwnerTodayTodoAcknowledgment,"handleOwnerTodayTodoAcknowledgment");
 function employeeEntryExportTextWithAnchors(exportText,entries,session){
   const base=String(exportText||"").replace(/\n*==== ENTRY ANCHORS JSON ====\s*[\s\S]*?\s*==== END ENTRY ANCHORS JSON ====\s*$/i,"").trimEnd();
   const normalized=Array.isArray(entries)?entries.map(row=>normalizeEntryAnchor(row)):[];
@@ -11428,6 +11492,9 @@ async function handleRequest(request, env, ctx) {
     }
     if (path === "/api/owner/today-todos" && method === "GET") {
       return handleOwnerTodayTodos(request, env, user);
+    }
+    if (path === "/api/owner/today-todos/acknowledge" && method === "POST") {
+      return handleOwnerTodayTodoAcknowledgment(request, env, user);
     }
     if (path === "/api/owner/bed-status" && method === "GET") {
       return handleOwnerBedStatus(request, env, user);
