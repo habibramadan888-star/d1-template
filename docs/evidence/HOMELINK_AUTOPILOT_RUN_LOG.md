@@ -87,3 +87,26 @@ Full-suite tests were not run because the first-run boundary permits only tests 
 - Bed Transfer status: `NOT_VERIFIED / REQUIREMENTS_REVIEW`
 - production cutover: `PRODUCTION_NO_GO`
 - recommended next task: `DEFINE_DURABLE_STAY_CONTEXT_ID_AND_CANONICAL_TRANSFER_LINEAGE_CONTRACT_ONLY`
+
+## Run 4 — 2026-07-12
+
+- task: `HOMELINK_BED_TRANSFER_PHASE1_CANONICAL_LINK_ANCHOR_001`
+- milestone: `BED_TRANSFER_PHASE1_CANONICAL_LINK_ANCHOR_VALIDATE_ONLY_TEST_PASS`
+- verified HEAD: `bbbd805f29c8f5fbc11ef38b92e3c5112a0ac776`
+- human decision: global Durable Stay lifecycle is no longer a Bed Transfer Phase 1 blocker
+- human gate: `NONE`
+- controller status: `READY_FOR_NEXT_MINIMAL_LOCAL_TASK`
+- verification level: `TEST_PASS`
+- Phase 1 identity model: `CANONICAL_TRANSFER_LINK_ANCHOR`
+- Durable Stay experimental code: retained, default-off
+- migration `008_durable_stay_context.sql`: unapplied
+- Bed Transfer write enabled: no
+- validate-only and pure lineage targeted tests: `49 passed / 0 failed`
+- production called: no
+- production business data changed: no
+- staging migration applied: no
+- production migration applied: no
+- deployment: no
+- Bed Transfer status: `NOT_VERIFIED / REQUIREMENTS_REVIEW`
+- production cutover: `PRODUCTION_NO_GO`
+- recommended next task: `AUDIT_BED_TRANSFER_PHASE1_SERVER_PROVENANCE_AND_DISABLED_WRITE`
