@@ -79,11 +79,11 @@ test("Current Session, Preview, and WhatsApp export share the one calculation", 
   const preview = source.slice(source.lastIndexOf("previewSession=function"), source.indexOf("function closePreviewModal", source.lastIndexOf("previewSession=function")));
   const whatsapp = source.slice(source.lastIndexOf("function buildEntrySessionWhatsAppText"), source.indexOf("function previewField", source.lastIndexOf("function buildEntrySessionWhatsAppText")));
   assert.match(kpis, /calculateEmployeeSessionSummary\(state\.drafts\)/);
-  assert.match(preview, /calculateEmployeeSessionSummary\(state\.drafts\)/);
+  assert.match(preview, /buildEntrySessionWhatsAppText\(\)/);
+  assert.match(preview, /data-session-ledger-preview/);
   assert.match(whatsapp, /calculateEmployeeSessionSummary\(rows\)/);
   for (const label of ["Total Received", "Net Funds", "Cash Net", "Bank Net"]) {
     assert.match(kpis, new RegExp(label));
-    assert.match(preview, new RegExp(label));
     assert.match(whatsapp, new RegExp(label));
   }
   assert.doesNotMatch(kpis, /Gross Received|Cash Balance|Total Income/);

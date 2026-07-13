@@ -2985,12 +2985,12 @@ label .label-en{
             <option value="R">R 收租</option><option value="D">D 收押金</option><option value="DR">DR 退押金</option><option value="CO">CO 退房</option><option value="AP">AP 还欠款</option><option value="E">E 支出</option><option value="TF">TF 换床</option>
           </select></div>
           <div class="field" id="selectedEventWrap"><label>Selected Event<span class="label-en">已选事件</span></label><div id="selectedEventDisplay" class="readonly-pill">Rent / 收租</div></div>
-          <div class="field" id="genericBedFieldWrap"><label>床位 BED</label><input id="bed" placeholder="431" autocomplete="off"><div id="employeeBedInfoStrip" class="bed-info-strip hidden" data-bed-info-strip="true"></div></div>
+          <div class="field" id="genericBedFieldWrap"><label id="genericBedFieldLabel">床位 BED</label><input id="bed" placeholder="431" autocomplete="off"><div id="employeeBedInfoStrip" class="bed-info-strip hidden" data-bed-info-strip="true"></div></div>
         </div>
         <div class="small" id="objectHint">收租/收押金/退押金/还欠款：填写床位号；换床：填写原床位后再填新床位；支出：选择支出类别。</div>
         <div id="bedTransferStep2Mount" data-bed-transfer-step2="true"></div>
         </div>
-        <div class="step">
+        <div class="step" id="verifyContextStep">
           <div class="step-title"><span>3</span><div>Step 3 · Verify System Context<small>第三步：系统展示上下文，员工核对</small></div></div>
         <div class="ctx" id="bedContext"></div>
         <div class="context-note" id="contextNotice"></div>
@@ -3101,9 +3101,7 @@ label .label-en{
           </div>
         </div>
         <div class="grid" id="expenseFields">
-          <div class="field"><label>支出类别</label><select id="expenseCategory"><option value="ROOM">指定房间</option><option value="COMMON">公共区域</option><option value="SUPPLIES">采购耗材</option><option value="OTHER">其他</option></select></div>
-          <div class="field"><label>支出说明</label><input id="expenseDesc" placeholder="维修、采购、耗材等"></div>
-          <div class="field"><label>Evidence Ref<span class="label-en">凭证编号</span></label><input id="expenseEvidenceRef" placeholder="receipt/photo/reference for >=100 AED"></div>
+          <div class="field"><label>Expense Description<span class="label-en">支出说明</span></label><input id="expenseDesc" placeholder="修空调、采购耗材等实际用途"></div>
         </div>
 
         <div class="grid">
@@ -4043,7 +4041,8 @@ function employeeRenderBedInfoStrip(el,bedValue,{label='Bed',labelZh='床位'}={
 let employeeBedInfoStripTimer=null;
 function renderEmployeeBedInfoStrips(){
   const transfer=$('entryType')?.value==='TF';
-  employeeRenderBedInfoStrip($('employeeBedInfoStrip'),transfer?'':$('bed')?.value,{label:$('entryType')?.value==='E'?'Target Bed / Room':'Bed',labelZh:$('entryType')?.value==='E'?'目标床位 / 房间':'床位'});
+  const expense=$('entryType')?.value==='E';
+  employeeRenderBedInfoStrip($('employeeBedInfoStrip'),transfer||expense?'':$('bed')?.value,{label:'Bed',labelZh:'床位'});
   employeeRenderBedInfoStrip($('employeeTransferFromBedInfoStrip'),transfer?'':$('transferFromBed')?.value,{label:'From Bed',labelZh:'原床位'});
 }
 function employeeScheduleBedInfoStrip(){
@@ -4318,7 +4317,7 @@ function employeeSetFieldLabel(id,en,zh){
   if(label)label.innerHTML=`${esc(en)}<span class="label-en">${esc(zh)}</span>`;
 }
 function employeeApplyEventSpecificFieldLabels(type){
-  if(type==='E')employeeSetFieldLabel('bed','Target Bed / Room','目标床位 / 房间');
+  if(type==='E')employeeSetFieldLabel('bed','Room Number','房间号');
   else employeeSetFieldLabel('bed','Bed','床位');
   if(type==='DR'){
     employeeSetFieldLabel('amount','Actual Refund Amount','\u5b9e\u9000\u91d1\u989d');
@@ -4509,12 +4508,10 @@ function validateCheckoutEntry(){
 }
 function validateExpenseEntry(){
   const errors=[],warns=[];
-  employeeRequire(errors,!!employeeTrimField('bed'),'Target Bed / Room is required.');
+  employeeRequire(errors,!!employeeTrimField('bed'),'Room Number is required.');
   employeeValidateCommonAmount(errors,{label:'Expense Amount'});
-  employeeRequire(errors,!!employeeTrimField('expenseCategory'),'Expense Category is required.');
   employeeRequire(errors,!!employeePaymentMethodValue(),'Payment Method is required.');
-  employeeRequire(errors,!!employeeTrimField('expenseDesc')||!!employeeTrimField('remark'),'Reason or Note is required.');
-  if(num(employeeFieldValue('amount'))>=100&&!employeeTrimField('expenseEvidenceRef'))errors.push('Evidence Ref is required for expenses of 100 AED or more.');
+  employeeRequire(errors,!!employeeTrimField('expenseDesc'),'Expense Description is required.');
   return employeeValidationResult(errors,warns);
 }
 function validateBedTransferEntry(){
@@ -4732,10 +4729,10 @@ function buildCheckoutAnchor(){
 }
 function buildExpenseAnchor(){
   const amount=num(employeeFieldValue('amount'));
-  const category=employeeTrimField('expenseCategory');
-  const note=employeeTrimField('expenseDesc')||employeeTrimField('remark');
+  const category='EXPENSE';
+  const note=employeeTrimField('expenseDesc');
   const targetBed=employeeTrimField('bed').replace(/^#/,'');
-  const payload=employeeBaseEntryPayload('E',{reason_code:category||'E',cat:'expense',room:targetBed,target_bed:targetBed,amount,due:amount,paid:amount,expense_category:category,expense_desc:note,reason:note,note,remark:note,evidence_ref:employeeTrimField('expenseEvidenceRef')});
+  const payload=employeeBaseEntryPayload('E',{reason_code:'E',cat:'expense',room:targetBed,target_bed:targetBed,amount,due:amount,paid:amount,expense_category:category,expense_desc:note,reason:note,note,remark:note});
   return applyEntryAnchors(payload);
 }
 function buildBedTransferAnchor(){
@@ -4815,8 +4812,8 @@ const entryTemplates={
   },
   expense:{
     code:'E',event_type:'expense',title:['Expense','\u652f\u51fa'],
-    fields:['selectedEventWrap','genericBedFieldWrap','paymentStep','amount','expenseFields','remark'],
-    required_fields:['target_bed','expense_amount','expense_category','payment_method','reason'],
+    fields:['selectedEventWrap','genericBedFieldWrap','paymentStep','amount','expenseFields'],
+    required_fields:['target_bed','expense_amount','payment_method','reason'],
     system_read_fields:[],
     forbidden_fields:['periodStep','linkedTaskId','depositOutFields','checkoutFields','transferFields','listPrice'],
     validator:validateExpenseEntry,anchorBuilder:buildExpenseAnchor,uploadValidation:uploadValidationByEventType,whatsappRenderer:renderEntryAnchorForWhatsapp,ownerDetailRenderer:renderEntryAnchorForOwner
@@ -5220,6 +5217,12 @@ updateEntrySessionActionState=function(){
   const blocked=currentSessionHasUploadBlockingError();
   const hasRows=state.drafts.length>0;
   const whats=$('btnWhatsAppSession');
+  const preview=$('btnPreviewSession');
+  if(preview){
+    preview.disabled=!hasRows;
+    preview.classList.toggle('disabled',!hasRows);
+    preview.title=hasRows?'':'Add a record before opening Preview / 请先加入一条本票记录';
+  }
   if(whats){
     whats.disabled=!uploaded||blocked;
     whats.classList.toggle('disabled',!uploaded||blocked);
@@ -5327,7 +5330,7 @@ function renderSummary(){
   const task=selectedTask();
   const items=[
     ['事件',eventLabel(type)],
-    ['对象',type==='TF'?`#${$('bed').value||'-'} → #${$('bedTo').value||'-'}`:(type==='E'?$('expenseCategory').value:`#${$('bed').value||'-'}`)],
+    ['对象',type==='TF'?`#${$('bed').value||'-'} → #${$('bedTo').value||'-'}`:`#${$('bed').value||'-'}`],
     ['备注/CID',`${$('tenantName').value||'-'} / ${$('tenantCardId').value||'-'}`],
     ['金额',`${fmtMoney(num($('amount').value))} AED`],
     ['应收/计入',`${fmtMoney(num($('due').value))} / ${fmtMoney(num($('paid').value||$('amount').value))}`],
@@ -5360,9 +5363,10 @@ function syncForm(){
     if(!$('transferFromBed').value.trim()&&$('bed').value.trim())$('transferFromBed').value=$('bed').value.trim().replace(/^#/,'');
   }
   updateEventChips();
-  $('objectHint').textContent=type==='E'?'Expense requires Target Bed / Room. Enter the related bed or room before adding to session. / 支出必须填写目标床位或房间。':(type==='TF'?'Bed Transfer requires From Bed and To Bed. / 换床需要填写原床位和新床位。':(type==='AP'?'Arrears Payment uses cloud open arrears for the selected bed only. / 还欠款只针对云端未清欠款，不使用本期账期。':'Enter Bed first. The system shows open arrears and access card status below. / 请先填写床位，系统会显示欠款和门禁卡状态。'));
+  if($('genericBedFieldLabel'))$('genericBedFieldLabel').textContent=type==='E'?'Room Number / 房间号':'Bed / 床位';
+  $('objectHint').textContent=type==='E'?'Expense uses Room Number only. No bed context or tenant lookup is performed. / 支出只填写房间号，不查询床位、住客或门禁资料。':(type==='TF'?'Bed Transfer requires From Bed and To Bed. / 换床需要填写原床位和新床位。':(type==='AP'?'Arrears Payment uses cloud open arrears for the selected bed only. / 还欠款只针对云端未清欠款，不使用本期账期。':'Enter Bed first. The system shows open arrears and access card status below. / 请先填写床位，系统会显示欠款和门禁卡状态。'));
   if($('btnSaveEntry'))$('btnSaveEntry').innerHTML=type==='TF'?renderEmployeeButtonLabel('Save Transfer','保存换床'):renderEmployeeButtonLabel('Add to Session','加入本票');
-  visible(['periodStep'],hasPeriod);visible(['apFields'],type==='AP');visible(['checkoutFields'],type==='CO');visible(['transferFields'],type==='TF');visible(['expenseFields'],type==='E');visible(['paymentStep'],type!=='CO');visible(['genericBedFieldWrap'],type!=='TF');
+  visible(['periodStep'],hasPeriod);visible(['apFields'],type==='AP');visible(['checkoutFields'],type==='CO');visible(['transferFields'],type==='TF');visible(['expenseFields'],type==='E');visible(['paymentStep'],type!=='CO');visible(['genericBedFieldWrap'],type!=='TF');visible(['verifyContextStep'],type!=='E');
   updatePaymentButtons();
   visible(['exceptionStep'],needsException());
   visible(['excessWrap'],type==='R'&&num($('amount').value)>num($('due').value));
@@ -5834,7 +5838,7 @@ async function saveEntry(){
 }
 const saveEntryWithoutTtlockGate=saveEntry;
 async function saveEntryWithTtlockGate(){
-  if($('entryType')?.value==='TF')return saveEntryWithoutTtlockGate();
+  if(['TF','E'].includes($('entryType')?.value))return saveEntryWithoutTtlockGate();
   if(state.user&&!(await ensureEntryTtlockReady({auto:false})))return;
   return saveEntryWithoutTtlockGate();
 }
@@ -7142,7 +7146,7 @@ function buildEntrySessionWhatsAppText(){
     entryStatementSection(expenses.map(entryStatementLine),'📤','Expense Details')
   ].filter(Boolean);
   return [
-    'Statement',
+    'HOMELINK LEDGER',
     `Date ${entryStatementDate(today())} Time ${entryStatementTime()}`,
     `Employee ${entryWhatsappSafe(operatorName()||operatorId())}`,
     '',
@@ -7205,7 +7209,7 @@ function buildEntrySessionWhatsAppText(){
     entryStatementSection(expenses.map(entryStatementLine),'\u{1F4E4}','Expense Details')
   ].filter(Boolean);
   const text=[
-    'Statement',
+    'HOMELINK LEDGER',
     `Date ${entryStatementDate(today())} Time ${entryStatementTime()}`,
     `Employee ${entryWhatsappSafe(operatorName()||operatorId())}`,
     '',
@@ -7264,7 +7268,7 @@ renderSessionPreview=function(){
     const amount=expense||employeeSessionReceivedAmount(e);
     const sign=expense>0?'-':amount>0?'+':'';
     const cls=expense>0?'red':'';
-    const subject=e.type==='TF'?`#${esc(e.bed_from||e.room||'')} → #${esc(e.bed_to||'')}`:(e.type==='E'?esc(e.expense_category||'Expense'):`#${esc(e.room||'')}`);
+    const subject=e.type==='TF'?`#${esc(e.bed_from||e.room||'')} → #${esc(e.bed_to||'')}`:(e.type==='E'?`Room ${esc(e.room||'')}`:`#${esc(e.room||'')}`);
     const method=employeeSessionPaymentMethod(e)==='bank'?'Bank / 银行':'Cash / 现金';
     const status=e.sync_status==='SYNCED'?'<span class="status-pill">Uploaded</span>':'<span class="status-pill local">Local</span>';
     const undo=canUndo(e)?`<button class="mini-btn danger" data-undo="${esc(e.id)}">Remove Record / 删除记录</button>`:'';
@@ -7283,16 +7287,12 @@ function employeeSessionPreviewCard(e,i){
 }
 previewSession=function(){
   refreshSessionViews();
-  const s=calculateEmployeeSessionSummary(state.drafts);
   const body=$('previewModalBody');
   if(!state.drafts.length){
-    body.innerHTML='<div class="preview-empty"><div><b>No Records</b><br><span>Finish one entry first, then open Preview to check it.</span></div></div>';
+    return;
   }else{
-    const anchors=[
-      ['Cash Received / 现金收款',s.cashReceived],['Bank Received / 银行收款',s.bankReceived],['Total Received / 本票总收款',s.totalReceived],['Expenses / 本票支出',s.totalExpenses],['Net Funds / 本票净资金增加',s.netFunds],['Cash Net / 本票现金净额',s.cashNet],['Bank Net / 本票银行净额',s.bankNet],
-      ...(s.outstanding>0?[['Outstanding / 本票未收金额',s.outstanding]]:[]),...(s.depositIncluded>0?[['Deposit Included / 其中押金',s.depositIncluded]]:[])
-    ];
-    body.innerHTML=`<div class="preview-anchor-row">${anchors.map(([label,value])=>`<div class="preview-anchor"><span>${esc(label)}</span><b>${fmtMoney(value)} AED</b></div>`).join('')}</div>${state.drafts.map(employeeSessionPreviewCard).join('')}`;
+    const ledger=buildEntrySessionWhatsAppText();
+    body.innerHTML=`<div class="preview-detail-card" data-session-ledger-preview="true"><div class="preview-detail-top"><b>HOMELINK LEDGER</b></div><pre>${esc(ledger)}</pre></div>`;
   }
   $('previewModal').classList.add('show');
   showStatus(`Preview opened: ${state.drafts.length} records.`);
@@ -8411,9 +8411,9 @@ showEmployeeView(location.hash||'entry',{pushHash:false});
 document.querySelectorAll('.event-chip').forEach(btn=>btn.addEventListener('click',e=>{e.preventDefault();setEntryType(btn.dataset.type);}));
 document.querySelectorAll('#transferFields input,#transferFields select,#transferFields textarea').forEach(control=>control.addEventListener('input',employeeInvalidateBedTransferValidation));
 document.querySelectorAll('.pay-option').forEach(btn=>btn.addEventListener('click',e=>{e.preventDefault();setPaymentType(btn.dataset.pay);}));
-['entryType','cycle','payType','amount','reasonCode','feePaid','transferWaiverReason','transferFeePaymentMethod','transferFeeDueDate','bedDifferenceMode','bedDifferenceAmount','bedDifferencePaymentMethod','bedDifferenceDueDate','bedDifferenceReason','customReason','tenantName','bankRef','periodDays','depositOutRefundDate','depositOutDifferenceReason','depositDeduction','checkoutDate','noNoticeDeduction','otherDeduction','dedNote','leftWithArrearsMode','leftFormerCustomerName','leftWhatsappPhone','leftContactMethod','leftContactNote','leftDepositBalance','leftCoverageEndDate','leftArrearsAmount','leftBelongingsHeld','leftBelongingsNote','leftPromisedPaymentDate','leftPromisedReturnDate','leftConfirmedNotReturningDate','leftGraceDays','excessTo','bedTo','transferReason','expenseCategory','expenseDesc','expenseEvidenceRef','remark','arrearHandling','arrearPromiseDate','arrearReasonDetail'].forEach(id=>$(id).addEventListener('input',syncForm));
+['entryType','cycle','payType','amount','reasonCode','feePaid','transferWaiverReason','transferFeePaymentMethod','transferFeeDueDate','bedDifferenceMode','bedDifferenceAmount','bedDifferencePaymentMethod','bedDifferenceDueDate','bedDifferenceReason','customReason','tenantName','bankRef','periodDays','depositOutRefundDate','depositOutDifferenceReason','depositDeduction','checkoutDate','noNoticeDeduction','otherDeduction','dedNote','leftWithArrearsMode','leftFormerCustomerName','leftWhatsappPhone','leftContactMethod','leftContactNote','leftDepositBalance','leftCoverageEndDate','leftArrearsAmount','leftBelongingsHeld','leftBelongingsNote','leftPromisedPaymentDate','leftPromisedReturnDate','leftConfirmedNotReturningDate','leftGraceDays','excessTo','bedTo','transferReason','expenseDesc','remark','arrearHandling','arrearPromiseDate','arrearReasonDetail'].forEach(id=>$(id).addEventListener('input',syncForm));
 $('linkedTaskId').addEventListener('change',applyLinkedTask);
-$('bed').addEventListener('input',()=>{if($('entryType').value==='TF')$('transferFromBed').value=$('bed').value.trim().replace(/^#/,'');employeeScheduleLookupBed();if($('entryType').value==='AP'){populateTaskSelect();syncForm();}});
+$('bed').addEventListener('input',()=>{const type=$('entryType').value;if(type==='E'){syncForm();return;}if(type==='TF')$('transferFromBed').value=$('bed').value.trim().replace(/^#/,'');employeeScheduleLookupBed();if(type==='AP'){populateTaskSelect();syncForm();}});
 $('transferFromBed').addEventListener('input',()=>{if($('entryType').value==='TF'){$('bed').value=$('transferFromBed').value.trim().replace(/^#/,'');employeeScheduleLookupBed();employeeScheduleBedTransferContexts();syncForm();}});
 $('transferFromBed').addEventListener('change',()=>{if($('entryType').value==='TF'){$('bed').value=$('transferFromBed').value.trim().replace(/^#/,'');lookupBed();syncForm();}});
 $('transferFromBed').addEventListener('change',()=>{if($('entryType').value==='TF'&&$('bedTo').value.trim())employeeLoadBedTransferContexts().catch(()=>validate());});
@@ -8466,7 +8466,7 @@ function applyBilingualUILegacy(){
   label('checkoutDate','实际离开日期','CHECKOUT DATE');label('overdayDeduction','超期扣款','OVERDAY DEDUCTION');label('noNoticeDeduction','未提前告知扣款','NO NOTICE DEDUCTION');
   label('otherDeduction','其他扣款','OTHER DEDUCTION');label('depositDeduction','押金扣款合计','DEPOSIT DEDUCTION');label('depositReturnAmount','应退押金','DEPOSIT REFUND');
   label('dedNote','扣款说明','DEDUCTION NOTE');label('transferFromBed','原床位','FROM BED');label('bedTo','新床位','TO BED');label('transferReason','换床原因','TRANSFER REASON');label('feePaid','费用选项','FEE OPTION');label('transferWaiverReason','豁免原因','WAIVER REASON');
-  label('expenseCategory','支出类别','EXPENSE CATEGORY');label('expenseDesc','支出说明','EXPENSE DESCRIPTION');label('paid','系统计入','SYSTEM PAID');label('entryClr','系统结清','SYSTEM CLEAR');
+  label('expenseDesc','支出说明','EXPENSE DESCRIPTION');label('paid','系统计入','SYSTEM PAID');label('entryClr','系统结清','SYSTEM CLEAR');
   label('excessTo','超收处理','EXCESS HANDLING');label('arrearAmount','尾款金额','TAIL BALANCE');label('arrearPromiseDate','承诺支付日期','PROMISE DATE');label('arrearHandling','处理方式','HANDLING');label('arrearReasonDetail','尾款原因','TAIL REASON');label('reasonCode','原因代码','REASON CODE');label('customReason','异常原因','EXCEPTION REASON');label('remark','备注','REMARK');
 }
 function labelPair(zh,en){return `${esc(zh)}<small>${esc(en)}</small>`}
@@ -8549,7 +8549,7 @@ function applyBilingualUI(){
   label('checkoutDate','实际离开日期','CHECKOUT DATE');label('overdayDeduction','超期扣款','OVERDAY DEDUCTION');label('noNoticeDeduction','未提前告知扣款','NO NOTICE DEDUCTION');
   label('otherDeduction','其他扣款','OTHER DEDUCTION');label('depositDeduction','押金扣款合计','DEPOSIT DEDUCTION');label('depositReturnAmount','应退押金','DEPOSIT REFUND');
   label('dedNote','扣款说明','DEDUCTION NOTE');label('transferFromBed','原床位','FROM BED');label('bedTo','新床位','TO BED');label('transferReason','换床原因','TRANSFER REASON');label('feePaid','费用选项','FEE OPTION');label('transferWaiverReason','豁免原因','WAIVER REASON');
-  label('expenseCategory','支出类别','EXPENSE CATEGORY');label('expenseDesc','支出说明','EXPENSE DESCRIPTION');label('paid','系统计入','SYSTEM PAID');label('entryClr','系统结清','SYSTEM CLEAR');
+  label('expenseDesc','支出说明','EXPENSE DESCRIPTION');label('paid','系统计入','SYSTEM PAID');label('entryClr','系统结清','SYSTEM CLEAR');
   label('excessTo','超收处理','EXCESS HANDLING');label('arrearAmount','尾款金额','TAIL BALANCE');label('arrearPromiseDate','承诺支付日期','PROMISE DATE');label('arrearHandling','处理方式','HANDLING');label('arrearReasonDetail','尾款原因','TAIL REASON');label('reasonCode','原因代码','REASON CODE');label('customReason','异常原因','EXCEPTION REASON');label('remark','备注','REMARK');
 }
 function ctxRowFinal(zh,en,value,extra=''){
@@ -8932,7 +8932,7 @@ function applyBilingualUI(){
   label('checkoutDate','Checkout Date','\u5b9e\u9645\u79bb\u5f00\u65e5\u671f');label('overdayDeduction','Overday Deduction','\u8d85\u671f\u6263\u6b3e');label('noNoticeDeduction','No Notice Deduction','\u672a\u63d0\u524d\u544a\u77e5\u6263\u6b3e');
   label('otherDeduction','Other Deduction','\u5176\u4ed6\u6263\u6b3e');label('depositDeduction','Deposit Deduction','\u62bc\u91d1\u6263\u6b3e\u5408\u8ba1');label('depositReturnAmount','Deposit Refund','\u5e94\u9000\u62bc\u91d1');
   label('dedNote','Deduction Note','\u6263\u6b3e\u8bf4\u660e');label('transferFromBed','From Bed','\u539f\u5e8a\u4f4d');label('bedTo','To Bed','\u65b0\u5e8a\u4f4d');label('transferReason','Transfer Reason','\u6362\u5e8a\u539f\u56e0');label('feePaid','Fee Option','\u8d39\u7528\u9009\u9879');label('transferWaiverReason','Waiver Reason','\u8c41\u514d\u539f\u56e0');
-  label('expenseCategory','Expense Category','\u652f\u51fa\u7c7b\u522b');label('expenseDesc','Expense Description','\u652f\u51fa\u8bf4\u660e');label('paid','System Paid','\u7cfb\u7edf\u8ba1\u5165');label('entryClr','System Clear','\u7cfb\u7edf\u7ed3\u6e05');
+  label('expenseDesc','Expense Description','\u652f\u51fa\u8bf4\u660e');label('paid','System Paid','\u7cfb\u7edf\u8ba1\u5165');label('entryClr','System Clear','\u7cfb\u7edf\u7ed3\u6e05');
   label('excessTo','Excess Handling','\u8d85\u6536\u5904\u7406');label('arrearAmount','Tail Balance','\u5c3e\u6b3e\u91d1\u989d');label('arrearPromiseDate','Promise Date','\u627f\u8bfa\u652f\u4ed8\u65e5\u671f');label('arrearHandling','Handling','\u5904\u7406\u65b9\u5f0f');label('arrearReasonDetail','Tail Reason','\u5c3e\u6b3e\u539f\u56e0');label('reasonCode','Reason Code','\u539f\u56e0\u4ee3\u7801');label('customReason','Exception Reason','\u5f02\u5e38\u539f\u56e0');label('remark','Remark','\u5907\u6ce8');
 }
 function employeeContextTitle(en,cn){return `<span>${esc(en)}<small>${esc(cn)}</small></span>`}
@@ -9132,7 +9132,7 @@ renderSummary=function(){
   const task=selectedTask();
   const items=[
     ['Event','事件',eventLabel(type)],
-    ['Target','对象',type==='TF'?`#${$('bed').value||'-'} -> #${$('bedTo').value||'-'}`:(type==='E'?$('expenseCategory').value:`#${$('bed').value||'-'}`)],
+    ['Target','对象',type==='TF'?`#${$('bed').value||'-'} -> #${$('bedTo').value||'-'}`:`#${$('bed').value||'-'}`],
     ['Remark / CID','备注 / CID',`${$('tenantName').value||'-'} / ${$('tenantCardId').value||'-'}`],
     ['Amount','金额',`${fmtMoney(num($('amount').value))} AED`],
     ['Expected / Included','应收 / 计入',`${fmtMoney(num($('due').value))} / ${fmtMoney(num($('paid').value||$('amount').value))}`],
@@ -9259,7 +9259,7 @@ function employeeStep3SummaryHtml(){
 function employeeStep8SummaryHtml(validationResult=null){
   const type=$('entryType')?.value||'';
   const event=entryEventType(type).replaceAll('_',' ');
-  const target=type==='TF'?`#${transferValue('transferFromBed')||transferValue('bed')||'-'} -> #${transferValue('bedTo')||'-'}`:(type==='E'?($('expenseCategory')?.value||'expense'):`#${$('bed')?.value||'-'}`);
+  const target=type==='TF'?`#${transferValue('transferFromBed')||transferValue('bed')||'-'} -> #${transferValue('bedTo')||'-'}`:`#${$('bed')?.value||'-'}`;
   const amount=`${fmtMoney(num($('amount')?.value))} AED`;
   const errors=validationResult?.errors||[];
   const warns=validationResult?.warns||[];

@@ -715,7 +715,7 @@ function totals(entries){
   const sum=c=>r2(entries.filter(e=>e.cat===c)
     .reduce((s,e)=>s+Number(e.amount||0),0));
   const ci=sum('cash'),bi=sum('bank'),ro=sum('refund'),eo=sum('expense');
-  return{cashIn:ci,bankIn:bi,refundOut:ro,expOut:eo,
+  return{cashIn:ci,bankIn:bi,refundOut:ro,expOut:eo,cashOut:r2(ro+eo),netFunds:r2(ci+bi-ro-eo),
     cashBal:r2(ci-ro-eo),total:r2(ci+bi)}; // 总收入=现金+银行（不扣退款/支出），现金结余=现金-退款-支出
 }
 
@@ -728,25 +728,32 @@ function historyDetailMismatchHtml(session,renderedCount){
   const entries=Array.isArray(session?.entries)?session.entries:[];
   const rendered=totals(entries);
   const expectedCount=Number(session?.entriesCount||session?.entries_count||0)||0;
-  const summaryCash=Math.round(Number(session?.cash_handover||0)*100)/100;
-  const summaryBank=Math.round(Number(session?.bank_transfer_total||0)*100)/100;
-  const summaryGross=Math.round(Number(session?.gross_received||0)*100)/100;
+  const summaryNetCash=Math.round(Number(session?.net_cash??session?.cash_handover??0)*100)/100;
+  const summaryCashOut=Math.round(Number(session?.cash_out??session?.cash_expenses??rendered.cashOut)*100)/100;
+  const summaryCashReceived=Math.round(Number(session?.cash_received??session?.cash_in??(summaryNetCash+summaryCashOut))*100)/100;
+  const summaryBank=Math.round(Number(session?.bank_received??session?.bank_transfer_total??0)*100)/100;
+  const summaryGross=Math.round(Number(session?.gross_received??0)*100)/100;
+  const summaryNetFunds=Math.round(Number(session?.net_funds??session?.balance_total??(summaryNetCash+summaryBank))*100)/100;
   const diff=(a,b)=>Math.round((Number(a||0)-Number(b||0))*100)/100;
   const problems=[];
   if(expectedCount&&expectedCount!==renderedCount)problems.push(`saved record count ${expectedCount} / rendered ${renderedCount}`);
-  if(summaryCash&&Math.abs(diff(summaryCash,rendered.cashIn))>=0.01)problems.push(`summary cash ${fmtMoney(summaryCash)} / rendered ${fmtMoney(rendered.cashIn)}`);
-  if(summaryBank&&Math.abs(diff(summaryBank,rendered.bankIn))>=0.01)problems.push(`summary bank ${fmtMoney(summaryBank)} / rendered ${fmtMoney(rendered.bankIn)}`);
-  if(summaryGross&&Math.abs(diff(summaryGross,rendered.total))>=0.01)problems.push(`summary gross ${fmtMoney(summaryGross)} / rendered ${fmtMoney(rendered.total)}`);
+  if(Math.abs(diff(summaryCashReceived,rendered.cashIn))>=0.01)problems.push(`cash received ${fmtMoney(summaryCashReceived)} / rendered ${fmtMoney(rendered.cashIn)}`);
+  if(Math.abs(diff(summaryCashOut,rendered.cashOut))>=0.01)problems.push(`cash out ${fmtMoney(summaryCashOut)} / rendered ${fmtMoney(rendered.cashOut)}`);
+  if(Math.abs(diff(summaryNetCash,rendered.cashBal))>=0.01)problems.push(`net cash ${fmtMoney(summaryNetCash)} / rendered ${fmtMoney(rendered.cashBal)}`);
+  if(Math.abs(diff(summaryBank,rendered.bankIn))>=0.01)problems.push(`bank received ${fmtMoney(summaryBank)} / rendered ${fmtMoney(rendered.bankIn)}`);
+  if(Math.abs(diff(summaryGross,rendered.total))>=0.01)problems.push(`gross received ${fmtMoney(summaryGross)} / rendered ${fmtMoney(rendered.total)}`);
+  if(Math.abs(diff(summaryNetFunds,rendered.netFunds))>=0.01)problems.push(`net funds ${fmtMoney(summaryNetFunds)} / rendered ${fmtMoney(rendered.netFunds)}`);
   if(!problems.length)return '';
   const missing=[];
   if(expectedCount&&expectedCount>renderedCount)missing.push(`${expectedCount-renderedCount} records`);
-  if(summaryCash>rendered.cashIn)missing.push('cash income');
+  if(summaryCashReceived>rendered.cashIn)missing.push('cash income');
+  if(summaryCashOut>rendered.cashOut)missing.push('cash outflow');
   if(summaryBank>rendered.bankIn)missing.push('bank income');
   if(summaryGross>rendered.total)missing.push('gross total');
   return `<div class="card-sub" data-owner-detail-render-mismatch="true" style="margin-top:8px;color:var(--red);font-weight:800;line-height:1.6">
     <div>Detail Render Mismatch / 详情解析不完整</div>
     <div>saved record count ${expectedCount||0} · rendered record count ${renderedCount||0} · missing count ${Math.max(0,(expectedCount||0)-(renderedCount||0))}</div>
-    <div>summary cash ${fmtMoney(summaryCash)} · rendered cash ${fmtMoney(rendered.cashIn)} · summary bank ${fmtMoney(summaryBank)} · rendered bank ${fmtMoney(rendered.bankIn)} · summary gross ${fmtMoney(summaryGross)} · rendered gross ${fmtMoney(rendered.total)}</div>
+    <div>cash received ${fmtMoney(summaryCashReceived)} · rendered cash received ${fmtMoney(rendered.cashIn)} · cash out ${fmtMoney(summaryCashOut)} · rendered cash out ${fmtMoney(rendered.cashOut)} · net cash ${fmtMoney(summaryNetCash)} · rendered net cash ${fmtMoney(rendered.cashBal)} · bank received ${fmtMoney(summaryBank)} · rendered bank received ${fmtMoney(rendered.bankIn)} · gross received ${fmtMoney(summaryGross)} · rendered gross received ${fmtMoney(rendered.total)} · net funds ${fmtMoney(summaryNetFunds)} · rendered net funds ${fmtMoney(rendered.netFunds)}</div>
     <div>suspected missing categories: ${esc(missing.join(', ')||'unknown')}</div>
   </div>`;
 }
