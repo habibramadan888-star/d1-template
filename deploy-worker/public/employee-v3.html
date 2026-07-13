@@ -7058,6 +7058,12 @@ function entryStatementPay(e){
 function entryStatementNote(value){
   return entryWhatsappSafe(value).replace(/\b(expected|method|raw enum|raw|source)\b/ig,'').trim();
 }
+function entryStatementTimeAndNote(timeValue,noteValue){
+  const time=String(timeValue||'').trim();
+  const note=entryStatementNote(noteValue);
+  if(/^\d{4}$/.test(time)&&/^\d+$/.test(note))return `Time:${time} · Note:${note}`;
+  return `${time}${note?' '+note:''}`.trim();
+}
 function entrySearchableArrearsTokens(dueValue,noteValue){
   const tokens=[];
   if(String(dueValue||'').trim())tokens.push(`DUE:${entryStatementDate(dueValue)}`);
@@ -7083,7 +7089,7 @@ function entryStatementLine(e){
   }
   if(type==='arrears_payment'){
     const note=entryStatementNote(e?.note||e?.remark||e?.arrears_note||e?.custom_reason||'');
-    return `${entryStatementBed(e?.room||e?.bed)} arrears paid ${entryStatementAmount(e?.payment_amount||e?.amount)} ${pay} ${time}${note?' '+note:''}`.trim();
+    return `${entryStatementBed(e?.room||e?.bed)} arrears paid ${entryStatementAmount(e?.payment_amount||e?.amount)} ${pay} ${entryStatementTimeAndNote(time,note)}`.trim();
   }
   if(type==='deposit_in'){
     return `${entryStatementBed(e?.room||e?.bed)} deposit ${entryStatementAmount(e?.deposit_amount||e?.amount)} ${pay} ${time}`.trim();
@@ -7094,11 +7100,11 @@ function entryStatementLine(e){
     const waived=e?.fee_status==='waived'||e?.fee_mode==='waived'||e?.fee_paid==='N'||entryWhatsappAmount(e)===0;
     const reason=entryStatementNote(e?.waiver_reason||e?.fee_waiver_reason||e?.transfer_reason||e?.reason||e?.note||'');
     const fee=waived?'waived':`${entryStatementAmount(e?.fee_amount||e?.amount)} ${pay}`;
-    return `${entryStatementBed(from)}\n${entryStatementBed(to)}\ntransfer ${fee} ${time}${reason?' '+reason:''}`.trim();
+    return `${entryStatementBed(from)}\n${entryStatementBed(to)}\ntransfer ${fee} ${entryStatementTimeAndNote(time,reason)}`.trim();
   }
   if(type==='deposit_out'){
     const reason=entryStatementNote(e?.refund_reason||e?.difference_reason||e?.reason||e?.note||e?.ded_note||'');
-    return `${entryStatementBed(e?.room||e?.bed)} deposit refund ${entryStatementAmount(e?.actual_refund_amount||e?.refund_amount||e?.amount)} ${pay||'cash'} ${time}${reason?' '+reason:''}`.trim();
+    return `${entryStatementBed(e?.room||e?.bed)} deposit refund ${entryStatementAmount(e?.actual_refund_amount||e?.refund_amount||e?.amount)} ${pay||'cash'} ${entryStatementTimeAndNote(time,reason)}`.trim();
   }
   if(type==='left_with_arrears'){
     const promise=entryStatementDate(e?.promised_payment_date||e?.promise_date||e?.promised_return_date||e?.promise_return_date||'');
@@ -7113,10 +7119,10 @@ function entryStatementLine(e){
   if(type==='expense'){
     const bed=e?.room||e?.bed||e?.target_bed||e?.expense_category||'item';
     const reason=entryStatementNote(e?.expense_desc||e?.expense_category||e?.reason||e?.note||e?.ded_note||'');
-    return `${entryStatementBed(bed)} expense ${entryStatementAmount(e?.expense_amount||e?.refund_amount||e?.amount)} ${pay||'cash'} ${time}${reason?' '+reason:''}`.trim();
+    return `${entryStatementBed(bed)} expense ${entryStatementAmount(e?.expense_amount||e?.refund_amount||e?.amount)} ${pay||'cash'} ${entryStatementTimeAndNote(time,reason)}`.trim();
   }
   const reason=entryStatementNote(e?.reason_code||e?.custom_reason||e?.note||e?.remark||e?.expense_desc||'');
-  return `${entryStatementBed(e?.room||e?.bed||e?.expense_category)} ${type} ${entryStatementAmount(entryWhatsappAmount(e))} ${pay} ${time}${reason?' '+reason:''}`.trim();
+  return `${entryStatementBed(e?.room||e?.bed||e?.expense_category)} ${type} ${entryStatementAmount(entryWhatsappAmount(e))} ${pay} ${entryStatementTimeAndNote(time,reason)}`.trim();
 }
 function entryStatementSection(lines,emoji,title){
   if(!lines.length)return '';

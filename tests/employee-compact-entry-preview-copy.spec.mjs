@@ -61,6 +61,18 @@ test("searchable arrears tokens distinguish due date and note", async () => {
   assert.equal(helper('', '11'), 'NOTE:11');
 });
 
+test("numeric note immediately after a four-digit ledger time is labelled without changing other ledger text", async () => {
+  const source = await readFile(path, "utf8");
+  const start = source.indexOf('function entryStatementNote');
+  const end = source.indexOf('function entrySearchableArrearsTokens');
+  const format = new Function('entryWhatsappSafe', `${source.slice(start, end)}; return entryStatementTimeAndNote;`)(value => String(value || '').trim());
+  assert.equal(`[144] deposit refund 100 cash ${format('2210', '11')}`, '[144] deposit refund 100 cash Time:2210 · Note:11');
+  assert.doesNotMatch(`[144] deposit refund 100 cash ${format('2210', '11')}`, /2210 11/);
+  assert.equal(format('2210', 'room_issue'), '2210 room_issue');
+  assert.equal(format('2210', ''), '2210');
+  assert.equal(format('time', '11'), 'time 11');
+});
+
 test("rent period disclosure keeps real DOM state collapsed until a completed real amount mismatch", async () => {
   const source = await readFile(path, "utf8");
   const start = source.indexOf('function employeeRentPeriodDisclosureState');
