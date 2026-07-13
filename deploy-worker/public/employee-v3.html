@@ -3496,7 +3496,10 @@ function startRepeatableUploadSessionId(){
 }
 function cloneEntryForUpload(entry,sessionId,attemptId,index){
   const copy={...(entry||{})};
-  const entryId=uid('ent')+'-'+String(index+1).padStart(2,'0');
+  const isBedTransfer=String(copy.type||'').toUpperCase()==='TF'||String(copy.event_type||'').toLowerCase()==='bed_transfer';
+  const entryId=isBedTransfer
+    ?String(copy.id||copy.event_id||copy.anchor_id||uid('E'))
+    :uid('ent')+'-'+String(index+1).padStart(2,'0');
   copy.id=entryId;
   copy.event_id=entryId;
   copy.anchor_id=entryId;
@@ -3506,7 +3509,7 @@ function cloneEntryForUpload(entry,sessionId,attemptId,index){
   copy.sync_error='';
   copy.cloud_entry_id='';
   copy.upload_attempt_id=attemptId;
-  copy.idempotency_key=`${attemptId}-${entryId}`;
+  copy.idempotency_key=isBedTransfer?`bed-transfer-${sessionId}-${entryId}`:`${attemptId}-${entryId}`;
   copy.original_local_entry_id=entry?.id||entry?.event_id||entry?.anchor_id||'';
   return normalizeEntryAnchor(copy);
 }
@@ -5673,6 +5676,10 @@ function resetEmployeeEntryForm(){
   if(transferDraftId){
     state.drafts=state.drafts.filter(entry=>entry.id!==transferDraftId||entry.sync_status!=='DRAFT');
     state.lastSavedBedTransferDraftId=null;
+    if(!state.drafts.length){
+      state.sessionId='';
+      try{localStorage.removeItem(employeeStorageKey('empv3:sessionId'))}catch{}
+    }
     saveDrafts();
     refreshSessionViews();
     buildExport();

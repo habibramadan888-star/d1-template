@@ -94,6 +94,47 @@ test("Reset removes only the just-saved local Bed Transfer draft", () => {
   assert.equal(persisted, 1);
 });
 
+test("Reset of the final local Bed Transfer rotates only the next ticket session identity", () => {
+  const source = block("resetEmployeeEntryForm");
+  const state = {
+    sessionId: "conflicted-session",
+    lastSavedBedTransferDraftId: "local-transfer",
+    drafts: [{ id: "local-transfer", type: "TF", sync_status: "DRAFT" }]
+  };
+  const removed = [];
+  const context = {
+    state,
+    employeeStorageKey: key => `${key}:abdul`,
+    localStorage: { removeItem: key => removed.push(key) },
+    saveDrafts: () => true,
+    refreshSessionViews: () => {}, buildExport: () => {}, resetForm: () => {}, showStatus: () => {}, toast: () => {}
+  };
+  vm.createContext(context);
+  vm.runInContext(`${source};globalThis.resetEntry=resetEmployeeEntryForm`, context);
+  context.resetEntry();
+  assert.equal(state.drafts.length, 0);
+  assert.equal(state.sessionId, "");
+  assert.deepEqual(removed, ["empv3:sessionId:abdul"]);
+});
+
+test("Bed Transfer upload preserves its local Entry ID across validate and write retries", () => {
+  const source = block("cloneEntryForUpload");
+  const context = {
+    String,
+    uid: () => "unexpected-new-id",
+    normalizeEntryAnchor: value => value
+  };
+  vm.createContext(context);
+  vm.runInContext(`${source};globalThis.cloneForUpload=cloneEntryForUpload`, context);
+  const local = { id: "E20260713-aichb", type: "TF", event_type: "bed_transfer", from_bed: "144", to_bed: "111" };
+  const first = context.cloneForUpload(local, "S-new-ticket", "upload-one", 0);
+  const retry = context.cloneForUpload(local, "S-new-ticket", "upload-two", 0);
+  assert.equal(first.id, "E20260713-aichb");
+  assert.equal(retry.id, "E20260713-aichb");
+  assert.equal(first.idempotency_key, retry.idempotency_key);
+  assert.equal(first.idempotency_key, "bed-transfer-S-new-ticket-E20260713-aichb");
+});
+
 test("Current Session card derives beds, due, paid, cash, difference and reason from transfer fields", () => {
   const source = block("employeeBedTransferSessionCardModel");
   const context = { Number, String, fmtMoney: value => Number(value || 0).toFixed(2) };
@@ -125,6 +166,21 @@ test("Upload Session includes TF, validates it, writes only canonical entry, and
   assert.match(upload, /state\.drafts=state\.drafts\.filter/);
   for (const forbidden of ["/api/employee/bed-transfers", "/api/save_session", "event-ledger"])
     assert.equal(upload.includes(forbidden), false);
+});
+
+test("Bed Transfer validate-only and write reuse the same sanitized business payload", () => {
+  const validate = block("employeeBedTransferValidatePayload");
+  const record = block("employeeBedTransferRecordPayload");
+  const context = { Object, String, state: { bedTransferCapabilities: null } };
+  vm.createContext(context);
+  vm.runInContext(`${validate};${record};globalThis.validatePayload=employeeBedTransferValidatePayload;globalThis.recordPayload=employeeBedTransferRecordPayload`, context);
+  const validation = context.validatePayload({ event_type: "bed_transfer", type: "TF", source: "employee_entry", from_bed: "144", to_bed: "111", transfer_reason: "customer_request", fee_mode: "paid", fee_amount_aed: 50, payment_method: "cash", dry_run: true, no_write: true }, { id: "S-new-ticket" });
+  const recordPayload = context.recordPayload(validation);
+  assert.deepEqual(recordPayload.entry, validation.entry);
+  assert.equal("dry_run" in recordPayload.entry, false);
+  assert.equal("validate_only" in recordPayload.entry, false);
+  assert.equal("no_write" in recordPayload.entry, false);
+  assert.equal(recordPayload.session.id, validation.session.id);
 });
 
 test("failed upload restores original Current Session and repeat clicks are busy-guarded", () => {
