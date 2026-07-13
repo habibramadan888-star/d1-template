@@ -8709,15 +8709,21 @@ async function canonicalOwnerHistorySessionRowForList(env,user,sessionRow={}){
 }
 __name(canonicalOwnerHistorySessionRowForList,"canonicalOwnerHistorySessionRowForList");
 async function canonicalOwnerHistorySessionRowsForList(env,user,rows=[]){
-  const canonicalRows=await Promise.all((rows||[]).map(row=>canonicalOwnerHistorySessionRowForList(env,user,row)));
+  // History already has the corpid-scoped session snapshot.  Keep this list
+  // projection in-memory: detail/correction reads belong to explicit detail
+  // requests, never one per History card.
+  const projectedBySessionId=new Map();
   const transferBySessionId=new Map();
   const voidsByTargetAnchor=new Map();
+  const transferVoidSessionIds=new Set();
   for(const row of rows||[]){
+    const sessionId=String(row?.id||"");
+    projectedBySessionId.set(sessionId,canonicalOwnerHistorySessionRow(row));
     for(const anchor of extractEmployeeEntryAnchorsFromSession(row)){
       const eventType=String(anchor?.event_type||anchor?.type||"").trim().toLowerCase();
       const anchorId=cleanText(anchor?.transfer_anchor_id||anchor?.anchor_id||anchor?.event_id||"",180);
       if(eventType==="bed_transfer"&&anchorId){
-        transferBySessionId.set(String(row?.id||""),{row,anchor,anchor_id:anchorId});
+        transferBySessionId.set(sessionId,{row,anchor,anchor_id:anchorId});
       }else if(["void_transfer","transfer_void"].includes(eventType)){
         const target=cleanText(anchor?.target_transfer_anchor_id||anchor?.voids_transfer_anchor_id||"",180);
         const voidAnchorId=cleanText(anchor?.void_anchor_id||anchor?.anchor_id||anchor?.event_id||"",180);
@@ -8725,11 +8731,13 @@ async function canonicalOwnerHistorySessionRowsForList(env,user,rows=[]){
           const list=voidsByTargetAnchor.get(target)||[];
           list.push({row,anchor,anchor_id:voidAnchorId});
           voidsByTargetAnchor.set(target,list);
+          transferVoidSessionIds.add(sessionId);
         }
       }
     }
   }
-  return canonicalRows.flatMap(canonicalRow=>{
+  return (rows||[]).flatMap(row=>{
+    const canonicalRow=projectedBySessionId.get(String(row?.id||""))||canonicalOwnerHistorySessionRow(row);
     const transfer=transferBySessionId.get(String(canonicalRow?.id||""));
     if(transfer){
       const voids=voidsByTargetAnchor.get(transfer.anchor_id)||[];
@@ -8755,7 +8763,7 @@ async function canonicalOwnerHistorySessionRowsForList(env,user,rows=[]){
         audit_trail:auditTrail
       }}];
     }
-    const isTransferVoid=[...voidsByTargetAnchor.values()].some(items=>items.some(item=>String(item.row?.id||"")===String(canonicalRow?.id||"")));
+    const isTransferVoid=transferVoidSessionIds.has(String(canonicalRow?.id||""));
     const isGenericVoided=Boolean(canonicalRow?.voided_at)||String(canonicalRow?.handover_status||"").trim().toUpperCase()==="VOID";
     return isTransferVoid||isGenericVoided?[]:[canonicalRow];
   });

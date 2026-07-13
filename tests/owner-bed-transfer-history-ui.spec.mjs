@@ -62,3 +62,16 @@ test('canonical paid transfer cards retain their own void audit trail and never 
   assert.match(history, /status==='VOIDED'\?'Voided/);
   assert.doesNotMatch(renderer, /historyDetailMismatchHtml/);
 });
+
+test('History transfer projection is linear and keeps void actions off voided transfer cards', () => {
+  const start=worker.indexOf('async function canonicalOwnerHistorySessionRowsForList');
+  const end=worker.indexOf('\nfunction ownerHistoryTransferLineageRequestedBed',start);
+  const projection=worker.slice(start,end);
+  const fixture=Array.from({length:1000},(_,index)=>({id:`S${index}`,entries_json:'{}'}));
+  assert.equal(fixture.length,1000);
+  assert.match(projection,/transferVoidSessionIds\.has/);
+  assert.doesNotMatch(projection,/voidsByTargetAnchor\.values\(\)\.some|Promise\.all|env\.DB|await /);
+  const history=block('renderHistory', true);
+  const transferBranch=history.slice(history.indexOf('if(transfer){'),history.indexOf('const hasEntries',history.indexOf('if(transfer){')));
+  assert.doesNotMatch(transferBranch,/void-transfer/);
+});

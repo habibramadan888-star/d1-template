@@ -78,8 +78,8 @@ test("owner history routes are canonical archive gateway based", async () => {
   const history = routeBlock(worker, 'if (path === "/api/history")', 'if (path === "/api/session_detail"');
   const detail = routeBlock(worker, 'if (path === "/api/session_detail" && method === "GET")', 'return errorResponse("not_found"');
 
-  assert.match(history, /COALESCE\(voided_at,''\)=''/);
-  assert.match(history, /COALESCE\(handover_status,''\)<>'VOID'/);
+  assert.match(history, /SELECT \* FROM sessions WHERE corpid=\? ORDER BY created_at DESC/);
+  assert.match(history, /canonicalOwnerHistorySessionRowsForList filters/);
   assert.match(history, /canonicalOwnerHistorySessionRowsForList\(env,user,results\|\|\[\]\)/);
   assert.doesNotMatch(history, /parseEmployeeEntryExportRows/);
 
@@ -112,7 +112,7 @@ test("archive correction and void totals expose raw corrected and effective sema
   assert.match(detail, /archive_effective_totals/);
 });
 
-test("owner history list enriches rows with correction-aware archive effective totals", async () => {
+test("owner history list projects the loaded session snapshot without per-card D1 reads", async () => {
   const worker = await readFile(workerPath, "utf8");
   const detailRows = functionBlock(worker, "ownerHistoryArchiveDetailRows");
   const rowForList = functionBlock(worker, "canonicalOwnerHistorySessionRowForList");
@@ -125,7 +125,10 @@ test("owner history list enriches rows with correction-aware archive effective t
   assert.match(rowForList, /ownerCorrectionFetchExistingCorrectionSessions/);
   assert.match(rowForList, /ownerHistoryDetailCorrectionFields/);
   assert.match(rowForList, /canonicalOwnerHistorySessionRow/);
-  assert.match(rowsForList, /Promise\.all/);
+  assert.match(rowsForList, /projectedBySessionId=new Map\(\)/);
+  assert.match(rowsForList, /voidsByTargetAnchor=new Map\(\)/);
+  assert.match(rowsForList, /transferVoidSessionIds=new Set\(\)/);
+  assert.doesNotMatch(rowsForList, /Promise\.all|await |env\.DB|canonicalOwnerHistorySessionRowForList/);
 });
 
 test("entries_json is preferred over display text and fallback is display-only", async () => {
