@@ -1,5 +1,5 @@
 import { classifyBedTransferTtlockSequence } from './bed-transfer-ttlock-sequence.mjs';
-const SERVER_FIELDS = new Set(["transferanchorid", "transferlineageid", "previoustransferanchorid", "sourcecontextanchorrefs", "carriedarrearsrefs", "rentcoverageref", "depositcontextref", "expirycontextref", "snapshotfingerprint", "snapshotprovenance", "currentbed", "corpid", "companyscope", "staycontextid", "lifecycle", "lifecyclestatus", "status", "void", "voided", "voidedat", "voidstatus", "reversalstatus", "ttlocksequence", "sourcesnapshotfingerprint", "targetsnapshotfingerprint", "ttlockobservationat", "physicalstatebeforesubmission", "continuitychecks", "reconciliationrequired"]);
+const SERVER_FIELDS = new Set(["transferanchorid", "transferlineageid", "previoustransferanchorid", "sourcecontextanchorrefs", "carriedarrearsrefs", "rentcoverageref", "depositcontextref", "expirycontextref", "snapshotfingerprint", "snapshotprovenance", "sourcecontextmode", "lineagegenesis", "ownerconfirmationscope", "currentbed", "corpid", "companyscope", "staycontextid", "lifecycle", "lifecyclestatus", "status", "void", "voided", "voidedat", "voidstatus", "reversalstatus", "ttlocksequence", "sourcesnapshotfingerprint", "targetsnapshotfingerprint", "ttlockobservationat", "physicalstatebeforesubmission", "continuitychecks", "reconciliationrequired"]);
 const IDENTITY_FIELDS = new Set([
   "tenantcardid", "cardid", "oldttlockref", "providerphone", "phone99099",
   "creatorphone", "creatortime", "cardcreationtime", "providermetadata",
@@ -105,6 +105,9 @@ export function buildBedTransferCanonicalLinkAnchor(input = {}, options = {}) {
     transfer_anchor_id: transferAnchorId,
     transfer_lineage_id: lineageId,
     previous_transfer_anchor_id: active ? clean(active.last_active_transfer_anchor_id) : null,
+    source_context_mode: clean(source.source_context_mode),
+    lineage_genesis: source.lineage_genesis===true,
+    owner_confirmation_scope: clean(source.owner_confirmation_scope),
     from_bed: fromBed, to_bed: toBed, transfer_at: clean(input.transfer_at), corpid,
     source_context_anchor_refs: refs,
     carried_arrears_refs: carried,

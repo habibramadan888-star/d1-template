@@ -10,7 +10,7 @@ import {
 import {
   buildBedTransferCanonicalLinkAnchor
 } from "../../modules/employees/bed-transfer-canonical-link-anchor.mjs";
-import { resolveBedTransferSourceContext } from "../../modules/employees/bed-transfer-source-context-resolver.mjs";
+import { resolveBedTransferSourceContext, resolveOwnerConfirmedLegacyGenesis } from "../../modules/employees/bed-transfer-source-context-resolver.mjs";
 import { classifyExistingCanonicalTransfer, prepareCanonicalTransferArchiveWrite } from "../../modules/employees/bed-transfer-canonical-archive-write.mjs";
 import { projectOwnerHistoryTransferLineage } from "../../modules/owner-history/bed-transfer-lineage-projection.mjs";
 import { projectBedTransferFinanceAndArrears } from "../../modules/finance/bed-transfer-finance-arrears-projection.mjs";
@@ -32,6 +32,7 @@ import {
   validateOwnerCorrectionApplyRequest,
   validateOwnerCorrectionTargetScopedApplyAuthorization
 } from "../../modules/owner-corrections/correction-anchor-parser.mjs";
+import { prepareOwnerBedTransferVoid } from "../../modules/owner-corrections/bed-transfer-void.mjs";
 import { createDashboardTotalsPayload } from "./handlers/dashboard-totals.js";
 import { ErrorCodes } from "../../dist/lib/constants/error-codes.js";
 import { fail, ok } from "../../dist/lib/lib/api-response.js";
@@ -2687,6 +2688,24 @@ async function resolveEmployeeBedTransferSourceContext(env,user,fromBed,gateway=
   return resolveBedTransferSourceContext({corpid:user?.corpid||"",from_bed:fromBed,archive_entries:archiveEntries,transfer_anchors:archiveEntries.filter(row=>row.event_type==="bed_transfer"),void_anchors:archiveEntries.filter(row=>row.event_type==="void_transfer"),open_arrears:gateway?.open_arrears||[],access_snapshot:{parsed_checkin_mmdd:access.parsed_checkin_mmdd,snapshot_fingerprint:access.snapshot_fingerprint}});
 }
 __name(resolveEmployeeBedTransferSourceContext,"resolveEmployeeBedTransferSourceContext");
+function bedTransferLegacyGenesisAllowlist(env={}){
+  return [...new Set(String(env.BED_TRANSFER_LEGACY_GENESIS_ALLOWLIST||"").split(",").map(value=>cleanText(value,40).replace(/^#+/,"")).filter(Boolean))];
+}
+__name(bedTransferLegacyGenesisAllowlist,"bedTransferLegacyGenesisAllowlist");
+function bedTransferSafeSnapshotFingerprint(user={},gateway={}){
+  const occupancy=gateway.occupancy_gateway||{},access=gateway.access_snapshot_context||{},bed=cleanText(gateway.bed||access.bed||"",80).replace(/^#+/,"");
+  const parts=[cleanText(user?.corpid||"",120),bed,occupancy.deposit_recorded_amount??access.parsed_deposit_amount??"missing",cleanText(access.parsed_checkin_mmdd||"",20),cleanText(access.normalized_expiry_value||access.parsed_valid_until_mmdd||"",80),access.parsed_vacancy_marker===true,cleanText(occupancy.physical_bed_status||access.physical_bed_status||"unknown",60),cleanText(access.parse_status||"",60)];
+  return `bed_transfer_access_${accessSnapshotRuntimeHash(parts.join("|"))}`;
+}
+__name(bedTransferSafeSnapshotFingerprint,"bedTransferSafeSnapshotFingerprint");
+function resolveEmployeeOwnerConfirmedLegacyGenesis(env,user,fromBed,toBed,sourceGateway,targetGateway,baseResolution){
+  const context=(gateway={})=>{
+    const occupancy=gateway.occupancy_gateway||{},access=gateway.access_snapshot_context||{};
+    return {corpid:cleanText(user?.corpid||"",120),physical_bed_status:cleanText(occupancy.physical_bed_status||"",40),parsed_vacancy_marker:access.parsed_vacancy_marker===true,candidate_count:access.candidate_count??0,ambiguous:access.ambiguous===true,conflict:access.conflict===true,stale:access.stale===true,parsed_deposit_amount:occupancy.deposit_recorded_amount??access.parsed_deposit_amount??null,parsed_checkin_mmdd:cleanText(access.parsed_checkin_mmdd||"",20),parsed_valid_until_mmdd:cleanText(access.parsed_valid_until_mmdd||"",20),normalized_expiry_value:cleanText(access.normalized_expiry_value||"",80),snapshot_fingerprint:bedTransferSafeSnapshotFingerprint(user,gateway)};
+  };
+  return resolveOwnerConfirmedLegacyGenesis({base_resolution:baseResolution,corpid:user?.corpid||"",from_bed:fromBed,to_bed:toBed,app_env:env.APP_ENV,write_approved:bedTransferWriteApproved(env),allowed_source_beds:bedTransferLegacyGenesisAllowlist(env),source_context:context(sourceGateway),target_context:context(targetGateway),open_arrears:sourceGateway?.open_arrears||[]});
+}
+__name(resolveEmployeeOwnerConfirmedLegacyGenesis,"resolveEmployeeOwnerConfirmedLegacyGenesis");
 async function validateEmployeeBedTransferCanonicalLink(env,user,entry={},normalized={}){
   const fromBed=cleanText(normalized.from_bed||entry.from_bed||entry.bed_from||entry.room||"",40).replace(/^#+/,"");
   const toBed=cleanText(normalized.to_bed||entry.to_bed||entry.bed_to||entry.roomTo||"",40).replace(/^#+/,"");
@@ -2695,11 +2714,12 @@ async function validateEmployeeBedTransferCanonicalLink(env,user,entry={},normal
     canonicalBedContextGateway(env,user,{bed:toBed,limit:1000,strict_access_snapshot:true})
   ]);
   const fee=employeeEntryBedTransferFee(entry,normalized);
-  const resolved=await resolveEmployeeBedTransferSourceContext(env,user,fromBed,sourceGateway);
+  let resolved=await resolveEmployeeBedTransferSourceContext(env,user,fromBed,sourceGateway);
+  if(resolved.resolution_status!=="resolved")resolved=resolveEmployeeOwnerConfirmedLegacyGenesis(env,user,fromBed,toBed,sourceGateway,targetGateway,resolved);
   if(resolved.resolution_status!=="resolved")return {ok:false,error_code:resolved.error_code||"BED_TRANSFER_SOURCE_CONTEXT_AMBIGUOUS",message:"Canonical source context could not be resolved.",invalid_fields:["source_context"],source_context_resolution:resolved};
   const sourceAccess=sourceGateway?.access_snapshot_context||{},targetAccess=targetGateway?.access_snapshot_context||{};
-  const source={...resolved,corpid:user?.corpid||"",physical_bed_status:sourceGateway?.occupancy_gateway?.physical_bed_status||"unknown",parsed_vacancy_marker:sourceAccess.parsed_vacancy_marker===true,snapshot_fingerprint:sourceAccess.snapshot_fingerprint||resolved.snapshot_fingerprint,candidate_count:sourceAccess.candidate_count??1,ambiguous:sourceAccess.ambiguous===true,conflict:sourceAccess.conflict===true,stale:sourceAccess.stale===true,parse_status:sourceAccess.parse_status||"parsed",parsed_deposit_amount:sourceAccess.parsed_deposit_amount,parsed_checkin_mmdd:sourceAccess.parsed_checkin_mmdd,parsed_valid_until_mmdd:sourceAccess.parsed_valid_until_mmdd,active_lineage:resolved.active_transfer_lineage_id?{current_bed:fromBed,transfer_lineage_id:resolved.active_transfer_lineage_id,last_active_transfer_anchor_id:resolved.previous_transfer_anchor_id}:null};
-  const target={corpid:user?.corpid||"",physical_bed_status:targetGateway?.occupancy_gateway?.physical_bed_status||"unknown",parsed_vacancy_marker:targetAccess.parsed_vacancy_marker===true,snapshot_fingerprint:targetAccess.snapshot_fingerprint,candidate_count:targetAccess.candidate_count??1,ambiguous:targetAccess.ambiguous===true,conflict:targetAccess.conflict===true,stale:targetAccess.stale===true,parse_status:targetAccess.parse_status||"parsed",parsed_deposit_amount:targetAccess.parsed_deposit_amount,parsed_checkin_mmdd:targetAccess.parsed_checkin_mmdd,parsed_valid_until_mmdd:targetAccess.parsed_valid_until_mmdd,normalized_expiry_value:targetAccess.normalized_expiry_value};
+  const source={...resolved,corpid:user?.corpid||"",physical_bed_status:sourceGateway?.occupancy_gateway?.physical_bed_status||"unknown",parsed_vacancy_marker:sourceAccess.parsed_vacancy_marker===true,snapshot_fingerprint:resolved.snapshot_fingerprint||bedTransferSafeSnapshotFingerprint(user,sourceGateway),candidate_count:sourceAccess.candidate_count??1,ambiguous:sourceAccess.ambiguous===true,conflict:sourceAccess.conflict===true,stale:sourceAccess.stale===true,parse_status:sourceAccess.parse_status||"parsed",parsed_deposit_amount:sourceAccess.parsed_deposit_amount,parsed_checkin_mmdd:sourceAccess.parsed_checkin_mmdd,parsed_valid_until_mmdd:sourceAccess.parsed_valid_until_mmdd,normalized_expiry_value:sourceAccess.normalized_expiry_value,active_lineage:resolved.active_transfer_lineage_id?{current_bed:fromBed,transfer_lineage_id:resolved.active_transfer_lineage_id,last_active_transfer_anchor_id:resolved.previous_transfer_anchor_id}:null};
+  const target={corpid:user?.corpid||"",physical_bed_status:targetGateway?.occupancy_gateway?.physical_bed_status||"unknown",parsed_vacancy_marker:targetAccess.parsed_vacancy_marker===true,snapshot_fingerprint:bedTransferSafeSnapshotFingerprint(user,targetGateway),candidate_count:targetAccess.candidate_count??1,ambiguous:targetAccess.ambiguous===true,conflict:targetAccess.conflict===true,stale:targetAccess.stale===true,parse_status:targetAccess.parse_status||"parsed",parsed_deposit_amount:targetAccess.parsed_deposit_amount,parsed_checkin_mmdd:targetAccess.parsed_checkin_mmdd,parsed_valid_until_mmdd:targetAccess.parsed_valid_until_mmdd,normalized_expiry_value:targetAccess.normalized_expiry_value};
   return buildBedTransferCanonicalLinkAnchor({
     client_payload:entry,from_bed:fromBed,to_bed:toBed,
     transfer_at:empNow(),
@@ -3124,8 +3144,8 @@ async function validateEmployeeEntryUploadPayload(env,user,body,opts={}){
   }
   let amount=Number(String((type==="AP"?(entry.amount||entry.payment_amount||normalized.payment_amount):entry.amount)||0).replace(/,/g,""));
   const room=cleanText(entry.room||entry.bed||normalized.bed||(type==="E"?entry.expense_category:""),40).replace(/^#+/,"");
-  const amountOptional=type==="CO"||type==="TF";
-  if(!room||!Number.isFinite(amount)||(!amountOptional&&amount<=0)){
+  const amountOptional=type==="CO"||type==="TF"||type==="TFF",canonicalTransfer=["TF","TFF"].includes(type);
+  if(!canonicalTransfer&&(!room||!Number.isFinite(amount)||(!amountOptional&&amount<=0))){
     return employeeEntryValidationFailure("basic_fields","ROOM_AMOUNT_REQUIRED","Room and amount are required.",{
       event_index:eventIndex,event_type:normalized.event_type||entryAnchorEventType(type),
       missing_fields:[!room?"room":"",(!Number.isFinite(amount)||(!amountOptional&&amount<=0))?"amount":""].filter(Boolean),
@@ -3409,10 +3429,12 @@ async function handleEmployeeEntry(request,env,user){
     const boundaryFailure=employeeBedTransferSingleEntryFailure(body||{});
     if(boundaryFailure)return json({success:false,...boundaryFailure},422);
   }
-  if(!await empTableExists(env,"sessions")||!await empTableExists(env,"transactions"))return errorResponse("employee_entry_schema_not_ready",503,"employee_entry_schema_not_ready");
+  if(!await empTableExists(env,"sessions")||(!["TF","TFF"].includes(writeGateType)&&!await empTableExists(env,"transactions")))return errorResponse("employee_entry_schema_not_ready",503,"employee_entry_schema_not_ready");
+  if(["TF","TFF"].includes(writeGateType)&&!(await empTableColumns(env,"sessions")).has("entries_json"))return json({success:false,ok:false,error_code:"BED_TRANSFER_CANONICAL_ARCHIVE_SCHEMA_NOT_READY",no_write:true,write_attempted:false,production_cutover:"PRODUCTION_NO_GO"},503);
   body=normalizeEmployeeEntryBodyForValidation(body||{});
   const validationResult=await validateEmployeeEntryUploadPayload(env,user,body,{event_index:body?.event_index,canonical_transfer_link_anchor:["TF","TFF"].includes(writeGateType)});
   if(!validationResult.ok)return json({success:false,...validationResult},422);
+  if(["TF","TFF"].includes(writeGateType))return persistEmployeeBedTransferCanonicalArchive(env,user,body,validationResult);
   if(validationResult.idempotent){
     const entry=body?.entry||{};
     return success({
@@ -3745,7 +3767,6 @@ async function handleEmployeeEntry(request,env,user){
       },202);
     }
   }
-  if(["TF","TFF"].includes(writeGateType))return persistEmployeeBedTransferCanonicalArchive(env,user,body,validationResult);
   timing.d1_write_ms=Date.now()-d1WriteStart;
   timing.total_ms=Date.now()-timing.started_at;
   return success({
@@ -5718,6 +5739,41 @@ function ownerTodayTodoAcknowledgmentWriteEnabled(env={}){
   return ["1","true","yes","on"].includes(String(env.OWNER_TODAY_TODO_ACK_ENABLED||"").trim().toLowerCase())&&["development","dev","local","test","beta_preview"].includes(String(env.APP_ENV||"").trim().toLowerCase());
 }
 __name(ownerTodayTodoAcknowledgmentWriteEnabled,"ownerTodayTodoAcknowledgmentWriteEnabled");
+function ownerBedTransferVoidWriteEnabled(env={}){
+  return String(env.APP_ENV||"").trim().toLowerCase()==="beta_preview"&&String(env.BED_TRANSFER_VOID_APPROVED||"").trim().toLowerCase()==="true"&&bedTransferWriteApproved(env);
+}
+__name(ownerBedTransferVoidWriteEnabled,"ownerBedTransferVoidWriteEnabled");
+async function handleOwnerBedTransferVoid(request,env,user){
+  if(!requireManager(user))return forbidden();
+  if(request.method!=="POST")return errorResponse("method_not_allowed",405,"METHOD_NOT_ALLOWED");
+  if(!ownerBedTransferVoidWriteEnabled(env))return json({ok:false,error_code:"BED_TRANSFER_VOID_DISABLED",no_write:true,production_cutover:"PRODUCTION_NO_GO"},409);
+  let body;
+  try{
+    const contentType=String(request.headers.get("content-type")||"").toLowerCase();
+    if(contentType.includes("application/x-www-form-urlencoded")||contentType.includes("multipart/form-data"))body=Object.fromEntries(await request.formData());
+    else body=await request.json();
+  }catch{return json({ok:false,error_code:"INVALID_JSON",no_write:true},400);}
+  if(!await empTableExists(env,"sessions"))return json({ok:false,error_code:"SESSIONS_TABLE_NOT_READY",no_write:true},503);
+  if(!(await empTableColumns(env,"sessions")).has("entries_json"))return json({ok:false,error_code:"BED_TRANSFER_CANONICAL_ARCHIVE_SCHEMA_NOT_READY",no_write:true,write_attempted:false,production_cutover:"PRODUCTION_NO_GO"},503);
+  const target=cleanText(body?.transfer_anchor_id||"",180);
+  const sessions=await cloudArrearsFetchActiveSessionRows(env,user,{limit:1000,include_archive:true});
+  const entries=ownerHistoryTransferLineageArchiveEntries(sessions,user.corpid);
+  const existingVoid=entries.find(row=>["void_transfer","transfer_void"].includes(String(row?.event_type||row?.type||"").toLowerCase())&&cleanText(row?.target_transfer_anchor_id||"",180)===target);
+  if(existingVoid)return success({ok:true,idempotent:true,void_anchor_id:cleanText(existingVoid.void_anchor_id||existingVoid.anchor_id||existingVoid.event_id||"",180),target_transfer_anchor_id:target,effective:false,original_transfer_mutated:false,hard_delete:false});
+  const effective=findEffectiveBedTransferAnchor(entries,target);
+  const now=empNow(),deterministic=accessSnapshotRuntimeHash([user.corpid,target,"CONTROLLED_BETA_TEST_CLEANUP"].join("|"));
+  const prepared=prepareOwnerBedTransferVoid({request:body,effective_transfer:effective,corpid:user.corpid,accepted_at:now,owner_reference:user.userid},{idFactory:kind=>`${kind==="void_session_id"?"owner-tf-void-session":"owner-tf-void-anchor"}-${deterministic}`});
+  if(!prepared.ok)return json({...prepared,production_cutover:"PRODUCTION_NO_GO"},422);
+  try{
+    await empInsertDynamicMode(env,"sessions",{id:prepared.void_session_id,corpid:user.corpid,anchor_id:prepared.void_anchor_id,date:now.slice(0,10),entries_count:1,created_by:user.userid,created_at:now,operator_id:user.userid,operator_name:cleanText(user.employee_name||user.userid,120),cash_handover:0,bank_transfer_total:0,bank_transfer_count:0,gross_received:0,handover_status:"TRANSFER_VOID_APPLIED",exported_at:now,export_text:"",source:"owner_transfer_void",entries_json:prepared.entries_json,summary_json:JSON.stringify({cash_handover:0,bank_transfer_total:0,bank_transfer_count:0,gross_received:0,balance_total:0})},EMP_SESSION_COLUMNS,"INSERT");
+  }catch(error){
+    const raced=await env.DB.prepare("SELECT id FROM sessions WHERE id=? AND corpid=? LIMIT 1").bind(prepared.void_session_id,user.corpid).first().catch(()=>null);
+    if(!raced)throw error;
+    return success({ok:true,idempotent:true,void_anchor_id:prepared.void_anchor_id,target_transfer_anchor_id:target,effective:false,original_transfer_mutated:false,hard_delete:false});
+  }
+  return json({ok:true,idempotent:false,void_session_id:prepared.void_session_id,void_anchor_id:prepared.void_anchor_id,target_transfer_anchor_id:target,effective:false,original_transfer_mutated:false,hard_delete:false,transaction_write_attempted:false,finance_mutated:false,deposit_mutated:false,arrears_mutated:false,ttlock_mutated:false,production_cutover:"PRODUCTION_NO_GO"},201);
+}
+__name(handleOwnerBedTransferVoid,"handleOwnerBedTransferVoid");
 async function handleOwnerTodayTodoAcknowledgment(request,env,user){
   if(!canWriteOwnerData(user))return forbidden();
   if(request.method!=="POST")return errorResponse("method_not_allowed",405,"METHOD_NOT_ALLOWED");
@@ -10952,6 +11008,13 @@ async function fetchStaticAsset(request, env, pathname) {
   return response;
 }
 __name(fetchStaticAsset, "fetchStaticAsset");
+function ownerBedTransferVoidControlResponse(request,env,claim){
+  if(!requireManager(claim)||!ownerBedTransferVoidWriteEnabled(env))return new Response("Not Found",{status:404,headers:{"Cache-Control":"no-store"}});
+  const target=cleanText(new URL(request.url).searchParams.get("transfer_anchor_id")||"",180);
+  const html=`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Controlled Beta Transfer Void</title></head><body><main><h1>Controlled Beta Transfer Void</h1><p>Beta Preview only. Adds canonical void evidence; no hard delete and no TTLock mutation.</p><form method="post" action="/api/owner/bed-transfer/void"><label>Transfer anchor <input name="transfer_anchor_id" value="${esc(target)}" required readonly></label><input type="hidden" name="reason" value="CONTROLLED_BETA_TEST_CLEANUP"><button type="submit">Void Controlled Beta Transfer</button></form></main></body></html>`;
+  return new Response(html,{status:200,headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store","Content-Security-Policy":"default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'"}});
+}
+__name(ownerBedTransferVoidControlResponse,"ownerBedTransferVoidControlResponse");
 async function handleAppEntryRoute(request, env, path, method) {
   if (method !== "GET") return null;
   // Compatibility-only paths are intercepted before static assets so legacy login UI cannot render.
@@ -10963,6 +11026,11 @@ async function handleAppEntryRoute(request, env, path, method) {
   if (path === "/admin-login") return redirectToRootEntry(request, "admin");
   if (path === "/employee-v3.html" || path === "/employee-v2.html") return redirectToPath(request, "/employee");
   if (path === "/index.html" || path === "/index-51.html" || path === "/owner.html") return redirectToPath(request, "/owner");
+  if (path === "/owner/beta-transfer-void") {
+    const claim=await readRouteClaim(request,env);
+    if(!claim)return redirectToRootEntry(request,"owner");
+    return ownerBedTransferVoidControlResponse(request,env,claim);
+  }
   if (path !== "/employee" && path !== "/owner" && path !== "/admin") return null;
 
   const claim = await readRouteClaim(request, env);
@@ -11031,6 +11099,9 @@ async function handleRequest(request, env, ctx) {
     }
     if (path === "/api/owner/corrections/apply" && method === "POST") {
       return handleOwnerCorrectionApply(request, env, user);
+    }
+    if (path === "/api/owner/bed-transfer/void" && method === "POST") {
+      return handleOwnerBedTransferVoid(request, env, user);
     }
     const employeeApiResponse = await handleEmployeeApi(request, env, user);
     if (employeeApiResponse) return employeeApiResponse;

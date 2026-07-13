@@ -12,6 +12,26 @@ function failure(status,error_code,count,reasons){return{resolution_status:statu
 function contextRefs(entries){return stable(entries.map(ref));}
 function arrearsRefs(rows){return stable(rows.map(r=>clean(r.arrears_ref||r.cloud_arrears_ref)).filter(Boolean));}
 function contextRefsFromSnapshot(snapshot={}){const fp=clean(snapshot.snapshot_fingerprint||snapshot.fingerprint);return{snapshot_fingerprint:fp,deposit_context_ref:fp?`access_snapshot:${fp}:D`:'',expiry_context_ref:fp?`access_snapshot:${fp}:expiry`:''};}
+
+export function resolveOwnerConfirmedLegacyGenesis(raw={}){
+  const input=clone(raw),base=input.base_resolution||{},fromBed=bed(input.from_bed),toBed=bed(input.to_bed);
+  const source=input.source_context||{},target=input.target_context||{};
+  const allowlist=new Set((Array.isArray(input.allowed_source_beds)?input.allowed_source_beds:[]).map(bed).filter(Boolean));
+  const fail=(code,reasons)=>failure('ambiguous',code,0,reasons);
+  if(clean(input.app_env).toLowerCase()!=='beta_preview'||input.write_approved!==true)return fail('BED_TRANSFER_LEGACY_GENESIS_DISABLED',['beta_preview_gate_closed']);
+  if(!allowlist.has(fromBed))return fail('BED_TRANSFER_LEGACY_GENESIS_NOT_ALLOWLISTED',['source_bed_not_allowlisted']);
+  if(fromBed!=='146'||toBed!=='111')return fail('BED_TRANSFER_LEGACY_GENESIS_SCOPE_MISMATCH',['controlled_beta_pair_required']);
+  if(fromBed==='334'||toBed==='334'||!fromBed||!toBed||fromBed===toBed)return fail('BED_TRANSFER_LEGACY_GENESIS_SCOPE_MISMATCH',['invalid_bed_pair']);
+  if(clean(input.corpid)!==clean(source.corpid)||clean(input.corpid)!==clean(target.corpid))return fail('BED_TRANSFER_COMPANY_SCOPE_MISMATCH',['corpid_mismatch']);
+  if(base.error_code!=='BED_TRANSFER_SOURCE_CONTEXT_AMBIGUOUS'||Number(base.candidate_group_count||0)!==0||!Array.isArray(base.ambiguity_reasons)||base.ambiguity_reasons.length!==1||base.ambiguity_reasons[0]!=='no_legacy_mmdd_match')return fail(base.error_code||'BED_TRANSFER_SOURCE_CONTEXT_AMBIGUOUS',['canonical_conflict_or_existing_context']);
+  if(!['occupied','not_marked_vacant'].includes(clean(source.physical_bed_status).toLowerCase())||source.parsed_vacancy_marker===true)return fail('BED_TRANSFER_LEGACY_GENESIS_SOURCE_NOT_OCCUPIED',['source_not_occupied']);
+  if(clean(target.physical_bed_status).toLowerCase()!=='vacant'||target.parsed_vacancy_marker!==true)return fail('BED_TRANSFER_TARGET_NOT_VACANT',['target_not_vacant']);
+  for(const ctx of [source,target])if(ctx.ambiguous===true||ctx.conflict===true||ctx.stale===true||Number(ctx.candidate_count||0)!==1)return fail('BED_TRANSFER_ACCESS_SNAPSHOT_AMBIGUOUS',['access_snapshot_not_unique']);
+  const fp=clean(source.snapshot_fingerprint),mmdd=clean(source.parsed_checkin_mmdd),expiry=clean(source.normalized_expiry_value||source.parsed_valid_until_mmdd);
+  if(!fp||!mmdd||!expiry||source.parsed_deposit_amount==null)return fail('BED_TRANSFER_LEGACY_GENESIS_CONTEXT_INCOMPLETE',['source_snapshot_context_incomplete']);
+  const prefix=`access_snapshot:${fp}`;
+  return {resolution_status:'resolved',resolution_method:'owner_confirmed_legacy_genesis',source_context_mode:'owner_confirmed_legacy',lineage_genesis:true,owner_confirmation_scope:'CONTROLLED_BETA_TEST',corpid:clean(input.corpid),from_bed:fromBed,active_transfer_lineage_id:null,previous_transfer_anchor_id:null,genesis_anchor_ref:`${prefix}:legacy_genesis`,source_context_anchor_refs:[`${prefix}:legacy_genesis`],carried_arrears_refs:arrearsRefs(input.open_arrears||[]),rent_coverage_ref:`${prefix}:MMDD:${mmdd}`,deposit_context_ref:`${prefix}:D`,expiry_context_ref:`${prefix}:expiry`,snapshot_fingerprint:fp,expected_checkin_mmdd:mmdd,candidate_group_count:1,candidate_count:1,ambiguity_reasons:[]};
+}
 function finish(method,input,entries,genesis,options={}){
   const snapshot=contextRefsFromSnapshot(input.access_snapshot||{});
   const rents=entries.filter(e=>eventType(e)==='rent');

@@ -1,0 +1,14 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import {prepareOwnerBedTransferVoid} from '../modules/owner-corrections/bed-transfer-void.mjs';
+import {projectBedTransferLineage} from '../modules/owner-history/bed-transfer-lineage-projection.mjs';
+import {projectBedTransferFinanceAndArrears} from '../modules/finance/bed-transfer-finance-arrears-projection.mjs';
+import {projectBedTransferOwnerTodos} from '../modules/owner-todo/bed-transfer-owner-todo.mjs';
+
+const transfer={event_type:'bed_transfer',transfer_anchor_id:'transfer-anchor-opaque-146-111',transfer_lineage_id:'transfer-lineage-opaque-146',from_bed:'146',to_bed:'111',corpid:'corp',fee_mode:'waived',fee_amount_aed:0,fee_waiver_reason:'CONTROLLED_BETA_TEST_NO_CHARGE',ttlock_sequence:'employee_first_pre_move',reconciliation_required:true};
+const request={transfer_anchor_id:transfer.transfer_anchor_id,reason:'CONTROLLED_BETA_TEST_CLEANUP',idempotency_key:'cleanup-1'};
+const build=()=>prepareOwnerBedTransferVoid({request,effective_transfer:transfer,corpid:'corp',accepted_at:'2026-07-13T12:00:00Z',owner_reference:'manager'},{idFactory:kind=>kind==='void_session_id'?'void-session-opaque':'void-anchor-opaque'});
+
+test('prepares one additive zero-finance void anchor without mutating the transfer',()=>{const r=build();assert.equal(r.ok,true);assert.equal(r.entry.event_type,'void_transfer');assert.equal(r.entry.target_transfer_anchor_id,transfer.transfer_anchor_id);assert.equal(r.entry.original_transfer_mutated,false);assert.equal(r.entry.hard_delete,false);assert.equal(r.entry.ttlock_mutated,false);assert.deepEqual(r.entry.finance_effect,{rent_income:0,deposit_received:0,deposit_refund:0,arrears_repaid:0,bed_transfer_fee_income:0});assert.equal(JSON.parse(r.entries_json).entries.length,1);});
+test('void request rejects client server fields and corpid mismatch before write',()=>{assert.equal(prepareOwnerBedTransferVoid({request:{...request,corpid:'evil'},effective_transfer:transfer,corpid:'corp'}).error_code,'BED_TRANSFER_VOID_FIELD_FORBIDDEN');assert.equal(prepareOwnerBedTransferVoid({request,effective_transfer:transfer,corpid:'other'}).error_code,'BED_TRANSFER_VOID_CORPID_MISMATCH');});
+test('void restores lineage and clears effective finance and todo projections',()=>{const v=build().entry;const lineage=projectBedTransferLineage({transfer_anchors:[transfer],void_anchors:[v]});assert.equal(lineage.current_bed,'146');const finance=projectBedTransferFinanceAndArrears({corpid:'corp',archive_entries:[transfer,v],source_arrears:[]});assert.equal(finance.effective_transfer_events.length,0);assert.equal(finance.finance.bed_transfer_fee_income,0);const todo=projectBedTransferOwnerTodos({corpid:'corp',archive_entries:[transfer,v],access_snapshots:{}});assert.equal(todo.todos.length,0);});
