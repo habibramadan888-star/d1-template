@@ -3027,7 +3027,6 @@ label .label-en{
             <div class="field"><label>账期应收 period_due（系统计算）</label><input id="periodDue" inputmode="decimal" placeholder="系统计算" readonly></div>
             <div class="field"><label>本条应收 DUE（系统计算）</label><input id="due" inputmode="decimal" placeholder="系统计算" readonly></div>
           </div>
-          <label class="period-exception-confirm hidden" id="periodExceptionConfirmWrap"><input id="periodExceptionConfirmed" type="checkbox"> I confirm the period, due, paid amount, and difference. / 我确认账期、应收、实收和差额。</label>
         </div>
         </div>
 
@@ -3105,9 +3104,12 @@ label .label-en{
           <div class="field"><label>Expense Description<span class="label-en">支出说明</span></label><input id="expenseDesc" placeholder="修空调、采购耗材等实际用途"></div>
         </div>
 
-        <div class="grid">
-          <div class="field"><label>系统计入 paid</label><input id="paid" inputmode="decimal" placeholder="系统自动计算" readonly></div>
-          <div class="field"><label>系统结清 entry_clr</label><select id="entryClr" disabled><option value="Y">Y 已够本期</option><option value="N">N 不足</option><option value="P">P 部分</option></select></div>
+        <div class="employee-system-calculation collapsed" id="systemCalculation">
+          <button type="button" class="employee-system-calculation-toggle" id="systemCalculationToggle" aria-expanded="false"><span>System Calculation <small>系统计算</small></span><span id="systemCalculationCompactStatus">Paid 0.00 · Clear Y ✓</span></button>
+          <div class="grid employee-system-calculation-body">
+            <div class="field"><label>系统计入 paid</label><input id="paid" inputmode="decimal" placeholder="系统自动计算" readonly></div>
+            <div class="field"><label>系统结清 entry_clr</label><select id="entryClr" disabled><option value="Y">Y 已够本期</option><option value="N">N 不足</option><option value="P">P 部分</option></select></div>
+          </div>
         </div>
         <div class="step diffbox hidden" id="exceptionStep">
           <div class="step-title"><span>7</span><div>Step 7 · Handle Exception<small>第七步：处理异常或差额</small></div></div>
@@ -4428,13 +4430,14 @@ function employeeValidateCommonAmount(errors,{optional=false,label='Amount'}={})
   const amt=num(employeeFieldValue('amount'));
   if(!optional&&(!amt||amt<=0))errors.push(`${label} must be greater than 0.`);
 }
-function employeeRentPeriodRequiresConfirmation(){
+function employeeRentPeriodNeedsAttention(){
   if($('entryType')?.value!=='R')return false;
-  const due=num($('due')?.value);
+  const target=rentForBed();
   const paid=num($('amount')?.value);
   const standard=$('cycle')?.value==='1M';
-  const deterministic=!!($('periodStart')?.value&&$('periodEnd')?.value&&due>0&&rentForBed()>0);
-  return !standard||!deterministic||Math.abs(due-paid)>0.01;
+  const ttlockExpiry=String(state.current?.end||state.current?.valid_until||'').trim();
+  const datesReady=!!($('periodStart')?.value&&$('periodEnd')?.value);
+  return !standard||!ttlockExpiry||!datesReady||target<=0||Math.abs(paid-target)>0.01;
 }
 function employeeUpdatePeriodDisclosure(){
   const step=$('periodStep');
@@ -4450,13 +4453,34 @@ function employeeUpdatePeriodDisclosure(){
     title?.insertAdjacentElement('afterend',summary);
     summary.onclick=()=>step.classList.toggle('collapsed');
   }
-  const required=employeeRentPeriodRequiresConfirmation();
-  const due=num($('due')?.value), paid=num($('amount')?.value);
-  summary.textContent=`System period: ${$('periodStart')?.value||'-'} → ${$('periodEnd')?.value||'-'} · Due AED ${fmtMoney(due)}${required?' · confirmation required':''}`;
+  const attention=employeeRentPeriodNeedsAttention();
+  const target=rentForBed(), paid=num($('amount')?.value);
+  const start=$('periodStart')?.value||'Start required';
+  const end=$('periodEnd')?.value||'End required';
+  const ttlockExpiry=String(state.current?.end||state.current?.valid_until||'').trim();
+  const difference=Math.abs(paid-target);
+  summary.textContent=attention
+    ?`Review period: ${$('cycle')?.value||'1M'} · ${start} → ${end} · Target AED ${fmtMoney(target)} · Paid AED ${fmtMoney(paid)} · Difference AED ${fmtMoney(difference)}${ttlockExpiry?'':' · TTLock expiry unavailable'}`
+    :`✓ ${$('cycle')?.value||'1M'} · ${start} → ${end}`;
   step.classList.toggle('employee-period-collapsible',$('entryType')?.value==='R');
-  step.classList.toggle('collapsed',$('entryType')?.value==='R'&&!required);
-  visible(['periodExceptionConfirmWrap'],required);
-  if(!required&&$('periodExceptionConfirmed'))$('periodExceptionConfirmed').checked=false;
+  step.classList.toggle('collapsed',$('entryType')?.value==='R'&&!attention);
+}
+function employeeUpdateSystemCalculationDisclosure(){
+  const panel=$('systemCalculation');
+  const toggle=$('systemCalculationToggle');
+  const status=$('systemCalculationCompactStatus');
+  if(!panel||!toggle||!status)return;
+  const clear=$('entryClr')?.value||'Y';
+  const marker=clear==='Y'?'✓':clear==='N'?'!':'~';
+  status.textContent=`Paid ${fmtMoney(num($('paid')?.value))} · Clear ${clear} ${marker}`;
+  toggle.setAttribute('aria-expanded',String(!panel.classList.contains('collapsed')));
+  if(!toggle.dataset.bound){
+    toggle.dataset.bound='1';
+    toggle.onclick=()=>{
+      panel.classList.toggle('collapsed');
+      employeeUpdateSystemCalculationDisclosure();
+    };
+  }
 }
 function validateRentEntry(){
   const errors=[],warns=[];
@@ -4482,7 +4506,6 @@ function validateRentEntry(){
     if(!employeeTrimField('arrearReasonDetail'))errors.push('Short-paid rent requires a reason or note.');
   }
   if(due>0&&amount>due&&!employeeFieldValue('excessTo'))errors.push('Overpaid rent requires an excess handling choice.');
-  if(employeeRentPeriodRequiresConfirmation()&&!$('periodExceptionConfirmed')?.checked)errors.push('Confirm Period requires explicit confirmation for this exception.');
   return employeeValidationResult(errors,warns);
 }
 function validateArrearsPaymentEntry(){
@@ -5866,7 +5889,7 @@ async function saveEntryWithTtlockGate(){
   return saveEntryWithoutTtlockGate();
 }
 saveEntry=saveEntryWithTtlockGate;
-function resetForm(){['bed','transferFromBed','bedTo','transferReason','transferWaiverReason','transferFeeDueDate','transferFeePaymentMethod','bedDifferenceAmount','bedDifferencePaymentMethod','bedDifferenceDueDate','bedDifferenceReason','amount','due','paid','tenantName','tenantCardId','periodStart','periodEnd','periodDays','periodDue','listPrice','customReason','bankRef','checkoutDate','depositOutBalance','depositOutRefundDate','depositOutDifferenceReason','depositDeduction','depositReturnAmount','overdayDeduction','noNoticeDeduction','otherDeduction','dedNote','leftFormerCustomerName','leftWhatsappPhone','leftContactNote','leftDepositBalance','leftCoverageEndDate','leftArrearsAmount','leftBelongingsNote','leftPromisedPaymentDate','leftPromisedReturnDate','leftConfirmedNotReturningDate','leftGraceDays','expenseDesc','expenseEvidenceRef','remark','excessTo','arrearAmount','arrearPromiseDate','arrearReasonDetail'].forEach(id=>{if($(id))$(id).value=''});if($('periodExceptionConfirmed'))$('periodExceptionConfirmed').checked=false;$('feePaid').value='paid';$('bedDifferenceMode').value='none';$('leftWithArrearsMode').value='normal';$('leftContactMethod').value='whatsapp';$('leftBelongingsHeld').value='no';$('arrearHandling').value='ARREAR';state.current=null;state.depositBalance=null;state.depositContext=null;state.bedTransferContext={status:'idle',source:null,target:null,requestKey:'',serverValidation:null};employeeRenderBedTransferContext();renderContext();syncForm();refreshSessionViews()}
+function resetForm(){['bed','transferFromBed','bedTo','transferReason','transferWaiverReason','transferFeeDueDate','transferFeePaymentMethod','bedDifferenceAmount','bedDifferencePaymentMethod','bedDifferenceDueDate','bedDifferenceReason','amount','due','paid','tenantName','tenantCardId','periodStart','periodEnd','periodDays','periodDue','listPrice','customReason','bankRef','checkoutDate','depositOutBalance','depositOutRefundDate','depositOutDifferenceReason','depositDeduction','depositReturnAmount','overdayDeduction','noNoticeDeduction','otherDeduction','dedNote','leftFormerCustomerName','leftWhatsappPhone','leftContactNote','leftDepositBalance','leftCoverageEndDate','leftArrearsAmount','leftBelongingsNote','leftPromisedPaymentDate','leftPromisedReturnDate','leftConfirmedNotReturningDate','leftGraceDays','expenseDesc','expenseEvidenceRef','remark','excessTo','arrearAmount','arrearPromiseDate','arrearReasonDetail'].forEach(id=>{if($(id))$(id).value=''});$('feePaid').value='paid';$('bedDifferenceMode').value='none';$('leftWithArrearsMode').value='normal';$('leftContactMethod').value='whatsapp';$('leftBelongingsHeld').value='no';$('arrearHandling').value='ARREAR';state.current=null;state.depositBalance=null;state.depositContext=null;state.bedTransferContext={status:'idle',source:null,target:null,requestKey:'',serverValidation:null};employeeRenderBedTransferContext();renderContext();syncForm();refreshSessionViews()}
 function hasLocalOnly(){return state.drafts.some(e=>!employeeEntryCloudConfirmed(e))}
 function newSession(){
   if(hasLocalOnly()){toast('仍有云端未确认记录，不能开始新会话');return}
@@ -6867,7 +6890,7 @@ function buildExport(){
   const opened=drafts.filter(e=>e.type==='R'&&e.entry_clr!=='Y'&&num(e.period_due)>num(e.paid));
   if(opened.length){
     lines.push('', '==== ARREARS OPENED ====');
-    opened.forEach(e=>lines.push(`TASK auto  #${e.room} ${e.tenant_name||'-'} ${e.tenant_card_id||'-'}  expected ${fmtMoney(e.expected_rent||e.period_due)} paid ${fmtMoney(e.paid||e.amount)} owes ${fmtMoney(num(e.arrears_amount)||num(e.period_due)-num(e.paid))}  ${e.reason_code||'SHORT_PAID'} due ${e.arrears_due_date||e.arrear_promise_date||'-'} note ${e.arrears_note||e.arrear_reason_detail||e.custom_reason||'-'}  ${e.period_start}->${e.period_end}`));
+    opened.forEach(e=>lines.push(`TASK auto  #${e.room} ${e.tenant_name||'-'} ${e.tenant_card_id||'-'}  expected ${fmtMoney(e.expected_rent||e.period_due)} paid ${fmtMoney(e.paid||e.amount)} owes ${fmtMoney(num(e.arrears_amount)||num(e.period_due)-num(e.paid))}  ${e.reason_code||'SHORT_PAID'} ${entrySearchableArrearsTokens(e.arrears_due_date||e.arrear_promise_date||'',e.arrears_note||e.arrear_reason_detail||e.custom_reason||'')||'DUE:-'}  ${e.period_start}->${e.period_end}`));
   }
   const cashIn=drafts.filter(e=>e.pay_type==='C'&&!['E','DR'].includes(e.type)).reduce((s,e)=>s+num(e.amount),0);
   const bankIn=drafts.filter(e=>e.pay_type==='B'&&!['E','DR'].includes(e.type)).reduce((s,e)=>s+num(e.amount),0);
@@ -6971,8 +6994,8 @@ function entryWhatsappLine(e,i){
     const paid=num(e?.paid_amount||e?.paid||e?.amount);
     const shortPaid=num(e?.arrears_amount)||Math.max(0,expected-paid);
     const due=e?.arrears_due_date||e?.arrear_promise_date||e?.promise_date||'';
-    const note=entryWhatsappSafe(e?.arrears_note||e?.arrear_reason_detail||e?.custom_reason||e?.note||'');
-    const shortText=shortPaid>0?` expected ${fmtMoney(expected)} short_paid ${fmtMoney(shortPaid)} due ${due||'-'}${note?' note '+note:''}`:` expected ${fmtMoney(expected)}`;
+    const meta=entrySearchableArrearsTokens(due,e?.arrears_note||e?.arrear_reason_detail||e?.custom_reason||e?.note||'');
+    const shortText=shortPaid>0?` expected ${fmtMoney(expected)} short_paid ${fmtMoney(shortPaid)}${meta?' '+meta:''}`:` expected ${fmtMoney(expected)}`;
     return `${i+1}. ${bed.anchor} rent ${fmtMoney(paid)} ${pay}${shortText}${period}`.trim();
   }
   if(type==='arrears_payment'){
@@ -7028,6 +7051,13 @@ function entryStatementPay(e){
 function entryStatementNote(value){
   return entryWhatsappSafe(value).replace(/\b(expected|method|raw enum|raw|source)\b/ig,'').trim();
 }
+function entrySearchableArrearsTokens(dueValue,noteValue){
+  const tokens=[];
+  if(String(dueValue||'').trim())tokens.push(`DUE:${entryStatementDate(dueValue)}`);
+  const note=entryStatementNote(noteValue);
+  if(note)tokens.push(`NOTE:${note}`);
+  return tokens.join(' | ');
+}
 function entryStatementType(e){
   const event=String(e?.event_type||'').trim().toLowerCase();
   return event||entryWhatsappType(e);
@@ -7040,9 +7070,8 @@ function entryStatementLine(e){
     const expected=num(e?.expected_rent||e?.period_due||e?.due);
     const paid=num(e?.paid_amount||e?.paid||e?.amount);
     const shortPaid=num(e?.arrears_amount)||Math.max(0,expected-paid);
-    const note=entryStatementNote(e?.arrears_note||e?.arrear_reason_detail||e?.custom_reason||e?.note||'');
-    const due=entryStatementDate(e?.arrears_due_date||e?.arrear_promise_date||e?.promise_date||'');
-    const short=shortPaid>0?` short ${entryStatementAmount(shortPaid)} due ${due}${note?' '+note:''}`:'';
+    const meta=entrySearchableArrearsTokens(e?.arrears_due_date||e?.arrear_promise_date||e?.promise_date||'',e?.arrears_note||e?.arrear_reason_detail||e?.custom_reason||e?.note||'');
+    const short=shortPaid>0?` short ${entryStatementAmount(shortPaid)}${meta?' '+meta:''}`:'';
     return `${entryStatementBed(e?.room||e?.bed)} paid ${entryStatementAmount(paid)} ${pay} ${time}${short}`.trim();
   }
   if(type==='arrears_payment'){
@@ -8846,7 +8875,12 @@ function employeeEnsureEnglishFirstStyle(){
     .session-summary-section.collapsed .session-summary-content{display:none}
     .session-summary-section.collapsed .session-summary-toggle::after{content:'▸'}
     .session-summary-section:not(.collapsed) .session-summary-toggle::after{content:'▾'}
-    .period-exception-confirm{display:block;margin-top:10px;font-weight:800;color:#8a4d00}
+    .employee-system-calculation{border:1px solid var(--line);border-radius:14px;padding:10px;margin-bottom:10px;background:#fff}
+    .employee-system-calculation-toggle{width:100%;display:flex;justify-content:space-between;align-items:center;gap:10px;border:0;background:transparent;color:#142033;font-weight:900;cursor:pointer;text-align:left;padding:2px 0}
+    .employee-system-calculation-toggle small{display:block;color:#69788a;font-size:10px;font-weight:650}
+    .employee-system-calculation-toggle::after{content:'▾';color:#64748b}
+    .employee-system-calculation.collapsed .employee-system-calculation-body{display:none}
+    .employee-system-calculation.collapsed .employee-system-calculation-toggle::after{content:'▸'}
     #periodStep.employee-period-collapsible.collapsed #periodFields{display:none}
     #periodStep.employee-period-collapsible .period-summary-toggle{width:100%;border:0;background:transparent;text-align:left;font-weight:800;color:#3f4d61;cursor:pointer;padding:4px 0}
     #periodStep.employee-period-collapsible.collapsed .period-summary-toggle::after{content:' ▸'}
@@ -9602,6 +9636,7 @@ function employeeRenumberRequiredFlowTitles(){
   employeeSetStepTitle($('periodStep'),'5','Step 5 \u00b7 Confirm Period','\u7b2c\u4e94\u6b65\uff1a\u786e\u8ba4\u8d26\u671f');
 }
 function employeeUpdateCollapsedStepSummaries(validationResult=null){
+  employeeUpdateSystemCalculationDisclosure();
   const step3=employeeEnsureCollapsibleStep(3,'Reference / Verify System Context','\u53c2\u8003\u4fe1\u606f / \u6838\u5bf9\u7cfb\u7edf\u8d44\u6599');
   const step8=employeeEnsureCollapsibleStep(8,'Review & Submit','\u9884\u89c8\u786e\u8ba4\u4e0e\u63d0\u4ea4');
   const step3Marker=step3?.querySelector('.step-title>span');
