@@ -48,3 +48,17 @@ test('History requests only the current bed and never expands into bed-number me
   assert.match(history, /&bed=\$\{encodeURIComponent\(state\.historyBedQuery\)\}/);
   assert.doesNotMatch(history, /historical_beds.*fetch|room IN|Promise\.all.*history|\[A,B,C\]/);
 });
+
+test('canonical paid transfer cards retain their own void audit trail and never render a standalone void business card', () => {
+  const renderer=block('ownerBedTransferHistoryDetailHtml');
+  assert.match(renderer, /Raw transfer fee/);
+  assert.match(renderer, /Effective transfer fee/);
+  assert.match(renderer, /Original transfer/);
+  assert.match(renderer, /Owner void/);
+  assert.match(renderer, /fee_paid_amount/);
+  const history=block('renderHistory', true);
+  assert.match(history, /bed_transfer_history:s\.bed_transfer_history\|\|null/);
+  assert.match(history, /data-bed-transfer-history="true"/);
+  assert.match(history, /status==='VOIDED'\?'Voided/);
+  assert.doesNotMatch(renderer, /historyDetailMismatchHtml/);
+});

@@ -8709,7 +8709,56 @@ async function canonicalOwnerHistorySessionRowForList(env,user,sessionRow={}){
 }
 __name(canonicalOwnerHistorySessionRowForList,"canonicalOwnerHistorySessionRowForList");
 async function canonicalOwnerHistorySessionRowsForList(env,user,rows=[]){
-  return Promise.all((rows||[]).map(row=>canonicalOwnerHistorySessionRowForList(env,user,row)));
+  const canonicalRows=await Promise.all((rows||[]).map(row=>canonicalOwnerHistorySessionRowForList(env,user,row)));
+  const transferBySessionId=new Map();
+  const voidsByTargetAnchor=new Map();
+  for(const row of rows||[]){
+    for(const anchor of extractEmployeeEntryAnchorsFromSession(row)){
+      const eventType=String(anchor?.event_type||anchor?.type||"").trim().toLowerCase();
+      const anchorId=cleanText(anchor?.transfer_anchor_id||anchor?.anchor_id||anchor?.event_id||"",180);
+      if(eventType==="bed_transfer"&&anchorId){
+        transferBySessionId.set(String(row?.id||""),{row,anchor,anchor_id:anchorId});
+      }else if(["void_transfer","transfer_void"].includes(eventType)){
+        const target=cleanText(anchor?.target_transfer_anchor_id||anchor?.voids_transfer_anchor_id||"",180);
+        const voidAnchorId=cleanText(anchor?.void_anchor_id||anchor?.anchor_id||anchor?.event_id||"",180);
+        if(target&&voidAnchorId){
+          const list=voidsByTargetAnchor.get(target)||[];
+          list.push({row,anchor,anchor_id:voidAnchorId});
+          voidsByTargetAnchor.set(target,list);
+        }
+      }
+    }
+  }
+  return canonicalRows.flatMap(canonicalRow=>{
+    const transfer=transferBySessionId.get(String(canonicalRow?.id||""));
+    if(transfer){
+      const voids=voidsByTargetAnchor.get(transfer.anchor_id)||[];
+      const feeAmount=cleanMoney(transfer.anchor?.fee_amount_aed??transfer.anchor?.fee_paid_amount??0);
+      const feeMode=cleanText(transfer.anchor?.fee_mode||"",40).toLowerCase();
+      const paymentMethod=cleanText(transfer.anchor?.payment_method||"",40).toLowerCase();
+      const auditTrail=[
+        {kind:"transfer",anchor_id:transfer.anchor_id,at:cleanText(transfer.anchor?.canonical_accepted_at||transfer.anchor?.transfer_at||transfer.row?.created_at||"",80),effective:voids.length===0},
+        ...voids.map(item=>({kind:"owner_void",anchor_id:item.anchor_id,at:cleanText(item.anchor?.voided_at||item.row?.created_at||"",80),effective:true}))
+      ];
+      return [{...canonicalRow,bed_transfer_history:{
+        transfer_anchor_id:transfer.anchor_id,
+        from_bed:cleanText(transfer.anchor?.from_bed||"",80),
+        to_bed:cleanText(transfer.anchor?.to_bed||"",80),
+        fee_mode:feeMode,
+        fee_amount_aed:feeAmount,
+        fee_due_amount:cleanMoney(transfer.anchor?.fee_due_amount??feeAmount),
+        fee_paid_amount:cleanMoney(transfer.anchor?.fee_paid_amount??(feeMode==="paid"?feeAmount:0)),
+        payment_method:paymentMethod,
+        status:voids.length?"VOIDED":"ACTIVE",
+        raw_fee_amount_aed:feeAmount,
+        effective_fee_amount_aed:voids.length?0:feeAmount,
+        audit_trail:auditTrail
+      }}];
+    }
+    const isTransferVoid=[...voidsByTargetAnchor.values()].some(items=>items.some(item=>String(item.row?.id||"")===String(canonicalRow?.id||"")));
+    const isGenericVoided=Boolean(canonicalRow?.voided_at)||String(canonicalRow?.handover_status||"").trim().toUpperCase()==="VOID";
+    return isTransferVoid||isGenericVoided?[]:[canonicalRow];
+  });
 }
 __name(canonicalOwnerHistorySessionRowsForList,"canonicalOwnerHistorySessionRowsForList");
 function ownerHistoryTransferLineageRequestedBed(url){
@@ -11673,9 +11722,10 @@ async function handleRequest(request, env, ctx) {
       const rawOffset = Number(url.searchParams.get("offset") || 0);
       const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(Math.floor(rawLimit), 30) : 30;
       const offset = Number.isFinite(rawOffset) && rawOffset > 0 ? Math.floor(rawOffset) : 0;
-      const baseSql = includeVoided
-        ? "SELECT * FROM sessions WHERE corpid=? ORDER BY created_at DESC"
-        : "SELECT * FROM sessions WHERE corpid=? AND COALESCE(voided_at,'')='' AND COALESCE(handover_status,'')<>'VOID' ORDER BY created_at DESC";
+      // The transfer projection needs both immutable original anchors and their
+      // additive void anchors.  canonicalOwnerHistorySessionRowsForList filters
+      // unrelated voided sessions from the normal Owner list.
+      const baseSql = "SELECT * FROM sessions WHERE corpid=? ORDER BY created_at DESC";
       if (limit) {
         const { results } = await env.DB.prepare(`${baseSql} LIMIT ? OFFSET ?`).bind(user.corpid, limit, offset).all();
         const data=await canonicalOwnerHistorySessionRowsForList(env,user,results||[]);

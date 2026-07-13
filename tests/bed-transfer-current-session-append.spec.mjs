@@ -190,6 +190,8 @@ test("Upload Session includes TF, validates it, writes only canonical entry, and
   assert.match(upload, /apiFetch\('\/api\/employee\/entry'/);
   assert.match(upload, /if\(cloudConfirmed&&includesBedTransfer\)/);
   assert.match(upload, /state\.drafts=state\.drafts\.filter/);
+  assert.match(upload, /state\.lastSavedBedTransferDraftId=null/);
+  assert.match(upload, /localStorage\.removeItem\(employeeStorageKey\('empv3:sessionId'\)\)/);
   for (const forbidden of ["/api/employee/bed-transfers", "/api/save_session", "event-ledger"])
     assert.equal(upload.includes(forbidden), false);
 });

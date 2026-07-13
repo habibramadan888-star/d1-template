@@ -8259,6 +8259,7 @@ async function commitSessionAndExport(){
   if(cloudConfirmed&&includesBedTransfer){
     state.drafts=state.drafts.filter(entry=>String(entry?.type||'').toUpperCase()!=='TF'&&String(entry?.event_type||'').toLowerCase()!=='bed_transfer');
     if(!state.drafts.length){state.sessionId='';try{localStorage.removeItem(employeeStorageKey('empv3:sessionId'))}catch{}}
+    state.lastSavedBedTransferDraftId=null;
     saveDrafts();
   }
   buildExport();
