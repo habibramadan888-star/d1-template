@@ -10,6 +10,7 @@
   --bg:#f4f6f8;--surface:#fff;--surface2:#f7faf8;--line:#dfe5e8;--line2:#cfd8dc;
   --text:#111827;--muted:#5f6877;--soft:#8a94a3;--green:#09a64f;--green2:#078d42;
   --green-bg:rgba(9,166,79,.10);--orange:#e16b00;--red:#d93025;--blue:#1a73e8;
+  --employee-active-background:linear-gradient(180deg,#10ad5a,#078d42);--employee-active-border:rgba(9,166,79,.7);--employee-active-shadow:0 12px 26px rgba(9,166,79,.24);--employee-active-text:#fff;
   --shadow:0 16px 38px rgba(20,32,51,.10);--r:22px;--r2:30px;
 }
 *{box-sizing:border-box}html{background:var(--bg)}
@@ -8900,6 +8901,12 @@ function employeeEnsureEnglishFirstStyle(){
     .employee-system-calculation.collapsed .employee-system-calculation-body{display:none}
     .employee-system-calculation.collapsed .employee-system-calculation-toggle::after{content:'▸'}
     .employee-workspace-switch{position:sticky;top:0;z-index:12;display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:0 0 8px;padding:6px 0;background:#f7f9fc}.employee-workspace-switch button{min-height:44px;border:1px solid var(--line);border-radius:10px;background:#f8fafc;color:#475569;font-weight:850}.employee-workspace-switch button.active,.event-chip.active{background:#157347!important;color:#fff!important;border-color:#157347!important}.employee-workspace-switch small{display:block;font-size:10px;opacity:.78}.employee-session-card{display:none}.employee-session-active .employee-entry-card{display:none}.employee-session-active .employee-session-card{display:block}.employee-session-status-bar{width:100%;border:1px solid #d6e7dc;background:#f3fbf5;color:#166534;border-radius:10px;min-height:38px;text-align:left;font-weight:800;padding:8px 10px;margin-bottom:8px}.employee-picker-title{font-weight:900;font-size:14px;margin:0 0 7px}.employee-picker-title small{display:block;color:#64748b;font-size:10px}.employee-entry-card>.head{display:none}.employee-entry-card .step-title{display:none!important}.employee-entry-card .step> .step-title>span{display:none!important}.employee-entry-card #listPrice{display:none!important}.employee-entry-card #listPriceWrap,.employee-entry-card #verifyContextStep,.employee-entry-card .employee-collapsible-step{margin-top:8px}.employee-entry-card #objectHint,.employee-entry-card #entrySummary{display:none!important}.employee-session-card .preview-entry{padding:8px 10px;min-height:0}.employee-session-card .preview-entry .small{font-size:11px}.employee-session-card .preview-entry .preview-tools{margin-top:4px}.employee-session-card .preview-entry .amt{font-size:14px}.employee-session-card #sessionKpis{margin:0}.employee-entry-card #systemCalculation{margin-top:8px}#validationBox[data-pristine="true"]{display:none!important}.employee-entry-card textarea#remark{min-height:64px;max-height:72px}
+    /* One computed brand-green treatment for every selected or primary entry control. */
+    .tab.active,.employee-workspace-switch button.active,.event-chip.active,.pay-option.active,.btn.primary:not(:disabled){background:var(--employee-active-background)!important;border-color:var(--employee-active-border)!important;box-shadow:var(--employee-active-shadow)!important;color:var(--employee-active-text)!important}
+    .pay-option.active .label-en{color:rgba(255,255,255,.76)!important}
+    /* The global navigation is sticky above this switch; keep the switch below it. */
+    .top{z-index:20}.employee-workspace-switch{position:fixed!important;top:134px!important;left:max(10px,calc((100vw - min(1480px,calc(100vw - 40px)))/2));width:min(1480px,calc(100vw - 40px));z-index:12;isolation:isolate;box-shadow:0 8px 14px rgba(20,32,51,.06)}#view-entry{padding-top:64px}
+    @media(max-width:720px){.employee-workspace-switch{top:106px!important;left:10px;width:calc(100vw - 20px)}#view-entry{padding-top:64px}}
     #periodStep.employee-period-collapsible.collapsed #periodFields{display:none}
     #periodStep.employee-period-collapsible .period-summary-toggle{width:100%;border:0;background:transparent;text-align:left;font-weight:800;color:#3f4d61;cursor:pointer;padding:4px 0}
     #periodStep.employee-period-collapsible.collapsed .period-summary-toggle::after{content:' ▸'}
