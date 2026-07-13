@@ -2955,17 +2955,19 @@ label .label-en{
 </div>
 <main class="wrap">
   <section id="view-entry">
-    <div class="card">
+    <div class="employee-workspace-switch" role="tablist" aria-label="Employee workspace"><button type="button" class="active" data-employee-workspace="entry">录入事项 <small>Add Entry</small></button><button type="button" data-employee-workspace="session">本票记录 <small id="workspaceSessionCount">Current Session (0)</small></button></div>
+    <div class="card employee-session-card" id="employeeSessionSummaryCard">
       <div class="head"><div><div class="title">Current Session Summary<span class="label-en">本票流水汇总</span></div><div class="small" id="sessionClock">CURRENT SESSION</div></div><button class="btn" id="btnNewSessionTop">New Session<span class="label-en">新会话</span></button></div>
       <div class="body">
         <div class="kpi-grid" id="sessionKpis"></div>
       </div>
     </div>
-    <div class="card">
+    <div class="card employee-entry-card" id="employeeEntryCard">
       <div class="head"><div class="title">Add Entry<span class="label-en">事件录入</span></div><button class="btn" id="btnLoadLock"><span class="employee-btn-main">Load Cards</span><span class="label-en">加载卡片</span></button></div>
       <div class="body">
+        <button type="button" class="employee-session-status-bar" id="employeeSessionStatusBar">本票 0 条 · 查看本票 &gt;</button>
           <div class="step employee-event-picker">
-          <div class="step-title"><span>1</span><div>Step 1 · Select Event Type<small>第一步：选择事件类型</small></div></div>
+          <div class="employee-picker-title">选择事项 <small>Select Event</small></div>
           <div class="event-grid" id="eventChips">
             <button class="event-chip" data-type="R"><span>Rent</span><small>收租</small></button>
             <button class="event-chip" data-type="AP"><span>Arrears Payment</span><small>还欠款</small></button>
@@ -2984,7 +2986,7 @@ label .label-en{
           <div class="field hidden" id="entryTypeWrap"><label>事件类型 type</label><select id="entryType">
             <option value="R">R 收租</option><option value="D">D 收押金</option><option value="DR">DR 退押金</option><option value="CO">CO 退房</option><option value="AP">AP 还欠款</option><option value="E">E 支出</option><option value="TF">TF 换床</option>
           </select></div>
-          <div class="field" id="selectedEventWrap"><label>Selected Event<span class="label-en">已选事件</span></label><div id="selectedEventDisplay" class="readonly-pill">Rent / 收租</div></div>
+          <div class="field hidden" id="selectedEventWrap"><label>Selected Event<span class="label-en">已选事件</span></label><div id="selectedEventDisplay" class="readonly-pill">Rent / 收租</div></div>
           <div class="field" id="genericBedFieldWrap"><label id="genericBedFieldLabel">床位 BED</label><input id="bed" placeholder="431" autocomplete="off"><div id="employeeBedInfoStrip" class="bed-info-strip hidden" data-bed-info-strip="true"></div></div>
         </div>
         <div class="small" id="objectHint">收租/收押金/退押金/还欠款：填写床位号；换床：填写原床位后再填新床位；支出：选择支出类别。</div>
@@ -3140,7 +3142,7 @@ label .label-en{
         <div class="row"><button class="btn primary" id="btnSaveEntry"><span class="employee-btn-main">Add to Session</span><span class="label-en">加入本票</span></button><button class="btn" id="btnReset"><span class="employee-btn-main">Reset</span><span class="label-en">清空</span></button></div>
       </div>
     </div>
-    <div class="card">
+    <div class="card employee-session-card" id="employeeSessionRecordsCard">
       <div class="head">
         <div><div class="title">本次会话</div><div class="small" id="sessionMeta">0 条记录</div></div>
         <div class="row" style="flex:0 0 auto"><button class="btn" id="btnPreviewSession"><span class="employee-btn-main">Preview &amp; Copy</span><span class="label-en">预览并复制</span></button><button class="btn primary" id="btnExportSession"><span class="employee-btn-main">Upload Session</span><span class="label-en">确认本票并上传云端</span></button></div>
@@ -8897,6 +8899,7 @@ function employeeEnsureEnglishFirstStyle(){
     .employee-system-calculation-toggle::after{content:'▾';color:#64748b}
     .employee-system-calculation.collapsed .employee-system-calculation-body{display:none}
     .employee-system-calculation.collapsed .employee-system-calculation-toggle::after{content:'▸'}
+    .employee-workspace-switch{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:8px 0 10px}.employee-workspace-switch button{min-height:44px;border:1px solid var(--line);border-radius:10px;background:#f8fafc;color:#475569;font-weight:850}.employee-workspace-switch button.active{background:#157347;color:#fff;border-color:#157347}.employee-workspace-switch small{display:block;font-size:10px;opacity:.78}.employee-session-card{display:none}.employee-session-active .employee-entry-card{display:none}.employee-session-active .employee-session-card{display:block}.employee-session-status-bar{width:100%;border:1px solid #d6e7dc;background:#f3fbf5;color:#166534;border-radius:10px;min-height:38px;text-align:left;font-weight:800;padding:8px 10px;margin-bottom:8px}.employee-picker-title{font-weight:900;font-size:14px;margin:0 0 7px}.employee-picker-title small{display:block;color:#64748b;font-size:10px}.employee-event-picker .step-title{display:none!important}.employee-session-card .preview-entry{padding:8px 10px;min-height:0}.employee-session-card .preview-entry .small{font-size:11px}.employee-session-card .preview-entry .preview-tools{margin-top:4px}.employee-session-card .preview-entry .amt{font-size:14px}.employee-session-card #sessionKpis{margin:0}.employee-entry-card #verifyContextStep,.employee-entry-card #systemCalculation,.employee-entry-card .employee-collapsible-step{margin-top:8px}#validationBox[data-pristine="true"]{display:none!important}
     #periodStep.employee-period-collapsible.collapsed #periodFields{display:none}
     #periodStep.employee-period-collapsible .period-summary-toggle{width:100%;border:0;background:transparent;text-align:left;font-weight:800;color:#3f4d61;cursor:pointer;padding:4px 0}
     #periodStep.employee-period-collapsible.collapsed .period-summary-toggle::after{content:' ▸'}
@@ -9666,6 +9669,20 @@ function employeeUpdateCollapsedStepSummaries(validationResult=null){
   if(!employeeEntryActiveEditable())employeePrioritizeEntryInputs();
   employeeRenderOpenArrearsAlert();
 }
+function employeeSetWorkspace(mode='entry'){
+  const root=$('view-entry');
+  if(!root)return;
+  const session=mode==='session';
+  root.classList.toggle('employee-session-active',session);
+  document.querySelectorAll('[data-employee-workspace]').forEach(btn=>btn.classList.toggle('active',btn.dataset.employeeWorkspace===(session?'session':'entry')));
+}
+function employeeRefreshWorkspaceStatus(){
+  const summary=calculateEmployeeSessionSummary(state.drafts);
+  const count=summary.rows.length;
+  const label=`本票 ${count} 条 · 现金净额 ${fmtDisplayMoney(summary.cashNet)} · 银行 ${fmtDisplayMoney(summary.bankNet)}${summary.outstanding>0?` · 未收 ${fmtDisplayMoney(summary.outstanding)}`:''}    查看本票 >`;
+  if($('employeeSessionStatusBar'))$('employeeSessionStatusBar').textContent=label;
+  if($('workspaceSessionCount'))$('workspaceSessionCount').textContent=`Current Session (${count})`;
+}
 const employeeCollapsedLegacyValidate=validate;
 validate=function(){
   const result=employeeCollapsedLegacyValidate();
@@ -9778,6 +9795,14 @@ renderTaskInfo=function(){
   $('apTaskInfo').innerHTML=$('apTaskInfo').innerHTML.replace('</div>',`<br>Left With Arrears / 离店未清欠款 · Phone ${esc(left.whatsapp_phone||'-')} · Belongings ${esc(left.belongings_held?'yes':'no')} · Return ${esc(left.promised_return_date||'-')}</div>`);
 };
 applyBilingualUI();
+const employeeWorkspaceRefreshLegacy=refreshSessionViews;
+refreshSessionViews=function(){employeeWorkspaceRefreshLegacy();employeeRefreshWorkspaceStatus();};
+document.querySelectorAll('[data-employee-workspace]').forEach(btn=>btn.onclick=()=>employeeSetWorkspace(btn.dataset.employeeWorkspace));
+$('employeeSessionStatusBar').onclick=()=>employeeSetWorkspace('session');
+$('validationBox').dataset.pristine='true';
+$('btnSaveEntry').addEventListener('click',()=>{$('validationBox').dataset.pristine='false';},{capture:true});
+employeeSetWorkspace('entry');
+employeeRefreshWorkspaceStatus();
 employeeUpdateCollapsedStepSummaries();
 renderEntryTtlockStatus();
 updateEntrySessionActionState();
