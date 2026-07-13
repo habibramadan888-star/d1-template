@@ -2703,7 +2703,7 @@ function resolveEmployeeOwnerConfirmedLegacyGenesis(env,user,fromBed,toBed,sourc
     const occupancy=gateway.occupancy_gateway||{},access=gateway.access_snapshot_context||{};
     return {corpid:cleanText(user?.corpid||"",120),physical_bed_status:cleanText(occupancy.physical_bed_status||"",40),parsed_vacancy_marker:access.parsed_vacancy_marker===true,candidate_count:access.candidate_count??0,ambiguous:access.ambiguous===true,conflict:access.conflict===true,stale:access.stale===true,parsed_deposit_amount:occupancy.deposit_recorded_amount??access.parsed_deposit_amount??null,parsed_checkin_mmdd:cleanText(access.parsed_checkin_mmdd||"",20),parsed_valid_until_mmdd:cleanText(access.parsed_valid_until_mmdd||"",20),normalized_expiry_value:cleanText(access.normalized_expiry_value||"",80),snapshot_fingerprint:bedTransferSafeSnapshotFingerprint(user,gateway)};
   };
-  return resolveOwnerConfirmedLegacyGenesis({base_resolution:baseResolution,corpid:user?.corpid||"",from_bed:fromBed,to_bed:toBed,app_env:env.APP_ENV,write_approved:bedTransferWriteApproved(env),allowed_source_beds:bedTransferLegacyGenesisAllowlist(env),source_context:context(sourceGateway),target_context:context(targetGateway),open_arrears:sourceGateway?.open_arrears||[]});
+  return resolveOwnerConfirmedLegacyGenesis({base_resolution:baseResolution,corpid:user?.corpid||"",from_bed:fromBed,to_bed:toBed,app_env:env.APP_ENV,write_approved:bedTransferWriteApproved(env),legacy_genesis_mode:env.BED_TRANSFER_LEGACY_GENESIS_MODE,allowed_source_beds:bedTransferLegacyGenesisAllowlist(env),source_context:context(sourceGateway),target_context:context(targetGateway),open_arrears:sourceGateway?.open_arrears||[]});
 }
 __name(resolveEmployeeOwnerConfirmedLegacyGenesis,"resolveEmployeeOwnerConfirmedLegacyGenesis");
 async function validateEmployeeBedTransferCanonicalLink(env,user,entry={},normalized={}){
@@ -5741,11 +5741,13 @@ async function handleOwnerTodayTodos(request,env,user){
 }
 __name(handleOwnerTodayTodos,"handleOwnerTodayTodos");
 function ownerTodayTodoAcknowledgmentWriteEnabled(env={}){
-  return ["1","true","yes","on"].includes(String(env.OWNER_TODAY_TODO_ACK_ENABLED||"").trim().toLowerCase())&&["development","dev","local","test","beta_preview"].includes(String(env.APP_ENV||"").trim().toLowerCase());
+  return ["1","true","yes","on"].includes(String(env.OWNER_TODAY_TODO_ACK_ENABLED||"").trim().toLowerCase())&&["development","dev","local","test","beta_preview","internal_beta"].includes(String(env.APP_ENV||"").trim().toLowerCase());
 }
 __name(ownerTodayTodoAcknowledgmentWriteEnabled,"ownerTodayTodoAcknowledgmentWriteEnabled");
 function ownerBedTransferVoidWriteEnabled(env={}){
-  return String(env.APP_ENV||"").trim().toLowerCase()==="beta_preview"&&String(env.BED_TRANSFER_VOID_APPROVED||"").trim().toLowerCase()==="true"&&bedTransferWriteApproved(env);
+  const appEnv=String(env.APP_ENV||"").trim().toLowerCase();
+  const gate=appEnv==="internal_beta"?env.BED_TRANSFER_OWNER_VOID_ENABLED:env.BED_TRANSFER_VOID_APPROVED;
+  return ["beta_preview","internal_beta"].includes(appEnv)&&String(gate||"").trim().toLowerCase()==="true"&&bedTransferWriteApproved(env);
 }
 __name(ownerBedTransferVoidWriteEnabled,"ownerBedTransferVoidWriteEnabled");
 async function handleOwnerBedTransferVoid(request,env,user){
@@ -8315,7 +8317,9 @@ function bedTransferDeploymentCapabilities(env={}){
     bed_transfer_validate_enabled:true,
     bed_transfer_write_enabled:bedTransferWriteApproved(env),
     owner_waiver_ack_enabled:ownerTodayTodoAcknowledgmentWriteEnabled(env),
+    bed_transfer_owner_void_enabled:ownerBedTransferVoidWriteEnabled(env),
     controlled_beta_preview:String(env.APP_ENV||"").trim().toLowerCase()==="beta_preview",
+    internal_beta:String(env.APP_ENV||"").trim().toLowerCase()==="internal_beta",
     canonical_write_path:"/api/employee/entry",
     production_cutover:"PRODUCTION_NO_GO",
     app_version:cleanText(env.APP_VERSION||"",40)

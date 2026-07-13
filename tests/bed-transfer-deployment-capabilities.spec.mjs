@@ -19,6 +19,7 @@ function functionBlock(source, name) {
 function capability(env = {}) {
   const code = [
     functionBlock(worker, 'ownerTodayTodoAcknowledgmentWriteEnabled'),
+    functionBlock(worker, 'ownerBedTransferVoidWriteEnabled'),
     functionBlock(worker, 'bedTransferWriteApproved'),
     functionBlock(worker, 'bedTransferDeploymentCapabilities'),
     'result=bedTransferDeploymentCapabilities(env);'
@@ -46,6 +47,15 @@ test('server capability response reflects exact real gates without exposing env 
   assert.equal(row.app_version, '2.0.0');
   assert.equal(Object.hasOwn(row, 'JWT_SECRET'), false);
   assert.match(worker, /path==="\/api\/capabilities"&&method==="GET"/);
+});
+
+test('internal beta capabilities expose write, owner acknowledgment, and exact owner void gate', () => {
+  const row = capability({ BED_TRANSFER_WRITE_APPROVED: 'true', OWNER_TODAY_TODO_ACK_ENABLED: 'true', BED_TRANSFER_OWNER_VOID_ENABLED: 'true', APP_ENV: 'internal_beta' });
+  assert.equal(row.bed_transfer_write_enabled, true);
+  assert.equal(row.owner_waiver_ack_enabled, true);
+  assert.equal(row.bed_transfer_owner_void_enabled, true);
+  assert.equal(row.internal_beta, true);
+  assert.equal(row.production_cutover, 'PRODUCTION_NO_GO');
 });
 
 test('employee capability failure disables final Bed Transfer session upload but keeps validate-only available', () => {
