@@ -39,8 +39,59 @@ test("Save Transfer appends exactly one local draft and performs zero API writes
   assert.equal(state.drafts.length, 1);
   assert.equal(state.drafts[0].session_id, "stable-session");
   assert.equal(state.drafts[0].sync_status, "DRAFT");
+  assert.equal(state.lastSavedBedTransferDraftId, "local-transfer");
   assert.equal(apiWrites, 0);
   assert.doesNotMatch(source, /apiFetch\(|validateEmployeeUploadDryRun|recordCanonicalBedTransfer/);
+});
+
+test("Bed Transfer keeps the shared Save and Reset action row visible while gate controls disabled state", () => {
+  assert.match(html, /visible\(\['btnSaveEntry'\],true\)/);
+  assert.doesNotMatch(html, /visible\(\['btnSaveEntry'\],type!=='TF'\)/);
+  const source = block("applyEmployeeBedTransferUiGate");
+  const actionRow = { hidden: false };
+  const parking = { hidden: true, contains: () => false };
+  const save = {
+    hidden: false, disabled: true, readOnly: false, title: "",
+    parentElement: actionRow,
+    setAttribute(name, value) { this[name] = value; }
+  };
+  const entryType = { value: "TF" };
+  const context = {
+    state: { bedTransferContext: { status: "ready" } },
+    employeeBedTransferUiGateState: () => ({ fields_enabled: true, validate_enabled: true, final_upload_enabled: true, error_code: "" }),
+    document: { querySelectorAll: () => [], querySelector: () => ({ disabled: false, title: "" }) },
+    $: id => ({ btnSaveEntry: save, entryType, bedTransferWriteDisabledNotice: { textContent: "" }, employeeTemplateFieldParking: parking }[id] || null)
+  };
+  vm.createContext(context);
+  vm.runInContext(`${source};globalThis.applyGate=applyEmployeeBedTransferUiGate`, context);
+  context.applyGate();
+  assert.equal(save.hidden, false);
+  assert.equal(save.disabled, false);
+  assert.equal(save.readOnly, false);
+  assert.equal(parking.contains(save), false);
+});
+
+test("Reset removes only the just-saved local Bed Transfer draft", () => {
+  const source = block("resetEmployeeEntryForm");
+  const state = {
+    lastSavedBedTransferDraftId: "local-transfer",
+    drafts: [
+      { id: "local-transfer", type: "TF", sync_status: "DRAFT" },
+      { id: "rent-entry", type: "R", sync_status: "DRAFT" }
+    ]
+  };
+  let persisted = 0;
+  const context = {
+    state,
+    saveDrafts: () => { persisted += 1; },
+    refreshSessionViews: () => {}, buildExport: () => {}, resetForm: () => {}, showStatus: () => {}, toast: () => {}
+  };
+  vm.createContext(context);
+  vm.runInContext(`${source};globalThis.resetEntry=resetEmployeeEntryForm`, context);
+  context.resetEntry();
+  assert.deepEqual(state.drafts.map(entry => entry.id), ["rent-entry"]);
+  assert.equal(state.lastSavedBedTransferDraftId, null);
+  assert.equal(persisted, 1);
 });
 
 test("Current Session card derives beds, due, paid, cash, difference and reason from transfer fields", () => {
