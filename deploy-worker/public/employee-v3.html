@@ -4430,14 +4430,26 @@ function employeeValidateCommonAmount(errors,{optional=false,label='Amount'}={})
   const amt=num(employeeFieldValue('amount'));
   if(!optional&&(!amt||amt<=0))errors.push(`${label} must be greater than 0.`);
 }
-function employeeRentPeriodNeedsAttention(){
-  if($('entryType')?.value!=='R')return false;
-  const target=rentForBed();
-  const paid=num($('amount')?.value);
-  const standard=$('cycle')?.value==='1M';
+function employeeRentPeriodDisclosureState(){
+  const type=$('entryType')?.value||'';
+  const amount=$('amount');
+  const paidRaw=String(amount?.value||'').trim();
+  const paid=num(paidRaw);
+  const target=num(rentForBed());
   const ttlockExpiry=String(state.current?.end||state.current?.valid_until||'').trim();
-  const datesReady=!!($('periodStart')?.value&&$('periodEnd')?.value);
-  return !standard||!ttlockExpiry||!datesReady||target<=0||Math.abs(paid-target)>0.01;
+  const start=$('periodStart')?.value||'';
+  const end=$('periodEnd')?.value||'';
+  const paidCompleted=amount?.dataset.periodAmountComplete==='true'&&paidRaw!==''&&Number.isFinite(paid)&&paid>0;
+  const targetReady=Number.isFinite(target)&&target>0;
+  const realMismatch=type==='R'&&!!ttlockExpiry&&paidCompleted&&targetReady&&Math.abs(paid-target)>0.01;
+  const label=!ttlockExpiry?'Period / 账期 · 日期待查看'
+    :(!targetReady||!paidCompleted?'Period / 账期 · 点击查看'
+      :(!realMismatch?`✓ Period / 账期 · ${$('cycle')?.value||'1M'} · ${start||'-'} → ${end||'-'}`
+        :`Period / 账期 · ${$('cycle')?.value||'1M'} · Target AED ${fmtMoney(target)} · Paid AED ${fmtMoney(paid)} · Difference AED ${fmtMoney(Math.abs(paid-target))}`));
+  return { type, realMismatch, label };
+}
+function employeeRentPeriodNeedsAttention(){
+  return employeeRentPeriodDisclosureState().realMismatch;
 }
 function employeeUpdatePeriodDisclosure(){
   const step=$('periodStep');
@@ -4453,17 +4465,12 @@ function employeeUpdatePeriodDisclosure(){
     title?.insertAdjacentElement('afterend',summary);
     summary.onclick=()=>step.classList.toggle('collapsed');
   }
-  const attention=employeeRentPeriodNeedsAttention();
-  const target=rentForBed(), paid=num($('amount')?.value);
-  const start=$('periodStart')?.value||'Start required';
-  const end=$('periodEnd')?.value||'End required';
-  const ttlockExpiry=String(state.current?.end||state.current?.valid_until||'').trim();
-  const difference=Math.abs(paid-target);
-  summary.textContent=attention
-    ?`Review period: ${$('cycle')?.value||'1M'} · ${start} → ${end} · Target AED ${fmtMoney(target)} · Paid AED ${fmtMoney(paid)} · Difference AED ${fmtMoney(difference)}${ttlockExpiry?'':' · TTLock expiry unavailable'}`
-    :`✓ ${$('cycle')?.value||'1M'} · ${start} → ${end}`;
-  step.classList.toggle('employee-period-collapsible',$('entryType')?.value==='R');
-  step.classList.toggle('collapsed',$('entryType')?.value==='R'&&!attention);
+  const disclosure=employeeRentPeriodDisclosureState();
+  summary.textContent=disclosure.label;
+  step.classList.toggle('employee-period-collapsible',disclosure.type==='R');
+  step.classList.toggle('collapsed',disclosure.type==='R'&&!disclosure.realMismatch);
+  step.open=disclosure.realMismatch;
+  step.dataset.periodDisclosureOpen=String(disclosure.realMismatch);
 }
 function employeeUpdateSystemCalculationDisclosure(){
   const panel=$('systemCalculation');
@@ -5889,7 +5896,7 @@ async function saveEntryWithTtlockGate(){
   return saveEntryWithoutTtlockGate();
 }
 saveEntry=saveEntryWithTtlockGate;
-function resetForm(){['bed','transferFromBed','bedTo','transferReason','transferWaiverReason','transferFeeDueDate','transferFeePaymentMethod','bedDifferenceAmount','bedDifferencePaymentMethod','bedDifferenceDueDate','bedDifferenceReason','amount','due','paid','tenantName','tenantCardId','periodStart','periodEnd','periodDays','periodDue','listPrice','customReason','bankRef','checkoutDate','depositOutBalance','depositOutRefundDate','depositOutDifferenceReason','depositDeduction','depositReturnAmount','overdayDeduction','noNoticeDeduction','otherDeduction','dedNote','leftFormerCustomerName','leftWhatsappPhone','leftContactNote','leftDepositBalance','leftCoverageEndDate','leftArrearsAmount','leftBelongingsNote','leftPromisedPaymentDate','leftPromisedReturnDate','leftConfirmedNotReturningDate','leftGraceDays','expenseDesc','expenseEvidenceRef','remark','excessTo','arrearAmount','arrearPromiseDate','arrearReasonDetail'].forEach(id=>{if($(id))$(id).value=''});$('feePaid').value='paid';$('bedDifferenceMode').value='none';$('leftWithArrearsMode').value='normal';$('leftContactMethod').value='whatsapp';$('leftBelongingsHeld').value='no';$('arrearHandling').value='ARREAR';state.current=null;state.depositBalance=null;state.depositContext=null;state.bedTransferContext={status:'idle',source:null,target:null,requestKey:'',serverValidation:null};employeeRenderBedTransferContext();renderContext();syncForm();refreshSessionViews()}
+function resetForm(){['bed','transferFromBed','bedTo','transferReason','transferWaiverReason','transferFeeDueDate','transferFeePaymentMethod','bedDifferenceAmount','bedDifferencePaymentMethod','bedDifferenceDueDate','bedDifferenceReason','amount','due','paid','tenantName','tenantCardId','periodStart','periodEnd','periodDays','periodDue','listPrice','customReason','bankRef','checkoutDate','depositOutBalance','depositOutRefundDate','depositDeduction','depositReturnAmount','overdayDeduction','noNoticeDeduction','otherDeduction','dedNote','leftFormerCustomerName','leftWhatsappPhone','leftContactNote','leftDepositBalance','leftCoverageEndDate','leftArrearsAmount','leftBelongingsNote','leftPromisedPaymentDate','leftPromisedReturnDate','leftConfirmedNotReturningDate','leftGraceDays','expenseDesc','expenseEvidenceRef','remark','excessTo','arrearAmount','arrearPromiseDate','arrearReasonDetail'].forEach(id=>{if($(id))$(id).value=''});if($('amount'))delete $('amount').dataset.periodAmountComplete;$('feePaid').value='paid';$('bedDifferenceMode').value='none';$('leftWithArrearsMode').value='normal';$('leftContactMethod').value='whatsapp';$('leftBelongingsHeld').value='no';$('arrearHandling').value='ARREAR';state.current=null;state.depositBalance=null;state.depositContext=null;state.bedTransferContext={status:'idle',source:null,target:null,requestKey:'',serverValidation:null};employeeRenderBedTransferContext();renderContext();syncForm();refreshSessionViews()}
 function hasLocalOnly(){return state.drafts.some(e=>!employeeEntryCloudConfirmed(e))}
 function newSession(){
   if(hasLocalOnly()){toast('仍有云端未确认记录，不能开始新会话');return}
@@ -8431,6 +8438,9 @@ document.querySelectorAll('.event-chip').forEach(btn=>btn.addEventListener('clic
 document.querySelectorAll('#transferFields input,#transferFields select,#transferFields textarea').forEach(control=>control.addEventListener('input',employeeInvalidateBedTransferValidation));
 document.querySelectorAll('.pay-option').forEach(btn=>btn.addEventListener('click',e=>{e.preventDefault();setPaymentType(btn.dataset.pay);}));
 ['entryType','cycle','payType','amount','reasonCode','feePaid','transferWaiverReason','transferFeePaymentMethod','transferFeeDueDate','bedDifferenceMode','bedDifferenceAmount','bedDifferencePaymentMethod','bedDifferenceDueDate','bedDifferenceReason','customReason','tenantName','bankRef','periodDays','depositOutRefundDate','depositOutDifferenceReason','depositDeduction','checkoutDate','noNoticeDeduction','otherDeduction','dedNote','leftWithArrearsMode','leftFormerCustomerName','leftWhatsappPhone','leftContactMethod','leftContactNote','leftDepositBalance','leftCoverageEndDate','leftArrearsAmount','leftBelongingsHeld','leftBelongingsNote','leftPromisedPaymentDate','leftPromisedReturnDate','leftConfirmedNotReturningDate','leftGraceDays','excessTo','bedTo','transferReason','expenseDesc','remark','arrearHandling','arrearPromiseDate','arrearReasonDetail'].forEach(id=>$(id).addEventListener('input',syncForm));
+$('amount').addEventListener('input',()=>{delete $('amount').dataset.periodAmountComplete;});
+$('amount').addEventListener('change',()=>{$('amount').dataset.periodAmountComplete='true';syncForm();});
+$('amount').addEventListener('blur',()=>{$('amount').dataset.periodAmountComplete='true';syncForm();});
 $('linkedTaskId').addEventListener('change',applyLinkedTask);
 $('bed').addEventListener('input',()=>{const type=$('entryType').value;if(type==='E'){syncForm();return;}if(type==='TF')$('transferFromBed').value=$('bed').value.trim().replace(/^#/,'');employeeScheduleLookupBed();if(type==='AP'){populateTaskSelect();syncForm();}});
 $('transferFromBed').addEventListener('input',()=>{if($('entryType').value==='TF'){$('bed').value=$('transferFromBed').value.trim().replace(/^#/,'');employeeScheduleLookupBed();employeeScheduleBedTransferContexts();syncForm();}});

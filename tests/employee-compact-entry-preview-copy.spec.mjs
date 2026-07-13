@@ -61,16 +61,41 @@ test("searchable arrears tokens distinguish due date and note", async () => {
   assert.equal(helper('', '11'), 'NOTE:11');
 });
 
-test("rent period is collapsed only for a TTLock-anchored matching one-month payment", async () => {
+test("rent period disclosure keeps real DOM state collapsed until a completed real amount mismatch", async () => {
   const source = await readFile(path, "utf8");
-  const start = source.indexOf('function employeeRentPeriodNeedsAttention');
-  const end = source.indexOf('function employeeUpdatePeriodDisclosure');
-  const fields = { entryType: { value: 'R' }, cycle: { value: '1M' }, amount: { value: '770' }, periodStart: { value: '2026-08-02' }, periodEnd: { value: '2026-09-02' } };
-  const attention = new Function('$', 'num', 'rentForBed', 'state', `${source.slice(start, end)}; return employeeRentPeriodNeedsAttention;`)(id => fields[id], Number, () => 770, { current: { end: '2026-08-02' } });
-  assert.equal(attention(), false);
+  const start = source.indexOf('function employeeRentPeriodDisclosureState');
+  const end = source.indexOf('function validateRentEntry');
+  const classes = new Set();
+  const step = {
+    open: true,
+    dataset: {},
+    classList: { toggle: (name, on) => on ? classes.add(name) : classes.delete(name), contains: name => classes.has(name) }
+  };
+  const fields = {
+    entryType: { value: 'R' }, cycle: { value: '1M' }, amount: { value: '', dataset: {} },
+    periodStart: { value: '2026-08-02' }, periodEnd: { value: '2026-09-02' },
+    periodStep: step, periodCompactSummary: { textContent: '', dataset: {} }
+  };
+  const api = new Function('$', 'num', 'rentForBed', 'state', 'fmtMoney', `${source.slice(start, end)}; return { state: employeeRentPeriodDisclosureState, update: employeeUpdatePeriodDisclosure };`)(id => fields[id], Number, () => 770, { current: { end: '2026-08-02' } }, value => Number(value).toFixed(2));
+  const assertClosed = () => { api.update(); assert.equal(step.open, false); assert.equal(classes.has('collapsed'), true); };
+  assertClosed(); // initial page and selecting Rent
   fields.amount.value = '700';
-  assert.equal(attention(), true);
+  assertClosed(); // incomplete draft
+  fields.amount.dataset.periodAmountComplete = 'true';
+  assert.equal(api.state().realMismatch, true);
+  api.update();
+  assert.equal(step.open, true);
+  assert.equal(classes.has('collapsed'), false);
   fields.amount.value = '770';
-  fields.cycle.value = '15D';
-  assert.equal(attention(), true);
+  api.update();
+  assert.equal(step.open, false);
+  fields.amount.value = '';
+  api.update();
+  assert.equal(step.open, false); // reset and re-render
+  fields.amount.value = '700';
+  fields.amount.dataset.periodAmountComplete = 'true';
+  const noExpiryApi = new Function('$', 'num', 'rentForBed', 'state', 'fmtMoney', `${source.slice(start, end)}; return { state: employeeRentPeriodDisclosureState, update: employeeUpdatePeriodDisclosure };`)(id => fields[id], Number, () => 770, { current: {} }, value => Number(value).toFixed(2));
+  noExpiryApi.update();
+  assert.equal(step.open, false);
+  assert.match(fields.periodCompactSummary.textContent, /日期待查看/);
 });
