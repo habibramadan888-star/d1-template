@@ -70,7 +70,8 @@ export function assertCanonicalEmployeeUi() {
   for (const field of ['from_bed', 'to_bed', 'transfer_reason', 'fee_mode', 'fee_amount_aed', 'bed_price_difference_mode']) assert.match(builder, new RegExp(field));
   assert.doesNotMatch(builder, /transfer_date|transfer_at|tenant_card_id|card_id|provider_phone|phone_99099|old_ttlock_ref/);
   assert.match(draft, /validateEmployeeUploadDryRun/);
-  assert.match(draft, /state\.drafts=\[entry\]/);
+  assert.match(draft, /validatedRecord=employeeBedTransferRecordPayload/);
+  assert.doesNotMatch(draft, /state\.drafts|saveDrafts\(|buildExport\(|refreshSessionViews\(/);
   assert.doesNotMatch(draft, /\/api\/employee\/bed-transfers/);
   assert.match(employeeUi, /const BED_TRANSFER_WRITE_ENABLED=false/);
 }

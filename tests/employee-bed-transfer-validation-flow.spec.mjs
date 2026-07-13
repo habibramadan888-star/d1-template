@@ -15,15 +15,16 @@ function block(source, name, asyncFunction = false) {
   return source.slice(start, ends.length ? Math.min(...ends) : source.length);
 }
 
-test('draft flow performs local check, fresh contexts and validate-only before retaining one draft', () => {
+test('validate flow performs local check, fresh contexts and validate-only without changing Current Session', () => {
   const flow = block(html, 'saveCanonicalBedTransferDraft', true);
   const firstLocal = flow.indexOf('validateBedTransferEntry()');
   const contexts = flow.indexOf('await employeeLoadBedTransferContexts()');
   const secondLocal = flow.indexOf('validateBedTransferEntry()', firstLocal + 1);
   const dryRun = flow.indexOf('await validateEmployeeUploadDryRun');
-  const retain = flow.indexOf('state.drafts=[entry]');
+  const retain = flow.indexOf('validatedRecord=employeeBedTransferRecordPayload');
   assert.ok(firstLocal >= 0 && firstLocal < contexts && contexts < secondLocal && secondLocal < dryRun && dryRun < retain);
   assert.match(flow, /result\?\.ok!==true\|\|result\?\.event_type!=='bed_transfer'\|\|result\?\.no_write_requested!==true/);
+  assert.doesNotMatch(flow, /state\.drafts|saveDrafts\(|refreshSessionViews\(|buildExport\(/);
   assert.doesNotMatch(flow, /\/api\/employee\/entry['"]/);
 });
 
@@ -31,7 +32,7 @@ test('validate failure preserves form and makes no real-write call', () => {
   const flow = block(html, 'saveCanonicalBedTransferDraft', true);
   const catchBlock = flow.slice(flow.indexOf('}catch(error){'));
   assert.match(catchBlock, /renderEmployeeUploadDryRunError/);
-  assert.doesNotMatch(catchBlock, /resetForm\(|state\.drafts=\[entry\]|\/api\/employee\/entry['"]/);
+  assert.doesNotMatch(catchBlock, /resetForm\(|state\.drafts|\/api\/employee\/entry['"]/);
 });
 
 test('formal upload gate remains closed and reports a specific no-write error', () => {
@@ -62,5 +63,6 @@ test('Bed Transfer retry identity is stable across validate and final upload', (
   assert.match(flow, /const entry=buildBedTransferAnchor\(\)/);
   assert.match(flow, /employeeBedTransferValidatePayload\(canonicalEntry,session\)/);
   assert.match(flow, /validateEmployeeUploadDryRun\(requestPayload\.entry,requestPayload\.session,0,\{requestPayload\}\)/);
-  assert.match(flow, /state\.drafts=\[entry\]/);
+  assert.match(flow, /state\.bedTransferContext\.requestSessionId\|\|uid\('S'\)/);
+  assert.doesNotMatch(flow, /currentSessionId\(\)|state\.drafts/);
 });

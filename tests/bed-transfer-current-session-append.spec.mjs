@@ -2,18 +2,22 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-test("employee UI appends saved Bed Transfer to Current Session", async () => {
+test("employee UI keeps validated and recorded Bed Transfer outside Current Session", async () => {
   const html = await readFile("deploy-worker/public/employee-v3.html", "utf8");
-
-  assert.match(html, /function bedTransferSessionEntryFromResponse/);
-  assert.match(html, /function appendSyncedBedTransferSessionEntry/);
-  assert.match(html, /state\.drafts\.unshift\(entry\)/);
-  assert.match(html, /appendSyncedBedTransferSessionEntry\(bedTransferSessionEntryFromResponse\(data,e\)\)/);
-  assert.match(html, /sync_status:'SYNCED'/);
+  const start = html.indexOf("async function saveCanonicalBedTransferDraft");
+  const end = html.indexOf("async function recordCanonicalBedTransfer", start);
+  const validate = html.slice(start, end);
+  const recordEnd = html.indexOf("async function saveEntry", end);
+  const record = html.slice(end, recordEnd);
+  assert.match(validate, /validatedRecord=employeeBedTransferRecordPayload/);
+  assert.doesNotMatch(validate + record, /state\.drafts|saveDrafts\(|appendSyncedBedTransferSessionEntry/);
+  assert.match(record, /apiFetch\('\/api\/employee\/entry'/);
 });
 
-test("synced Bed Transfer rows do not keep handover export blocked", async () => {
+test("Upload Session excludes any legacy local Bed Transfer row", async () => {
   const html = await readFile("deploy-worker/public/employee-v3.html", "utf8");
-
-  assert.match(html, /state\.drafts\.some\(e=>e\.type==='TF'&&e\.sync_status!=='SYNCED'\)/);
+  const upload = html.slice(html.lastIndexOf("async function commitSessionAndExport"));
+  assert.match(upload, /sessionOnlyDrafts=state\.drafts\.filter/);
+  assert.match(upload, /toUpperCase\(\)!=='TF'/);
+  assert.match(upload, /toLowerCase\(\)!=='bed_transfer'/);
 });

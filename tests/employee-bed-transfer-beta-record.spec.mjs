@@ -38,6 +38,37 @@ test('record failure retains draft and success exposes only canonical IDs',()=>{
   for(const field of ['tenant_card_id','card_id','provider_phone','phone_99099','provider_metadata','old_ttlock_ref'])assert.doesNotMatch(record,new RegExp(field));
 });
 
+test('canonical receipt uses transfer fields for beds, amount, paid and cash labels',()=>{
+  const receipt=block(html,'employeeBedTransferCanonicalReceipt');
+  const context={String,Number,NumberIsFinite:Number.isFinite,fmtMoney:n=>Number(n||0).toFixed(2)};
+  context.Number.isFinite=Number.isFinite;
+  vm.createContext(context);vm.runInContext(`${receipt};globalThis.buildReceipt=employeeBedTransferCanonicalReceipt`,context);
+  const result=context.buildReceipt({from_bed:'144',to_bed:'111',fee_amount_aed:50,fee_mode:'paid',payment_method:'cash'},{});
+  assert.equal(result.beds_label,'144 → 111');
+  assert.equal(result.amount_label,'AED 50.00');
+  assert.equal(result.fee_label,'Paid / 已收');
+  assert.equal(result.payment_label,'Cash / 现金');
+  assert.equal(result.status_label,'Recorded / 已记录');
+});
+
+test('waived and unpaid receipts do not fall back to generic amount due or paid',()=>{
+  const receipt=block(html,'employeeBedTransferCanonicalReceipt');
+  const context={String,Number,fmtMoney:n=>Number(n||0).toFixed(2)};
+  vm.createContext(context);vm.runInContext(`${receipt};globalThis.buildReceipt=employeeBedTransferCanonicalReceipt`,context);
+  assert.equal(context.buildReceipt({from_bed:'A',to_bed:'B',fee_amount_aed:0,fee_mode:'waived'},{}).fee_label,'Waived / 免收');
+  assert.equal(context.buildReceipt({from_bed:'A',to_bed:'B',fee_amount_aed:50,fee_mode:'unpaid'},{}).fee_label,'Unpaid / 未收');
+  assert.doesNotMatch(receipt,/canonical\.amount\b|validated\.amount\b|\.due\b|\.paid\b/);
+});
+
+test('validate and record never enqueue Bed Transfer for a second Upload Session',()=>{
+  const validate=block(html,'saveCanonicalBedTransferDraft'),record=block(html,'recordCanonicalBedTransfer');
+  const upload=html.slice(html.lastIndexOf('async function commitSessionAndExport'));
+  assert.doesNotMatch(validate+record,/state\.drafts|saveDrafts\(|appendSyncedBedTransferSessionEntry/);
+  assert.match(upload,/sessionOnlyDrafts=state\.drafts\.filter/);
+  assert.match(upload,/event_type\|\|''\)\.toLowerCase\(\)!=='bed_transfer'/);
+  assert.ok(upload.indexOf('sessionOnlyDrafts=')<upload.indexOf('prepareRepeatableUploadRows'));
+});
+
 test('beta serializer uses a legal transfer reason marker and no extra beta field',()=>{
   const serializer=block(html,'employeeBedTransferValidatePayload');
   const context={Object,String,state:{bedTransferCapabilities:{controlled_beta_preview:true}}};vm.createContext(context);vm.runInContext(`${serializer};globalThis.serialize=employeeBedTransferValidatePayload`,context);

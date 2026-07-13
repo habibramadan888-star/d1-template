@@ -30,11 +30,12 @@ test('capability failure is fail closed for validation and upload',()=>{
   assert.match(block('saveCanonicalBedTransferDraft'),/if\(!employeeBedTransferValidateEnabled\(\)\)/);
 });
 
-test('validate-only draft remains local and final upload remains write-gated',()=>{
+test('validate-only state stays outside Current Session and final record remains write-gated',()=>{
   const save=block('saveCanonicalBedTransferDraft');
   assert.match(save,/validateEmployeeUploadDryRun/);
   assert.match(save,/upload_status='VALIDATED_NO_WRITE'/);
-  assert.match(save,/state\.drafts=\[entry\]/);
+  assert.match(save,/validatedRecord=employeeBedTransferRecordPayload/);
+  assert.doesNotMatch(save,/state\.drafts|saveDrafts\(|buildExport\(|refreshSessionViews\(/);
   assert.doesNotMatch(save,/submitBedTransferEvent|\/api\/employee\/entry['"`]/);
   assert.match(html,/transferWriteBlocked[\s\S]{0,500}!employeeBedTransferWriteEnabled\(\)[\s\S]{0,500}exportBtn\.disabled=true/);
 });
