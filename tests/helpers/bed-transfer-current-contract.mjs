@@ -35,7 +35,8 @@ export function assertLegacyRecordOnlyPathSuperseded() {
 export function assertCanonicalArchiveWrite() {
   const persist = block(worker, 'persistEmployeeBedTransferCanonicalArchive');
   assert.match(persist, /prepareCanonicalTransferArchiveWrite/);
-  assert.match(persist, /empInsertDynamicMode\(env,'sessions'/);
+  assert.match(persist, /INSERT INTO sessions .*source,entries_json\)/s);
+  assert.match(persist, /CANONICAL_ARCHIVE_PERSISTENCE_VERIFICATION_FAILED/);
   assert.match(persist, /classifyExistingCanonicalTransfer/);
   assert.match(persist, /classified\.status==='conflict'/);
   assert.match(linkContract, /canonical_request_fingerprint|transfer_anchor_id/);
@@ -45,8 +46,9 @@ export function assertCanonicalArchiveWrite() {
 
 export function assertCanonicalNoMutation() {
   const persist = block(worker, 'persistEmployeeBedTransferCanonicalArchive');
-  assert.equal((persist.match(/empInsertDynamicMode\(env,'sessions'/g) || []).length, 1);
-  assert.doesNotMatch(persist, /occupancy|deposit|arrear_tasks|ttlock|bed_transfer_events|entry_events|transactions|UPDATE|DELETE/i);
+  assert.equal((persist.match(/INSERT INTO sessions/g) || []).length, 1);
+  assert.match(persist, /UPDATE sessions SET voided_at=.*CANONICAL_ARCHIVE_PERSISTENCE_VERIFICATION_FAILED/s);
+  assert.doesNotMatch(persist, /occupancy|deposit|arrear_tasks|ttlock|bed_transfer_events|entry_events|transactions|DELETE/i);
   assert.match(worker, /production_cutover:"PRODUCTION_NO_GO"/);
 }
 

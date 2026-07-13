@@ -2980,6 +2980,7 @@ async function renderHistory(){
     const uploader=s.source==='employee_entry'||s.source==='EMP'||s.createdBy==='staff'||(s.createdBy&&s.createdBy!=='manager')?`员工上传 ${esc(s.operatorName||s.createdBy||s.operatorId||'')}`:(s.createdBy==='manager'?'老板上传':'');
     const mismatch=Number(s.entriesCount||0)&&hasEntries&&Number(s.entriesCount||0)!==s.entries.length;
     const deleted=s._voided;
+    const exactBetaTransferVoidCandidate=isOwnerWriteRole()&&!deleted&&s.source==='employee_entry'&&cnt===1&&Number(s.gross_received||0)===0;
     const grossLabel=deleted?'原始流水金额，不计入有效收入':'总收入';
     const deletedTotals=ownerArchiveVoidedTotalsHtml(s,t);
     return `<div class="hist-card" data-id="${s.id}">
@@ -2998,6 +2999,7 @@ async function renderHistory(){
       ${deletedTotals}
       <div class="hist-actions">
         <button class="btn btn-ghost" data-act="view"><svg class="ico"><use href="#i-eye"/></svg>查看</button>
+        ${exactBetaTransferVoidCandidate?`<button class="btn btn-danger" data-act="void-transfer">Void Transfer</button>`:''}
         ${isOwnerWriteRole()&&!deleted?`<button class="btn btn-danger" data-act="del"><svg class="ico"><use href="#i-trash"/></svg></button>`:''}
       </div>
     </div>`;
@@ -3044,7 +3046,25 @@ async function renderHistory(){
       const a=e.target.closest('[data-act]');if(!a)return;
       const id=card.dataset.id;
       const s=all.find(x=>x.id===id);if(!s)return;
-      if(a.dataset.act==='del'){
+      if(a.dataset.act==='void-transfer'){
+        if(denyReadonlyAdminWrite())return;
+        try{
+          a.disabled=true;
+          a.textContent='Voiding...';
+          const detail=await ownerGatewayJson(`/api/session_detail?id=${encodeURIComponent(id)}`,{},HISTORY_FETCH_TIMEOUT_MS);
+          const rows=Array.isArray(detail)?detail:(Array.isArray(detail?.data)?detail.data:[]);
+          const transfers=rows.filter(row=>String(row?.event_type||row?.type||'').toLowerCase()==='bed_transfer');
+          if(rows.length!==1||transfers.length!==1)throw new Error('BED_TRANSFER_VOID_EXACT_SESSION_REQUIRED');
+          const transferAnchor=String(transfers[0]?.transfer_anchor_id||transfers[0]?.anchor_id||transfers[0]?.event_id||s.anchorId||'').trim();
+          if(!transferAnchor)throw new Error('BED_TRANSFER_VOID_TARGET_REQUIRED');
+          const voidResult=await ownerGatewayJson('/api/owner/bed-transfer/void',{method:'POST',body:JSON.stringify({transfer_anchor_id:transferAnchor,reason:'CONTROLLED_BETA_TEST_CLEANUP'})},HISTORY_FETCH_TIMEOUT_MS);
+          toast('Bed Transfer voided');
+          a.dataset.result=JSON.stringify({ok:voidResult?.ok===true,idempotent:voidResult?.idempotent===true,void_anchor_id:voidResult?.void_anchor_id||''});
+          a.title=a.dataset.result;
+          a.textContent='Voided';
+          state.historyViewing=null;
+        }catch(error){const message=String(error?.message||error);a.disabled=false;a.textContent='Void Transfer';a.dataset.error=message;a.title=message;toast(`Bed Transfer void failed: ${message}`,'err');}
+      }else if(a.dataset.act==='del'){
         if(denyReadonlyAdminWrite())return;
         const ok=await confirmManagerPassword('删除流水记录将同时从云端移除');
         if(!ok) return;
