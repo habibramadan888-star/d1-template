@@ -75,3 +75,16 @@ test('History transfer projection is linear and keeps void actions off voided tr
   const transferBranch=history.slice(history.indexOf('if(transfer){'),history.indexOf('const hasEntries',history.indexOf('if(transfer){')));
   assert.doesNotMatch(transferBranch,/void-transfer/);
 });
+
+test('mixed History fixtures retain ordinary dated records rather than replacing them with transfer cards', () => {
+  const mixedFixture=[
+    ...Array.from({length:7},(_,index)=>({type:'bed_transfer',date:`2026-07-${String(index+1).padStart(2,'0')}`})),
+    ...Array.from({length:10},(_,index)=>({type:'rent',date:`2026-07-${String(index+1).padStart(2,'0')}`})),
+    ...Array.from({length:5},(_,index)=>({type:'deposit',date:`2026-07-${String(index+1).padStart(2,'0')}`})),
+    ...Array.from({length:3},(_,index)=>({type:'checkout',date:`2026-07-${String(index+5).padStart(2,'0')}`})),
+    ...Array.from({length:3},(_,index)=>({type:'arrears',date:`2026-07-${String(index+7).padStart(2,'0')}`}))
+  ];
+  assert.ok(mixedFixture.some(row=>row.type==='rent'&&row.date==='2026-07-05'));
+  assert.ok(mixedFixture.some(row=>row.type==='arrears'&&row.date==='2026-07-07'));
+  assert.equal(mixedFixture.filter(row=>row.type!=='bed_transfer').length,21);
+});

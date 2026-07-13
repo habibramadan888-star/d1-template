@@ -11730,10 +11730,13 @@ async function handleRequest(request, env, ctx) {
       const rawOffset = Number(url.searchParams.get("offset") || 0);
       const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(Math.floor(rawLimit), 30) : 30;
       const offset = Number.isFinite(rawOffset) && rawOffset > 0 ? Math.floor(rawOffset) : 0;
-      // The transfer projection needs both immutable original anchors and their
-      // additive void anchors.  canonicalOwnerHistorySessionRowsForList filters
-      // unrelated voided sessions from the normal Owner list.
-      const baseSql = "SELECT * FROM sessions WHERE corpid=? ORDER BY created_at DESC";
+      // Keep the normal History page's legacy active-row window intact. Transfer
+      // void anchors use TRANSFER_VOID_APPLIED (not VOID), so the same one-row
+      // snapshot still contains the immutable audit evidence needed by the
+      // lightweight Map projection without crowding out ordinary history rows.
+      const baseSql = includeVoided
+        ? "SELECT * FROM sessions WHERE corpid=? ORDER BY created_at DESC"
+        : "SELECT * FROM sessions WHERE corpid=? AND COALESCE(voided_at,'')='' AND COALESCE(handover_status,'')<>'VOID' ORDER BY created_at DESC";
       if (limit) {
         const { results } = await env.DB.prepare(`${baseSql} LIMIT ? OFFSET ?`).bind(user.corpid, limit, offset).all();
         const data=await canonicalOwnerHistorySessionRowsForList(env,user,results||[]);

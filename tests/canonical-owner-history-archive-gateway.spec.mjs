@@ -78,8 +78,9 @@ test("owner history routes are canonical archive gateway based", async () => {
   const history = routeBlock(worker, 'if (path === "/api/history")', 'if (path === "/api/session_detail"');
   const detail = routeBlock(worker, 'if (path === "/api/session_detail" && method === "GET")', 'return errorResponse("not_found"');
 
-  assert.match(history, /SELECT \* FROM sessions WHERE corpid=\? ORDER BY created_at DESC/);
-  assert.match(history, /canonicalOwnerHistorySessionRowsForList filters/);
+  assert.match(history, /const baseSql = includeVoided/);
+  assert.match(history, /COALESCE\(voided_at,''\)=''/);
+  assert.match(history, /COALESCE\(handover_status,''\)<>'VOID'/);
   assert.match(history, /canonicalOwnerHistorySessionRowsForList\(env,user,results\|\|\[\]\)/);
   assert.doesNotMatch(history, /parseEmployeeEntryExportRows/);
 
@@ -129,6 +130,23 @@ test("owner history list projects the loaded session snapshot without per-card D
   assert.match(rowsForList, /voidsByTargetAnchor=new Map\(\)/);
   assert.match(rowsForList, /transferVoidSessionIds=new Set\(\)/);
   assert.doesNotMatch(rowsForList, /Promise\.all|await |env\.DB|canonicalOwnerHistorySessionRowForList/);
+});
+
+test("normal History keeps ordinary rows in its one-query window while retaining transfer-void evidence", async () => {
+  const worker = await readFile(workerPath, "utf8");
+  const history = routeBlock(worker, 'if (path === "/api/history")', 'if (path === "/api/session_detail"');
+  const mixedFixture=[
+    ...Array.from({length:7},(_,index)=>({kind:'transfer',id:`T${index}`})),
+    ...Array.from({length:2},(_,index)=>({kind:'transfer_void',id:`V${index}`})),
+    ...Array.from({length:10},(_,index)=>({kind:'rent',id:`R${index}`})),
+    ...Array.from({length:5},(_,index)=>({kind:'deposit',id:`D${index}`})),
+    ...Array.from({length:3},(_,index)=>({kind:'checkout',id:`C${index}`})),
+    ...Array.from({length:3},(_,index)=>({kind:'arrears',id:`A${index}`}))
+  ];
+  assert.equal(mixedFixture.length,30);
+  assert.equal(mixedFixture.filter(row=>!['transfer','transfer_void'].includes(row.kind)).length,21);
+  assert.match(history,/TRANSFER_VOID_APPLIED/);
+  assert.match(history,/canonicalOwnerHistorySessionRowsForList\(env,user,results\|\|\[\]\)/);
 });
 
 test("entries_json is preferred over display text and fallback is display-only", async () => {
