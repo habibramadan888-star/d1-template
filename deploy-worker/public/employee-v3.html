@@ -2954,9 +2954,9 @@ label .label-en{
     <button class="tab" data-view="system"><span class="en">System</span><span class="tab-cn">系统</span></button>
   </div>
 </div>
+<div class="employee-workspace-switch" role="tablist" aria-label="Employee workspace"><button type="button" class="active" data-employee-workspace="entry">录入事项 <small>Add Entry</small></button><button type="button" data-employee-workspace="session">本票记录 <small id="workspaceSessionCount">Current Session (0)</small></button></div>
 <main class="wrap">
   <section id="view-entry">
-    <div class="employee-workspace-switch" role="tablist" aria-label="Employee workspace"><button type="button" class="active" data-employee-workspace="entry">录入事项 <small>Add Entry</small></button><button type="button" data-employee-workspace="session">本票记录 <small id="workspaceSessionCount">Current Session (0)</small></button></div>
     <div class="card employee-session-card" id="employeeSessionSummaryCard">
       <div class="head"><div><div class="title">Current Session Summary<span class="label-en">本票流水汇总</span></div><div class="small" id="sessionClock">CURRENT SESSION</div></div><button class="btn" id="btnNewSessionTop">New Session<span class="label-en">新会话</span></button></div>
       <div class="body">
@@ -8905,8 +8905,11 @@ function employeeEnsureEnglishFirstStyle(){
     .tab.active,.employee-workspace-switch button.active,.event-chip.active,.pay-option.active,.btn.primary:not(:disabled){background:var(--employee-active-background)!important;border-color:var(--employee-active-border)!important;box-shadow:var(--employee-active-shadow)!important;color:var(--employee-active-text)!important}
     .pay-option.active .label-en{color:rgba(255,255,255,.76)!important}
     /* The global navigation is sticky above this switch; keep the switch below it. */
-    .top{z-index:20}.employee-workspace-switch{position:fixed!important;top:134px!important;left:max(10px,calc((100vw - min(1480px,calc(100vw - 40px)))/2));width:min(1480px,calc(100vw - 40px));z-index:12;isolation:isolate;box-shadow:0 8px 14px rgba(20,32,51,.06)}#view-entry{padding-top:64px}
-    @media(max-width:720px){.employee-workspace-switch{top:106px!important;left:10px;width:calc(100vw - 20px)}#view-entry{padding-top:64px}}
+    /* One workspace switch, in normal document flow, made sticky below the real global navigation. */
+    html,body.employee-ui{overflow:visible!important}.top{z-index:20}.employee-workspace-switch{position:sticky!important;top:var(--employee-global-nav-height,106px)!important;left:auto!important;width:min(1480px,calc(100vw - 20px))!important;z-index:12;isolation:isolate;margin:0 auto 16px!important;padding:6px 0!important;background:var(--bg)!important;box-shadow:none!important}#view-entry{padding-top:0!important}
+    /* Employee visual system: a single floating-card language with no card-inside-card treatment. */
+    :root{--employee-card-radius:18px;--employee-card-shadow:0 10px 24px rgba(20,32,51,.08);--employee-card-gap:16px}
+    .employee-entry-card{background:transparent!important;border:0!important;border-radius:0!important;box-shadow:none!important;margin:0!important}.employee-entry-card>.body{padding:0!important}.employee-entry-card .step{background:transparent!important;border:0!important;border-radius:0!important;box-shadow:none!important;padding:0!important;margin:0 0 var(--employee-card-gap)!important}.employee-entry-card .employee-event-picker,.employee-session-card,.employee-system-calculation{background:#fff!important;border:0!important;border-radius:var(--employee-card-radius)!important;box-shadow:var(--employee-card-shadow)!important}.employee-entry-card .employee-event-picker{padding:16px!important}.employee-session-card{margin:0 0 var(--employee-card-gap)!important}.employee-session-card .head,.employee-session-card .body{padding:16px!important}.employee-entry-card .field{margin-bottom:12px!important}.employee-entry-card .grid{gap:12px!important}.employee-entry-card #verifyContextStep,.employee-entry-card #entrySummary,.employee-entry-card #objectHint,#ttlockEntryStatus,#view-entry .employee-collapsible-step[data-employee-collapsed-step="8"]{display:none!important}.employee-entry-card #listPriceWrap{display:block!important}.employee-entry-card #listPrice{display:none!important}.employee-entry-card #paymentStep,.employee-entry-card #periodStep{padding:0!important}.employee-entry-card #periodStep{margin-bottom:12px!important}.employee-entry-card #systemCalculation{margin:0 0 12px!important;padding:12px!important}.employee-entry-card #exceptionStep{margin-top:0!important}.employee-entry-card textarea#remark{min-height:52px!important;max-height:64px!important}.employee-entry-card #validationBox{margin:0 0 12px!important}.employee-entry-card .row{gap:8px!important}.employee-entry-card .row .btn{min-height:46px!important;padding:10px 14px!important}.employee-session-status-bar{margin:0 0 12px!important}.employee-session-card#employeeSessionSummaryCard .head{display:none!important}.employee-session-card#employeeSessionSummaryCard .body{padding:12px 16px!important}.employee-session-card#employeeSessionSummaryCard .kpi-grid{gap:8px!important}.employee-session-card#employeeSessionSummaryCard .kpi-card{padding:8px!important;box-shadow:none!important;border:0!important;background:#f6f8f7!important}.employee-session-card .preview-entry{border:0!important;border-radius:12px!important;box-shadow:none!important;background:#f8faf9!important}.employee-session-card .preview-list{min-height:0!important}.employee-session-record-details{margin-top:6px}.employee-session-record-details summary{cursor:pointer;font-size:11px;color:#64748b}.employee-entry-card .label-en,.employee-entry-card .step-title,.employee-entry-card .event-chip small,.employee-session-card .label-en{display:none!important}.employee-entry-card .employee-picker-title{font-size:16px!important;margin:0 0 10px!important}.employee-entry-card label{font-size:14px!important;margin-bottom:6px!important}.employee-entry-card input,.employee-entry-card select,.employee-entry-card textarea{font-size:16px!important;border-radius:12px!important}.employee-entry-card .readonly-pill{height:auto!important;min-height:0!important;padding:0!important;border:0!important;background:transparent!important}.employee-entry-card #listPriceWrap{font-size:14px!important;color:#64748b!important}.employee-entry-card #listPriceWrap label::after{content:' · system reference';font-size:12px;color:#94a3b8;font-weight:600}.employee-entry-card #listPriceWrap input{display:none!important}
     #periodStep.employee-period-collapsible.collapsed #periodFields{display:none}
     #periodStep.employee-period-collapsible .period-summary-toggle{width:100%;border:0;background:transparent;text-align:left;font-weight:800;color:#3f4d61;cursor:pointer;padding:4px 0}
     #periodStep.employee-period-collapsible.collapsed .period-summary-toggle::after{content:' ▸'}
@@ -9131,7 +9134,7 @@ renderSessionPreview=function(){
     const failed=['VALIDATION_FAILED','STALE'].includes(recordState.key);
     const transferCard=e.type==='TF'?employeeBedTransferSessionCardModel(e):null;
     const subject=e.type==='TF'?esc(transferCard.beds):(e.type==='E'?esc(e.expense_category||'Expense'):`#${esc(e.room||'')}`);
-    const detail=e.type==='TF'?transferCard.detail:[eventLabel(e.type),e.tenant_name||'',e.pay_type==='B'?'Bank':'Cash',e.period_start&&e.period_end?`${e.period_start} -> ${e.period_end}`:''].filter(Boolean).join(' · ');
+    const detail=[eventLabel(e.type),e.pay_type==='B'?'Bank':'Cash'].filter(Boolean).join(' · ');
     const status=`<span class="status-pill ${esc(recordState.className||'')}">${esc(recordState.label)}</span>`;
     const undo=canUndo(e)?`<button class="mini-btn danger" data-undo="${esc(e.id)}">Undo</button>`:'';
     const remove=['VALIDATION_FAILED','STALE'].includes(recordState.key)?`<button class="mini-btn danger" data-remove-session-record="${esc(e.id)}">${renderEmployeeButtonLabel('Remove Invalid Record','删除无效记录')}</button>`:'';
@@ -9160,7 +9163,7 @@ renderSessionPreview=function(){
     const failed=['VALIDATION_FAILED','STALE'].includes(recordState.key);
     const transferCard=e.type==='TF'?employeeBedTransferSessionCardModel(e):null;
     const subject=e.type==='TF'?esc(transferCard.beds):(e.type==='E'?esc(e.expense_category||'Expense'):`#${esc(e.room||'')}`);
-    const detail=e.type==='TF'?transferCard.detail:[eventLabel(e.type),e.tenant_name||'',e.pay_type==='B'?'Bank':'Cash',e.period_start&&e.period_end?`${e.period_start} -> ${e.period_end}`:''].filter(Boolean).join(' · ');
+    const detail=[eventLabel(e.type),e.pay_type==='B'?'Bank':'Cash'].filter(Boolean).join(' · ');
     const status=`<span class="status-pill ${esc(recordState.className||'')}">${esc(recordState.label)}</span>`;
     const undo=canUndo(e)?`<button class="mini-btn danger" data-undo="${esc(e.id)}">Undo</button>`:'';
     const remove=['VALIDATION_FAILED','STALE'].includes(recordState.key)?`<button class="mini-btn danger" data-remove-session-record="${esc(e.id)}">${renderEmployeeButtonLabel('Remove Invalid Record','删除无效记录')}</button>`:'';
@@ -9168,7 +9171,7 @@ renderSessionPreview=function(){
     const failedActions=failed?`<div class="preview-tools">${remove}<button class="mini-btn" data-retry-session-record="${esc(e.id)}">${renderEmployeeButtonLabel('Retry','重试')}</button></div>`:'';
     const failNote=failed?renderSessionRecordValidationDetails(recordState.validation,i):'';
     const cloudReview=renderEmployeeCloudReviewPanel(e,i,recordState);
-    return `<div class="preview-entry ${failed?'upload-validation-failed':''}" data-session-record-index="${recordIndex}" data-entry-id="${esc(e.id)}"><div><b>Record #${recordIndex} · ${subject}</b> ${status}${failedActions}${failNote}${cloudReview}<div class="small">${esc(detail)}</div><div class="small">Entry ID ${esc(e.id)} · ${esc(e.created_at||'')}</div><div class="small">${esc(e.note||e.expense_desc||'')}</div><div class="preview-tools">${undo}${refresh}${failed?'':remove}</div></div><div class="amt ${cls}">${sign}${fmtMoney(e.amount)}</div></div>`;
+    return `<div class="preview-entry ${failed?'upload-validation-failed':''}" data-session-record-index="${recordIndex}" data-entry-id="${esc(e.id)}"><div><b>Record #${recordIndex} · ${subject}</b> ${status}${failedActions}${failNote}${cloudReview}<div class="small">${esc(detail)}</div><details class="employee-session-record-details"><summary>Details</summary><div class="small">Entry ID ${esc(e.id)} · ${esc(e.created_at||'')}</div></details><div class="preview-tools">${undo}${refresh}${failed?'':remove}</div></div><div class="amt ${cls}">${sign}${fmtMoney(e.amount)}</div></div>`;
   }).join('');
   document.querySelectorAll('[data-undo]').forEach(btn=>btn.onclick=()=>undoDraft(btn.dataset.undo));
   document.querySelectorAll('[data-remove-session-record]').forEach(btn=>btn.onclick=()=>removeCurrentSessionRecord(btn.dataset.removeSessionRecord,'Invalid record removed'));
@@ -9801,7 +9804,13 @@ renderTaskInfo=function(){
   if(!left.left_with_arrears||$('apTaskInfo').innerHTML.includes('Left With Arrears'))return;
   $('apTaskInfo').innerHTML=$('apTaskInfo').innerHTML.replace('</div>',`<br>Left With Arrears / 离店未清欠款 · Phone ${esc(left.whatsapp_phone||'-')} · Belongings ${esc(left.belongings_held?'yes':'no')} · Return ${esc(left.promised_return_date||'-')}</div>`);
 };
+function syncEmployeeWorkspaceStickyOffset(){
+  const globalNav=document.querySelector('.top');
+  document.documentElement.style.setProperty('--employee-global-nav-height',`${Math.ceil(globalNav?.getBoundingClientRect().height||106)}px`);
+}
+window.addEventListener('resize',syncEmployeeWorkspaceStickyOffset,{passive:true});
 applyBilingualUI();
+syncEmployeeWorkspaceStickyOffset();
 const employeeWorkspaceRefreshLegacy=refreshSessionViews;
 refreshSessionViews=function(){employeeWorkspaceRefreshLegacy();employeeRefreshWorkspaceStatus();};
 document.querySelectorAll('[data-employee-workspace]').forEach(btn=>btn.onclick=()=>employeeSetWorkspace(btn.dataset.employeeWorkspace));
