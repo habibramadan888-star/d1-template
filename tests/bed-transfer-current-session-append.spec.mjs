@@ -71,6 +71,32 @@ test("Bed Transfer keeps the shared Save and Reset action row visible while gate
   assert.equal(parking.contains(save), false);
 });
 
+test("Bed Context loading is scheduled from actual From and To Bed input without duplicate ready reads", () => {
+  const source = block("employeeScheduleBedTransferContexts");
+  assert.match(html, /transferFromBed'\)\.addEventListener\('input',[\s\S]{0,400}employeeScheduleBedTransferContexts/);
+  assert.match(html, /bedTo'\)\.addEventListener\('input',[\s\S]{0,160}employeeScheduleBedTransferContexts/);
+  const timers = [];
+  const state = { bedTransferContext: { status: "idle", requestKey: "" } };
+  const fields = { entryType: { value: "TF" }, transferFromBed: { value: "411" }, bedTo: { value: "414" } };
+  let loads = 0;
+  const context = {
+    state, clearTimeout: () => {}, setTimeout: fn => { timers.push(fn); return timers.length; },
+    employeeBedTransferContextTimer: null,
+    $: id => fields[id], employeeBedTransferBed: value => String(value || "").trim(),
+    employeeFieldValue: id => fields[id].value,
+    employeeLoadBedTransferContexts: () => { loads += 1; return Promise.resolve(); }
+  };
+  vm.createContext(context);
+  vm.runInContext(`${source};globalThis.scheduleContexts=employeeScheduleBedTransferContexts`, context);
+  context.scheduleContexts();
+  assert.equal(timers.length, 1);
+  timers.shift()();
+  assert.equal(loads, 1);
+  state.bedTransferContext = { status: "ready", requestKey: "411->414" };
+  context.scheduleContexts();
+  assert.equal(timers.length, 0);
+});
+
 test("Reset removes only the just-saved local Bed Transfer draft", () => {
   const source = block("resetEmployeeEntryForm");
   const state = {

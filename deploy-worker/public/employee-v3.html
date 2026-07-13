@@ -4603,6 +4603,21 @@ async function employeeLoadBedTransferContexts(){
     throw error;
   }
 }
+let employeeBedTransferContextTimer=null;
+function employeeScheduleBedTransferContexts(){
+  if(employeeBedTransferContextTimer)clearTimeout(employeeBedTransferContextTimer);
+  if($('entryType')?.value!=='TF')return;
+  const from=employeeBedTransferBed(employeeFieldValue('transferFromBed'));
+  const to=employeeBedTransferBed(employeeFieldValue('bedTo'));
+  if(!from||!to)return;
+  const requestKey=`${from}->${to}`;
+  if(state.bedTransferContext?.status==='ready'&&state.bedTransferContext.requestKey===requestKey)return;
+  employeeBedTransferContextTimer=setTimeout(()=>{
+    employeeBedTransferContextTimer=null;
+    if($('entryType')?.value!=='TF')return;
+    employeeLoadBedTransferContexts().catch(()=>{});
+  },300);
+}
 function employeeRenderBedTransferServerValidation(result){
   state.bedTransferContext.serverValidation=result||null;
   const preview=result?.bed_transfer_phase1_preview||{};
@@ -8301,9 +8316,10 @@ document.querySelectorAll('.pay-option').forEach(btn=>btn.addEventListener('clic
 ['entryType','cycle','payType','amount','reasonCode','feePaid','transferWaiverReason','transferFeePaymentMethod','transferFeeDueDate','bedDifferenceMode','bedDifferenceAmount','bedDifferencePaymentMethod','bedDifferenceDueDate','bedDifferenceReason','customReason','tenantName','bankRef','periodDays','depositOutRefundDate','depositOutDifferenceReason','depositDeduction','checkoutDate','noNoticeDeduction','otherDeduction','dedNote','leftWithArrearsMode','leftFormerCustomerName','leftWhatsappPhone','leftContactMethod','leftContactNote','leftDepositBalance','leftCoverageEndDate','leftArrearsAmount','leftBelongingsHeld','leftBelongingsNote','leftPromisedPaymentDate','leftPromisedReturnDate','leftConfirmedNotReturningDate','leftGraceDays','excessTo','bedTo','transferReason','expenseCategory','expenseDesc','expenseEvidenceRef','remark','arrearHandling','arrearPromiseDate','arrearReasonDetail'].forEach(id=>$(id).addEventListener('input',syncForm));
 $('linkedTaskId').addEventListener('change',applyLinkedTask);
 $('bed').addEventListener('input',()=>{if($('entryType').value==='TF')$('transferFromBed').value=$('bed').value.trim().replace(/^#/,'');employeeScheduleLookupBed();if($('entryType').value==='AP'){populateTaskSelect();syncForm();}});
-$('transferFromBed').addEventListener('input',()=>{if($('entryType').value==='TF'){$('bed').value=$('transferFromBed').value.trim().replace(/^#/,'');employeeScheduleLookupBed();syncForm();}});
+$('transferFromBed').addEventListener('input',()=>{if($('entryType').value==='TF'){$('bed').value=$('transferFromBed').value.trim().replace(/^#/,'');employeeScheduleLookupBed();employeeScheduleBedTransferContexts();syncForm();}});
 $('transferFromBed').addEventListener('change',()=>{if($('entryType').value==='TF'){$('bed').value=$('transferFromBed').value.trim().replace(/^#/,'');lookupBed();syncForm();}});
 $('transferFromBed').addEventListener('change',()=>{if($('entryType').value==='TF'&&$('bedTo').value.trim())employeeLoadBedTransferContexts().catch(()=>validate());});
+$('bedTo').addEventListener('input',()=>{if($('entryType').value==='TF')employeeScheduleBedTransferContexts();});
 $('bedTo').addEventListener('change',()=>{if($('entryType').value==='TF'&&$('transferFromBed').value.trim())employeeLoadBedTransferContexts().catch(()=>validate());});
 $('tenantCardId').addEventListener('change',()=>{state.depositBalance=null;state.depositContext=null;const bed=$('bed')?.value.trim().replace(/^#/,'')||'';if(bed)loadDepositBalance(bed);else renderContext();});$('btnLoadLock').onclick=loadLock;$('btnSaveEntry').onclick=saveEntry;$('btnReset').onclick=resetEmployeeEntryForm;$('btnRefreshTasks').onclick=refreshFollowup;$('btnBuildExport').onclick=commitSessionAndExport;$('btnCopyExport').onclick=async()=>{try{await navigator.clipboard.writeText($('exportText').textContent);showStatus('导出文本已复制。');toast('已复制')}catch{showStatus('复制失败，请手动选择导出文本。','warn');toast('复制失败，请手动选择文本',6000)}};$('btnClearLocal').onclick=()=>{if(hasLocalOnly()){showStatus('仍有云端未确认记录，不能清空。','warn');toast('仍有云端未确认记录，不能清空',6000);return}if(confirm('清空本机草稿？')){state.drafts=[];saveDrafts();buildExport();refreshSessionViews();showStatus('本机草稿已清空。');toast('已清空')}};$('btnNewSessionTop').onclick=newSession;$('btnPreviewSession').onclick=previewSession;$('btnWhatsAppSession').onclick=exportEntrySessionWhatsApp;$('btnExportSession').onclick=commitSessionAndExport;$('operatorId').value=localStorage.getItem('empv3:operator')||'';$('operatorId').onchange=e=>{setOperator(e.target.value.trim());refreshSessionViews();showStatus('员工编号已更新。')};
 $('btnClosePreview').onclick=closePreviewModal;
