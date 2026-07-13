@@ -5074,24 +5074,73 @@ function buildEntryAnchorExportBlock(entries=state.drafts){
     '==== END ENTRY ANCHORS JSON ===='
   ].join('\n');
 }
+function employeeSessionValue(entry,fields){
+  for(const field of fields){
+    const value=entry?.[field];
+    if(value!==undefined&&value!==null&&String(value).trim()!=='')return num(value);
+  }
+  return 0;
+}
+function employeeSessionPaymentMethod(entry){
+  const raw=String(entry?.payment_method||entry?.pay_type||'').trim().toLowerCase();
+  return raw==='c'||raw==='cash'?'cash':raw==='b'||raw==='bank'?'bank':'none';
+}
+function employeeSessionIsBusinessRow(entry){
+  const type=String(entry?.type||entry?.event_type||'').trim().toUpperCase();
+  return !!type&&!['SUMMARY','SESSION_SUMMARY','TOTAL'].includes(type)&&entry?.is_summary!==true&&entry?.summary_row!==true;
+}
+function employeeSessionReceivedAmount(entry){
+  const type=String(entry?.type||'').trim().toUpperCase();
+  if(type==='R')return employeeSessionValue(entry,['paid_amount','paid','amount']);
+  if(type==='AP')return employeeSessionValue(entry,['payment_amount','paid_amount','paid','amount']);
+  if(type==='D')return employeeSessionValue(entry,['deposit_paid_amount','deposit_amount','paid_amount','paid','amount']);
+  if(type==='TF')return String(entry?.fee_mode||entry?.fee_status||'').toLowerCase()==='paid'?employeeSessionValue(entry,['fee_amount_aed','fee_amount','paid_amount','paid','amount']):0;
+  if(type==='TFF')return employeeSessionValue(entry,['paid_amount','paid','amount']);
+  return 0;
+}
+function employeeSessionExpenseAmount(entry){
+  const type=String(entry?.type||'').trim().toUpperCase();
+  if(type==='E')return employeeSessionValue(entry,['expense_amount','amount']);
+  if(type==='DR')return employeeSessionValue(entry,['actual_refund_amount','refund_amount','amount']);
+  return 0;
+}
+function employeeSessionOutstandingAmount(entry){
+  const type=String(entry?.type||'').trim().toUpperCase();
+  if(type==='R')return Math.max(0,employeeSessionValue(entry,['expected_rent','period_due','due'])-employeeSessionReceivedAmount(entry));
+  if(type==='TF')return Math.max(0,employeeSessionValue(entry,['fee_due_amount','fee_amount_aed','due'])-employeeSessionReceivedAmount(entry));
+  return 0;
+}
+function calculateEmployeeSessionSummary(entries=state.drafts){
+  const rows=(entries||[]).filter(employeeSessionIsBusinessRow);
+  const summary={rows,cashReceived:0,bankReceived:0,cashExpenses:0,bankExpenses:0,totalExpenses:0,outstanding:0,depositIncluded:0,rentIn:0,arrearsIn:0,transferFee:0,depRefund:0,expenses:0,bankCount:0,localOnly:0};
+  for(const entry of rows){
+    const method=employeeSessionPaymentMethod(entry);
+    const received=employeeSessionReceivedAmount(entry);
+    const expense=employeeSessionExpenseAmount(entry);
+    const type=String(entry?.type||'').trim().toUpperCase();
+    if(received>0&&method==='cash')summary.cashReceived+=received;
+    if(received>0&&method==='bank'){summary.bankReceived+=received;summary.bankCount+=1;}
+    if(expense>0&&method==='cash')summary.cashExpenses+=expense;
+    if(expense>0&&method==='bank')summary.bankExpenses+=expense;
+    summary.totalExpenses+=expense;
+    summary.outstanding+=employeeSessionOutstandingAmount(entry);
+    if(type==='D')summary.depositIncluded+=received;
+    if(type==='R')summary.rentIn+=received;
+    if(type==='AP')summary.arrearsIn+=received;
+    if(type==='TF'||type==='TFF')summary.transferFee+=received;
+    if(type==='DR')summary.depRefund+=expense;
+    if(type==='E')summary.expenses+=expense;
+    if(entry.sync_status!=='SYNCED')summary.localOnly+=1;
+  }
+  summary.totalReceived=summary.cashReceived+summary.bankReceived;
+  summary.cashNet=summary.cashReceived-summary.cashExpenses;
+  summary.bankNet=summary.bankReceived-summary.bankExpenses;
+  summary.netFunds=summary.totalReceived-summary.totalExpenses;
+  return summary;
+}
 function sessionStats(){
-  const rows=state.drafts;
-  const cashIn=rows.filter(e=>e.pay_type==='C'&&entryDirection(e)==='in').reduce((s,e)=>s+num(e.amount),0);
-  const bankIn=rows.filter(e=>e.pay_type==='B'&&entryDirection(e)==='in').reduce((s,e)=>s+num(e.amount),0);
-  const bankCount=rows.filter(e=>e.pay_type==='B'&&entryDirection(e)==='in'&&num(e.amount)>0).length;
-  const rentIn=rows.filter(e=>e.type==='R').reduce((s,e)=>s+num(e.paid||e.amount),0);
-  const depositIn=rows.filter(e=>e.type==='D').reduce((s,e)=>s+num(e.amount),0);
-  const arrearsIn=rows.filter(e=>e.type==='AP').reduce((s,e)=>s+num(e.amount),0);
-  const transferFee=rows.filter(e=>e.type==='TF'||e.type==='TFF').reduce((s,e)=>s+num(e.amount),0);
-  const depRefund=rows.filter(e=>e.type==='DR').reduce((s,e)=>s+num(e.amount),0);
-  const expenses=rows.filter(e=>e.type==='E').reduce((s,e)=>s+num(e.amount),0);
-  const cashOut=rows.filter(e=>e.pay_type==='C'&&entryDirection(e)==='out').reduce((s,e)=>s+num(e.amount),0);
-  const bankOut=rows.filter(e=>e.pay_type==='B'&&entryDirection(e)==='out').reduce((s,e)=>s+num(e.amount),0);
-  const cashBalance=cashIn-cashOut;
-  const grossReceived=cashIn+bankIn;
-  const operatingIn=rentIn+transferFee;
-  const localOnly=rows.filter(e=>e.sync_status!=='SYNCED').length;
-  return {rows,cashIn,bankIn,bankCount,rentIn,depositIn,arrearsIn,transferFee,depRefund,expenses,cashBalance,grossReceived,operatingIn,bankOut,localOnly};
+  const s=calculateEmployeeSessionSummary(state.drafts);
+  return {...s,cashIn:s.cashReceived,bankIn:s.bankReceived,cashOut:s.cashExpenses,bankOut:s.bankExpenses,cashBalance:s.cashNet,grossReceived:s.totalReceived,operatingIn:s.rentIn+s.transferFee};
 }
 function renderSessionKpisLegacy(){
   const s=sessionStats();
@@ -7059,7 +7108,7 @@ function renderEntryAnchorForWhatsapp(e,i=0){
 }
 function buildEntrySessionWhatsAppText(){
   const rows=state.drafts.map(e=>typeof normalizeEntryAnchor==='function'?normalizeEntryAnchor(e):e);
-  const stats=sessionStats();
+  const summary=calculateEmployeeSessionSummary(rows);
   const rentCash=rows.filter(e=>entryStatementType(e)==='rent'&&entryStatementPay(e)==='cash');
   const rentBank=rows.filter(e=>entryStatementType(e)==='rent'&&entryStatementPay(e)==='bank');
   const arrears=rows.filter(e=>entryStatementType(e)==='arrears_payment');
@@ -7117,31 +7166,36 @@ function entryStatementSection(lines,emoji,title){
 }
 function buildEntrySessionWhatsAppText(){
   const rows=state.drafts.map(e=>typeof normalizeEntryAnchor==='function'?normalizeEntryAnchor(e):e);
-  const stats=sessionStats();
+  const summary=calculateEmployeeSessionSummary(rows);
   const rentCash=rows.filter(e=>entryStatementType(e)==='rent'&&entryStatementPay(e)==='cash');
   const rentBank=rows.filter(e=>entryStatementType(e)==='rent'&&entryStatementPay(e)==='bank');
   const arrears=rows.filter(e=>entryStatementType(e)==='arrears_payment');
   const deposits=rows.filter(e=>entryStatementType(e)==='deposit_in');
   const transfers=rows.filter(e=>entryStatementType(e)==='bed_transfer');
-  const expenses=rows.filter(e=>['expense','deposit_out','checkout'].includes(entryStatementType(e)));
+  const expenses=rows.filter(e=>['expense','deposit_out'].includes(entryStatementType(e)));
   const sum=(list,selector)=>list.reduce((total,row)=>total+num(selector?selector(row):row.amount),0);
   const cashReceived=sum(rentCash,row=>row.paid_amount||row.paid||row.amount);
   const arrearsTotal=sum(arrears,row=>row.payment_amount||row.amount);
   const depositTotal=sum(deposits,row=>row.deposit_amount||row.amount);
   const transferTotal=sum(transfers,row=>row.fee_status==='waived'||row.fee_mode==='waived'||row.fee_paid==='N'?0:(row.fee_amount||row.amount));
-  const expenseTotal=sum(expenses,row=>row.expense_amount||row.refund_amount||row.amount);
   const sections=[
     entryStatementSection([
-      `Cash Handover ${entryStatementAmount(stats.cashBalance)}`,
-      `Bank ${entryStatementAmount(stats.bankIn)}`,
-      `Gross Received ${entryStatementAmount(stats.grossReceived)}`
-    ],'\u{1F4BC}','Core Summary'),
+      `Cash Handover ${entryStatementAmount(summary.cashNet)}`,
+      `Cash Received / 现金收款 AED ${entryStatementAmount(summary.cashReceived)}`,
+      `Bank Received / 银行收款 AED ${entryStatementAmount(summary.bankReceived)}`,
+      `Total Received / 本票总收款 AED ${entryStatementAmount(summary.totalReceived)}`,
+      `Expenses / 本票支出 AED ${entryStatementAmount(summary.totalExpenses)}`,
+      `Net Funds / 本票净资金增加 AED ${entryStatementAmount(summary.netFunds)}`,
+      `Cash Net / 本票现金净额 AED ${entryStatementAmount(summary.cashNet)}`,
+      `Bank Net / 本票银行净额 AED ${entryStatementAmount(summary.bankNet)}`,
+      summary.outstanding>0?`Outstanding / 本票未收金额 AED ${entryStatementAmount(summary.outstanding)}`:'',
+      summary.depositIncluded>0?`Deposit Included / 其中押金 AED ${entryStatementAmount(summary.depositIncluded)}`:''
+    ].filter(Boolean),'\u{1F4BC}','Core Summary'),
     entryStatementSection([
-      `Cash Received ${entryStatementAmount(cashReceived)}`,
       `Arrears ${entryStatementAmount(arrearsTotal)}`,
       `Deposit ${entryStatementAmount(depositTotal)}`,
       `Transfer ${entryStatementAmount(transferTotal)}`,
-      `Expense ${entryStatementAmount(expenseTotal)}`
+      `Expense ${entryStatementAmount(summary.totalExpenses)}`
     ],'\u{1F4CA}','Breakdown'),
     entryStatementSection(rentCash.map(entryStatementLine),'\u{1F4B5}','Cash Details'),
     entryStatementSection(rentBank.map(entryStatementLine),'\u{1F3E6}','Bank Details'),
@@ -7201,6 +7255,49 @@ function previewSession(){
   showStatus(`预览已打开：当前本票 ${state.drafts.length} 笔流水。`);
   toast(`预览已打开：${state.drafts.length} 笔流水`);
 }
+renderSessionPreview=function(){
+  const rows=state.drafts;
+  $('sessionMeta').textContent=`${today()} · ${new Date().toTimeString().slice(0,8)} · ${rows.length} records`;
+  if(!rows.length){$('sessionPreview').innerHTML='<div class="preview-empty"><div><b>No records</b><br><span>Add an entry to the Current Session.</span></div></div>';return;}
+  $('sessionPreview').innerHTML=rows.map((e,i)=>{
+    const expense=employeeSessionExpenseAmount(e);
+    const amount=expense||employeeSessionReceivedAmount(e);
+    const sign=expense>0?'-':amount>0?'+':'';
+    const cls=expense>0?'red':'';
+    const subject=e.type==='TF'?`#${esc(e.bed_from||e.room||'')} → #${esc(e.bed_to||'')}`:(e.type==='E'?esc(e.expense_category||'Expense'):`#${esc(e.room||'')}`);
+    const method=employeeSessionPaymentMethod(e)==='bank'?'Bank / 银行':'Cash / 现金';
+    const status=e.sync_status==='SYNCED'?'<span class="status-pill">Uploaded</span>':'<span class="status-pill local">Local</span>';
+    const undo=canUndo(e)?`<button class="mini-btn danger" data-undo="${esc(e.id)}">Remove Record / 删除记录</button>`:'';
+    return `<div class="preview-entry"><div><b>${rows.length-i}. ${subject}</b> ${status}<div class="small">${esc(eventLabel(e.type))} · ${method}</div><div class="small">EID ${esc(e.id)} · ${esc(e.created_at||'')}</div><div class="preview-tools">${undo}</div></div><div class="amt ${cls}">${sign}${fmtMoney(amount)}</div></div>`;
+  }).join('');
+  document.querySelectorAll('[data-undo]').forEach(btn=>btn.onclick=()=>undoDraft(btn.dataset.undo));
+};
+function employeeSessionPreviewCard(e,i){
+  const tail=Math.max(0,num(e.period_due)-num(e.paid));
+  const subject=e.type==='TF'?`#${e.bed_from||e.room||'-'} → #${e.bed_to||'-'}`:(e.type==='E'?(e.expense_category||'Expense'):`#${e.room||'-'}`);
+  const period=e.period_start&&e.period_end?`${e.period_start} → ${e.period_end}`:'-';
+  const pay=e.type==='E'?'Expense':(employeeSessionPaymentMethod(e)==='bank'?'Bank':'Cash');
+  const sync=e.sync_status==='SYNCED'?'Uploaded':'Pending upload';
+  const amount=employeeSessionExpenseAmount(e)||employeeSessionReceivedAmount(e);
+  return `<div class="preview-detail-card"><div class="preview-detail-top"><b>${i+1}. ${esc(eventLabel(e.type))} · ${esc(subject)}</b><b class="money">${fmtMoney(amount)} AED</b></div><div class="preview-detail-grid">${previewField('Payment / 付款方式',pay)}${previewField('Period / 账期',period)}${previewField('Due / Paid',`${fmtMoney(e.due)} / ${fmtMoney(e.paid)}`)}${previewField('Outstanding / 未收',tail>0?`${fmtMoney(tail)} AED`:'0.00 AED')}${previewField('Status / 状态',sync)}</div></div>`;
+}
+previewSession=function(){
+  refreshSessionViews();
+  const s=calculateEmployeeSessionSummary(state.drafts);
+  const body=$('previewModalBody');
+  if(!state.drafts.length){
+    body.innerHTML='<div class="preview-empty"><div><b>No Records</b><br><span>Finish one entry first, then open Preview to check it.</span></div></div>';
+  }else{
+    const anchors=[
+      ['Cash Received / 现金收款',s.cashReceived],['Bank Received / 银行收款',s.bankReceived],['Total Received / 本票总收款',s.totalReceived],['Expenses / 本票支出',s.totalExpenses],['Net Funds / 本票净资金增加',s.netFunds],['Cash Net / 本票现金净额',s.cashNet],['Bank Net / 本票银行净额',s.bankNet],
+      ...(s.outstanding>0?[['Outstanding / 本票未收金额',s.outstanding]]:[]),...(s.depositIncluded>0?[['Deposit Included / 其中押金',s.depositIncluded]]:[])
+    ];
+    body.innerHTML=`<div class="preview-anchor-row">${anchors.map(([label,value])=>`<div class="preview-anchor"><span>${esc(label)}</span><b>${fmtMoney(value)} AED</b></div>`).join('')}</div>${state.drafts.map(employeeSessionPreviewCard).join('')}`;
+  }
+  $('previewModal').classList.add('show');
+  showStatus(`Preview opened: ${state.drafts.length} records.`);
+  toast(`Preview opened: ${state.drafts.length} records.`);
+};
 function closePreviewModal(){
   $('previewModal').classList.remove('show');
 }
@@ -8394,7 +8491,7 @@ function renderContextLegacyPanels(){
   ].join('');
 }
 function renderSessionKpis(){
-  const s=sessionStats();
+  const s=calculateEmployeeSessionSummary(state.drafts);
   $('sessionClock').textContent=`${today()} · ${operatorId()} · ${s.rows.length} 条记录`;
   const grid=$('sessionKpis');
   grid.className='kpi-grid session-kpi-grid';
@@ -8766,22 +8863,26 @@ function updateEventChips(){
   if($('selectedEventDisplay'))$('selectedEventDisplay').dataset.normalizedEvent=normalizedBusinessEvent();
 }
 function renderSessionKpis(){
-  const s=sessionStats();
+  const s=calculateEmployeeSessionSummary(state.drafts);
   $('sessionClock').textContent=`${today()} · ${operatorId()} · ${s.rows.length} records`;
   const grid=$('sessionKpis');
   grid.className='kpi-grid session-kpi-grid';
   const anchors=[
-    ['Cash Handover','\u73b0\u91d1\u7ed3\u4f59',s.cashBalance,'anchor','Cash to hand over face to face'],
-    ['Bank Transfer','\u94f6\u884c\u8f6c\u8d26\u603b\u8ba1',s.bankIn,'anchor bank',`${s.bankCount} bank records`],
-    ['Gross Received','\u6536\u6b3e\u603b\u8ba1',s.grossReceived,'anchor total','Cash received + bank received']
+    ['Cash Received','\u73b0\u91d1\u6536\u6b3e',s.cashReceived,'anchor','Actual paid cash only'],
+    ['Bank Received','\u94f6\u884c\u6536\u6b3e',s.bankReceived,'anchor bank',`${s.bankCount} bank records`],
+    ['Total Received','\u672c\u7968\u603b\u6536\u6b3e',s.totalReceived,'anchor total','Cash received + bank received'],
+    ['Expenses','\u672c\u7968\u652f\u51fa',s.totalExpenses,'red','Actual cash and bank expenses'],
+    ['Net Funds','\u672c\u7968\u51c0\u8d44\u91d1\u589e\u52a0',s.netFunds,'anchor total','Total received - total expenses'],
+    ['Cash Net','\u672c\u7968\u73b0\u91d1\u51c0\u989d',s.cashNet,'anchor','Cash received - cash expenses'],
+    ['Bank Net','\u672c\u7968\u94f6\u884c\u51c0\u989d',s.bankNet,'anchor bank','Bank received - bank expenses']
   ];
   const details=[
-    ['Rent','\u79df\u91d1\u6536\u5165',s.rentIn,'','Rent income in this session'],
-    ['Deposit In','\u62bc\u91d1\u6536\u53d6',s.depositIn,'blue','Deposit liability anchor'],
+    ['Deposit Included','\u5176\u4e2d\u62bc\u91d1',s.depositIncluded,'blue','Deposit is received funds, not rent income'],
     ['Arrears Payment','\u6b20\u6b3e\u56de\u6536',s.arrearsIn,'orange','Historical arrears collected'],
     ['Bed Transfer Fee','\u6362\u5e8a\u8d39',s.transferFee,'','Service fee income'],
     ['Deposit Refund','\u62bc\u91d1\u9000\u6b3e',s.depRefund,'orange','Cash outflow'],
-    ['Expenses','\u5176\u4ed6\u652f\u51fa',s.expenses,'red','Cash outflow']
+    ['Other Expenses','\u5176\u4ed6\u652f\u51fa',s.expenses,'red','Cash or bank outflow'],
+    ...(s.outstanding>0?[['Outstanding','\u672c\u7968\u672a\u6536\u91d1\u989d',s.outstanding,'orange','Due - paid; excluded from funds']]:[])
   ];
   const card=([en,cn,v,cls,note])=>`<div class="kpi-card ${esc(cls)}"><span>${esc(en)}</span><small>${esc(cn)}</small><b class="entry-session-money" data-entry-summary-money="true">${fmtDisplayMoney(v)}</b><small>${esc(note)}</small></div>`;
   grid.innerHTML=`<div class="kpi-section-label">Handover Core<small>\u4ea4\u63a5\u6838\u5fc3</small></div><div class="handover-anchors">${anchors.map(card).join('')}</div><div class="kpi-section-label">Detail Breakdown<small>\u6d41\u6c34\u660e\u7ec6</small></div><div class="handover-details">${details.map(card).join('')}</div>`;

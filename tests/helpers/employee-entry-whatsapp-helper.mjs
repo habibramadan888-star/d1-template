@@ -20,6 +20,12 @@ export function extractFunctionBlock(source, startName, endName) {
 export async function buildWhatsappTextWithDrafts(drafts) {
   const source = await readEmployeeHtml();
   const block = extractFunctionBlock(source, "entryWhatsappSafe", "previewField");
+  const summaryStart = source.indexOf("function employeeSessionValue");
+  const summaryEnd = source.indexOf("function renderSessionKpisLegacy", summaryStart);
+  if (summaryStart < 0 || summaryEnd <= summaryStart) {
+    throw new Error("Unable to extract shared employee session summary");
+  }
+  const summaryBlock = source.slice(summaryStart, summaryEnd);
   const sandbox = {
     state: { drafts },
     num: (value) => Number(String(value || "").replace(/,/g, "")),
@@ -52,6 +58,6 @@ export async function buildWhatsappTextWithDrafts(drafts) {
     };
   };
   vm.createContext(sandbox);
-  vm.runInContext(`${block}\nresult = buildEntrySessionWhatsAppText();`, sandbox);
+  vm.runInContext(`${summaryBlock}\n${block}\nresult = buildEntrySessionWhatsAppText();`, sandbox);
   return sandbox.result;
 }
