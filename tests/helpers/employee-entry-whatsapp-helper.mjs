@@ -58,6 +58,6 @@ export async function buildWhatsappTextWithDrafts(drafts) {
     };
   };
   vm.createContext(sandbox);
-  vm.runInContext(`${summaryBlock}\n${block}\nresult = buildEntrySessionWhatsAppText();`, sandbox);
+  vm.runInContext(`${summaryBlock}\n${block}\nresult = buildEntrySessionLedgerText();`, sandbox);
   return sandbox.result;
 }

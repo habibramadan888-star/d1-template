@@ -2964,7 +2964,7 @@ label .label-en{
     <div class="card">
       <div class="head"><div class="title">Add Entry<span class="label-en">事件录入</span></div><button class="btn" id="btnLoadLock"><span class="employee-btn-main">Load Cards</span><span class="label-en">加载卡片</span></button></div>
       <div class="body">
-        <div class="step">
+          <div class="step employee-event-picker">
           <div class="step-title"><span>1</span><div>Step 1 · Select Event Type<small>第一步：选择事件类型</small></div></div>
           <div class="event-grid" id="eventChips">
             <button class="event-chip" data-type="R"><span>Rent</span><small>收租</small></button>
@@ -2999,7 +2999,7 @@ label .label-en{
           <div class="field hidden" id="tenantCardWrap"><label>门禁卡卡号 CID</label><input id="tenantCardId" placeholder="自动抓取或手动填写"></div>
         </div>
         </div>
-        <div class="step" id="paymentStep">
+        <div class="step payment-compact" id="paymentStep">
           <div class="step-title"><span>4</span><div>Step 4 · Payment Method<small>第四步：付款方式</small></div></div>
         <div class="grid" id="paymentFields">
           <div class="field"><label>付款方式 PY</label><select id="payType" class="hidden"><option value="C">Cash / 现金</option><option value="B">Bank / 银行</option></select><div class="pay-toggle"><button type="button" class="pay-option active" data-pay="C"><span class="employee-btn-main">Cash</span><span class="label-en">现金</span></button><button type="button" class="pay-option" data-pay="B"><span class="employee-btn-main">Bank</span><span class="label-en">银行</span></button></div></div>
@@ -3027,6 +3027,7 @@ label .label-en{
             <div class="field"><label>账期应收 period_due（系统计算）</label><input id="periodDue" inputmode="decimal" placeholder="系统计算" readonly></div>
             <div class="field"><label>本条应收 DUE（系统计算）</label><input id="due" inputmode="decimal" placeholder="系统计算" readonly></div>
           </div>
+          <label class="period-exception-confirm hidden" id="periodExceptionConfirmWrap"><input id="periodExceptionConfirmed" type="checkbox"> I confirm the period, due, paid amount, and difference. / 我确认账期、应收、实收和差额。</label>
         </div>
         </div>
 
@@ -3140,7 +3141,7 @@ label .label-en{
     <div class="card">
       <div class="head">
         <div><div class="title">本次会话</div><div class="small" id="sessionMeta">0 条记录</div></div>
-        <div class="row" style="flex:0 0 auto"><button class="btn" id="btnPreviewSession"><span class="employee-btn-main">Preview</span><span class="label-en">预览</span></button><button class="btn" id="btnWhatsAppSession"><span class="employee-btn-main">WhatsApp Export</span><span class="label-en">WhatsApp 导出</span></button><button class="btn primary" id="btnExportSession"><span class="employee-btn-main">Upload Session</span><span class="label-en">确认本票并上传云端</span></button></div>
+        <div class="row" style="flex:0 0 auto"><button class="btn" id="btnPreviewSession"><span class="employee-btn-main">Preview &amp; Copy</span><span class="label-en">预览并复制</span></button><button class="btn primary" id="btnExportSession"><span class="employee-btn-main">Upload Session</span><span class="label-en">确认本票并上传云端</span></button></div>
       </div>
       <div class="body"><div class="preview-list" id="sessionPreview"></div></div>
     </div>
@@ -4427,6 +4428,36 @@ function employeeValidateCommonAmount(errors,{optional=false,label='Amount'}={})
   const amt=num(employeeFieldValue('amount'));
   if(!optional&&(!amt||amt<=0))errors.push(`${label} must be greater than 0.`);
 }
+function employeeRentPeriodRequiresConfirmation(){
+  if($('entryType')?.value!=='R')return false;
+  const due=num($('due')?.value);
+  const paid=num($('amount')?.value);
+  const standard=$('cycle')?.value==='1M';
+  const deterministic=!!($('periodStart')?.value&&$('periodEnd')?.value&&due>0&&rentForBed()>0);
+  return !standard||!deterministic||Math.abs(due-paid)>0.01;
+}
+function employeeUpdatePeriodDisclosure(){
+  const step=$('periodStep');
+  const summaryId='periodCompactSummary';
+  if(!step)return;
+  let summary=$(summaryId);
+  if(!summary){
+    summary=document.createElement('button');
+    summary.type='button';
+    summary.id=summaryId;
+    summary.className='period-summary-toggle';
+    const title=step.querySelector('.step-title');
+    title?.insertAdjacentElement('afterend',summary);
+    summary.onclick=()=>step.classList.toggle('collapsed');
+  }
+  const required=employeeRentPeriodRequiresConfirmation();
+  const due=num($('due')?.value), paid=num($('amount')?.value);
+  summary.textContent=`System period: ${$('periodStart')?.value||'-'} → ${$('periodEnd')?.value||'-'} · Due AED ${fmtMoney(due)}${required?' · confirmation required':''}`;
+  step.classList.toggle('employee-period-collapsible',$('entryType')?.value==='R');
+  step.classList.toggle('collapsed',$('entryType')?.value==='R'&&!required);
+  visible(['periodExceptionConfirmWrap'],required);
+  if(!required&&$('periodExceptionConfirmed'))$('periodExceptionConfirmed').checked=false;
+}
 function validateRentEntry(){
   const errors=[],warns=[];
   const amount=num(employeeFieldValue('amount'));
@@ -4451,6 +4482,7 @@ function validateRentEntry(){
     if(!employeeTrimField('arrearReasonDetail'))errors.push('Short-paid rent requires a reason or note.');
   }
   if(due>0&&amount>due&&!employeeFieldValue('excessTo'))errors.push('Overpaid rent requires an excess handling choice.');
+  if(employeeRentPeriodRequiresConfirmation()&&!$('periodExceptionConfirmed')?.checked)errors.push('Confirm Period requires explicit confirmation for this exception.');
   return employeeValidationResult(errors,warns);
 }
 function validateArrearsPaymentEntry(){
@@ -5109,7 +5141,7 @@ function employeeSessionOutstandingAmount(entry){
 }
 function calculateEmployeeSessionSummary(entries=state.drafts){
   const rows=(entries||[]).filter(employeeSessionIsBusinessRow);
-  const summary={rows,cashReceived:0,bankReceived:0,cashExpenses:0,bankExpenses:0,totalExpenses:0,outstanding:0,depositIncluded:0,rentIn:0,arrearsIn:0,transferFee:0,depRefund:0,expenses:0,bankCount:0,localOnly:0};
+  const summary={rows,cashReceived:0,bankReceived:0,cashExpenses:0,bankExpenses:0,totalExpenses:0,outstanding:0,arrearsOpened:0,arrearsRepaid:0,depositIncluded:0,rentIn:0,arrearsIn:0,transferFee:0,depRefund:0,expenses:0,bankCount:0,localOnly:0};
   for(const entry of rows){
     const method=employeeSessionPaymentMethod(entry);
     const received=employeeSessionReceivedAmount(entry);
@@ -5120,10 +5152,12 @@ function calculateEmployeeSessionSummary(entries=state.drafts){
     if(expense>0&&method==='cash')summary.cashExpenses+=expense;
     if(expense>0&&method==='bank')summary.bankExpenses+=expense;
     summary.totalExpenses+=expense;
-    summary.outstanding+=employeeSessionOutstandingAmount(entry);
+    const outstanding=employeeSessionOutstandingAmount(entry);
+    summary.outstanding+=outstanding;
+    if(type==='R')summary.arrearsOpened+=outstanding;
     if(type==='D')summary.depositIncluded+=received;
     if(type==='R')summary.rentIn+=received;
-    if(type==='AP')summary.arrearsIn+=received;
+    if(type==='AP'){summary.arrearsIn+=received;summary.arrearsRepaid+=received;}
     if(type==='TF'||type==='TFF')summary.transferFee+=received;
     if(type==='DR')summary.depRefund+=expense;
     if(type==='E')summary.expenses+=expense;
@@ -5190,12 +5224,6 @@ function entrySessionUploaded(){
 function updateEntrySessionActionState(){
   const uploaded=entrySessionUploaded();
   const hasRows=state.drafts.length>0;
-  const whats=$('btnWhatsAppSession');
-  if(whats){
-    whats.disabled=!uploaded;
-    whats.classList.toggle('disabled',!uploaded);
-    whats.title=uploaded?'':'Upload this session to cloud before WhatsApp export / 请先确认本票并上传云端';
-  }
   const exportBtn=$('btnExportSession');
   if(exportBtn&&!exportBtn.dataset.busy){
     exportBtn.innerHTML=renderEmployeeButtonLabel('Upload Session','确认本票并上传云端');
@@ -5216,17 +5244,11 @@ updateEntrySessionActionState=function(){
   const uploaded=entrySessionUploaded();
   const blocked=currentSessionHasUploadBlockingError();
   const hasRows=state.drafts.length>0;
-  const whats=$('btnWhatsAppSession');
   const preview=$('btnPreviewSession');
   if(preview){
     preview.disabled=!hasRows;
     preview.classList.toggle('disabled',!hasRows);
     preview.title=hasRows?'':'Add a record before opening Preview / 请先加入一条本票记录';
-  }
-  if(whats){
-    whats.disabled=!uploaded||blocked;
-    whats.classList.toggle('disabled',!uploaded||blocked);
-    whats.title=uploaded&&!blocked?'':'Upload this session to cloud before WhatsApp export / \u8bf7\u5148\u786e\u8ba4\u672c\u7968\u5e76\u4e0a\u4f20\u4e91\u7aef';
   }
   const exportBtn=$('btnExportSession');
   if(exportBtn&&exportBtn.dataset.busy!=='1'){
@@ -5442,6 +5464,7 @@ function syncForm(){
   updateBedTransferReviewPanel();
   renderSummary();
   renderEmployeeBedInfoStrips();
+  employeeUpdatePeriodDisclosure();
   validate();
 }
 function validateDeprecatedGenericEntryValidation(){
@@ -5843,7 +5866,7 @@ async function saveEntryWithTtlockGate(){
   return saveEntryWithoutTtlockGate();
 }
 saveEntry=saveEntryWithTtlockGate;
-function resetForm(){['bed','transferFromBed','bedTo','transferReason','transferWaiverReason','transferFeeDueDate','transferFeePaymentMethod','bedDifferenceAmount','bedDifferencePaymentMethod','bedDifferenceDueDate','bedDifferenceReason','amount','due','paid','tenantName','tenantCardId','periodStart','periodEnd','periodDays','periodDue','listPrice','customReason','bankRef','checkoutDate','depositOutBalance','depositOutRefundDate','depositOutDifferenceReason','depositDeduction','depositReturnAmount','overdayDeduction','noNoticeDeduction','otherDeduction','dedNote','leftFormerCustomerName','leftWhatsappPhone','leftContactNote','leftDepositBalance','leftCoverageEndDate','leftArrearsAmount','leftBelongingsNote','leftPromisedPaymentDate','leftPromisedReturnDate','leftConfirmedNotReturningDate','leftGraceDays','expenseDesc','expenseEvidenceRef','remark','excessTo','arrearAmount','arrearPromiseDate','arrearReasonDetail'].forEach(id=>{if($(id))$(id).value=''});$('feePaid').value='paid';$('bedDifferenceMode').value='none';$('leftWithArrearsMode').value='normal';$('leftContactMethod').value='whatsapp';$('leftBelongingsHeld').value='no';$('arrearHandling').value='ARREAR';state.current=null;state.depositBalance=null;state.depositContext=null;state.bedTransferContext={status:'idle',source:null,target:null,requestKey:'',serverValidation:null};employeeRenderBedTransferContext();renderContext();syncForm();refreshSessionViews()}
+function resetForm(){['bed','transferFromBed','bedTo','transferReason','transferWaiverReason','transferFeeDueDate','transferFeePaymentMethod','bedDifferenceAmount','bedDifferencePaymentMethod','bedDifferenceDueDate','bedDifferenceReason','amount','due','paid','tenantName','tenantCardId','periodStart','periodEnd','periodDays','periodDue','listPrice','customReason','bankRef','checkoutDate','depositOutBalance','depositOutRefundDate','depositOutDifferenceReason','depositDeduction','depositReturnAmount','overdayDeduction','noNoticeDeduction','otherDeduction','dedNote','leftFormerCustomerName','leftWhatsappPhone','leftContactNote','leftDepositBalance','leftCoverageEndDate','leftArrearsAmount','leftBelongingsNote','leftPromisedPaymentDate','leftPromisedReturnDate','leftConfirmedNotReturningDate','leftGraceDays','expenseDesc','expenseEvidenceRef','remark','excessTo','arrearAmount','arrearPromiseDate','arrearReasonDetail'].forEach(id=>{if($(id))$(id).value=''});if($('periodExceptionConfirmed'))$('periodExceptionConfirmed').checked=false;$('feePaid').value='paid';$('bedDifferenceMode').value='none';$('leftWithArrearsMode').value='normal';$('leftContactMethod').value='whatsapp';$('leftBelongingsHeld').value='no';$('arrearHandling').value='ARREAR';state.current=null;state.depositBalance=null;state.depositContext=null;state.bedTransferContext={status:'idle',source:null,target:null,requestKey:'',serverValidation:null};employeeRenderBedTransferContext();renderContext();syncForm();refreshSessionViews()}
 function hasLocalOnly(){return state.drafts.some(e=>!employeeEntryCloudConfirmed(e))}
 function newSession(){
   if(hasLocalOnly()){toast('仍有云端未确认记录，不能开始新会话');return}
@@ -6968,55 +6991,11 @@ function entryWhatsappLine(e,i){
 function renderEntryAnchorForWhatsapp(e,i=0){
   return entryWhatsappLine(e,i);
 }
-function buildEntrySessionWhatsAppText(){
-  const s=sessionStats();
-  const entryDate=today().slice(5).replace('-','/');
-  const count=state.drafts.length;
-  const lines=[
-    `Entry ${entryDate} | ${entryWhatsappSafe(operatorName()||operatorId())} | ${count} ${count===1?'record':'records'}`,
-    `Cash ${fmtMoney(s.cashBalance)} | Bank ${fmtMoney(s.bankIn)} | Total ${fmtMoney(s.grossReceived)}`
-  ];
-  state.drafts.forEach((e,i)=>lines.push(entryWhatsappLine(e,i)));
-  return lines.join('\n');
-}
-function showEntryWhatsappFallback(text,url){
-  const body=$('previewModalBody');
-  if(body){
-    body.innerHTML=`<div class="preview-detail-card entry-session-whatsapp-fallback"><div class="preview-detail-top"><b>WhatsApp Export</b><button class="btn" type="button" onclick="window.open('${esc(url)}','_blank','noopener,noreferrer')">Open WhatsApp</button></div><div class="small">Text copied. If WhatsApp did not open, copy manually below.</div><pre>${esc(text)}</pre></div>`;
-    $('previewModal').classList.add('show');
-  }
-}
 function employeeUploadTimingEnabled(){
   return localStorage.getItem('empv3:uploadTiming')==='1'||location.search.includes('uploadTiming=1');
 }
 function employeeUploadTimingLog(label,data){
   if(employeeUploadTimingEnabled())console.log('[employee-entry-upload]',label,data||{});
-}
-async function exportEntrySessionWhatsApp(){
-  refreshSessionViews();
-  if(!state.drafts.length){toast('Current Session has no entries to export',6000);showStatus('Current Session has no entries to export.','warn');return '';}
-  if(hasLocalOnly()){
-    const message='Upload this session to cloud first, then WhatsApp export is enabled. / 请先点击“确认本票并上传云端”，成功后才能 WhatsApp 导出。';
-    toast(message,6000);
-    showStatus(message,'warn');
-    return '';
-  }
-  const text=buildEntrySessionWhatsAppText();
-  if(!entryWhatsappAssertTextSafe(text,'WhatsApp export'))return '';
-  const url='https://wa.me/?text='+encodeURIComponent(text);
-  let copied=false;
-  try{
-    if(navigator.clipboard?.writeText){
-      await navigator.clipboard.writeText(text);
-      copied=true;
-    }
-  }catch{}
-  let opened=null;
-  try{opened=window.open(url,'_blank','noopener,noreferrer');}catch{}
-  if(!opened)showEntryWhatsappFallback(text,url);
-  showStatus(copied?'WhatsApp text copied for Current Session.':'WhatsApp text generated; copy manually if needed.',copied?'ok':'warn');
-  toast(copied?'WhatsApp text copied':'WhatsApp text ready',6000);
-  return text;
 }
 function entryStatementAmount(value){
   const n=num(value);
@@ -7110,7 +7089,7 @@ function entryStatementSection(lines,emoji,title){
 function renderEntryAnchorForWhatsapp(e,i=0){
   return entryStatementLine(typeof normalizeEntryAnchor==='function'?normalizeEntryAnchor(e):e,i);
 }
-function buildEntrySessionWhatsAppText(){
+function buildEntrySessionLedgerTextLegacy(){
   const rows=state.drafts.map(e=>typeof normalizeEntryAnchor==='function'?normalizeEntryAnchor(e):e);
   const summary=calculateEmployeeSessionSummary(rows);
   const rentCash=rows.filter(e=>entryStatementType(e)==='rent'&&entryStatementPay(e)==='cash');
@@ -7168,7 +7147,7 @@ function entryStatementSection(lines,emoji,title){
   if(!lines.length)return '';
   return [`${emoji} ${'\u25AC'.repeat(13)} ${emoji}`,title,...lines].join('\n');
 }
-function buildEntrySessionWhatsAppText(){
+function buildEntrySessionLedgerText(){
   const rows=state.drafts.map(e=>typeof normalizeEntryAnchor==='function'?normalizeEntryAnchor(e):e);
   const summary=calculateEmployeeSessionSummary(rows);
   const rentCash=rows.filter(e=>entryStatementType(e)==='rent'&&entryStatementPay(e)==='cash');
@@ -7196,7 +7175,9 @@ function buildEntrySessionWhatsAppText(){
       summary.depositIncluded>0?`Deposit Included / 其中押金 AED ${entryStatementAmount(summary.depositIncluded)}`:''
     ].filter(Boolean),'\u{1F4BC}','Core Summary'),
     entryStatementSection([
-      `Arrears ${entryStatementAmount(arrearsTotal)}`,
+      `Outstanding / \u672c\u7968\u672a\u6536 AED ${entryStatementAmount(summary.outstanding)}`,
+      `Arrears Opened / \u672c\u7968\u65b0\u589e\u6b20\u6b3e AED ${entryStatementAmount(summary.arrearsOpened)}`,
+      `Arrears Repaid / \u672c\u7968\u6536\u56de\u6b20\u6b3e AED ${entryStatementAmount(summary.arrearsRepaid)}`,
       `Deposit ${entryStatementAmount(depositTotal)}`,
       `Transfer ${entryStatementAmount(transferTotal)}`,
       `Expense ${entryStatementAmount(summary.totalExpenses)}`
@@ -7291,8 +7272,17 @@ previewSession=function(){
   if(!state.drafts.length){
     return;
   }else{
-    const ledger=buildEntrySessionWhatsAppText();
-    body.innerHTML=`<div class="preview-detail-card" data-session-ledger-preview="true"><div class="preview-detail-top"><b>HOMELINK LEDGER</b></div><pre>${esc(ledger)}</pre></div>`;
+    const ledger=buildEntrySessionLedgerText();
+    body.innerHTML=`<div class="preview-detail-card" data-session-ledger-preview="true"><div class="preview-detail-top"><b>HOMELINK LEDGER</b><button class="btn" type="button" id="btnCopyLedger">Copy Ledger / 复制流水</button></div><pre>${esc(ledger)}</pre></div>`;
+    $('btnCopyLedger').onclick=async()=>{
+      try{
+        await navigator.clipboard.writeText(ledger);
+        showStatus('已复制，可以粘贴到WhatsApp','ok');
+        toast('已复制，可以粘贴到WhatsApp',6000);
+      }catch{
+        showStatus('Copy failed. Select the ledger text and copy manually. / 复制失败，请手动选择流水文本。','warn');
+      }
+    };
   }
   $('previewModal').classList.add('show');
   showStatus(`Preview opened: ${state.drafts.length} records.`);
@@ -8419,7 +8409,7 @@ $('transferFromBed').addEventListener('change',()=>{if($('entryType').value==='T
 $('transferFromBed').addEventListener('change',()=>{if($('entryType').value==='TF'&&$('bedTo').value.trim())employeeLoadBedTransferContexts().catch(()=>validate());});
 $('bedTo').addEventListener('input',()=>{if($('entryType').value==='TF')employeeScheduleBedTransferContexts();});
 $('bedTo').addEventListener('change',()=>{if($('entryType').value==='TF'&&$('transferFromBed').value.trim())employeeLoadBedTransferContexts().catch(()=>validate());});
-$('tenantCardId').addEventListener('change',()=>{state.depositBalance=null;state.depositContext=null;const bed=$('bed')?.value.trim().replace(/^#/,'')||'';if(bed)loadDepositBalance(bed);else renderContext();});$('btnLoadLock').onclick=loadLock;$('btnSaveEntry').onclick=saveEntry;$('btnReset').onclick=resetEmployeeEntryForm;$('btnRefreshTasks').onclick=refreshFollowup;$('btnBuildExport').onclick=commitSessionAndExport;$('btnCopyExport').onclick=async()=>{try{await navigator.clipboard.writeText($('exportText').textContent);showStatus('导出文本已复制。');toast('已复制')}catch{showStatus('复制失败，请手动选择导出文本。','warn');toast('复制失败，请手动选择文本',6000)}};$('btnClearLocal').onclick=()=>{if(hasLocalOnly()){showStatus('仍有云端未确认记录，不能清空。','warn');toast('仍有云端未确认记录，不能清空',6000);return}if(confirm('清空本机草稿？')){state.drafts=[];saveDrafts();buildExport();refreshSessionViews();showStatus('本机草稿已清空。');toast('已清空')}};$('btnNewSessionTop').onclick=newSession;$('btnPreviewSession').onclick=previewSession;$('btnWhatsAppSession').onclick=exportEntrySessionWhatsApp;$('btnExportSession').onclick=commitSessionAndExport;$('operatorId').value=localStorage.getItem('empv3:operator')||'';$('operatorId').onchange=e=>{setOperator(e.target.value.trim());refreshSessionViews();showStatus('员工编号已更新。')};
+$('tenantCardId').addEventListener('change',()=>{state.depositBalance=null;state.depositContext=null;const bed=$('bed')?.value.trim().replace(/^#/,'')||'';if(bed)loadDepositBalance(bed);else renderContext();});$('btnLoadLock').onclick=loadLock;$('btnSaveEntry').onclick=saveEntry;$('btnReset').onclick=resetEmployeeEntryForm;$('btnRefreshTasks').onclick=refreshFollowup;$('btnBuildExport').onclick=commitSessionAndExport;$('btnCopyExport').onclick=async()=>{try{await navigator.clipboard.writeText($('exportText').textContent);showStatus('导出文本已复制。');toast('已复制')}catch{showStatus('复制失败，请手动选择导出文本。','warn');toast('复制失败，请手动选择文本',6000)}};$('btnClearLocal').onclick=()=>{if(hasLocalOnly()){showStatus('仍有云端未确认记录，不能清空。','warn');toast('仍有云端未确认记录，不能清空',6000);return}if(confirm('清空本机草稿？')){state.drafts=[];saveDrafts();buildExport();refreshSessionViews();showStatus('本机草稿已清空。');toast('已清空')}};$('btnNewSessionTop').onclick=newSession;$('btnPreviewSession').onclick=previewSession;$('btnExportSession').onclick=commitSessionAndExport;$('operatorId').value=localStorage.getItem('empv3:operator')||'';$('operatorId').onchange=e=>{setOperator(e.target.value.trim());refreshSessionViews();showStatus('员工编号已更新。')};
 $('btnClosePreview').onclick=closePreviewModal;
 $('previewModal').addEventListener('click',e=>{if(e.target===$('previewModal'))closePreviewModal()});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closePreviewModal()});
@@ -8840,7 +8830,29 @@ function employeeEnsureEnglishFirstStyle(){
     .employee-tabs .tab .en{font-size:17px!important;font-weight:860!important;letter-spacing:.01em!important;text-transform:none!important;color:inherit!important}
     .employee-tabs .tab .tab-cn{font-size:10px!important;font-weight:560!important;letter-spacing:.04em!important;color:#7b8797!important}
     .employee-tabs .tab.active .tab-cn{color:rgba(255,255,255,.72)!important}
-  `;
+    #eventChips{grid-template-columns:repeat(12,minmax(0,1fr))!important;gap:8px!important}
+    #eventChips .event-chip{grid-column:span 3!important;padding:10px 7px!important;border-radius:12px!important;font-size:13px!important;min-height:54px!important}
+    #eventChips .event-chip[data-type="CO"]{grid-column:2 / span 3!important}
+    #eventChips .event-chip>span{font-size:13px!important}
+    #eventChips .event-chip small{font-size:9px!important}
+    #paymentStep{padding:10px 14px!important;margin-bottom:10px!important}
+    #paymentStep .step-title{display:none!important}
+    #paymentStep #paymentFields{display:block!important}
+    #paymentStep .field{margin:0!important}
+    #paymentStep .pay-toggle{display:flex!important;gap:6px!important}
+    #paymentStep .pay-option{flex:1!important;padding:8px 12px!important;border-radius:10px!important}
+    .session-summary-section{border:1px solid var(--line);border-radius:14px;padding:10px;margin-bottom:10px;background:#fff}
+    .session-summary-toggle{width:100%;display:flex;justify-content:space-between;align-items:center;border:0;background:transparent;color:#142033;font-weight:900;cursor:pointer;text-align:left}
+    .session-summary-section.collapsed .session-summary-content{display:none}
+    .session-summary-section.collapsed .session-summary-toggle::after{content:'▸'}
+    .session-summary-section:not(.collapsed) .session-summary-toggle::after{content:'▾'}
+    .period-exception-confirm{display:block;margin-top:10px;font-weight:800;color:#8a4d00}
+    #periodStep.employee-period-collapsible.collapsed #periodFields{display:none}
+    #periodStep.employee-period-collapsible .period-summary-toggle{width:100%;border:0;background:transparent;text-align:left;font-weight:800;color:#3f4d61;cursor:pointer;padding:4px 0}
+    #periodStep.employee-period-collapsible.collapsed .period-summary-toggle::after{content:' ▸'}
+    #periodStep.employee-period-collapsible:not(.collapsed) .period-summary-toggle::after{content:' ▾'}
+    @media(max-width:720px){#eventChips{grid-template-columns:repeat(12,minmax(0,1fr))!important}#eventChips .event-chip{min-height:50px!important;font-size:11px!important;padding:8px 3px!important}#eventChips .event-chip>span{font-size:11px!important}}
+   `;
   document.head.appendChild(style);
 }
 function updateEventChips(){
@@ -8882,10 +8894,14 @@ function renderSessionKpis(){
     ['Bed Transfer Fee','\u6362\u5e8a\u8d39',s.transferFee,'','Service fee income'],
     ['Deposit Refund','\u62bc\u91d1\u9000\u6b3e',s.depRefund,'orange','Cash outflow'],
     ['Other Expenses','\u5176\u4ed6\u652f\u51fa',s.expenses,'red','Cash or bank outflow'],
-    ...(s.outstanding>0?[['Outstanding','\u672c\u7968\u672a\u6536\u91d1\u989d',s.outstanding,'orange','Due - paid; excluded from funds']]:[])
+    ...(s.outstanding>0?[['Outstanding','\u672c\u7968\u672a\u6536\u91d1\u989d',s.outstanding,'orange','Due - paid; excluded from funds']]:[]),
+    ['Arrears Opened','\u672c\u7968\u65b0\u589e\u6b20\u6b3e',s.arrearsOpened,'orange','Short-paid rent opened in this session; excluded from funds'],
+    ['Arrears Repaid','\u672c\u7968\u6536\u56de\u6b20\u6b3e',s.arrearsRepaid,'orange','Actual Arrears Payment received in this session']
   ];
   const card=([en,cn,v,cls,note])=>`<div class="kpi-card ${esc(cls)}"><span>${esc(en)}</span><small>${esc(cn)}</small><b class="entry-session-money" data-entry-summary-money="true">${fmtDisplayMoney(v)}</b><small>${esc(note)}</small></div>`;
-  grid.innerHTML=`<div class="kpi-section-label">Handover Core<small>\u4ea4\u63a5\u6838\u5fc3</small></div><div class="handover-anchors">${anchors.map(card).join('')}</div><div class="kpi-section-label">Detail Breakdown<small>\u6d41\u6c34\u660e\u7ec6</small></div><div class="handover-details">${details.map(card).join('')}</div>`;
+  const section=(id,en,cn,items)=>`<section class="session-summary-section collapsed" data-session-summary-section="${id}"><button type="button" class="session-summary-toggle" data-session-summary-toggle="${id}"><span>${esc(en)}<small>${esc(cn)}</small></span></button><div class="session-summary-content ${id==='handover'?'handover-anchors':'handover-details'}">${items.map(card).join('')}</div></section>`;
+  grid.innerHTML=section('handover','Handover Core','\u4ea4\u63a5\u6838\u5fc3',anchors)+section('breakdown','Detail Breakdown','\u6d41\u6c34\u660e\u7ec6',details);
+  grid.querySelectorAll('[data-session-summary-toggle]').forEach(btn=>btn.onclick=()=>btn.closest('.session-summary-section')?.classList.toggle('collapsed'));
 }
 function applyBilingualUI(){
   employeeEnsureEnglishFirstStyle();
@@ -8904,8 +8920,7 @@ function applyBilingualUI(){
   $('btnLoadLock').innerHTML=renderEmployeeButtonLabel('Reload Cards','\u91cd\u65b0\u8bfb\u53d6\u5361\u7247');
   $('btnSaveEntry').innerHTML=renderEmployeeButtonLabel('Add to Session','\u52a0\u5165\u672c\u7968');
   $('btnReset').innerHTML=renderEmployeeButtonLabel('Reset','\u6e05\u7a7a');
-  $('btnPreviewSession').innerHTML=renderEmployeeButtonLabel('Preview','\u9884\u89c8');
-  $('btnWhatsAppSession').innerHTML=renderEmployeeButtonLabel('WhatsApp Export','WhatsApp \u5bfc\u51fa');
+  $('btnPreviewSession').innerHTML=renderEmployeeButtonLabel('Preview & Copy','\u9884\u89c8\u5e76\u590d\u5236');
   $('btnExportSession').innerHTML=renderEmployeeButtonLabel('Upload Session','\u786e\u8ba4\u672c\u7968\u5e76\u4e0a\u4f20\u4e91\u7aef');
   const steps=[
     ['Step 1 · Select Event Type','\u7b2c\u4e00\u6b65\uff1a\u9009\u62e9\u4e8b\u4ef6\u7c7b\u578b'],

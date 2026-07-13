@@ -39,7 +39,7 @@ test("Preview renders the exact WhatsApp ledger text and empty sessions stay dis
     { type: "E", room: "204", expense_amount: 100, amount: 100, pay_type: "C", expense_desc: "AC repair", created_at: "2026-07-13T10:00:00Z" }
   ]);
 
-  assert.match(preview, /const ledger=buildEntrySessionWhatsAppText\(\)/);
+  assert.match(preview, /const ledger=buildEntrySessionLedgerText\(\)/);
   assert.match(preview, /data-session-ledger-preview/);
   assert.match(preview, /<pre>\$\{esc\(ledger\)\}<\/pre>/);
   assert.match(actionState, /preview\.disabled=!hasRows/);

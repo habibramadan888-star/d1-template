@@ -77,14 +77,32 @@ test("Current Session, Preview, and WhatsApp export share the one calculation", 
   const source = await readFile(employeePath, "utf8");
   const kpis = source.slice(source.lastIndexOf("function renderSessionKpis"), source.indexOf("function applyBilingualUI", source.lastIndexOf("function renderSessionKpis")));
   const preview = source.slice(source.lastIndexOf("previewSession=function"), source.indexOf("function closePreviewModal", source.lastIndexOf("previewSession=function")));
-  const whatsapp = source.slice(source.lastIndexOf("function buildEntrySessionWhatsAppText"), source.indexOf("function previewField", source.lastIndexOf("function buildEntrySessionWhatsAppText")));
+  const ledger = source.slice(source.lastIndexOf("function buildEntrySessionLedgerText"), source.indexOf("function previewField", source.lastIndexOf("function buildEntrySessionLedgerText")));
   assert.match(kpis, /calculateEmployeeSessionSummary\(state\.drafts\)/);
-  assert.match(preview, /buildEntrySessionWhatsAppText\(\)/);
+  assert.match(preview, /buildEntrySessionLedgerText\(\)/);
   assert.match(preview, /data-session-ledger-preview/);
-  assert.match(whatsapp, /calculateEmployeeSessionSummary\(rows\)/);
+  assert.match(ledger, /calculateEmployeeSessionSummary\(rows\)/);
   for (const label of ["Total Received", "Net Funds", "Cash Net", "Bank Net"]) {
     assert.match(kpis, new RegExp(label));
-    assert.match(whatsapp, new RegExp(label));
+    assert.match(ledger, new RegExp(label));
   }
   assert.doesNotMatch(kpis, /Gross Received|Cash Balance|Total Income/);
+});
+
+test("short-paid rent exposes outstanding, arrears opened, and arrears repaid independently", async () => {
+  const calculate = await summaryCalculator();
+  const summary = calculate([
+    { type: "R", pay_type: "C", due: 770, paid: 700 },
+    { type: "R", pay_type: "B", due: 700, paid: 700 },
+    { type: "E", pay_type: "C", expense_amount: 250 }
+  ]);
+  assert.equal(summary.cashReceived, 700);
+  assert.equal(summary.bankReceived, 700);
+  assert.equal(summary.totalReceived, 1400);
+  assert.equal(summary.cashExpenses, 250);
+  assert.equal(summary.cashNet, 450);
+  assert.equal(summary.netFunds, 1150);
+  assert.equal(summary.outstanding, 70);
+  assert.equal(summary.arrearsOpened, 70);
+  assert.equal(summary.arrearsRepaid, 0);
 });
