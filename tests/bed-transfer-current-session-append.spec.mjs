@@ -191,6 +191,37 @@ test("failed upload restores original Current Session and repeat clicks are busy
   assert.match(upload, /upload_validation_error=firstUploadFailure\.result/);
 });
 
+test("failed record actions are above collapsed diagnostics and remove clears only local session state", () => {
+  const finalRender = html.slice(html.lastIndexOf("renderSessionPreview=function"));
+  assert.match(finalRender, /const failedActions=failed\?`<div class="preview-tools">\$\{remove\}<button[^`]+data-retry-session-record/);
+  assert.ok(finalRender.indexOf("${failedActions}") < finalRender.indexOf("${failNote}"));
+  assert.match(html, /<details class="uv-list"><summary><span class="uv-label">Raw Validation Debug/);
+  assert.doesNotMatch(html, /<details class="uv-list" open><summary><span class="uv-label">Raw Validation Debug/);
+  const source = block("removeCurrentSessionRecord");
+  const state = { drafts: [{ id: "failed-transfer", upload_validation_error: { error_code: "SERVER_PROCESSING_TIMEOUT" } }], sessionId: "S-failed", uploadValidationFailedIndex: 0, uploadValidationFailedMessage: "failed" };
+  const removed = [];
+  let apiCalls = 0;
+  const context = {
+    state, confirm: () => true, employeeSessionRecordState: () => ({ key: "VALIDATION_FAILED" }), employeeStorageKey: key => `${key}:employee`,
+    localStorage: { removeItem: key => removed.push(key) }, refreshSessionViews: () => {}, buildExport: () => {}, toast: () => {}, saveDrafts: () => { apiCalls += 1; }
+  };
+  vm.createContext(context);
+  vm.runInContext(`${source};globalThis.removeRecord=removeCurrentSessionRecord`, context);
+  context.removeRecord("failed-transfer");
+  assert.deepEqual(state.drafts, []);
+  assert.equal(state.sessionId, "");
+  assert.deepEqual(removed, ["empv3:drafts:employee", "empv3:sessionId:employee"]);
+  assert.equal(apiCalls, 0);
+});
+
+test("non-JSON 503 is summarized without rendering Cloudflare HTML", () => {
+  const validate = block("validateEmployeeUploadDryRun", true);
+  assert.match(validate, /SERVER_PROCESSING_TIMEOUT/);
+  assert.match(validate, /服务器处理超时，请重试。/);
+  assert.match(validate, /raw_body:r\.status===503\?'':String\(raw\|\|''\)\.slice\(0,400\)/);
+  assert.doesNotMatch(validate, /slice\(0,4000\)/);
+});
+
 test("independent Validate and Record buttons are absent", () => {
   assert.doesNotMatch(html, /id="btnValidateBedTransfer"|id="btnRecordBedTransfer"/);
   assert.match(html, /Save Transfer/);

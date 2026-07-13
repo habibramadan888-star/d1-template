@@ -7817,7 +7817,7 @@ renderEmployeeUploadDryRunError=function(result){
       ${trace?`<div class="uv-list"><span class="uv-label">Validation Trace<br><small>\u6821\u9a8c\u94fe\u8def</small></span><span class="uv-value"><pre>${esc(trace)}</pre></span></div>`:''}
       ${r.stale_frontend_asset?`<div class="warn">STALE_FRONTEND_ASSET<br><small>前端资源可能是旧版本，请强制刷新。</small></div>`:''}
       <div class="uv-list"><button class="mini-btn" data-copy-diagnostic-json="${esc(String(r.event_index))}">${renderEmployeeButtonLabel('Copy Diagnostic JSON','复制诊断 JSON')}</button></div>
-      <details class="uv-list" open><summary><span class="uv-label">Raw Validation Debug<br><small>\u539f\u59cb\u6821\u9a8c\u8fd4\u56de</small></span></summary><pre>${esc(rawDebug)}</pre></details>
+      <details class="uv-list"><summary><span class="uv-label">Raw Validation Debug<br><small>\u539f\u59cb\u6821\u9a8c\u8fd4\u56de</small></span></summary><pre>${esc(rawDebug)}</pre></details>
       <div class="warn">No cloud data was written. Fix this record and upload again. / \u672a\u5199\u5165\u4e91\u7aef\uff0c\u8bf7\u4fee\u6b63\u8fd9\u6761\u8bb0\u5f55\u540e\u91cd\u65b0\u4e0a\u4f20\u3002</div>
     </div>`;
 };
@@ -7986,9 +7986,9 @@ async function validateEmployeeUploadDryRun(entry,sessionForEntry,index,options=
       stage:'server_dry_run_response_parse',
       event_index:index,
       event_type:entry?.event_type||entryEventType(entry?.type||'entry'),
-      error_code:'SERVER_VALIDATE_MALFORMED_RESPONSE',
-      message:'Upload validation returned an unreadable response.',
-      message_en:'Upload validation returned an unreadable response.',
+      error_code:r.status===503?'SERVER_PROCESSING_TIMEOUT':'SERVER_VALIDATE_MALFORMED_RESPONSE',
+      message:r.status===503?'服务器处理超时，请重试。':'Upload validation returned an unreadable response.',
+      message_en:r.status===503?'Server processing timed out. Please retry.':'Upload validation returned an unreadable response.',
       message_zh:'上传校验接口返回内容无法解析。',
       invalid_fields:['response_body'],
       validation_trace:[{
@@ -8002,9 +8002,9 @@ async function validateEmployeeUploadDryRun(entry,sessionForEntry,index,options=
         missing_fields:[],
         invalid_fields:['response_body']
       }],
-      raw_validation_response:{http_status:r.status,raw_body:String(raw||'').slice(0,4000)}
-    },index,raw||('HTTP '+r.status));
-    const err=new Error(formatEmployeeUploadDryRunError(result,index));
+      raw_validation_response:{http_status:r.status,raw_body:r.status===503?'':String(raw||'').slice(0,400)}
+    },index,r.status===503?'服务器处理超时，请重试。':raw||('HTTP '+r.status));
+    const err=new Error(r.status===503?'服务器处理超时，请重试。':formatEmployeeUploadDryRunError(result,index));
     err.dryRunResult=result;
     throw err;
   }
@@ -8012,9 +8012,11 @@ async function validateEmployeeUploadDryRun(entry,sessionForEntry,index,options=
     const result=normalizeEmployeeUploadDryRunError({
       ...(data||{}),
       source:'server_dry_run_validation',
-      raw_validation_response:data||{http_status:r.status,raw_body:String(raw||'').slice(0,4000)}
-    },index,raw||('HTTP '+r.status));
-    const err=new Error(formatEmployeeUploadDryRunError(result,index)||raw||('HTTP '+r.status));
+      error_code:data?.error_code||data?.code||data?.error||(r.status===503?'SERVER_PROCESSING_TIMEOUT':'SERVER_UPLOAD_VALIDATION_FAILED'),
+      message:data?.message||data?.error||(r.status===503?'服务器处理超时，请重试。':'Upload validation failed.'),
+      raw_validation_response:data||{http_status:r.status,raw_body:r.status===503?'':String(raw||'').slice(0,400)}
+    },index,r.status===503?'服务器处理超时，请重试。':raw||('HTTP '+r.status));
+    const err=new Error(r.status===503?'服务器处理超时，请重试。':formatEmployeeUploadDryRunError(result,index)||('HTTP '+r.status));
     err.dryRunResult=result;
     throw err;
   }
@@ -8881,7 +8883,10 @@ function removeCurrentSessionRecord(id,reason=''){
   state.drafts=state.drafts.filter(e=>e.id!==id);
   state.uploadValidationFailedIndex=null;
   state.uploadValidationFailedMessage='';
-  saveDrafts();
+  if(!state.drafts.length){
+    state.sessionId='';
+    try{localStorage.removeItem(employeeStorageKey('empv3:drafts'));localStorage.removeItem(employeeStorageKey('empv3:sessionId'))}catch{}
+  }else saveDrafts();
   refreshSessionViews();
   buildExport();
   toast(reason||'Record removed from Current Session');
@@ -8967,12 +8972,14 @@ renderSessionPreview=function(){
     const undo=canUndo(e)?`<button class="mini-btn danger" data-undo="${esc(e.id)}">Undo</button>`:'';
     const remove=['VALIDATION_FAILED','STALE'].includes(recordState.key)?`<button class="mini-btn danger" data-remove-session-record="${esc(e.id)}">${renderEmployeeButtonLabel('Remove Invalid Record','删除无效记录')}</button>`:'';
     const refresh=recordState.key==='STALE'?`<button class="mini-btn" data-refresh-arrears-record="${esc(e.id)}">${renderEmployeeButtonLabel('Refresh Arrears','刷新欠款')}</button>`:'';
+    const failedActions=failed?`<div class="preview-tools">${remove}<button class="mini-btn" data-retry-session-record="${esc(e.id)}">${renderEmployeeButtonLabel('Retry','重试')}</button></div>`:'';
     const failNote=failed?renderSessionRecordValidationDetails(recordState.validation,i):'';
     const cloudReview=renderEmployeeCloudReviewPanel(e,i,recordState);
-    return `<div class="preview-entry ${failed?'upload-validation-failed':''}" data-session-record-index="${recordIndex}" data-entry-id="${esc(e.id)}"><div><b>Record #${recordIndex} · ${subject}</b> ${status}${failNote}${cloudReview}<div class="small">${esc(detail)}</div><div class="small">Entry ID ${esc(e.id)} · ${esc(e.created_at||'')}</div><div class="small">${esc(e.note||e.expense_desc||'')}</div><div class="preview-tools">${undo}${refresh}${remove}</div></div><div class="amt ${cls}">${sign}${fmtMoney(e.amount)}</div></div>`;
+    return `<div class="preview-entry ${failed?'upload-validation-failed':''}" data-session-record-index="${recordIndex}" data-entry-id="${esc(e.id)}"><div><b>Record #${recordIndex} · ${subject}</b> ${status}${failedActions}${failNote}${cloudReview}<div class="small">${esc(detail)}</div><div class="small">Entry ID ${esc(e.id)} · ${esc(e.created_at||'')}</div><div class="small">${esc(e.note||e.expense_desc||'')}</div><div class="preview-tools">${undo}${refresh}${failed?'':remove}</div></div><div class="amt ${cls}">${sign}${fmtMoney(e.amount)}</div></div>`;
   }).join('');
   document.querySelectorAll('[data-undo]').forEach(btn=>btn.onclick=()=>undoDraft(btn.dataset.undo));
   document.querySelectorAll('[data-remove-session-record]').forEach(btn=>btn.onclick=()=>removeCurrentSessionRecord(btn.dataset.removeSessionRecord,'Invalid record removed'));
+  document.querySelectorAll('[data-retry-session-record]').forEach(btn=>btn.onclick=()=>commitSessionAndExport());
   document.querySelectorAll('[data-remove-cloud-local]').forEach(btn=>btn.onclick=()=>removeCurrentSessionRecord(btn.dataset.removeCloudLocal,'Local cloud-state copy removed. No cloud data was changed.'));
   document.querySelectorAll('[data-request-owner-reupload]').forEach(btn=>btn.onclick=()=>employeeRequestOwnerReuploadApproval(btn.dataset.requestOwnerReupload));
   document.querySelectorAll('[data-view-cloud-state]').forEach(btn=>btn.onclick=()=>employeeViewCloudState(btn.dataset.viewCloudState));

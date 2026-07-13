@@ -2630,12 +2630,13 @@ async function validateEmployeeBedTransferPhase1(env,user,entry={},normalized={}
   const fromBed=cleanText(normalized.from_bed||entry.from_bed||entry.bed_from||entry.room||"",40).replace(/^#+/,"");
   const toBed=cleanText(normalized.to_bed||entry.to_bed||entry.bed_to||entry.roomTo||"",40).replace(/^#+/,"");
   const companyScope=cleanText(user?.corpid||"",120);
+  const archiveSnapshot=await cloudArrearsFetchActiveSessionRows(env,user,{limit:1000}).catch(()=>[]);
   let sourceGateway;
   let targetGateway;
   try{
     [sourceGateway,targetGateway]=await Promise.all([
-      canonicalBedContextGateway(env,user,{bed:fromBed,limit:1000,strict_access_snapshot:true}),
-      canonicalBedContextGateway(env,user,{bed:toBed,limit:1000,strict_access_snapshot:true})
+      canonicalBedContextGateway(env,user,{bed:fromBed,limit:1000,strict_access_snapshot:true,archive_snapshot:archiveSnapshot}),
+      canonicalBedContextGateway(env,user,{bed:toBed,limit:1000,strict_access_snapshot:true,archive_snapshot:archiveSnapshot})
     ]);
   }catch(error){
     return {ok:false,error_code:"BED_TRANSFER_ACCESS_SNAPSHOT_UNAVAILABLE",message:"Strict Access Snapshot data could not be loaded.",invalid_fields:["source_context","target_context"],source_error:cleanText(error?.message||error||"",160)};
@@ -2667,8 +2668,8 @@ async function validateEmployeeBedTransferPhase1(env,user,entry={},normalized={}
   return contractResult;
 }
 __name(validateEmployeeBedTransferPhase1,"validateEmployeeBedTransferPhase1");
-async function resolveEmployeeBedTransferSourceContext(env,user,fromBed,gateway={}){
-  const sessions=await cloudArrearsFetchActiveSessionRows(env,user,{limit:1000});
+async function resolveEmployeeBedTransferSourceContext(env,user,fromBed,gateway={},opts={}){
+  const sessions=await cloudArrearsFetchActiveSessionRows(env,user,{limit:1000,archive_snapshot:opts.archive_snapshot});
   const archiveEntries=[];
   for(const session of sessions||[])for(const raw of extractEmployeeEntryAnchorsFromSession(session)){
     const anchor=normalizeEntryAnchor(raw),eventType=canonicalFinanceProjectionEventType(anchor);
@@ -2709,12 +2710,13 @@ __name(resolveEmployeeOwnerConfirmedLegacyGenesis,"resolveEmployeeOwnerConfirmed
 async function validateEmployeeBedTransferCanonicalLink(env,user,entry={},normalized={}){
   const fromBed=cleanText(normalized.from_bed||entry.from_bed||entry.bed_from||entry.room||"",40).replace(/^#+/,"");
   const toBed=cleanText(normalized.to_bed||entry.to_bed||entry.bed_to||entry.roomTo||"",40).replace(/^#+/,"");
+  const archiveSnapshot=await cloudArrearsFetchActiveSessionRows(env,user,{limit:1000}).catch(()=>[]);
   const [sourceGateway,targetGateway]=await Promise.all([
-    canonicalBedContextGateway(env,user,{bed:fromBed,limit:1000,strict_access_snapshot:true}),
-    canonicalBedContextGateway(env,user,{bed:toBed,limit:1000,strict_access_snapshot:true})
+    canonicalBedContextGateway(env,user,{bed:fromBed,limit:1000,strict_access_snapshot:true,archive_snapshot:archiveSnapshot}),
+    canonicalBedContextGateway(env,user,{bed:toBed,limit:1000,strict_access_snapshot:true,archive_snapshot:archiveSnapshot})
   ]);
   const fee=employeeEntryBedTransferFee(entry,normalized);
-  let resolved=await resolveEmployeeBedTransferSourceContext(env,user,fromBed,sourceGateway);
+  let resolved=await resolveEmployeeBedTransferSourceContext(env,user,fromBed,sourceGateway,{archive_snapshot:archiveSnapshot});
   if(resolved.resolution_status!=="resolved")resolved=resolveEmployeeOwnerConfirmedLegacyGenesis(env,user,fromBed,toBed,sourceGateway,targetGateway,resolved);
   if(resolved.resolution_status!=="resolved")return {ok:false,error_code:resolved.error_code||"BED_TRANSFER_SOURCE_CONTEXT_AMBIGUOUS",message:"Canonical source context could not be resolved.",invalid_fields:["source_context"],source_context_resolution:resolved};
   const sourceAccess=sourceGateway?.access_snapshot_context||{},targetAccess=targetGateway?.access_snapshot_context||{};
@@ -4826,6 +4828,7 @@ function buildCloudArrearsProjectionFromSessions(sessions=[],opts={}){
 }
 __name(buildCloudArrearsProjectionFromSessions,"buildCloudArrearsProjectionFromSessions");
 async function cloudArrearsFetchActiveSessionRows(env,user,opts={}){
+  if(Array.isArray(opts.archive_snapshot))return opts.archive_snapshot;
   if(!await empTableExists(env,"sessions").catch(()=>false))return [];
   const limit=Math.min(Math.max(Number(opts.limit||1000),1),2000);
   const sessionId=cleanId(opts.session_id||opts.sessionId||"");
@@ -4964,7 +4967,7 @@ async function canonicalArrearsGateway(env,user,opts={}){
   const bed=cleanText(opts.bed||"",80).replace(/^#/,"");
   const arrearsRef=cleanText(opts.arrears_ref||opts.task_id||opts.ref||"",160);
   const limit=Math.min(Math.max(Number(opts.limit||1000),1),2000);
-  const projection=bed?await rebuildCloudArrearsForBed(env,user,bed,{limit}):await rebuildAllCloudArrears(env,user,{limit});
+  const projection=bed?await rebuildCloudArrearsForBed(env,user,bed,{limit,archive_snapshot:opts.archive_snapshot}):await rebuildAllCloudArrears(env,user,{limit,archive_snapshot:opts.archive_snapshot});
   let allItems=(projection.all_items&&projection.all_items.length?projection.all_items:[...(projection.open_items||[]),...(projection.closed_items||[])])
     .map(canonicalArrearsGatewayCleanItem);
   if(arrearsRef)allItems=allItems.filter(item=>[item.arrears_ref,item.task_id,item.id].some(value=>cleanText(value,160)===arrearsRef));
@@ -5005,9 +5008,9 @@ async function canonicalArrearsGateway(env,user,opts={}){
 __name(canonicalArrearsGateway,"canonicalArrearsGateway");
 async function canonicalBedContextGateway(env,user,opts={}){
   const bed=cleanText(opts.bed||"",80).replace(/^#/,"");
-  const arrears=await canonicalArrearsGateway(env,user,{bed,limit:opts.limit||1000});
-  const occupancy=await canonicalOccupancyGateway(env,user,{bed,arrears_gateway:arrears,limit:opts.limit||1000,strict_access_snapshot:opts.strict_access_snapshot===true});
-  const stayContext=await canonicalStayBedContextGateway(env,user,{bed,limit:opts.limit||500});
+  const arrears=await canonicalArrearsGateway(env,user,{bed,limit:opts.limit||1000,archive_snapshot:opts.archive_snapshot});
+  const occupancy=await canonicalOccupancyGateway(env,user,{bed,arrears_gateway:arrears,limit:opts.limit||1000,strict_access_snapshot:opts.strict_access_snapshot===true,archive_snapshot:opts.archive_snapshot});
+  const stayContext=await canonicalStayBedContextGateway(env,user,{bed,limit:opts.limit||500,archive_snapshot:opts.archive_snapshot});
   return {
     ok:true,
     success:true,
@@ -5039,7 +5042,7 @@ __name(canonicalBedContextGateway,"canonicalBedContextGateway");
 async function canonicalStayBedContextGateway(env,user,opts={}){
   const bed=cleanText(opts.bed||"",80).replace(/^#/,"");
   const limit=Math.min(Math.max(Number(opts.limit||500),1),1000);
-  const sessions=await cloudArrearsFetchActiveSessionRows(env,user,{limit}).catch(()=>[]);
+  const sessions=await cloudArrearsFetchActiveSessionRows(env,user,{limit,archive_snapshot:opts.archive_snapshot}).catch(()=>[]);
   let stayContexts=[];
   let stayEventLinks=[];
   if(await empTableExists(env,"stay_contexts").catch(()=>false)){
@@ -5124,7 +5127,7 @@ __name(canonicalOccupancyCompareEventDate,"canonicalOccupancyCompareEventDate");
 async function canonicalOccupancyArchiveEventsForBed(env,user,bed,opts={}){
   const cleanBed=cleanText(bed,80).replace(/^#/,"");
   if(!cleanBed)return [];
-  const sessions=await cloudArrearsFetchActiveSessionRows(env,user,{limit:opts.limit||1000}).catch(()=>[]);
+  const sessions=await cloudArrearsFetchActiveSessionRows(env,user,{limit:opts.limit||1000,archive_snapshot:opts.archive_snapshot}).catch(()=>[]);
   const events=[];
   for(const session of sessions||[]){
     for(const raw of extractEmployeeEntryAnchorsFromSession(session)){
@@ -5193,8 +5196,8 @@ async function canonicalOccupancyGateway(env,user,opts={}){
   const access=opts.access_snapshot
     ?{snapshot:opts.access_snapshot,card:opts.card||null,source_status:"provided",warning:""}
     :await canonicalDepositAccessSnapshotForBed(env,user,bed,{strict_access_snapshot:opts.strict_access_snapshot===true}).catch(e=>({snapshot:null,card:null,source_status:"access_snapshot_unavailable",warning:empReadErrorCode(e),error:empReadErrorCode(e),data_source:"live_api",fallback:false,candidate_count:0,ambiguous:false,conflict:false,stale:false}));
-  const arrears=opts.arrears_gateway||await canonicalArrearsGateway(env,user,{bed,limit:opts.limit||1000});
-  const events=Array.isArray(opts.events)?opts.events:await canonicalOccupancyArchiveEventsForBed(env,user,bed,{limit:opts.limit||1000});
+  const arrears=opts.arrears_gateway||await canonicalArrearsGateway(env,user,{bed,limit:opts.limit||1000,archive_snapshot:opts.archive_snapshot});
+  const events=Array.isArray(opts.events)?opts.events:await canonicalOccupancyArchiveEventsForBed(env,user,bed,{limit:opts.limit||1000,archive_snapshot:opts.archive_snapshot});
   const openArrears=Array.isArray(arrears.open_items)?arrears.open_items:[];
   const projected=canonicalOccupancyProjectStatus(bed,events,openArrears);
   projected.openArrears=openArrears;
