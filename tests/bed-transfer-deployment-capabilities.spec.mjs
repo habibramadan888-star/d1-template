@@ -58,14 +58,14 @@ test('internal beta capabilities expose write, owner acknowledgment, and exact o
   assert.equal(row.production_cutover, 'PRODUCTION_NO_GO');
 });
 
-test('employee capability failure disables final Bed Transfer session upload but keeps validate-only available', () => {
+test('employee capability failure disables Bed Transfer fields, local save and final session upload', () => {
   assert.match(employee, /bedTransferCapabilities:\{status:'idle'.*bed_transfer_write_enabled:false/);
   assert.match(employee, /catch\{\s*state\.bedTransferCapabilities=\{.*status:'error'.*bed_transfer_write_enabled:false/s);
   assert.match(employee, /transferWriteBlocked=.*!employeeBedTransferWriteEnabled\(\)/);
   assert.match(employee, /renderEmployeeButtonLabel\('Upload Disabled','Bed Transfer validation only'\)/);
   assert.match(employee, /saveCanonicalBedTransferDraft/);
-  assert.match(employee, /validateEmployeeUploadDryRun/);
-  assert.match(employee, /VALIDATED_NO_WRITE/);
+  assert.match(employee, /saveButton\.disabled=!gate\.fields_enabled\|\|!contextReady/);
+  assert.match(employee, /status:'error',bed_transfer_validate_enabled:false,bed_transfer_write_enabled:false/);
 });
 
 test('owner capability failure hides waiver acknowledgment and blocks direct invocation', () => {

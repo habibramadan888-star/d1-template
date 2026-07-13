@@ -7,69 +7,43 @@ const html=await readFile(new URL('../deploy-worker/public/employee-v3.html',imp
 const worker=await readFile(new URL('../deploy-worker/src/index.js',import.meta.url),'utf8');
 const block=(source,name)=>{const start=source.indexOf(`function ${name}`);assert.ok(start>=0,name);const next=source.slice(start+10).match(/\n(?:async\s+)?function\s+/);return source.slice(start,next?start+10+next.index:source.length)};
 
-test('Bed Transfer bypasses generic save and generic bed validation',()=>{
+test('Bed Transfer bypasses generic single-bed validation and saves through its local session path',()=>{
   const save=block(html,'saveEntry');
-  assert.match(save,/entryType'\)\.value==='TF'\)\{showStatus\('Use Validate Transfer/);
+  assert.match(save,/value==='TF'\)return saveCanonicalBedTransferDraft\(\)/);
   assert.ok(save.indexOf("value==='TF'")<save.indexOf('const v=validate()'));
   assert.doesNotMatch(block(html,'validateBedTransferEntry'),/(?:^|['"`])Bed is required|room.*required/i);
 });
 
-test('validated clean identity is reused for one canonical record request',()=>{
-  const validate=block(html,'saveCanonicalBedTransferDraft'),record=block(html,'recordCanonicalBedTransfer');
-  assert.match(validate,/validatedRecord=employeeBedTransferRecordPayload\(requestPayload\)/);
-  assert.match(record,/apiFetch\('\/api\/employee\/entry'/);
-  assert.equal((record.match(/apiFetch\(/g)||[]).length,1);
-  for(const path of ['/api/employee/bed-transfers','/api/save_session'])assert.equal(record.includes(path),false);
-  assert.doesNotMatch(record,/submitBedTransferEvent|saveEntry\(/);
-});
-
-test('write false, unvalidated, busy, and accepted states make zero duplicate writes',()=>{
-  const gate=block(html,'applyEmployeeBedTransferUiGate'),record=block(html,'recordCanonicalBedTransfer');
-  assert.match(gate,/gate\.final_upload_enabled/);assert.match(gate,/validatedRecord/);assert.match(gate,/!state\.bedTransferContext\?\.recordedResult/);
-  assert.match(record,/dataset\.busy==='1'\|\|state\.bedTransferContext\?\.recordedResult/);
-  assert.match(record,/await employeeLoadBedTransferCapabilities\(\)/);
-  assert.match(record,/if\(!employeeBedTransferWriteEnabled\(\)\)/);
-});
-
-test('record failure retains draft and success exposes only canonical IDs',()=>{
-  const record=block(html,'recordCanonicalBedTransfer');
-  assert.match(record,/draft retained/);assert.doesNotMatch(record,/sync_status='SYNCED'|upload_status='SYNCED'/);
-  for(const field of ['session_id','transfer_anchor_id','transfer_lineage_id'])assert.match(record,new RegExp(field));
-  for(const field of ['tenant_card_id','card_id','provider_phone','phone_99099','provider_metadata','old_ttlock_ref'])assert.doesNotMatch(record,new RegExp(field));
-});
-
-test('canonical receipt uses transfer fields for beds, amount, paid and cash labels',()=>{
-  const receipt=block(html,'employeeBedTransferCanonicalReceipt');
-  const context={String,Number,NumberIsFinite:Number.isFinite,fmtMoney:n=>Number(n||0).toFixed(2)};
-  context.Number.isFinite=Number.isFinite;
-  vm.createContext(context);vm.runInContext(`${receipt};globalThis.buildReceipt=employeeBedTransferCanonicalReceipt`,context);
-  const result=context.buildReceipt({from_bed:'144',to_bed:'111',fee_amount_aed:50,fee_mode:'paid',payment_method:'cash'},{});
-  assert.equal(result.beds_label,'144 → 111');
-  assert.equal(result.amount_label,'AED 50.00');
-  assert.equal(result.fee_label,'Paid / 已收');
-  assert.equal(result.payment_label,'Cash / 现金');
-  assert.equal(result.status_label,'Recorded / 已记录');
-});
-
-test('waived and unpaid receipts do not fall back to generic amount due or paid',()=>{
-  const receipt=block(html,'employeeBedTransferCanonicalReceipt');
-  const context={String,Number,fmtMoney:n=>Number(n||0).toFixed(2)};
-  vm.createContext(context);vm.runInContext(`${receipt};globalThis.buildReceipt=employeeBedTransferCanonicalReceipt`,context);
-  assert.equal(context.buildReceipt({from_bed:'A',to_bed:'B',fee_amount_aed:0,fee_mode:'waived'},{}).fee_label,'Waived / 免收');
-  assert.equal(context.buildReceipt({from_bed:'A',to_bed:'B',fee_amount_aed:50,fee_mode:'unpaid'},{}).fee_label,'Unpaid / 未收');
-  assert.doesNotMatch(receipt,/canonical\.amount\b|validated\.amount\b|\.due\b|\.paid\b/);
-});
-
-test('validate and record never enqueue Bed Transfer for a second Upload Session',()=>{
-  const validate=block(html,'saveCanonicalBedTransferDraft'),record=block(html,'recordCanonicalBedTransfer');
+test('canonical serializer is used automatically by unified Upload Session',()=>{
   const upload=html.slice(html.lastIndexOf('async function commitSessionAndExport'));
-  assert.doesNotMatch(validate+record,/state\.drafts|saveDrafts\(|appendSyncedBedTransferSessionEntry/);
-  assert.match(upload,/sessionOnlyDrafts=state\.drafts\.filter/);
-  assert.match(upload,/event_type\|\|''\)\.toLowerCase\(\)!=='bed_transfer'/);
-  assert.ok(upload.indexOf('sessionOnlyDrafts=')<upload.indexOf('prepareRepeatableUploadRows'));
+  assert.match(upload,/employeeBedTransferValidatePayload\(e,sessionForEntry\)/);
+  assert.match(upload,/employeeBedTransferRecordPayload\(requestPayload\)/);
+  assert.equal((upload.match(/apiFetch\('\/api\/employee\/entry'/g)||[]).length,1);
+  for(const path of ['/api/employee/bed-transfers','/api/save_session'])assert.equal(upload.includes(path),false);
 });
 
-test('beta serializer uses a legal transfer reason marker and no extra beta field',()=>{
+test('Save Transfer carries stable local identity but no canonical transfer anchor',()=>{
+  const builder=block(html,'buildBedTransferAnchor');
+  assert.match(builder,/const id=uid\('E'\)/);
+  assert.doesNotMatch(builder,/transfer_anchor_id|transfer_lineage_id|previous_transfer_anchor_id/);
+  assert.match(builder,/return applyEntryAnchors\(payload\)/);
+  const save=block(html,'saveCanonicalBedTransferDraft');
+  assert.match(save,/entry\.session_id=currentSessionId\(\)/);
+  assert.match(save,/state\.drafts\.unshift\(entry\)/);
+});
+
+test('paid, waived and unpaid Current Session models never fall back to generic zero values',()=>{
+  const source=block(html,'employeeBedTransferSessionCardModel');
+  const context={Number,String,fmtMoney:n=>Number(n||0).toFixed(2)};
+  vm.createContext(context);vm.runInContext(`${source};globalThis.card=employeeBedTransferSessionCardModel`,context);
+  const paid=context.card({from_bed:'144',to_bed:'111',fee_amount_aed:50,fee_mode:'paid',payment_method:'cash'});
+  assert.equal(paid.beds,'144 → 111');
+  assert.match(paid.detail,/Due AED 50\.00/);assert.match(paid.detail,/Paid AED 50\.00/);assert.match(paid.detail,/Cash/);
+  assert.match(context.card({fee_amount_aed:0,fee_mode:'waived'}).detail,/Due AED 0\.00/);
+  assert.match(context.card({fee_amount_aed:50,fee_mode:'unpaid'}).detail,/Paid AED 0\.00/);
+});
+
+test('beta serializer uses legal business fields and no provider or server-managed fields',()=>{
   const serializer=block(html,'employeeBedTransferValidatePayload');
   const context={Object,String,state:{bedTransferCapabilities:{controlled_beta_preview:true}}};vm.createContext(context);vm.runInContext(`${serializer};globalThis.serialize=employeeBedTransferValidatePayload`,context);
   const payload=context.serialize({event_type:'bed_transfer',type:'TF',source:'employee_entry',from_bed:'146',to_bed:'111',transfer_reason:'customer_request',fee_mode:'paid',fee_amount_aed:50,payment_method:'cash'},{id:'beta-session'});
@@ -78,8 +52,8 @@ test('beta serializer uses a legal transfer reason marker and no extra beta fiel
   assert.deepEqual(Object.keys(payload.entry).filter(key=>/context|fingerprint|provider|card|transfer_at|transfer_date|corpid/i.test(key)),[]);
 });
 
-test('beta capability is version-scoped and keeps production no-go',()=>{
-  assert.match(block(worker,'bedTransferDeploymentCapabilities'),/controlled_beta_preview:String\(env\.APP_ENV/);
-  assert.match(block(worker,'ownerTodayTodoAcknowledgmentWriteEnabled'),/"beta_preview"/);
+test('internal beta capability remains version-scoped and production cutover remains no-go',()=>{
+  assert.match(block(worker,'bedTransferDeploymentCapabilities'),/internal_beta:String\(env\.APP_ENV/);
+  assert.match(block(worker,'ownerTodayTodoAcknowledgmentWriteEnabled'),/"internal_beta"/);
   assert.match(block(worker,'bedTransferDeploymentCapabilities'),/production_cutover:"PRODUCTION_NO_GO"/);
 });

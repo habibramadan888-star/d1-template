@@ -67,13 +67,17 @@ export function assertCanonicalFeeContract() {
 export function assertCanonicalEmployeeUi() {
   const builder = block(employeeUi, 'buildBedTransferAnchor');
   const draft = block(employeeUi, 'saveCanonicalBedTransferDraft');
+  const upload = employeeUi.slice(employeeUi.lastIndexOf('async function commitSessionAndExport'));
   for (const field of ['from_bed', 'to_bed', 'transfer_reason', 'fee_mode', 'fee_amount_aed', 'bed_price_difference_mode']) assert.match(builder, new RegExp(field));
   assert.doesNotMatch(builder, /transfer_date|transfer_at|tenant_card_id|card_id|provider_phone|phone_99099|old_ttlock_ref/);
-  assert.match(draft, /validateEmployeeUploadDryRun/);
-  assert.match(draft, /validatedRecord=employeeBedTransferRecordPayload/);
-  assert.doesNotMatch(draft, /state\.drafts|saveDrafts\(|buildExport\(|refreshSessionViews\(/);
+  assert.match(draft, /state\.drafts\.unshift\(entry\)/);
+  assert.match(draft, /saveDrafts\(\)/);
+  assert.doesNotMatch(draft, /apiFetch\(|validateEmployeeUploadDryRun/);
+  assert.match(upload, /employeeBedTransferValidatePayload\(e,sessionForEntry\)/);
+  assert.match(upload, /employeeBedTransferRecordPayload\(requestPayload\)/);
+  assert.match(upload, /apiFetch\('\/api\/employee\/entry'/);
   assert.doesNotMatch(draft, /\/api\/employee\/bed-transfers/);
-  assert.match(employeeUi, /const BED_TRANSFER_WRITE_ENABLED=false/);
+  assert.doesNotMatch(employeeUi, /id="btnValidateBedTransfer"|id="btnRecordBedTransfer"/);
 }
 
 export function assertCanonicalContextAndSummary() {

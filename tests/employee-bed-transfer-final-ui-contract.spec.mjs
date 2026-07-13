@@ -21,12 +21,12 @@ test('Bed Transfer DOM never renders the raw Access Card strip',()=>{
   assert.doesNotMatch(block(html,'employeeRenderBedTransferContext'),/cardName|card_name|remark|phone|99099|provider/);
 });
 
-test('dedicated Validate and disabled Record buttons have the exact contract',()=>{
-  assert.match(html,/id="btnValidateBedTransfer"[^>]*>Validate Transfer \/ 验证换床/);
-  assert.match(html,/id="btnRecordBedTransfer"[^>]*disabled[^>]*aria-disabled="true"/);
+test('Bed Transfer uses Save Transfer plus the one existing Upload Session action',()=>{
+  assert.doesNotMatch(html,/id="btnValidateBedTransfer"|id="btnRecordBedTransfer"/);
+  assert.match(html,/renderEmployeeButtonLabel\('Save Transfer','保存换床'\)/);
+  assert.match(html,/id="btnExportSession"/);
   const gate=block(html,'applyEmployeeBedTransferUiGate');
-  assert.match(gate,/validateButton\.disabled=!gate\.validate_enabled/);
-  assert.match(gate,/recordButton\.disabled=!recordEnabled/);
+  assert.match(gate,/saveButton\.disabled=!gate\.fields_enabled\|\|!contextReady/);
 });
 
 test('validate serializer is an exact business-input allowlist with no dates context or provider fields',()=>{
@@ -38,10 +38,12 @@ test('validate serializer is an exact business-input allowlist with no dates con
   assert.equal(payload.entry.fee_amount_aed,50);assert.equal(payload.entry.from_bed,'146');assert.equal(payload.entry.to_bed,'111');
 });
 
-test('Validate click uses only canonical validate endpoint and never a write route',()=>{
+test('Save is local-only while Upload uses canonical validate then canonical write',()=>{
   const save=block(html,'saveCanonicalBedTransferDraft'),request=block(html,'validateEmployeeUploadDryRun');
-  assert.match(save,/employeeBedTransferValidatePayload/);assert.match(save,/validateEmployeeUploadDryRun/);assert.match(request,/\/api\/employee\/entry\/validate/);
-  for(const route of ['/api/employee/bed-transfers','/api/save_session'])assert.equal((save+request).includes(route),false);
+  const upload=html.slice(html.lastIndexOf('async function commitSessionAndExport'));
+  assert.match(save,/state\.drafts\.unshift\(entry\)/);assert.doesNotMatch(save,/apiFetch\(|validateEmployeeUploadDryRun/);assert.match(request,/\/api\/employee\/entry\/validate/);
+  assert.match(upload,/employeeBedTransferValidatePayload/);assert.match(upload,/apiFetch\('\/api\/employee\/entry'/);
+  for(const route of ['/api/employee/bed-transfers','/api/save_session'])assert.equal((save+request+upload).includes(route),false);
   assert.doesNotMatch(save+request,/submitBedTransferEvent/);
 });
 

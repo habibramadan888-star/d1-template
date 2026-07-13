@@ -319,9 +319,12 @@ test('Scenario G: provider, server fields, timestamps, mixed sessions, gate fals
   const changed = archiveTransfer(buildTransfer({ to_bed: 'C' }, { anchor: 'transfer-anchor-idempotent' }), 'session-idempotent', '2026-07-12T16:10:00+04:00');
   assert.equal(classifyExistingCanonicalTransfer(accepted.entries_json, changed.request_fingerprint).error_code, 'BED_TRANSFER_IDEMPOTENCY_CONFLICT');
   const flow = functionBlock(employeeUi, 'saveCanonicalBedTransferDraft');
-  assert.match(flow, /validatedRecord=employeeBedTransferRecordPayload/);
-  assert.doesNotMatch(flow, /state\.drafts|saveDrafts\(|buildExport\(|refreshSessionViews\(/);
-  assert.match(flow, /renderEmployeeUploadDryRunError/);
+  assert.match(flow, /state\.drafts\.unshift\(entry\)/);
+  assert.doesNotMatch(flow, /apiFetch\(|validateEmployeeUploadDryRun/);
+  const upload = employeeUi.slice(employeeUi.lastIndexOf('async function commitSessionAndExport'));
+  assert.match(upload, /employeeBedTransferValidatePayload/);
+  assert.match(upload, /employeeBedTransferRecordPayload/);
+  assert.match(upload, /renderEmployeeUploadDryRunError/);
 });
 
 test('Source-of-truth acceptance: canonical archive is the only transfer fact and all projections remain rebuildable', () => {

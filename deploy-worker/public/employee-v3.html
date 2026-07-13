@@ -3096,12 +3096,8 @@ label .label-en{
               <div class="transfer-check"><span>Target Context</span><b id="bedTransferTargetContext">Not loaded</b></div>
             </div>
             <div id="bedTransferSequenceResult" class="context-note">TTLock sequence is decided by server validation.</div>
-            <div id="bedTransferServerValidation" class="context-note">Server validation not run.</div>
-            <div class="row" id="bedTransferActions" data-bed-transfer-actions="true">
-              <button class="btn primary" id="btnValidateBedTransfer" type="button">Validate Transfer / 验证换床</button>
-              <button class="btn" id="btnRecordBedTransfer" type="button" disabled aria-disabled="true" title="正式换床上传尚未启用">Record Transfer / 记录换床</button>
-            </div>
-            <div class="warn" id="bedTransferWriteDisabledNotice">正式换床上传尚未启用</div>
+            <div id="bedTransferServerValidation" class="context-note">Formal validation runs automatically during Upload Session.</div>
+            <div class="context-note" id="bedTransferWriteDisabledNotice">Save Transfer adds one local Current Session record. Upload Session performs the canonical write.</div>
           </div>
         </div>
         <div class="grid" id="expenseFields">
@@ -3219,17 +3215,12 @@ function readDrafts(userid){
   try{
     const key=employeeStorageKey('empv3:drafts',userid);
     const scoped=JSON.parse(localStorage.getItem(key)||'[]')||[];
-    if(scoped.length||!userid){
-      const sessionOnly=scoped.filter(entry=>String(entry?.type||'').toUpperCase()!=='TF'&&String(entry?.event_type||'').toLowerCase()!=='bed_transfer');
-      if(sessionOnly.length!==scoped.length)localStorage.setItem(key,JSON.stringify(sessionOnly));
-      return sessionOnly;
-    }
+    if(scoped.length||!userid)return scoped;
     const legacy=JSON.parse(localStorage.getItem('empv3:drafts')||'[]')||[];
     if(legacy.length&&!localStorage.getItem('empv3:legacyDraftsMigrated')){
-      const sessionOnly=legacy.filter(entry=>String(entry?.type||'').toUpperCase()!=='TF'&&String(entry?.event_type||'').toLowerCase()!=='bed_transfer');
-      localStorage.setItem(key,JSON.stringify(sessionOnly));
+      localStorage.setItem(key,JSON.stringify(legacy));
       localStorage.setItem('empv3:legacyDraftsMigrated',userid);
-      return sessionOnly;
+      return legacy;
     }
     return [];
   }catch{return []}
@@ -3304,13 +3295,15 @@ function applyEmployeeBedTransferUiGate(){
   document.querySelectorAll('#transferFields input,#transferFields select,#transferFields textarea').forEach(control=>{control.disabled=!gate.fields_enabled});
   const chip=document.querySelector('.event-chip[data-type="TF"]');
   if(chip){chip.disabled=!gate.validate_enabled;chip.title=gate.validate_enabled?'':gate.error_code;}
-  const validateButton=$('btnValidateBedTransfer');
-  if(validateButton){validateButton.disabled=!gate.validate_enabled;validateButton.setAttribute('aria-disabled',String(!gate.validate_enabled));}
-  const recordButton=$('btnRecordBedTransfer');
-  const recordEnabled=gate.final_upload_enabled&&state.bedTransferContext?.serverValidation?.ok===true&&!!state.bedTransferContext?.validatedRecord&&!state.bedTransferContext?.recordedResult;
-  if(recordButton){recordButton.disabled=!recordEnabled;recordButton.setAttribute('aria-disabled',String(!recordEnabled));recordButton.title=recordEnabled?'':'正式换床上传尚未启用';}
+  const saveButton=$('btnSaveEntry');
+  if(saveButton&&$('entryType')?.value==='TF'){
+    const contextReady=state.bedTransferContext?.status==='ready';
+    saveButton.disabled=!gate.fields_enabled||!contextReady;
+    saveButton.setAttribute('aria-disabled',String(saveButton.disabled));
+    saveButton.title=saveButton.disabled?(gate.error_code||'BED_TRANSFER_BED_CONTEXT_REQUIRED'):'';
+  }
   const notice=$('bedTransferWriteDisabledNotice');
-  if(notice){notice.textContent=!gate.final_upload_enabled?'正式换床上传尚未启用。':(!state.bedTransferContext?.validatedRecord?'请先验证换床信息。':(state.bedTransferContext?.recordedResult?'Canonical transfer accepted.':'验证通过，可以记录换床。'));}
+  if(notice){notice.textContent=gate.final_upload_enabled?'Save Transfer adds one local Current Session record; Upload Session performs the canonical write.':'Formal Bed Transfer upload is not enabled; local Save Transfer remains read-only.';}
   return gate;
 }
 async function employeeLoadBedTransferCapabilities(){
@@ -4544,8 +4537,8 @@ function validateBedTransferEntry(){
   if(differenceMode==='paid')employeeRequire(errors,!!employeeFieldValue('bedDifferencePaymentMethod'),'Bed Price Difference Payment Method is required.');
   if(differenceMode==='unpaid')employeeRequire(errors,!!employeeFieldValue('bedDifferenceDueDate'),'Bed Price Difference Due Date is required.');
   if(state.bedTransferContext.status==='ambiguous')errors.push('BED_TRANSFER_CONTEXT_AMBIGUOUS');
-  if(state.bedTransferContext.status!=='ready')warns.push('Load the latest source and target Bed Context before server validation.');
-  if(isBedTransferWriteGated('TF'))warns.push(BED_TRANSFER_WRITE_DISABLED_MESSAGE);
+  const expectedContextKey=from&&to?`${from}->${to}`:'';
+  if(state.bedTransferContext.status!=='ready'||state.bedTransferContext.requestKey!==expectedContextKey)errors.push('BED_TRANSFER_BED_CONTEXT_REQUIRED');
   return employeeValidationResult(errors,warns);
 }
 function employeeBedTransferBed(value){return String(value||'').trim().replace(/^#+/,'');}
@@ -4598,6 +4591,7 @@ async function employeeLoadBedTransferContexts(){
     const status=source.ambiguous||target.ambiguous?'ambiguous':'ready';
     state.bedTransferContext={status,source,target,requestKey,serverValidation:null};
     employeeRenderBedTransferContext();
+    applyEmployeeBedTransferUiGate();
     if(status!=='ready')throw new Error('BED_TRANSFER_CONTEXT_AMBIGUOUS');
     return state.bedTransferContext;
   }catch(error){
@@ -4733,11 +4727,14 @@ function buildBedTransferAnchor(){
   const from=employeeTrimField('transferFromBed').replace(/^#/,'')||employeeTrimField('bed').replace(/^#/,'');
   const to=employeeTrimField('bedTo').replace(/^#/,'');
   const id=uid('E');
+  const paymentMethod=feeMode==='paid'?employeeFieldValue('transferFeePaymentMethod'):'';
   const payload={
-    id,entry_id:null,event_id:id,anchor_id:id,type:'TF',event_type:'bed_transfer',source:'employee_entry',
+    id,type:'TF',event_type:'bed_transfer',source:'employee_entry',
     from_bed:from,to_bed:to,transfer_reason:employeeTrimField('transferReason'),
+    bed_from:from,bed_to:to,room:from,
     fee_mode:feeMode,fee_amount_aed:amount,fee_amount_fils:amount*100,
-    payment_method:feeMode==='paid'?employeeFieldValue('transferFeePaymentMethod'):'',
+    payment_method:paymentMethod,pay_type:paymentMethod==='bank'?'B':paymentMethod==='cash'?'C':'',
+    amount:feeMode==='paid'?amount:0,due:feeMode==='waived'?0:amount,paid:feeMode==='paid'?amount:0,
     fee_waiver_reason:feeMode==='waived'?employeeTrimField('transferWaiverReason'):'',
     fee_due_date:feeMode==='unpaid'?employeeFieldValue('transferFeeDueDate'):'',
     bed_price_difference_mode:differenceMode,
@@ -5297,7 +5294,7 @@ function syncForm(){
   }
   updateEventChips();
   $('objectHint').textContent=type==='E'?'Expense requires Target Bed / Room. Enter the related bed or room before adding to session. / 支出必须填写目标床位或房间。':(type==='TF'?'Bed Transfer requires From Bed and To Bed. / 换床需要填写原床位和新床位。':(type==='AP'?'Arrears Payment uses cloud open arrears for the selected bed only. / 还欠款只针对云端未清欠款，不使用本期账期。':'Enter Bed first. The system shows open arrears and access card status below. / 请先填写床位，系统会显示欠款和门禁卡状态。'));
-  if($('btnSaveEntry'))$('btnSaveEntry').innerHTML=type==='TF'?renderEmployeeButtonLabel('Validate Transfer','验证换床'):renderEmployeeButtonLabel('Add to Session','加入本票');
+  if($('btnSaveEntry'))$('btnSaveEntry').innerHTML=type==='TF'?renderEmployeeButtonLabel('Save Transfer','保存换床'):renderEmployeeButtonLabel('Add to Session','加入本票');
   visible(['periodStep'],hasPeriod);visible(['apFields'],type==='AP');visible(['checkoutFields'],type==='CO');visible(['transferFields'],type==='TF');visible(['expenseFields'],type==='E');visible(['paymentStep'],type!=='CO');visible(['genericBedFieldWrap'],type!=='TF');
   updatePaymentButtons();
   visible(['exceptionStep'],needsException());
@@ -5645,47 +5642,29 @@ async function saveCanonicalBedTransferDraft(){
     showStatus(message,'warn');
     return false;
   }
-  const first=validateBedTransferEntry();
-  if(first.errors.length)return false;
-  const button=$('btnValidateBedTransfer');
-  const old=button?.innerHTML;
-  if(button){button.dataset.busy='1';button.disabled=true;button.innerHTML=renderEmployeeButtonLabel('Loading Context','加载床位事实');}
+  const validation=validateBedTransferEntry();
+  if(validation.errors.length){toast('Bed Transfer cannot be saved until the displayed fields and Bed Context are complete.',7000);return false;}
+  const button=$('btnSaveEntry');
+  if(button?.dataset.busy==='1')return false;
+  if(button){button.dataset.busy='1';button.disabled=true;}
   try{
-    await employeeLoadBedTransferContexts();
-    const second=validateBedTransferEntry();
-    if(second.errors.length)return false;
     const entry=buildBedTransferAnchor();
-    const transferSessionId=state.bedTransferContext.requestSessionId||uid('S');
-    state.bedTransferContext.requestSessionId=transferSessionId;
-    entry.sync_status='VALIDATING_NO_WRITE';
-    entry.upload_status='VALIDATING_NO_WRITE';
-    entry.session_id=transferSessionId;
-    const canonicalEntry=normalizeEntryAnchor(entry);
-    const entries=[canonicalEntry];
-    const session={id:transferSessionId,date:today(),operator_id:operatorId(),operator_name:operatorName(),source:'employee_entry',handover_status:'EXPORTING',entries,entries_json:JSON.stringify({anchor_contract_version:'employee_entry_anchor_v1',entries})};
-    if(button)button.innerHTML=renderEmployeeButtonLabel('Server Validating','服务器校验');
-    const requestPayload=employeeBedTransferValidatePayload(canonicalEntry,session);
-    const result=await validateEmployeeUploadDryRun(requestPayload.entry,requestPayload.session,0,{requestPayload});
-    if(result?.ok!==true||result?.event_type!=='bed_transfer'||result?.no_write_requested!==true)throw new Error('BED_TRANSFER_VALIDATE_ONLY_RESPONSE_INVALID');
-    state.bedTransferContext.validatedRecord=employeeBedTransferRecordPayload(requestPayload);
-    state.bedTransferContext.recordedResult=null;
-    employeeRenderBedTransferServerValidation(result);
-    entry.upload_status='VALIDATED_NO_WRITE';
-    $('validationBox').innerHTML=`<div>Validation passed. Current Session unchanged; use Record Transfer for the single canonical write.</div>${bedTransferWriteGateHtml()}`;
-    toast('Bed Transfer validated; Current Session unchanged / 换床已验证，本票未增加记录',7000);
+    entry.sync_status='DRAFT';
+    entry.upload_status='DRAFT';
+    entry.session_id=currentSessionId();
+    state.uploadValidationFailedIndex=null;
+    state.uploadValidationFailedMessage='';
+    state.drafts.unshift(entry);
+    const localOk=saveDrafts();
+    refreshSessionViews();
+    buildExport();
+    resetForm();
+    $('validationBox').innerHTML=localOk?'<div>Bed Transfer saved to Current Session. Upload Session will run formal server validation and the canonical write. / 换床已保存到本票，上传本票时自动完成正式校验与写入。</div>':'<div class="warn">Bed Transfer is in the page Current Session, but local persistence failed. Keep this page open.</div>';
+    toast('Bed Transfer added to Current Session / 换床已加入本票',6000);
     return true;
-  }catch(error){
-    const result=error?.dryRunResult||null;
-    state.bedTransferContext.serverValidation=result;
-    if(result){
-      $('validationBox').innerHTML=renderEmployeeUploadDryRunError(result);
-      employeeBindDiagnosticCopyButtons();
-      if($('bedTransferServerValidation'))$('bedTransferServerValidation').textContent=`${result.error_code||'VALIDATION_FAILED'} · ${(result.missing_fields||[]).join(', ')}`;
-    }else $('validationBox').innerHTML=`<div class="bad">${esc(error?.message||error)}</div>`;
-    toast(`Bed Transfer validation failed: ${result?.error_code||error?.message||error}`,7000);
-    return false;
   }finally{
-    if(button){button.dataset.busy='0';button.disabled=!employeeBedTransferValidateEnabled();button.innerHTML=old||renderEmployeeButtonLabel('Validate Transfer','验证换床');}
+    if(button){button.dataset.busy='0';button.innerHTML=renderEmployeeButtonLabel('Save Transfer','保存换床');}
+    applyEmployeeBedTransferUiGate();
   }
 }
 function employeeBedTransferCanonicalReceipt(canonical={},validated={}){
@@ -5697,6 +5676,18 @@ function employeeBedTransferCanonicalReceipt(canonical={},validated={}){
   const feeLabel=feeMode==='paid'?'Paid / 已收':feeMode==='waived'?'Waived / 免收':feeMode==='unpaid'?'Unpaid / 未收':'Unknown / 未知';
   const paymentLabel=paymentMethod==='cash'?'Cash / 现金':paymentMethod==='bank'?'Bank / 银行':feeMode==='paid'?'Other / 其他':'—';
   return {from_bed:fromBed,to_bed:toBed,fee_amount_aed:Number.isFinite(amount)?amount:0,fee_mode:feeMode,payment_method:paymentMethod,beds_label:`${fromBed} → ${toBed}`,amount_label:`AED ${fmtMoney(Number.isFinite(amount)?amount:0)}`,fee_label:feeLabel,payment_label:paymentLabel,status_label:'Recorded / 已记录'};
+}
+function employeeBedTransferSessionCardModel(entry={}){
+  const fee=Number(entry.fee_amount_aed||0);
+  const due=entry.fee_mode==='waived'?0:fee;
+  const paid=entry.fee_mode==='paid'?fee:0;
+  const payment=entry.payment_method==='bank'?'Bank / 银行':entry.payment_method==='cash'?'Cash / 现金':'No payment / 未收款';
+  const difference=Number(entry.bed_price_difference_amount_aed||0);
+  return {
+    beds:`${String(entry.from_bed||entry.bed_from||'')} → ${String(entry.to_bed||entry.bed_to||'')}`,
+    detail:[`Bed Transfer / 换床`,`Due AED ${fmtMoney(due)} / 应收${fmtMoney(due)}`,`Paid AED ${fmtMoney(paid)} / 已收${fmtMoney(paid)}`,payment,`Bed Difference AED ${fmtMoney(difference)} / 床价差`,`Reason ${entry.transfer_reason||'-'} / 换床原因`].join(' · '),
+    amount:entry.fee_mode==='paid'?fee:0
+  };
 }
 function renderEmployeeBedTransferCanonicalReceipt(receipt={}){
   return `<div class="bed-transfer-canonical-receipt"><b>${esc(receipt.beds_label||'')}</b><span>${esc(receipt.amount_label||'')}</span><span>${esc(receipt.fee_label||'')}</span><span>${esc(receipt.payment_label||'')}</span><strong>${esc(receipt.status_label||'Recorded / 已记录')}</strong></div>`;
@@ -5732,7 +5723,7 @@ async function recordCanonicalBedTransfer(){
 }
 async function saveEntry(){
   if(!state.user){applyEmployeeUser(null);toast('请先登录员工账号',6000);return}
-  if($('entryType').value==='TF'){showStatus('Use Validate Transfer, then Record Transfer.','warn');return false;}
+  if($('entryType').value==='TF')return saveCanonicalBedTransferDraft();
   const btn=$('btnSaveEntry');
   if(btn?.dataset.busy==='1')return;
   const v=validate();if(v.errors.length){toast('请先处理阻断校验');return}
@@ -7180,8 +7171,6 @@ function closePreviewModal(){
 async function commitSessionAndExport(){
   const uploadT0=performance.now();
   const uploadTiming={payload_build_ms:0,validation_ms:0,api_request_ms:0,response_parse_ms:0,total_ms:0};
-  const sessionOnlyDrafts=state.drafts.filter(entry=>String(entry?.type||'').toUpperCase()!=='TF'&&String(entry?.event_type||'').toLowerCase()!=='bed_transfer');
-  if(sessionOnlyDrafts.length!==state.drafts.length){state.drafts=sessionOnlyDrafts;saveDrafts();refreshSessionViews();buildExport();}
   if(!state.user){applyEmployeeUser(null);toast('请先登录员工账号',6000);return}
   buildExport();
   if(!state.drafts.length){showStatus('Current Session has no entries. Upload is not available. / 当前本票没有流水，不能上传。','warn');toast('Current Session has no entries / 当前本票没有流水',6000);return}
@@ -8013,8 +8002,6 @@ async function validateEmployeeUploadDryRun(entry,sessionForEntry,index,options=
 async function commitSessionAndExport(){
   const uploadT0=performance.now();
   const uploadTiming={payload_build_ms:0,validation_ms:0,api_request_ms:0,response_parse_ms:0,total_ms:0};
-  const sessionOnlyDrafts=state.drafts.filter(entry=>String(entry?.type||'').toUpperCase()!=='TF'&&String(entry?.event_type||'').toLowerCase()!=='bed_transfer');
-  if(sessionOnlyDrafts.length!==state.drafts.length){state.drafts=sessionOnlyDrafts;saveDrafts();refreshSessionViews();buildExport();}
   if(state.user&&!state.drafts.length){
     const result=normalizeEmployeeUploadDryRunError({
       source:'no_records_to_upload',
@@ -8077,7 +8064,9 @@ async function commitSessionAndExport(){
   const originalDrafts=state.drafts.map(e=>({...e}));
   const originalSessionId=state.sessionId;
   const payloadStart=performance.now();
-  const uploadSessionId=startRepeatableUploadSessionId();
+  const includesBedTransfer=originalDrafts.some(entry=>String(entry?.type||'').toUpperCase()==='TF'||String(entry?.event_type||'').toLowerCase()==='bed_transfer');
+  const uploadSessionId=includesBedTransfer?currentSessionId():startRepeatableUploadSessionId();
+  state.sessionId=uploadSessionId;
   const uploadList=prepareRepeatableUploadRows(originalDrafts,uploadSessionId);
   uploadList.forEach(e=>{e.upload_status='VALIDATING';e.upload_validation_error=null;});
   state.drafts=uploadList;
@@ -8090,6 +8079,7 @@ async function commitSessionAndExport(){
   const sessionEntriesJson=JSON.stringify({anchor_contract_version:'employee_entry_anchor_v1',entries:canonicalEntries});
   const failed=[];
   const dryRunFailed=[];
+  const bedTransferUploadPayloads=[];
   setUploadPhase(`Dry-run validating 0/${uploadList.length}`,'Validating');
   for(let i=0;i<uploadList.length;i++){
     const e=uploadList[i];
@@ -8104,7 +8094,10 @@ async function commitSessionAndExport(){
     try{
       e.upload_status='VALIDATING';
       setUploadPhase(`Dry-run validating ${i+1}/${uploadList.length}`,'Validating');
-      await validateEmployeeUploadDryRun(e,sessionForEntry,i);
+      const isBedTransfer=String(e?.type||'').toUpperCase()==='TF'||String(e?.event_type||'').toLowerCase()==='bed_transfer';
+      const requestPayload=isBedTransfer?employeeBedTransferValidatePayload(e,sessionForEntry):null;
+      await validateEmployeeUploadDryRun(requestPayload?.entry||e,requestPayload?.session||sessionForEntry,i,requestPayload?{requestPayload}:{});
+      if(isBedTransfer)bedTransferUploadPayloads[i]=employeeBedTransferRecordPayload(requestPayload);
     }catch(err){
       const dryRunResult=normalizeEmployeeUploadDryRunError(err?.dryRunResult||{},i,err?.message||'dry_run_validation_failed');
       e.sync_status='LOCAL';
@@ -8156,7 +8149,8 @@ async function commitSessionAndExport(){
       e.upload_status='UPLOADING';
       setUploadPhase(`Uploading ${i+1}/${uploadList.length}`,'Uploading');
       const apiStart=performance.now();
-      const r=await apiFetch('/api/employee/entry',{method:'POST',headers:employeeUploadTimingEnabled()?{'X-Employee-Entry-Timing':'1'}:{},body:JSON.stringify({entry:e,session:sessionForEntry,timing_debug:employeeUploadTimingEnabled()})});
+      const requestBody=bedTransferUploadPayloads[i]||{entry:e,session:sessionForEntry,timing_debug:employeeUploadTimingEnabled()};
+      const r=await apiFetch('/api/employee/entry',{method:'POST',headers:employeeUploadTimingEnabled()?{'X-Employee-Entry-Timing':'1'}:{},body:JSON.stringify(requestBody)});
       uploadTiming.api_request_ms+=Math.round(performance.now()-apiStart);
       setUploadPhase(`Confirming ${i+1}/${uploadList.length}`,'Confirming');
       const parseStart=performance.now();
@@ -8224,6 +8218,11 @@ async function commitSessionAndExport(){
   saveDrafts();
   const syncCheck=await reconcileEmployeeCloudSyncState({silent:true});
   const cloudConfirmed=entrySessionUploaded();
+  if(cloudConfirmed&&includesBedTransfer){
+    state.drafts=state.drafts.filter(entry=>String(entry?.type||'').toUpperCase()!=='TF'&&String(entry?.event_type||'').toLowerCase()!=='bed_transfer');
+    if(!state.drafts.length){state.sessionId='';try{localStorage.removeItem(employeeStorageKey('empv3:sessionId'))}catch{}}
+    saveDrafts();
+  }
   buildExport();
   refreshSessionViews();
   renderContext();
@@ -8274,8 +8273,6 @@ if(location.hash==='#export'){
 }
 showEmployeeView(location.hash||'entry',{pushHash:false});
 document.querySelectorAll('.event-chip').forEach(btn=>btn.addEventListener('click',e=>{e.preventDefault();setEntryType(btn.dataset.type);}));
-if($('btnValidateBedTransfer'))$('btnValidateBedTransfer').addEventListener('click',e=>{e.preventDefault();saveCanonicalBedTransferDraft();});
-if($('btnRecordBedTransfer'))$('btnRecordBedTransfer').addEventListener('click',e=>{e.preventDefault();recordCanonicalBedTransfer();});
 document.querySelectorAll('#transferFields input,#transferFields select,#transferFields textarea').forEach(control=>control.addEventListener('input',employeeInvalidateBedTransferValidation));
 document.querySelectorAll('.pay-option').forEach(btn=>btn.addEventListener('click',e=>{e.preventDefault();setPaymentType(btn.dataset.pay);}));
 ['entryType','cycle','payType','amount','reasonCode','feePaid','transferWaiverReason','transferFeePaymentMethod','transferFeeDueDate','bedDifferenceMode','bedDifferenceAmount','bedDifferencePaymentMethod','bedDifferenceDueDate','bedDifferenceReason','customReason','tenantName','bankRef','periodDays','depositOutRefundDate','depositOutDifferenceReason','depositDeduction','checkoutDate','noNoticeDeduction','otherDeduction','dedNote','leftWithArrearsMode','leftFormerCustomerName','leftWhatsappPhone','leftContactMethod','leftContactNote','leftDepositBalance','leftCoverageEndDate','leftArrearsAmount','leftBelongingsHeld','leftBelongingsNote','leftPromisedPaymentDate','leftPromisedReturnDate','leftConfirmedNotReturningDate','leftGraceDays','excessTo','bedTo','transferReason','expenseCategory','expenseDesc','expenseEvidenceRef','remark','arrearHandling','arrearPromiseDate','arrearReasonDetail'].forEach(id=>$(id).addEventListener('input',syncForm));
@@ -8881,8 +8878,15 @@ renderSessionPreview=function(){
     const cls=dir==='out'?'red':'';
     const recordIndex=i+1;
     const failed=Number(state.uploadValidationFailedIndex)===i;
-    const subject=e.type==='TF'?`#${esc(e.bed_from||e.room||'')} -> #${esc(e.bed_to||'')}`:(e.type==='E'?esc(e.expense_category||'Expense'):`#${esc(e.room||'')}`);
-    const detail=[eventLabel(e.type),e.tenant_name||'',e.pay_type==='B'?'Bank':'Cash',e.period_start&&e.period_end?`${e.period_start} -> ${e.period_end}`:''].filter(Boolean).join(' · ');
+    const transferFee=Number(e.fee_amount_aed||0);
+    const transferDue=e.fee_mode==='waived'?0:transferFee;
+    const transferPaid=e.fee_mode==='paid'?transferFee:0;
+    const transferPayment=e.payment_method==='bank'?'Bank / 银行':e.payment_method==='cash'?'Cash / 现金':'No payment / 未收款';
+    const transferDifference=Number(e.bed_price_difference_amount_aed||0);
+    const subject=e.type==='TF'?`${esc(e.from_bed||e.bed_from||'')} → ${esc(e.to_bed||e.bed_to||'')}`:(e.type==='E'?esc(e.expense_category||'Expense'):`#${esc(e.room||'')}`);
+    const detail=e.type==='TF'?
+      [`Bed Transfer / 换床`,`Due AED ${fmtMoney(transferDue)} / 应收${fmtMoney(transferDue)}`,`Paid AED ${fmtMoney(transferPaid)} / 已收${fmtMoney(transferPaid)}`,transferPayment,`Bed Difference AED ${fmtMoney(transferDifference)} / 床价差`, `Reason ${e.transfer_reason||'-'} / 换床原因`].join(' · '):
+      [eventLabel(e.type),e.tenant_name||'',e.pay_type==='B'?'Bank':'Cash',e.period_start&&e.period_end?`${e.period_start} -> ${e.period_end}`:''].filter(Boolean).join(' · ');
     const status=e.sync_status==='SYNCED'?'<span class="status-pill">Synced</span>':'<span class="status-pill local">Local</span>';
     const undo=canUndo(e)?`<button class="mini-btn danger" data-undo="${esc(e.id)}">Undo</button>`:'';
     const remove=e.sync_status!=='SYNCED'?`<button class="mini-btn danger" data-remove-session-record="${esc(e.id)}">Remove invalid record</button>`:'';
@@ -8906,8 +8910,9 @@ renderSessionPreview=function(){
     const recordIndex=i+1;
     const recordState=employeeSessionRecordState(e,i);
     const failed=['VALIDATION_FAILED','STALE'].includes(recordState.key);
-    const subject=e.type==='TF'?`#${esc(e.bed_from||e.room||'')} -> #${esc(e.bed_to||'')}`:(e.type==='E'?esc(e.expense_category||'Expense'):`#${esc(e.room||'')}`);
-    const detail=[eventLabel(e.type),e.tenant_name||'',e.pay_type==='B'?'Bank':'Cash',e.period_start&&e.period_end?`${e.period_start} -> ${e.period_end}`:''].filter(Boolean).join(' · ');
+    const transferCard=e.type==='TF'?employeeBedTransferSessionCardModel(e):null;
+    const subject=e.type==='TF'?esc(transferCard.beds):(e.type==='E'?esc(e.expense_category||'Expense'):`#${esc(e.room||'')}`);
+    const detail=e.type==='TF'?transferCard.detail:[eventLabel(e.type),e.tenant_name||'',e.pay_type==='B'?'Bank':'Cash',e.period_start&&e.period_end?`${e.period_start} -> ${e.period_end}`:''].filter(Boolean).join(' · ');
     const status=`<span class="status-pill ${esc(recordState.className||'')}">${esc(recordState.label)}</span>`;
     const undo=canUndo(e)?`<button class="mini-btn danger" data-undo="${esc(e.id)}">Undo</button>`:'';
     const remove=['VALIDATION_FAILED','STALE'].includes(recordState.key)?`<button class="mini-btn danger" data-remove-session-record="${esc(e.id)}">${renderEmployeeButtonLabel('Remove Invalid Record','删除无效记录')}</button>`:'';
@@ -8934,8 +8939,9 @@ renderSessionPreview=function(){
     const recordIndex=i+1;
     const recordState=employeeSessionRecordState(e,i);
     const failed=['VALIDATION_FAILED','STALE'].includes(recordState.key);
-    const subject=e.type==='TF'?`#${esc(e.bed_from||e.room||'')} -> #${esc(e.bed_to||'')}`:(e.type==='E'?esc(e.expense_category||'Expense'):`#${esc(e.room||'')}`);
-    const detail=[eventLabel(e.type),e.tenant_name||'',e.pay_type==='B'?'Bank':'Cash',e.period_start&&e.period_end?`${e.period_start} -> ${e.period_end}`:''].filter(Boolean).join(' · ');
+    const transferCard=e.type==='TF'?employeeBedTransferSessionCardModel(e):null;
+    const subject=e.type==='TF'?esc(transferCard.beds):(e.type==='E'?esc(e.expense_category||'Expense'):`#${esc(e.room||'')}`);
+    const detail=e.type==='TF'?transferCard.detail:[eventLabel(e.type),e.tenant_name||'',e.pay_type==='B'?'Bank':'Cash',e.period_start&&e.period_end?`${e.period_start} -> ${e.period_end}`:''].filter(Boolean).join(' · ');
     const status=`<span class="status-pill ${esc(recordState.className||'')}">${esc(recordState.label)}</span>`;
     const undo=canUndo(e)?`<button class="mini-btn danger" data-undo="${esc(e.id)}">Undo</button>`:'';
     const remove=['VALIDATION_FAILED','STALE'].includes(recordState.key)?`<button class="mini-btn danger" data-remove-session-record="${esc(e.id)}">${renderEmployeeButtonLabel('Remove Invalid Record','删除无效记录')}</button>`:'';
@@ -8968,8 +8974,8 @@ renderSummary=function(){
       ['Reason','原因',$('transferReason').value||'-'],
       ['Bed Difference','床价差',`${differenceMode} · ${differenceMode==='none'?'0.00':fmtMoney(num($('bedDifferenceAmount').value))} AED`],
       ['Note','备注',sanitizeBedTransferDisplay($('remark').value||'-','[hidden]')],
-      ['Server Validation','服务器校验',state.bedTransferContext.serverValidation?.ok===true?'Passed without write':'Not run'],
-      ['Write Gate','写入开关',BED_TRANSFER_WRITE_ENABLED?'Enabled':'Formal upload not enabled']
+      ['Upload Validation','上传校验','Runs automatically during Upload Session / 上传本票时自动执行'],
+      ['Write Gate','写入开关',employeeBedTransferWriteEnabled()?'Internal beta enabled':'Formal upload not enabled']
     ];
     if(feeMode==='waived')items.splice(3,0,['Waiver Reason','豁免原因',$('transferWaiverReason').value||'-']);
     $('entrySummary').innerHTML=items.map(([en,cn,v])=>`<div data-bed-transfer-step8-summary="true"><span>${esc(en)}<small>${esc(cn)}</small></span><b>${esc(v)}</b></div>`).join('');
