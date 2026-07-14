@@ -1034,42 +1034,97 @@ async function fetchJsonOrNull(url, init) {
   }
 }
 __name(fetchJsonOrNull, "fetchJsonOrNull");
-async function loadLockCards(env) {
+const TTLOCK_READ_CACHE_MAX_AGE_MS=5*60*1000;
+const TTLOCK_STRICT_CACHE_MAX_AGE_MS=60*1000;
+const TTLOCK_TOKEN_SAFETY_MARGIN_SECONDS=24*60*60;
+const TTLOCK_CANONICAL_PRODUCTION_HOST="homelink-finance.habibramadan888.workers.dev";
+const ttlockSnapshotFlights=new Map();
+const ttlockTokenMemory=new Map();
+function ttlockScopeKey(env={},corpid=""){
+  return `${cleanText(env.APP_ENV||"production",40)||"production"}:${accessSnapshotRuntimeHash(cleanText(corpid||env.CORPID||"default",120)||"default")}`;
+}
+__name(ttlockScopeKey,"ttlockScopeKey");
+function ttlockRequestContext(request,env,user,routeCategory="read",maxAgeMs=TTLOCK_READ_CACHE_MAX_AGE_MS){
+  let requestHost="";
+  try{requestHost=new URL(request?.url||"").hostname.toLowerCase();}catch{}
+  return {corpid:cleanText(user?.corpid||env?.CORPID||"default",120)||"default",request_host:requestHost,route_category:cleanText(routeCategory,80)||"read",max_age_ms:maxAgeMs,ttlockSnapshotPromise:null};
+}
+__name(ttlockRequestContext,"ttlockRequestContext");
+function ttlockLiveFetchAllowed(env={},context={}){
+  const appEnv=cleanText(env.APP_ENV||"production",40).toLowerCase();
+  const host=cleanText(context.request_host||"",160).toLowerCase();
+  return !["staging","test","local","development"].includes(appEnv)&&host===TTLOCK_CANONICAL_PRODUCTION_HOST;
+}
+__name(ttlockLiveFetchAllowed,"ttlockLiveFetchAllowed");
+function ttlockSafeLog(payload={}){
+  const safe={event:"ttlock_outbound",endpoint_class:cleanText(payload.endpoint_class||"snapshot",40),environment:cleanText(payload.environment||"production",40),worker_version:HOMELINK_DIAGNOSTIC_WORKER_VERSION,cache:cleanText(payload.cache||"",20),snapshot_age_ms:Number(payload.snapshot_age_ms||0),lock_count:Number(payload.lock_count||0),page_count:Number(payload.page_count||0),calling_route_category:cleanText(payload.calling_route_category||"read",80),duration_ms:Number(payload.duration_ms||0),success:payload.success===true,http_status:Number(payload.http_status||0),external_call_count:Number(payload.external_call_count||0),snapshot_reused:payload.snapshot_reused===true,single_flight_joined:payload.single_flight_joined===true};
+  console.log(JSON.stringify(safe));
+}
+__name(ttlockSafeLog,"ttlockSafeLog");
+async function ttlockKvReadJson(env,key){
+  if(!env?.RATE_LIMIT?.get)return null;
+  try{const raw=await env.RATE_LIMIT.get(key);return raw?JSON.parse(raw):null;}catch{return null;}
+}
+__name(ttlockKvReadJson,"ttlockKvReadJson");
+async function ttlockKvWriteJson(env,key,value,ttl){
+  if(!env?.RATE_LIMIT?.put)return false;
+  try{await env.RATE_LIMIT.put(key,JSON.stringify(value),{expirationTtl:Math.max(60,Math.floor(ttl))});return true;}catch{return false;}
+}
+__name(ttlockKvWriteJson,"ttlockKvWriteJson");
+async function ttlockDeleteCachedToken(env,key){
+  ttlockTokenMemory.delete(key);
+  try{if(env?.RATE_LIMIT?.delete)await env.RATE_LIMIT.delete(key);}catch{}
+}
+__name(ttlockDeleteCachedToken,"ttlockDeleteCachedToken");
+async function ttlockAccessToken(env,corpid,opts={}){
+  const scope=ttlockScopeKey(env,corpid),key=`ttlock:oauth:v2:${scope}`,now=Date.now();
+  if(!opts.force_refresh){
+    const memory=ttlockTokenMemory.get(key);
+    if(memory?.access_token&&Number(memory.expires_at)>now)return {access_token:memory.access_token,cache:"hit"};
+    const cached=await ttlockKvReadJson(env,key);
+    if(cached?.access_token&&Number(cached.expires_at)>now){ttlockTokenMemory.set(key,cached);return {access_token:cached.access_token,cache:"hit"};}
+  }
+  const clientId=String(env.TTLOCK_CLIENT_ID||"").trim(),clientSecret=String(env.TTLOCK_CLIENT_SECRET||"").trim(),username=String(env.TTLOCK_USERNAME||"").trim(),password=String(env.TTLOCK_PASSWORD||"").trim();
+  if(!clientId||!clientSecret||!username||!password)return {error:"ttlock_not_configured",status:500};
+  const started=Date.now(),tokenBody=new URLSearchParams({client_id:clientId,client_secret:clientSecret,username,password,grant_type:"password"});
+  const tokenData=await fetchJson(`${String(env.TTLOCK_API_ORIGIN||TTLOCK_API_ORIGIN).trim().replace(/\/+$/,"")}/oauth2/token`,{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:tokenBody.toString()});
+  if(!tokenData.access_token)return {error:tokenData.errmsg||"ttlock_token_failed",status:502};
+  const expiresIn=Math.max(3600,Number(tokenData.expires_in||7776000)),cacheSeconds=Math.max(60,expiresIn-TTLOCK_TOKEN_SAFETY_MARGIN_SECONDS),record={access_token:tokenData.access_token,expires_at:now+cacheSeconds*1000};
+  ttlockTokenMemory.set(key,record);await ttlockKvWriteJson(env,key,record,cacheSeconds);
+  ttlockSafeLog({endpoint_class:"oauth",environment:env.APP_ENV,cache:"miss",calling_route_category:opts.route_category,duration_ms:Date.now()-started,success:true,http_status:200,external_call_count:1});
+  return {access_token:record.access_token,cache:"miss"};
+}
+__name(ttlockAccessToken,"ttlockAccessToken");
+function ttlockAuthRejected(data,status=0){
+  const code=Number(data?.errcode||data?.errorCode||0),message=String(data?.errmsg||data?.message||"").toLowerCase();
+  return status===401||status===403||[10003,10004].includes(code)||message.includes("access token")||message.includes("invalid token")||message.includes("token expired");
+}
+__name(ttlockAuthRejected,"ttlockAuthRejected");
+async function ttlockAuthorizedJson(env,corpid,endpointClass,buildRequest,opts={}){
+  let refreshed=false;
+  for(;;){
+    const token=await ttlockAccessToken(env,corpid,{route_category:opts.route_category,force_refresh:refreshed});
+    if(token.error)return token;
+    const started=Date.now(),request=buildRequest(token.access_token),response=await fetch(request.url,request.init),text=await response.text();
+    let data=null;try{data=JSON.parse(text);}catch{}
+    const rejected=ttlockAuthRejected(data,response.status);
+    ttlockSafeLog({endpoint_class:endpointClass,environment:env.APP_ENV,cache:opts.cache_state,calling_route_category:opts.route_category,duration_ms:Date.now()-started,success:response.ok&&!rejected,http_status:response.status,external_call_count:1});
+    if(rejected&&!refreshed){await ttlockDeleteCachedToken(env,`ttlock:oauth:v2:${ttlockScopeKey(env,corpid)}`);refreshed=true;continue;}
+    if(!response.ok||!data)return {error:data?.errmsg||data?.message||`upstream_${response.status}`,status:response.status||502};
+    return data;
+  }
+}
+__name(ttlockAuthorizedJson,"ttlockAuthorizedJson");
+async function loadLockCards(env,opts={}) {
   const apiOrigin = String(env.TTLOCK_API_ORIGIN || TTLOCK_API_ORIGIN).trim().replace(/\/+$/, "");
   const clientId = String(env.TTLOCK_CLIENT_ID || "").trim();
-  const clientSecret = String(env.TTLOCK_CLIENT_SECRET || "").trim();
-  const username = String(env.TTLOCK_USERNAME || "").trim();
-  const password = String(env.TTLOCK_PASSWORD || "").trim();
-  if (!clientId || !clientSecret || !username || !password) {
+  const corpid=cleanText(opts.corpid||env.CORPID||"default",120)||"default";
+  if (!clientId || !env.TTLOCK_CLIENT_SECRET || !env.TTLOCK_USERNAME || !env.TTLOCK_PASSWORD) {
     return { error: "ttlock_not_configured", status: 500 };
   }
-  const tokenBody = new URLSearchParams({
-    client_id: clientId,
-    client_secret: clientSecret,
-    username,
-    password,
-    grant_type: "password"
-  });
-  const tokenData = await fetchJson(`${apiOrigin}/oauth2/token`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: tokenBody.toString()
-  });
-  if (!tokenData.access_token) {
-    return { error: tokenData.errmsg || "ttlock_token_failed", status: 502 };
-  }
-  const lockBody = new URLSearchParams({
-    clientId,
-    accessToken: tokenData.access_token,
-    date: String(Date.now()),
-    pageNo: "1",
-    pageSize: "100"
-  });
-  const lockData = await fetchJson(`${apiOrigin}/v3/lock/list`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: lockBody.toString()
-  });
+  let externalCallCount=0,pageCount=0;
+  const lockData=await ttlockAuthorizedJson(env,corpid,"lock_list",accessToken=>({url:`${apiOrigin}/v3/lock/list`,init:{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:new URLSearchParams({clientId,accessToken,date:String(Date.now()),pageNo:"1",pageSize:"100"}).toString()}}),{route_category:opts.route_category,cache_state:opts.cache_state});
+  externalCallCount++;if(lockData?.error)return lockData;
   const locks = Array.isArray(lockData.list) ? lockData.list : [];
   locks.sort((a, b) => String(a.lockAlias || "").localeCompare(String(b.lockAlias || ""), void 0, { numeric: true }));
   const roomsData = {};
@@ -1082,14 +1137,14 @@ async function loadLockCards(env) {
     do {
       const qs = new URLSearchParams({
         clientId,
-        accessToken: tokenData.access_token,
+        accessToken: "",
         lockId: String(lock.lockId),
         date: String(Date.now()),
         pageNo: String(page),
         pageSize: "20"
       });
-      const data = await fetchJsonOrNull(`${apiOrigin}/v3/identityCard/list?${qs.toString()}`);
-      if (!data) break;
+      const data=await ttlockAuthorizedJson(env,corpid,"identity_card_list",accessToken=>{qs.set("accessToken",accessToken);return {url:`${apiOrigin}/v3/identityCard/list?${qs.toString()}`,init:{method:"GET"}};},{route_category:opts.route_category,cache_state:opts.cache_state});
+      externalCallCount++;pageCount++;if(!data||data.error)break;
       total = Number(data.pages || 1);
       for (const card of data.list || []) {
         const cid = card.cardId !== void 0 ? card.cardId : card.cardNumber;
@@ -1106,20 +1161,30 @@ async function loadLockCards(env) {
           card.desc,
           card.comment
         ].filter((v)=>v !== void 0 && v !== null && String(v).trim()).join(" ");
-        roomsData[room].push({
-          ...card,
-          room,
-          cardName,
-          endDate: card.endDate || 0,
-          remark
-        });
+        roomsData[room].push({room,cardName,endDate:card.endDate||0,remark});
       }
       page++;
     } while (page <= total);
   }
-  return { roomsData, locksCount: locks.length, loadedAt: (/* @__PURE__ */ new Date()).toISOString() };
+  return {roomsData,locksCount:locks.length,loadedAt:(/* @__PURE__ */ new Date()).toISOString(),snapshot_fingerprint:`ttlock_snapshot_${accessSnapshotRuntimeHash(JSON.stringify(roomsData))}`,_ttlock_meta:{external_call_count:externalCallCount,page_count:pageCount,cache_hit:false,snapshot_reused:false,single_flight_joined:false}};
 }
 __name(loadLockCards, "loadLockCards");
+async function getCanonicalTTLockSnapshot(env,corpid,options={}){
+  const context=options.request_context||{},maxAgeMs=Math.max(0,Number(options.max_age_ms??context.max_age_ms??TTLOCK_READ_CACHE_MAX_AGE_MS)),now=Date.now(),scope=ttlockScopeKey(env,corpid),cacheKey=`ttlock:snapshot:v2:${scope}`;
+  if(context.ttlockSnapshotPromise){const reused=await context.ttlockSnapshotPromise;return {...reused,_ttlock_meta:{...(reused?._ttlock_meta||{}),snapshot_reused:true}};}
+  const task=(async()=>{
+    const cached=await ttlockKvReadJson(env,cacheKey),observed=Date.parse(cached?.observed_at||""),age=Number.isFinite(observed)?Math.max(0,now-observed):Infinity;
+    if(cached?.roomsData&&age<=maxAgeMs){ttlockSafeLog({endpoint_class:"snapshot",environment:env.APP_ENV,cache:"hit",snapshot_age_ms:age,lock_count:cached.locksCount,calling_route_category:context.route_category,success:true,external_call_count:0});return {...cached,data_source:"ttl_cache",fallback:false,_ttlock_meta:{external_call_count:0,page_count:0,cache_hit:true,snapshot_reused:false,single_flight_joined:false,snapshot_age_ms:age}};}
+    if(!ttlockLiveFetchAllowed(env,context))return {error:["staging","test","local","development"].includes(cleanText(env.APP_ENV||"",40).toLowerCase())?"TTLOCK_LIVE_FETCH_DISABLED_IN_STAGING":"TTLOCK_LIVE_FETCH_DISABLED_IN_PREVIEW",status:503,roomsData:{},locksCount:0,data_source:"cache_miss_firewall",_ttlock_meta:{external_call_count:0,cache_hit:false}};
+    const flightKey=`${scope}:v2`;
+    if(ttlockSnapshotFlights.has(flightKey)){const joined=await ttlockSnapshotFlights.get(flightKey);return {...joined,_ttlock_meta:{...(joined?._ttlock_meta||{}),single_flight_joined:true}};}
+    const flight=(async()=>{const live=await loadLockCards(env,{corpid,route_category:context.route_category,cache_state:cached?"stale":"miss"});if(!live?.error){const record={roomsData:live.roomsData,locksCount:live.locksCount,observed_at:live.loadedAt,expires_at:new Date(Date.parse(live.loadedAt)+TTLOCK_READ_CACHE_MAX_AGE_MS).toISOString(),snapshot_fingerprint:live.snapshot_fingerprint,loadedAt:live.loadedAt};await ttlockKvWriteJson(env,cacheKey,record,10*60);return {...live,data_source:"live_api",fallback:false};}return live;})();
+    ttlockSnapshotFlights.set(flightKey,flight);try{return await flight;}finally{if(ttlockSnapshotFlights.get(flightKey)===flight)ttlockSnapshotFlights.delete(flightKey);}
+  })();
+  context.ttlockSnapshotPromise=task;
+  return await task;
+}
+__name(getCanonicalTTLockSnapshot,"getCanonicalTTLockSnapshot");
 // EMPLOYEE_API_PATCH_START
 const EMP_TX_COLUMNS = [
   "id","corpid","userid","session_id","cat","room","amount","due","paid","deficit","tag","note","room_to",
@@ -1540,7 +1605,7 @@ async function canonicalDepositAccessSnapshotForBed(env,user,bed,opts={}){
   const cleanBed=cleanText(bed,80).replace(/^#/,"");
   if(!cleanBed)return {snapshot:null,card:null,source_status:"missing_bed",warning:"bed_required"};
   const strict=opts.strict_access_snapshot===true;
-  const lockResult=await empLoadLockCardsWithCacheFallback(env,user,{timeoutMs:8000,limit:500,strict_access_snapshot:strict}).catch(e=>({error:empTtlockReadErrorCode(e),roomsData:{},data_source:"live_api",fallback:false,strict_access_snapshot:strict}));
+  const lockResult=await empLoadLockCardsWithCacheFallback(env,user,{timeoutMs:8000,limit:500,strict_access_snapshot:strict,request_context:opts.request_context,max_age_ms:opts.max_age_ms}).catch(e=>({error:empTtlockReadErrorCode(e),roomsData:{},data_source:"live_api",fallback:false,strict_access_snapshot:strict}));
   const candidates=[];
   for(const [lockRoom,cards] of Object.entries(lockResult?.roomsData||{})){
     for(const card of cards||[]){
@@ -1626,7 +1691,7 @@ async function canonicalDepositGateway(env,user,opts={}){
   const requiredTotal=canonicalDepositMoney(opts.deposit_required_total||CANONICAL_DEPOSIT_REQUIRED_TOTAL);
   const access=opts.access_snapshot
     ?{snapshot:opts.access_snapshot,card:opts.card||null,source_status:"provided"}
-    :await canonicalDepositAccessSnapshotForBed(env,user,bed);
+    :await canonicalDepositAccessSnapshotForBed(env,user,bed,{request_context:opts.request_context,max_age_ms:opts.max_age_ms});
   const snapshot=access.snapshot||null;
   const recorded=snapshot&&snapshot.parsed_deposit_amount!==null?canonicalDepositMoney(snapshot.parsed_deposit_amount):null;
   const remaining=recorded===null?null:Math.max(0,canonicalDepositMoney(requiredTotal-recorded));
@@ -1916,7 +1981,7 @@ async function handleEmployeeDeposit(request,env,user){
   const url=new URL(request.url);
   const bed=cleanText(url.searchParams.get("bed"),80).replace(/^#/,"");
   if(!bed)return badRequest("bed_required");
-  const gateway=await canonicalDepositGateway(env,user,{bed,limit:1000});
+  const gateway=await canonicalDepositGateway(env,user,{bed,limit:1000,request_context:ttlockRequestContext(request,env,user,"employee_deposit",TTLOCK_READ_CACHE_MAX_AGE_MS)});
   return success({
     ...gateway,
     balance:gateway.deposit_recorded_amount,
@@ -1933,7 +1998,7 @@ async function handleEmployeeMigrate(request,env,user){
 }
 __name(handleEmployeeMigrate,"handleEmployeeMigrate");
 async function handleEmployeeLockCards(request,env,user){
-  const result=await empLoadLockCardsWithCacheFallback(env,user,{timeoutMs:8000,limit:500});
+  const result=await empLoadLockCardsWithCacheFallback(env,user,{timeoutMs:8000,limit:500,request_context:ttlockRequestContext(request,env,user,"employee_lock_cards",TTLOCK_READ_CACHE_MAX_AGE_MS)});
   if(result.error)return errorResponse(result.error,result.status||503,result.error);
   await audit(env,user,"employee.lock.cards.load","",{locksCount:result.locksCount,data_source:result.data_source||"live_api",fallback:!!result.fallback}).catch(()=>{});
   return success(result);
@@ -2626,7 +2691,7 @@ function employeeBedTransferPhase1GatewayContext(gateway,companyScope){
   };
 }
 __name(employeeBedTransferPhase1GatewayContext,"employeeBedTransferPhase1GatewayContext");
-async function validateEmployeeBedTransferPhase1(env,user,entry={},normalized={}){
+async function validateEmployeeBedTransferPhase1(env,user,entry={},normalized={},opts={}){
   const fromBed=cleanText(normalized.from_bed||entry.from_bed||entry.bed_from||entry.room||"",40).replace(/^#+/,"");
   const toBed=cleanText(normalized.to_bed||entry.to_bed||entry.bed_to||entry.roomTo||"",40).replace(/^#+/,"");
   const companyScope=cleanText(user?.corpid||"",120);
@@ -2635,8 +2700,8 @@ async function validateEmployeeBedTransferPhase1(env,user,entry={},normalized={}
   let targetGateway;
   try{
     [sourceGateway,targetGateway]=await Promise.all([
-      canonicalBedContextGateway(env,user,{bed:fromBed,limit:1000,strict_access_snapshot:true,archive_snapshot:archiveSnapshot}),
-      canonicalBedContextGateway(env,user,{bed:toBed,limit:1000,strict_access_snapshot:true,archive_snapshot:archiveSnapshot})
+      canonicalBedContextGateway(env,user,{bed:fromBed,limit:1000,strict_access_snapshot:true,archive_snapshot:archiveSnapshot,request_context:opts.request_context,max_age_ms:TTLOCK_STRICT_CACHE_MAX_AGE_MS}),
+      canonicalBedContextGateway(env,user,{bed:toBed,limit:1000,strict_access_snapshot:true,archive_snapshot:archiveSnapshot,request_context:opts.request_context,max_age_ms:TTLOCK_STRICT_CACHE_MAX_AGE_MS})
     ]);
   }catch(error){
     return {ok:false,error_code:"BED_TRANSFER_ACCESS_SNAPSHOT_UNAVAILABLE",message:"Strict Access Snapshot data could not be loaded.",invalid_fields:["source_context","target_context"],source_error:cleanText(error?.message||error||"",160)};
@@ -2707,13 +2772,13 @@ function resolveEmployeeOwnerConfirmedLegacyGenesis(env,user,fromBed,toBed,sourc
   return resolveOwnerConfirmedLegacyGenesis({base_resolution:baseResolution,corpid:user?.corpid||"",from_bed:fromBed,to_bed:toBed,app_env:env.APP_ENV,write_approved:bedTransferWriteApproved(env),legacy_genesis_mode:env.BED_TRANSFER_LEGACY_GENESIS_MODE,allowed_source_beds:bedTransferLegacyGenesisAllowlist(env),source_context:context(sourceGateway),target_context:context(targetGateway),open_arrears:sourceGateway?.open_arrears||[]});
 }
 __name(resolveEmployeeOwnerConfirmedLegacyGenesis,"resolveEmployeeOwnerConfirmedLegacyGenesis");
-async function validateEmployeeBedTransferCanonicalLink(env,user,entry={},normalized={}){
+async function validateEmployeeBedTransferCanonicalLink(env,user,entry={},normalized={},opts={}){
   const fromBed=cleanText(normalized.from_bed||entry.from_bed||entry.bed_from||entry.room||"",40).replace(/^#+/,"");
   const toBed=cleanText(normalized.to_bed||entry.to_bed||entry.bed_to||entry.roomTo||"",40).replace(/^#+/,"");
   const archiveSnapshot=await cloudArrearsFetchActiveSessionRows(env,user,{limit:1000}).catch(()=>[]);
   const [sourceGateway,targetGateway]=await Promise.all([
-    canonicalBedContextGateway(env,user,{bed:fromBed,limit:1000,strict_access_snapshot:true,archive_snapshot:archiveSnapshot}),
-    canonicalBedContextGateway(env,user,{bed:toBed,limit:1000,strict_access_snapshot:true,archive_snapshot:archiveSnapshot})
+    canonicalBedContextGateway(env,user,{bed:fromBed,limit:1000,strict_access_snapshot:true,archive_snapshot:archiveSnapshot,request_context:opts.request_context,max_age_ms:TTLOCK_STRICT_CACHE_MAX_AGE_MS}),
+    canonicalBedContextGateway(env,user,{bed:toBed,limit:1000,strict_access_snapshot:true,archive_snapshot:archiveSnapshot,request_context:opts.request_context,max_age_ms:TTLOCK_STRICT_CACHE_MAX_AGE_MS})
   ]);
   const fee=employeeEntryBedTransferFee(entry,normalized);
   let resolved=await resolveEmployeeBedTransferSourceContext(env,user,fromBed,sourceGateway,{archive_snapshot:archiveSnapshot});
@@ -3106,8 +3171,8 @@ async function validateEmployeeEntryUploadPayload(env,user,body,opts={}){
   if(eventFieldValidation)return eventFieldValidation;
   if(type==="TF"||type==="TFF"){
     const phase1=opts.canonical_transfer_link_anchor===true
-      ?await validateEmployeeBedTransferCanonicalLink(env,user,entry,normalized)
-      :await validateEmployeeBedTransferPhase1(env,user,entry,normalized);
+      ?await validateEmployeeBedTransferCanonicalLink(env,user,entry,normalized,opts)
+      :await validateEmployeeBedTransferPhase1(env,user,entry,normalized,opts);
     if(!phase1.ok)return employeeEntryValidationFailure("bed_transfer_phase1_contract",phase1.error_code,phase1.message||"Bed Transfer Phase 1 contract rejected the dry-run payload.",{event_index:eventIndex,event_type:"bed_transfer",missing_fields:phase1.missing_fields||[],invalid_fields:phase1.invalid_fields||[],anchor_preview:{...anchorPreview,phase1_contract:phase1}});
     bedTransferPhase1Preview=phase1;
   }
@@ -3357,9 +3422,10 @@ async function handleEmployeeEntryValidate(request,env,user){
     suggested_action_zh:"请刷新页面后重新上传；如果重复出现，请复制诊断返回。"
   })},400);}
   const assetInfo=employeeEntryDiagnosticAssetInfo(body);
+  const request_context=ttlockRequestContext(request,env,user,"employee_entry_validate",TTLOCK_STRICT_CACHE_MAX_AGE_MS);
   let result;
   try{
-    result=await validateEmployeeEntryUploadPayload(env,user,body,{event_index:body?.event_index,canonical_transfer_link_anchor:true});
+    result=await validateEmployeeEntryUploadPayload(env,user,body,{event_index:body?.event_index,canonical_transfer_link_anchor:true,request_context});
   }catch(err){
     const eventIndex=Number(body?.event_index||0)||0;
     const eventType=entryAnchorEventType(cleanText(body?.entry?.type||body?.entry?.reason_code||"R",12).toUpperCase());
@@ -3410,6 +3476,7 @@ async function persistEmployeeBedTransferCanonicalArchive(env,user,body,validati
 __name(persistEmployeeBedTransferCanonicalArchive,"persistEmployeeBedTransferCanonicalArchive");
 async function handleEmployeeEntry(request,env,user){
   const timingEnabled=request.headers.get("X-Employee-Entry-Timing")==="1";
+  const request_context=ttlockRequestContext(request,env,user,"employee_entry_upload",TTLOCK_STRICT_CACHE_MAX_AGE_MS);
   const timing={started_at:Date.now(),d1_write_ms:0,total_ms:0};
   let body;
   try{body=await request.json();}catch{return badRequest("invalid_json");}
@@ -3442,7 +3509,7 @@ async function handleEmployeeEntry(request,env,user){
   if(!await empTableExists(env,"sessions")||(!["TF","TFF"].includes(writeGateType)&&!await empTableExists(env,"transactions")))return errorResponse("employee_entry_schema_not_ready",503,"employee_entry_schema_not_ready");
   if(["TF","TFF"].includes(writeGateType)&&!(await empTableColumns(env,"sessions")).has("entries_json"))return json({success:false,ok:false,error_code:"CANONICAL_ARCHIVE_SCHEMA_UNAVAILABLE",no_write:true,write_attempted:false,production_cutover:"PRODUCTION_NO_GO"},503);
   body=normalizeEmployeeEntryBodyForValidation(body||{});
-  const validationResult=await validateEmployeeEntryUploadPayload(env,user,body,{event_index:body?.event_index,canonical_transfer_link_anchor:["TF","TFF"].includes(writeGateType)});
+  const validationResult=await validateEmployeeEntryUploadPayload(env,user,body,{event_index:body?.event_index,canonical_transfer_link_anchor:["TF","TFF"].includes(writeGateType),request_context});
   if(!validationResult.ok)return json({success:false,...validationResult},422);
   if(["TF","TFF"].includes(writeGateType))return persistEmployeeBedTransferCanonicalArchive(env,user,body,validationResult);
   if(validationResult.idempotent){
@@ -5008,8 +5075,8 @@ async function canonicalArrearsGateway(env,user,opts={}){
 __name(canonicalArrearsGateway,"canonicalArrearsGateway");
 async function canonicalBedContextGateway(env,user,opts={}){
   const bed=cleanText(opts.bed||"",80).replace(/^#/,"");
-  const arrears=await canonicalArrearsGateway(env,user,{bed,limit:opts.limit||1000,archive_snapshot:opts.archive_snapshot});
-  const occupancy=await canonicalOccupancyGateway(env,user,{bed,arrears_gateway:arrears,limit:opts.limit||1000,strict_access_snapshot:opts.strict_access_snapshot===true,archive_snapshot:opts.archive_snapshot});
+  const arrears=await canonicalArrearsGateway(env,user,{bed,limit:opts.limit||1000,archive_snapshot:opts.archive_snapshot,request_context:opts.request_context});
+  const occupancy=await canonicalOccupancyGateway(env,user,{bed,arrears_gateway:arrears,limit:opts.limit||1000,strict_access_snapshot:opts.strict_access_snapshot===true,archive_snapshot:opts.archive_snapshot,request_context:opts.request_context,max_age_ms:opts.max_age_ms});
   const stayContext=await canonicalStayBedContextGateway(env,user,{bed,limit:opts.limit||500,archive_snapshot:opts.archive_snapshot});
   return {
     ok:true,
@@ -5195,7 +5262,7 @@ async function canonicalOccupancyGateway(env,user,opts={}){
   const bed=cleanText(opts.bed||"",80).replace(/^#/,"");
   const access=opts.access_snapshot
     ?{snapshot:opts.access_snapshot,card:opts.card||null,source_status:"provided",warning:""}
-    :await canonicalDepositAccessSnapshotForBed(env,user,bed,{strict_access_snapshot:opts.strict_access_snapshot===true}).catch(e=>({snapshot:null,card:null,source_status:"access_snapshot_unavailable",warning:empReadErrorCode(e),error:empReadErrorCode(e),data_source:"live_api",fallback:false,candidate_count:0,ambiguous:false,conflict:false,stale:false}));
+    :await canonicalDepositAccessSnapshotForBed(env,user,bed,{strict_access_snapshot:opts.strict_access_snapshot===true,request_context:opts.request_context,max_age_ms:opts.max_age_ms}).catch(e=>({snapshot:null,card:null,source_status:"access_snapshot_unavailable",warning:empReadErrorCode(e),error:empReadErrorCode(e),data_source:"live_api",fallback:false,candidate_count:0,ambiguous:false,conflict:false,stale:false}));
   const arrears=opts.arrears_gateway||await canonicalArrearsGateway(env,user,{bed,limit:opts.limit||1000,archive_snapshot:opts.archive_snapshot});
   const events=Array.isArray(opts.events)?opts.events:await canonicalOccupancyArchiveEventsForBed(env,user,bed,{limit:opts.limit||1000,archive_snapshot:opts.archive_snapshot});
   const openArrears=Array.isArray(arrears.open_items)?arrears.open_items:[];
@@ -5315,7 +5382,7 @@ async function ownerTodayTodoCandidateBeds(env,user,opts={}){
       add(anchor.to_bed,"canonical_event_archive");
     }
   }
-  const lockResult=await empLoadLockCardsWithCacheFallback(env,user,{timeoutMs:8000,limit:500}).catch(e=>({roomsData:{},error:empTtlockReadErrorCode(e)}));
+  const lockResult=await empLoadLockCardsWithCacheFallback(env,user,{timeoutMs:8000,limit:500,request_context:opts.request_context,max_age_ms:opts.max_age_ms}).catch(e=>({roomsData:{},error:empTtlockReadErrorCode(e)}));
   for(const [lockRoom,cards] of Object.entries(lockResult?.roomsData||{})){
     for(const card of cards||[]){
       const remark=canonicalDepositRemarkText(card,lockRoom);
@@ -5637,7 +5704,7 @@ async function buildOwnerTodayTodoGateway(env,user,opts={}){
   const started=Date.now();
   const sessions=await cloudArrearsFetchActiveSessionRows(env,user,{limit:Math.min(limit,500)}).catch(()=>[]);
   const archiveByBed=ownerTodayTodoArchiveContextFromSessions(sessions);
-  const lockResult=await empLoadLockCardsWithCacheFallback(env,user,{timeoutMs:6000,limit:500}).catch(e=>({roomsData:{},error:empTtlockReadErrorCode(e)}));
+  const lockResult=await empLoadLockCardsWithCacheFallback(env,user,{timeoutMs:6000,limit:500,request_context:opts.request_context,max_age_ms:opts.max_age_ms}).catch(e=>({roomsData:{},error:empTtlockReadErrorCode(e)}));
   const accessByBed=ownerTodayTodoAccessCandidates(lockResult,user);
   const archiveEntries=ownerHistoryTransferLineageArchiveEntries(sessions,user.corpid);
   const transferSnapshots=Object.fromEntries([...accessByBed.entries()].map(([bedValue,row])=>[bedValue,ownerTodayTodoSafeTransferSnapshot(bedValue,row,user)]));
@@ -5661,7 +5728,7 @@ async function buildOwnerTodayTodoGateway(env,user,opts={}){
   const candidates=[...candidateBedSet].filter(Boolean).slice(0,limit).map(bed=>({bed}));
   const todos=[];
   if(transferTodos.ok)for(const todo of transferTodos.todos||[])ownerTodayTodoPush(todos,todo,filters);
-  const receivables=await resolveConsoleReceivablesSot(env,user,{limit:Math.min(limit,100),ttlockTimeoutMs:6000}).catch(()=>null);
+  const receivables=await resolveConsoleReceivablesSot(env,user,{limit:Math.min(limit,100),ttlockTimeoutMs:6000,request_context:opts.request_context,max_age_ms:opts.max_age_ms}).catch(()=>null);
   if(receivables)ownerTodayTodoBuildReceivables(todos,receivables,filters);
   for(const candidate of candidates){
     const bed=candidate.bed;
@@ -5716,7 +5783,8 @@ async function handleOwnerTodayTodos(request,env,user){
       severity:url.searchParams.get("severity")||"",
       category:url.searchParams.get("category")||"",
       bed:url.searchParams.get("bed")||"",
-      limit:url.searchParams.get("limit")||100
+      limit:url.searchParams.get("limit")||100,
+      request_context:ttlockRequestContext(request,env,user,"owner_today_todo",TTLOCK_READ_CACHE_MAX_AGE_MS)
     });
     return success(payload);
   }catch(e){
@@ -6360,10 +6428,12 @@ function empCachedTtlockRoomsDataFromTasks(rows){
 __name(empCachedTtlockRoomsDataFromTasks,"empCachedTtlockRoomsDataFromTasks");
 async function empLoadLockCardsWithCacheFallback(env,user,opts={}){
   const strict=opts.strict_access_snapshot===true;
+  const requestContext=opts.request_context||ttlockRequestContext(opts.request||null,env,user,opts.route_category||"employee_ttlock_read",opts.max_age_ms??(strict?TTLOCK_STRICT_CACHE_MAX_AGE_MS:TTLOCK_READ_CACHE_MAX_AGE_MS));
   try{
-    const live=await empWithTimeout(loadLockCards(env),opts.timeoutMs||8000,"ttlock_api");
-    if(!live?.error)return {...live,data_source:"live_api",fallback:false,strict_access_snapshot:strict};
-    if(strict)return {...live,data_source:"live_api",fallback:false,strict_access_snapshot:true,fallback_rejected:true,candidate_count:0,ambiguous:false,conflict:false};
+    const live=await getCanonicalTTLockSnapshot(env,user?.corpid||env.CORPID||"default",{request_context:requestContext,max_age_ms:opts.max_age_ms??(strict?TTLOCK_STRICT_CACHE_MAX_AGE_MS:TTLOCK_READ_CACHE_MAX_AGE_MS)});
+    if(!live?.error)return {...live,strict_access_snapshot:strict};
+    if(String(live.error).startsWith("TTLOCK_LIVE_FETCH_DISABLED_"))return {...live,strict_access_snapshot:strict,fallback_rejected:true};
+    if(strict)return {...live,strict_access_snapshot:true,fallback_rejected:true,candidate_count:0,ambiguous:false,conflict:false};
     const cached=await empCachedTtlockTaskRows(env,user,opts.limit||500);
     if(cached.length)return {
       roomsData:empCachedTtlockRoomsDataFromTasks(cached),
@@ -6879,7 +6949,7 @@ async function empLoadTtlockConsoleUnresolvedForArrears(env,user,existingTasks,o
     const today=empTodayDubai();
     const range={start:empAddMonths(today,-24)||"2024-01-01",end:today};
     const [lockResult,rentConfig,ledgerRows]=await Promise.all([
-      empWithTimeout(loadLockCards(env),timeoutMs,"ttlock_api"),
+      empLoadLockCardsWithCacheFallback(env,user,{timeoutMs,limit:500,request_context:opts.request_context,max_age_ms:opts.max_age_ms}),
       empRentConfigReadOnly(env,user.corpid),
       ownerOverviewFetchTransactions(env,user,range).catch(()=>[])
     ]);
@@ -6960,7 +7030,7 @@ async function empLoadTtlockExpiredUnpaidForArrears(env,user,opts={}){
   const timeoutMs=Math.min(Math.max(Number(opts.timeoutMs||8000),1000),12000);
   try{
     const [lockResult,rentConfig]=await Promise.all([
-      empWithTimeout(loadLockCards(env),timeoutMs,"ttlock_api"),
+      empLoadLockCardsWithCacheFallback(env,user,{timeoutMs,limit:500,request_context:opts.request_context,max_age_ms:opts.max_age_ms}),
       empRentConfigReadOnly(env,user.corpid)
     ]);
     if(lockResult?.error){
@@ -7227,7 +7297,7 @@ async function resolveConsoleReceivablesSot(env,user,opts={}){
   const started=Date.now();
   const timeoutMs=Math.min(Math.max(Number(opts.ttlockTimeoutMs||8000),1000),12000);
   const [lockResult,rentConfig,existing]=await Promise.all([
-    empWithTimeout(loadLockCards(env),timeoutMs,"ttlock_api").catch(e=>({error:String(e?.message||e),roomsData:{},locksCount:0,status:0})),
+    empLoadLockCardsWithCacheFallback(env,user,{timeoutMs,limit,request_context:opts.request_context,max_age_ms:opts.max_age_ms}).catch(e=>({error:String(e?.message||e),roomsData:{},locksCount:0,status:0})),
     empRentConfigReadOnly(env,user.corpid).catch(()=>({})),
     empLoadExistingArrearsRowsForConsoleSot(env,user,{limit})
   ]);
@@ -7371,7 +7441,7 @@ async function empListMergedArrearTasksDetailed(env,user,opts={}){
     }
   }
   await empAppendCloudArrearsProjectionRows(env,user,tasks,seenIds,seenKeys,source_status,{limit});
-  const ttlock=await empLoadTtlockConsoleUnresolvedForArrears(env,user,tasks,{timeoutMs:opts.ttlockTimeoutMs||8000});
+  const ttlock=await empLoadTtlockConsoleUnresolvedForArrears(env,user,tasks,{timeoutMs:opts.ttlockTimeoutMs||8000,request_context:opts.request_context,max_age_ms:opts.max_age_ms});
   ttlockRows=ttlock.rows||[];
   ttlockMissingRent=ttlock.missingRent||[];
   source_status.ttlock_expired_unpaid=ttlock.source_status||empSourceStatus(false,"TTLOCK_READ_FAILED");
@@ -7482,7 +7552,7 @@ __name(handleBossArrears,"handleBossArrears");
 async function handleBossArrearsFollowupTasks(request,env,user){
   const params=bossArrearsListParams(request);
   const sourceLimit=Math.min(Math.max(params.offset+params.limit,100),500);
-  const sot=await resolveCurrentReceivablesSot(env,user,{limit:sourceLimit});
+  const sot=await resolveCurrentReceivablesSot(env,user,{limit:sourceLimit,request_context:ttlockRequestContext(request,env,user,"boss_arrears_followup",TTLOCK_READ_CACHE_MAX_AGE_MS)});
   const fullTasks=sot.all_rows||[];
   const previewTasks=fullTasks.slice(0,Math.min(params.previewLimit,fullTasks.length));
   const pageTasks=fullTasks.slice(params.offset,params.offset+params.limit);
@@ -7618,7 +7688,7 @@ async function handleEmployeeBedContext(request,env,user){
   const url=new URL(request.url);
   const bed=cleanText(url.searchParams.get("bed")||"",80).replace(/^#/,"");
   try{
-    return success(employeeBedTransferSafeContextDto(await canonicalBedContextGateway(env,user,{bed,limit:1000})));
+    return success(employeeBedTransferSafeContextDto(await canonicalBedContextGateway(env,user,{bed,limit:1000,request_context:ttlockRequestContext(request,env,user,"employee_bed_context",TTLOCK_STRICT_CACHE_MAX_AGE_MS),max_age_ms:TTLOCK_STRICT_CACHE_MAX_AGE_MS})));
   }catch(e){
     return json({
       success:false,
@@ -10494,7 +10564,7 @@ async function handlePhase0ReadOnlyApi(request,env,user){
     if(path==="/api/owner/today-todos")return handleOwnerTodayTodos(request,env,user);
     if(path==="/api/owner/console-receivables-sot"||path==="/api/owner/current-receivables-sot"){
       const limit=Math.min(Math.max(Number(url.searchParams.get("limit")||500),1),500);
-      return success(await resolveConsoleReceivablesSot(env,user,{limit,ttlockTimeoutMs:8000}));
+      return success(await resolveConsoleReceivablesSot(env,user,{limit,ttlockTimeoutMs:8000,request_context:ttlockRequestContext(request,env,user,"owner_console_receivables",TTLOCK_READ_CACHE_MAX_AGE_MS)}));
     }
     if(path==="/api/owner/overview/comparative-summary")return phase0OwnerOverviewComparativeSummary(env,user,url);
     if(path==="/api/owner/history")return phase0Entries(env,user,url);
@@ -11234,7 +11304,7 @@ async function handleRequest(request, env, ctx) {
     if (path === "/api/lock/cards" && method === "GET") {
       if (!canReadOwnerData(user)) return forbidden();
       try {
-        const result = await loadLockCards(env);
+        const result = await empLoadLockCardsWithCacheFallback(env,user,{timeoutMs:8000,limit:500,request_context:ttlockRequestContext(request,env,user,"owner_lock_cards",TTLOCK_READ_CACHE_MAX_AGE_MS)});
         if (result.error) return errorResponse(result.error, result.status || 500, result.error);
         const purpose = new URL(request.url).searchParams.get("purpose") || "";
         if (canWriteOwnerData(user) && purpose !== "arrears_pool") await audit(env, user, "lock.cards.load", "", { locksCount: result.locksCount });
@@ -11337,7 +11407,7 @@ async function handleRequest(request, env, ctx) {
     if ((path === "/api/owner/current-receivables-sot" || path === "/api/owner/console-receivables-sot") && method === "GET") {
       if (!canReadOwnerData(user)) return forbidden();
       const limit=Math.min(Math.max(Number(url.searchParams.get("limit")||500),1),500);
-      return success(await resolveConsoleReceivablesSot(env,user,{limit,ttlockTimeoutMs:8000}));
+      return success(await resolveConsoleReceivablesSot(env,user,{limit,ttlockTimeoutMs:8000,request_context:ttlockRequestContext(request,env,user,"owner_console_receivables",TTLOCK_READ_CACHE_MAX_AGE_MS)}));
     }
     if (path === "/api/boss/arrears/directives" && method === "POST") {
       return handleBossArrearsDirectives(request, env, user);

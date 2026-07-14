@@ -4640,9 +4640,10 @@ async function employeeLoadBedTransferContexts(){
   if(from===to)throw new Error('BED_TRANSFER_SAME_BED_NOT_ALLOWED');
   if(from==='334'||to==='334')throw new Error('BED_TRANSFER_334_FORBIDDEN');
   const requestKey=`${from}->${to}`;
+  if(state.bedTransferContext?.requestKey===requestKey&&state.bedTransferContext?.status==='loading'&&state.bedTransferContext.promise)return state.bedTransferContext.promise;
   state.bedTransferContext={status:'loading',source:null,target:null,requestKey,serverValidation:null};
   employeeRenderBedTransferContext();
-  try{
+  const requestPromise=(async()=>{try{
     const [sourceResponse,targetResponse]=await Promise.all([
       apiFetch(`/api/employee/bed-context?bed=${encodeURIComponent(from)}`,{method:'GET'}),
       apiFetch(`/api/employee/bed-context?bed=${encodeURIComponent(to)}`,{method:'GET'})
@@ -4663,7 +4664,9 @@ async function employeeLoadBedTransferContexts(){
     if(state.bedTransferContext.status!=='ambiguous')state.bedTransferContext.status='error';
     employeeRenderBedTransferContext();
     throw error;
-  }
+  }})();
+  state.bedTransferContext.promise=requestPromise;
+  return requestPromise;
 }
 let employeeBedTransferContextTimer=null;
 function employeeScheduleBedTransferContexts(){
