@@ -1040,6 +1040,7 @@ const TTLOCK_TOKEN_SAFETY_MARGIN_SECONDS=24*60*60;
 const TTLOCK_CANONICAL_PRODUCTION_HOST="homelink-finance.habibramadan888.workers.dev";
 const ttlockSnapshotFlights=new Map();
 const ttlockTokenMemory=new Map();
+const employeeEntryAnchorParseCache=new WeakMap();
 function ttlockScopeKey(env={},corpid=""){
   return `${cleanText(env.APP_ENV||"production",40)||"production"}:${accessSnapshotRuntimeHash(cleanText(corpid||env.CORPID||"default",120)||"default")}`;
 }
@@ -1047,7 +1048,7 @@ __name(ttlockScopeKey,"ttlockScopeKey");
 function ttlockRequestContext(request,env,user,routeCategory="read",maxAgeMs=TTLOCK_READ_CACHE_MAX_AGE_MS){
   let requestHost="";
   try{requestHost=new URL(request?.url||"").hostname.toLowerCase();}catch{}
-  return {corpid:cleanText(user?.corpid||env?.CORPID||"default",120)||"default",request_host:requestHost,route_category:cleanText(routeCategory,80)||"read",max_age_ms:maxAgeMs,ttlockSnapshotPromise:null};
+  return {corpid:cleanText(user?.corpid||env?.CORPID||"default",120)||"default",request_host:requestHost,route_category:cleanText(routeCategory,80)||"read",max_age_ms:maxAgeMs,timeout_ms:8000,ttlockSnapshotPromise:null,archiveSnapshotPromise:null,archive_read_count:0,archive_parse_count:0,bed_context_count:0,ttlock_external_call_count:0,ttlock_cache_state:"",kv_read_count:0,kv_write_count:0,last_successful_stage:"request_started",started_at_ms:Date.now()};
 }
 __name(ttlockRequestContext,"ttlockRequestContext");
 function ttlockLiveFetchAllowed(env={},context={}){
@@ -1106,7 +1107,16 @@ async function ttlockAuthorizedJson(env,corpid,endpointClass,buildRequest,opts={
   for(;;){
     const token=await ttlockAccessToken(env,corpid,{route_category:opts.route_category,force_refresh:refreshed});
     if(token.error)return token;
-    const started=Date.now(),request=buildRequest(token.access_token),response=await fetch(request.url,request.init),text=await response.text();
+    const started=Date.now(),request=buildRequest(token.access_token),timeoutMs=Math.max(250,Number(opts.timeout_ms||8000));
+    const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),timeoutMs);
+    let response,text;
+    try{
+      response=await fetch(request.url,{...(request.init||{}),signal:controller.signal});
+      text=await response.text();
+    }catch(error){
+      ttlockSafeLog({endpoint_class:endpointClass,environment:env.APP_ENV,cache:opts.cache_state,calling_route_category:opts.route_category,duration_ms:Date.now()-started,success:false,http_status:0,external_call_count:1});
+      return {error:error?.name==="AbortError"?"TTLOCK_UPSTREAM_TIMEOUT":"TTLOCK_UPSTREAM_UNAVAILABLE",status:503};
+    }finally{clearTimeout(timer);}
     let data=null;try{data=JSON.parse(text);}catch{}
     const rejected=ttlockAuthRejected(data,response.status);
     ttlockSafeLog({endpoint_class:endpointClass,environment:env.APP_ENV,cache:opts.cache_state,calling_route_category:opts.route_category,duration_ms:Date.now()-started,success:response.ok&&!rejected,http_status:response.status,external_call_count:1});
@@ -1124,8 +1134,11 @@ async function loadLockCards(env,opts={}) {
     return { error: "ttlock_not_configured", status: 500 };
   }
   let externalCallCount=0,pageCount=0;
-  const lockData=await ttlockAuthorizedJson(env,corpid,"lock_list",accessToken=>({url:`${apiOrigin}/v3/lock/list`,init:{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:new URLSearchParams({clientId,accessToken,date:String(Date.now()),pageNo:"1",pageSize:"100"}).toString()}}),{route_category:opts.route_category,cache_state:opts.cache_state});
-  externalCallCount++;if(lockData?.error)return lockData;
+  const timeoutMs=Math.min(Math.max(Number(opts.timeout_ms||8000),1000),12000),deadline=Date.now()+timeoutMs;
+  const remaining=()=>Math.max(0,deadline-Date.now());
+  const boundedFailure=(error,status=503)=>({error,status,roomsData:{},locksCount:0,_ttlock_meta:{external_call_count:externalCallCount,page_count:pageCount,cache_hit:false,snapshot_reused:false,single_flight_joined:false}});
+  const lockData=await ttlockAuthorizedJson(env,corpid,"lock_list",accessToken=>({url:`${apiOrigin}/v3/lock/list`,init:{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:new URLSearchParams({clientId,accessToken,date:String(Date.now()),pageNo:"1",pageSize:"100"}).toString()}}),{route_category:opts.route_category,cache_state:opts.cache_state,timeout_ms:remaining()});
+  externalCallCount++;if(lockData?.error)return boundedFailure(lockData.error,lockData.status||503);
   const locks = Array.isArray(lockData.list) ? lockData.list : [];
   locks.sort((a, b) => String(a.lockAlias || "").localeCompare(String(b.lockAlias || ""), void 0, { numeric: true }));
   const roomsData = {};
@@ -1136,6 +1149,7 @@ async function loadLockCards(env,opts={}) {
     let page = 1;
     let total = 1;
     do {
+      if(remaining()<=0)return boundedFailure("TTLOCK_SNAPSHOT_TIMEOUT");
       const qs = new URLSearchParams({
         clientId,
         accessToken: "",
@@ -1144,8 +1158,8 @@ async function loadLockCards(env,opts={}) {
         pageNo: String(page),
         pageSize: "20"
       });
-      const data=await ttlockAuthorizedJson(env,corpid,"identity_card_list",accessToken=>{qs.set("accessToken",accessToken);return {url:`${apiOrigin}/v3/identityCard/list?${qs.toString()}`,init:{method:"GET"}};},{route_category:opts.route_category,cache_state:opts.cache_state});
-      externalCallCount++;pageCount++;if(!data||data.error)break;
+      const data=await ttlockAuthorizedJson(env,corpid,"identity_card_list",accessToken=>{qs.set("accessToken",accessToken);return {url:`${apiOrigin}/v3/identityCard/list?${qs.toString()}`,init:{method:"GET"}};},{route_category:opts.route_category,cache_state:opts.cache_state,timeout_ms:remaining()});
+      externalCallCount++;pageCount++;if(!data||data.error)return boundedFailure(data?.error||"TTLOCK_UPSTREAM_UNAVAILABLE",data?.status||503);
       total = Number(data.pages || 1);
       for (const card of data.list || []) {
         const cid = card.cardId !== void 0 ? card.cardId : card.cardNumber;
@@ -1174,16 +1188,20 @@ async function getCanonicalTTLockSnapshot(env,corpid,options={}){
   const context=options.request_context||{},maxAgeMs=Math.max(0,Number(options.max_age_ms??context.max_age_ms??TTLOCK_READ_CACHE_MAX_AGE_MS)),now=Date.now(),scope=ttlockScopeKey(env,corpid),cacheKey=`ttlock:snapshot:v2:${scope}`;
   if(context.ttlockSnapshotPromise){const reused=await context.ttlockSnapshotPromise;return {...reused,_ttlock_meta:{...(reused?._ttlock_meta||{}),snapshot_reused:true}};}
   const task=(async()=>{
+    context.kv_read_count=Number(context.kv_read_count||0)+1;
     const cached=await ttlockKvReadJson(env,cacheKey),observed=Date.parse(cached?.observed_at||""),age=Number.isFinite(observed)?Math.max(0,now-observed):Infinity;
     if(cached?.roomsData&&age<=maxAgeMs){ttlockSafeLog({endpoint_class:"snapshot",environment:env.APP_ENV,cache:"hit",snapshot_age_ms:age,lock_count:cached.locksCount,calling_route_category:context.route_category,success:true,external_call_count:0});return {...cached,data_source:"ttl_cache",fallback:false,_ttlock_meta:{external_call_count:0,page_count:0,cache_hit:true,snapshot_reused:false,single_flight_joined:false,snapshot_age_ms:age}};}
     if(!ttlockLiveFetchAllowed(env,context))return {error:context.allow_live_fetch===false?"TTLOCK_LIVE_FETCH_DISABLED_FOR_EXIT_EVENT":(["staging","test","local","development"].includes(cleanText(env.APP_ENV||"",40).toLowerCase())?"TTLOCK_LIVE_FETCH_DISABLED_IN_STAGING":"TTLOCK_LIVE_FETCH_DISABLED_IN_PREVIEW"),status:503,roomsData:{},locksCount:0,data_source:"cache_miss_firewall",access_context_available:false,_ttlock_meta:{external_call_count:0,cache_hit:false}};
     const flightKey=`${scope}:v2`;
     if(ttlockSnapshotFlights.has(flightKey)){const joined=await ttlockSnapshotFlights.get(flightKey);return {...joined,_ttlock_meta:{...(joined?._ttlock_meta||{}),single_flight_joined:true}};}
-    const flight=(async()=>{const live=await loadLockCards(env,{corpid,route_category:context.route_category,cache_state:cached?"stale":"miss"});if(!live?.error){const record={roomsData:live.roomsData,locksCount:live.locksCount,observed_at:live.loadedAt,expires_at:new Date(Date.parse(live.loadedAt)+TTLOCK_READ_CACHE_MAX_AGE_MS).toISOString(),snapshot_fingerprint:live.snapshot_fingerprint,loadedAt:live.loadedAt};await ttlockKvWriteJson(env,cacheKey,record,10*60);return {...live,data_source:"live_api",fallback:false};}return live;})();
+    const flight=(async()=>{const live=await loadLockCards(env,{corpid,route_category:context.route_category,cache_state:cached?"stale":"miss",timeout_ms:context.timeout_ms||8000});if(!live?.error){const record={roomsData:live.roomsData,locksCount:live.locksCount,observed_at:live.loadedAt,expires_at:new Date(Date.parse(live.loadedAt)+TTLOCK_READ_CACHE_MAX_AGE_MS).toISOString(),snapshot_fingerprint:live.snapshot_fingerprint,loadedAt:live.loadedAt};context.kv_write_count=Number(context.kv_write_count||0)+1;await ttlockKvWriteJson(env,cacheKey,record,10*60);return {...live,data_source:"live_api",fallback:false};}return live;})();
     ttlockSnapshotFlights.set(flightKey,flight);try{return await flight;}finally{if(ttlockSnapshotFlights.get(flightKey)===flight)ttlockSnapshotFlights.delete(flightKey);}
   })();
   context.ttlockSnapshotPromise=task;
-  return await task;
+  const result=await task;
+  context.ttlock_external_call_count=Number(result?._ttlock_meta?.external_call_count||0);
+  context.ttlock_cache_state=result?._ttlock_meta?.cache_hit===true?"hit":(result?.error?"error":"miss");
+  return result;
 }
 __name(getCanonicalTTLockSnapshot,"getCanonicalTTLockSnapshot");
 // EMPLOYEE_API_PATCH_START
@@ -2841,11 +2859,17 @@ __name(resolveEmployeeOwnerConfirmedLegacyGenesis,"resolveEmployeeOwnerConfirmed
 async function validateEmployeeBedTransferCanonicalLink(env,user,entry={},normalized={},opts={}){
   const fromBed=cleanText(normalized.from_bed||entry.from_bed||entry.bed_from||entry.room||"",40).replace(/^#+/,"");
   const toBed=cleanText(normalized.to_bed||entry.to_bed||entry.bed_to||entry.roomTo||"",40).replace(/^#+/,"");
-  const archiveSnapshot=await cloudArrearsFetchActiveSessionRows(env,user,{limit:1000}).catch(()=>[]);
+  const requestContext=opts.request_context||null;
+  const archiveSnapshot=await cloudArrearsFetchActiveSessionRows(env,user,{limit:1000,request_context:requestContext}).catch(()=>[]);
+  for(const session of archiveSnapshot)extractEmployeeEntryAnchorsFromSession(session);
+  if(requestContext){requestContext.archive_parse_count=archiveSnapshot.length;requestContext.last_successful_stage="canonical_archive_parsed";}
   const [sourceGateway,targetGateway]=await Promise.all([
-    canonicalBedContextGateway(env,user,{bed:fromBed,limit:1000,strict_access_snapshot:true,archive_snapshot:archiveSnapshot,request_context:opts.request_context,max_age_ms:TTLOCK_STRICT_CACHE_MAX_AGE_MS}),
-    canonicalBedContextGateway(env,user,{bed:toBed,limit:1000,strict_access_snapshot:true,archive_snapshot:archiveSnapshot,request_context:opts.request_context,max_age_ms:TTLOCK_STRICT_CACHE_MAX_AGE_MS})
+    canonicalBedContextGateway(env,user,{bed:fromBed,limit:1000,strict_access_snapshot:true,archive_snapshot:archiveSnapshot,request_context:requestContext,max_age_ms:TTLOCK_STRICT_CACHE_MAX_AGE_MS,include_stay_context:false}),
+    canonicalBedContextGateway(env,user,{bed:toBed,limit:1000,strict_access_snapshot:true,archive_snapshot:archiveSnapshot,request_context:requestContext,max_age_ms:TTLOCK_STRICT_CACHE_MAX_AGE_MS,include_stay_context:false})
   ]);
+  if(requestContext){requestContext.bed_context_count=2;requestContext.last_successful_stage="bed_contexts_loaded";}
+  const accessErrors=[sourceGateway?.access_snapshot_context?.error,targetGateway?.access_snapshot_context?.error].map(value=>cleanText(value||"",120)).filter(Boolean);
+  if(accessErrors.some(code=>/TTLOCK_|TIMEOUT|UPSTREAM|UNAVAILABLE/i.test(code)))return {ok:false,error_code:"BED_TRANSFER_CONTEXT_TEMPORARILY_UNAVAILABLE",message:"Bed Transfer context is temporarily unavailable. Retry validation shortly.",invalid_fields:["source_context","target_context"],context_error_codes:[...new Set(accessErrors)]};
   const fee=employeeEntryBedTransferFee(entry,normalized);
   const legacyGenesisGate=employeeBedTransferLegacyGenesisGate(env,user);
   let resolved=await resolveEmployeeBedTransferSourceContext(env,user,fromBed,sourceGateway,{archive_snapshot:archiveSnapshot});
@@ -2854,7 +2878,7 @@ async function validateEmployeeBedTransferCanonicalLink(env,user,entry={},normal
   const sourceAccess=sourceGateway?.access_snapshot_context||{},targetAccess=targetGateway?.access_snapshot_context||{};
   const source={...resolved,corpid:user?.corpid||"",physical_bed_status:sourceGateway?.occupancy_gateway?.physical_bed_status||"unknown",parsed_vacancy_marker:sourceAccess.parsed_vacancy_marker===true,snapshot_fingerprint:resolved.snapshot_fingerprint||bedTransferSafeSnapshotFingerprint(user,sourceGateway),candidate_count:sourceAccess.candidate_count??1,ambiguous:sourceAccess.ambiguous===true,conflict:sourceAccess.conflict===true,stale:sourceAccess.stale===true,parse_status:sourceAccess.parse_status||"parsed",parsed_deposit_amount:sourceAccess.parsed_deposit_amount,parsed_checkin_mmdd:sourceAccess.parsed_checkin_mmdd,parsed_valid_until_mmdd:sourceAccess.parsed_valid_until_mmdd,normalized_expiry_value:sourceAccess.normalized_expiry_value,active_lineage:resolved.active_transfer_lineage_id?{current_bed:fromBed,transfer_lineage_id:resolved.active_transfer_lineage_id,last_active_transfer_anchor_id:resolved.previous_transfer_anchor_id}:null};
   const target={corpid:user?.corpid||"",physical_bed_status:targetGateway?.occupancy_gateway?.physical_bed_status||"unknown",parsed_vacancy_marker:targetAccess.parsed_vacancy_marker===true,snapshot_fingerprint:bedTransferSafeSnapshotFingerprint(user,targetGateway),candidate_count:targetAccess.candidate_count??1,ambiguous:targetAccess.ambiguous===true,conflict:targetAccess.conflict===true,stale:targetAccess.stale===true,parse_status:targetAccess.parse_status||"parsed",parsed_deposit_amount:targetAccess.parsed_deposit_amount,parsed_checkin_mmdd:targetAccess.parsed_checkin_mmdd,parsed_valid_until_mmdd:targetAccess.parsed_valid_until_mmdd,normalized_expiry_value:targetAccess.normalized_expiry_value};
-  return buildBedTransferCanonicalLinkAnchor({
+  const result=buildBedTransferCanonicalLinkAnchor({
     client_payload:entry,from_bed:fromBed,to_bed:toBed,
     transfer_at:empNow(),
     corpid:user?.corpid||"",canonical_source_context:source,canonical_target_context:target,
@@ -2869,6 +2893,8 @@ async function validateEmployeeBedTransferCanonicalLink(env,user,entry={},normal
     bed_price_difference_reason:entry.bed_price_difference_reason||"",
     transfer_reason:normalized.transfer_reason||entry.transfer_reason||entry.reason||"",payment_method:fee.payment_method||entry.payment_method||"",ttlock_observation_at:empNow()
   });
+  if(requestContext&&result?.ok===true)requestContext.last_successful_stage="canonical_link_validated";
+  return result;
 }
 __name(validateEmployeeBedTransferCanonicalLink,"validateEmployeeBedTransferCanonicalLink");
 function validateEmployeeEntryUploadEventFields(type,entry,normalized,eventIndex,anchorPreview){
@@ -3245,6 +3271,8 @@ async function validateEmployeeEntryUploadPayload(env,user,body,opts={}){
     const phase1=opts.canonical_transfer_link_anchor===true
       ?await validateEmployeeBedTransferCanonicalLink(env,user,entry,normalized,opts)
       :await validateEmployeeBedTransferPhase1(env,user,entry,normalized,opts);
+    const context=opts.request_context||{};
+    console.log(JSON.stringify({event:"bed_transfer_validate_metrics",route_category:cleanText(context.route_category||"employee_entry_validate",80),ok:phase1?.ok===true,error_code:cleanText(phase1?.error_code||"",120),duration_ms:Math.max(0,Date.now()-Number(context.started_at_ms||Date.now())),archive_read_count:Number(context.archive_read_count||0),archive_parse_count:Number(context.archive_parse_count||0),bed_context_count:Number(context.bed_context_count||0),ttlock_external_call_count:Number(context.ttlock_external_call_count||0),ttlock_cache_state:cleanText(context.ttlock_cache_state||"",20),kv_read_count:Number(context.kv_read_count||0),kv_write_count:Number(context.kv_write_count||0),last_successful_stage:cleanText(context.last_successful_stage||"request_started",80)}));
     if(!phase1.ok)return employeeEntryValidationFailure("bed_transfer_phase1_contract",phase1.error_code,phase1.message||"Bed Transfer Phase 1 contract rejected the dry-run payload.",{event_index:eventIndex,event_type:"bed_transfer",missing_fields:phase1.missing_fields||[],invalid_fields:phase1.invalid_fields||[],anchor_preview:{...anchorPreview,phase1_contract:phase1}});
     bedTransferPhase1Preview=phase1;
   }
@@ -4722,6 +4750,7 @@ function parseEmployeeEntryAnchorJson(value){
 }
 __name(parseEmployeeEntryAnchorJson,"parseEmployeeEntryAnchorJson");
 function extractEmployeeEntryAnchorsFromSession(session){
+  if(session&&typeof session==="object"&&employeeEntryAnchorParseCache.has(session))return employeeEntryAnchorParseCache.get(session);
   const direct=parseEmployeeEntryAnchorJson(session?.entries_json);
   const text=String(session?.export_text||"");
   const block=text.match(/==== ENTRY ANCHORS JSON ====\s*([\s\S]*?)\s*==== END ENTRY ANCHORS JSON ====/i);
@@ -4735,6 +4764,7 @@ function extractEmployeeEntryAnchorsFromSession(session){
     if(entryAnchorType(row)==="TF")for(const field of canonicalTransferFields)if(Object.prototype.hasOwnProperty.call(row,field))normalized[field]=row[field];
     return normalized;
   });
+  if(session&&typeof session==="object")employeeEntryAnchorParseCache.set(session,rows);
   return rows;
 }
 __name(extractEmployeeEntryAnchorsFromSession,"extractEmployeeEntryAnchorsFromSession");
@@ -4991,31 +5021,35 @@ function buildCloudArrearsProjectionFromSessions(sessions=[],opts={}){
 __name(buildCloudArrearsProjectionFromSessions,"buildCloudArrearsProjectionFromSessions");
 async function cloudArrearsFetchActiveSessionRows(env,user,opts={}){
   if(Array.isArray(opts.archive_snapshot))return opts.archive_snapshot;
-  if(!await empTableExists(env,"sessions").catch(()=>false))return [];
-  const limit=Math.min(Math.max(Number(opts.limit||1000),1),2000);
-  const sessionId=cleanId(opts.session_id||opts.sessionId||"");
-  const columns=await empTableColumns(env,"sessions").catch(()=>[]);
-  const hasEntriesJson=columns.has("entries_json");
-  const hasSummaryJson=columns.has("summary_json");
-  const params=[user.corpid];
-  const includeArchive=opts.include_archive!==false;
-  let where=includeArchive?"corpid=? AND ":"corpid=? AND COALESCE(voided_at,'')='' AND COALESCE(handover_status,'')<>'VOID' AND ";
-  where+=hasEntriesJson?"(COALESCE(entries_json,'')<>'' OR COALESCE(export_text,'') LIKE '%ENTRY ANCHORS JSON%')":"COALESCE(export_text,'') LIKE '%ENTRY ANCHORS JSON%'";
-  if(includeArchive)where=hasEntriesJson
-    ? "corpid=? AND (COALESCE(entries_json,'')<>'' OR COALESCE(export_text,'') LIKE '%ENTRY ANCHORS JSON%' OR COALESCE(export_text,'') LIKE '%CORRECTION ANCHORS JSON%')"
-    : "corpid=? AND (COALESCE(export_text,'') LIKE '%ENTRY ANCHORS JSON%' OR COALESCE(export_text,'') LIKE '%CORRECTION ANCHORS JSON%')";
-  if(sessionId){
-    where+=" AND id=?";
-    params.push(sessionId);
-  }
-  const entriesExpr=hasEntriesJson?"entries_json":"'' AS entries_json";
-  const summaryExpr=hasSummaryJson?"summary_json":"'' AS summary_json";
-  const rows=await env.DB.prepare(`SELECT id, corpid, anchor_id, date, entries_count, created_by, created_at, operator_id, operator_name, handover_status, exported_at, export_text, source, ${entriesExpr}, ${summaryExpr}, voided_at
-    FROM sessions
-    WHERE ${where}
-    ORDER BY date ASC, COALESCE(exported_at,created_at,'') ASC
-    LIMIT ?`).bind(...params,limit).all().catch(()=>({results:[]}));
-  return rows.results||[];
+  const context=opts.request_context||null;
+  if(context?.archiveSnapshotPromise)return await context.archiveSnapshotPromise;
+  const task=(async()=>{
+    if(!await empTableExists(env,"sessions").catch(()=>false))return [];
+    const limit=Math.min(Math.max(Number(opts.limit||1000),1),2000);
+    const sessionId=cleanId(opts.session_id||opts.sessionId||"");
+    const columns=await empTableColumns(env,"sessions").catch(()=>[]);
+    const hasEntriesJson=columns.has("entries_json");
+    const hasSummaryJson=columns.has("summary_json");
+    const params=[user.corpid];
+    const includeArchive=opts.include_archive!==false;
+    let where=includeArchive?"corpid=? AND ":"corpid=? AND COALESCE(voided_at,'')='' AND COALESCE(handover_status,'')<>'VOID' AND ";
+    where+=hasEntriesJson?"(COALESCE(entries_json,'')<>'' OR COALESCE(export_text,'') LIKE '%ENTRY ANCHORS JSON%')":"COALESCE(export_text,'') LIKE '%ENTRY ANCHORS JSON%'";
+    if(includeArchive)where=hasEntriesJson
+      ? "corpid=? AND (COALESCE(entries_json,'')<>'' OR COALESCE(export_text,'') LIKE '%ENTRY ANCHORS JSON%' OR COALESCE(export_text,'') LIKE '%CORRECTION ANCHORS JSON%')"
+      : "corpid=? AND (COALESCE(export_text,'') LIKE '%ENTRY ANCHORS JSON%' OR COALESCE(export_text,'') LIKE '%CORRECTION ANCHORS JSON%')";
+    if(sessionId){where+=" AND id=?";params.push(sessionId);}
+    const entriesExpr=hasEntriesJson?"entries_json":"'' AS entries_json";
+    const summaryExpr=hasSummaryJson?"summary_json":"'' AS summary_json";
+    const rows=await env.DB.prepare(`SELECT id, corpid, anchor_id, date, entries_count, created_by, created_at, operator_id, operator_name, handover_status, exported_at, export_text, source, ${entriesExpr}, ${summaryExpr}, voided_at
+      FROM sessions
+      WHERE ${where}
+      ORDER BY date ASC, COALESCE(exported_at,created_at,'') ASC
+      LIMIT ?`).bind(...params,limit).all().catch(()=>({results:[]}));
+    if(context){context.archive_read_count=Number(context.archive_read_count||0)+1;context.last_successful_stage="canonical_archive_loaded";}
+    return rows.results||[];
+  })();
+  if(context)context.archiveSnapshotPromise=task;
+  return await task;
 }
 __name(cloudArrearsFetchActiveSessionRows,"cloudArrearsFetchActiveSessionRows");
 async function rebuildAllCloudArrears(env,user,opts={}){
@@ -5129,9 +5163,15 @@ async function canonicalArrearsGateway(env,user,opts={}){
   const bed=cleanText(opts.bed||"",80).replace(/^#/,"");
   const arrearsRef=cleanText(opts.arrears_ref||opts.task_id||opts.ref||"",160);
   const limit=Math.min(Math.max(Number(opts.limit||1000),1),2000);
-  const projection=bed?await rebuildCloudArrearsForBed(env,user,bed,{limit,archive_snapshot:opts.archive_snapshot}):await rebuildAllCloudArrears(env,user,{limit,archive_snapshot:opts.archive_snapshot});
+  const requestContext=opts.request_context||null;
+  let projection;
+  if(requestContext&&Array.isArray(opts.archive_snapshot)){
+    if(!requestContext.canonicalArrearsProjectionPromise)requestContext.canonicalArrearsProjectionPromise=rebuildAllCloudArrears(env,user,{limit,archive_snapshot:opts.archive_snapshot});
+    projection=await requestContext.canonicalArrearsProjectionPromise;
+  }else projection=bed?await rebuildCloudArrearsForBed(env,user,bed,{limit,archive_snapshot:opts.archive_snapshot}):await rebuildAllCloudArrears(env,user,{limit,archive_snapshot:opts.archive_snapshot});
   let allItems=(projection.all_items&&projection.all_items.length?projection.all_items:[...(projection.open_items||[]),...(projection.closed_items||[])])
     .map(canonicalArrearsGatewayCleanItem);
+  if(bed)allItems=allItems.filter(item=>item.bed===bed||item.effective_current_bed===bed);
   if(arrearsRef)allItems=allItems.filter(item=>[item.arrears_ref,item.task_id,item.id].some(value=>cleanText(value,160)===arrearsRef));
   const open_items=allItems.filter(item=>["open","partial"].includes(String(item.status||"").toLowerCase())&&entryAnchorMoney(item.remaining_arrears)>0);
   const closed_items=allItems.filter(item=>!open_items.includes(item));
@@ -5172,7 +5212,7 @@ async function canonicalBedContextGateway(env,user,opts={}){
   const bed=cleanText(opts.bed||"",80).replace(/^#/,"");
   const arrears=await canonicalArrearsGateway(env,user,{bed,limit:opts.limit||1000,archive_snapshot:opts.archive_snapshot,request_context:opts.request_context});
   const occupancy=await canonicalOccupancyGateway(env,user,{bed,arrears_gateway:arrears,limit:opts.limit||1000,strict_access_snapshot:opts.strict_access_snapshot===true,archive_snapshot:opts.archive_snapshot,request_context:opts.request_context,max_age_ms:opts.max_age_ms});
-  const stayContext=await canonicalStayBedContextGateway(env,user,{bed,limit:opts.limit||500,archive_snapshot:opts.archive_snapshot});
+  const stayContext=opts.include_stay_context===false?{status:"not_requested",warnings:[]}:await canonicalStayBedContextGateway(env,user,{bed,limit:opts.limit||500,archive_snapshot:opts.archive_snapshot});
   return {
     ok:true,
     success:true,
@@ -5192,8 +5232,8 @@ async function canonicalBedContextGateway(env,user,opts={}){
       occupancy_source:occupancy.source_proof,
       arrears_gateway:"Canonical Arrears Gateway",
       arrears_source:arrears.source_proof,
-      stay_context_gateway:"Canonical Stay Bed Context Gateway",
-      stay_context_sources:["sessions.entries_json","stay_contexts","stay_event_links"],
+      stay_context_gateway:opts.include_stay_context===false?"not_requested":"Canonical Stay Bed Context Gateway",
+      stay_context_sources:opts.include_stay_context===false?[]:["sessions.entries_json","stay_contexts","stay_event_links"],
       forbidden_identity_excluded:true
     },
     readonly:true,
@@ -5289,19 +5329,22 @@ __name(canonicalOccupancyCompareEventDate,"canonicalOccupancyCompareEventDate");
 async function canonicalOccupancyArchiveEventsForBed(env,user,bed,opts={}){
   const cleanBed=cleanText(bed,80).replace(/^#/,"");
   if(!cleanBed)return [];
-  const sessions=await cloudArrearsFetchActiveSessionRows(env,user,{limit:opts.limit||1000,archive_snapshot:opts.archive_snapshot}).catch(()=>[]);
-  const events=[];
-  for(const session of sessions||[]){
-    for(const raw of extractEmployeeEntryAnchorsFromSession(session)){
-      const anchor=normalizeEntryAnchor(raw);
-      const type=canonicalFinanceProjectionEventType(anchor);
-      const event=canonicalOccupancyEventView(anchor,session);
-      const bedMatch=event.bed===cleanBed||event.from_bed===cleanBed||event.to_bed===cleanBed;
-      if(!bedMatch)continue;
-      if(["rent","checkout","left_with_arrears","bed_transfer","bed_transfer_fee"].includes(type))events.push(event);
+  const context=opts.request_context||null;
+  const buildEvents=async()=>{
+    const sessions=await cloudArrearsFetchActiveSessionRows(env,user,{limit:opts.limit||1000,archive_snapshot:opts.archive_snapshot,request_context:context}).catch(()=>[]);
+    const events=[];
+    for(const session of sessions||[]){
+      for(const raw of extractEmployeeEntryAnchorsFromSession(session)){
+        const anchor=normalizeEntryAnchor(raw);
+        const type=canonicalFinanceProjectionEventType(anchor);
+        if(["rent","checkout","left_with_arrears","bed_transfer","bed_transfer_fee"].includes(type))events.push(canonicalOccupancyEventView(anchor,session));
+      }
     }
-  }
-  return events.sort(canonicalOccupancyCompareEventDate);
+    return events.sort(canonicalOccupancyCompareEventDate);
+  };
+  if(context&&!context.canonicalOccupancyEventsPromise)context.canonicalOccupancyEventsPromise=buildEvents();
+  const events=context?await context.canonicalOccupancyEventsPromise:await buildEvents();
+  return events.filter(event=>event.bed===cleanBed||event.from_bed===cleanBed||event.to_bed===cleanBed);
 }
 __name(canonicalOccupancyArchiveEventsForBed,"canonicalOccupancyArchiveEventsForBed");
 function canonicalOccupancyProjectStatus(bed,events=[],openArrears=[]){
@@ -5359,7 +5402,7 @@ async function canonicalOccupancyGateway(env,user,opts={}){
     ?{snapshot:opts.access_snapshot,card:opts.card||null,source_status:"provided",warning:""}
     :await canonicalDepositAccessSnapshotForBed(env,user,bed,{strict_access_snapshot:opts.strict_access_snapshot===true,request_context:opts.request_context,max_age_ms:opts.max_age_ms}).catch(e=>({snapshot:null,card:null,source_status:"access_snapshot_unavailable",warning:empReadErrorCode(e),error:empReadErrorCode(e),data_source:"live_api",fallback:false,candidate_count:0,ambiguous:false,conflict:false,stale:false}));
   const arrears=opts.arrears_gateway||await canonicalArrearsGateway(env,user,{bed,limit:opts.limit||1000,archive_snapshot:opts.archive_snapshot});
-  const events=Array.isArray(opts.events)?opts.events:await canonicalOccupancyArchiveEventsForBed(env,user,bed,{limit:opts.limit||1000,archive_snapshot:opts.archive_snapshot});
+  const events=Array.isArray(opts.events)?opts.events:await canonicalOccupancyArchiveEventsForBed(env,user,bed,{limit:opts.limit||1000,archive_snapshot:opts.archive_snapshot,request_context:opts.request_context});
   const openArrears=Array.isArray(arrears.open_items)?arrears.open_items:[];
   const projected=canonicalOccupancyProjectStatus(bed,events,openArrears);
   projected.openArrears=openArrears;
@@ -6524,6 +6567,7 @@ __name(empCachedTtlockRoomsDataFromTasks,"empCachedTtlockRoomsDataFromTasks");
 async function empLoadLockCardsWithCacheFallback(env,user,opts={}){
   const strict=opts.strict_access_snapshot===true;
   const requestContext=opts.request_context||ttlockRequestContext(opts.request||null,env,user,opts.route_category||"employee_ttlock_read",opts.max_age_ms??(strict?TTLOCK_STRICT_CACHE_MAX_AGE_MS:TTLOCK_READ_CACHE_MAX_AGE_MS));
+  requestContext.timeout_ms=Math.min(Math.max(Number(opts.timeoutMs||requestContext.timeout_ms||8000),1000),12000);
   try{
     const live=await getCanonicalTTLockSnapshot(env,user?.corpid||env.CORPID||"default",{request_context:requestContext,max_age_ms:opts.max_age_ms??(strict?TTLOCK_STRICT_CACHE_MAX_AGE_MS:TTLOCK_READ_CACHE_MAX_AGE_MS)});
     if(!live?.error)return {...live,strict_access_snapshot:strict};
