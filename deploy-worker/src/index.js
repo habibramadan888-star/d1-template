@@ -3660,12 +3660,37 @@ __name(employeeBedTransferSingleEntryFailure,"employeeBedTransferSingleEntryFail
 async function persistEmployeeBedTransferCanonicalArchive(env,user,body,validationResult){
   const session=body?.session||{},sessionId=cleanId(session.id||session.session_id);
   const preview=validationResult?.bed_transfer_phase1_preview||{};
-  const base=prepareCanonicalTransferArchiveWrite({validated_anchor:preview,session_id:sessionId,accepted_at:empNow(),operator_reference:cleanText(user?.userid||'',120)});
+  const entryIdentity=cleanText(body?.entry_identity||body?.entry?.id||body?.entry?.event_id||body?.entry?.anchor_id||'',120);
+  const base=prepareCanonicalTransferArchiveWrite({validated_anchor:preview,session_id:sessionId,entry_identity:entryIdentity,accepted_at:empNow(),operator_reference:cleanText(user?.userid||'',120)});
   if(!base.ok)return json({success:false,ok:false,error_code:base.error_code,no_write:true},422);
-  const readExisting=()=>env.DB.prepare('SELECT id, anchor_id, entries_json, voided_at FROM sessions WHERE id=? AND corpid=? LIMIT 1').bind(sessionId,user.corpid).first().catch(()=>null);
+  const readExisting=()=>env.DB.prepare('SELECT id, anchor_id, entries_count, entries_json, handover_status, voided_at FROM sessions WHERE id=? AND corpid=? LIMIT 1').bind(sessionId,user.corpid).first().catch(()=>null);
   const existing=await readExisting();
-  if(existing){const classified=classifyExistingCanonicalTransfer(existing.entries_json,base.request_fingerprint);if(classified.status==='conflict')return json({success:false,ok:false,error_code:classified.error_code,no_write:true},409);return success({success:true,ok:true,idempotent:true,already_accepted:true,session_id:sessionId,canonical_entry:classified.entry});}
-  const prepared=prepareCanonicalTransferArchiveWrite({validated_anchor:preview,session_id:sessionId,accepted_at:empNow(),operator_reference:cleanText(user?.userid||'',120)},{idFactory:()=>crypto.randomUUID()});
+  if(existing){
+    const classified=classifyExistingCanonicalTransfer(existing.entries_json,base.request_fingerprint);
+    if(classified.status==='accepted')return success({success:true,ok:true,idempotent:true,already_accepted:true,session_finalized:String(existing.handover_status||'').toUpperCase()==='COMPLETED',session_id:sessionId,canonical_entry:classified.entry});
+    let envelope=null;
+    try{envelope=JSON.parse(existing.entries_json||'{}')}catch{}
+    const existingEntries=Array.isArray(envelope)?envelope:(Array.isArray(envelope?.entries)?envelope.entries:[]);
+    const resumable=String(env.APP_ENV||'').toLowerCase()==='internal_beta'&&bedTransferWriteApproved(env)&&!String(existing.voided_at||'').trim()&&String(existing.handover_status||'').toUpperCase()==='EXPORTING'&&existingEntries.length>0&&!existingEntries.some(row=>String(row?.event_type||'').toLowerCase()==='bed_transfer');
+    if(!resumable)return json({success:false,ok:false,error_code:classified.error_code,no_write:true},409);
+    const prepared=prepareCanonicalTransferArchiveWrite({validated_anchor:preview,session_id:sessionId,entry_identity:entryIdentity,accepted_at:empNow(),operator_reference:cleanText(user?.userid||'',120)},{idFactory:()=>crypto.randomUUID()});
+    const mergedEntries=[...existingEntries,prepared.entry];
+    const mergedJson=JSON.stringify({anchor_contract_version:'employee_entry_anchor_v1',entries:mergedEntries});
+    const update=await env.DB.prepare(`UPDATE sessions SET entries_json=?, entries_count=?, handover_status='COMPLETED', exported_at=? WHERE id=? AND corpid=? AND COALESCE(voided_at,'')='' AND UPPER(COALESCE(handover_status,''))='EXPORTING'`).bind(mergedJson,mergedEntries.length,prepared.entry.canonical_accepted_at,sessionId,user.corpid).run();
+    if(Number(update?.meta?.changes??update?.changes??0)!==1){
+      const raced=await readExisting(),racedClassified=classifyExistingCanonicalTransfer(raced?.entries_json,prepared.request_fingerprint);
+      if(racedClassified.status==='accepted')return success({success:true,ok:true,idempotent:true,already_accepted:true,session_finalized:true,session_id:sessionId,canonical_entry:racedClassified.entry});
+      return json({success:false,ok:false,error_code:'EMPLOYEE_SESSION_FINALIZATION_CONFLICT',no_write:true},409);
+    }
+    const persisted=await readExisting();
+    let persistedEnvelope=null;
+    try{persistedEnvelope=JSON.parse(persisted?.entries_json||'{}')}catch{}
+    const persistedEntries=Array.isArray(persistedEnvelope)?persistedEnvelope:(Array.isArray(persistedEnvelope?.entries)?persistedEnvelope.entries:[]);
+    const matching=persistedEntries.filter(row=>String(row?.event_type||'').toLowerCase()==='bed_transfer'&&row?.canonical_request_fingerprint===prepared.request_fingerprint&&(!entryIdentity||cleanText(row?.entry_identity||row?.id||row?.event_id||'',120)===entryIdentity));
+    if(matching.length!==1||String(persisted?.handover_status||'').toUpperCase()!=='COMPLETED')return json({success:false,ok:false,error_code:'CANONICAL_ARCHIVE_PERSISTENCE_VERIFICATION_FAILED',no_write:false,write_attempted:true,production_cutover:'PRODUCTION_NO_GO'},500);
+    return success({success:true,ok:true,idempotent:false,canonical_write_status:'accepted',canonical_persistence_verified:true,session_finalized:true,resumable_finalization:true,session_id:sessionId,canonical_entry:matching[0]});
+  }
+  const prepared=prepareCanonicalTransferArchiveWrite({validated_anchor:preview,session_id:sessionId,entry_identity:entryIdentity,accepted_at:empNow(),operator_reference:cleanText(user?.userid||'',120)},{idFactory:()=>crypto.randomUUID()});
   try{
     await env.DB.prepare(`INSERT INTO sessions (id,corpid,anchor_id,date,entries_count,created_by,created_at,operator_id,operator_name,cash_handover,bank_transfer_total,bank_transfer_count,gross_received,handover_status,exported_at,export_text,source,entries_json)
       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(sessionId,user.corpid,prepared.entry.transfer_anchor_id,cleanDate(session.date||prepared.entry.canonical_accepted_at),1,user.userid,prepared.entry.canonical_accepted_at,user.userid,cleanText(user.employee_name||user.userid,120),0,0,0,0,'COMPLETED',prepared.entry.canonical_accepted_at,'','employee_entry',prepared.entries_json).run();
@@ -4701,6 +4726,13 @@ async function handleEmployeeEntrySyncState(request,env,user){
   }
   const cloudEntries=extractEmployeeEntryAnchorsFromSession(session);
   const cloudKeySets=cloudEntries.map(row=>employeeEntryCloudSyncKeySet(row,user));
+  const localEntryIds=[...new Set((entries||[]).map(entry=>cleanId(entry?.event_id||entry?.anchor_id||entry?.id||entry?.cloud_entry_id||'')).filter(Boolean))].slice(0,100);
+  const persistedTransactionIds=new Set();
+  if(localEntryIds.length&&await empTableExists(env,'transactions').catch(()=>false)){
+    const placeholders=localEntryIds.map(()=>'?').join(',');
+    const rows=(await env.DB.prepare(`SELECT id FROM transactions WHERE corpid=? AND id IN (${placeholders})`).bind(user.corpid,...localEntryIds).all().catch(()=>({results:[]}))).results||[];
+    for(const row of rows)persistedTransactionIds.add(cleanId(row?.id||''));
+  }
   let effectiveTransferAnchorIds=null;
   if(cloudEntries.some(row=>parseBedTransferDerivedArrearsRef(row?.arrears_ref||row?.original_arrears_id||""))){
     const projection=await rebuildAllCloudArrears(env,user,{limit:2000});
@@ -4723,6 +4755,8 @@ async function handleEmployeeEntrySyncState(request,env,user){
       }
       return {index,local_event_id:cleanText(entry?.event_id||entry?.anchor_id||entry?.id||entry?.cloud_entry_id||"",120),status:"cloud_confirmed",sync_status:"SYNCED",archive_state:"exists_active",cloud_match:true,matched:true,matched_by:"canonical_fingerprint_or_event_id",cloud_record_id:cleanText(session.id||"",160),matched_event_id:cleanText(matched.event_id||matched.anchor_id||matched.id||"",120),source_proof:{source:"canonical_event_archive",session_id:session.id||"",anchor_id:session.anchor_id||""},allowed_next_action:"none",reason:"matched_cloud_anchor"};
     }
+    const localEventId=cleanId(entry?.event_id||entry?.anchor_id||entry?.id||entry?.cloud_entry_id||'');
+    if(localEventId&&persistedTransactionIds.has(localEventId))return {index,local_event_id:localEventId,status:'cloud_confirmed',sync_status:'SYNCED',archive_state:'exists_active',cloud_match:true,matched:true,matched_by:'transaction_entry_id',cloud_record_id:cleanText(session.id||'',160),matched_event_id:localEventId,source_proof:{source:'transactions',session_id:session.id||'',anchor_id:session.anchor_id||''},allowed_next_action:'none',reason:'matched_persisted_transaction'};
     return {index,local_event_id:cleanText(entry?.event_id||entry?.anchor_id||entry?.id||entry?.cloud_entry_id||"",120),status:"cloud_mismatch",sync_status:"CLOUD_MISMATCH",archive_state:"mismatch",cloud_match:false,matched:false,matched_by:"",cloud_record_id:cleanText(session.id||"",160),source_proof:{source:"canonical_event_archive",session_id:session.id||"",anchor_id:session.anchor_id||"",cloud_entries_count:cloudEntries.length},allowed_next_action:"owner_review_required",reason:cloudEntries.length?"no_matching_cloud_anchor":"no_cloud_entries"};
   });
   return success({...base,session_status:"cloud_active",archive_state:"exists_active",cloud_session:{id:session.id,anchor_id:session.anchor_id,handover_status:session.handover_status||"",voided_at:session.voided_at||""},entries:results});
@@ -4761,15 +4795,19 @@ async function employeeEntryExistingTransactionsByEventId(env,user,keys){
   return rows;
 }
 __name(employeeEntryExistingTransactionsByEventId,"employeeEntryExistingTransactionsByEventId");
-async function employeeEntryExistingSessionAnchors(env,user,incomingSessionId){
-  const rows=await env.DB.prepare(`SELECT id, anchor_id, created_at, entries_json, export_text FROM sessions
-    WHERE corpid=? AND COALESCE(voided_at,'')='' AND COALESCE(handover_status,'')<>'VOID'
-    ORDER BY created_at DESC LIMIT 1000`).bind(user.corpid).all().catch(()=>({results:[]}));
+async function employeeEntryExistingSessionAnchors(env,user,incomingSessionId,opts={}){
+  const snapshot=opts.request_context
+    ?await cloudArrearsFetchActiveSessionRows(env,user,{limit:1000,request_context:opts.request_context}).catch(()=>[])
+    :null;
+  const rows=Array.isArray(snapshot)
+    ?snapshot.filter(session=>!String(session?.voided_at||'').trim()&&String(session?.handover_status||'').toUpperCase()!=='VOID')
+    :(await env.DB.prepare(`SELECT id, anchor_id, created_at, entries_json, export_text FROM sessions
+      WHERE corpid=? AND COALESCE(voided_at,'')='' AND COALESCE(handover_status,'')<>'VOID'
+      ORDER BY created_at DESC LIMIT 1000`).bind(user.corpid).all().catch(()=>({results:[]}))).results||[];
   const anchors=[];
-  for(const session of rows.results||[]){
-    if(incomingSessionId&&String(session.id||"")===String(incomingSessionId))continue;
+  for(const session of rows){
     const extracted=extractEmployeeEntryAnchorsFromSession(session);
-    extracted.forEach((anchor,index)=>anchors.push({session,index,anchor}));
+    extracted.forEach((anchor,index)=>anchors.push({session,index,anchor,same_session:!!incomingSessionId&&String(session.id||'')===String(incomingSessionId)}));
   }
   return anchors;
 }
@@ -4808,10 +4846,26 @@ async function checkEmployeeEntryDuplicates(env,user,body,opts={}){
       incoming_fingerprint_set:employeeEntryDuplicateSetFingerprint(incomingKeys)
     };
   }
-  const existingAnchors=await employeeEntryExistingSessionAnchors(env,user,incomingSessionId);
+  const existingAnchors=await employeeEntryExistingSessionAnchors(env,user,incomingSessionId,opts);
+  const sameSessionAnchors=existingAnchors.filter(existing=>existing.same_session);
+  const allSameSessionArchiveExisting=incomingSessionId&&incomingKeys.length>0&&incomingKeys.every(incoming=>sameSessionAnchors.some(existing=>{
+    const stored=buildEmployeeEntryDuplicateKeys(existing.anchor,user,existing.index);
+    return !!((incoming.event_id&&stored.event_id===incoming.event_id)||(incoming.canonical_fingerprint&&stored.canonical_fingerprint===incoming.canonical_fingerprint));
+  }));
+  if(allSameSessionArchiveExisting){
+    return {
+      ok:true,
+      idempotent:true,
+      existing_session_id:incomingSessionId,
+      existing_anchor:cleanText(sameSessionAnchors[0]?.session?.anchor_id||session.anchorId||session.anchor_id||'',120),
+      canonical_fingerprint_persistence:'COMPLETE',
+      incoming_fingerprint_set:employeeEntryDuplicateSetFingerprint(incomingKeys)
+    };
+  }
   const sourceMap=new Map();
   const canonicalMap=new Map();
   for(const existing of existingAnchors){
+    if(existing.same_session)continue;
     const key=buildEmployeeEntryDuplicateKeys(existing.anchor,user,existing.index);
     const detail={
       event_id:key.event_id,

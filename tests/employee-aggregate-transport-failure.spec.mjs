@@ -105,7 +105,8 @@ test("pure Retry Validation validates all saved records and returns before forma
   assert.match(employee, /btnValidateSession'\)\.onclick=\(\)=>\{state\.aggregateValidationOnly=true;commitSessionAndExport\(\)\}/);
   assert.match(upload, /const validateOnly=state\.aggregateValidationOnly===true/);
   assert.match(employee, /state\.aggregateValidationOnly=true;commitSessionAndExport\(\)/);
-  assert.match(upload, /validateOnly\?allOriginalDrafts/);
+  assert.match(upload, /const originalDrafts=allOriginalDrafts/);
+  assert.doesNotMatch(upload, /state\.drafts=uploadList/);
   const validateOnlyGate = upload.indexOf("if(validateOnly)");
   const formalWrite = upload.indexOf("apiFetch('/api/employee/entry'", validateOnlyGate);
   assert.ok(validateOnlyGate >= 0 && formalWrite > validateOnlyGate);

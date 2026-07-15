@@ -4714,12 +4714,12 @@ function employeeBedTransferValidatePayload(entry={},session={}){
   const clean=Object.fromEntries(allowed.filter(field=>entry[field]!==undefined).map(field=>[field,entry[field]]));
   const entryIdentity=employeeEntryStableIdentity(entry);
   if(state.bedTransferCapabilities?.controlled_beta_preview===true&&!String(clean.transfer_reason||'').includes('CONTROLLED_BETA_TEST'))clean.transfer_reason=`CONTROLLED_BETA_TEST|${String(clean.transfer_reason||'employee_beta').slice(0,180)}`;
-  const safeSession={id:employeeBedTransferCanonicalSessionId(entry,session),source:'employee_entry',entries:[clean]};
+  const safeSession={id:String(session.id||session.session_id||employeeBedTransferCanonicalSessionId(entry,session)),source:'employee_entry',entries:[clean]};
   return {dry_run:true,validate_only:true,no_write:true,event_index:0,entry_identity:entryIdentity,entry:clean,entries:[clean],session:safeSession};
 }
 function employeeBedTransferRecordPayload(validated={}){
   const entry=validated.entry||{},session=validated.session||{};
-  return {event_index:0,entry,entries:[entry],session:{id:String(session.id||''),source:'employee_entry',entries:[entry]}};
+  return {event_index:0,entry_identity:String(validated.entry_identity||''),entry,entries:[entry],session:{id:String(session.id||''),source:'employee_entry',entries:[entry]}};
 }
 function employeeEntryStableIdentity(entry={}){
   return String(entry.id||entry.event_id||entry.anchor_id||entry.original_local_entry_id||'').trim();
@@ -7912,19 +7912,20 @@ function employeeUploadFieldListText(fields){
 }
 function employeeUploadSuggestedActionParts(result){
   const r=normalizeEmployeeUploadDryRunError(result,result?.event_index);
+  const errorCode=String(r.error_code||'');
   if(r.error_code==='SERVER_DRY_RUN_REQUIRED'){
     return {en:'Click Upload Session to run server validation before cloud upload.',zh:'请点击上传本票，系统会先执行服务器预校验。'};
   }
   if(r.error_code==='ARREARS_REF_STALE_REFRESH_REQUIRED'||r.event_type==='arrears_payment'){
     return {en:'Refresh arrears or remove this record, then select an open arrears item again.',zh:'请刷新欠款或删除这条记录，然后重新选择未清欠款。'};
   }
-  if((r.error_code||'').includes('CHECKOUT_OPEN_ARREARS')||(r.invalid_fields||[]).includes('open_arrears')){
+  if(errorCode.includes('CHECKOUT_OPEN_ARREARS')||(r.invalid_fields||[]).includes('open_arrears')){
     return {en:'Choose Collect Arrears First, Request Owner Approval, or Left With Arrears before adding checkout.',zh:'请先选择先收欠款、申请老板审核，或离店未清欠款后再录入退房。'};
   }
-  if((r.error_code||'').includes('DEPOSIT_REFUND_OPEN_ARREARS')){
+  if(errorCode.includes('DEPOSIT_REFUND_OPEN_ARREARS')){
     return {en:'Collect arrears first or request owner approval before refunding deposit.',zh:'请先收清欠款或申请老板审核后再退押金。'};
   }
-  if((r.error_code||'').includes('DEPOSIT_REFUND_DIFFERENCE_REASON')){
+  if(errorCode.includes('DEPOSIT_REFUND_DIFFERENCE_REASON')){
     return {en:'Enter Difference Reason, then upload again.',zh:'请填写差额原因后重新上传。'};
   }
   if((r.missing_fields||[]).length){
@@ -8375,7 +8376,7 @@ async function commitSessionAndExport(){
   };
   btns.forEach(b=>{b.dataset.busy='1';b.disabled=true;b.classList.add('disabled');b.innerHTML=renderEmployeeButtonLabel('Validating','正在校验')});
   const allOriginalDrafts=state.drafts.map(e=>({...e}));
-  const originalDrafts=validateOnly?allOriginalDrafts:allOriginalDrafts.filter(entry=>!employeeEntryCloudConfirmed(entry));
+  const originalDrafts=allOriginalDrafts;
   if(!originalDrafts.length){oldLabels.forEach(([b,html])=>{b.dataset.busy='0';b.innerHTML=html});updateEntrySessionActionState();return;}
   const originalSessionId=state.sessionId;
   const payloadStart=performance.now();
@@ -8384,7 +8385,11 @@ async function commitSessionAndExport(){
   state.sessionId=uploadSessionId;
   const uploadList=prepareRepeatableUploadRows(originalDrafts,uploadSessionId);
   uploadList.forEach(e=>{e.upload_status='VALIDATING';e.upload_validation_error=null;});
-  state.drafts=uploadList;
+  const transientByIdentity=new Map(uploadList.map(entry=>[employeeEntryStableIdentity(entry),entry]));
+  state.drafts.forEach(entry=>{
+    const transient=transientByIdentity.get(employeeEntryStableIdentity(entry));
+    if(transient){entry.upload_status='VALIDATING';entry.upload_validation_error=null;entry.upload_validation_error_code='';}
+  });
   refreshSessionViews();
   buildExport();
   uploadTiming.payload_build_ms=Math.round(performance.now()-payloadStart);
@@ -8396,7 +8401,7 @@ async function commitSessionAndExport(){
   const ordinarySession={...session,cash_handover:ordinarySummary.cashNet,bank_transfer_total:ordinarySummary.bankReceived,bank_transfer_count:ordinarySummary.bankCount,gross_received:ordinarySummary.totalReceived};
   const failed=[];
   const dryRunFailed=[];
-  const bedTransferUploadPayloads=[];
+  const bedTransferUploadPayloads=new Map();
   const validationRequests=[];
   setUploadPhase(`Dry-run validating ${uploadList.length} records`,'Validating');
   for(let i=0;i<uploadList.length;i++){
@@ -8414,7 +8419,7 @@ async function commitSessionAndExport(){
     const requestPayload=isBedTransfer?employeeBedTransferValidatePayload(e,sessionForEntry):{dry_run:true,validate_only:true,no_write:true,event_index:i,entry:e,entries:[e],session:{...sessionForEntry,entries:[e],entries_json:JSON.stringify({anchor_contract_version:'employee_entry_anchor_v1',entries:[e]})}};
     requestPayload.event_index=i;
     validationRequests.push(requestPayload);
-    if(isBedTransfer)bedTransferUploadPayloads[i]=employeeBedTransferRecordPayload(requestPayload);
+    if(isBedTransfer)bedTransferUploadPayloads.set(employeeEntryStableIdentity(e),employeeBedTransferRecordPayload(requestPayload));
   }
   const aggregatePreflight=await validateEmployeeUploadAggregateDryRun(validationRequests);
   if(aggregatePreflight?.transport_failure===true){
@@ -8453,7 +8458,8 @@ async function commitSessionAndExport(){
       buildExport();refreshSessionViews();oldLabels.forEach(([b,html])=>{b.dataset.busy='0';b.disabled=false;b.classList.remove('disabled');b.innerHTML=html});updateEntrySessionActionState();return;
     }
     if(rawResult?.ok===true){
-      e.upload_status='VALIDATION_PASSED';
+      e.upload_resume_state=rawResult.idempotent===true?'ALREADY_PERSISTED':'VALIDATED';
+      e.upload_status=rawResult.idempotent===true?'ALREADY_PERSISTED':'VALIDATION_PASSED';
       e.upload_validation_error=null;
       e.upload_validation_error_code='';
       e.sync_error='';
@@ -8500,7 +8506,8 @@ async function commitSessionAndExport(){
     uploadList.forEach(validated=>{
       const original=allOriginalDrafts.find(row=>employeeEntryStableIdentity(row)===employeeEntryStableIdentity(validated));
       if(!original)return;
-      original.upload_status='VALIDATION_PASSED';
+      original.upload_status=validated.upload_status;
+      original.upload_resume_state=validated.upload_resume_state||'VALIDATED';
       original.upload_validation_error=null;
       original.upload_validation_error_code='';
       original.sync_error='';
@@ -8514,11 +8521,19 @@ async function commitSessionAndExport(){
     updateEntrySessionActionState();
     return;
   }
-  showStatus(`Uploading confirmed session: ${uploadList.length} entries...`);
-  toast(`Uploading confirmed session: ${uploadList.length} entries...`,6000);
-  for(let i=0;i<uploadList.length;i++){
-    const e=uploadList[i];
-    const isFinal=i===uploadList.length-1;
+  const writeQueue=[...uploadList.filter(entry=>String(entry?.type||'').toUpperCase()!=='TF'),...uploadList.filter(entry=>String(entry?.type||'').toUpperCase()==='TF')];
+  const pendingWriteCount=writeQueue.filter(entry=>entry.upload_resume_state!=='ALREADY_PERSISTED').length;
+  showStatus(`Uploading confirmed session: ${pendingWriteCount} pending of ${uploadList.length} entries...`);
+  toast(`Uploading confirmed session: ${pendingWriteCount} pending of ${uploadList.length} entries...`,6000);
+  for(let i=0;i<writeQueue.length;i++){
+    const e=writeQueue[i];
+    if(e.upload_resume_state==='ALREADY_PERSISTED'){
+      e.sync_status='SYNCED';
+      e.upload_status='ALREADY_PERSISTED';
+      e.cloud_sync_status='CLOUD_CONFIRMED';
+      continue;
+    }
+    const isFinal=i===writeQueue.length-1;
     const isBedTransfer=String(e?.type||'').toUpperCase()==='TF'||String(e?.event_type||'').toLowerCase()==='bed_transfer';
     const requestEntries=isBedTransfer?[e]:ordinaryCanonicalEntries;
     const sessionForEntry={
@@ -8530,12 +8545,12 @@ async function commitSessionAndExport(){
     };
     try{
       e.upload_status='UPLOADING';
-      setUploadPhase(`Uploading ${i+1}/${uploadList.length}`,'Uploading');
+      setUploadPhase(`Uploading ${i+1}/${writeQueue.length}`,'Uploading');
       const apiStart=performance.now();
-      const requestBody=bedTransferUploadPayloads[i]||{entry:e,session:sessionForEntry,timing_debug:employeeUploadTimingEnabled()};
+      const requestBody=bedTransferUploadPayloads.get(employeeEntryStableIdentity(e))||{entry:e,session:sessionForEntry,timing_debug:employeeUploadTimingEnabled()};
       const r=await apiFetch('/api/employee/entry',{method:'POST',headers:employeeUploadTimingEnabled()?{'X-Employee-Entry-Timing':'1'}:{},body:JSON.stringify(requestBody)});
       uploadTiming.api_request_ms+=Math.round(performance.now()-apiStart);
-      setUploadPhase(`Confirming ${i+1}/${uploadList.length}`,'Confirming');
+      setUploadPhase(`Confirming ${i+1}/${writeQueue.length}`,'Confirming');
       const parseStart=performance.now();
       const raw=await r.text();
       let data=null;
@@ -8597,7 +8612,8 @@ async function commitSessionAndExport(){
     updateEntrySessionActionState();
     return;
   }
-  state.drafts=employeeMarkDraftsAwaitingCloudConfirmation(uploadList,uploadSessionId);
+  const completedByIdentity=new Map(uploadList.map(entry=>[employeeEntryStableIdentity(entry),entry]));
+  state.drafts=employeeMarkDraftsAwaitingCloudConfirmation(allOriginalDrafts.map(original=>completedByIdentity.get(employeeEntryStableIdentity(original))||original),uploadSessionId);
   state.sessionId=uploadSessionId;
   state.uploadValidationFailedIndex=null;
   state.uploadValidationFailedEntryId='';
@@ -9031,10 +9047,17 @@ async function checkEmployeeSession(){
   }catch{}
   $('loginOverlay').classList.add('hidden');
   $('loginOverlay').setAttribute('aria-hidden','true');
+  let me=null;
   try{
-    const me=await fetchCurrentAuthUser();
-    if(!me){redirectToUnifiedLogin('employee_session_required');return}
-    if(isEmployeeAuthRole(me.role)){
+    me=await fetchCurrentAuthUser();
+  }catch(e){
+    console.warn('[UnifiedLogin] employee session check temporarily unavailable:',e);
+    showStatus('Session check temporarily unavailable. Your login and local records were kept.','warn');
+    return;
+  }
+  if(!me){redirectToUnifiedLogin('employee_session_required');return}
+  if(isEmployeeAuthRole(me.role)){
+    try{
       applyEmployeeUser({
         userid:me.userid,
         employee_name:me.employee_name||me.name||me.username||me.userid,
@@ -9045,17 +9068,14 @@ async function checkEmployeeSession(){
         role:me.role
       });
       $('loginPin').value='';
-      return;
+    }catch(e){
+      console.error('[UnifiedLogin] employee local workspace render failed; authentication retained:',e);
+      showStatus('Local workspace could not render. Login and saved records were retained.','bad');
     }
-    if(isOwnerAuthRole(me.role)){
-      location.replace('/owner');
-      return;
-    }
-    redirectToUnifiedLogin('employee_role_denied');
-  }catch(e){
-    console.warn('[UnifiedLogin] employee session handoff failed:',e);
-    redirectToUnifiedLogin('employee_session_check_failed');
+    return;
   }
+  if(isOwnerAuthRole(me.role)){location.replace('/owner');return}
+  redirectToUnifiedLogin('employee_role_denied');
 }
 function employeeUiPair(en,cn){
   return `${esc(en)}<span class="label-en">${esc(cn)}</span>`;
