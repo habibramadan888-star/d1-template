@@ -34,48 +34,43 @@ function constBlock(source, name) {
   return source.slice(start, end + 2);
 }
 
-test("Expense validation enforces evidence threshold and required fields", async () => {
+test("Expense validation requires only room, positive amount, Cash or Bank, and description", async () => {
   const worker = await readFile(workerPath, "utf8");
   const validator = functionBlock(worker, "validateExpenseUploadFields");
 
-  for (const field of ["expense_amount", "expense_category", "payment_method", "reason"]) {
+  for (const field of ["target_bed", "expense_amount", "payment_method", "expense_description"]) {
     assert.match(validator, new RegExp(`missing\\.push\\("${field}"\\)`), `${field} must be required`);
   }
   assert.match(validator, /const rawPaymentMethod=cleanText\(entry\.payment_method\|\|entry\.pay_type\|\|""/);
-  assert.match(validator, /const rawReason=cleanText\(entry\.reason\|\|""/);
-  assert.doesNotMatch(validator, /normalized\.payment_method\|\|entry\.payment_method\|\|entry\.pay_type/);
-  assert.doesNotMatch(validator, /normalized\.reason\|\|entry\.reason\|\|entry\.expense_desc\|\|entry\.note/);
-  assert.match(validator, /amount>=100/);
-  assert.match(validator, /evidenceRef/);
-  assert.match(validator, /EXPENSE_EVIDENCE_REQUIRED/);
+  assert.match(validator, /const rawDescription=cleanText\(entry\.expense_description\|\|entry\.expense_desc\|\|entry\.note/);
+  assert.match(validator, /\["cash","bank"\]\.includes\(paymentMethod\)/);
+  assert.doesNotMatch(validator, /amount>=100|evidenceRef|EXPENSE_EVIDENCE_REQUIRED/);
   assert.match(validator, /EXPENSE_REQUIRED_FIELD_MISSING/);
   assert.doesNotMatch(validator, /RENT_REQUIRED_FIELD_MISSING/);
 });
 
-test("Expense missing reason and payment method cannot be hidden by normalization defaults", async () => {
+test("Expense missing description and payment method cannot be hidden by normalization defaults", async () => {
   const worker = await readFile(workerPath, "utf8");
   const validator = functionBlock(worker, "validateExpenseUploadFields");
   const normalizer = functionBlock(worker, "normalizeEntryAnchor");
 
   assert.match(normalizer, /payment_method=entryAnchorPaymentMethod/);
-  assert.match(normalizer, /reason:anchor\.reason\|\|anchor\.expense_desc/);
-  assert.match(validator, /rawReason/);
+  assert.match(normalizer, /const description=anchor\.expense_description\|\|anchor\.expense_desc/);
+  assert.match(validator, /rawDescription/);
   assert.match(validator, /rawPaymentMethod/);
-  assert.match(validator, /if\(!employeeEntryUploadHasValue\(rawReason\)\)missing\.push\("reason"\)/);
+  assert.match(validator, /if\(!rawDescription\)missing\.push\("expense_description"\)/);
   assert.match(validator, /if\(!employeeEntryUploadHasValue\(rawPaymentMethod\)\)missing\.push\("payment_method"\)/);
-  assert.doesNotMatch(validator, /entry\.expense_desc\|\|entry\.note/);
+  assert.match(validator, /entry\.expense_desc\|\|entry\.note/);
 });
 
-test("Employee Expense UI captures evidence_ref and requires it at 100 AED or more", async () => {
+test("Employee Expense UI has exactly the approved four inputs and no evidence control", async () => {
   const html = await readFile(employeePath, "utf8");
   const validate = functionBlock(html, "validateExpenseEntry");
   const builder = functionBlock(html, "buildExpenseAnchor");
 
-  assert.match(html, /id="expenseEvidenceRef"/);
-  assert.match(validate, /amount'\)\)>=100/);
-  assert.match(validate, /expenseEvidenceRef/);
-  assert.match(validate, /Evidence Ref is required for expenses of 100 AED or more/);
-  assert.match(builder, /evidence_ref:employeeTrimField\('expenseEvidenceRef'\)/);
+  assert.doesNotMatch(html, /id="expenseEvidenceRef"|Evidence Ref/);
+  assert.doesNotMatch(validate, /expenseEvidenceRef|evidence_ref/);
+  assert.doesNotMatch(builder, /expenseEvidenceRef/);
   assert.match(builder, /reason:note/);
 });
 
@@ -111,19 +106,9 @@ test("Expense finance movement is outflow only and not tenant debt", async () =>
   assert.match(candidate, /candidate_not_applicable/);
 });
 
-test("Today Todo surfaces canonical Expense evidence gaps without becoming source of truth", async () => {
+test("Today Todo does not recreate the removed Expense evidence requirement", async () => {
   const worker = await readFile(workerPath, "utf8");
-  const archive = functionBlock(worker, "ownerTodayTodoArchiveContextFromSessions");
   const evidence = functionBlock(worker, "ownerTodayTodoBuildExpenseEvidence");
-  const gateway = functionBlock(worker, "buildOwnerTodayTodoGateway");
-
-  assert.match(archive, /expense_events/);
-  assert.match(archive, /canonical_event_archive_expense/);
-  assert.match(evidence, /EXPENSE_EVIDENCE_MISSING/);
-  assert.match(evidence, /entryAnchorMoney\(event\.amount\)<100/);
-  assert.match(evidence, /canonical_event_archive \+ canonical_finance_projection_gateway/);
-  assert.match(evidence, /ownerTodayTodoSourceProof/);
-  assert.match(gateway, /ownerTodayTodoBuildExpenseEvidence/);
-  assert.match(gateway, /readonly:true/);
-  assert.match(gateway, /no_write:true/);
+  assert.match(evidence, /return todos/);
+  assert.doesNotMatch(evidence, /EXPENSE_EVIDENCE_MISSING|evidence_ref|100/);
 });

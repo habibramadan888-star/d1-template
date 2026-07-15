@@ -1048,7 +1048,7 @@ __name(ttlockScopeKey,"ttlockScopeKey");
 function ttlockRequestContext(request,env,user,routeCategory="read",maxAgeMs=TTLOCK_READ_CACHE_MAX_AGE_MS){
   let requestHost="";
   try{requestHost=new URL(request?.url||"").hostname.toLowerCase();}catch{}
-  return {corpid:cleanText(user?.corpid||env?.CORPID||"default",120)||"default",request_host:requestHost,route_category:cleanText(routeCategory,80)||"read",max_age_ms:maxAgeMs,timeout_ms:8000,ttlockSnapshotPromise:null,archiveSnapshotPromise:null,archive_read_count:0,archive_parse_count:0,bed_context_count:0,ttlock_external_call_count:0,ttlock_cache_state:"",kv_read_count:0,kv_write_count:0,last_successful_stage:"request_started",started_at_ms:Date.now()};
+  return {corpid:cleanText(user?.corpid||env?.CORPID||"default",120)||"default",request_host:requestHost,route_category:cleanText(routeCategory,80)||"read",max_age_ms:maxAgeMs,timeout_ms:8000,ttlockSnapshotPromise:null,ttlock_snapshot_count:0,archiveSnapshotPromise:null,archive_entries_prepared:false,archive_read_count:0,archive_parse_count:0,bed_context_count:0,capabilities_read_count:0,ttlock_external_call_count:0,ttlock_cache_state:"",kv_read_count:0,kv_write_count:0,last_successful_stage:"request_started",started_at_ms:Date.now()};
 }
 __name(ttlockRequestContext,"ttlockRequestContext");
 function ttlockLiveFetchAllowed(env={},context={}){
@@ -1187,6 +1187,7 @@ __name(loadLockCards, "loadLockCards");
 async function getCanonicalTTLockSnapshot(env,corpid,options={}){
   const context=options.request_context||{},maxAgeMs=Math.max(0,Number(options.max_age_ms??context.max_age_ms??TTLOCK_READ_CACHE_MAX_AGE_MS)),now=Date.now(),scope=ttlockScopeKey(env,corpid),cacheKey=`ttlock:snapshot:v2:${scope}`;
   if(context.ttlockSnapshotPromise){const reused=await context.ttlockSnapshotPromise;return {...reused,_ttlock_meta:{...(reused?._ttlock_meta||{}),snapshot_reused:true}};}
+  context.ttlock_snapshot_count=Number(context.ttlock_snapshot_count||0)+1;
   const task=(async()=>{
     context.kv_read_count=Number(context.kv_read_count||0)+1;
     const cached=await ttlockKvReadJson(env,cacheKey),observed=Date.parse(cached?.observed_at||""),age=Number.isFinite(observed)?Math.max(0,now-observed):Infinity;
@@ -1672,7 +1673,13 @@ __name(canonicalDepositAccessSnapshotForBed,"canonicalDepositAccessSnapshotForBe
 async function canonicalDepositAuditEventsForBed(env,user,bed,opts={}){
   const cleanBed=cleanText(bed,80).replace(/^#/,"");
   if(!cleanBed)return [];
-  const sessions=await cloudArrearsFetchActiveSessionRows(env,user,{limit:opts.limit||1000}).catch(()=>[]);
+  const context=opts.request_context||null;
+  const sessions=await cloudArrearsFetchActiveSessionRows(env,user,{limit:opts.limit||1000,archive_snapshot:opts.archive_snapshot,request_context:context}).catch(()=>[]);
+  if(context&&context.archive_entries_prepared!==true){
+    for(const session of sessions)extractEmployeeEntryAnchorsFromSession(session);
+    context.archive_entries_prepared=true;
+    context.archive_parse_count=Number(context.archive_parse_count||0)+1;
+  }
   const events=[];
   for(const session of sessions||[]){
     const anchors=extractEmployeeEntryAnchorsFromSession(session);
@@ -1705,9 +1712,9 @@ async function canonicalDepositAuditEventsForBed(env,user,bed,opts={}){
   return events;
 }
 __name(canonicalDepositAuditEventsForBed,"canonicalDepositAuditEventsForBed");
-async function employeeExitEventReference(env,user,entry,type){
+async function employeeExitEventReference(env,user,entry,type,opts={}){
   const bed=cleanText(entry?.room||entry?.bed||"",80).replace(/^#/,"");
-  const events=bed?await canonicalDepositAuditEventsForBed(env,user,bed,{limit:1000}).catch(()=>[]):[];
+  const events=bed?await canonicalDepositAuditEventsForBed(env,user,bed,{limit:1000,archive_snapshot:opts.archive_snapshot,request_context:opts.request_context}).catch(()=>[]):[];
   const historicalDepositAmount=canonicalDepositMoney(events.reduce((sum,event)=>sum+(event.event_type==="deposit_out"?-canonicalDepositMoney(event.amount):canonicalDepositMoney(event.amount)),0));
   const historicalDepositAvailable=events.length>0;
   const refundAmount=type==="DR"?canonicalDepositMoney(entry?.actual_refund_amount||entry?.refund_amount||entry?.amount||0):0;
@@ -1753,7 +1760,7 @@ async function canonicalDepositGateway(env,user,opts={}){
   const snapshot=access.snapshot||null;
   const recorded=snapshot&&snapshot.parsed_deposit_amount!==null?canonicalDepositMoney(snapshot.parsed_deposit_amount):null;
   const remaining=recorded===null?null:Math.max(0,canonicalDepositMoney(requiredTotal-recorded));
-  const auditEvents=Array.isArray(opts.cloud_deposit_events)?opts.cloud_deposit_events:await canonicalDepositAuditEventsForBed(env,user,bed,{limit:opts.limit||1000});
+  const auditEvents=Array.isArray(opts.cloud_deposit_events)?opts.cloud_deposit_events:await canonicalDepositAuditEventsForBed(env,user,bed,{limit:opts.limit||1000,archive_snapshot:opts.archive_snapshot,request_context:opts.request_context});
   const cloudNet=canonicalDepositMoney(auditEvents.reduce((sum,event)=>sum+(event.event_type==="deposit_out"?-canonicalDepositMoney(event.amount):canonicalDepositMoney(event.amount)),0));
   const expectedAfterPayment=canonicalDepositMoney(auditEvents.reduce((max,event)=>Math.max(max,canonicalDepositMoney(event.expected_deposit_after_payment||0)),0));
   const warnings=[];
@@ -1831,10 +1838,10 @@ async function empDepositMove(env,user,move){
   return {ledger_id:ledgerId,balance_before:before,balance_after:balanceAfter,delta};
 }
 __name(empDepositMove,"empDepositMove");
-async function empFindProjectionArrearsForPayment(env,user,taskId,bed=""){
+async function empFindProjectionArrearsForPayment(env,user,taskId,bed="",opts={}){
   const cleanTaskId=cleanId(taskId);
   if(!cleanTaskId)return null;
-  const gateway=await canonicalArrearsGateway(env,user,{bed,arrears_ref:cleanTaskId,limit:2000});
+  const gateway=await canonicalArrearsGateway(env,user,{bed,arrears_ref:cleanTaskId,limit:2000,archive_snapshot:opts.archive_snapshot,request_context:opts.request_context});
   const rows=[...(gateway.open_items||[]),...(gateway.closed_items||[]),...(gateway.all_items||[])];
   return rows.find(row=>[row.task_id,row.arrears_ref,row.id,row.source_ref].some(v=>cleanText(v,160)===cleanTaskId))||null;
 }
@@ -2706,16 +2713,18 @@ function validateCheckoutUploadFields(entry,normalized,eventIndex,anchorPreview)
 __name(validateCheckoutUploadFields,"validateCheckoutUploadFields");
 function validateExpenseUploadFields(entry,normalized,eventIndex,anchorPreview){
   const missing=[];
+  const invalid=[];
   const amount=employeeEntryUploadAmount(normalized.expense_amount||entry.expense_amount||entry.amount);
-  const evidenceRef=cleanText(normalized.evidence_ref||entry.evidence_ref||normalized.receipt_ref||entry.receipt_ref||"",160);
   const rawPaymentMethod=cleanText(entry.payment_method||entry.pay_type||"",40);
-  const rawReason=cleanText(entry.reason||"",500);
+  const paymentMethod=entryAnchorPaymentMethod(rawPaymentMethod);
+  const targetRoom=cleanText(entry.target_bed||entry.room||entry.bed||normalized.target_bed||normalized.bed||"",40).replace(/^#+/,"");
+  const rawDescription=cleanText(entry.expense_description||entry.expense_desc||entry.note||entry.remark||entry.reason||"",500);
+  if(!targetRoom)missing.push("target_bed");
   if(amount<=0)missing.push("expense_amount");
-  if(!employeeEntryUploadHasValue(normalized.expense_category||entry.expense_category||entry.reason_code))missing.push("expense_category");
   if(!employeeEntryUploadHasValue(rawPaymentMethod))missing.push("payment_method");
-  if(!employeeEntryUploadHasValue(rawReason))missing.push("reason");
-  if(missing.length)return employeeEntryValidationFailure("expense_event_validation","EXPENSE_REQUIRED_FIELD_MISSING","Expense entry is missing required fields.",{event_index:eventIndex,event_type:"expense",missing_fields:missing,anchor_preview:anchorPreview});
-  if(amount>=100&&!evidenceRef)return employeeEntryValidationFailure("expense_event_validation","EXPENSE_EVIDENCE_REQUIRED","Expense evidence is required for expenses of 100 AED or more.",{event_index:eventIndex,event_type:"expense",missing_fields:["evidence_ref"],invalid_fields:[],anchor_preview:{...anchorPreview,expense_amount:amount}});
+  else if(!["cash","bank"].includes(paymentMethod))invalid.push("payment_method");
+  if(!rawDescription)missing.push("expense_description");
+  if(missing.length||invalid.length)return employeeEntryValidationFailure("expense_event_validation","EXPENSE_REQUIRED_FIELD_MISSING","Expense entry is missing required fields.",{event_index:eventIndex,event_type:"expense",missing_fields:missing,invalid_fields:invalid,anchor_preview:anchorPreview});
   return null;
 }
 __name(validateExpenseUploadFields,"validateExpenseUploadFields");
@@ -2861,8 +2870,10 @@ async function validateEmployeeBedTransferCanonicalLink(env,user,entry={},normal
   const toBed=cleanText(normalized.to_bed||entry.to_bed||entry.bed_to||entry.roomTo||"",40).replace(/^#+/,"");
   const requestContext=opts.request_context||null;
   const archiveSnapshot=await cloudArrearsFetchActiveSessionRows(env,user,{limit:1000,request_context:requestContext}).catch(()=>[]);
-  for(const session of archiveSnapshot)extractEmployeeEntryAnchorsFromSession(session);
-  if(requestContext){requestContext.archive_parse_count=archiveSnapshot.length;requestContext.last_successful_stage="canonical_archive_parsed";}
+  if(!requestContext||requestContext.archive_entries_prepared!==true){
+    for(const session of archiveSnapshot)extractEmployeeEntryAnchorsFromSession(session);
+    if(requestContext){requestContext.archive_entries_prepared=true;requestContext.archive_parse_count=Number(requestContext.archive_parse_count||0)+1;requestContext.last_successful_stage="canonical_archive_parsed";}
+  }
   const [sourceGateway,targetGateway]=await Promise.all([
     canonicalBedContextGateway(env,user,{bed:fromBed,limit:1000,strict_access_snapshot:true,archive_snapshot:archiveSnapshot,request_context:requestContext,max_age_ms:TTLOCK_STRICT_CACHE_MAX_AGE_MS,include_stay_context:false}),
     canonicalBedContextGateway(env,user,{bed:toBed,limit:1000,strict_access_snapshot:true,archive_snapshot:archiveSnapshot,request_context:requestContext,max_age_ms:TTLOCK_STRICT_CACHE_MAX_AGE_MS,include_stay_context:false})
@@ -2871,7 +2882,7 @@ async function validateEmployeeBedTransferCanonicalLink(env,user,entry={},normal
   const accessErrors=[sourceGateway?.access_snapshot_context?.error,targetGateway?.access_snapshot_context?.error].map(value=>cleanText(value||"",120)).filter(Boolean);
   if(accessErrors.some(code=>/TTLOCK_|TIMEOUT|UPSTREAM|UNAVAILABLE/i.test(code)))return {ok:false,error_code:"BED_TRANSFER_CONTEXT_TEMPORARILY_UNAVAILABLE",message:"Bed Transfer context is temporarily unavailable. Retry validation shortly.",invalid_fields:["source_context","target_context"],context_error_codes:[...new Set(accessErrors)]};
   const fee=employeeEntryBedTransferFee(entry,normalized);
-  const legacyGenesisGate=employeeBedTransferLegacyGenesisGate(env,user);
+  const legacyGenesisGate=opts.legacy_genesis_gate||employeeBedTransferLegacyGenesisGate(env,user);
   let resolved=await resolveEmployeeBedTransferSourceContext(env,user,fromBed,sourceGateway,{archive_snapshot:archiveSnapshot});
   if(resolved.resolution_status!=="resolved")resolved=resolveEmployeeOwnerConfirmedLegacyGenesis(env,user,fromBed,toBed,sourceGateway,targetGateway,resolved,legacyGenesisGate);
   if(resolved.resolution_status!=="resolved")return {ok:false,error_code:resolved.error_code||"BED_TRANSFER_SOURCE_CONTEXT_AMBIGUOUS",message:"Canonical source context could not be resolved.",invalid_fields:["source_context"],source_context_resolution:resolved};
@@ -3123,14 +3134,14 @@ function arrearsPaymentForbiddenServerFieldFailure(body={},eventIndex=0){
   return employeeEntryValidationFailure("arrears_payment_source_of_truth_firewall","ARREARS_PAYMENT_SERVER_FIELD_INJECTION","Arrears Payment source and lineage fields are server controlled.",{event_index:eventIndex,event_type:"arrears_payment",invalid_fields:invalid,write_attempted:false});
 }
 __name(arrearsPaymentForbiddenServerFieldFailure,"arrearsPaymentForbiddenServerFieldFailure");
-async function resolveDerivedArrearsPaymentForEntry(env,user,entry={}){
+async function resolveDerivedArrearsPaymentForEntry(env,user,entry={},opts={}){
   const ref=cleanId(entry.arrears_ref||entry.cloud_arrears_ref||entry.linked_task_id||entry.original_arrears_id||"");
   const parsed=parseBedTransferDerivedArrearsRef(ref);
   if(!parsed)return {ok:true,derived:false,server_fields:{}};
-  const gateway=await canonicalArrearsGateway(env,user,{arrears_ref:ref,limit:2000});
+  const gateway=await canonicalArrearsGateway(env,user,{arrears_ref:ref,limit:2000,archive_snapshot:opts.archive_snapshot,request_context:opts.request_context});
   const item=[...(gateway.open_items||[]),...(gateway.closed_items||[]),...(gateway.all_items||[])].find(row=>cleanText(row.arrears_ref||row.task_id||row.id,160)===ref);
   if(!item){
-    const projection=await rebuildAllCloudArrears(env,user,{limit:2000});
+    const projection=await rebuildAllCloudArrears(env,user,{limit:2000,archive_snapshot:opts.archive_snapshot,request_context:opts.request_context});
     const raw=(projection.transfer_raw_events||[]).some(row=>cleanText(row.transfer_anchor_id,180)===parsed.source_anchor_ref);
     const effective=(projection.transfer_effective_events||[]).some(row=>cleanText(row.transfer_anchor_id,180)===parsed.source_anchor_ref);
     return {ok:false,error_code:raw&&!effective?"ARREARS_SOURCE_VOIDED":"ARREARS_REF_NOT_OPEN"};
@@ -3149,10 +3160,10 @@ async function resolveDerivedArrearsPaymentForEntry(env,user,entry={}){
   });
 }
 __name(resolveDerivedArrearsPaymentForEntry,"resolveDerivedArrearsPaymentForEntry");
-async function empFindOpenArrearTaskForPaymentReadOnly(env,user,taskId,bed=""){
+async function empFindOpenArrearTaskForPaymentReadOnly(env,user,taskId,bed="",opts={}){
   const cleanTaskId=cleanId(taskId);
   if(!cleanTaskId)return null;
-  const projected=await empFindProjectionArrearsForPayment(env,user,cleanTaskId,bed);
+  const projected=await empFindProjectionArrearsForPayment(env,user,cleanTaskId,bed,opts);
   if(projected&&["open","partial"].includes(String(projected.status||"").toLowerCase())&&cleanMoney(projected.remaining_arrears||0)>0){
     return {
       ...projected,
@@ -3247,12 +3258,12 @@ async function validateEmployeeEntryUploadPayload(env,user,body,opts={}){
   const type=employeeEntryUploadType(entry);
   let exitEventReference=null;
   if(["DR","CO"].includes(type)){
-    exitEventReference=await employeeExitEventReference(env,user,entry,type);
+    exitEventReference=await employeeExitEventReference(env,user,entry,type,opts);
     Object.assign(entry,exitEventReference.server_fields||{});
   }
   let derivedArrearsPayment=null;
   if(type==="AP"){
-    derivedArrearsPayment=await resolveDerivedArrearsPaymentForEntry(env,user,entry);
+    derivedArrearsPayment=await resolveDerivedArrearsPaymentForEntry(env,user,entry,opts);
     if(!derivedArrearsPayment.ok)return employeeEntryValidationFailure("arrears_payment_ref",derivedArrearsPayment.error_code,"Canonical derived arrears payment was rejected.",{event_index:eventIndex,event_type:"arrears_payment",invalid_fields:["payment_amount"],anchor_preview:{arrears_ref:cleanId(entry.arrears_ref||entry.linked_task_id||entry.cloud_arrears_ref||"")}});
     if(derivedArrearsPayment.derived)Object.assign(entry,derivedArrearsPayment.server_fields);
   }
@@ -3393,14 +3404,14 @@ async function validateEmployeeEntryUploadPayload(env,user,body,opts={}){
       due=amount;
       periodDue=amount;
     }else{
-    const projectedTask=await empFindProjectionArrearsForPayment(env,user,taskId,room);
+    const projectedTask=await empFindProjectionArrearsForPayment(env,user,taskId,room,opts);
     if(projectedTask&&!["open","partial"].includes(String(projectedTask.status||"").toLowerCase())){
       return employeeEntryValidationFailure("arrears_payment_ref","ARREARS_REF_STALE_REFRESH_REQUIRED","This arrears item is no longer open. Please refresh arrears.",{event_index:eventIndex,event_type:"arrears_payment",invalid_fields:["linked_task_id"],anchor_preview:{...anchorPreview,arrears_ref:taskId,projection_status:projectedTask.status||"",remaining_arrears:cleanMoney(projectedTask.remaining_arrears||0)}});
     }
     if(projectedTask&&cleanMoney(projectedTask.remaining_arrears||0)<=0){
       return employeeEntryValidationFailure("arrears_payment_ref","ARREARS_REF_STALE_REFRESH_REQUIRED","This arrears item is no longer open. Please refresh arrears.",{event_index:eventIndex,event_type:"arrears_payment",invalid_fields:["linked_task_id"],anchor_preview:{...anchorPreview,arrears_ref:taskId,projection_status:projectedTask.status||"",remaining_arrears:cleanMoney(projectedTask.remaining_arrears||0)}});
     }
-    apTaskForPayment=await empFindOpenArrearTaskForPaymentReadOnly(env,user,taskId,room);
+    apTaskForPayment=await empFindOpenArrearTaskForPaymentReadOnly(env,user,taskId,room,opts);
     if(!apTaskForPayment)return employeeEntryValidationFailure("arrears_payment_ref","ARREARS_REF_STALE_REFRESH_REQUIRED","This arrears item is no longer open. Please refresh arrears.",{event_index:eventIndex,event_type:"arrears_payment",invalid_fields:["linked_task_id"],anchor_preview:{...anchorPreview,arrears_ref:taskId}});
     const remain=Math.max(0,Number(apTaskForPayment.arrear_amount||0)-Number(apTaskForPayment.actual_received||0));
     if(amount<=0||amount>remain+0.01)return employeeEntryValidationFailure("arrears_payment_ref","ARREAR_PAYMENT_AMOUNT_INVALID","Arrears payment amount must be positive and no more than remaining arrears.",{event_index:eventIndex,event_type:"arrears_payment",invalid_fields:["amount"],anchor_preview:{...anchorPreview,arrears_ref:taskId,remaining_arrears:remain}});
@@ -3423,7 +3434,7 @@ async function validateEmployeeEntryUploadPayload(env,user,body,opts={}){
   if(tenantCardId&&["DR","CO"].includes(type)&&depositBalance<=0&&depositHeldInput>0)depositBalance=depositHeldInput;
   if(!tenantCardId&&["DR","CO"].includes(type)&&depositHeldInput>0)depositBalance=depositHeldInput;
   if(type==="CO"&&!entry.left_with_arrears){
-    const openArrears=room?await getOpenCloudArrearsForBed(env,user,room,{limit:2000}).catch(()=>[]):[];
+    const openArrears=room?await getOpenCloudArrearsForBed(env,user,room,{limit:2000,request_context:opts.request_context}).catch(()=>[]):[];
     if(openArrears.length){
       return employeeEntryValidationFailure("checkout_validation","CHECKOUT_OPEN_ARREARS_LEFT_WITH_ARREARS_REQUIRED","This customer has unpaid arrears. Normal checkout is not allowed.",{event_index:eventIndex,event_type:"checkout",invalid_fields:["open_arrears"],anchor_preview:{...anchorPreview,open_arrears_count:openArrears.length}});
     }
@@ -3437,7 +3448,7 @@ async function validateEmployeeEntryUploadPayload(env,user,body,opts={}){
     }
     const taskId=cleanId(entry.cloud_arrears_ref||entry.arrears_ref||"");
     if(taskId){
-      const openLeftTask=await empFindOpenArrearTaskForPaymentReadOnly(env,user,taskId,room);
+      const openLeftTask=await empFindOpenArrearTaskForPaymentReadOnly(env,user,taskId,room,opts);
       if(!openLeftTask)return employeeEntryValidationFailure("left_with_arrears_validation","CLOUD_ARREARS_NOT_OPEN","The supplied Cloud Arrears reference is not open.",{event_index:eventIndex,event_type:"left_with_arrears",invalid_fields:["cloud_arrears_ref"],anchor_preview:{...anchorPreview,cloud_arrears_ref:taskId}});
     }
   }
@@ -3512,6 +3523,89 @@ async function validateEmployeeEntryUploadPayload(env,user,body,opts={}){
   };
 }
 __name(validateEmployeeEntryUploadPayload,"validateEmployeeEntryUploadPayload");
+function employeeEntryAggregateValidationRequests(body={}){
+  const rows=Array.isArray(body?.validation_requests)?body.validation_requests:[];
+  return rows.slice(0,100).map((row,index)=>({
+    ...(row&&typeof row==="object"?row:{}),
+    dry_run:true,
+    validate_only:true,
+    no_write:true,
+    event_index:index
+  }));
+}
+__name(employeeEntryAggregateValidationRequests,"employeeEntryAggregateValidationRequests");
+function employeeEntryAggregateResultIdentity(requestBody={},index=0){
+  const entry=employeeEntryValidationEntryFromBody(requestBody,index)||{};
+  return cleanText(entry.id||entry.entry_id||entry.event_id||entry.anchor_id||entry.original_local_entry_id||"",120);
+}
+__name(employeeEntryAggregateResultIdentity,"employeeEntryAggregateResultIdentity");
+function employeeEntryAggregateRequestMetrics(context={}){
+  return {
+    capabilities_read_count:Number(context.capabilities_read_count||0),
+    archive_read_count:Number(context.archive_read_count||0),
+    entries_json_parse_count:Number(context.archive_parse_count||0),
+    ttlock_snapshot_count:Number(context.ttlock_snapshot_count||0),
+    ttlock_external_call_count:Number(context.ttlock_external_call_count||0),
+    kv_read_count:Number(context.kv_read_count||0),
+    kv_write_count:Number(context.kv_write_count||0),
+    last_successful_stage:cleanText(context.last_successful_stage||"request_started",80)
+  };
+}
+__name(employeeEntryAggregateRequestMetrics,"employeeEntryAggregateRequestMetrics");
+async function validateEmployeeEntryAggregatePreflight(env,user,body,opts={}){
+  const requests=employeeEntryAggregateValidationRequests(body);
+  const context=opts.request_context||{};
+  if(!requests.length){
+    const failure=employeeEntryValidationFailure("aggregate_preflight","AGGREGATE_PREFLIGHT_EMPTY","Upload Session contains no validation requests.",{event_index:0,event_type:"session",missing_fields:["validation_requests"]});
+    return {...failure,source:"aggregate_dry_run",validation_results:[failure],validation_result_count:1,failed_result_count:1,passed_result_count:0,no_write:true,write_attempted:false,formal_write_count:0,request_context_metrics:employeeEntryAggregateRequestMetrics(context)};
+  }
+  const requestTypes=requests.map(row=>employeeEntryUploadType(employeeEntryValidationEntryFromBody(row,row.event_index)));
+  const hasTransfer=requestTypes.some(type=>["TF","TFF"].includes(type));
+  if(hasTransfer&&!context.legacy_genesis_gate){context.legacy_genesis_gate=employeeBedTransferLegacyGenesisGate(env,user);context.capabilities_read_count=1;}
+  if(requestTypes.some(type=>["TF","TFF","AP","DR","CO"].includes(type))){
+    const archiveSnapshot=await cloudArrearsFetchActiveSessionRows(env,user,{limit:1000,request_context:context}).catch(()=>[]);
+    if(context.archive_entries_prepared!==true){
+      for(const session of archiveSnapshot)extractEmployeeEntryAnchorsFromSession(session);
+      context.archive_entries_prepared=true;
+      context.archive_parse_count=Number(context.archive_parse_count||0)+1;
+      context.last_successful_stage="canonical_archive_parsed";
+    }
+  }
+  const validationResults=[];
+  for(let index=0;index<requests.length;index++){
+    const requestBody=requests[index];
+    const entry=employeeEntryValidationEntryFromBody(requestBody,index)||{};
+    const eventType=entryAnchorEventType(employeeEntryUploadType(entry)||cleanText(entry.event_type||"entry",40));
+    const entryIdentity=employeeEntryAggregateResultIdentity(requestBody,index);
+    let result;
+    try{
+      result=await validateEmployeeEntryUploadPayload(env,user,requestBody,{event_index:index,canonical_transfer_link_anchor:true,request_context:context,legacy_genesis_gate:context.legacy_genesis_gate});
+    }catch(error){
+      result=employeeEntryValidationFailure("validate_exception","VALIDATION_EXCEPTION","Upload validation threw an exception before cloud write.",{event_index:index,event_type:eventType,record_id:entryIdentity,invalid_fields:[],anchor_preview:{id:entryIdentity,exception_name:error?.name||"Error"}});
+    }
+    validationResults.push({...result,event_index:index,event_type:result?.event_type||eventType,record_id:result?.record_id||entryIdentity,entry_identity:entryIdentity,write_attempted:false});
+  }
+  const failed=validationResults.filter(result=>result.ok!==true);
+  const primary=failed[0]||validationResults[0];
+  return {
+    ...primary,
+    source:"aggregate_dry_run",
+    ok:failed.length===0,
+    stage:failed.length?primary.stage:"aggregate_preflight",
+    error_code:failed.length?primary.error_code:"",
+    message:failed.length?primary.message:"All Upload Session records passed validation.",
+    message_en:failed.length?primary.message_en:"All Upload Session records passed validation.",
+    validation_results:validationResults,
+    validation_result_count:validationResults.length,
+    failed_result_count:failed.length,
+    passed_result_count:validationResults.length-failed.length,
+    no_write:true,
+    write_attempted:false,
+    formal_write_count:0,
+    request_context_metrics:employeeEntryAggregateRequestMetrics(context)
+  };
+}
+__name(validateEmployeeEntryAggregatePreflight,"validateEmployeeEntryAggregatePreflight");
 async function handleEmployeeEntryValidate(request,env,user){
   let body;
   try{body=await request.json();}catch{return json({success:false,...employeeEntryValidationFailure("payload","PAYLOAD_PARSE_FAILED","Upload payload could not be parsed.",{
@@ -3525,10 +3619,17 @@ async function handleEmployeeEntryValidate(request,env,user){
   })},400);}
   const assetInfo=employeeEntryDiagnosticAssetInfo(body);
   const request_context=ttlockRequestContext(request,env,user,"employee_entry_validate",TTLOCK_STRICT_CACHE_MAX_AGE_MS);
-  if(["DR","CO"].includes(employeeEntryUploadType(employeeEntryValidationEntryFromBody(body||{},body?.event_index??0))))request_context.allow_live_fetch=false;
+  const aggregateRequested=body?.aggregate_preflight===true||Array.isArray(body?.validation_requests);
+  const aggregateRequests=employeeEntryAggregateValidationRequests(body);
+  const aggregateTypes=aggregateRequests.map(row=>employeeEntryUploadType(employeeEntryValidationEntryFromBody(row,row.event_index)));
+  const singleType=employeeEntryUploadType(employeeEntryValidationEntryFromBody(body||{},body?.event_index??0));
+  if((aggregateTypes.length&&!aggregateTypes.some(type=>["TF","TFF"].includes(type))&&aggregateTypes.some(type=>["DR","CO"].includes(type)))||(!aggregateTypes.length&&["DR","CO"].includes(singleType)))request_context.allow_live_fetch=false;
+  if(!aggregateTypes.length&&["TF","TFF"].includes(singleType)){request_context.legacy_genesis_gate=employeeBedTransferLegacyGenesisGate(env,user);request_context.capabilities_read_count=1;}
   let result;
   try{
-    result=await validateEmployeeEntryUploadPayload(env,user,body,{event_index:body?.event_index,canonical_transfer_link_anchor:true,request_context});
+    result=aggregateRequested
+      ?await validateEmployeeEntryAggregatePreflight(env,user,body,{request_context})
+      :await validateEmployeeEntryUploadPayload(env,user,body,{event_index:body?.event_index,canonical_transfer_link_anchor:true,request_context,legacy_genesis_gate:request_context.legacy_genesis_gate});
   }catch(err){
     const eventIndex=Number(body?.event_index||0)||0;
     const eventType=entryAnchorEventType(cleanText(body?.entry?.type||body?.entry?.reason_code||"R",12).toUpperCase());
@@ -3544,7 +3645,9 @@ async function handleEmployeeEntryValidate(request,env,user){
     })},422);
   }
   result={...result,...assetInfo};
+  if(Array.isArray(result.validation_results))result.validation_results=result.validation_results.map(row=>({...row,...assetInfo}));
   if(!result.ok)return json({success:false,...result},422);
+  if(Array.isArray(result.validation_results))return success(result);
   return success({...result,occupancy_candidate_preview:buildEmployeeEntryOccupancyCandidatePreview(user,body)});
 }
 __name(handleEmployeeEntryValidate,"handleEmployeeEntryValidate");
@@ -3605,6 +3708,7 @@ async function handleEmployeeEntry(request,env,user){
   if(apFirewallFailure)return json({success:false,...apFirewallFailure},422);
   const entryForWriteGate=employeeEntryValidationEntryFromBody(body||{});
   const writeGateType=employeeEntryUploadType(entryForWriteGate);
+  if(["TF","TFF"].includes(writeGateType)){request_context.legacy_genesis_gate=employeeBedTransferLegacyGenesisGate(env,user);request_context.capabilities_read_count=1;}
   if(["TF","TFF"].includes(writeGateType)&&!bedTransferWriteApproved(env))return bedTransferWriteDisabledResponse();
   if(["TF","TFF"].includes(writeGateType)){
     const boundaryFailure=employeeBedTransferSingleEntryFailure(body||{});
@@ -3613,7 +3717,7 @@ async function handleEmployeeEntry(request,env,user){
   if(!await empTableExists(env,"sessions")||(!["TF","TFF"].includes(writeGateType)&&!await empTableExists(env,"transactions")))return errorResponse("employee_entry_schema_not_ready",503,"employee_entry_schema_not_ready");
   if(["TF","TFF"].includes(writeGateType)&&!(await empTableColumns(env,"sessions")).has("entries_json"))return json({success:false,ok:false,error_code:"CANONICAL_ARCHIVE_SCHEMA_UNAVAILABLE",no_write:true,write_attempted:false,production_cutover:"PRODUCTION_NO_GO"},503);
   body=normalizeEmployeeEntryBodyForValidation(body||{});
-  const validationResult=await validateEmployeeEntryUploadPayload(env,user,body,{event_index:body?.event_index,canonical_transfer_link_anchor:["TF","TFF"].includes(writeGateType),request_context});
+  const validationResult=await validateEmployeeEntryUploadPayload(env,user,body,{event_index:body?.event_index,canonical_transfer_link_anchor:["TF","TFF"].includes(writeGateType),request_context,legacy_genesis_gate:request_context.legacy_genesis_gate});
   if(!validationResult.ok)return json({success:false,...validationResult},422);
   if(["TF","TFF"].includes(writeGateType))return persistEmployeeBedTransferCanonicalArchive(env,user,body,validationResult);
   if(validationResult.idempotent){
@@ -3995,7 +4099,7 @@ const entryAnchorContract={
   D:["event_type","bed","deposit_amount","deposit_required_total","previous_deposit_recorded_amount","deposit_paid_amount","expected_deposit_after_payment","deposit_remaining_after_payment","deposit_remaining","payment_method","linked_tenant","note","operator","created_at"],
   DR:["event_type","bed","deposit_balance","refund_amount","payment_method","refund_method","refund_date","refund_reason","deposit_remaining_after_refund","owner_override_ref","arrears_offset_ref","arrears_offset_amount","checkout_ref","note","operator","created_at"],
   CO:["event_type","bed","checkout_date","deposit_refund","outstanding_arrears","owner_approval_required","owner_approval_status","checkout_mode","left_with_arrears","customer_left","former_customer_name","whatsapp_phone","contact_method","contact_note","arrears_amount","cloud_arrears_ref","belongings_held","belongings_note","promised_payment_date","promised_return_date","deposit_balance","left_status","final_status","final_note","ttlock_context","operator","created_at"],
-  E:["event_type","expense_amount","expense_category","target_bed","reason","note","payment_method","evidence_ref","operator","created_at"],
+  E:["event_type","expense_amount","expense_category","target_bed","reason","note","payment_method","operator","created_at"],
   TF:["event_type","from_bed","to_bed","transfer_reason","fee_amount_aed","fee_mode","fee_due_date","payment_method","fee_waiver_reason","bed_price_difference_mode","bed_price_difference_amount_aed","bed_price_difference_due_date","bed_price_difference_payment_method","bed_price_difference_reason","note","operator","created_at"]
 };
 const employeeSourceFirewallForbiddenFields=["card_id","cardid","tenant_card_id","tenantCardId","old_ttlock_ref","oldTtlockRef","provider_phone","providerPhone","ttlock_phone","ttlockPhone","phone_99099","phone99099","access_card_phone","accessCardPhone","ttlock_account_phone","ttlockAccountPhone","ttlock_context","old_ttlock_context","provider_metadata","ttlock_metadata","card_provider_metadata"];
@@ -4353,7 +4457,8 @@ function normalizeEntryAnchor(row){
     const safePhone=sanitizeBusinessContactFromProviderMetadata(anchor.whatsapp_phone||anchor.former_customer_phone||"",{source:contactSource});
     Object.assign(anchor,{event_type:left?"left_with_arrears":"checkout",bed:anchor.bed||anchor.room||"",checkout_date:anchor.checkout_date||"",checkout_type:left?"left_with_arrears":anchor.checkout_type||anchor.checkout_mode||"normal",deposit_refund:left?0:entryAnchorMoney(anchor.deposit_refund||0),outstanding_arrears:entryAnchorMoney(anchor.outstanding_arrears||anchor.carry_over_arrears||anchor.deficit||0),open_arrears_amount:entryAnchorMoney(anchor.open_arrears_amount||anchor.outstanding_arrears||anchor.carry_over_arrears||0),owner_approval_required:left?false:!!anchor.owner_approval_required,owner_approval_status:left?"not_required":anchor.owner_approval_status||"not_required",checkout_mode:left?"left_with_arrears":anchor.checkout_mode||"normal",left_with_arrears:left,customer_left:left,former_customer_name:anchor.former_customer_name||anchor.card_name||anchor.tenant_name||"",card_name:anchor.card_name||anchor.former_customer_name||anchor.tenant_name||"",whatsapp_phone:safePhone,former_customer_phone:safePhone,contact_method:anchor.contact_method||"",contact_note:anchor.contact_note||"",arrears_amount:entryAnchorMoney(anchor.arrears_amount||anchor.left_arrears_amount||anchor.outstanding_arrears||0),left_arrears_amount:entryAnchorMoney(anchor.left_arrears_amount||anchor.arrears_amount||anchor.outstanding_arrears||0),cloud_arrears_ref:anchor.cloud_arrears_ref||anchor.arrears_ref||"",belongings_held:!!anchor.belongings_held,belongings_note:anchor.belongings_note||"",coverage_end_date:anchor.coverage_end_date||anchor.card_end_date||anchor.rent_coverage_end||anchor.old_lock_valid_until||"",card_end_date:anchor.card_end_date||anchor.coverage_end_date||anchor.rent_coverage_end||anchor.old_lock_valid_until||"",rent_coverage_end:anchor.rent_coverage_end||anchor.coverage_end_date||anchor.card_end_date||anchor.old_lock_valid_until||"",promised_payment_date:anchor.promised_payment_date||anchor.promise_date||"",promised_return_date:anchor.promised_return_date||anchor.promise_return_date||"",promise_return_date:anchor.promise_return_date||anchor.promised_return_date||"",deposit_balance:entryAnchorMoney(anchor.deposit_balance||anchor.deposit_held||0),left_date:anchor.left_date||anchor.checkout_date||"",checkout_attempt_date:anchor.checkout_attempt_date||anchor.checkout_date||"",left_status:anchor.left_status||(left?"left_pending_return":""),final_status:anchor.final_status||(left?"left_pending_return":""),status:anchor.status||(left?"left_pending_return":""),overdue_days:Number(anchor.overdue_days||0)||0,grace_days_after_promise:Number(anchor.grace_days_after_promise||0)||0,review_date:anchor.review_date||"",confirmed_not_returning_date:anchor.confirmed_not_returning_date||"",confirmed_not_returning_by:anchor.confirmed_not_returning_by||"",confirmation_note:anchor.confirmation_note||"",original_session_id:anchor.original_session_id||anchor.session_id||"",original_event_id:anchor.original_event_id||anchor.event_id||anchor.id||"",final_note:anchor.final_note||anchor.note||anchor.ded_note||""});
   }else if(type==="E"){
-    Object.assign(anchor,{expense_amount:entryAnchorMoney(anchor.expense_amount||anchor.amount),expense_category:anchor.expense_category||anchor.reason_code||"",target_bed:anchor.target_bed||anchor.room||"",reason:anchor.reason||anchor.expense_desc||anchor.custom_reason||"",payment_method:entryAnchorPaymentMethod(anchor.payment_method||anchor.pay_type),evidence_ref:anchor.evidence_ref||anchor.receipt_ref||"",note:anchor.note||anchor.expense_desc||""});
+    const description=anchor.expense_description||anchor.expense_desc||anchor.note||anchor.remark||anchor.reason||"";
+    Object.assign(anchor,{expense_amount:entryAnchorMoney(anchor.expense_amount||anchor.amount),expense_category:anchor.expense_category||anchor.reason_code||"EXPENSE",target_bed:anchor.target_bed||anchor.room||"",reason:description,payment_method:entryAnchorPaymentMethod(anchor.payment_method||anchor.pay_type),evidence_ref:anchor.evidence_ref||anchor.receipt_ref||"",note:description});
   }
   applyEmployeeEntrySourceFirewall(type,anchor);
   anchor.raw_display_line=anchor.raw_display_line||renderEntryAnchorForOwner(anchor);
@@ -5067,7 +5172,7 @@ async function rebuildCloudArrearsForBed(env,user,bed,opts={}){
 }
 __name(rebuildCloudArrearsForBed,"rebuildCloudArrearsForBed");
 async function getOpenCloudArrearsForBed(env,user,bed,opts={}){
-  const gateway=await canonicalArrearsGateway(env,user,{bed,limit:opts.limit||1000});
+  const gateway=await canonicalArrearsGateway(env,user,{bed,limit:opts.limit||1000,archive_snapshot:opts.archive_snapshot,request_context:opts.request_context});
   return gateway.open_items||[];
 }
 __name(getOpenCloudArrearsForBed,"getOpenCloudArrearsForBed");
@@ -5164,9 +5269,12 @@ async function canonicalArrearsGateway(env,user,opts={}){
   const arrearsRef=cleanText(opts.arrears_ref||opts.task_id||opts.ref||"",160);
   const limit=Math.min(Math.max(Number(opts.limit||1000),1),2000);
   const requestContext=opts.request_context||null;
+  const archiveSnapshot=Array.isArray(opts.archive_snapshot)
+    ?opts.archive_snapshot
+    :(requestContext?await cloudArrearsFetchActiveSessionRows(env,user,{limit,request_context:requestContext}).catch(()=>[]):null);
   let projection;
-  if(requestContext&&Array.isArray(opts.archive_snapshot)){
-    if(!requestContext.canonicalArrearsProjectionPromise)requestContext.canonicalArrearsProjectionPromise=rebuildAllCloudArrears(env,user,{limit,archive_snapshot:opts.archive_snapshot});
+  if(requestContext&&Array.isArray(archiveSnapshot)){
+    if(!requestContext.canonicalArrearsProjectionPromise)requestContext.canonicalArrearsProjectionPromise=rebuildAllCloudArrears(env,user,{limit,archive_snapshot:archiveSnapshot,request_context:requestContext});
     projection=await requestContext.canonicalArrearsProjectionPromise;
   }else projection=bed?await rebuildCloudArrearsForBed(env,user,bed,{limit,archive_snapshot:opts.archive_snapshot}):await rebuildAllCloudArrears(env,user,{limit,archive_snapshot:opts.archive_snapshot});
   let allItems=(projection.all_items&&projection.all_items.length?projection.all_items:[...(projection.open_items||[]),...(projection.closed_items||[])])
@@ -5783,23 +5891,7 @@ function ownerTodayTodoDepositGatewayView(bed,accessRow={},archiveRow={}){
 }
 __name(ownerTodayTodoDepositGatewayView,"ownerTodayTodoDepositGatewayView");
 function ownerTodayTodoBuildExpenseEvidence(todos,bed,archiveRow={},filters={}){
-  const expenseEvents=Array.isArray(archiveRow.expense_events)?archiveRow.expense_events:[];
-  for(const event of expenseEvents){
-    if(entryAnchorMoney(event.amount)<100||cleanText(event.evidence_ref||"",160))continue;
-    ownerTodayTodoPush(todos,ownerTodayTodoItem("EXPENSE_EVIDENCE_MISSING",{
-      category:"finance_evidence",
-      severity:"high",
-      bed,
-      session_id:event.session_id,
-      event_id:event.event_id,
-      title:`Bed ${bed} expense evidence is missing`,
-      description:`Expense ${entryAnchorMoney(event.amount).toFixed(2)} AED requires evidence_ref because it is 100 AED or more.`,
-      source_gateway:"canonical_event_archive + canonical_finance_projection_gateway",
-      source_proof:ownerTodayTodoSourceProof("canonical_event_archive + canonical_finance_projection_gateway",{expense_amount:event.amount,evidence_ref:event.evidence_ref||"",expense_category:event.expense_category||""}),
-      recommended_action:"Attach the missing receipt/evidence reference or void/correct the Expense anchor if it was entered in error.",
-      auto_resolve_condition:"The Expense anchor has evidence_ref, or the invalid Expense anchor is voided/corrected."
-    }),filters);
-  }
+  return todos;
 }
 __name(ownerTodayTodoBuildExpenseEvidence,"ownerTodayTodoBuildExpenseEvidence");
 function ownerTodayTodoOccupancyGatewayView(bed,accessRow={},archiveRow={},openArrears=[]){

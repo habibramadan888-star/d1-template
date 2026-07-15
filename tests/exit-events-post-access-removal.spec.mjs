@@ -179,10 +179,11 @@ test("validate and write handlers explicitly disable live TTLock for all exit ev
   const worker = await readFile(workerPath, "utf8");
   const validate = functionBlock(worker, "handleEmployeeEntryValidate");
   const write = functionBlock(worker, "handleEmployeeEntry");
-  for (const block of [validate, write]) {
-    assert.match(block, /\["DR","CO"\]\.includes\(employeeEntryUploadType/);
-    assert.match(block, /request_context\.allow_live_fetch=false/);
-  }
+  assert.match(validate, /aggregateTypes\.some\(type=>\["DR","CO"\]\.includes\(type\)\)/);
+  assert.match(validate, /\["DR","CO"\]\.includes\(singleType\)/);
+  assert.match(validate, /request_context\.allow_live_fetch=false/);
+  assert.match(write, /\["DR","CO"\]\.includes\(employeeEntryUploadType/);
+  assert.match(write, /request_context\.allow_live_fetch=false/);
   assert.match(worker, /context\.allow_live_fetch===false\)return false/);
   assert.match(worker, /EXIT_EVENT_ACCESS_CONTEXT_REFERENCE_ONLY/);
 });

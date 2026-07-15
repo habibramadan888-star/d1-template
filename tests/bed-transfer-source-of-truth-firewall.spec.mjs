@@ -125,7 +125,7 @@ test("Worker rejects before D1 and preserves existing Bed Transfer validation an
 
   assert.ok(validator.indexOf("bedTransferForbiddenIdentityFailure") < validator.indexOf("normalizeEmployeeEntryBodyForValidation"));
   assert.ok(validator.indexOf("bedTransferForbiddenIdentityFailure") < validator.indexOf('empTableExists(env,"sessions")'));
-  assert.match(validator, /validateEmployeeBedTransferPhase1\(env,user,entry,normalized\)/);
+  assert.match(validator, /validateEmployeeBedTransferPhase1\(env,user,entry,normalized,opts\)/);
   assert.ok(writer.indexOf("bedTransferForbiddenIdentityFailure") < writer.indexOf('empTableExists(env,"sessions")'));
   assert.match(writer, /\["TF","TFF"\]\.includes\(writeGateType\)&&!bedTransferWriteApproved\(env\)/);
   assert.match(validateRoute, /if\(!result\.ok\)return json\(\{success:false,\.\.\.result\},422\)/);

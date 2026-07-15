@@ -22,7 +22,7 @@ These defaults are owner-approved and should guide future implementation and clo
 2. Arrears Payment overpayment: reject by default. If remaining_arrears is `80`, payment above `80` is not allowed unless a future owner-approved excess path is implemented.
 3. Deposit Out refund above balance: reject by default. Owner override with reason is required if this is ever allowed.
 4. Checkout with open arrears: Normal Checkout is not allowed with open arrears. Employee must use Left With Arrears mode and capture required fields.
-5. Expense evidence: category, reason, amount, and payment_method are always required. Receipt/evidence is required for expenses `>= 100 AED`; below `100 AED`, reason/category/payment_method are enough.
+5. Expense input: room number, amount, payment method, and expense description are required. `expense_category` is server-generated as `EXPENSE`. Historical `evidence_ref` remains readable, but new Expense records may omit it at every amount.
 6. Bed Transfer timing: transfer_date is the effective date. New bed becomes occupied on transfer_date. Old bed becomes available on transfer_date. deposit_balance, arrears, and rent_coverage carry over to the new bed.
 
 ## EMPLOYEE_7_EVENT_SOURCE_OF_TRUTH_CONTRACT_V1
@@ -47,7 +47,7 @@ Shared infrastructure is allowed for auth, dry-run wrapper, upload wrapper, mone
 | Deposit In | Record deposit liability payment. | bed, deposit_amount, deposit_required_total, deposit_paid_amount, deposit_remaining, payment_method, promise_date when remaining deposit is promised. | note, deposit_ref, occupancy_candidate_id, future occupancy_session_id. | Deposit merged into Rent; card_id, tenant_card_id, old_ttlock_ref, provider phone, 99099 phone as deposit identity. | amount and payment method required; deposit top-up must link to deposit/occupancy context; partial deposit must preserve remaining due. | increases cash/bank and deposit liability; not rent income. | No bed-status change by itself; attaches to occupancy/deposit context. |
 | Deposit Out | Record deposit refund, deduction, or explicit offset. | bed, deposit_balance, refund_amount, refund_method, refund_date, refund_reason. | deduction_amount, deduction_reason, difference_reason, owner_override_ref, note. | Refund above balance without owner override; card_id, tenant_card_id, old_ttlock_ref, provider phone, 99099 phone as identity. | refund cannot exceed deposit_balance by default; refund difference requires reason; open arrears require offset or owner approval. | decreases cash/bank and deposit liability. | No bed-status change by itself. |
 | Checkout | Record customer leaving a bed or leaving with arrears. | bed, checkout_date, checkout_type, note; for Left With Arrears: whatsapp_phone/contact, left_date, promised_payment_date, left_arrears_amount, note. | deposit_refund_amount, deduction fields, confirmed_not_returning_date, promised_return_date, belongings fields. | Normal checkout with open arrears; card_id, tenant_card_id, old_ttlock_ref, provider phone, 99099 phone as identity. | open arrears blocks Normal Checkout; Left With Arrears requires contact, left date, promised payment date, arrears amount, note. | may refund/deduct deposit; may preserve or create arrears; does not create rent income. | releases bed for normal checkout or marks customer-left financial state for left-with-arrears. |
-| Expense | Record company/property expense. | target_bed or room, expense_amount, expense_category, reason, payment_method; receipt/evidence if amount >= 100 AED. | receipt/evidence when amount < 100 AED, note. | Treating expense as tenant debt without approved link; card_id, tenant_card_id, old_ttlock_ref, provider phone, 99099 phone as identity. | amount/category/reason/payment_method required; evidence required for expenses >= 100 AED. | cash/bank outflow; owner expense only. | No occupancy or bed-status change by default. |
+| Expense | Record company/property expense. | room number, expense_amount, payment_method, expense_description. | historical evidence_ref remains compatible but is never required for a new record. | Treating expense as tenant debt without approved link; card_id, tenant_card_id, old_ttlock_ref, provider phone, 99099 phone as identity. | room/positive amount/description required; payment method must be Cash or Bank; no evidence threshold. | cash/bank outflow; owner expense only. | No occupancy or bed-status change by default. |
 | Bed Transfer | Move the same customer stay from old bed to new bed. | from_bed, to_bed, transfer_date, fee option, transfer_reason. | fee_amount, fee_status, fee_payment_method, waiver_reason, note. | Creating duplicate rent/deposit/new customer; card_id, tenant_card_id, old_ttlock_ref, provider phone, 99099 phone as identity. | from_bed and to_bed required; transfer_date effective; fee paid requires method; fee waived requires reason. | optional fee increases cash/bank; waived fee has no receipt. | old bed available and new bed occupied on transfer_date; deposit_balance, arrears, and rent_coverage carry over. |
 
 | Event | Deposit effect | Arrears effect | Access / network / power downstream effect | Required anchor fields | Owner history display expectation | Projection expectation |
@@ -57,7 +57,7 @@ Shared infrastructure is allowed for auth, dry-run wrapper, upload wrapper, mone
 | Deposit In | creates/increases deposit_balance and preserves payment history. | no arrears effect. | no direct effect. | common fields plus deposit_ref if available, deposit_required_total, deposit_paid_amount, deposit_remaining, promise_date if needed. | show deposit amount, required total, paid, remaining, method, date, note. | deposit_balance and deposit payment history. |
 | Deposit Out | reduces/closes deposit_balance; explicit deduction/offset required. | open arrears blocks direct refund unless approved offset/owner approval exists. | no direct effect. | common fields plus deposit_ref, balance before/after, refund amount/method/date/reason, difference/override fields. | show refund, balance before/after, reason, method, approval/offset status. | deposit_balance reduction and any explicit arrears offset. |
 | Checkout | may refund, deduct, or preserve deposit balance by explicit fields. | normal checkout blocked by open arrears; Left With Arrears keeps arrears open/partial and traceable. | creates future access/network/power review context only; provider actions must be separate. | common fields plus checkout_date/type, deposit and arrears fields, approval fields, left-with-arrears fields when applicable. | show checkout type, bed, date, deposit, outstanding arrears, approval status, left-with-arrears detail. | occupancy close/release or left-with-arrears financial state. |
-| Expense | no deposit effect. | no arrears effect unless future approved tenant-linked expense rule exists. | no direct effect. | common fields plus target_bed/room, expense_amount, category, reason, payment_method, evidence_ref if required. | show amount, category, method, target, reason, evidence/note. | owner finance expense only. |
+| Expense | no deposit effect. | no arrears effect unless future approved tenant-linked expense rule exists. | no direct effect. | common fields plus target_bed/room, expense_amount, server-generated category, description/reason, payment_method; historical evidence_ref optional. | show amount, method, target, and description; historical evidence may remain visible. | owner finance expense only. |
 | Bed Transfer | carries deposit_balance to new bed/occupancy context. | carries open arrears by arrears_ref, not bed-only matching. | old bed expectations end and new bed expectations begin; provider changes are separate operational actions. | common fields plus from_bed, to_bed, transfer_date, fee fields, waiver reason if waived, transfer reason, context snapshots. | show from/to, transfer date, fee/waiver, reason, carried context. | occupancy migration, bed availability, carried deposit/arrears/rent_coverage. |
 
 | Event | Correction / void / reversal expectation | Duplicate / idempotency expectation | Downstream events that depend on it | Current implementation status |
@@ -781,22 +781,19 @@ Business meaning: record company/property expense.
 
 Preconditions:
 
-- Expense amount, category, and reason are known.
+- Room number, expense amount, and expense description are known.
 - Payment method is selected.
 
 Required employee input fields:
 
 - target_bed or room
 - expense_amount
-- expense_category
-- reason
 - payment_method
-- receipt/evidence ref when expense_amount >= 100 AED
+- expense_description
 
 Optional fields:
 
-- receipt/evidence ref when expense_amount < 100 AED
-- note
+- historical evidence_ref, when already present
 
 Forbidden identity fields:
 
@@ -807,10 +804,10 @@ Created anchor fields:
 - common fields
 - target_bed or room
 - expense_amount
-- expense_category
-- reason
+- expense_category, server-generated as `EXPENSE`
+- expense_description/reason
 - payment_method
-- evidence_ref if available
+- evidence_ref if historically supplied
 
 Financial effect:
 
@@ -832,14 +829,14 @@ Downstream dependencies:
 Invalid/rejected cases:
 
 - Missing amount.
-- Missing category/reason.
+- Missing room number or expense description.
 - Missing payment method.
-- Missing receipt/evidence ref when expense_amount >= 100 AED.
+- Payment method other than Cash or Bank.
 - Treating expense as tenant debt without explicit approved link.
 
 Duplicate guard rules:
 
-- Guard duplicate expense by canonical_fingerprint and evidence/source event.
+- Guard duplicate expense by stable Entry ID and canonical business fingerprint; evidence_ref is not an idempotency requirement.
 
 Correction/void/reversal requirements:
 
@@ -847,7 +844,7 @@ Correction/void/reversal requirements:
 
 Owner History representation:
 
-- Show amount, category, payment method, target bed/room, reason, and evidence/note.
+- Show amount, payment method, target room, and expense description; preserve historical evidence when present.
 
 WhatsApp/compiler future representation:
 

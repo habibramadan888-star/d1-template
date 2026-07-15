@@ -25,12 +25,14 @@ test("upload session uses server dry-run as the first non-empty validation autho
   assert.match(uploadBlock, /error_code:'NO_RECORDS_TO_UPLOAD'/);
   assert.match(uploadBlock, /source:'no_records_to_upload'/);
   assert.match(uploadBlock, /const canonicalEntries=uploadList\.map\(normalizeEntryAnchor\)/);
-  assert.match(uploadBlock, /await validateEmployeeUploadDryRun\(requestPayload\?\.entry\|\|e,requestPayload\?\.session\|\|sessionForEntry,i/);
+  assert.match(uploadBlock, /validationRequests\.push\(requestPayload\)/);
+  assert.match(uploadBlock, /await validateEmployeeUploadAggregateDryRun\(validationRequests\)/);
+  assert.match(uploadBlock, /if\(dryRunFailed\.length\)/);
   assert.doesNotMatch(uploadBlock, /const validation=validateUploadAnchorBatch\(uploadList\)/);
   assert.doesNotMatch(uploadBlock, /if\(!validation\.ok\)/);
   assert.doesNotMatch(uploadBlock, /CLIENT_ANCHOR_BATCH_VALIDATION_FAILED/);
 
-  const dryRunIndex = uploadBlock.indexOf("await validateEmployeeUploadDryRun(requestPayload?.entry||e,requestPayload?.session||sessionForEntry,i");
+  const dryRunIndex = uploadBlock.indexOf("await validateEmployeeUploadAggregateDryRun(validationRequests)");
   const realUploadIndex = uploadBlock.indexOf("apiFetch('/api/employee/entry'", dryRunIndex);
   assert.ok(realUploadIndex > dryRunIndex, "real upload must occur only after server dry-run");
 });

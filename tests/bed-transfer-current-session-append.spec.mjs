@@ -185,7 +185,9 @@ test("Upload Session includes TF, validates it, writes only canonical entry, and
   const upload = html.slice(html.lastIndexOf("async function commitSessionAndExport"));
   assert.doesNotMatch(upload, /sessionOnlyDrafts/);
   assert.match(upload, /employeeBedTransferValidatePayload\(e,sessionForEntry\)/);
-  assert.match(upload, /validateEmployeeUploadDryRun\(requestPayload\?\.entry\|\|e/);
+  assert.match(upload, /validationRequests\.push\(requestPayload\)/);
+  assert.match(upload, /validateEmployeeUploadAggregateDryRun\(validationRequests\)/);
+  assert.match(upload, /if\(dryRunFailed\.length\)[\s\S]*?return;/);
   assert.match(upload, /bedTransferUploadPayloads\[i\]=employeeBedTransferRecordPayload\(requestPayload\)/);
   assert.match(upload, /apiFetch\('\/api\/employee\/entry'/);
   assert.match(upload, /if\(cloudConfirmed\)\{\s*state\.drafts=\[\]/);

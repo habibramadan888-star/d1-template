@@ -5142,7 +5142,8 @@ function applyEntryAnchors(e){
       deposit_balance:num(e.deposit_balance||e.deposit_held||0),left_date:e.left_date||e.checkout_date||'',checkout_attempt_date:e.checkout_attempt_date||e.checkout_date||'',
       left_status:e.left_status||(left?'left_pending_return':''),final_status:e.final_status||(left?'left_pending_return':''),status:e.status||(left?'left_pending_return':''),overdue_days:num(e.overdue_days||0),grace_days_after_promise:num(e.grace_days_after_promise||0),review_date:e.review_date||'',original_session_id:e.original_session_id||'',original_event_id:e.original_event_id||''});
   }else if(type==='E'){
-    Object.assign(e,{expense_amount:num(e.amount),expense_category:e.expense_category||e.reason_code||'',target_bed:e.room||'',reason:e.expense_category||e.reason_code||'',note:e.expense_desc||e.note||''});
+    const description=e.expense_description||e.expense_desc||e.note||e.remark||e.reason||'';
+    Object.assign(e,{expense_amount:num(e.amount),expense_category:e.expense_category||e.reason_code||'EXPENSE',target_bed:e.room||'',reason:description,note:description,evidence_ref:e.evidence_ref||e.receipt_ref||''});
   }else if(type==='TF'){
     Object.assign(e,{from_bed:e.from_bed||'',to_bed:e.to_bed||'',fee_amount_aed:num(e.fee_amount_aed),fee_amount_fils:num(e.fee_amount_fils),fee_mode:e.fee_mode||'',fee_due_date:e.fee_due_date||'',payment_method:e.payment_method||'',fee_waiver_reason:e.fee_waiver_reason||'',bed_price_difference_mode:e.bed_price_difference_mode||'none',bed_price_difference_amount_aed:num(e.bed_price_difference_amount_aed),bed_price_difference_due_date:e.bed_price_difference_due_date||'',bed_price_difference_payment_method:e.bed_price_difference_payment_method||'',bed_price_difference_reason:e.bed_price_difference_reason||'',transfer_reason:e.transfer_reason||'',note:e.note||''});
   }
@@ -8232,6 +8233,41 @@ async function validateEmployeeUploadDryRun(entry,sessionForEntry,index,options=
   }
   return data;
 }
+function employeeAggregateValidationFallback(validationRequests,errorCode,message,httpStatus=0){
+  const results=(validationRequests||[]).map((request,index)=>{
+    const entry=request?.entry||request?.entries?.[0]||{};
+    return employeeBindUploadValidationResult({
+      source:'aggregate_dry_run',
+      stage:'aggregate_preflight_request',
+      event_index:index,
+      event_type:entry?.event_type||entryEventType(entry?.type||'entry'),
+      error_code:errorCode,
+      message,
+      message_en:message,
+      missing_fields:[],
+      invalid_fields:httpStatus?['response_body']:[],
+      suggested_action:'Retry Upload Session. No business write was attempted.',
+      last_successful_stage:null,
+      validation_trace:[{stage:'aggregate_preflight_request',function:'validateEmployeeUploadAggregateDryRun',ok:false,event_index:index,event_type:entry?.event_type||entryEventType(entry?.type||'entry'),error_code: errorCode,message,missing_fields:[],invalid_fields:httpStatus?['response_body']:[]}],
+      raw_validation_response:{http_status:httpStatus,no_write:true}
+    },entry,index,message);
+  });
+  return {success:false,ok:false,source:'aggregate_dry_run',error_code:errorCode,message,validation_results:results,validation_result_count:results.length,failed_result_count:results.length,passed_result_count:0,no_write:true,write_attempted:false,formal_write_count:0};
+}
+async function validateEmployeeUploadAggregateDryRun(validationRequests){
+  let response;
+  try{
+    response=await apiFetch('/api/employee/entry/validate',{method:'POST',body:JSON.stringify({aggregate_preflight:true,dry_run:true,validate_only:true,no_write:true,validation_requests,diagnostic:employeeDiagnosticAssetMeta()})});
+  }catch{
+    return employeeAggregateValidationFallback(validationRequests,'SERVER_VALIDATE_UNREACHABLE','Unable to reach aggregate upload validation.');
+  }
+  const raw=await response.text();
+  let data=null;
+  try{data=raw?unwrapStandardResponse(JSON.parse(raw)):null}catch{}
+  if(Array.isArray(data?.validation_results)&&data.validation_results.length===validationRequests.length)return data;
+  const timeout=response.status===503;
+  return employeeAggregateValidationFallback(validationRequests,timeout?'SERVER_PROCESSING_TIMEOUT':'SERVER_VALIDATE_MALFORMED_RESPONSE',timeout?'Server processing timed out. Please retry.':'Aggregate upload validation returned an unreadable response.',response.status);
+}
 async function commitSessionAndExport(){
   const uploadT0=performance.now();
   const uploadTiming={payload_build_ms:0,validation_ms:0,api_request_ms:0,response_parse_ms:0,total_ms:0};
@@ -8317,7 +8353,8 @@ async function commitSessionAndExport(){
   const failed=[];
   const dryRunFailed=[];
   const bedTransferUploadPayloads=[];
-  setUploadPhase(`Dry-run validating 0/${uploadList.length}`,'Validating');
+  const validationRequests=[];
+  setUploadPhase(`Dry-run validating ${uploadList.length} records`,'Validating');
   for(let i=0;i<uploadList.length;i++){
     const e=uploadList[i];
     const isFinal=i===uploadList.length-1;
@@ -8330,39 +8367,44 @@ async function commitSessionAndExport(){
       entries:requestEntries,
       entries_json:JSON.stringify({anchor_contract_version:'employee_entry_anchor_v1',entries:requestEntries})
     };
-    try{
-      e.upload_status='VALIDATING';
-      setUploadPhase(`Dry-run validating ${i+1}/${uploadList.length}`,'Validating');
-      const requestPayload=isBedTransfer?employeeBedTransferValidatePayload(e,sessionForEntry):null;
-      await validateEmployeeUploadDryRun(requestPayload?.entry||e,requestPayload?.session||sessionForEntry,i,requestPayload?{requestPayload}:{});
+    const requestPayload=isBedTransfer?employeeBedTransferValidatePayload(e,sessionForEntry):{dry_run:true,validate_only:true,no_write:true,event_index:i,entry:e,entries:[e],session:{...sessionForEntry,entries:[e],entries_json:JSON.stringify({anchor_contract_version:'employee_entry_anchor_v1',entries:[e]})}};
+    requestPayload.event_index=i;
+    validationRequests.push(requestPayload);
+    if(isBedTransfer)bedTransferUploadPayloads[i]=employeeBedTransferRecordPayload(requestPayload);
+  }
+  const aggregatePreflight=await validateEmployeeUploadAggregateDryRun(validationRequests);
+  const aggregateResults=Array.isArray(aggregatePreflight?.validation_results)?aggregatePreflight.validation_results:[];
+  for(let i=0;i<uploadList.length;i++){
+    const e=uploadList[i];
+    const rawResult=aggregateResults[i]||employeeAggregateValidationFallback([validationRequests[i]],'AGGREGATE_RESULT_MISSING','Aggregate preflight did not return this record.',0).validation_results[0];
+    if(rawResult?.ok===true){
       e.upload_status='VALIDATION_PASSED';
-      if(isBedTransfer)bedTransferUploadPayloads[i]=employeeBedTransferRecordPayload(requestPayload);
-    }catch(err){
-      const dryRunResult=employeeBindUploadValidationResult(err?.dryRunResult||{},e,i,err?.message||'dry_run_validation_failed');
+      e.upload_validation_error=null;
+      e.upload_validation_error_code='';
+      e.sync_error='';
+    }else{
+      const dryRunResult=employeeBindUploadValidationResult(rawResult||{},e,i,rawResult?.message||'dry_run_validation_failed');
       e.sync_status='LOCAL';
       e.upload_status=dryRunResult.error_code==='ARREARS_REF_STALE_REFRESH_REQUIRED'?'STALE':'VALIDATION_FAILED';
       e.upload_validation_error=dryRunResult;
+      e.upload_validation_error_code=dryRunResult.error_code;
       e.sync_error=formatEmployeeUploadDryRunError(dryRunResult,i);
       dryRunFailed.push({entry:e,result:dryRunResult,message:e.sync_error});
-      break;
     }
   }
   if(dryRunFailed.length){
     const firstDryRunFailure=dryRunFailed[0];
-    uploadList.filter(row=>row.upload_status==='VALIDATION_PASSED').forEach(validated=>{
+    uploadList.forEach(validated=>{
       const original=allOriginalDrafts.find(row=>employeeEntryStableIdentity(row)===employeeEntryStableIdentity(validated));
-      if(original){original.upload_status='VALIDATION_PASSED';original.upload_validation_error=null;original.upload_validation_error_code='';original.sync_error='';}
+      if(!original)return;
+      original.sync_status='LOCAL';
+      original.upload_status=validated.upload_status;
+      original.upload_validation_error=validated.upload_validation_error||null;
+      original.upload_validation_error_code=validated.upload_validation_error_code||'';
+      original.sync_error=validated.sync_error||'';
     });
     const failedIdentity=employeeEntryStableIdentity(firstDryRunFailure.entry);
-    const failedOriginal=allOriginalDrafts.find(row=>employeeEntryStableIdentity(row)===failedIdentity);
     const failedIndex=Math.max(0,allOriginalDrafts.findIndex(row=>employeeEntryStableIdentity(row)===failedIdentity));
-    if(failedOriginal){
-      failedOriginal.sync_status='LOCAL';
-      failedOriginal.upload_status=firstDryRunFailure.result?.error_code==='ARREARS_REF_STALE_REFRESH_REQUIRED'?'STALE':'VALIDATION_FAILED';
-      failedOriginal.upload_validation_error=firstDryRunFailure.result;
-      failedOriginal.upload_validation_error_code=firstDryRunFailure.result?.error_code||'SERVER_DRY_RUN_GENERIC_ERROR';
-      failedOriginal.sync_error=firstDryRunFailure.message;
-    }
     state.drafts=allOriginalDrafts;
     state.sessionId=originalSessionId;
     state.uploadValidationFailedIndex=failedIndex;
@@ -8375,7 +8417,7 @@ async function commitSessionAndExport(){
     showStatus(`Upload validation failed / \u4e0a\u4f20\u6821\u9a8c\u5931\u8d25: ${firstDryRunFailure.message}`,'bad');
     $('validationBox').innerHTML=renderEmployeeUploadDryRunError(firstDryRunFailure.result);
     employeeBindDiagnosticCopyButtons();
-    toast(`Upload validation failed / \u4e0a\u4f20\u6821\u9a8c\u5931\u8d25: ${firstDryRunFailure.result.error_code}`,6000);
+    toast(`${dryRunFailed.length} records failed validation / ${dryRunFailed.length} \u6761\u8bb0\u5f55\u6821\u9a8c\u5931\u8d25`,6000);
     updateEntrySessionActionState();
     return;
   }

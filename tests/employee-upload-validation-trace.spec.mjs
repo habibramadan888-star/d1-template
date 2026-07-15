@@ -90,10 +90,10 @@ test("client-side batch validation cannot block server dry-run", async () => {
   const commitStart = html.lastIndexOf("async function commitSessionAndExport");
   assert.ok(commitStart >= 0, "effective commitSessionAndExport function must exist");
   const commitBlock = html.slice(commitStart);
-  const dryRunStart = commitBlock.indexOf("validateEmployeeUploadDryRun(e,sessionForEntry,i)");
+  const dryRunStart = commitBlock.indexOf("validateEmployeeUploadAggregateDryRun(validationRequests)");
   const realUploadStart = commitBlock.indexOf("apiFetch('/api/employee/entry'", dryRunStart);
 
-  assert.ok(dryRunStart > 0, "server dry-run branch must exist");
+  assert.ok(dryRunStart > 0, "aggregate server dry-run branch must exist");
   assert.ok(realUploadStart > dryRunStart, "real upload must run after server dry-run");
   assert.doesNotMatch(commitBlock, /CLIENT_ANCHOR_BATCH_VALIDATION_FAILED/);
   assert.doesNotMatch(commitBlock, /source:'client_local_validation'/);

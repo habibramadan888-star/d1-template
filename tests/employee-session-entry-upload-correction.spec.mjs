@@ -88,28 +88,30 @@ test("Bed Transfer card uses formal fee fields for paid, waived, and unpaid", ()
   assert.match(context.result({ fee_mode: "unpaid", fee_amount_aed: 50 }).amountLabel, /Unpaid AED 50\.00/);
 });
 
-test("Expense card exposes description with remark fallback and keeps evidence rule", () => {
+test("Expense card exposes description and no longer requires an evidence field", () => {
   const render = employee.slice(employee.lastIndexOf("renderSessionPreview=function(){"), employee.indexOf("renderSummary=function(){", employee.lastIndexOf("renderSessionPreview=function(){")));
   assert.match(render, /e\.expense_description\|\|e\.expense_desc\|\|e\.remark\|\|e\.note/);
   assert.match(render, /employee-expense-card-description/);
   assert.doesNotMatch(render, /expenseEvidenceRef|evidence_ref|fingerprint|provider/);
   assert.match(employee, /employee-expense-card-description\{[^}]*-webkit-line-clamp:2/);
-  assert.match(worker, /EXPENSE_EVIDENCE_REQUIRED/);
+  assert.doesNotMatch(worker, /EXPENSE_EVIDENCE_REQUIRED/);
 });
 
 test("mixed upload validates every unsynced row before formal writes and clears on confirmation", () => {
   const upload = block(employee, "async function commitSessionAndExport()", "function normalizeEmployeeView", true);
-  const validateLoop = upload.indexOf("for(let i=0;i<uploadList.length;i++)");
-  const formalWrite = upload.indexOf("apiFetch('/api/employee/entry'", validateLoop);
-  const failedGate = upload.indexOf("if(dryRunFailed.length)", validateLoop);
-  assert.ok(validateLoop >= 0 && failedGate > validateLoop && formalWrite > failedGate);
+  const aggregateCall = upload.indexOf("validateEmployeeUploadAggregateDryRun(validationRequests)");
+  const formalWrite = upload.indexOf("apiFetch('/api/employee/entry'", aggregateCall);
+  const failedGate = upload.indexOf("if(dryRunFailed.length)", aggregateCall);
+  assert.ok(aggregateCall >= 0 && failedGate > aggregateCall && formalWrite > failedGate);
   assert.match(upload, /allOriginalDrafts\.filter\(entry=>!employeeEntryCloudConfirmed\(entry\)\)/);
   assert.match(upload, /ordinaryCanonicalEntries=canonicalEntries\.filter/);
   assert.match(upload, /ordinarySummary=calculateEmployeeSessionSummary\(ordinaryCanonicalEntries\)/);
   assert.match(upload, /requestEntries=isBedTransfer\?\[e\]:ordinaryCanonicalEntries/);
   assert.match(upload, /employeeBedTransferValidatePayload/);
   assert.match(upload, /employeeBedTransferRecordPayload/);
-  assert.match(upload, /employeeBindUploadValidationResult\(err\?\.dryRunResult\|\|\{\},e,i/);
+  assert.match(upload, /aggregatePreflight\?\.validation_results/);
+  assert.match(upload, /dryRunFailed\.push/);
+  assert.doesNotMatch(upload.slice(aggregateCall, failedGate), /break;/);
   assert.match(upload, /failedIdentity=employeeEntryStableIdentity\(firstDryRunFailure\.entry\)/);
   assert.match(upload, /employeeEntryStableIdentity\(row\)===failedIdentity/);
   assert.match(upload, /if\(cloudConfirmed\)\{\s*state\.drafts=\[\]/s);

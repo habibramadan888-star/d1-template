@@ -45,7 +45,7 @@ test("source-of-truth document covers all seven event contracts and approved bus
     "payment above `80` is not allowed",
     "Refund above balance without owner override",
     "Normal Checkout is not allowed with open arrears",
-    "Receipt/evidence is required for expenses `>= 100 AED`",
+    "Historical `evidence_ref` remains readable, but new Expense records may omit it at every amount",
     "New bed becomes occupied on transfer_date",
     "TTLock provider metadata"
   ]) {
@@ -97,7 +97,7 @@ test("runtime anchor contract exposes event-specific required fields from the so
     D: ["deposit_amount", "deposit_required_total", "previous_deposit_recorded_amount", "deposit_paid_amount", "expected_deposit_after_payment", "deposit_remaining_after_payment", "deposit_remaining"],
     DR: ["refund_amount", "refund_reason", "deposit_balance", "owner_override_ref"],
     CO: ["checkout_date", "owner_approval_required", "left_with_arrears", "whatsapp_phone", "promised_payment_date"],
-    E: ["expense_amount", "expense_category", "reason", "payment_method", "evidence_ref"],
+    E: ["expense_amount", "expense_category", "reason", "payment_method"],
     TF: ["from_bed", "to_bed", "transfer_reason", "fee_amount_aed", "fee_mode", "fee_due_date", "payment_method", "fee_waiver_reason", "bed_price_difference_mode", "bed_price_difference_amount_aed"]
   };
 
@@ -203,8 +203,8 @@ test("event-specific business rules are visible in current runtime validation", 
     ["DepositOut.refund_reason", depositOut, /refund_reason/],
     ["Checkout.left_with_arrears", checkout, /left_with_arrears/],
     ["Checkout.left_arrears_amount", checkout, /left_arrears_amount/],
-    ["Expense.evidence_ref", expense, /evidence_ref/],
-    ["Expense.evidence_threshold_100", expense, /100/],
+    ["Expense.description", expense, /expense_description|expense_desc/],
+    ["Expense.cash_bank_only", expense, /cash.*bank|bank.*cash/],
     ["BedTransfer.reject_same_bed", transfer, /fromBed===toBed|from_bed.*to_bed/]
   ].filter(([, block, pattern]) => !pattern.test(block)).map(([name]) => name);
 
@@ -253,7 +253,7 @@ test("Deposit Out contract preserves balance, override, offset, and refund field
   assert.doesNotMatch(correctionTotals, /type==="deposit_out"\)totals\.rent_income/);
 });
 
-test("Expense contract preserves evidence, category, payment method, and cost-only accounting", async () => {
+test("Expense contract keeps evidence optional, server category, four employee inputs, and cost-only accounting", async () => {
   const worker = await readFile(workerPath, "utf8");
   const validator = functionBlock(worker, "validateExpenseUploadFields");
   const normalize = functionBlock(worker, "normalizeEntryAnchor");
@@ -261,13 +261,14 @@ test("Expense contract preserves evidence, category, payment method, and cost-on
   const contractLine = contract.match(/E:\[[^\]]+\]/)?.[0] || "";
   const correctionTotals = functionBlock(worker, "ownerCorrectionPreviewSessionTotals");
 
-  for (const field of ["expense_amount", "expense_category", "reason", "payment_method", "evidence_ref"]) {
+  for (const field of ["expense_amount", "expense_category", "reason", "payment_method"]) {
     assert.match(validator + normalize + contractLine, new RegExp(field));
   }
 
   assert.match(validator, /EXPENSE_REQUIRED_FIELD_MISSING/);
-  assert.match(validator, /EXPENSE_EVIDENCE_REQUIRED/);
-  assert.match(validator, /amount>=100/);
+  assert.doesNotMatch(validator, /EXPENSE_EVIDENCE_REQUIRED|amount>=100/);
+  assert.match(validator, /target_bed/);
+  assert.match(validator, /expense_description|expense_desc/);
   assert.doesNotMatch(validator, /RENT_REQUIRED_FIELD_MISSING/);
   assert.doesNotMatch(normalize, /linked_tenant_ref/);
   assert.match(correctionTotals, /type==="expense"\)totals\.expense\+=/);

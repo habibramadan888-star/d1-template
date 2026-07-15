@@ -39,7 +39,7 @@ test("only arrears payment reconciliation can settle a cloud arrears task", asyn
   const source = await readFile(workerPath, "utf8");
   const writePathStart = source.indexOf("let arrearTask=null;");
   assert.notEqual(writePathStart, -1, "write-path arrears task block should exist");
-  const apStart = source.indexOf('if(type==="AP"){\n    const taskId=cleanId(entry.linked_task_id);\n    if(taskId&&apTaskForPayment)', writePathStart);
+  const apStart = source.indexOf('if(type==="AP"){', writePathStart);
   assert.notEqual(apStart, -1, "arrears payment reconciliation block should exist");
   const apBlock = source.slice(apStart, source.indexOf("let leftWithArrearsTask", apStart));
 
