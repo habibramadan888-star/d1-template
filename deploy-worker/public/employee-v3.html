@@ -2954,7 +2954,7 @@ label .label-en{
     <button class="tab" data-view="system"><span class="en">System</span><span class="tab-cn">系统</span></button>
   </div>
 </div>
-<div class="employee-workspace-switch" role="tablist" aria-label="Employee workspace"><button type="button" class="active" data-employee-workspace="entry">录入事项 <small>Add Entry</small></button><button type="button" data-employee-workspace="session">本票记录 <small id="workspaceSessionCount">Current Session (0)</small></button><button type="button" class="employee-session-status-bar" id="employeeSessionStatusBar"><span>本票 0 条</span><span>现金净额 AED 0.00</span><span>银行收款 AED 0.00</span></button></div>
+<div class="employee-workspace-switch" role="tablist" aria-label="Employee workspace"><button type="button" class="active" data-employee-workspace="entry">录入事项 <small>Add Entry</small></button><button type="button" data-employee-workspace="session">本票记录 <small id="workspaceSessionCount">Current Session (0)</small></button><button type="button" class="employee-session-status-bar" id="employeeSessionStatusBar" aria-label="Records 0, Cash Net AED 0.00, Bank Received AED 0.00"><span class="employee-session-status-item"><span class="employee-session-status-label">Records</span><strong>0</strong></span><span class="employee-session-status-item"><span class="employee-session-status-label">Cash Net</span><strong>AED 0.00</strong></span><span class="employee-session-status-item"><span class="employee-session-status-label">Bank Received</span><strong>AED 0.00</strong></span></button></div>
 <main class="wrap">
   <section id="view-entry">
     <div class="card employee-session-card" id="employeeSessionSummaryCard">
@@ -2989,7 +2989,7 @@ label .label-en{
             <option value="R">R 收租</option><option value="D">D 收押金</option><option value="DR">DR 退押金</option><option value="CO">CO 退房</option><option value="AP">AP 还欠款</option><option value="E">E 支出</option><option value="TF">TF 换床</option>
           </select></div>
           <div class="field hidden" id="selectedEventWrap"><label>Selected Event<span class="label-en">已选事件</span></label><div id="selectedEventDisplay" class="readonly-pill">Rent / 收租</div></div>
-          <div class="field" id="genericBedFieldWrap"><label id="genericBedFieldLabel">床位 BED</label><input id="bed" placeholder="431" autocomplete="off"><div id="employeeBedInfoStrip" class="bed-info-strip hidden" data-bed-info-strip="true"></div></div>
+          <div class="field" id="genericBedFieldWrap"><label id="genericBedFieldLabel">床位 BED</label><input id="bed" autocomplete="off"><div id="employeeBedInfoStrip" class="bed-info-strip hidden" data-bed-info-strip="true"></div></div>
         </div>
         <div class="small" id="objectHint">收租/收押金/退押金/还欠款：填写床位号；换床：填写原床位后再填新床位；支出：选择支出类别。</div>
         <div id="bedTransferStep2Mount" data-bed-transfer-step2="true"></div>
@@ -2999,21 +2999,21 @@ label .label-en{
         <div class="ctx" id="bedContext"></div>
         <div class="context-note" id="contextNotice"></div>
         <div class="grid">
-          <div class="field hidden" id="tenantNameWrap"><label>门禁卡备注快照 ACCESS CARD REMARK SNAPSHOT</label><input id="tenantName" placeholder="自动抓取，不让员工自由猜填"></div>
-          <div class="field hidden" id="tenantCardWrap"><label>门禁卡卡号 CID</label><input id="tenantCardId" placeholder="自动抓取或手动填写"></div>
+          <div class="field hidden" id="tenantNameWrap"><label>门禁卡备注快照 ACCESS CARD REMARK SNAPSHOT</label><input id="tenantName"></div>
+          <div class="field hidden" id="tenantCardWrap"><label>门禁卡卡号 CID</label><input id="tenantCardId"></div>
         </div>
         </div>
         <div class="step payment-compact" id="paymentStep">
           <div class="step-title"><span>4</span><div>Step 4 · Payment Method<small>第四步：付款方式</small></div></div>
         <div class="grid" id="paymentFields">
           <div class="field"><label>付款方式 PY</label><select id="payType" class="hidden"><option value="C">Cash / 现金</option><option value="B">Bank / 银行</option></select><div class="pay-toggle"><button type="button" class="pay-option active" data-pay="C"><span class="employee-btn-main">Cash</span><span class="label-en">现金</span></button><button type="button" class="pay-option" data-pay="B"><span class="employee-btn-main">Bank</span><span class="label-en">银行</span></button></div></div>
-          <div class="field hidden" id="bankRefWrap"><label>银行参考 bank_ref</label><input id="bankRef" placeholder="系统保留字段，员工无需填写"></div>
+          <div class="field hidden" id="bankRefWrap"><label>银行参考 bank_ref</label><input id="bankRef"></div>
         </div>
         </div>
         <div class="step">
           <div class="step-title"><span>5</span><div>Step 5 · Enter Amount<small>第五步：填写金额，系统对比应收和实收</small></div></div>
         <div class="grid">
-          <div class="field"><label>实收/支出金额 AMT</label><input id="amount" inputmode="decimal" placeholder="0.00"></div>
+          <div class="field"><label>实收/支出金额 AMT</label><input id="amount" inputmode="decimal"></div>
           <div class="field" id="listPriceWrap"><label>List Price / 系统月租</label><input id="listPrice" type="hidden" readonly><div id="listPriceDisplay" class="readonly-pill" aria-live="polite">Not configured</div></div>
         </div>
         </div>
@@ -3036,25 +3036,25 @@ label .label-en{
 
         <div class="field hidden" id="apFields">
           <label>选择欠款任务 linked_task_id</label>
-          <select id="linkedTaskId"><option value="">先刷新欠款任务</option></select>
+          <select id="linkedTaskId"><option value=""></option></select>
           <div class="context-note" id="apTaskInfo" style="margin-top:12px"></div>
         </div>
 
         <div class="grid hidden" id="depositOutFields" data-deposit-out-fields="true">
           <div class="field"><label>Deposit Balance<span class="label-en">应退押金</span></label><input id="depositOutBalance" readonly placeholder="System read"></div>
           <div class="field"><label>Refund Date<span class="label-en">退款日期</span></label><input id="depositOutRefundDate" type="date"></div>
-          <div class="field"><label>Difference Reason<span class="label-en">差异原因</span></label><input id="depositOutDifferenceReason" placeholder="Required if actual refund differs from deposit balance"></div>
+          <div class="field"><label>Difference Reason<span class="label-en">差异原因</span></label><input id="depositOutDifferenceReason"></div>
         </div>
 
         <div class="grid" id="checkoutFields">
           <div class="field"><label>Checkout Type<span class="label-en">退房类型</span></label><select id="leftWithArrearsMode" data-left-with-arrears-mode="true"><option value="normal">Normal Checkout / 正常退房</option><option value="left_with_arrears">Left With Arrears / 离店未清欠款</option></select></div>
           <div class="field"><label>实际离开日期 checkout_date</label><input id="checkoutDate" type="date"></div>
           <div class="field"><label>超期扣款 OVERDAY</label><input id="overdayDeduction" readonly></div>
-          <div class="field"><label>未提前告知扣款 NO_NOTICE</label><input id="noNoticeDeduction" inputmode="decimal" placeholder="0"></div>
-          <div class="field"><label>其他扣款 OTHER</label><input id="otherDeduction" inputmode="decimal" placeholder="0"></div>
+          <div class="field"><label>未提前告知扣款 NO_NOTICE</label><input id="noNoticeDeduction" inputmode="decimal"></div>
+          <div class="field"><label>其他扣款 OTHER</label><input id="otherDeduction" inputmode="decimal"></div>
           <div class="field"><label>押金扣款合计 deposit_deduction</label><input id="depositDeduction" inputmode="decimal" placeholder="系统合计" readonly></div>
           <div class="field"><label>应退押金 deposit_amt</label><input id="depositReturnAmount" readonly></div>
-          <div class="field"><label>扣款说明 ded_note</label><input id="dedNote" placeholder="其他扣款必须说明"></div>
+          <div class="field"><label>扣款说明 ded_note</label><input id="dedNote"></div>
           <div class="left-with-arrears-panel hidden" id="leftWithArrearsFields" data-left-with-arrears-fields="true">
             <div class="panel-title">Left With Arrears<small>离店未清欠款</small></div>
             <input id="leftFormerCustomerName" data-left-former-customer-name="true" type="hidden">
@@ -3064,7 +3064,7 @@ label .label-en{
             <input id="leftPromisedReturnDate" data-left-promised-return-date="true" type="hidden">
             <div class="context-note" id="leftWithArrearsSystemFields" data-left-with-arrears-system-fields="true">System fields will load after bed check.</div>
             <div class="grid3">
-              <div class="field"><label>WhatsApp Phone<span class="label-en">客户 WhatsApp 号码</span></label><input id="leftWhatsappPhone" data-left-whatsapp-phone="true" placeholder="Customer WhatsApp phone"></div>
+              <div class="field"><label>WhatsApp Phone<span class="label-en">客户 WhatsApp 号码</span></label><input id="leftWhatsappPhone" data-left-whatsapp-phone="true"></div>
               <div class="field"><label>Coverage End Date<span class="label-en">租期或卡片截止日期</span></label><input id="leftCoverageEndDate" data-left-coverage-end-date="true" type="date"></div>
               <div class="field"><label>Confirmed Not Returning Date<span class="label-en">确认不再回来日期</span></label><input id="leftConfirmedNotReturningDate" data-left-confirmed-not-returning-date="true" type="date"></div>
               <div class="field"><label>Promised Payment Date<span class="label-en">承诺付款日期</span></label><input id="leftPromisedPaymentDate" data-left-promised-payment-date="true" type="date"></div>
@@ -3072,25 +3072,25 @@ label .label-en{
             <div class="grid3">
               <div class="field"><label>Left Arrears Amount<span class="label-en">离店欠款总金额</span></label><input id="leftArrearsAmount" data-left-arrears-amount="true" inputmode="decimal"></div>
               <div class="field"><label>Belongings Held<span class="label-en">物品留存</span></label><select id="leftBelongingsHeld" data-left-belongings-held="true"><option value="no">No / 否</option><option value="yes">Yes / 是</option></select></div>
-              <div class="field"><label>Note<span class="label-en">备注</span></label><input id="leftContactNote" data-left-contact-note="true" placeholder="Tracking note"></div>
+              <div class="field"><label>Note<span class="label-en">备注</span></label><input id="leftContactNote" data-left-contact-note="true"></div>
             </div>
-            <div class="field"><label>Belongings Note<span class="label-en">物品说明</span></label><textarea id="leftBelongingsNote" data-left-belongings-note="true" placeholder="Bags, documents, clothes, tools..."></textarea></div>
+            <div class="field"><label>Belongings Note<span class="label-en">物品说明</span></label><textarea id="leftBelongingsNote" data-left-belongings-note="true"></textarea></div>
             <div class="context-note" id="leftWithArrearsSummary" data-left-with-arrears-summary="true">Open arrears details will appear after bed check.</div>
           </div>
         </div>
         <div class="grid" id="transferFields">
-          <div class="field"><label>From Bed / 原床位</label><input id="transferFromBed" data-bed-transfer-from="true" placeholder="431"><div id="employeeTransferFromBedInfoStrip" class="bed-info-strip hidden" data-bed-transfer-bed-info-strip="true"></div></div>
-          <div class="field"><label>To Bed / 新床位</label><input id="bedTo" data-bed-transfer-to="true" placeholder="852"></div>
-          <div class="field"><label>Transfer Reason / 换床原因</label><select id="transferReason" data-bed-transfer-reason="true"><option value="">请选择原因</option><option value="customer_request">customer request / 客户要求</option><option value="room_issue">room issue / 房间问题</option><option value="management_adjustment">management adjustment / 管理调整</option><option value="bed_upgrade">bed upgrade / 升级</option><option value="other">other / 其他</option></select></div>
+          <div class="field"><label>From Bed / 原床位</label><input id="transferFromBed" data-bed-transfer-from="true"><div id="employeeTransferFromBedInfoStrip" class="bed-info-strip hidden" data-bed-transfer-bed-info-strip="true"></div></div>
+          <div class="field"><label>To Bed / 新床位</label><input id="bedTo" data-bed-transfer-to="true"></div>
+          <div class="field"><label>Transfer Reason / 换床原因</label><select id="transferReason" data-bed-transfer-reason="true"><option value=""></option><option value="customer_request">customer request / 客户要求</option><option value="room_issue">room issue / 房间问题</option><option value="management_adjustment">management adjustment / 管理调整</option><option value="bed_upgrade">bed upgrade / 升级</option><option value="other">other / 其他</option></select></div>
           <div class="field"><label>Transfer Fee / 换床费</label><select id="feePaid" data-bed-transfer-fee-mode="true"><option value="paid">Paid AED 50 / 已收 50</option><option value="waived">Waived / 免责声明免收</option><option value="unpaid">Unpaid AED 50 / 暂未支付 50</option></select></div>
-          <div class="field" id="transferFeePaymentMethodWrap"><label>Fee Payment Method / 换床费支付方式</label><select id="transferFeePaymentMethod"><option value="">请选择</option><option value="cash">Cash / 现金</option><option value="bank">Bank / 银行</option></select></div>
-          <div class="field hidden" id="transferWaiverReasonWrap"><label>Waiver Reason / 豁免原因</label><input id="transferWaiverReason" data-bed-transfer-waiver-reason="true" placeholder="Required when fee is waived"><div class="amount-hint">免收声明将进入老板 Today Todo。</div></div>
+          <div class="field" id="transferFeePaymentMethodWrap"><label>Fee Payment Method / 换床费支付方式</label><select id="transferFeePaymentMethod"><option value=""></option><option value="cash">Cash / 现金</option><option value="bank">Bank / 银行</option></select></div>
+          <div class="field hidden" id="transferWaiverReasonWrap"><label>Waiver Reason / 豁免原因</label><input id="transferWaiverReason" data-bed-transfer-waiver-reason="true"><div class="amount-hint">免收声明将进入老板 Today Todo。</div></div>
           <div class="field hidden" id="transferFeeDueDateWrap"><label>Fee Due Date / 换床费到期日</label><input id="transferFeeDueDate" type="date"><div class="amount-hint">未付 50 AED 将进入统一欠款。</div></div>
           <div class="field"><label>Bed Price Difference / 床价差</label><select id="bedDifferenceMode"><option value="none">None / 无床价差</option><option value="paid">Paid now / 当场已付</option><option value="unpaid">Record arrears / 记为欠款</option></select></div>
-          <div class="field hidden" id="bedDifferenceAmountWrap"><label>Difference Amount AED / 床价差金额</label><input id="bedDifferenceAmount" inputmode="decimal" placeholder="Employee calculated / 员工计算"></div>
-          <div class="field hidden" id="bedDifferencePaymentMethodWrap"><label>Difference Payment Method / 床价差支付方式</label><select id="bedDifferencePaymentMethod"><option value="">请选择</option><option value="cash">Cash / 现金</option><option value="bank">Bank / 银行</option></select></div>
+          <div class="field hidden" id="bedDifferenceAmountWrap"><label>Difference Amount AED / 床价差金额</label><input id="bedDifferenceAmount" inputmode="decimal"></div>
+          <div class="field hidden" id="bedDifferencePaymentMethodWrap"><label>Difference Payment Method / 床价差支付方式</label><select id="bedDifferencePaymentMethod"><option value=""></option><option value="cash">Cash / 现金</option><option value="bank">Bank / 银行</option></select></div>
           <div class="field hidden" id="bedDifferenceDueDateWrap"><label>Difference Due Date / 床价差到期日</label><input id="bedDifferenceDueDate" type="date"></div>
-          <div class="field hidden" id="bedDifferenceReasonWrap"><label>Difference Note / 床价差说明</label><input id="bedDifferenceReason" placeholder="Optional business note"></div>
+          <div class="field hidden" id="bedDifferenceReasonWrap"><label>Difference Note / 床价差说明</label><input id="bedDifferenceReason"></div>
           <div class="bed-transfer-context" id="transferReviewPanel" data-bed-transfer-review="true">
             <strong>Canonical Bed Context / 床位事实摘要</strong>
             <div>提交时间以服务器接受时间为准；本表单不允许补录历史换床时间。</div>
@@ -3105,7 +3105,7 @@ label .label-en{
           </div>
         </div>
         <div class="grid" id="expenseFields">
-          <div class="field"><label>Expense Description<span class="label-en">支出说明</span></label><input id="expenseDesc" placeholder="修空调、采购耗材等实际用途"></div>
+          <div class="field"><label>Expense Description<span class="label-en">支出说明</span></label><input id="expenseDesc"></div>
         </div>
 
         <div id="systemCalculation" hidden aria-hidden="true">
@@ -3114,7 +3114,7 @@ label .label-en{
         </div>
         <div class="step diffbox hidden" id="exceptionStep">
           <div class="step-title"><span>7</span><div>Step 7 · Handle Exception<small>第七步：处理异常或差额</small></div></div>
-        <div class="field hidden" id="excessWrap"><label>超收处理 excess_to</label><select id="excessTo"><option value="">请选择超收处理</option><option value="RETURNED">找零/零头已退还</option><option value="MANAGER">转老板处理，不作为本期收入</option></select></div>
+        <div class="field hidden" id="excessWrap"><label>超收处理 excess_to</label><select id="excessTo"><option value=""></option><option value="RETURNED">找零/零头已退还</option><option value="MANAGER">转老板处理，不作为本期收入</option></select></div>
         <div class="arrear-plan hidden" id="arrearPlan">
           <div class="plan-head">
             <div>尾款任务<small>TAIL BALANCE TASK</small></div>
@@ -3126,11 +3126,11 @@ label .label-en{
             <div class="field"><label>承诺支付日期 promise_date</label><input id="arrearPromiseDate" type="date"></div>
             <div class="field"><label>处理方式 arrear_handling</label><select id="arrearHandling"><option value="ARREAR">生成尾款任务 TAIL BALANCE</option><option value="FIX">返回修改 ENTRY ERROR</option><option value="DISCOUNT" disabled>折扣/减免需老板授权 DISCOUNT</option></select></div>
           </div>
-          <div class="field"><label>尾款原因 arrear_reason_detail</label><textarea id="arrearReasonDetail" placeholder="例如：客户今天只付 100，承诺 5/25 补齐尾款。"></textarea></div>
+          <div class="field"><label>尾款原因 arrear_reason_detail</label><textarea id="arrearReasonDetail"></textarea></div>
         </div>
-        <div class="field hidden"><label>原因代码 RC</label><select id="reasonCode"><option value="">无</option><option value="SHORT_PAID">SHORT_PAID 短付</option><option value="DISCOUNT">DISCOUNT 折扣</option><option value="FIRST_PRO">FIRST_PRO 首月比例</option><option value="LAST_PRO">LAST_PRO 末月比例</option><option value="OTHER">OTHER 其他</option></select></div>
-        <div class="field hidden" id="customReasonWrap"><label>自定义/折扣/异常原因 custom_reason</label><input id="customReason" placeholder="CUST、折扣、短付、免收时必填"></div>
-        <div class="field"><label>备注 RMK</label><textarea id="remark" placeholder="必要时说明承诺日期、折扣原因、免收原因、退房扣款原因等"></textarea></div>
+        <div class="field hidden"><label>原因代码 RC</label><select id="reasonCode"><option value=""></option><option value="SHORT_PAID">SHORT_PAID 短付</option><option value="DISCOUNT">DISCOUNT 折扣</option><option value="FIRST_PRO">FIRST_PRO 首月比例</option><option value="LAST_PRO">LAST_PRO 末月比例</option><option value="OTHER">OTHER 其他</option></select></div>
+        <div class="field hidden" id="customReasonWrap"><label>自定义/折扣/异常原因 custom_reason</label><input id="customReason"></div>
+        <div class="field"><label>备注 RMK</label><textarea id="remark"></textarea></div>
         </div>
         <div class="step">
           <div class="step-title"><span>8</span><div>Step 8 · Review & Submit<small>第八步：摘要确认 + 提交</small></div></div>
@@ -3936,7 +3936,7 @@ function populateTaskSelect(){
   const bed=$('bed').value.trim().replace(/^#/,'');
   const previous=sel.value||state.selectedArrearsTaskRef||'';
   const open=bed?openTasksForBed():[];
-  sel.innerHTML='<option value="">请选择要偿还的欠款</option>'+open.map(t=>`<option value="${esc(employeeTaskRef(t))}">#${esc(t.bed||'')} ${esc(t.tenant_name||'-')} · 剩余 ${fmtMoney(taskRemain(t))} AED · 原欠款 ${fmtMoney(num(t.arrear_amount))}</option>`).join('');
+  sel.innerHTML='<option value=""></option>'+open.map(t=>`<option value="${esc(employeeTaskRef(t))}">#${esc(t.bed||'')} ${esc(t.tenant_name||'-')} · 剩余 ${fmtMoney(taskRemain(t))} AED · 原欠款 ${fmtMoney(num(t.arrear_amount))}</option>`).join('');
   if($('linkedTaskId').value&&!open.some(t=>employeeTaskRef(t)===$('linkedTaskId').value))$('linkedTaskId').value='';
   renderTaskInfo();
 }
@@ -4173,7 +4173,7 @@ function populateTaskSelect(){
   const previous=sel.value||state.selectedArrearsTaskRef||'';
   const open=bed?openTasksForBed():[];
   const legacyOption=bed&&open.length===0?'<option value="legacy_manual">Legacy Arrears Payment / 历史欠款还款</option>':'';
-  sel.innerHTML='<option value="">Select cloud arrears to repay / 选择要偿还的云端欠款</option>'+open.map(t=>`<option value="${esc(employeeTaskRef(t))}">#${esc(t.bed||'')} ${esc(t.tenant_name||'-')} · Remaining ${fmtMoney(taskRemain(t))} AED · Original ${fmtMoney(num(t.arrear_amount))}</option>`).join('')+legacyOption;
+  sel.innerHTML='<option value=""></option>'+open.map(t=>`<option value="${esc(employeeTaskRef(t))}">#${esc(t.bed||'')} ${esc(t.tenant_name||'-')} · Remaining ${fmtMoney(taskRemain(t))} AED · Original ${fmtMoney(num(t.arrear_amount))}</option>`).join('')+legacyOption;
   if(previous==='legacy_manual'&&bed&&open.length===0)sel.value=previous;
   else if(previous&&open.some(t=>employeeTaskRef(t)===previous))sel.value=previous;
   if(sel.value!=='legacy_manual'&&sel.value&&!open.some(t=>employeeTaskRef(t)===sel.value)){
@@ -4722,6 +4722,18 @@ function employeeBedTransferValidatePayload(entry={},session={}){
 function employeeBedTransferRecordPayload(validated={}){
   const entry=validated.entry||{},session=validated.session||{};
   return {event_index:0,entry,entries:[entry],session:{id:String(session.id||''),source:'employee_entry',entries:[entry]}};
+}
+function employeeEntryStableIdentity(entry={}){
+  return String(entry.id||entry.event_id||entry.anchor_id||entry.original_local_entry_id||'').trim();
+}
+function employeeBindUploadValidationResult(result,entry,eventIndex,fallbackMessage=''){
+  const normalized=normalizeEmployeeUploadDryRunError(result,eventIndex,fallbackMessage);
+  return {
+    ...normalized,
+    event_index:Number(eventIndex)||0,
+    event_type:entryEventType(entry?.type||entry?.event_type||normalized.event_type||'entry'),
+    entry_identity:employeeEntryStableIdentity(entry)
+  };
 }
 function employeeInvalidateBedTransferValidation(){
   if(!state.bedTransferContext)return;
@@ -5807,6 +5819,7 @@ async function saveCanonicalBedTransferDraft(){
     entry.upload_status='DRAFT';
     entry.session_id=currentSessionId();
     state.uploadValidationFailedIndex=null;
+    state.uploadValidationFailedEntryId='';
     state.uploadValidationFailedMessage='';
     state.drafts.unshift(entry);
     state.lastSavedBedTransferDraftId=entry.id;
@@ -5911,6 +5924,7 @@ async function saveEntry(){
   e.sync_status='DRAFT';
   e.session_id=currentSessionId();
   state.uploadValidationFailedIndex=null;
+  state.uploadValidationFailedEntryId='';
   state.uploadValidationFailedMessage='';
   state.drafts.unshift(e);
   const localOk=saveDrafts();
@@ -5927,7 +5941,7 @@ async function saveEntryWithTtlockGate(){
   return saveEntryWithoutTtlockGate();
 }
 saveEntry=saveEntryWithTtlockGate;
-function resetForm(){['bed','transferFromBed','bedTo','transferReason','transferWaiverReason','transferFeeDueDate','transferFeePaymentMethod','bedDifferenceAmount','bedDifferencePaymentMethod','bedDifferenceDueDate','bedDifferenceReason','amount','due','paid','tenantName','tenantCardId','periodStart','periodEnd','periodDays','periodDue','listPrice','customReason','bankRef','checkoutDate','depositOutBalance','depositOutRefundDate','depositDeduction','depositReturnAmount','overdayDeduction','noNoticeDeduction','otherDeduction','dedNote','leftFormerCustomerName','leftWhatsappPhone','leftContactNote','leftDepositBalance','leftCoverageEndDate','leftArrearsAmount','leftBelongingsNote','leftPromisedPaymentDate','leftPromisedReturnDate','leftConfirmedNotReturningDate','leftGraceDays','expenseDesc','expenseEvidenceRef','remark','excessTo','arrearAmount','arrearPromiseDate','arrearReasonDetail'].forEach(id=>{if($(id))$(id).value=''});if($('amount'))delete $('amount').dataset.periodAmountComplete;$('feePaid').value='paid';$('bedDifferenceMode').value='none';$('leftWithArrearsMode').value='normal';$('leftContactMethod').value='whatsapp';$('leftBelongingsHeld').value='no';$('arrearHandling').value='ARREAR';state.current=null;state.depositBalance=null;state.depositContext=null;state.bedTransferContext={status:'idle',source:null,target:null,requestKey:'',serverValidation:null};employeeRenderBedTransferContext();renderContext();syncForm();refreshSessionViews()}
+function resetForm(){['bed','transferFromBed','bedTo','transferReason','transferWaiverReason','transferFeeDueDate','transferFeePaymentMethod','bedDifferenceAmount','bedDifferencePaymentMethod','bedDifferenceDueDate','bedDifferenceReason','amount','due','paid','tenantName','tenantCardId','periodStart','periodEnd','periodDays','periodDue','listPrice','customReason','bankRef','checkoutDate','depositOutBalance','depositOutRefundDate','depositOutDifferenceReason','depositDeduction','depositReturnAmount','overdayDeduction','noNoticeDeduction','otherDeduction','dedNote','leftFormerCustomerName','leftWhatsappPhone','leftContactNote','leftDepositBalance','leftCoverageEndDate','leftArrearsAmount','leftBelongingsNote','leftPromisedPaymentDate','leftPromisedReturnDate','leftConfirmedNotReturningDate','leftGraceDays','expenseDesc','expenseEvidenceRef','remark','excessTo','reasonCode','linkedTaskId','arrearAmount','arrearPromiseDate','arrearReasonDetail'].forEach(id=>{if($(id))$(id).value=''});if($('amount'))delete $('amount').dataset.periodAmountComplete;$('feePaid').value='paid';$('bedDifferenceMode').value='none';$('leftWithArrearsMode').value='normal';$('leftContactMethod').value='whatsapp';$('leftBelongingsHeld').value='no';$('arrearHandling').value='ARREAR';state.current=null;state.depositBalance=null;state.depositContext=null;state.bedTransferContext={status:'idle',source:null,target:null,requestKey:'',serverValidation:null};employeeRenderBedTransferContext();renderContext();syncForm();refreshSessionViews()}
 function hasLocalOnly(){return state.drafts.some(e=>!employeeEntryCloudConfirmed(e))}
 function newSession(){
   if(hasLocalOnly()){toast('仍有云端未确认记录，不能开始新会话');return}
@@ -5945,6 +5959,7 @@ function newSessionFinal(){
   state.drafts=[];
   state.sessionId='';
   state.uploadValidationFailedIndex=null;
+  state.uploadValidationFailedEntryId='';
   state.uploadValidationFailedMessage='';
   try{localStorage.removeItem(employeeStorageKey('empv3:drafts'));localStorage.removeItem(employeeStorageKey('empv3:sessionId'))}catch{}
   currentSessionId();
@@ -8001,7 +8016,8 @@ renderEmployeeUploadDryRunError=function(result){
 function employeeRecordValidationError(entry,index){
   if(entry?.sync_status==='SYNCED'||entry?.upload_status==='SYNCED')return null;
   if(entry?.upload_validation_error)return normalizeEmployeeUploadDryRunError(entry.upload_validation_error,index,entry.sync_error||'');
-  if(Number(state.uploadValidationFailedIndex)===index){
+  const failedIdentity=String(state.uploadValidationFailedEntryId||'');
+  if((failedIdentity&&employeeEntryStableIdentity(entry)===failedIdentity)||(!failedIdentity&&Number(state.uploadValidationFailedIndex)===index)){
     return normalizeEmployeeUploadDryRunError({
       event_index:index,
       event_type:entryEventType(entry?.type||entry?.event_type||'entry'),
@@ -8047,6 +8063,7 @@ function employeeSessionRecordState(entry,index){
     return {key:stale?'STALE':'VALIDATION_FAILED',label:stale?'Stale / Needs Refresh':'Validation Failed',className:stale?'stale':'failed',validation};
   }
   const status=String(entry?.upload_status||'').trim().toUpperCase();
+  if(status==='VALIDATION_PASSED')return {key:'VALIDATION_PASSED',label:'Validation Passed',className:'validated'};
   if(status==='VALIDATING')return {key:'VALIDATING',label:'Validating',className:'validating'};
   if(status==='UPLOADING')return {key:'UPLOADING',label:'Uploading',className:'uploading'};
   if(entry?.sync_status==='SYNCED'){
@@ -8302,9 +8319,10 @@ async function commitSessionAndExport(){
       setUploadPhase(`Dry-run validating ${i+1}/${uploadList.length}`,'Validating');
       const requestPayload=isBedTransfer?employeeBedTransferValidatePayload(e,sessionForEntry):null;
       await validateEmployeeUploadDryRun(requestPayload?.entry||e,requestPayload?.session||sessionForEntry,i,requestPayload?{requestPayload}:{});
+      e.upload_status='VALIDATION_PASSED';
       if(isBedTransfer)bedTransferUploadPayloads[i]=employeeBedTransferRecordPayload(requestPayload);
     }catch(err){
-      const dryRunResult=normalizeEmployeeUploadDryRunError(err?.dryRunResult||{},i,err?.message||'dry_run_validation_failed');
+      const dryRunResult=employeeBindUploadValidationResult(err?.dryRunResult||{},e,i,err?.message||'dry_run_validation_failed');
       e.sync_status='LOCAL';
       e.upload_status=dryRunResult.error_code==='ARREARS_REF_STALE_REFRESH_REQUIRED'?'STALE':'VALIDATION_FAILED';
       e.upload_validation_error=dryRunResult;
@@ -8315,8 +8333,13 @@ async function commitSessionAndExport(){
   }
   if(dryRunFailed.length){
     const firstDryRunFailure=dryRunFailed[0];
-    const failedIndex=Number(firstDryRunFailure.result?.event_index||0);
-    const failedOriginal=allOriginalDrafts.find(row=>String(row.id||row.event_id||'')===String(originalDrafts[failedIndex]?.id||originalDrafts[failedIndex]?.event_id||''));
+    uploadList.filter(row=>row.upload_status==='VALIDATION_PASSED').forEach(validated=>{
+      const original=allOriginalDrafts.find(row=>employeeEntryStableIdentity(row)===employeeEntryStableIdentity(validated));
+      if(original){original.upload_status='VALIDATION_PASSED';original.upload_validation_error=null;original.upload_validation_error_code='';original.sync_error='';}
+    });
+    const failedIdentity=employeeEntryStableIdentity(firstDryRunFailure.entry);
+    const failedOriginal=allOriginalDrafts.find(row=>employeeEntryStableIdentity(row)===failedIdentity);
+    const failedIndex=Math.max(0,allOriginalDrafts.findIndex(row=>employeeEntryStableIdentity(row)===failedIdentity));
     if(failedOriginal){
       failedOriginal.sync_status='LOCAL';
       failedOriginal.upload_status=firstDryRunFailure.result?.error_code==='ARREARS_REF_STALE_REFRESH_REQUIRED'?'STALE':'VALIDATION_FAILED';
@@ -8327,6 +8350,7 @@ async function commitSessionAndExport(){
     state.drafts=allOriginalDrafts;
     state.sessionId=originalSessionId;
     state.uploadValidationFailedIndex=failedIndex;
+    state.uploadValidationFailedEntryId=failedIdentity;
     state.uploadValidationFailedMessage=`${firstDryRunFailure.result?.error_code||'SERVER_DRY_RUN_GENERIC_ERROR'}: ${firstDryRunFailure.result?.message||firstDryRunFailure.message||''}`;
     saveDrafts();
     buildExport();
@@ -8377,7 +8401,7 @@ async function commitSessionAndExport(){
       e.sync_error='';
       if(data?.arrear_task)e.cloud_task_id=data.arrear_task.task_id||e.cloud_task_id||'';
     }catch(err){
-      const uploadResult=normalizeEmployeeUploadDryRunError(err?.uploadResult||{
+      const uploadResult=employeeBindUploadValidationResult(err?.uploadResult||{
         source:'server_upload',
         stage:'server_upload',
         event_index:i,
@@ -8385,7 +8409,7 @@ async function commitSessionAndExport(){
         error_code:'SERVER_UPLOAD_FAILED',
         message:String(err?.message||err||'cloud_submit_failed'),
         raw_validation_response:{source:'server_upload',message:String(err?.message||err||'cloud_submit_failed')}
-      },i,String(err?.message||err||'cloud_submit_failed'));
+      },e,i,String(err?.message||err||'cloud_submit_failed'));
       e.sync_status='LOCAL';
       e.upload_status='VALIDATION_FAILED';
       e.upload_validation_error=uploadResult;
@@ -8398,8 +8422,9 @@ async function commitSessionAndExport(){
   oldLabels.forEach(([b,html])=>{b.dataset.busy='0';b.disabled=false;b.classList.remove('disabled');b.innerHTML=html});
   if(failed.length){
     const firstUploadFailure=failed[0];
-    const failedIndex=Number(firstUploadFailure.index||0);
-    const failedOriginal=allOriginalDrafts.find(row=>String(row.id||row.event_id||'')===String(originalDrafts[failedIndex]?.id||originalDrafts[failedIndex]?.event_id||''));
+    const failedIdentity=employeeEntryStableIdentity(firstUploadFailure.entry);
+    const failedOriginal=allOriginalDrafts.find(row=>employeeEntryStableIdentity(row)===failedIdentity);
+    const failedIndex=Math.max(0,allOriginalDrafts.findIndex(row=>employeeEntryStableIdentity(row)===failedIdentity));
     if(failedOriginal){
       failedOriginal.sync_status='LOCAL';
       failedOriginal.upload_status='VALIDATION_FAILED';
@@ -8410,6 +8435,7 @@ async function commitSessionAndExport(){
     state.drafts=allOriginalDrafts;
     state.sessionId=originalSessionId;
     state.uploadValidationFailedIndex=failedIndex;
+    state.uploadValidationFailedEntryId=failedIdentity;
     state.uploadValidationFailedMessage=`${firstUploadFailure.result?.error_code||'SERVER_UPLOAD_FAILED'}: ${firstUploadFailure.result?.message||firstUploadFailure.message||''}`;
     saveDrafts();
     buildExport();
@@ -8423,6 +8449,7 @@ async function commitSessionAndExport(){
   state.drafts=employeeMarkDraftsAwaitingCloudConfirmation(uploadList,uploadSessionId);
   state.sessionId=uploadSessionId;
   state.uploadValidationFailedIndex=null;
+  state.uploadValidationFailedEntryId='';
   state.uploadValidationFailedMessage='';
   saveDrafts();
   const syncCheck=await reconcileEmployeeCloudSyncState({silent:true});
@@ -8941,7 +8968,7 @@ function employeeEnsureEnglishFirstStyle(){
     .employee-system-calculation-toggle::after{content:'▾';color:#64748b}
     .employee-system-calculation.collapsed .employee-system-calculation-body{display:none}
     .employee-system-calculation.collapsed .employee-system-calculation-toggle::after{content:'▸'}
-    .employee-workspace-switch{position:sticky;top:0;z-index:12;display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:0 0 8px;padding:6px 0;background:#f7f9fc}.employee-workspace-switch button{min-height:44px;border:1px solid var(--line);border-radius:10px;background:#f8fafc;color:#475569;font-weight:850}.employee-workspace-switch button.active,.event-chip.active{background:#157347!important;color:#fff!important;border-color:#157347!important}.employee-workspace-switch small{display:block;font-size:10px;opacity:.78}.employee-workspace-switch>.employee-session-status-bar{grid-column:1/-1;min-height:38px}.employee-session-card{display:none}.employee-session-active .employee-entry-card{display:none}.employee-session-active .employee-session-card{display:block}.employee-session-quick-row{display:flex;justify-content:flex-end;align-items:stretch;margin-bottom:12px}.employee-session-status-bar{width:100%;border:1px solid #d6e7dc;background:#fff;color:#166534;border-radius:12px;min-height:38px;text-align:left;font-weight:800;padding:6px 8px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;box-shadow:var(--employee-card-shadow)}.employee-session-status-bar span{display:block;white-space:nowrap;text-align:center;font-size:11px}.employee-new-session-quick{min-width:112px!important;border-radius:14px!important}.employee-new-session-quick small{display:block;font-size:10px;opacity:.72}@media(max-width:560px){.employee-session-status-bar span{font-size:9.5px}.employee-new-session-quick{width:100%}}.employee-entry-card>.head{display:none}.employee-entry-card .step-title{display:none!important}.employee-entry-card .step> .step-title>span{display:none!important}.employee-entry-card #listPrice{display:none!important}.employee-entry-card #listPriceWrap,.employee-entry-card #verifyContextStep,.employee-entry-card .employee-collapsible-step{margin-top:8px}.employee-entry-card #objectHint,.employee-entry-card #entrySummary{display:none!important}.employee-session-card .preview-entry{padding:8px 10px;min-height:0}.employee-session-card .preview-entry .small{font-size:11px}.employee-session-card .preview-entry .preview-tools{margin-top:4px}.employee-session-card .preview-entry .amt{font-size:14px}.employee-session-card #sessionKpis{margin:0}#validationBox[data-pristine="true"]{display:none!important}.employee-entry-card textarea#remark{min-height:64px;max-height:72px}
+    .employee-workspace-switch{position:sticky;top:0;z-index:12;display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:0 0 8px;padding:6px 0;background:#f7f9fc}.employee-workspace-switch button{min-height:44px;border:1px solid var(--line);border-radius:10px;background:#f8fafc;color:#475569;font-weight:850}.employee-workspace-switch button.active,.event-chip.active{background:#157347!important;color:#fff!important;border-color:#157347!important}.employee-workspace-switch small{display:block;font-size:10px;opacity:.78}.employee-workspace-switch>.employee-session-status-bar{grid-column:1/-1;min-height:48px}.employee-session-card{display:none}.employee-session-active .employee-entry-card{display:none}.employee-session-active .employee-session-card{display:block}.employee-session-quick-row{display:flex;justify-content:flex-end;align-items:stretch;margin-bottom:12px}.employee-session-status-bar{width:100%;border:1px solid #d6e7dc;background:#fff;color:#166534;border-radius:12px;min-height:48px;font-weight:800;padding:5px 4px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));align-items:center;gap:2px;box-shadow:var(--employee-card-shadow);overflow:hidden}.employee-session-status-item{min-width:0;display:flex!important;flex-direction:column;align-items:center;justify-content:center;text-align:center;line-height:1.15}.employee-session-status-label{display:block;max-width:100%;white-space:nowrap;font-size:clamp(8px,2.45vw,11px);font-weight:750;color:#49705b}.employee-session-status-item strong{display:block;max-width:100%;white-space:nowrap;font-size:clamp(9px,2.8vw,13px);font-variant-numeric:tabular-nums;letter-spacing:-.02em}.employee-new-session-quick{min-width:112px!important;border-radius:14px!important}.employee-new-session-quick small{display:block;font-size:10px;opacity:.72}@media(min-width:560px){.employee-session-status-bar{gap:8px;padding-inline:12px}.employee-session-status-label{font-size:11px}.employee-session-status-item strong{font-size:13px}}.employee-entry-card>.head{display:none}.employee-entry-card .step-title{display:none!important}.employee-entry-card .step> .step-title>span{display:none!important}.employee-entry-card #listPrice{display:none!important}.employee-entry-card #listPriceWrap,.employee-entry-card #verifyContextStep,.employee-entry-card .employee-collapsible-step{margin-top:8px}.employee-entry-card #objectHint,.employee-entry-card #entrySummary{display:none!important}.employee-session-card .preview-entry{padding:8px 10px;min-height:0}.employee-session-card .preview-entry .small{font-size:11px}.employee-session-card .preview-entry .preview-tools{margin-top:4px}.employee-session-card .preview-entry .amt{font-size:14px}.employee-session-card #sessionKpis{margin:0}#validationBox[data-pristine="true"]{display:none!important}.employee-entry-card textarea#remark{min-height:64px;max-height:72px}
     /* One computed brand-green treatment for every selected or primary entry control. */
     .tab.active,.employee-workspace-switch button.active,.event-chip.active,.pay-option.active,.btn.primary:not(:disabled){background:var(--employee-active-background)!important;border-color:var(--employee-active-border)!important;box-shadow:var(--employee-active-shadow)!important;color:var(--employee-active-text)!important}
     .pay-option.active .label-en{color:rgba(255,255,255,.76)!important}
@@ -9120,6 +9147,7 @@ function removeCurrentSessionRecord(id,reason=''){
   if(!confirm('Remove this local record from Current Session?'))return;
   state.drafts=state.drafts.filter(e=>e.id!==id);
   state.uploadValidationFailedIndex=null;
+  state.uploadValidationFailedEntryId='';
   state.uploadValidationFailedMessage='';
   if(!state.drafts.length){
     state.sessionId='';
@@ -9745,8 +9773,21 @@ function employeeSetWorkspace(mode='entry'){
 function employeeRefreshWorkspaceStatus(){
   const summary=calculateEmployeeSessionSummary(state.drafts);
   const count=summary.rows.length;
-  if($('employeeSessionStatusBar'))$('employeeSessionStatusBar').innerHTML=`<span>本票 ${count} 条</span><span>现金净额 AED ${fmtDisplayMoney(summary.cashNet)}</span><span>银行收款 AED ${fmtDisplayMoney(summary.bankReceived)}</span>`;
+  const statusBar=$('employeeSessionStatusBar');
+  if(statusBar){
+    const cashNet=`AED ${fmtDisplayMoney(summary.cashNet)}`;
+    const bankReceived=`AED ${fmtDisplayMoney(summary.bankReceived)}`;
+    statusBar.innerHTML=`<span class="employee-session-status-item"><span class="employee-session-status-label">Records</span><strong>${count}</strong></span><span class="employee-session-status-item"><span class="employee-session-status-label">Cash Net</span><strong>${cashNet}</strong></span><span class="employee-session-status-item"><span class="employee-session-status-label">Bank Received</span><strong>${bankReceived}</strong></span>`;
+    statusBar.setAttribute('aria-label',`Records ${count}, Cash Net ${cashNet}, Bank Received ${bankReceived}`);
+  }
   if($('workspaceSessionCount'))$('workspaceSessionCount').textContent=`Current Session (${count})`;
+}
+function employeeAssociateEntryFieldLabels(){
+  document.querySelectorAll('#view-entry .employee-entry-card .field').forEach(field=>{
+    const label=field.querySelector(':scope > label');
+    const control=field.querySelector(':scope > input,:scope > select,:scope > textarea');
+    if(label&&control?.id&&!label.htmlFor)label.htmlFor=control.id;
+  });
 }
 const employeeCollapsedLegacyValidate=validate;
 validate=function(){
@@ -9876,6 +9917,7 @@ $('validationBox').dataset.pristine='true';
 $('btnSaveEntry').addEventListener('click',()=>{$('validationBox').dataset.pristine='false';},{capture:true});
 employeeSetWorkspace('entry');
 employeeRefreshWorkspaceStatus();
+employeeAssociateEntryFieldLabels();
 employeeUpdateCollapsedStepSummaries();
 renderEntryTtlockStatus();
 updateEntrySessionActionState();

@@ -31,7 +31,10 @@ test("quick summary uses shared totals and only records, cash net, and bank rece
   assert.match(fn, /summary\.cashNet/);
   assert.match(fn, /summary\.bankReceived/);
   assert.doesNotMatch(fn, /summary\.outstanding|summary\.bankNet/);
-  assert.match(fn, /本票 \$\{count\} 条/);
+  assert.match(fn, /Records/);
+  assert.match(fn, /Cash Net/);
+  assert.match(fn, /Bank Received/);
+  assert.doesNotMatch(fn, /本票|现金净额|银行收款/);
 });
 
 test("compact bed reference has only safe note, expiry, status, and configured rent", () => {
@@ -102,6 +105,9 @@ test("mixed upload validates every unsynced row before formal writes and clears 
   assert.match(upload, /requestEntries=isBedTransfer\?\[e\]:ordinaryCanonicalEntries/);
   assert.match(upload, /employeeBedTransferValidatePayload/);
   assert.match(upload, /employeeBedTransferRecordPayload/);
+  assert.match(upload, /employeeBindUploadValidationResult\(err\?\.dryRunResult\|\|\{\},e,i/);
+  assert.match(upload, /failedIdentity=employeeEntryStableIdentity\(firstDryRunFailure\.entry\)/);
+  assert.match(upload, /employeeEntryStableIdentity\(row\)===failedIdentity/);
   assert.match(upload, /if\(cloudConfirmed\)\{\s*state\.drafts=\[\]/s);
   assert.match(upload, /currentSessionId\(\)/);
   assert.doesNotMatch(upload, /\/api\/employee\/bed-transfers|\/api\/save_session|event-ledger/);
