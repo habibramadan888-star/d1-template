@@ -202,17 +202,19 @@ test("Bed Transfer validate-only and write reuse the same sanitized business pay
   const canonicalSessionId = block("employeeBedTransferCanonicalSessionId");
   const validate = block("employeeBedTransferValidatePayload");
   const record = block("employeeBedTransferRecordPayload");
-  const context = { Object, String, state: { bedTransferCapabilities: null } };
+  const context = { Object, String, state: { bedTransferCapabilities: null }, employeeEntryStableIdentity: entry => String(entry?.id || "").trim() };
   vm.createContext(context);
   vm.runInContext(`${canonicalSessionId};${validate};${record};globalThis.validatePayload=employeeBedTransferValidatePayload;globalThis.recordPayload=employeeBedTransferRecordPayload`, context);
-  const validation = context.validatePayload({ event_type: "bed_transfer", type: "TF", source: "employee_entry", from_bed: "144", to_bed: "111", transfer_reason: "customer_request", fee_mode: "paid", fee_amount_aed: 50, payment_method: "cash", dry_run: true, no_write: true }, { id: "S-new-ticket" });
+  const validation = context.validatePayload({ id: "entry-roundtrip", event_type: "bed_transfer", type: "TF", source: "employee_entry", from_bed: "144", to_bed: "111", transfer_reason: "customer_request", fee_mode: "paid", fee_amount_aed: 50, payment_method: "cash", dry_run: true, no_write: true }, { id: "S-new-ticket" });
   const recordPayload = context.recordPayload(validation);
   assert.deepEqual(recordPayload.entry, validation.entry);
   assert.equal("dry_run" in recordPayload.entry, false);
   assert.equal("validate_only" in recordPayload.entry, false);
   assert.equal("no_write" in recordPayload.entry, false);
+  assert.equal("id" in recordPayload.entry, false);
+  assert.equal(validation.entry_identity, "entry-roundtrip");
   assert.equal(recordPayload.session.id, validation.session.id);
-  assert.match(validation.session.id, /^bed-transfer-entry-S-new-ticket$/);
+  assert.match(validation.session.id, /^bed-transfer-entry-roundtrip-S-new-ticket$/);
 });
 
 test("failed upload restores original Current Session and repeat clicks are busy-guarded", () => {

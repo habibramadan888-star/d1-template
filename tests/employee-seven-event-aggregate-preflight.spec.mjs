@@ -118,7 +118,9 @@ test("Employee sends one aggregate validation request, binds every card by stabl
   assert.match(upload, /validationRequests\.push\(requestPayload\)/);
   assert.match(upload, /aggregatePreflight\?\.transport_failure===true/);
   assert.match(upload, /aggregatePreflight\?\.validation_results/);
-  assert.match(upload, /aggregateResults\.find\(result=>String\(result\?\.entry_identity/);
+  assert.match(upload, /employeeAggregateValidationIdentityContract\(aggregateResults,uploadList\)/);
+  assert.match(upload, /aggregateResults\.find\(result=>String\(result\?\.entry_identity\|\|''\)/);
+  assert.doesNotMatch(upload, /aggregateResults\[(?:i|index|eventIndex)\]/);
   assert.match(upload, /uploadList\.forEach\(validated=>/);
   assert.match(upload, /employeeEntryStableIdentity\(row\)===employeeEntryStableIdentity\(validated\)/);
   const aggregateCall = upload.indexOf("validateEmployeeUploadAggregateDryRun(validationRequests)");

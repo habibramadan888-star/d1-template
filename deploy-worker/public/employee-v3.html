@@ -3140,7 +3140,7 @@ label .label-en{
     <div class="card employee-session-card" id="employeeSessionRecordsCard">
       <div class="head">
         <div><div class="title">本次会话</div><div class="small" id="sessionMeta">0 条记录</div></div>
-        <div class="employee-session-actions" style="flex:0 0 auto"><div class="employee-session-actions-primary"><button class="btn" id="btnPreviewSession"><span class="employee-btn-main">Preview &amp; Copy</span><span class="label-en">预览并复制</span></button><button class="btn primary" id="btnExportSession"><span class="employee-btn-main">Upload Session</span><span class="label-en">确认本票并上传云端</span></button></div><button class="btn employee-new-session-action" id="btnNewSessionTop"><span class="employee-btn-main">New Session</span><span class="label-en">新会话</span></button></div>
+        <div class="employee-session-actions" style="flex:0 0 auto"><div class="employee-session-actions-primary"><button class="btn" id="btnPreviewSession"><span class="employee-btn-main">Preview &amp; Copy</span><span class="label-en">预览并复制</span></button><button class="btn" id="btnValidateSession"><span class="employee-btn-main">Validate Session</span><span class="label-en">仅预校验</span></button><button class="btn primary" id="btnExportSession"><span class="employee-btn-main">Upload Session</span><span class="label-en">确认本票并上传云端</span></button></div><button class="btn employee-new-session-action" id="btnNewSessionTop"><span class="employee-btn-main">New Session</span><span class="label-en">新会话</span></button></div>
       </div>
       <div class="body"><div class="preview-list" id="sessionPreview"></div></div>
     </div>
@@ -4712,9 +4712,10 @@ function employeeBedTransferCanonicalSessionId(entry={},session={}){
 function employeeBedTransferValidatePayload(entry={},session={}){
   const allowed=['event_type','type','source','from_bed','to_bed','transfer_reason','fee_mode','fee_amount_aed','payment_method','fee_waiver_reason','fee_due_date','bed_price_difference_mode','bed_price_difference_amount_aed','bed_price_difference_due_date','bed_price_difference_payment_method','bed_price_difference_reason','note'];
   const clean=Object.fromEntries(allowed.filter(field=>entry[field]!==undefined).map(field=>[field,entry[field]]));
+  const entryIdentity=employeeEntryStableIdentity(entry);
   if(state.bedTransferCapabilities?.controlled_beta_preview===true&&!String(clean.transfer_reason||'').includes('CONTROLLED_BETA_TEST'))clean.transfer_reason=`CONTROLLED_BETA_TEST|${String(clean.transfer_reason||'employee_beta').slice(0,180)}`;
   const safeSession={id:employeeBedTransferCanonicalSessionId(entry,session),source:'employee_entry',entries:[clean]};
-  return {dry_run:true,validate_only:true,no_write:true,event_index:0,entry:clean,entries:[clean],session:safeSession};
+  return {dry_run:true,validate_only:true,no_write:true,event_index:0,entry_identity:entryIdentity,entry:clean,entries:[clean],session:safeSession};
 }
 function employeeBedTransferRecordPayload(validated={}){
   const entry=validated.entry||{},session=validated.session||{};
@@ -7406,7 +7407,7 @@ async function commitSessionAndExport(){
     toast(message,6000);
     return;
   }
-  const btns=[$('btnExportSession'),$('btnBuildExport')].filter(Boolean);
+  const btns=[$('btnValidateSession'),$('btnExportSession'),$('btnBuildExport')].filter(Boolean);
   const setUploadPhase=(cn,en)=>{btns.forEach(b=>{b.innerHTML=renderEmployeeButtonLabel(en,cn);});showStatus(`${en} / ${cn}`);};
   if(btns.some(b=>b.dataset.busy==='1'))return;
   const oldLabels=btns.map(b=>[b,b.innerHTML]);
@@ -8237,7 +8238,7 @@ async function validateEmployeeUploadDryRun(entry,sessionForEntry,index,options=
 const EMPLOYEE_AGGREGATE_TRANSPORT_ERRORS=new Set(['SERVER_VALIDATE_UNREACHABLE','SERVER_PROCESSING_TIMEOUT','SERVER_VALIDATE_MALFORMED_RESPONSE','SERVER_VALIDATE_AUTH_REQUIRED','SERVER_VALIDATE_ROUTE_NOT_FOUND','SERVER_VALIDATE_REQUEST_SERIALIZATION_FAILED']);
 function employeeAggregateValidationSessionFailure(errorCode,details){
   details=details||{};
-  return {success:false,ok:false,source:'aggregate_dry_run',stage:'aggregate_preflight_transport',transport_failure:true,session_error:true,error_code:errorCode,message:'Server validation unavailable. Please retry.',message_en:'Server validation unavailable. Please retry.',validation_results:[],validation_result_count:0,failed_result_count:0,passed_result_count:0,no_write:true,write_attempted:false,formal_write_count:0,request_url:'/api/employee/entry/validate',request_method:'POST',credentials_mode:'include',same_origin:true,http_status:Number(details.http_status||0),response_content_type:String(details.response_content_type||''),response_body_kind:String(details.response_body_kind||''),response_error_code:String(details.response_error_code||''),exception_name:String(details.exception_name||''),exception_message:String(details.exception_message||'').slice(0,160),request_body_bytes:Number(details.request_body_bytes||0)};
+  return {success:false,ok:false,source:'aggregate_dry_run',stage:'aggregate_preflight_transport',transport_failure:true,session_error:true,error_code:errorCode,message:'Server validation unavailable. Please retry.',message_en:'Server validation unavailable. Please retry.',validation_results:[],validation_result_count:Number(details.validation_result_count||0),failed_result_count:0,passed_result_count:0,unmatched_result_count:Number(details.unmatched_result_count||0),duplicate_entry_id_count:Number(details.duplicate_entry_id_count||0),no_write:true,write_attempted:false,formal_write_count:0,request_url:'/api/employee/entry/validate',request_method:'POST',credentials_mode:'include',same_origin:true,http_status:Number(details.http_status||0),response_content_type:String(details.response_content_type||''),response_body_kind:String(details.response_body_kind||''),response_error_code:String(details.response_error_code||''),exception_name:String(details.exception_name||''),exception_message:String(details.exception_message||'').slice(0,160),request_body_bytes:Number(details.request_body_bytes||0)};
 }
 function employeeLiftAggregateTransportFailuresToSession(){
   let lifted=null,changed=false;
@@ -8262,6 +8263,18 @@ function employeeAggregateValidationEntry(entry){
   const clean={...(entry||{})};
   ['sync_status','upload_status','cloud_sync_status','cloud_sync_checked_at','upload_validation_error','upload_validation_error_code','sync_error','cloud_entry_id','upload_attempt_id'].forEach(field=>delete clean[field]);
   return clean;
+}
+function employeeAggregateValidationIdentityContract(validationResults,uploadList){
+  const expected=(uploadList||[]).map(employeeEntryStableIdentity);
+  const actual=(validationResults||[]).map(result=>String(result?.entry_identity||'').trim());
+  const duplicateCount=values=>values.length-new Set(values.filter(Boolean)).size-(values.filter(value=>!value).length);
+  const expectedSet=new Set(expected.filter(Boolean));
+  const actualSet=new Set(actual.filter(Boolean));
+  const missing=expected.filter(identity=>!identity||!actualSet.has(identity));
+  const unknown=actual.filter(identity=>!identity||!expectedSet.has(identity));
+  const duplicate_entry_id_count=duplicateCount(expected)+duplicateCount(actual);
+  const unmatched_result_count=missing.length+unknown.length;
+  return {ok:expected.length===actual.length&&unmatched_result_count===0&&duplicate_entry_id_count===0,expected,actual,unmatched_result_count,duplicate_entry_id_count};
 }
 function renderEmployeeAggregateSessionError(result){
   const r=result||{};
@@ -8292,7 +8305,7 @@ async function validateEmployeeUploadAggregateDryRun(validationRequests){
   const raw=await response.text();
   let data=null;
   try{data=raw?unwrapStandardResponse(JSON.parse(raw)):null}catch{}
-  if(Array.isArray(data?.validation_results)&&data.validation_results.length===validationRequests.length)return data;
+  if(Array.isArray(data?.validation_results)&&data.validation_results.length===validationRequests.length)return {...data,aggregate_http_status:response.status};
   const contentType=String(response.headers?.get?.('content-type')||'');
   const errorCode=[401,403].includes(response.status)?'SERVER_VALIDATE_AUTH_REQUIRED':response.status===404?'SERVER_VALIDATE_ROUTE_NOT_FOUND':response.status===503?'SERVER_PROCESSING_TIMEOUT':'SERVER_VALIDATE_MALFORMED_RESPONSE';
   return employeeAggregateValidationSessionFailure(errorCode,{http_status:response.status,response_content_type:contentType,response_body_kind:contentType.includes('json')?'json':(raw?'non_json':'empty'),response_error_code:data?.error_code||data?.code||'',request_body_bytes:new Blob([requestBody]).size});
@@ -8423,9 +8436,16 @@ async function commitSessionAndExport(){
   }
   state.aggregateValidationSessionError=null;
   const aggregateResults=Array.isArray(aggregatePreflight?.validation_results)?aggregatePreflight.validation_results:[];
+  const identityContract=employeeAggregateValidationIdentityContract(aggregateResults,uploadList);
+  if(!identityContract.ok){
+    state.drafts=allOriginalDrafts;
+    state.sessionId=originalSessionId;
+    state.aggregateValidationSessionError=employeeAggregateValidationSessionFailure('SERVER_VALIDATE_MALFORMED_RESPONSE',{http_status:aggregatePreflight?.aggregate_http_status||0,response_body_kind:'entry_identity_contract',validation_result_count:aggregateResults.length,unmatched_result_count:identityContract.unmatched_result_count,duplicate_entry_id_count:identityContract.duplicate_entry_id_count});
+    buildExport();refreshSessionViews();oldLabels.forEach(([b,html])=>{b.dataset.busy='0';b.disabled=false;b.classList.remove('disabled');b.innerHTML=html});updateEntrySessionActionState();return;
+  }
   for(let i=0;i<uploadList.length;i++){
     const e=uploadList[i];
-    const rawResult=aggregateResults.find(result=>String(result?.entry_identity||result?.record_id||'')===employeeEntryStableIdentity(e));
+    const rawResult=aggregateResults.find(result=>String(result?.entry_identity||'')===employeeEntryStableIdentity(e));
     if(!rawResult){
       state.drafts=allOriginalDrafts;
       state.sessionId=originalSessionId;
@@ -9190,6 +9210,7 @@ function applyBilingualUI(){
   $('btnSaveEntry').innerHTML=renderEmployeeButtonLabel('Add to Session','\u52a0\u5165\u672c\u7968');
   $('btnReset').innerHTML=renderEmployeeButtonLabel('Reset','\u6e05\u7a7a');
   $('btnPreviewSession').innerHTML=renderEmployeeButtonLabel('Preview & Copy','\u9884\u89c8\u5e76\u590d\u5236');
+  $('btnValidateSession').innerHTML=renderEmployeeButtonLabel('Validate Session','\u4ec5\u9884\u6821\u9a8c');
   $('btnExportSession').innerHTML=renderEmployeeButtonLabel('Upload Session','\u786e\u8ba4\u672c\u7968\u5e76\u4e0a\u4f20\u4e91\u7aef');
   const steps=[
     ['Step 1 · Select Event Type','\u7b2c\u4e00\u6b65\uff1a\u9009\u62e9\u4e8b\u4ef6\u7c7b\u578b'],
@@ -10053,6 +10074,7 @@ document.querySelectorAll('[data-employee-workspace]').forEach(btn=>btn.onclick=
 $('employeeSessionStatusBar').onclick=()=>employeeSetWorkspace('session');
 $('validationBox').dataset.pristine='true';
 $('btnSaveEntry').addEventListener('click',()=>{$('validationBox').dataset.pristine='false';},{capture:true});
+$('btnValidateSession').onclick=()=>{state.aggregateValidationOnly=true;commitSessionAndExport()};
 employeeSetWorkspace('entry');
 employeeRefreshWorkspaceStatus();
 employeeAssociateEntryFieldLabels();

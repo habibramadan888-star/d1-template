@@ -3536,7 +3536,7 @@ function employeeEntryAggregateValidationRequests(body={}){
 __name(employeeEntryAggregateValidationRequests,"employeeEntryAggregateValidationRequests");
 function employeeEntryAggregateResultIdentity(requestBody={},index=0){
   const entry=employeeEntryValidationEntryFromBody(requestBody,index)||{};
-  return cleanText(entry.id||entry.entry_id||entry.event_id||entry.anchor_id||entry.original_local_entry_id||"",120);
+  return cleanText(requestBody?.entry_identity||entry.id||entry.entry_id||entry.event_id||entry.anchor_id||entry.original_local_entry_id||"",120);
 }
 __name(employeeEntryAggregateResultIdentity,"employeeEntryAggregateResultIdentity");
 function employeeEntryAggregateRequestMetrics(context={}){

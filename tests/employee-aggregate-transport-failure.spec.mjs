@@ -37,6 +37,20 @@ function transportSandbox(apiFetch) {
   return sandbox;
 }
 
+function identitySandbox() {
+  const sandbox = {
+    employeeEntryStableIdentity: entry => String(entry?.id || entry?.event_id || entry?.anchor_id || entry?.original_local_entry_id || "").trim()
+  };
+  vm.createContext(sandbox);
+  vm.runInContext([
+    functionBlock(employee, "employeeAggregateValidationSessionFailure"),
+    functionBlock(employee, "employeeAggregateValidationIdentityContract"),
+    "this.contract=employeeAggregateValidationIdentityContract",
+    "this.failure=employeeAggregateValidationSessionFailure"
+  ].join("\n"), sandbox);
+  return sandbox;
+}
+
 test("aggregate validation uses the authenticated same-origin Worker route without recursive public fetch", () => {
   const client = functionBlock(employee, "validateEmployeeUploadAggregateDryRun");
   const handler = functionBlock(worker, "handleEmployeeEntryValidate");
@@ -87,6 +101,8 @@ test("transport failures render one retryable session error and never Remove Inv
 
 test("pure Retry Validation validates all saved records and returns before formal write", () => {
   const upload = functionBlock(employee, "commitSessionAndExport", true);
+  assert.match(employee, /id="btnValidateSession"/);
+  assert.match(employee, /btnValidateSession'\)\.onclick=\(\)=>\{state\.aggregateValidationOnly=true;commitSessionAndExport\(\)\}/);
   assert.match(upload, /const validateOnly=state\.aggregateValidationOnly===true/);
   assert.match(employee, /state\.aggregateValidationOnly=true;commitSessionAndExport\(\)/);
   assert.match(upload, /validateOnly\?allOriginalDrafts/);
@@ -94,4 +110,49 @@ test("pure Retry Validation validates all saved records and returns before forma
   const formalWrite = upload.indexOf("apiFetch('/api/employee/entry'", validateOnlyGate);
   assert.ok(validateOnlyGate >= 0 && formalWrite > validateOnlyGate);
   assert.match(upload.slice(validateOnlyGate, formalWrite), /No business write was attempted/);
+});
+
+test("Bed Transfer preserves its stable Entry ID outside the business allowlist", () => {
+  const payloadStart = employee.indexOf("function employeeBedTransferValidatePayload");
+  const payload = employee.slice(payloadStart, employee.indexOf("function employeeBedTransferRecordPayload", payloadStart));
+  const identityStart = worker.indexOf("function employeeEntryAggregateResultIdentity");
+  const identity = worker.slice(identityStart, worker.indexOf("__name(employeeEntryAggregateResultIdentity", identityStart));
+  const aggregateStart = worker.indexOf("async function validateEmployeeEntryAggregatePreflight");
+  const aggregate = worker.slice(aggregateStart, worker.indexOf("__name(validateEmployeeEntryAggregatePreflight", aggregateStart));
+  assert.match(payload, /const entryIdentity=employeeEntryStableIdentity\(entry\)/);
+  assert.match(payload, /entry_identity:entryIdentity/);
+  assert.doesNotMatch(payload, /const allowed=\[[^\]]*(?:anchor_id|fingerprint|transfer_at|accepted_at)/);
+  assert.match(identity, /requestBody\?\.entry_identity\|\|entry\.id/);
+  assert.match(aggregate, /entry_identity:entryIdentity/);
+});
+
+test("missing, duplicate and unknown Entry IDs fail once at the session boundary", () => {
+  const sandbox = identitySandbox();
+  const uploads = [{ id: "entry-a" }, { id: "entry-b" }];
+  const valid = sandbox.contract([{ entry_identity: "entry-a" }, { entry_identity: "entry-b" }], uploads);
+  assert.equal(valid.ok, true);
+  for (const results of [
+    [{ entry_identity: "entry-a" }, { entry_identity: "" }],
+    [{ entry_identity: "entry-a" }, { entry_identity: "entry-a" }],
+    [{ entry_identity: "entry-a" }, { entry_identity: "entry-x" }]
+  ]) {
+    const contract = sandbox.contract(results, uploads);
+    assert.equal(contract.ok, false);
+    const failure = sandbox.failure("SERVER_VALIDATE_MALFORMED_RESPONSE", {
+      validation_result_count: results.length,
+      unmatched_result_count: contract.unmatched_result_count,
+      duplicate_entry_id_count: contract.duplicate_entry_id_count
+    });
+    assert.equal(failure.session_error, true);
+    assert.equal(failure.failed_result_count, 0);
+    assert.deepEqual(Array.from(failure.validation_results), []);
+  }
+});
+
+test("frontend result association uses only stable Entry ID and never event index", () => {
+  const upload = functionBlock(employee, "commitSessionAndExport", true);
+  assert.match(upload, /employeeAggregateValidationIdentityContract\(aggregateResults,uploadList\)/);
+  assert.match(upload, /aggregateResults\.find\(result=>String\(result\?\.entry_identity\|\|''\)===employeeEntryStableIdentity\(e\)\)/);
+  assert.doesNotMatch(upload, /aggregateResults\[(?:i|index|eventIndex)\]/);
+  assert.doesNotMatch(upload, /result\?\.entry_identity\|\|result\?\.record_id/);
 });
