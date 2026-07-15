@@ -1051,6 +1051,7 @@ function ttlockRequestContext(request,env,user,routeCategory="read",maxAgeMs=TTL
 }
 __name(ttlockRequestContext,"ttlockRequestContext");
 function ttlockLiveFetchAllowed(env={},context={}){
+  if(context.allow_live_fetch===false)return false;
   const appEnv=cleanText(env.APP_ENV||"production",40).toLowerCase();
   const host=cleanText(context.request_host||"",160).toLowerCase();
   return !["staging","test","local","development"].includes(appEnv)&&host===TTLOCK_CANONICAL_PRODUCTION_HOST;
@@ -1175,7 +1176,7 @@ async function getCanonicalTTLockSnapshot(env,corpid,options={}){
   const task=(async()=>{
     const cached=await ttlockKvReadJson(env,cacheKey),observed=Date.parse(cached?.observed_at||""),age=Number.isFinite(observed)?Math.max(0,now-observed):Infinity;
     if(cached?.roomsData&&age<=maxAgeMs){ttlockSafeLog({endpoint_class:"snapshot",environment:env.APP_ENV,cache:"hit",snapshot_age_ms:age,lock_count:cached.locksCount,calling_route_category:context.route_category,success:true,external_call_count:0});return {...cached,data_source:"ttl_cache",fallback:false,_ttlock_meta:{external_call_count:0,page_count:0,cache_hit:true,snapshot_reused:false,single_flight_joined:false,snapshot_age_ms:age}};}
-    if(!ttlockLiveFetchAllowed(env,context))return {error:["staging","test","local","development"].includes(cleanText(env.APP_ENV||"",40).toLowerCase())?"TTLOCK_LIVE_FETCH_DISABLED_IN_STAGING":"TTLOCK_LIVE_FETCH_DISABLED_IN_PREVIEW",status:503,roomsData:{},locksCount:0,data_source:"cache_miss_firewall",_ttlock_meta:{external_call_count:0,cache_hit:false}};
+    if(!ttlockLiveFetchAllowed(env,context))return {error:context.allow_live_fetch===false?"TTLOCK_LIVE_FETCH_DISABLED_FOR_EXIT_EVENT":(["staging","test","local","development"].includes(cleanText(env.APP_ENV||"",40).toLowerCase())?"TTLOCK_LIVE_FETCH_DISABLED_IN_STAGING":"TTLOCK_LIVE_FETCH_DISABLED_IN_PREVIEW"),status:503,roomsData:{},locksCount:0,data_source:"cache_miss_firewall",access_context_available:false,_ttlock_meta:{external_call_count:0,cache_hit:false}};
     const flightKey=`${scope}:v2`;
     if(ttlockSnapshotFlights.has(flightKey)){const joined=await ttlockSnapshotFlights.get(flightKey);return {...joined,_ttlock_meta:{...(joined?._ttlock_meta||{}),single_flight_joined:true}};}
     const flight=(async()=>{const live=await loadLockCards(env,{corpid,route_category:context.route_category,cache_state:cached?"stale":"miss"});if(!live?.error){const record={roomsData:live.roomsData,locksCount:live.locksCount,observed_at:live.loadedAt,expires_at:new Date(Date.parse(live.loadedAt)+TTLOCK_READ_CACHE_MAX_AGE_MS).toISOString(),snapshot_fingerprint:live.snapshot_fingerprint,loadedAt:live.loadedAt};await ttlockKvWriteJson(env,cacheKey,record,10*60);return {...live,data_source:"live_api",fallback:false};}return live;})();
@@ -1686,6 +1687,45 @@ async function canonicalDepositAuditEventsForBed(env,user,bed,opts={}){
   return events;
 }
 __name(canonicalDepositAuditEventsForBed,"canonicalDepositAuditEventsForBed");
+async function employeeExitEventReference(env,user,entry,type){
+  const bed=cleanText(entry?.room||entry?.bed||"",80).replace(/^#/,"");
+  const events=bed?await canonicalDepositAuditEventsForBed(env,user,bed,{limit:1000}).catch(()=>[]):[];
+  const historicalDepositAmount=canonicalDepositMoney(events.reduce((sum,event)=>sum+(event.event_type==="deposit_out"?-canonicalDepositMoney(event.amount):canonicalDepositMoney(event.amount)),0));
+  const historicalDepositAvailable=events.length>0;
+  const refundAmount=type==="DR"?canonicalDepositMoney(entry?.actual_refund_amount||entry?.refund_amount||entry?.amount||0):0;
+  const historicalMismatch=type==="DR"&&historicalDepositAvailable&&Math.abs(refundAmount-historicalDepositAmount)>0.01;
+  const ownerReviewRequired=type==="DR"
+    ?(!historicalDepositAvailable||historicalMismatch)
+    :(type==="CO"&&!historicalDepositAvailable);
+  const warnings=["EXIT_EVENT_ACCESS_CONTEXT_REFERENCE_ONLY"];
+  if(type==="DR"&&!historicalDepositAvailable)warnings.push("HISTORICAL_DEPOSIT_REFERENCE_UNAVAILABLE");
+  if(type==="CO"&&!historicalDepositAvailable)warnings.push("CHECKOUT_HISTORICAL_CONTEXT_INCOMPLETE");
+  if(historicalMismatch)warnings.push("DEPOSIT_REFUND_HISTORICAL_AMOUNT_MISMATCH");
+  return {
+    access_context_available:false,
+    live_fetch_allowed:false,
+    ttlock_external_calls:0,
+    historical_deposit_available:historicalDepositAvailable,
+    historical_deposit_amount:historicalDepositAvailable?historicalDepositAmount:null,
+    owner_review_required:ownerReviewRequired,
+    warnings,
+    server_fields:{
+      access_context_available:false,
+      exit_event_ttlock_calls:0,
+      historical_deposit_available:historicalDepositAvailable,
+      historical_deposit_amount:historicalDepositAvailable?historicalDepositAmount:null,
+      owner_review_required:ownerReviewRequired,
+      owner_approval_required:ownerReviewRequired,
+      owner_approval_status:ownerReviewRequired?"pending_owner_review":"not_required",
+      owner_review_warnings:warnings,
+      ...(type==="DR"?{
+        deposit_balance:historicalDepositAvailable?historicalDepositAmount:0,
+        deposit_held:historicalDepositAvailable?historicalDepositAmount:0,
+      }: {})
+    }
+  };
+}
+__name(employeeExitEventReference,"employeeExitEventReference");
 async function canonicalDepositGateway(env,user,opts={}){
   const bed=cleanText(opts.bed||"",80).replace(/^#/,"");
   const requiredTotal=canonicalDepositMoney(opts.deposit_required_total||CANONICAL_DEPOSIT_REQUIRED_TOTAL);
@@ -1714,6 +1754,8 @@ async function canonicalDepositGateway(env,user,opts={}){
     ok:true,
     success:true,
     gateway:"canonical_deposit_gateway",
+    access_context_available:!!snapshot,
+    live_fetch_allowed:opts.request_context?.allow_live_fetch!==false,
     bed,
     deposit_required_total:requiredTotal,
     deposit_recorded_amount:recorded,
@@ -1892,7 +1934,7 @@ async function empApplyLeftWithArrearsMetadata(env,user,entry,entryId,operatorId
   const task=await env.DB.prepare(`SELECT * FROM arrear_tasks
     WHERE task_id=? AND corpid=? AND COALESCE(close_status,'') NOT IN ('PAID','CLEARED','CLOSED','VOID','WAIVED','WRITTEN_OFF','已结清','结清','作废') LIMIT 1`)
     .bind(taskId,user.corpid).first();
-  if(!task)return {ok:false,error:"cloud_arrears_not_open",task_id:taskId};
+  if(!task)return {ok:true,created:true,task_id:taskId,materialized_from:"sessions.entries_json",metadata:empLeftWithArrearsMetaFromEntry({...entry,id:entryId},taskId)};
   const meta=empLeftWithArrearsMetaFromEntry({...entry,id:entryId},taskId);
   const marker=`LEFT_WITH_ARREARS ${JSON.stringify(meta)}`;
   const existingStaff=cleanText(task.staff_note||"",4000);
@@ -1981,7 +2023,9 @@ async function handleEmployeeDeposit(request,env,user){
   const url=new URL(request.url);
   const bed=cleanText(url.searchParams.get("bed"),80).replace(/^#/,"");
   if(!bed)return badRequest("bed_required");
-  const gateway=await canonicalDepositGateway(env,user,{bed,limit:1000,request_context:ttlockRequestContext(request,env,user,"employee_deposit",TTLOCK_READ_CACHE_MAX_AGE_MS)});
+  const requestContext=ttlockRequestContext(request,env,user,"employee_deposit",TTLOCK_READ_CACHE_MAX_AGE_MS);
+  if(url.searchParams.get("allow_live_fetch")==="0")requestContext.allow_live_fetch=false;
+  const gateway=await canonicalDepositGateway(env,user,{bed,limit:1000,request_context:requestContext});
   return success({
     ...gateway,
     balance:gateway.deposit_recorded_amount,
@@ -2590,28 +2634,12 @@ function validateDepositInUploadFields(entry,normalized,eventIndex,anchorPreview
 __name(validateDepositInUploadFields,"validateDepositInUploadFields");
 function validateDepositOutUploadFields(entry,normalized,eventIndex,anchorPreview){
   const missing=[];
-  const invalid=[];
-  const balance=employeeEntryUploadAmount(normalized.deposit_balance||entry.deposit_balance||entry.deposit_held);
   const refund=employeeEntryUploadAmount(normalized.actual_refund_amount||normalized.refund_amount||entry.actual_refund_amount||entry.refund_amount||entry.amount);
-  const ownerOverrideRef=cleanId(normalized.owner_override_ref||entry.owner_override_ref||"");
-  const overrideReason=cleanText(normalized.override_reason||entry.override_reason||normalized.owner_override_reason||entry.owner_override_reason||"",500);
-  const openArrearsAmount=employeeEntryUploadAmount(normalized.open_arrears_amount||entry.open_arrears_amount||entry.outstanding_arrears);
-  const arrearsOffsetRef=cleanId(normalized.arrears_offset_ref||entry.arrears_offset_ref||"");
-  const arrearsOffsetAmount=employeeEntryUploadAmount(normalized.arrears_offset_amount||entry.arrears_offset_amount);
   if(!employeeEntryUploadHasValue(normalized.bed||entry.room))missing.push("bed");
-  if(balance<=0)missing.push("deposit_balance");
   if(refund<=0)missing.push("actual_refund_amount");
   if(!employeeEntryUploadHasValue(normalized.refund_method||entry.refund_method||normalized.payment_method||entry.pay_type))missing.push("refund_method");
-  if(!employeeEntryUploadHasValue(normalized.refund_date||entry.refund_date))missing.push("refund_date");
   if(!employeeEntryUploadHasValue(normalized.refund_reason||entry.refund_reason||entry.reason))missing.push("refund_reason");
-  if(Math.abs(refund-balance)>0.01&&!employeeEntryUploadHasValue(normalized.difference_reason||entry.difference_reason))missing.push("difference_reason");
-  if(missing.length||invalid.length)return employeeEntryValidationFailure("deposit_out_event_validation","DEPOSIT_OUT_REQUIRED_FIELD_MISSING","Deposit Out entry is missing required fields.",{event_index:eventIndex,event_type:"deposit_out",missing_fields:missing,invalid_fields:invalid,anchor_preview:anchorPreview});
-  if(refund>balance+0.01&&(!ownerOverrideRef||!overrideReason)){
-    return employeeEntryValidationFailure("deposit_out_validation","DEPOSIT_OUT_EXCEEDS_BALANCE","Deposit refund exceeds deposit balance and requires owner override.",{event_index:eventIndex,event_type:"deposit_out",missing_fields:["owner_override_ref","override_reason"].filter(field=>field==="owner_override_ref"?!ownerOverrideRef:!overrideReason),invalid_fields:["refund_amount"],anchor_preview:{...anchorPreview,deposit_balance:balance,refund_amount:refund}});
-  }
-  if(openArrearsAmount>0&&(!ownerOverrideRef&&(!arrearsOffsetRef||arrearsOffsetAmount<=0))){
-    return employeeEntryValidationFailure("deposit_out_validation","DEPOSIT_OUT_OPEN_ARREARS_REQUIRES_OFFSET_OR_APPROVAL","Open arrears require explicit offset or owner approval before deposit refund.",{event_index:eventIndex,event_type:"deposit_out",missing_fields:["arrears_offset_ref","arrears_offset_amount","owner_override_ref"],invalid_fields:["open_arrears"],anchor_preview:{...anchorPreview,open_arrears_amount:openArrearsAmount}});
-  }
+  if(missing.length)return employeeEntryValidationFailure("deposit_out_event_validation","DEPOSIT_OUT_REQUIRED_FIELD_MISSING","Deposit Out entry is missing required fields.",{event_index:eventIndex,event_type:"deposit_out",missing_fields:missing,invalid_fields:[],anchor_preview:anchorPreview});
   return null;
 }
 __name(validateDepositOutUploadFields,"validateDepositOutUploadFields");
@@ -2624,9 +2652,6 @@ function validateCheckoutUploadFields(entry,normalized,eventIndex,anchorPreview)
   if(!employeeEntryUploadHasValue(normalized.checkout_mode||entry.checkout_mode))missing.push("checkout_type");
   if(!left&&!employeeEntryUploadHasValue(normalized.checkout_date||entry.checkout_date))missing.push("checkout_date");
   if(left){
-    if(!employeeEntryUploadHasValue(normalized.left_date||entry.left_date||normalized.checkout_date||entry.checkout_date))missing.push("left_date");
-    if(!employeeEntryUploadHasValue(normalized.whatsapp_phone||entry.whatsapp_phone||entry.former_customer_phone||normalized.contact_method||entry.contact_method))missing.push("contact_phone_or_method");
-    if(!employeeEntryUploadHasValue(normalized.promised_payment_date||entry.promised_payment_date||entry.promise_date))missing.push("promised_payment_date");
     if(employeeEntryUploadAmount(normalized.left_arrears_amount||normalized.arrears_amount||entry.left_arrears_amount||entry.arrears_amount)<=0)missing.push("left_arrears_amount");
     if(!employeeEntryUploadHasValue(normalized.final_note||entry.final_note||normalized.note||entry.note))missing.push("note");
   }
@@ -3152,6 +3177,11 @@ async function validateEmployeeEntryUploadPayload(env,user,body,opts={}){
     };
   }
   const type=employeeEntryUploadType(entry);
+  let exitEventReference=null;
+  if(["DR","CO"].includes(type)){
+    exitEventReference=await employeeExitEventReference(env,user,entry,type);
+    Object.assign(entry,exitEventReference.server_fields||{});
+  }
   let derivedArrearsPayment=null;
   if(type==="AP"){
     derivedArrearsPayment=await resolveDerivedArrearsPaymentForEntry(env,user,entry);
@@ -3312,33 +3342,24 @@ async function validateEmployeeEntryUploadPayload(env,user,body,opts={}){
   let depositBalance=tenantCardId?await empDepositBalance(env,user.corpid,tenantCardId):0;
   if(tenantCardId&&["DR","CO"].includes(type)&&depositBalance<=0&&depositHeldInput>0)depositBalance=depositHeldInput;
   if(!tenantCardId&&["DR","CO"].includes(type)&&depositHeldInput>0)depositBalance=depositHeldInput;
-  if(type==="DR"){
-    const diff=Math.round((amount-depositBalance)*100)/100;
-    const differenceReason=cleanText(entry.difference_reason||"",500);
-    if(Math.abs(diff)>0.01&&!differenceReason){
-      return employeeEntryValidationFailure("deposit_out_validation","DEPOSIT_REFUND_DIFFERENCE_REASON_REQUIRED","Difference Reason is required when actual refund differs from deposit balance.",{event_index:eventIndex,event_type:"deposit_out",missing_fields:["difference_reason"],anchor_preview:{...anchorPreview,deposit_balance:depositBalance,actual_refund_amount:amount,refund_difference:diff}});
-    }
-  }
-  if(["DR","CO"].includes(type)&&!(type==="CO"&&entry.left_with_arrears)){
+  if(type==="CO"&&!entry.left_with_arrears){
     const openArrears=room?await getOpenCloudArrearsForBed(env,user,room,{limit:2000}).catch(()=>[]):[];
     if(openArrears.length){
-      return employeeEntryValidationFailure(type==="DR"?"deposit_out_validation":"checkout_validation",type==="DR"?"DEPOSIT_REFUND_OPEN_ARREARS_OWNER_APPROVAL_REQUIRED":"CHECKOUT_OPEN_ARREARS_LEFT_WITH_ARREARS_REQUIRED",type==="DR"?"Open cloud arrears block direct deposit refund.":"This customer has unpaid arrears. Normal checkout is not allowed.",{event_index:eventIndex,event_type:type==="DR"?"deposit_out":"checkout",invalid_fields:["open_arrears"],anchor_preview:{...anchorPreview,open_arrears_count:openArrears.length}});
+      return employeeEntryValidationFailure("checkout_validation","CHECKOUT_OPEN_ARREARS_LEFT_WITH_ARREARS_REQUIRED","This customer has unpaid arrears. Normal checkout is not allowed.",{event_index:eventIndex,event_type:"checkout",invalid_fields:["open_arrears"],anchor_preview:{...anchorPreview,open_arrears_count:openArrears.length}});
     }
   }
   if(type==="CO"&&entry.left_with_arrears){
     const missing=[];
-    if(!cleanText(entry.whatsapp_phone||entry.former_customer_phone||entry.contact_method,80))missing.push("contact_phone_or_method");
-    if(!cleanDate(entry.left_date||entry.checkout_date||entry.checkout_attempt_date||""))missing.push("left_date");
-    if(!cleanDate(entry.promised_payment_date||entry.promise_date||""))missing.push("promised_payment_date");
     if(cleanMoney(entry.left_arrears_amount||entry.arrears_amount||entry.outstanding_arrears||0)<=0)missing.push("left_arrears_amount");
     if(!cleanText(entry.final_note||entry.note,500))missing.push("note");
     if(missing.length){
       return employeeEntryValidationFailure("left_with_arrears_validation","LEFT_WITH_ARREARS_REQUIRED_FIELDS_MISSING","Left With Arrears is missing required fields.",{event_index:eventIndex,event_type:"left_with_arrears",missing_fields:missing,anchor_preview:anchorPreview});
     }
     const taskId=cleanId(entry.cloud_arrears_ref||entry.arrears_ref||"");
-    if(!taskId)return employeeEntryValidationFailure("left_with_arrears_validation","CLOUD_ARREARS_REF_REQUIRED","Left With Arrears requires a cloud arrears ref.",{event_index:eventIndex,event_type:"left_with_arrears",missing_fields:["cloud_arrears_ref"],anchor_preview:anchorPreview});
-    const openLeftTask=await empFindOpenArrearTaskForPaymentReadOnly(env,user,taskId,room);
-    if(!openLeftTask)return employeeEntryValidationFailure("left_with_arrears_validation","CLOUD_ARREARS_NOT_OPEN","Left With Arrears cloud arrears ref is not open.",{event_index:eventIndex,event_type:"left_with_arrears",invalid_fields:["cloud_arrears_ref"],anchor_preview:{...anchorPreview,cloud_arrears_ref:taskId}});
+    if(taskId){
+      const openLeftTask=await empFindOpenArrearTaskForPaymentReadOnly(env,user,taskId,room);
+      if(!openLeftTask)return employeeEntryValidationFailure("left_with_arrears_validation","CLOUD_ARREARS_NOT_OPEN","The supplied Cloud Arrears reference is not open.",{event_index:eventIndex,event_type:"left_with_arrears",invalid_fields:["cloud_arrears_ref"],anchor_preview:{...anchorPreview,cloud_arrears_ref:taskId}});
+    }
   }
   if(type==="CO"&&depositDeduction>depositBalance+0.01){
     return employeeEntryValidationFailure("checkout_validation","DEPOSIT_DEDUCTION_EXCEEDS_BALANCE","Deposit deduction exceeds deposit balance.",{event_index:eventIndex,event_type:"checkout",invalid_fields:["deposit_deduction"],anchor_preview:{...anchorPreview,deposit_balance:depositBalance,deposit_deduction:depositDeduction}});
@@ -3383,6 +3404,7 @@ async function validateEmployeeEntryUploadPayload(env,user,body,opts={}){
     write_attempted:false,
     normalized_entry:normalized,
     derived_arrears_payment:derivedArrearsPayment,
+    exit_event_reference:exitEventReference,
     ...(stayGenesis.requested?{
       stay_genesis:{requested:true,genesis_event_type:stayGenesis.genesis_event_type,write_enabled:false},
       write_attempted:false,
@@ -3423,6 +3445,7 @@ async function handleEmployeeEntryValidate(request,env,user){
   })},400);}
   const assetInfo=employeeEntryDiagnosticAssetInfo(body);
   const request_context=ttlockRequestContext(request,env,user,"employee_entry_validate",TTLOCK_STRICT_CACHE_MAX_AGE_MS);
+  if(["DR","CO"].includes(employeeEntryUploadType(employeeEntryValidationEntryFromBody(body||{},body?.event_index??0))))request_context.allow_live_fetch=false;
   let result;
   try{
     result=await validateEmployeeEntryUploadPayload(env,user,body,{event_index:body?.event_index,canonical_transfer_link_anchor:true,request_context});
@@ -3480,6 +3503,7 @@ async function handleEmployeeEntry(request,env,user){
   const timing={started_at:Date.now(),d1_write_ms:0,total_ms:0};
   let body;
   try{body=await request.json();}catch{return badRequest("invalid_json");}
+  if(["DR","CO"].includes(employeeEntryUploadType(employeeEntryValidationEntryFromBody(body||{},body?.event_index??0))))request_context.allow_live_fetch=false;
   const stayGenesisEnvelopeFailure=employeeEntryStayGenesisEnvelopeFailure(body||{},body?.event_index??0);
   const stayGenesisEntry=employeeEntryValidationEntryFromBody(body||{},body?.event_index??0);
   const stayGenesisStartRequested=employeeEntryStayGenesisStartRequested(body||{},body?.event_index??0);
@@ -3533,6 +3557,13 @@ async function handleEmployeeEntry(request,env,user){
     if(Array.isArray(body?.session?.entries)&&body.session.entries[eventIndex])Object.assign(body.session.entries[eventIndex],fields);
     if(Array.isArray(body?.entries)&&body.entries[eventIndex])Object.assign(body.entries[eventIndex],fields);
   }
+  if(validationResult.exit_event_reference?.server_fields){
+    const fields=validationResult.exit_event_reference.server_fields;
+    if(body.entry)Object.assign(body.entry,fields);
+    const eventIndex=Number(body?.event_index||0)||0;
+    if(Array.isArray(body?.session?.entries)&&body.session.entries[eventIndex])Object.assign(body.session.entries[eventIndex],fields);
+    if(Array.isArray(body?.entries)&&body.entries[eventIndex])Object.assign(body.entries[eventIndex],fields);
+  }
   const entry=stayGenesis.requested?employeeEntryValidationEntryFromBody(body||{},body?.event_index??0):(body?.entry||{});
   const session=body?.session||{};
   const liveRouteGate=eeaLiveRouteGate(env);
@@ -3562,6 +3593,13 @@ async function handleEmployeeEntry(request,env,user){
   const amountOptional=type==="CO"||type==="TF";
   const entryId=cleanId(entry.id)||empId("ent");
   const sessionId=cleanId(session.id)||empId("emp");
+  if(type==="CO"&&entry.left_with_arrears&&!cleanId(entry.cloud_arrears_ref||entry.arrears_ref||"")){
+    const generatedArrearsRef=cleanId(`left-with-arrears-${sessionId}-${entryId}`);
+    Object.assign(entry,{cloud_arrears_ref:generatedArrearsRef,arrears_ref:generatedArrearsRef});
+    const eventIndex=Number(body?.event_index||0)||0;
+    if(Array.isArray(session.entries)&&session.entries[eventIndex])Object.assign(session.entries[eventIndex],{cloud_arrears_ref:generatedArrearsRef,arrears_ref:generatedArrearsRef});
+    if(Array.isArray(body?.entries)&&body.entries[eventIndex])Object.assign(body.entries[eventIndex],{cloud_arrears_ref:generatedArrearsRef,arrears_ref:generatedArrearsRef});
+  }
   const now=cleanText(entry.created_at,40)||empNow();
   const entryAnchorId=cleanId(entry.anchor_id||entry.event_id||entry.id)||entryId;
   const authOperatorId=cleanText(user.userid,80);
@@ -3674,15 +3712,10 @@ async function handleEmployeeEntry(request,env,user){
   const depositDeduction=Number(String(entry.deposit_deduction||0).replace(/,/g,""));
   let depositBalance=tenantCardId?await empDepositBalance(env,user.corpid,tenantCardId):0;
   const seedLegacyDeposit=tenantCardId&&["DR","CO"].includes(type)&&depositBalance<=0&&depositHeldInput>0;
-  if(seedLegacyDeposit)depositBalance=depositHeldInput;
-  if(type==="DR"){
-    const diff=Math.round((amount-depositBalance)*100)/100;
-    const refundReason=cleanText(entry.refund_reason||entry.difference_reason||entry.ded_note||entry.note,500);
-    if(Math.abs(diff)>0.01&&!refundReason)return badRequest("deposit_refund_difference_reason_required");
-  }
-  if(["DR","CO"].includes(type)&&!(type==="CO"&&entry.left_with_arrears)){
+  if(["DR","CO"].includes(type)&&depositBalance<=0&&depositHeldInput>0)depositBalance=depositHeldInput;
+  if(type==="CO"&&!entry.left_with_arrears){
     const openArrears=room?await getOpenCloudArrearsForBed(env,user,room,{limit:2000}).catch(()=>[]):[];
-    if(openArrears.length)return badRequest(type==="DR"?"deposit_refund_open_arrears_owner_approval_required":"checkout_open_arrears_owner_approval_required");
+    if(openArrears.length)return badRequest("checkout_open_arrears_owner_approval_required");
   }
   if(type==="CO"&&depositDeduction>depositBalance+0.01)return badRequest("deposit_deduction_exceeds_balance");
   const preparedStayGenesis=stayGenesis.requested?prepareStayGenesis({
@@ -10006,6 +10039,12 @@ function canonicalFinanceProjectionApplyAnchor(totals,anchor={}){
     const sourceType=String(anchor.source_arrears_type||anchor.source_event_type||"").toLowerCase();
     if(sourceType==="bed_transfer_fee_unpaid")totals.bed_transfer_fee_arrears_repaid+=amount;
     if(sourceType==="bed_price_difference_unpaid")totals.bed_price_difference_arrears_repaid+=amount;
+  }else if(type==="left_with_arrears"){
+    const amount=canonicalFinanceProjectionAmount(anchor.left_arrears_amount,anchor.arrears_amount,anchor.outstanding_arrears);
+    if(amount>0){
+      totals.arrears_opened_amount+=amount;
+      totals.arrears_opened_count+=1;
+    }
   }else if(type==="deposit_in"){
     const amount=canonicalFinanceProjectionAmount(anchor.deposit_paid_amount,anchor.deposit_amount,anchor.amount,anchor.paid_amount);
     canonicalFinanceProjectionAddInflow(totals,method,amount);

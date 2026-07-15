@@ -49,20 +49,23 @@ test("normal Checkout validates bed, type, date and rejects open arrears", async
   assert.doesNotMatch(backend, /period_start|periodDue|list_price/);
 });
 
-test("Left With Arrears requires current readiness fields only", async () => {
+test("Left With Arrears requires amount and note while promised date and existing item are optional", async () => {
   const worker = await readFile(workerPath, "utf8");
   const backend = functionBlock(worker, "validateCheckoutUploadFields");
   const payload = functionBlock(worker, "validateEmployeeEntryUploadPayload");
   const ui = functionBlock(await readFile(employeePath, "utf8"), "validateCheckoutEntry");
 
-  for (const required of ["left_date", "left_arrears_amount", "promised_payment_date", "note"]) {
+  for (const required of ["left_arrears_amount", "note"]) {
     assert.match(backend, new RegExp(`missing\\.push\\("${required}"\\)`), `${required} must be required by event validator`);
     assert.match(payload, new RegExp(`missing\\.push\\("${required}"\\)`), `${required} must be required by upload validator`);
   }
 
-  assert.match(backend, /contact_phone_or_method/);
-  assert.match(payload, /contact_phone_or_method/);
-  assert.match(ui, /Phone or Contact Method is required/);
+  for (const optional of ["left_date", "promised_payment_date", "contact_phone_or_method"]) {
+    assert.doesNotMatch(backend, new RegExp(`missing\\.push\\("${optional}"\\)`));
+    assert.doesNotMatch(payload, new RegExp(`missing\\.push\\("${optional}"\\)`));
+  }
+  assert.doesNotMatch(payload, /CLOUD_ARREARS_REF_REQUIRED/);
+  assert.doesNotMatch(ui, /Phone or Contact Method is required/);
   assert.match(ui, /Note is required for Left With Arrears/);
   assert.doesNotMatch(backend, /missing\.push\("confirmed_not_returning_date"\)/);
   assert.doesNotMatch(backend, /missing\.push\("belongings_held"\)/);

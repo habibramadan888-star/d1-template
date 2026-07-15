@@ -198,10 +198,11 @@ test("event-specific business rules are visible in current runtime validation", 
     ["ArrearsPayment.status_consistency", arrears, /ARREARS_PAYMENT_REMAINING_STATUS_MISMATCH/],
     ["DepositIn.deposit_required_total", depositIn, /deposit_required_total/],
     ["DepositIn.deposit_remaining_after_payment", depositIn, /deposit_remaining_after_payment/],
-    ["DepositOut.refund_date", depositOut, /refund_date/],
-    ["DepositOut.owner_override_ref", depositOut, /owner_override_ref/],
+    ["DepositOut.refund_amount", depositOut, /actual_refund_amount|refund_amount/],
+    ["DepositOut.refund_method", depositOut, /refund_method|payment_method/],
+    ["DepositOut.refund_reason", depositOut, /refund_reason/],
     ["Checkout.left_with_arrears", checkout, /left_with_arrears/],
-    ["Checkout.promised_payment_date", checkout, /promised_payment_date/],
+    ["Checkout.left_arrears_amount", checkout, /left_arrears_amount/],
     ["Expense.evidence_ref", expense, /evidence_ref/],
     ["Expense.evidence_threshold_100", expense, /100/],
     ["BedTransfer.reject_same_bed", transfer, /fromBed===toBed|from_bed.*to_bed/]
@@ -245,8 +246,8 @@ test("Deposit Out contract preserves balance, override, offset, and refund field
   }
 
   assert.match(validator, /DEPOSIT_OUT_REQUIRED_FIELD_MISSING/);
-  assert.match(validator, /DEPOSIT_OUT_EXCEEDS_BALANCE/);
-  assert.match(validator, /DEPOSIT_OUT_OPEN_ARREARS_REQUIRES_OFFSET_OR_APPROVAL/);
+  assert.doesNotMatch(validator, /DEPOSIT_OUT_EXCEEDS_BALANCE/);
+  assert.doesNotMatch(validator, /DEPOSIT_OUT_OPEN_ARREARS_REQUIRES_OFFSET_OR_APPROVAL/);
   assert.doesNotMatch(validator, /RENT_REQUIRED_FIELD_MISSING/);
   assert.match(correctionTotals, /type==="deposit_out"\)totals\.deposit_liability-=/);
   assert.doesNotMatch(correctionTotals, /type==="deposit_out"\)totals\.rent_income/);

@@ -23,55 +23,38 @@ function constBlock(source, name) {
   return source.slice(start, end + 2);
 }
 
-test("Deposit Out dry-run validates required refund fields and difference reason", async () => {
+test("Deposit Out requires only bed, refund amount, method, and reason", async () => {
   const worker = await readFile(workerPath, "utf8");
   const validator = functionBlock(worker, "validateDepositOutUploadFields");
   const payloadValidator = functionBlock(worker, "validateEmployeeEntryUploadPayload");
 
-  for (const field of [
-    "bed",
-    "deposit_balance",
-    "actual_refund_amount",
-    "refund_method",
-    "refund_date",
-    "refund_reason"
-  ]) {
+  for (const field of ["bed", "actual_refund_amount", "refund_method", "refund_reason"]) {
     assert.match(validator, new RegExp(`missing\\.push\\("${field}"\\)`), `${field} must be required`);
   }
-
-  assert.match(validator, /Math\.abs\(refund-balance\)>0\.01/);
-  assert.match(validator, /missing\.push\("difference_reason"\)/);
-  assert.doesNotMatch(
-    validator,
-    /difference_reason\|\|entry\.difference_reason\|\|normalized\.refund_reason|difference_reason\|\|entry\.difference_reason\|\|entry\.refund_reason/,
-    "refund_reason must not satisfy the separate difference_reason requirement"
-  );
-  assert.match(payloadValidator, /DEPOSIT_REFUND_DIFFERENCE_REASON_REQUIRED/);
-  assert.match(payloadValidator, /const differenceReason=cleanText\(entry\.difference_reason/);
+  for (const optional of ["deposit_balance", "refund_date", "difference_reason"]) {
+    assert.doesNotMatch(validator, new RegExp(`missing\\.push\\("${optional}"\\)`), `${optional} must be optional`);
+  }
+  assert.doesNotMatch(payloadValidator, /DEPOSIT_REFUND_DIFFERENCE_REASON_REQUIRED/);
 });
 
-test("Deposit Out refund above balance rejects unless owner override is present", async () => {
+test("Deposit Out missing or mismatched historical deposit becomes Owner Review", async () => {
   const worker = await readFile(workerPath, "utf8");
-  const validator = functionBlock(worker, "validateDepositOutUploadFields");
+  const reference = functionBlock(worker, "employeeExitEventReference");
 
-  assert.match(validator, /refund>balance\+0\.01/);
-  assert.match(validator, /ownerOverrideRef/);
-  assert.match(validator, /overrideReason/);
-  assert.match(validator, /DEPOSIT_OUT_EXCEEDS_BALANCE/);
-  assert.match(validator, /missing_fields:\["owner_override_ref","override_reason"\]/);
+  assert.match(reference, /!historicalDepositAvailable\|\|historicalMismatch/);
+  assert.match(reference, /pending_owner_review/);
+  assert.match(reference, /HISTORICAL_DEPOSIT_REFERENCE_UNAVAILABLE/);
+  assert.match(reference, /DEPOSIT_REFUND_HISTORICAL_AMOUNT_MISMATCH/);
 });
 
-test("Deposit Out open arrears requires offset or owner approval", async () => {
+test("Deposit Out open arrears is a warning, not a UI or backend block", async () => {
   const worker = await readFile(workerPath, "utf8");
   const validator = functionBlock(worker, "validateDepositOutUploadFields");
   const uiValidate = functionBlock(await readFile(employeePath, "utf8"), "validateDepositOutEntry");
 
-  assert.match(validator, /openArrearsAmount>0/);
-  assert.match(validator, /arrearsOffsetRef/);
-  assert.match(validator, /arrearsOffsetAmount/);
-  assert.match(validator, /ownerOverrideRef/);
-  assert.match(validator, /DEPOSIT_OUT_OPEN_ARREARS_REQUIRES_OFFSET_OR_APPROVAL/);
-  assert.match(uiValidate, /Open Arrears Found\. Deposit refund requires arrears collection or owner approval/);
+  assert.doesNotMatch(validator, /openArrearsAmount|DEPOSIT_OUT_OPEN_ARREARS_REQUIRES_OFFSET_OR_APPROVAL/);
+  assert.match(uiValidate, /Open arrears found\. The refund will be marked for Owner Review/);
+  assert.doesNotMatch(uiValidate, /errors\.push\([^)]*Open Arrears/);
 });
 
 test("Deposit Out anchor preserves refund, balance, offset, override, and reason fields", async () => {
@@ -144,17 +127,18 @@ test("Deposit Out source firewall excludes provider identity fields", async () =
   }
 });
 
-test("Employee Deposit Out UI reads deposit by bed and requires system balance", async () => {
+test("Employee Deposit Out UI reads cache-only deposit reference and does not require it", async () => {
   const html = await readFile(employeePath, "utf8");
   const loader = functionBlock(html, "loadDepositBalance");
   const validate = functionBlock(html, "validateDepositOutEntry");
   const builder = functionBlock(html, "buildDepositOutAnchor");
 
   assert.match(loader, /\/api\/employee\/deposit\?bed=/);
+  assert.match(loader, /allow_live_fetch=0/);
   assert.match(loader, /deposit_recorded_amount/);
   assert.doesNotMatch(loader, /tenant_card_id|deposit\?cid=/);
-  assert.match(validate, /Deposit Balance must be available from system context/);
-  assert.match(validate, /depositOutDifferenceReason/);
+  assert.doesNotMatch(validate, /Deposit Balance must be available from system context/);
+  assert.match(validate, /Refund Reason \/ Remark is required/);
   assert.match(builder, /deposit_balance:balance/);
   assert.match(builder, /difference_reason:employeeTrimField\('depositOutDifferenceReason'\)/);
 });

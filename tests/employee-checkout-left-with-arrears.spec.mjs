@@ -4,7 +4,7 @@ import test from "node:test";
 
 const htmlPath = "deploy-worker/public/employee-v3.html";
 
-test("employee checkout exposes Left With Arrears required fields and validation", async () => {
+test("employee checkout keeps optional tracking fields but requires only amount and remark", async () => {
   const html = await readFile(htmlPath, "utf8");
 
   assert.match(html, /leftWithArrearsMode/);
@@ -17,10 +17,10 @@ test("employee checkout exposes Left With Arrears required fields and validation
   assert.match(html, /id="leftContactMethod"[^>]*type="hidden"[^>]*value="whatsapp"/);
   assert.match(html, /id="leftDepositBalance"[^>]*type="hidden"/);
   assert.match(html, /id="leftGraceDays"[^>]*type="hidden"[^>]*value="0"/);
-  assert.match(html, /Blocked: WhatsApp phone is required for left customer arrears/);
-  assert.match(html, /Left Date is required for Left With Arrears/);
-  assert.match(html, /Promised Payment Date is required/);
-  assert.match(html, /Confirmed Not Returning Date is required/);
+  assert.match(html, /validate=function\(\)\{\s*const result=employeeCheckoutArrearsLegacyValidate\(\);\s*return result;/);
+  assert.match(html, /Left Arrears Amount is required/);
+  assert.match(html, /Note is required for Left With Arrears/);
+  assert.match(html, /Upload will create a new canonical arrears item/);
   assert.doesNotMatch(html, /Promised Return Date is required/);
   assert.doesNotMatch(html, /Coverage End Date is required/);
   assert.match(html, /Belongings Note is required when belongings are held/);

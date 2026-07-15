@@ -3748,12 +3748,19 @@ function normalizeCard(raw){
   const staff_bed=isStaffRemark(fullCardText);
   return {bed,remark_bed:anchors.bed,room,tenant,tenant_card_id:String(cid),deposit,start,start_md:anchors.start_md,end,remark,cardText,vacant,staff_bed,followup_class:staff_bed?'staff':(vacant?'vacant':'customer'),searchText:text,remark_parse_ok:anchors.ok,remark_parse_missing:anchors.missing||[],raw};
 }
+function employeeExitEventSelected(type=$('entryType')?.value){return type==='DR'||type==='CO'}
 function lookupBed(){
   const bed=$('bed').value.trim().replace(/^#/,'');if(!bed){state.current=null;state.depositBalance=null;state.depositContext=null;renderEmployeeBedInfoStrips();renderContext();return}
   const exact=state.lockCards.filter(c=>String(c.bed)===bed);
   const loose=state.lockCards.filter(c=>new RegExp(`(^|\\D)${bed}(\\D|$)`).test(String(c.searchText||'')));
   if(!exact.length){
     state.current=null;$('tenantName').value='';$('tenantCardId').value='';state.depositBalance=null;state.depositContext=null;renderEmployeeBedInfoStrips();renderContext();
+    if(employeeExitEventSelected()){
+      loadDepositBalance(bed,{allowLiveFetch:false});
+      toast('Access card may be deleted or expired. Record the actual refund/exit facts. / 当前门禁卡可能已删除或过期，请根据实际退款/离店情况录入。',6000);
+      syncForm();
+      return;
+    }
     toast(loose.length?'找到相关文本，但没有可靠的备注床位匹配。请检查门禁卡备注格式：床位 D押金 入住月日。':'未找到该床位的门禁卡，请先刷新或检查备注。',6000);
     syncForm();
     return;
@@ -3769,7 +3776,7 @@ function lookupBed(){
   state.depositContext=null;
   renderEmployeeBedInfoStrips();
   renderContext();
-  if(bed)loadDepositBalance(bed);
+  if(bed)loadDepositBalance(bed,{allowLiveFetch:!employeeExitEventSelected()});
   syncForm();
 }
 function depositHeld(){
@@ -3777,11 +3784,12 @@ function depositHeld(){
   if(state.current&&state.current.deposit!==''&&state.current.deposit!=null)return num(state.current.deposit);
   return 0;
 }
-async function loadDepositBalance(bed){
+async function loadDepositBalance(bed,opts={}){
   try{
     const cleanBed=String(bed||'').trim().replace(/^#/,'');
     if(!cleanBed){state.depositBalance=null;state.depositContext=null;renderContext();syncForm();return}
-    const r=await apiFetch('/api/employee/deposit?bed='+encodeURIComponent(cleanBed));
+    const noLive=opts.allowLiveFetch===false?'&allow_live_fetch=0':'';
+    const r=await apiFetch('/api/employee/deposit?bed='+encodeURIComponent(cleanBed)+noLive);
     const raw=r.ok?await r.json():null;
     const data=raw?.data||raw||null;
     state.depositContext=data&&data.success!==false?data:null;
@@ -3816,13 +3824,16 @@ function renderEntryTtlockStatus(){
   const count=state.lockCards?.length||0;
   const loadedAt=state.ttlockLoadedAt?new Date(state.ttlockLoadedAt).toLocaleString():'';
   const status=state.ttlockStatus||'idle';
+  const exitEvent=employeeExitEventSelected();
   const messages={
     loading:'Loading Access Cards / 正在加载卡片...',
     success:`${state.ttlockDataSource==='materialized_cache'?'Using Card Cache / 使用门禁卡缓存':'Card Data Loaded / 门禁卡已加载'}：${count} cards${loadedAt?' · '+loadedAt:''}`,
     error:`Card Data Load Failed / 门禁卡加载失败：${esc(state.ttlockError||'retry required')}`,
     idle:'Card Data Required Before Entry / 正式录入前必须先加载卡片'
   };
-  el.innerHTML=`<div class="ttlock-status-line ${esc(status)}">${messages[status]||messages.idle}</div>`;
+  el.innerHTML=exitEvent
+    ?'<div class="ttlock-status-line warn">Access context is reference only. The card may be deleted or expired; record the actual refund/exit facts. / 当前门禁卡可能已删除或过期，请根据实际退款/离店情况录入。</div>'
+    :`<div class="ttlock-status-line ${esc(status)}">${messages[status]||messages.idle}</div>`;
   const btn=$('btnLoadLock');
   if(btn){
     btn.disabled=status==='loading';
@@ -3833,13 +3844,14 @@ function renderEntryTtlockStatus(){
   const save=$('btnSaveEntry');
   if(save){
     const isTransfer=$('entryType')?.value==='TF';
-    const blocked=isTransfer?!employeeBedTransferValidateEnabled():!ttlockCacheReady();
+    const blocked=isTransfer?!employeeBedTransferValidateEnabled():(exitEvent?false:!ttlockCacheReady());
     save.disabled=blocked;
     save.classList.toggle('disabled',blocked);
     save.title=blocked?(isTransfer?employeeBedTransferUiGateState().error_code:'Load Cards before formal entry / 请先加载卡片'):'';
   }
 }
 async function ensureEntryTtlockReady(opts={}){
+  if(employeeExitEventSelected()){renderEntryTtlockStatus();return true}
   if(ttlockCacheReady()){renderEntryTtlockStatus();return true}
   if(state.ttlockStatus==='loading'){renderEntryTtlockStatus();return false}
   if(opts.auto){
@@ -4354,7 +4366,7 @@ function employeeBaseEntryPayload(type,overrides={}){
   const room=employeeTrimField('bed').replace(/^#/,'');
   const payload={
     id:uid('E'),entry_id:null,type,reason_code:employeeFieldValue('reasonCode')||type,
-    cat:pay==='B'?'bank':(type==='E'||type==='DR'?'expense':'cash'),
+    cat:pay==='B'?'bank':(type==='E'?'expense':'cash'),
     pay_type:pay,bank_ref:employeeTrimField('bankRef'),
     room,roomTo:employeeTrimField('bedTo').replace(/^#/,''),
     bed_from:(employeeTrimField('transferFromBed')||room).replace(/^#/,''),
@@ -4547,12 +4559,12 @@ function validateDepositOutEntry(){
   const amount=num(employeeFieldValue('amount'));
   const balance=depositHeld();
   employeeRequire(errors,!!employeeTrimField('bed'),'Bed is required.');
-  employeeRequire(errors,balance>0,'Deposit Balance must be available from system context.');
   employeeValidateCommonAmount(errors,{label:'Actual Refund Amount'});
   employeeRequire(errors,!!employeePaymentMethodValue(),'Refund Method is required.');
-  employeeRequire(errors,!!employeeFieldValue('depositOutRefundDate'),'Refund Date is required.');
-  if(Math.abs(amount-balance)>0.01&&!employeeTrimField('depositOutDifferenceReason'))errors.push('Difference Reason is required when Actual Refund Amount differs from Deposit Balance.');
-  if(openTasksForBed().some(t=>taskRemain(t)>0))errors.push('Open Arrears Found. Deposit refund requires arrears collection or owner approval.');
+  employeeRequire(errors,!!employeeTrimField('remark'),'Refund Reason / Remark is required.');
+  if(balance<=0)warns.push('Historical deposit reference unavailable. Owner Review will be required.');
+  else if(Math.abs(amount-balance)>0.01)warns.push('Refund differs from the historical deposit reference. Owner Review will be required.');
+  if(openTasksForBed().some(t=>taskRemain(t)>0))warns.push('Open arrears found. The refund will be marked for Owner Review.');
   return employeeValidationResult(errors,warns);
 }
 function validateCheckoutEntry(){
@@ -4563,11 +4575,9 @@ function validateCheckoutEntry(){
   if(!left)employeeRequire(errors,!!employeeFieldValue('checkoutDate'),'Checkout Date is required for normal checkout.');
   if(!left&&openTasksForBed().some(t=>taskRemain(t)>0))errors.push('Open Arrears Found: This customer has unpaid arrears. Normal checkout is not allowed. / 发现未清欠款：该客户存在未清欠款，不能直接正常退房。');
   if(left){
-    employeeRequire(errors,!!employeeFieldValue('checkoutDate'),'Left Date is required for Left With Arrears.');
-    employeeRequire(errors,!!(employeeTrimField('leftWhatsappPhone')||employeeFieldValue('leftContactMethod')),'Phone or Contact Method is required for Left With Arrears.');
-    employeeRequire(errors,!!employeeFieldValue('leftPromisedPaymentDate'),'Promised Payment Date is required.');
     employeeRequire(errors,num(employeeFieldValue('leftArrearsAmount'))>0,'Left Arrears Amount is required.');
     employeeRequire(errors,!!employeeTrimField('remark'),'Note is required for Left With Arrears.');
+    if(!leftWithArrearsRows().length)warns.push('No existing open arrears. Upload will create a new canonical arrears item.');
   }
   return employeeValidationResult(errors,warns);
 }
@@ -4761,11 +4771,13 @@ function buildDepositOutAnchor(){
   const balance=depositHeld();
   const difference=Math.round((amount-balance)*100)/100;
   const reason=employeeTrimField('depositOutDifferenceReason')||employeeTrimField('remark');
+  const ownerReview=balance<=0||Math.abs(amount-balance)>0.01||openTasksForBed().some(t=>taskRemain(t)>0);
   const payload=employeeBaseEntryPayload('DR',{
     reason_code:'DR',amount,due:amount,paid:amount,deposit_held:balance,deposit_balance:balance,actual_refund_amount:amount,refund_amount:amount,refund_difference:difference,
     refund_method:employeePaymentMethodValue()==='B'?'bank':'cash',refund_date:employeeFieldValue('depositOutRefundDate')||today(),refund_reason:reason,difference_reason:employeeTrimField('depositOutDifferenceReason'),
     ded_reason:reason?'DIFFERENCE':'',ded_note:reason,deposit_return:'DR',
-    outstanding_arrears:openTasksForBed().reduce((s,t)=>s+taskRemain(t),0),owner_approval_required:openTasksForBed().some(t=>taskRemain(t)>0),owner_approval_status:openTasksForBed().some(t=>taskRemain(t)>0)?'pending_owner_approval':'not_required'
+    outstanding_arrears:openTasksForBed().reduce((s,t)=>s+taskRemain(t),0),owner_review_required:ownerReview,owner_approval_required:ownerReview,owner_approval_status:ownerReview?'pending_owner_review':'not_required',
+    tenant_card_id:'',old_ttlock_ref:'',access_context_available:!!state.current
   });
   return applyEntryAnchors(payload);
 }
@@ -4779,7 +4791,7 @@ function buildCheckoutAnchor(){
     reason_code:'CO',amount:0,due:0,paid:0,checkout_date:employeeFieldValue('checkoutDate')||today(),deposit_held:depositHeld(),deposit_balance:depositHeld(),
     carry_over_arrears:openArrearsTotal,outstanding_arrears:openArrearsTotal,owner_approval_required:openArrearsTotal>0&&!left,owner_approval_status:openArrearsTotal>0&&!left?'pending_owner_approval':'not_required',
     checkout_type:left?'left_with_arrears':'normal',checkout_mode:left?'left_with_arrears':'normal',left_with_arrears:left,customer_left:left,cloud_arrears_ref:leftArrearsRef,open_arrears_amount:openArrearsTotal,
-    former_customer_ref:employeeTrimField('tenantCardId')||(left?leftArrearsRef:''),former_customer_name:formerCustomer,
+    former_customer_ref:left?leftArrearsRef:'',former_customer_name:formerCustomer,tenant_card_id:'',old_ttlock_ref:'',access_context_available:!!state.current,
     card_name:formerCustomer,
     former_customer_phone:left?employeeTrimField('leftWhatsappPhone'):'',whatsapp_phone:left?employeeTrimField('leftWhatsappPhone'):'',
     contact_method:left?employeeFieldValue('leftContactMethod'):'',contact_note:left?employeeTrimField('leftContactNote'):'',
@@ -5090,7 +5102,8 @@ function applyEntryAnchors(e){
     const outstanding=num(e.outstanding_arrears||e.carry_over_arrears||0);
     const depositBalance=num(e.deposit_balance||e.deposit_held||0);
     const actualRefund=num(e.actual_refund_amount||e.refund_amount||e.amount);
-    Object.assign(e,{bed:e.room,deposit_balance:depositBalance,actual_refund_amount:actualRefund,refund_amount:actualRefund,refund_difference:Math.round((actualRefund-depositBalance)*100)/100,refund_method:e.refund_method||method,refund_date:e.refund_date||today(),refund_reason:e.refund_reason||e.difference_reason||e.ded_note||e.note||'',difference_reason:e.difference_reason||e.refund_reason||e.ded_note||'',checkout_ref:e.checkout_date||'',open_arrears_amount:outstanding,outstanding_arrears:outstanding,owner_approval_required:outstanding>0,owner_approval_status:outstanding>0?(e.owner_approval_status||'pending_owner_approval'):(e.owner_approval_status||'not_required'),note:e.note||''});
+    const ownerReview=!!e.owner_approval_required||depositBalance<=0||Math.abs(actualRefund-depositBalance)>0.01||outstanding>0;
+    Object.assign(e,{bed:e.room,deposit_balance:depositBalance,actual_refund_amount:actualRefund,refund_amount:actualRefund,refund_difference:Math.round((actualRefund-depositBalance)*100)/100,refund_method:e.refund_method||method,refund_date:e.refund_date||today(),refund_reason:e.refund_reason||e.difference_reason||e.ded_note||e.note||'',difference_reason:e.difference_reason||e.refund_reason||e.ded_note||'',checkout_ref:e.checkout_date||'',open_arrears_amount:outstanding,outstanding_arrears:outstanding,owner_review_required:ownerReview,owner_approval_required:ownerReview,owner_approval_status:ownerReview?(e.owner_approval_status||'pending_owner_review'):'not_required',note:e.note||''});
   }else if(type==='CO'){
     const outstanding=num(e.outstanding_arrears||e.carry_over_arrears||0);
     const left=!!e.left_with_arrears;
@@ -5598,7 +5611,7 @@ function entryPayloadDeprecatedGenericBuilder(){
   const leftBelongingsHeld=$('leftBelongingsHeld')?.value==='yes';
   const ownerApprovalRequired=['CO','DR'].includes(type)&&openArrearsTotal>0&&!leftMode;
   const payload={
-    id:uid('E'),entry_id:null,type,reason_code:reasonCode,cat:pay==='B'?'bank':(type==='E'||type==='DR'?'expense':'cash'),pay_type:pay,bank_ref:$('bankRef').value.trim(),
+    id:uid('E'),entry_id:null,type,reason_code:reasonCode,cat:pay==='B'?'bank':(type==='E'?'expense':'cash'),pay_type:pay,bank_ref:$('bankRef').value.trim(),
     room:$('bed').value.trim().replace(/^#/,''),roomTo:$('bedTo').value.trim().replace(/^#/,''),bed_from:($('transferFromBed').value.trim()||$('bed').value.trim()).replace(/^#/,''),bed_to:$('bedTo').value.trim().replace(/^#/,''),
     tenant_name:$('tenantName').value.trim(),tenant_card_id:$('tenantCardId').value.trim(),tag:type==='D'?'N':type==='TF'?'T':'O',
     amount:amt,due,paid,deficit:Math.max(0,due-paid),entry_clr:$('entryClr').value,clr:$('entryClr').value,excess:Math.max(0,amt-due),excess_to:$('excessTo').value,
@@ -5897,7 +5910,7 @@ async function saveEntry(){
 }
 const saveEntryWithoutTtlockGate=saveEntry;
 async function saveEntryWithTtlockGate(){
-  if(['TF','E'].includes($('entryType')?.value))return saveEntryWithoutTtlockGate();
+  if(['TF','E','DR','CO'].includes($('entryType')?.value))return saveEntryWithoutTtlockGate();
   if(state.user&&!(await ensureEntryTtlockReady({auto:false})))return;
   return saveEntryWithoutTtlockGate();
 }
@@ -9391,7 +9404,7 @@ function employeeCheckoutRefundEventType(){
   return type==='CO'?'checkout':(type==='DR'?'deposit_refund':'');
 }
 function employeeCheckoutRefundBlockedByArrears(){
-  return !!employeeCheckoutRefundEventType()&&openTasksForBed().length>0;
+  return employeeCheckoutRefundEventType()==='checkout'&&openTasksForBed().length>0;
 }
 function employeeOwnerApprovalNote(type,rows){
   const label=type==='CO'?'Checkout':'Deposit refund';
@@ -9509,7 +9522,7 @@ function renderLeftWithArrearsFields(){
   const summary=$('leftWithArrearsSummary');
   if(!summary)return;
   if(!rows.length){
-    summary.innerHTML='<b>No Open Arrears</b><br>Left With Arrears requires an existing open Cloud Arrears item.';
+    summary.innerHTML='<b>No Existing Open Arrears</b><br>Upload will create one new canonical arrears item from this Left With Arrears record.';
     return;
   }
   summary.innerHTML=rows.map(t=>{
@@ -9555,7 +9568,7 @@ function employeeRenderOpenArrearsAlert(){
     box.innerHTML=`<div class="open-arrears-title"><div><b>No Open Arrears</b><small>\u65e0\u672a\u6e05\u6b20\u6b3e</small></div><span class="open-arrears-badge">OK</span></div>${closedMessage?`<div class="small" style="margin-top:8px">${closedMessage}</div>`:''}`;
     return;
   }
-  const blockedExit=type==='CO'||type==='DR';
+  const blockedExit=type==='CO';
   const selectedRef=String($('linkedTaskId')?.value||state.selectedArrearsTaskRef||'').trim();
   const list=rows.map(t=>{
     const m=employeeArrearsMeta(t);
@@ -9705,9 +9718,10 @@ validate=function(){
 const employeeCheckoutArrearsLegacyValidate=validate;
 validate=function(){
   const result=employeeCheckoutArrearsLegacyValidate();
+  return result;
   const type=$('entryType')?.value||'';
   const leftMode=leftWithArrearsSelected();
-  if(leftMode){
+  if(false&&leftMode){
     const rows=leftWithArrearsRows();
     const phone=($('leftWhatsappPhone')?.value||'').trim();
     const belongingsHeld=$('leftBelongingsHeld')?.value==='yes';
@@ -9720,14 +9734,14 @@ validate=function(){
     if(($('leftFinalStatus')?.value||$('leftStatus')?.value||'')==='abandoned_confirmed'&&!($('leftConfirmedNotReturningDate')?.value||''))addError('Confirmed Not Returning Date is required when abandoned is confirmed. / 确认不再回来时必须填写确认日期。');
     if(belongingsHeld&&!($('leftBelongingsNote')?.value||'').trim())addError('Belongings Note is required when belongings are held. / 物品留存时必须填写物品说明。');
   }
-  if(leftMode){
+  if(false&&leftMode){
     result.errors=result.errors.filter(msg=>!/WhatsApp phone is required|Confirmed Not Returning Date is required\.|Belongings Note is required when belongings are held/.test(msg));
     const contact=($('leftWhatsappPhone')?.value||$('leftContactMethod')?.value||'').trim();
     const addError=msg=>{if(!result.errors.includes(msg))result.errors.push(msg);};
     if(!contact)addError('Phone or Contact Method is required for Left With Arrears. / 离店未清欠款必须填写联系方式。');
     if(!($('remark')?.value||'').trim())addError('Note is required for Left With Arrears. / 离店未清欠款必须填写备注。');
   }
-  const blocked=['CO','DR'].includes(type)&&openTasksForBed().length>0;
+  const blocked=type==='CO'&&!leftMode&&openTasksForBed().length>0;
   if(blocked&&!(type==='CO'&&leftMode)){
     const msg=type==='CO'
       ?'Open Arrears Found: This customer has unpaid arrears. Normal checkout is not allowed. / \u53d1\u73b0\u672a\u6e05\u6b20\u6b3e\uff1a\u8be5\u5ba2\u6237\u5b58\u5728\u672a\u6e05\u6b20\u6b3e\uff0c\u4e0d\u80fd\u76f4\u63a5\u6b63\u5e38\u9000\u623f\u3002'

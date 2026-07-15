@@ -216,13 +216,13 @@ test("stale arrears selection is cleared or marked when open refs disappear", as
   assert.match(html, /Refresh Arrears/);
 });
 
-test("checkout open arrears is blocked before add to session", async () => {
+test("normal checkout open arrears is blocked while Deposit Out remains review-only", async () => {
   const html = await readFile(employeePath, "utf8");
   const checkoutValidateIndex = html.lastIndexOf("const employeeCheckoutArrearsLegacyValidate=validate");
   assert.ok(checkoutValidateIndex >= 0, "final checkout arrears validation wrapper must exist");
   const validateBlock = html.slice(checkoutValidateIndex, html.indexOf("const employeeCollapsedLegacyRenderSummary=renderSummary", checkoutValidateIndex));
 
-  assert.match(validateBlock, /\['CO','DR'\]\.includes\(type\)&&openTasksForBed\(\)\.length>0/);
+  assert.match(validateBlock, /type==='CO'&&!leftMode&&openTasksForBed\(\)\.length>0/);
   assert.match(validateBlock, /Open Arrears Found/);
   assert.match(validateBlock, /submit\.disabled=true/);
   assert.match(validateBlock, /submit\.classList\.add\('disabled'\)/);
