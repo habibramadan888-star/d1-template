@@ -212,7 +212,7 @@ test("stale arrears selection is cleared or marked when open refs disappear", as
   assert.match(html, /state\.selectedArrearsTaskSnapshot=null/);
   assert.match(html, /state\.arrearsTasksLoaded=Array\.isArray\(state\.tasks\)/);
   assert.match(html, /employeeOpenTaskRefSet\(\)/);
-  assert.match(html, /state\.arrearsTasksLoaded&&!openRefs\.has\(ref\)/);
+  assert.match(html, /state\.arrearsTasksLoaded&&!employeeLegacyArrearsReferenceIsStable\(entry\)&&!openRefs\.has\(ref\)/);
   assert.match(html, /Refresh Arrears/);
 });
 

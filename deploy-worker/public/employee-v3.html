@@ -2958,7 +2958,7 @@ label .label-en{
 <main class="wrap">
   <section id="view-entry">
     <div class="card employee-session-card" id="employeeSessionSummaryCard">
-      <div class="head"><div><div class="title">Current Session Summary<span class="label-en">本票流水汇总</span></div><div class="small" id="sessionClock">CURRENT SESSION</div></div><button class="btn" id="btnNewSessionTop">New Session<span class="label-en">新会话</span></button></div>
+      <div class="head"><div><div class="title">Current Session Summary<span class="label-en">本票流水汇总</span></div><div class="small" id="sessionClock">CURRENT SESSION</div></div></div>
       <div class="body">
         <div class="kpi-grid" id="sessionKpis"></div>
       </div>
@@ -2966,9 +2966,6 @@ label .label-en{
     <div class="card employee-entry-card" id="employeeEntryCard">
       <div class="head"><div class="title">Add Entry<span class="label-en">事件录入</span></div><button class="btn" id="btnLoadLock"><span class="employee-btn-main">Load Cards</span><span class="label-en">加载卡片</span></button></div>
       <div class="body">
-        <div class="employee-session-quick-row">
-          <button type="button" class="btn employee-new-session-quick" id="btnNewSessionQuick">New Session<small>新会话</small></button>
-        </div>
           <div class="step employee-event-picker">
           <div class="event-grid" id="eventChips">
             <button class="event-chip" data-type="R"><span>Rent</span><small>收租</small></button>
@@ -3003,10 +3000,9 @@ label .label-en{
           <div class="field hidden" id="tenantCardWrap"><label>门禁卡卡号 CID</label><input id="tenantCardId"></div>
         </div>
         </div>
-        <div class="step payment-compact" id="paymentStep">
-          <div class="step-title"><span>4</span><div>Step 4 · Payment Method<small>第四步：付款方式</small></div></div>
+        <div class="step payment-compact" id="paymentStep" role="group" aria-label="Payment Method / 付款方式">
         <div class="grid" id="paymentFields">
-          <div class="field"><label>付款方式 PY</label><select id="payType" class="hidden"><option value="C">Cash / 现金</option><option value="B">Bank / 银行</option></select><div class="pay-toggle"><button type="button" class="pay-option active" data-pay="C"><span class="employee-btn-main">Cash</span><span class="label-en">现金</span></button><button type="button" class="pay-option" data-pay="B"><span class="employee-btn-main">Bank</span><span class="label-en">银行</span></button></div></div>
+          <div class="field"><label class="employee-sr-only" for="payType">Payment Method / 付款方式</label><select id="payType" class="hidden" aria-label="Payment Method / 付款方式"><option value="C">Cash / 现金</option><option value="B">Bank / 银行</option></select><div class="pay-toggle" role="group" aria-label="Payment Method / 付款方式"><button type="button" class="pay-option active" data-pay="C" aria-pressed="true"><span class="employee-btn-main">Cash</span><span class="label-en">现金</span></button><button type="button" class="pay-option" data-pay="B" aria-pressed="false"><span class="employee-btn-main">Bank</span><span class="label-en">银行</span></button></div></div>
           <div class="field hidden" id="bankRefWrap"><label>银行参考 bank_ref</label><input id="bankRef"></div>
         </div>
         </div>
@@ -3083,12 +3079,12 @@ label .label-en{
           <div class="field"><label>To Bed / 新床位</label><input id="bedTo" data-bed-transfer-to="true"></div>
           <div class="field"><label>Transfer Reason / 换床原因</label><select id="transferReason" data-bed-transfer-reason="true"><option value=""></option><option value="customer_request">customer request / 客户要求</option><option value="room_issue">room issue / 房间问题</option><option value="management_adjustment">management adjustment / 管理调整</option><option value="bed_upgrade">bed upgrade / 升级</option><option value="other">other / 其他</option></select></div>
           <div class="field"><label>Transfer Fee / 换床费</label><select id="feePaid" data-bed-transfer-fee-mode="true"><option value="paid">Paid AED 50 / 已收 50</option><option value="waived">Waived / 免责声明免收</option><option value="unpaid">Unpaid AED 50 / 暂未支付 50</option></select></div>
-          <div class="field" id="transferFeePaymentMethodWrap"><label>Fee Payment Method / 换床费支付方式</label><select id="transferFeePaymentMethod"><option value=""></option><option value="cash">Cash / 现金</option><option value="bank">Bank / 银行</option></select></div>
+          <div class="field hidden" id="transferFeePaymentMethodWrap"><select id="transferFeePaymentMethod" aria-label="Transfer fee payment method"><option value=""></option><option value="cash">Cash / 现金</option><option value="bank">Bank / 银行</option></select></div>
           <div class="field hidden" id="transferWaiverReasonWrap"><label>Waiver Reason / 豁免原因</label><input id="transferWaiverReason" data-bed-transfer-waiver-reason="true"><div class="amount-hint">免收声明将进入老板 Today Todo。</div></div>
           <div class="field hidden" id="transferFeeDueDateWrap"><label>Fee Due Date / 换床费到期日</label><input id="transferFeeDueDate" type="date"><div class="amount-hint">未付 50 AED 将进入统一欠款。</div></div>
           <div class="field"><label>Bed Price Difference / 床价差</label><select id="bedDifferenceMode"><option value="none">None / 无床价差</option><option value="paid">Paid now / 当场已付</option><option value="unpaid">Record arrears / 记为欠款</option></select></div>
           <div class="field hidden" id="bedDifferenceAmountWrap"><label>Difference Amount AED / 床价差金额</label><input id="bedDifferenceAmount" inputmode="decimal"></div>
-          <div class="field hidden" id="bedDifferencePaymentMethodWrap"><label>Difference Payment Method / 床价差支付方式</label><select id="bedDifferencePaymentMethod"><option value=""></option><option value="cash">Cash / 现金</option><option value="bank">Bank / 银行</option></select></div>
+          <div class="field hidden" id="bedDifferencePaymentMethodWrap"><select id="bedDifferencePaymentMethod" aria-label="Bed price difference payment method"><option value=""></option><option value="cash">Cash / 现金</option><option value="bank">Bank / 银行</option></select></div>
           <div class="field hidden" id="bedDifferenceDueDateWrap"><label>Difference Due Date / 床价差到期日</label><input id="bedDifferenceDueDate" type="date"></div>
           <div class="field hidden" id="bedDifferenceReasonWrap"><label>Difference Note / 床价差说明</label><input id="bedDifferenceReason"></div>
           <div class="bed-transfer-context" id="transferReviewPanel" data-bed-transfer-review="true">
@@ -3144,7 +3140,7 @@ label .label-en{
     <div class="card employee-session-card" id="employeeSessionRecordsCard">
       <div class="head">
         <div><div class="title">本次会话</div><div class="small" id="sessionMeta">0 条记录</div></div>
-        <div class="row" style="flex:0 0 auto"><button class="btn" id="btnPreviewSession"><span class="employee-btn-main">Preview &amp; Copy</span><span class="label-en">预览并复制</span></button><button class="btn primary" id="btnExportSession"><span class="employee-btn-main">Upload Session</span><span class="label-en">确认本票并上传云端</span></button></div>
+        <div class="employee-session-actions" style="flex:0 0 auto"><div class="employee-session-actions-primary"><button class="btn" id="btnPreviewSession"><span class="employee-btn-main">Preview &amp; Copy</span><span class="label-en">预览并复制</span></button><button class="btn primary" id="btnExportSession"><span class="employee-btn-main">Upload Session</span><span class="label-en">确认本票并上传云端</span></button></div><button class="btn employee-new-session-action" id="btnNewSessionTop"><span class="employee-btn-main">New Session</span><span class="label-en">新会话</span></button></div>
       </div>
       <div class="body"><div class="preview-list" id="sessionPreview"></div></div>
     </div>
@@ -4728,11 +4724,18 @@ function employeeEntryStableIdentity(entry={}){
 }
 function employeeBindUploadValidationResult(result,entry,eventIndex,fallbackMessage=''){
   const normalized=normalizeEmployeeUploadDryRunError(result,eventIndex,fallbackMessage);
+  const outerIndex=Number(eventIndex)||0;
+  const boundTrace=(normalized.validation_trace||[]).map(step=>({...step,event_index:outerIndex,event_type:entryEventType(entry?.type||entry?.event_type||step?.event_type||normalized.event_type||'entry')}));
+  const raw=normalized.raw_validation_response&&typeof normalized.raw_validation_response==='object'
+    ?{...normalized.raw_validation_response,event_index:outerIndex,validation_trace:boundTrace}
+    :normalized.raw_validation_response;
   return {
     ...normalized,
-    event_index:Number(eventIndex)||0,
+    event_index:outerIndex,
     event_type:entryEventType(entry?.type||entry?.event_type||normalized.event_type||'entry'),
-    entry_identity:employeeEntryStableIdentity(entry)
+    entry_identity:employeeEntryStableIdentity(entry),
+    validation_trace:boundTrace,
+    raw_validation_response:raw
   };
 }
 function employeeInvalidateBedTransferValidation(){
@@ -4923,7 +4926,7 @@ const entryTemplates={
   },
   bed_transfer:{
     code:'TF',event_type:'bed_transfer',title:['Bed Transfer','\u6362\u5e8a'],
-    fields:['selectedEventWrap','transferFields','remark'],
+    fields:['selectedEventWrap','transferFields','paymentStep','remark'],
     required_fields:['from_bed','to_bed','fee_mode','transfer_reason'],
     system_read_fields:['canonical_source_bed_context','canonical_target_bed_context','ttlock_sequence'],
     forbidden_fields:['genericBedFieldWrap','periodStep','linkedTaskId','depositOutFields','checkoutFields','expenseFields','listPrice','arrearsPaymentCorePanel'],
@@ -5368,7 +5371,11 @@ function updateEventChips(){
   if($('selectedEventDisplay'))$('selectedEventDisplay').dataset.normalizedEvent=normalizedBusinessEvent();
 }
 function updatePaymentButtons(){
-  document.querySelectorAll('.pay-option').forEach(btn=>btn.classList.toggle('active',btn.dataset.pay===$('payType').value));
+  document.querySelectorAll('.pay-option').forEach(btn=>{
+    const selected=btn.dataset.pay===$('payType').value;
+    btn.classList.toggle('active',selected);
+    btn.setAttribute('aria-pressed',selected?'true':'false');
+  });
 }
 function setPaymentType(type){
   $('payType').value=type;
@@ -5467,11 +5474,14 @@ function syncForm(){
   visible(['customReasonWrap'],['DISCOUNT','OTHER'].includes($('reasonCode').value));
   const transferFeeMode=$('feePaid').value;
   const differenceMode=$('bedDifferenceMode')?.value||'none';
-  visible(['transferFeePaymentMethodWrap'],type==='TF'&&transferFeeMode==='paid');
+  const sharedPaymentMethod=employeePaymentMethodValue()==='B'?'bank':'cash';
+  if($('transferFeePaymentMethod'))$('transferFeePaymentMethod').value=type==='TF'&&transferFeeMode==='paid'?sharedPaymentMethod:'';
+  if($('bedDifferencePaymentMethod'))$('bedDifferencePaymentMethod').value=type==='TF'&&differenceMode==='paid'?sharedPaymentMethod:'';
+  $('transferFeePaymentMethodWrap')?.classList.add('hidden');
   visible(['transferWaiverReasonWrap'],type==='TF'&&transferFeeMode==='waived');
   visible(['transferFeeDueDateWrap'],type==='TF'&&transferFeeMode==='unpaid');
   visible(['bedDifferenceAmountWrap','bedDifferenceReasonWrap'],type==='TF'&&differenceMode!=='none');
-  visible(['bedDifferencePaymentMethodWrap'],type==='TF'&&differenceMode==='paid');
+  $('bedDifferencePaymentMethodWrap')?.classList.add('hidden');
   visible(['bedDifferenceDueDateWrap'],type==='TF'&&differenceMode==='unpaid');
   $('bankRefWrap').classList.add('hidden');
   if(type==='AP'&&!state.tasks.length)loadTasks(false);
@@ -8042,6 +8052,12 @@ function employeeRecordValidationError(entry,index){
 function employeeEntryArrearsRef(entry){
   return String(entry?.arrears_ref||entry?.original_arrears_id||entry?.linked_task_id||'').trim();
 }
+function employeeLegacyArrearsReferenceIsStable(entry={}){
+  if(String(entry.arrears_source||'').trim()!=='legacy_manual')return false;
+  const sessionId=String(entry.session_id||'').trim();
+  const entryId=employeeEntryStableIdentity(entry);
+  return !!sessionId&&!!entryId&&employeeEntryArrearsRef(entry)===`legacy-manual-${sessionId}-${entryId}`;
+}
 function employeeOpenTaskRefSet(){
   const refs=new Set();
   (state.tasks||[]).forEach(t=>{
@@ -8078,7 +8094,7 @@ function employeeSessionRecordState(entry,index){
   if(entry?.type==='AP'){
     const ref=employeeEntryArrearsRef(entry);
     const openRefs=employeeOpenTaskRefSet();
-    if(ref&&state.arrearsTasksLoaded&&!openRefs.has(ref)){
+    if(ref&&state.arrearsTasksLoaded&&!employeeLegacyArrearsReferenceIsStable(entry)&&!openRefs.has(ref)){
       const staleResult=normalizeEmployeeUploadDryRunError({
         event_index:index,
         event_type:'arrears_payment',
@@ -8957,6 +8973,12 @@ function employeeEnsureEnglishFirstStyle(){
     #paymentStep .field{margin:0!important}
     #paymentStep .pay-toggle{display:flex!important;gap:6px!important}
     #paymentStep .pay-option{flex:1!important;padding:8px 12px!important;border-radius:10px!important}
+    .employee-sr-only{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
+    #employeeSessionRecordsCard>.head{align-items:flex-start!important;gap:12px!important}
+    .employee-session-actions{display:grid!important;grid-template-columns:1fr!important;gap:8px!important;width:min(100%,430px)!important}
+    .employee-session-actions-primary{display:grid!important;grid-template-columns:1fr 1fr!important;gap:8px!important}
+    .employee-session-actions .btn{width:100%!important;min-height:44px!important}
+    .employee-new-session-action{background:#fff!important;color:#475569!important;border-color:var(--line)!important;box-shadow:none!important}
     .session-summary-section{border:1px solid var(--line);border-radius:14px;padding:10px;margin-bottom:10px;background:#fff}
     .session-summary-toggle{width:100%;display:flex;justify-content:space-between;align-items:center;border:0;background:transparent;color:#142033;font-weight:900;cursor:pointer;text-align:left}
     .session-summary-section.collapsed .session-summary-content{display:none}
@@ -8983,7 +9005,7 @@ function employeeEnsureEnglishFirstStyle(){
     #periodStep.employee-period-collapsible .period-summary-toggle{width:100%;border:0;background:transparent;text-align:left;font-weight:800;color:#3f4d61;cursor:pointer;padding:4px 0}
     #periodStep.employee-period-collapsible.collapsed .period-summary-toggle::after{content:' ▸'}
     #periodStep.employee-period-collapsible:not(.collapsed) .period-summary-toggle::after{content:' ▾'}
-    @media(max-width:720px){#eventChips{grid-template-columns:repeat(12,minmax(0,1fr))!important}#eventChips .event-chip{min-height:50px!important;font-size:11px!important;padding:8px 3px!important}#eventChips .event-chip>span{font-size:11px!important}}
+    @media(max-width:720px){#eventChips{grid-template-columns:repeat(12,minmax(0,1fr))!important}#eventChips .event-chip{min-height:50px!important;font-size:11px!important;padding:8px 3px!important}#eventChips .event-chip>span{font-size:11px!important}#employeeSessionRecordsCard>.head{display:block!important}.employee-session-actions{width:100%!important;margin-top:10px!important}}
    `;
   document.head.appendChild(style);
 }
@@ -9912,7 +9934,6 @@ const employeeWorkspaceRefreshLegacy=refreshSessionViews;
 refreshSessionViews=function(){employeeWorkspaceRefreshLegacy();employeeRefreshWorkspaceStatus();};
 document.querySelectorAll('[data-employee-workspace]').forEach(btn=>btn.onclick=()=>employeeSetWorkspace(btn.dataset.employeeWorkspace));
 $('employeeSessionStatusBar').onclick=()=>employeeSetWorkspace('session');
-if($('btnNewSessionQuick'))$('btnNewSessionQuick').onclick=newSession;
 $('validationBox').dataset.pristine='true';
 $('btnSaveEntry').addEventListener('click',()=>{$('validationBox').dataset.pristine='false';},{capture:true});
 employeeSetWorkspace('entry');

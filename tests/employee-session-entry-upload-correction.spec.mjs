@@ -15,8 +15,12 @@ function block(source, startText, endText, last = false) {
 }
 
 test("New Session is visible, clears browser-only state, rotates identity, and calls no API", () => {
-  assert.match(employee, /id="btnNewSessionQuick"/);
-  assert.match(employee, /employee-session-quick-row/);
+  assert.equal((employee.match(/id="btnNewSessionTop"/g) || []).length, 1);
+  assert.doesNotMatch(employee, /id="btnNewSessionQuick"/);
+  const actions = block(employee, '<div class="employee-session-actions"', '</div>\n      </div>');
+  assert.match(actions, /id="btnPreviewSession"/);
+  assert.match(actions, /id="btnExportSession"/);
+  assert.match(actions, /id="btnNewSessionTop"/);
   const fn = block(employee, "function newSessionFinal()", "newSession=newSessionFinal");
   assert.match(fn, /state\.drafts=\[\]/);
   assert.match(fn, /state\.uploadValidationFailedIndex=null/);

@@ -342,7 +342,7 @@ test("frontend AP builder uses selected arrears ref without spreading selected t
   const taskInfoEnd = html.indexOf("function applyLinkedTask", taskInfoStart);
   const taskInfoBlock = html.slice(taskInfoStart, taskInfoEnd);
 
-  assert.match(builderBlock, /const ref=employeeFieldValue\('linkedTaskId'\)/);
+  assert.match(builderBlock, /const ref=legacy\?'':employeeFieldValue\('linkedTaskId'\)/);
   assert.match(builderBlock, /linked_task_id:ref/);
   assert.match(builderBlock, /arrears_ref:ref/);
   assert.match(builderBlock, /original_arrears_id:ref/);

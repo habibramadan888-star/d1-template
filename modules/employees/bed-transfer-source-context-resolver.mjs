@@ -1,11 +1,14 @@
 const clean=v=>String(v??'').trim();
 const bed=v=>clean(v).replace(/^#+/,'');
 const stable=a=>[...new Set(a.map(clean).filter(Boolean))].sort((x,y)=>x.localeCompare(y));
-const active=e=>!['void','voided','reversed','deleted','inactive'].includes(clean(e.effective_status||e.archive_state||e.status).toLowerCase())&&!e.voided_at;
+const active=e=>e.effective!==false&&!['void','voided','reversed','deleted','inactive'].includes(clean(e.effective_status||e.archive_state||e.status).toLowerCase())&&!e.voided_at;
 const time=e=>clean(e.accepted_at||e.occurred_at||e.created_at||e.date);
 const ref=e=>clean(e.anchor_ref||e.anchor_id||e.event_id||(e.session_id&&e.entry_id?`${e.session_id}:${e.entry_id}`:''));
 const eventType=e=>clean(e.event_type).toLowerCase();
 const relevant=(e,b)=>bed(e.bed||e.room)===b||bed(e.from_bed)===b||bed(e.to_bed)===b;
+const sourceCandidate=e=>eventType(e)==='rent';
+const voidTarget=e=>clean(e.target_anchor_id||e.voided_anchor_id||e.target_transfer_anchor_id||e.voided_transfer_anchor_id||e.voids_transfer_anchor_id||e.reversal_of_transfer_anchor_id||e.original_event_id);
+const voidEvidence=e=>['void','void_event','void_transfer','transfer_void','reversal','reverse','correction_void'].includes(eventType(e));
 const clone=v=>JSON.parse(JSON.stringify(v??null));
 
 function failure(status,error_code,count,reasons){return{resolution_status:status,error_code,candidate_group_count:count,ambiguity_reasons:stable(reasons)}}
@@ -66,25 +69,29 @@ function resolveLineage(input,transfers,voided){
 export function resolveBedTransferSourceContext(raw={}){
   const input=clone(raw),fromBed=bed(input.from_bed);
   if(fromBed==='334')return failure('ambiguous','BED_TRANSFER_334_FORBIDDEN',0,['bed_334_forbidden']);
-  const all=(input.archive_entries||[]).filter(active).sort((a,b)=>time(a).localeCompare(time(b))||ref(a).localeCompare(ref(b)));
+  const rawEntries=input.archive_entries||[];
+  const voidRows=[...(input.void_anchors||[]),...rawEntries.filter(voidEvidence)].filter(active);
+  const voidedRefs=new Set(voidRows.map(voidTarget).filter(Boolean));
+  const all=rawEntries.filter(e=>active(e)&&!voidedRefs.has(ref(e))).sort((a,b)=>time(a).localeCompare(time(b))||ref(a).localeCompare(ref(b)));
   const transfers=(input.transfer_anchors||all.filter(e=>eventType(e)==='bed_transfer')).filter(active);
-  const voided=new Set((input.void_anchors||[]).filter(active).map(v=>clean(v.target_transfer_anchor_id||v.voided_transfer_anchor_id)).filter(Boolean));
+  const voided=new Set(voidRows.map(voidTarget).filter(Boolean));
   const lineage=resolveLineage(input,transfers,voided);if(lineage)return lineage;
   const entries=all.filter(e=>relevant(e,fromBed)&&eventType(e)!=='bed_transfer');
   const closes=entries.filter(e=>['checkout','left_with_arrears'].includes(eventType(e)));
   if(closes.length){
     const latest=closes.at(-1),segment=entries.filter(e=>time(e)>time(latest));
-    const starts=segment.filter(e=>['rent','deposit_in'].includes(eventType(e)));
+    const starts=segment.filter(sourceCandidate);
     if(!starts.length)return failure('ambiguous','BED_TRANSFER_SOURCE_CONTEXT_AMBIGUOUS',0,['no_post_checkout_genesis']);
     const explicit=stable(starts.filter(e=>e.stay_action==='start'||e.genesis_candidate===true).map(e=>clean(e.genesis_group_id||e.session_id||ref(e))));
     if(explicit.length>1)return failure('ambiguous','BED_TRANSFER_SOURCE_CONTEXT_AMBIGUOUS',explicit.length,['multiple_unmergeable_post_checkout_genesis_groups']);
-    const genesis=starts[0];return finish('post_latest_checkout_segment',input,segment,genesis);
+    const genesis=starts[0];return finish('post_latest_checkout_segment',input,segment.filter(sourceCandidate),genesis);
   }
   const mmdd=clean(input.access_snapshot?.checkin_mmdd||input.access_snapshot?.parsed_checkin_mmdd);
-  const starts=entries.filter(e=>['rent','deposit_in'].includes(eventType(e))&&clean(e.checkin_mmdd||e.parsed_checkin_mmdd)===mmdd);
+  const sourceEntries=entries.filter(sourceCandidate);
+  const starts=sourceEntries.filter(e=>clean(e.checkin_mmdd||e.parsed_checkin_mmdd)===mmdd);
   const groups=new Map();for(const e of starts){const k=clean(e.genesis_group_id||e.session_id||ref(e));if(!groups.has(k))groups.set(k,[]);groups.get(k).push(e)}
   if(!mmdd||groups.size!==1)return failure('ambiguous','BED_TRANSFER_SOURCE_CONTEXT_AMBIGUOUS',groups.size,[groups.size?'multiple_legacy_mmdd_matches':'no_legacy_mmdd_match']);
   const group=[...groups.values()][0],genesis=group[0],startTime=time(genesis);
-  if(entries.some(e=>time(e)<startTime&&!group.includes(e)))return failure('ambiguous','BED_TRANSFER_SOURCE_CONTEXT_AMBIGUOUS',1,['unassigned_legacy_history']);
-  return finish('unique_legacy_mmdd_canonical_match',input,entries.filter(e=>time(e)>=startTime),genesis);
+  if(sourceEntries.some(e=>time(e)<startTime&&!group.includes(e)))return failure('ambiguous','BED_TRANSFER_SOURCE_CONTEXT_AMBIGUOUS',1,['unassigned_legacy_history']);
+  return finish('unique_legacy_mmdd_canonical_match',input,sourceEntries.filter(e=>time(e)>=startTime),genesis);
 }

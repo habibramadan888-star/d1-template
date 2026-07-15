@@ -2795,10 +2795,11 @@ async function resolveEmployeeBedTransferSourceContext(env,user,fromBed,gateway=
       anchor_id:cleanText(anchor.anchor_id||anchor.event_id||anchor.id||anchor.entry_id||"",160),session_id:cleanText(session.id||anchor.session_id||"",160),
       bed:cleanText(anchor.bed||anchor.room||"",80).replace(/^#/,""),from_bed:cleanText(anchor.from_bed||anchor.bed_from||"",80).replace(/^#/,""),to_bed:cleanText(anchor.to_bed||anchor.bed_to||"",80).replace(/^#/,""),
       accepted_at:cleanText(anchor.transfer_at||anchor.transfer_date||anchor.checkout_date||anchor.created_at||session.created_at||session.date||"",80),
-      effective_status:cleanText(anchor.archive_state||anchor.status||"active",40),voided_at:cleanText(anchor.voided_at||session.voided_at||"",80),
+      effective_status:cleanText(anchor.archive_state||anchor.status||"active",40),effective:anchor.effective!==false,voided_at:cleanText(anchor.voided_at||session.voided_at||"",80),
       stay_action:anchor.stay_action,genesis_candidate:anchor.genesis_candidate===true,genesis_group_id:cleanText(anchor.genesis_group_id||"",160),
       checkin_mmdd:cleanText(anchor.checkin_mmdd||anchor.parsed_checkin_mmdd||"",20),rent_coverage_ref:cleanText(anchor.rent_coverage_ref||"",160),
       transfer_anchor_id:cleanText(anchor.transfer_anchor_id||"",160),transfer_lineage_id:cleanText(anchor.transfer_lineage_id||"",160),previous_transfer_anchor_id:cleanText(anchor.previous_transfer_anchor_id||"",160)||null,
+      target_anchor_id:cleanText(anchor.target_anchor_id||"",160),voided_anchor_id:cleanText(anchor.voided_anchor_id||"",160),target_transfer_anchor_id:cleanText(anchor.target_transfer_anchor_id||"",160),voided_transfer_anchor_id:cleanText(anchor.voided_transfer_anchor_id||"",160),voids_transfer_anchor_id:cleanText(anchor.voids_transfer_anchor_id||"",160),reversal_of_transfer_anchor_id:cleanText(anchor.reversal_of_transfer_anchor_id||"",160),original_event_id:cleanText(anchor.original_event_id||"",160),
       source_context_anchor_refs:Array.isArray(anchor.source_context_anchor_refs)?anchor.source_context_anchor_refs:[]
     });
   }
