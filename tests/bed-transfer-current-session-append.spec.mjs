@@ -188,8 +188,8 @@ test("Upload Session includes TF, validates it, writes only canonical entry, and
   assert.match(upload, /validateEmployeeUploadDryRun\(requestPayload\?\.entry\|\|e/);
   assert.match(upload, /bedTransferUploadPayloads\[i\]=employeeBedTransferRecordPayload\(requestPayload\)/);
   assert.match(upload, /apiFetch\('\/api\/employee\/entry'/);
-  assert.match(upload, /if\(cloudConfirmed&&includesBedTransfer\)/);
-  assert.match(upload, /state\.drafts=state\.drafts\.filter/);
+  assert.match(upload, /if\(cloudConfirmed\)\{\s*state\.drafts=\[\]/);
+  assert.match(upload, /localStorage\.removeItem\(employeeStorageKey\('empv3:drafts'\)\)/);
   assert.match(upload, /state\.lastSavedBedTransferDraftId=null/);
   assert.match(upload, /localStorage\.removeItem\(employeeStorageKey\('empv3:sessionId'\)\)/);
   for (const forbidden of ["/api/employee/bed-transfers", "/api/save_session", "event-ledger"])
@@ -197,11 +197,12 @@ test("Upload Session includes TF, validates it, writes only canonical entry, and
 });
 
 test("Bed Transfer validate-only and write reuse the same sanitized business payload", () => {
+  const canonicalSessionId = block("employeeBedTransferCanonicalSessionId");
   const validate = block("employeeBedTransferValidatePayload");
   const record = block("employeeBedTransferRecordPayload");
   const context = { Object, String, state: { bedTransferCapabilities: null } };
   vm.createContext(context);
-  vm.runInContext(`${validate};${record};globalThis.validatePayload=employeeBedTransferValidatePayload;globalThis.recordPayload=employeeBedTransferRecordPayload`, context);
+  vm.runInContext(`${canonicalSessionId};${validate};${record};globalThis.validatePayload=employeeBedTransferValidatePayload;globalThis.recordPayload=employeeBedTransferRecordPayload`, context);
   const validation = context.validatePayload({ event_type: "bed_transfer", type: "TF", source: "employee_entry", from_bed: "144", to_bed: "111", transfer_reason: "customer_request", fee_mode: "paid", fee_amount_aed: 50, payment_method: "cash", dry_run: true, no_write: true }, { id: "S-new-ticket" });
   const recordPayload = context.recordPayload(validation);
   assert.deepEqual(recordPayload.entry, validation.entry);
@@ -209,12 +210,13 @@ test("Bed Transfer validate-only and write reuse the same sanitized business pay
   assert.equal("validate_only" in recordPayload.entry, false);
   assert.equal("no_write" in recordPayload.entry, false);
   assert.equal(recordPayload.session.id, validation.session.id);
+  assert.match(validation.session.id, /^bed-transfer-entry-S-new-ticket$/);
 });
 
 test("failed upload restores original Current Session and repeat clicks are busy-guarded", () => {
   const upload = html.slice(html.lastIndexOf("async function commitSessionAndExport"));
   assert.match(upload, /if\(btns\.some\(b=>b\.dataset\.busy==='1'\)\)return/);
-  assert.ok((upload.match(/state\.drafts=originalDrafts/g) || []).length >= 2);
+  assert.ok((upload.match(/state\.drafts=allOriginalDrafts/g) || []).length >= 2);
   assert.match(upload, /state\.sessionId=originalSessionId/);
   assert.match(upload, /upload_validation_error=firstUploadFailure\.result/);
 });

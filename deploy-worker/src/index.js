@@ -3314,6 +3314,15 @@ async function validateEmployeeEntryUploadPayload(env,user,body,opts={}){
   }else if(type==="AP"){
     const taskId=cleanId(entry.linked_task_id||entry.arrears_ref||entry.original_arrears_id);
     if(!taskId)return employeeEntryValidationFailure("arrears_payment_ref","LINKED_TASK_REQUIRED","Arrears Payment requires a selected cloud arrears ref.",{event_index:eventIndex,event_type:"arrears_payment",missing_fields:["linked_task_id","arrears_ref"],anchor_preview:anchorPreview});
+    const legacyManual=cleanText(entry.arrears_source,40)==="legacy_manual";
+    if(legacyManual){
+      const expectedLegacyRef=cleanId(`legacy-manual-${cleanId(entry.session_id||session?.id||session?.session_id)}-${cleanId(entry.id||entry.event_id||entry.anchor_id)}`);
+      if(taskId!==expectedLegacyRef)return employeeEntryValidationFailure("arrears_payment_ref","LEGACY_ARREARS_CANONICAL_REF_INVALID","Legacy Arrears Payment requires the server-verifiable Session ID + Entry ID reference.",{event_index:eventIndex,event_type:"arrears_payment",invalid_fields:["arrears_ref"],anchor_preview:anchorPreview});
+      if(amount<=0)return employeeEntryValidationFailure("arrears_payment_ref","ARREAR_PAYMENT_AMOUNT_INVALID","Legacy Arrears Payment amount must be positive.",{event_index:eventIndex,event_type:"arrears_payment",invalid_fields:["amount"],anchor_preview:anchorPreview});
+      if(!cleanText(entry.note||entry.remark,500))return employeeEntryValidationFailure("arrears_payment_ref","LEGACY_ARREARS_REMARK_REQUIRED","Legacy Arrears Payment requires a source remark.",{event_index:eventIndex,event_type:"arrears_payment",missing_fields:["remark"],anchor_preview:anchorPreview});
+      due=amount;
+      periodDue=amount;
+    }else{
     const projectedTask=await empFindProjectionArrearsForPayment(env,user,taskId,room);
     if(projectedTask&&!["open","partial"].includes(String(projectedTask.status||"").toLowerCase())){
       return employeeEntryValidationFailure("arrears_payment_ref","ARREARS_REF_STALE_REFRESH_REQUIRED","This arrears item is no longer open. Please refresh arrears.",{event_index:eventIndex,event_type:"arrears_payment",invalid_fields:["linked_task_id"],anchor_preview:{...anchorPreview,arrears_ref:taskId,projection_status:projectedTask.status||"",remaining_arrears:cleanMoney(projectedTask.remaining_arrears||0)}});
@@ -3327,6 +3336,7 @@ async function validateEmployeeEntryUploadPayload(env,user,body,opts={}){
     if(amount<=0||amount>remain+0.01)return employeeEntryValidationFailure("arrears_payment_ref","ARREAR_PAYMENT_AMOUNT_INVALID","Arrears payment amount must be positive and no more than remaining arrears.",{event_index:eventIndex,event_type:"arrears_payment",invalid_fields:["amount"],anchor_preview:{...anchorPreview,arrears_ref:taskId,remaining_arrears:remain}});
     due=amount;
     periodDue=Number(String(entry.period_due||amount).replace(/,/g,""));
+    }
   }
   if(["R","TF","TFF"].includes(type))paid=Math.min(amount,due||amount);
   if(type==="AP")paid=amount;
@@ -3607,7 +3617,7 @@ async function handleEmployeeEntry(request,env,user){
   const existingTx=await env.DB.prepare("SELECT id,session_id,type,linked_task_id FROM transactions WHERE id=? AND corpid=? LIMIT 1").bind(entryId,user.corpid).first();
   if(existingTx){
     let arrearTask=null;
-    if(existingTx.type==="AP"&&existingTx.linked_task_id){
+    if(existingTx.type==="AP"&&existingTx.linked_task_id&&!String(existingTx.linked_task_id).startsWith("legacy-manual-")){
       arrearTask=await empReconcileArrearTask(env,user,existingTx.linked_task_id,authOperatorId,now);
     }
     return success({
@@ -3691,12 +3701,22 @@ async function handleEmployeeEntry(request,env,user){
   }else if(type==="AP"){
     const taskId=cleanId(entry.linked_task_id);
     if(!taskId)return badRequest("linked_task_required");
-    apTaskForPayment=await empEnsureOpenArrearTaskForPayment(env,user,taskId,authOperatorId,now,room);
-    if(!apTaskForPayment)return badRequest("linked_task_not_open");
-    const remain=Math.max(0,Number(apTaskForPayment.arrear_amount||0)-Number(apTaskForPayment.actual_received||0));
-    if(amount<=0||amount>remain+0.01)return badRequest("arrear_payment_amount_invalid");
-    due=amount;
-    periodDue=Number(String(entry.period_due||amount).replace(/,/g,""));
+    const legacyManual=cleanText(entry.arrears_source,40)==="legacy_manual";
+    if(legacyManual){
+      const expectedLegacyRef=cleanId(`legacy-manual-${sessionId}-${entryId}`);
+      if(taskId!==expectedLegacyRef)return badRequest("legacy_arrears_canonical_ref_invalid");
+      if(amount<=0)return badRequest("arrear_payment_amount_invalid");
+      if(!cleanText(entry.note||entry.remark,500))return badRequest("legacy_arrears_remark_required");
+      due=amount;
+      periodDue=amount;
+    }else{
+      apTaskForPayment=await empEnsureOpenArrearTaskForPayment(env,user,taskId,authOperatorId,now,room);
+      if(!apTaskForPayment)return badRequest("linked_task_not_open");
+      const remain=Math.max(0,Number(apTaskForPayment.arrear_amount||0)-Number(apTaskForPayment.actual_received||0));
+      if(amount<=0||amount>remain+0.01)return badRequest("arrear_payment_amount_invalid");
+      due=amount;
+      periodDue=Number(String(entry.period_due||amount).replace(/,/g,""));
+    }
   }
   if(["R","TF","TFF"].includes(type))paid=Math.min(amount,due||amount);
   if(type==="AP")paid=amount;
@@ -3832,7 +3852,7 @@ async function handleEmployeeEntry(request,env,user){
   }
   if(type==="AP"){
     const taskId=cleanId(entry.linked_task_id);
-    if(taskId&&apTaskForPayment)arrearTask=await empReconcileArrearTask(env,user,taskId,authOperatorId,now,room);
+    if(taskId&&apTaskForPayment&&!String(taskId).startsWith("legacy-manual-"))arrearTask=await empReconcileArrearTask(env,user,taskId,authOperatorId,now,room);
   }
   let leftWithArrearsTask=null;
   if(type==="CO"&&entry.left_with_arrears){
@@ -3911,7 +3931,7 @@ const entryAnchorContract={
 const employeeSourceFirewallForbiddenFields=["card_id","cardid","tenant_card_id","tenantCardId","old_ttlock_ref","oldTtlockRef","provider_phone","providerPhone","ttlock_phone","ttlockPhone","phone_99099","phone99099","access_card_phone","accessCardPhone","ttlock_account_phone","ttlockAccountPhone","ttlock_context","old_ttlock_context","provider_metadata","ttlock_metadata","card_provider_metadata"];
 const employeeSourceFirewallAllowedFields={
   R:["id","entry_id","event_id","anchor_id","session_id","type","event_type","source","cat","room","bed","amount","due","paid","expected_rent","paid_amount","payment_method","pay_type","bank_ref","deficit","entry_clr","clr","excess","excess_to","list_price","period_start","period_end","rent_period_start","rent_period_end","cycle","period_day_count","period_due","custom_reason","original_period_start","original_period_end","arrear_handling","arrear_promise_date","arrear_reason_detail","arrears_amount","arrears_due_date","arrears_note","arrears_status","short_paid","promise_date","promise_amount","deposit_included_amount","raw_display_line","anchor_contract_version","validation_status","validation_missing_fields","operator","operator_id","operator_name","employee","created_at","ts","note","remark","status","src","sync_status","upload_status","cloud_sync_status","cloud_sync_checked_at","upload_validation_error","upload_validation_error_code","sync_error","cloud_entry_id","upload_attempt_id","idempotency_key","original_local_entry_id","ttlock_context"],
-  AP:["id","entry_id","event_id","anchor_id","session_id","type","event_type","source","cat","room","bed","amount","due","paid","payment_amount","paid_amount","payment_method","pay_type","bank_ref","deficit","entry_clr","clr","linked_task_id","arrears_ref","original_arrears_id","original_arrears_ref","original_arrears_amount","already_paid_amount","remaining_arrears_before_payment","remaining_arrears","remaining_arrears_after_payment","settlement_status","raw_display_line","anchor_contract_version","validation_status","validation_missing_fields","operator","operator_id","operator_name","employee","created_at","ts","note","remark","status","src","sync_status","upload_status","cloud_sync_status","cloud_sync_checked_at","upload_validation_error","upload_validation_error_code","sync_error","cloud_entry_id","upload_attempt_id","idempotency_key","original_local_entry_id"],
+  AP:["id","entry_id","event_id","anchor_id","session_id","type","event_type","source","cat","room","bed","amount","due","paid","payment_amount","paid_amount","payment_method","pay_type","bank_ref","deficit","entry_clr","clr","linked_task_id","arrears_ref","original_arrears_id","original_arrears_ref","original_arrears_amount","already_paid_amount","remaining_arrears_before_payment","remaining_arrears","remaining_arrears_after_payment","settlement_status","arrears_source","raw_display_line","anchor_contract_version","validation_status","validation_missing_fields","operator","operator_id","operator_name","employee","created_at","ts","note","remark","status","src","sync_status","upload_status","cloud_sync_status","cloud_sync_checked_at","upload_validation_error","upload_validation_error_code","sync_error","cloud_entry_id","upload_attempt_id","idempotency_key","original_local_entry_id"],
   D:["id","entry_id","event_id","anchor_id","session_id","type","event_type","source","cat","room","bed","amount","deposit_amount","deposit_required_total","previous_deposit_recorded_amount","deposit_paid_amount","expected_deposit_after_payment","deposit_remaining_after_payment","deposit_remaining","deposit_ref","promise_date","payment_method","pay_type","bank_ref","linked_tenant","raw_display_line","anchor_contract_version","validation_status","validation_missing_fields","operator","operator_id","operator_name","employee","created_at","ts","note","remark","status","src","sync_status","upload_status","cloud_sync_status","cloud_sync_checked_at","upload_validation_error","upload_validation_error_code","sync_error","cloud_entry_id","upload_attempt_id","idempotency_key","original_local_entry_id"],
   DR:["id","entry_id","event_id","anchor_id","session_id","type","event_type","source","cat","room","bed","amount","deposit_balance","actual_refund_amount","refund_amount","refund_difference","deposit_remaining_after_refund","payment_method","pay_type","refund_method","refund_date","refund_reason","difference_reason","owner_override_ref","override_reason","arrears_offset_ref","arrears_offset_amount","checkout_ref","open_arrears_amount","outstanding_arrears","owner_approval_required","owner_approval_status","raw_display_line","anchor_contract_version","validation_status","validation_missing_fields","operator","operator_id","operator_name","employee","created_at","ts","note","remark","status","src","sync_status","upload_status","cloud_sync_status","cloud_sync_checked_at","upload_validation_error","upload_validation_error_code","sync_error","cloud_entry_id","upload_attempt_id","idempotency_key","original_local_entry_id"],
   CO:["id","entry_id","event_id","anchor_id","session_id","type","event_type","source","cat","room","bed","amount","checkout_date","checkout_type","deposit_refund","deposit_balance","outstanding_arrears","open_arrears_amount","owner_approval_required","owner_approval_status","checkout_mode","left_with_arrears","customer_left","former_customer_ref","former_customer_name","card_name","whatsapp_phone","former_customer_phone","contact_method","contact_note","arrears_amount","left_arrears_amount","cloud_arrears_ref","belongings_held","belongings_note","coverage_end_date","card_end_date","rent_coverage_end","promised_payment_date","promised_return_date","promise_return_date","left_date","checkout_attempt_date","left_status","final_status","overdue_days","grace_days_after_promise","review_date","confirmed_not_returning_date","confirmed_not_returning_by","confirmation_note","original_session_id","original_event_id","final_note","raw_display_line","anchor_contract_version","validation_status","validation_missing_fields","operator","operator_id","operator_name","employee","created_at","ts","note","remark","status","src","sync_status","upload_status","cloud_sync_status","cloud_sync_checked_at","upload_validation_error","upload_validation_error_code","sync_error","cloud_entry_id","upload_attempt_id","idempotency_key","original_local_entry_id","ttlock_context"],
@@ -4197,7 +4217,7 @@ function renderEntryAnchorForOwner(row){
     if(row.short_paid||entryAnchorMoney(row.arrears_amount)>0)parts.push("short_paid",entryAnchorMoney(row.arrears_amount).toFixed(2),"due",row.arrears_due_date||row.arrear_promise_date||"-","note",row.arrears_note||row.arrear_reason_detail||"-");
     return parts.join(" ");
   }
-  if(type==="AP")return `${row.room||row.bed} arrears_payment ${entryAnchorMoney(row.payment_amount||row.amount).toFixed(2)} ref ${row.arrears_ref||row.original_arrears_id||row.linked_task_id||"-"} remaining ${entryAnchorMoney(row.remaining_arrears||row.remaining_arrears_after_payment).toFixed(2)}`.trim();
+  if(type==="AP")return `${row.room||row.bed} ${row.arrears_source==="legacy_manual"?"legacy_arrears_payment":"arrears_payment"} ${entryAnchorMoney(row.payment_amount||row.amount).toFixed(2)} ${row.payment_method||""} ref ${row.arrears_ref||row.original_arrears_id||row.linked_task_id||"-"} remaining ${entryAnchorMoney(row.remaining_arrears||row.remaining_arrears_after_payment).toFixed(2)} note ${row.note||row.remark||"-"}`.trim();
   if(type==="D")return `${row.room||row.bed} deposit_in ${entryAnchorMoney(row.deposit_amount||row.amount).toFixed(2)} ${row.payment_method||""} ${row.note||""}`.trim();
   if(type==="DR")return `${row.room||row.bed} deposit_out ${entryAnchorMoney(row.actual_refund_amount||row.refund_amount||row.amount).toFixed(2)} ${row.refund_method||row.payment_method||""} balance ${entryAnchorMoney(row.deposit_balance||0).toFixed(2)} diff ${entryAnchorMoney(row.refund_difference||0).toFixed(2)} reason ${row.refund_reason||row.difference_reason||row.reason||"-"} note ${row.note||"-"}`.trim();
   if(type==="CO"){
@@ -4240,7 +4260,7 @@ function normalizeEntryAnchor(row){
     const remainingBefore=entryAnchorMoney(anchor.remaining_arrears_before_payment||Math.max(0,original-already));
     const remaining=entryAnchorMoney(anchor.remaining_arrears_after_payment||anchor.remaining_arrears||Math.max(0,remainingBefore-payment));
     const ref=anchor.arrears_ref||anchor.original_arrears_id||anchor.linked_task_id||"";
-    Object.assign(anchor,{bed:anchor.bed||anchor.room,arrears_ref:ref,original_arrears_id:ref,original_arrears_amount:original,already_paid_amount:already,payment_amount:payment,remaining_arrears_before_payment:remainingBefore,remaining_arrears_after_payment:remaining,remaining_arrears:remaining,settlement_status:anchor.settlement_status||(remaining<=0?"settled":"partial")});
+    Object.assign(anchor,{bed:anchor.bed||anchor.room,arrears_ref:ref,original_arrears_id:ref,original_arrears_amount:original,already_paid_amount:already,payment_amount:payment,remaining_arrears_before_payment:remainingBefore,remaining_arrears_after_payment:remaining,remaining_arrears:remaining,settlement_status:anchor.settlement_status||(remaining<=0?"settled":"partial"),arrears_source:cleanText(anchor.arrears_source,40)});
   }else if(type==="TF"){
     const fee=employeeEntryBedTransferFee(anchor,{});
     Object.assign(anchor,{from_bed:anchor.from_bed||anchor.bed_from||anchor.room||"",to_bed:anchor.to_bed||anchor.bed_to||anchor.room_to||"",transfer_date:anchor.transfer_date||anchor.date||"",transfer_reason:anchor.transfer_reason||anchor.reason_code||anchor.reason||anchor.custom_reason||anchor.note||"",deposit_balance_carryover:entryAnchorMoney(anchor.deposit_balance_carryover||anchor.deposit_balance||0),arrears_carryover:entryAnchorMoney(anchor.arrears_carryover||anchor.open_arrears_amount||anchor.outstanding_arrears||0),rent_coverage_carryover:anchor.rent_coverage_carryover||anchor.rent_coverage_end||anchor.coverage_end_date||anchor.card_end_date||"",fee_amount:entryAnchorMoney(fee.fee_amount),fee_status:anchor.fee_status||fee.fee_choice||"",payment_method:entryAnchorPaymentMethod(anchor.payment_method||anchor.pay_type||fee.payment_method),waiver_reason:fee.waiver_reason||anchor.waiver_reason||anchor.fee_waiver_reason||"",fee_waived_reason:fee.waiver_reason||anchor.fee_waived_reason||anchor.waiver_reason||"",old_tenant_context:anchor.old_tenant_context||"",old_ttlock_context:anchor.old_ttlock_context||"",note:anchor.note||""});

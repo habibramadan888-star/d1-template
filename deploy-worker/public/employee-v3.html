@@ -2966,7 +2966,10 @@ label .label-en{
     <div class="card employee-entry-card" id="employeeEntryCard">
       <div class="head"><div class="title">Add Entry<span class="label-en">事件录入</span></div><button class="btn" id="btnLoadLock"><span class="employee-btn-main">Load Cards</span><span class="label-en">加载卡片</span></button></div>
       <div class="body">
-        <button type="button" class="employee-session-status-bar" id="employeeSessionStatusBar">本票 0 条 · 查看本票 &gt;</button>
+        <div class="employee-session-quick-row">
+          <button type="button" class="employee-session-status-bar" id="employeeSessionStatusBar"><span>本票 0 条</span><span>现金净额 AED 0.00</span><span>银行收款 AED 0.00</span></button>
+          <button type="button" class="btn employee-new-session-quick" id="btnNewSessionQuick">New Session<small>新会话</small></button>
+        </div>
           <div class="step employee-event-picker">
           <div class="employee-picker-title">选择事项 <small>Select Event</small></div>
           <div class="event-grid" id="eventChips">
@@ -3501,9 +3504,7 @@ function startRepeatableUploadSessionId(){
 function cloneEntryForUpload(entry,sessionId,attemptId,index){
   const copy={...(entry||{})};
   const isBedTransfer=String(copy.type||'').toUpperCase()==='TF'||String(copy.event_type||'').toLowerCase()==='bed_transfer';
-  const entryId=isBedTransfer
-    ?String(copy.id||copy.event_id||copy.anchor_id||uid('E'))
-    :uid('ent')+'-'+String(index+1).padStart(2,'0');
+  const entryId=String(copy.id||copy.event_id||copy.anchor_id||`${sessionId}-entry-${String(index+1).padStart(2,'0')}`);
   copy.id=entryId;
   copy.event_id=entryId;
   copy.anchor_id=entryId;
@@ -3513,11 +3514,11 @@ function cloneEntryForUpload(entry,sessionId,attemptId,index){
   copy.sync_error='';
   copy.cloud_entry_id='';
   copy.upload_attempt_id=attemptId;
-  copy.idempotency_key=isBedTransfer?`bed-transfer-${sessionId}-${entryId}`:`${attemptId}-${entryId}`;
+  copy.idempotency_key=isBedTransfer?`bed-transfer-${sessionId}-${entryId}`:`employee-entry-${sessionId}-${entryId}`;
   copy.original_local_entry_id=entry?.id||entry?.event_id||entry?.anchor_id||'';
   return normalizeEntryAnchor(copy);
 }
-function prepareRepeatableUploadRows(rows,sessionId=startRepeatableUploadSessionId(),attemptId=uid('upload')){
+function prepareRepeatableUploadRows(rows,sessionId=currentSessionId(),attemptId=uid('upload')){
   return (rows||[]).map((entry,index)=>cloneEntryForUpload(entry,sessionId,attemptId,index));
 }
 function validateUploadAnchorBatch(rows){
@@ -4032,28 +4033,20 @@ function employeeRenderBedInfoStrip(el,bedValue,{label='Bed',labelZh='床位'}={
     el.innerHTML='';
     return;
   }
-  const loading=state.ttlockStatus==='loading'||state.arrearsTasksLoaded===false;
-  const arrearsUnavailable=!!state.arrearTasksError&&!loading;
-  const open=arrearsUnavailable?[]:employeeOpenTasksForBedValue(bed);
-  const arrearsTotal=open.reduce((sum,t)=>sum+taskRemain(t),0);
   const card=employeeFindCardForBedValue(bed);
   const status=employeeCardStatus(card);
-  const cardName=card?(card.remark||card.cardText||card.tenant||card.room||card.bed||'Access Card'):'';
-  const cardUntil=employeeCardUntilText(card);
-  const stripKind=(open.length||arrearsUnavailable)?'warn':(status.kind==='ok'?'ok':(status.kind==='warn'?'warn':''));
+  const rawNote=String(card?.remark||card?.cardText||'').trim();
+  const noteMatch=rawNote.match(/^([0-9]{2,5}[Ee]?)(?:\s|$)/);
+  const cardNote=noteMatch?.[1]||String(card?.bed||'Not configured');
+  const cardUntil=employeeCardUntilText(card).slice(0,10);
+  const systemRent=rentForBed(bed);
+  const stripKind=status.kind==='ok'?'ok':(status.kind==='warn'?'warn':'');
   el.className=`bed-info-strip ${stripKind}`.trim();
-  const badge=loading?'Loading Bed Info':(arrearsUnavailable?'Arrears Unavailable':(open.length?'Open Arrears':'No Open Arrears'));
-  const badgeZh=loading?'正在读取床位信息':(arrearsUnavailable?'欠款信息暂不可用':(open.length?'未清欠款':'无未清欠款'));
-  const cardLine=state.ttlockStatus==='error'&&!card?'Bed Info Unavailable':(cardName||'No Card Data');
-  const cardLineZh=state.ttlockStatus==='error'&&!card?'床位信息暂不可用':(cardName?'门禁卡':'无门禁卡数据');
-  const arrearsLine=arrearsUnavailable?'Arrears temporarily unavailable':(open.length?fmtMoney(arrearsTotal)+' AED':'No Open Arrears');
-  const arrearsLineZh=arrearsUnavailable?'欠款信息暂不可用':(open.length?'未清欠款：'+fmtMoney(arrearsTotal)+' AED':'无未清欠款');
-  el.innerHTML=`<div class="bed-info-main"><div>${esc(label)} ${esc(bed)}<small>${esc(labelZh)} ${esc(bed)}</small></div><span class="bed-info-badge">${esc(badge)}<small>${esc(badgeZh)}</small></span></div>
-    <div class="bed-info-rows">
-      <div class="bed-info-row"><b>Open Arrears: ${esc(arrearsLine)}</b><small>${esc(arrearsLineZh)}</small></div>
-      <div class="bed-info-row"><b>Access Card: ${esc(cardLine)}</b><small>${esc(cardLineZh)}</small></div>
-      <div class="bed-info-row"><b>Card Until: ${esc(cardUntil||'No Card Data')}</b><small>${cardUntil?'卡片截止：'+esc(cardUntil):'无门禁卡数据'}</small></div>
+  el.innerHTML=`<div class="bed-info-rows compact-bed-reference" data-compact-bed-reference="true">
+      <div class="bed-info-row"><b>Access Card Note: ${esc(cardNote)}</b><small>门卡备注：${esc(cardNote)}</small></div>
+      <div class="bed-info-row"><b>Card Expiry: ${esc(cardUntil||'Not configured')}</b><small>截止日期：${esc(cardUntil||'未配置')}</small></div>
       <div class="bed-info-row"><b>Status: ${esc(status.en)}</b><small>状态：${esc(status.zh)}</small></div>
+      <div class="bed-info-row"><b>System Rent: ${systemRent?`AED ${fmtMoney(systemRent)}`:'Not configured'}</b><small>系统月租：${systemRent?`AED ${fmtMoney(systemRent)}`:'未配置'}</small></div>
     </div>`;
 }
 let employeeBedInfoStripTimer=null;
@@ -4179,9 +4172,11 @@ function populateTaskSelect(){
   const bed=$('bed').value.trim().replace(/^#/,'');
   const previous=sel.value||state.selectedArrearsTaskRef||'';
   const open=bed?openTasksForBed():[];
-  sel.innerHTML='<option value="">Select cloud arrears to repay / 选择要偿还的云端欠款</option>'+open.map(t=>`<option value="${esc(employeeTaskRef(t))}">#${esc(t.bed||'')} ${esc(t.tenant_name||'-')} · Remaining ${fmtMoney(taskRemain(t))} AED · Original ${fmtMoney(num(t.arrear_amount))}</option>`).join('');
-  if(previous&&open.some(t=>employeeTaskRef(t)===previous))sel.value=previous;
-  if(sel.value&&!open.some(t=>employeeTaskRef(t)===sel.value)){
+  const legacyOption=bed&&open.length===0?'<option value="legacy_manual">Legacy Arrears Payment / 历史欠款还款</option>':'';
+  sel.innerHTML='<option value="">Select cloud arrears to repay / 选择要偿还的云端欠款</option>'+open.map(t=>`<option value="${esc(employeeTaskRef(t))}">#${esc(t.bed||'')} ${esc(t.tenant_name||'-')} · Remaining ${fmtMoney(taskRemain(t))} AED · Original ${fmtMoney(num(t.arrear_amount))}</option>`).join('')+legacyOption;
+  if(previous==='legacy_manual'&&bed&&open.length===0)sel.value=previous;
+  else if(previous&&open.some(t=>employeeTaskRef(t)===previous))sel.value=previous;
+  if(sel.value!=='legacy_manual'&&sel.value&&!open.some(t=>employeeTaskRef(t)===sel.value)){
     sel.value='';
     state.selectedArrearsTaskRef='';
     state.selectedArrearsTaskSnapshot=null;
@@ -4190,6 +4185,9 @@ function populateTaskSelect(){
 }
 function selectedTask(){
   return findEmployeeTaskByRef($('linkedTaskId')?.value||state.selectedArrearsTaskRef)||null;
+}
+function employeeLegacyArrearsSelected(){
+  return $('entryType')?.value==='AP'&&$('linkedTaskId')?.value==='legacy_manual';
 }
 function renderTaskInfo(){
   const t=selectedTask();
@@ -4216,9 +4214,20 @@ function renderTaskInfo(){
   state.selectedArrearsTaskRef='';
   state.selectedArrearsTaskSnapshot=null;
   const open=bed?openTasksForBed():[];
-  $('apTaskInfo').innerHTML=bed&&open.length===0?'No Open Arrears / 无未清欠款':'Select a cloud open arrears item for this bed. Arrears Payment does not use billing period. / 请选择该床位的云端未清欠款；还欠款不使用账期。';
+  $('apTaskInfo').innerHTML=employeeLegacyArrearsSelected()
+    ?'Legacy Arrears Payment / 历史欠款还款 · Enter the amount received and a required source remark. / 请填写实收金额及必填来源备注。'
+    :(bed&&open.length===0?'No Open Arrears / 无未清欠款':'Select a cloud open arrears item for this bed. Arrears Payment does not use billing period. / 请选择该床位的云端未清欠款；还欠款不使用账期。');
 }
 function applyLinkedTask(taskOverride=null){
+  if(employeeLegacyArrearsSelected()){
+    state.selectedArrearsTaskRef='';
+    state.selectedArrearsTaskSnapshot=null;
+    $('reasonCode').value='ARREARS_PAYMENT';
+    renderTaskInfo();
+    renderArrearsPaymentPanel();
+    syncForm();
+    return;
+  }
   const task=taskOverride&&typeof taskOverride==='object'&&employeeTaskRef(taskOverride)?taskOverride:selectedTask();
   if(!task)return;
   const ref=employeeTaskRef(task);
@@ -4275,7 +4284,9 @@ function renderArrearsPaymentPanel(){
     const bed=$('bed').value.trim().replace(/^#/,'');
     const open=bed?openTasksForBed():[];
     panel.className='open-arrears-core-alert neutral';
-    panel.innerHTML=`<div class="open-arrears-title"><div><b>Select Cloud Arrears</b><small>\u9009\u62e9\u4e91\u7aef\u672a\u6e05\u6b20\u6b3e</small></div><span class="open-arrears-badge">${open.length?`${open.length} Open`:'Waiting'}</span></div><div class="small">Arrears Payment uses cloud arrears only. It does not use rent period or monthly rent. / \u8fd8\u6b20\u6b3e\u53ea\u4f7f\u7528\u4e91\u7aef\u672a\u6e05\u6b20\u6b3e\uff0c\u4e0d\u4f7f\u7528\u8d26\u671f\u6216\u6708\u79df\u3002</div>`;
+    panel.innerHTML=employeeLegacyArrearsSelected()
+      ?'<div class="open-arrears-title"><div><b>Legacy Arrears Payment</b><small>历史欠款还款</small></div><span class="open-arrears-badge">Manual</span></div><div class="small">No open cloud arrears item is created. Bed, positive received amount, payment method and source remark are required. / 不创建云端欠款任务；必须填写床位、实收金额、付款方式和来源备注。</div>'
+      :`<div class="open-arrears-title"><div><b>Select Cloud Arrears</b><small>选择云端未清欠款</small></div><span class="open-arrears-badge">${open.length?`${open.length} Open`:'Waiting'}</span></div><div class="small">Select an open cloud arrears item, or use Legacy Arrears Payment when none exists. / 请选择云端未清欠款；没有记录时可选择历史欠款还款。</div>`;
     return;
   }
   const already=num(task.actual_received||task.already_paid_amount||task.paid_amount);
@@ -4414,7 +4425,7 @@ const EMPLOYEE_SOURCE_FIREWALL_FORBIDDEN_FIELDS=[
 ];
 const EMPLOYEE_SOURCE_FIREWALL_ALLOWED_FIELDS={
   R:['id','entry_id','event_id','anchor_id','session_id','type','event_type','source','cat','room','bed','amount','due','paid','expected_rent','paid_amount','payment_method','pay_type','bank_ref','deficit','entry_clr','clr','excess','excess_to','list_price','period_start','period_end','rent_period_start','rent_period_end','cycle','period_day_count','period_due','custom_reason','original_period_start','original_period_end','arrear_handling','arrear_promise_date','arrear_reason_detail','arrears_amount','arrears_due_date','arrears_note','arrears_status','short_paid','promise_date','promise_amount','deposit_included_amount','raw_display_line','anchor_contract_version','validation_status','validation_missing_fields','operator','operator_id','operator_name','employee','created_at','ts','note','remark','status','src','sync_status','upload_status','cloud_sync_status','cloud_sync_checked_at','upload_validation_error','upload_validation_error_code','sync_error','cloud_entry_id','upload_attempt_id','idempotency_key','original_local_entry_id'],
-  AP:['id','entry_id','event_id','anchor_id','session_id','type','event_type','source','cat','room','bed','amount','due','paid','payment_amount','paid_amount','payment_method','pay_type','bank_ref','deficit','entry_clr','clr','linked_task_id','arrears_ref','original_arrears_id','original_arrears_ref','original_arrears_amount','already_paid_amount','remaining_arrears_before_payment','remaining_arrears','remaining_arrears_after_payment','settlement_status','raw_display_line','anchor_contract_version','validation_status','validation_missing_fields','operator','operator_id','operator_name','employee','created_at','ts','note','remark','status','src','sync_status','upload_status','cloud_sync_status','cloud_sync_checked_at','upload_validation_error','upload_validation_error_code','sync_error','cloud_entry_id','upload_attempt_id','idempotency_key','original_local_entry_id'],
+  AP:['id','entry_id','event_id','anchor_id','session_id','type','event_type','source','cat','room','bed','amount','due','paid','payment_amount','paid_amount','payment_method','pay_type','bank_ref','deficit','entry_clr','clr','linked_task_id','arrears_ref','original_arrears_id','original_arrears_ref','original_arrears_amount','already_paid_amount','remaining_arrears_before_payment','remaining_arrears','remaining_arrears_after_payment','settlement_status','arrears_source','raw_display_line','anchor_contract_version','validation_status','validation_missing_fields','operator','operator_id','operator_name','employee','created_at','ts','note','remark','status','src','sync_status','upload_status','cloud_sync_status','cloud_sync_checked_at','upload_validation_error','upload_validation_error_code','sync_error','cloud_entry_id','upload_attempt_id','idempotency_key','original_local_entry_id'],
   D:['id','entry_id','event_id','anchor_id','session_id','type','event_type','source','cat','room','bed','amount','deposit_amount','deposit_required_total','previous_deposit_recorded_amount','deposit_paid_amount','expected_deposit_after_payment','deposit_remaining_after_payment','deposit_remaining','deposit_ref','promise_date','payment_method','pay_type','bank_ref','linked_tenant','raw_display_line','anchor_contract_version','validation_status','validation_missing_fields','operator','operator_id','operator_name','employee','created_at','ts','note','remark','status','src','sync_status','upload_status','cloud_sync_status','cloud_sync_checked_at','upload_validation_error','upload_validation_error_code','sync_error','cloud_entry_id','upload_attempt_id','idempotency_key','original_local_entry_id'],
   DR:['id','entry_id','event_id','anchor_id','session_id','type','event_type','source','cat','room','bed','amount','deposit_balance','actual_refund_amount','refund_amount','refund_difference','deposit_remaining_after_refund','payment_method','pay_type','refund_method','refund_date','refund_reason','difference_reason','owner_override_ref','override_reason','arrears_offset_ref','arrears_offset_amount','checkout_ref','open_arrears_amount','outstanding_arrears','owner_approval_required','owner_approval_status','raw_display_line','anchor_contract_version','validation_status','validation_missing_fields','operator','operator_id','operator_name','employee','created_at','ts','note','remark','status','src','sync_status','upload_status','cloud_sync_status','cloud_sync_checked_at','upload_validation_error','upload_validation_error_code','sync_error','cloud_entry_id','upload_attempt_id','idempotency_key','original_local_entry_id'],
   CO:['id','entry_id','event_id','anchor_id','session_id','type','event_type','source','cat','room','bed','amount','checkout_date','checkout_type','deposit_refund','deposit_balance','outstanding_arrears','open_arrears_amount','owner_approval_required','owner_approval_status','checkout_mode','left_with_arrears','customer_left','former_customer_ref','former_customer_name','card_name','whatsapp_phone','former_customer_phone','contact_method','contact_note','arrears_amount','left_arrears_amount','cloud_arrears_ref','belongings_held','belongings_note','coverage_end_date','card_end_date','rent_coverage_end','promised_payment_date','promised_return_date','promise_return_date','left_date','checkout_attempt_date','left_status','final_status','overdue_days','grace_days_after_promise','review_date','confirmed_not_returning_date','confirmed_not_returning_by','confirmation_note','original_session_id','original_event_id','final_note','raw_display_line','anchor_contract_version','validation_status','validation_missing_fields','operator','operator_id','operator_name','employee','created_at','ts','note','remark','status','src','sync_status','upload_status','cloud_sync_status','cloud_sync_checked_at','upload_validation_error','upload_validation_error_code','sync_error','cloud_entry_id','upload_attempt_id','idempotency_key','original_local_entry_id','ttlock_context'],
@@ -4533,12 +4544,13 @@ function validateRentEntry(){
 function validateArrearsPaymentEntry(){
   const errors=[],warns=[];
   employeeRequire(errors,!!employeeTrimField('bed'),'Bed is required.');
-  employeeRequire(errors,!!employeeFieldValue('linkedTaskId'),'Cloud arrears ref must be selected.');
+  employeeRequire(errors,!!employeeFieldValue('linkedTaskId'),'Cloud arrears ref or Legacy Arrears Payment must be selected.');
   employeeValidateCommonAmount(errors,{label:'Payment Amount'});
   employeeRequire(errors,!!employeePaymentMethodValue(),'Payment Method is required.');
   const task=selectedTask();
   const amount=num(employeeFieldValue('amount'));
-  if(!task&&employeeFieldValue('linkedTaskId'))errors.push('Selected arrears ref is no longer open. Refresh arrears and select again.');
+  if(employeeLegacyArrearsSelected())employeeRequire(errors,!!employeeTrimField('remark'),'Legacy Arrears Payment requires a source Remark.');
+  if(!task&&employeeFieldValue('linkedTaskId')&&!employeeLegacyArrearsSelected())errors.push('Selected arrears ref is no longer open. Refresh arrears and select again.');
   if(task){
     const remain=taskRemain(task);
     if(remain<=0)errors.push('Selected arrears item is no longer open. Refresh arrears.');
@@ -4709,11 +4721,15 @@ function employeeRenderBedTransferServerValidation(result){
     :`${result?.error_code||'VALIDATION_FAILED'} · missing_fields ${(result?.missing_fields||[]).join(', ')||'none'}${warnings.length?` · warnings ${warnings.join(' | ')}`:''} · draft retained`;
   applyEmployeeBedTransferUiGate();
 }
+function employeeBedTransferCanonicalSessionId(entry={},session={}){
+  return `bed-transfer-${String(entry.id||entry.event_id||entry.anchor_id||'entry')}-${String(session.id||session.session_id||'session')}`
+    .replace(/[^A-Za-z0-9_-]/g,'-').slice(0,80);
+}
 function employeeBedTransferValidatePayload(entry={},session={}){
   const allowed=['event_type','type','source','from_bed','to_bed','transfer_reason','fee_mode','fee_amount_aed','payment_method','fee_waiver_reason','fee_due_date','bed_price_difference_mode','bed_price_difference_amount_aed','bed_price_difference_due_date','bed_price_difference_payment_method','bed_price_difference_reason','note'];
   const clean=Object.fromEntries(allowed.filter(field=>entry[field]!==undefined).map(field=>[field,entry[field]]));
   if(state.bedTransferCapabilities?.controlled_beta_preview===true&&!String(clean.transfer_reason||'').includes('CONTROLLED_BETA_TEST'))clean.transfer_reason=`CONTROLLED_BETA_TEST|${String(clean.transfer_reason||'employee_beta').slice(0,180)}`;
-  const safeSession={id:String(session.id||''),source:'employee_entry',entries:[clean]};
+  const safeSession={id:employeeBedTransferCanonicalSessionId(entry,session),source:'employee_entry',entries:[clean]};
   return {dry_run:true,validate_only:true,no_write:true,event_index:0,entry:clean,entries:[clean],session:safeSession};
 }
 function employeeBedTransferRecordPayload(validated={}){
@@ -4753,12 +4769,20 @@ function buildArrearsPaymentAnchor(){
   const original=task?num(task.arrear_amount||task.amount||task.original_arrears_amount||(taskRemain(task)+already)):0;
   const before=Math.max(0,original-already);
   const remaining=Math.max(0,before-amount);
-  const ref=employeeFieldValue('linkedTaskId');
+  const legacy=employeeLegacyArrearsSelected();
+  const ref=legacy?'':employeeFieldValue('linkedTaskId');
   const payload=employeeBaseEntryPayload('AP',{
     reason_code:'AP',amount,due:amount,paid:amount,deficit:0,entry_clr:remaining<=0?'Y':'P',clr:remaining<=0?'Y':'P',
-    linked_task_id:ref,arrears_ref:ref,original_arrears_id:ref,original_arrears_amount:original,already_paid_amount:already,payment_amount:amount,
-    remaining_arrears_before_payment:before,remaining_arrears:remaining,remaining_arrears_after_payment:remaining,settlement_status:remaining<=0?'settled':'partial'
+    linked_task_id:ref,arrears_ref:ref,original_arrears_id:ref,original_arrears_amount:legacy?amount:original,already_paid_amount:already,payment_amount:amount,
+    remaining_arrears_before_payment:legacy?amount:before,remaining_arrears:legacy?0:remaining,remaining_arrears_after_payment:legacy?0:remaining,settlement_status:legacy?'settled':(remaining<=0?'settled':'partial'),
+    arrears_source:legacy?'legacy_manual':''
   });
+  if(legacy){
+    const legacyRef=`legacy-manual-${currentSessionId()}-${payload.id}`;
+    payload.linked_task_id=legacyRef;
+    payload.arrears_ref=legacyRef;
+    payload.original_arrears_id=legacyRef;
+  }
   return applyEntryAnchors(payload);
 }
 function buildDepositInAnchor(){
@@ -5839,7 +5863,7 @@ function employeeBedTransferCanonicalReceipt(canonical={},validated={}){
   return {from_bed:fromBed,to_bed:toBed,fee_amount_aed:Number.isFinite(amount)?amount:0,fee_mode:feeMode,payment_method:paymentMethod,beds_label:`${fromBed} → ${toBed}`,amount_label:`AED ${fmtMoney(Number.isFinite(amount)?amount:0)}`,fee_label:feeLabel,payment_label:paymentLabel,status_label:'Recorded / 已记录'};
 }
 function employeeBedTransferSessionCardModel(entry={}){
-  const fee=Number(entry.fee_amount_aed||0);
+  const fee=Number(entry.fee_amount_aed??entry.fee_amount??entry.due??0);
   const due=entry.fee_mode==='waived'?0:fee;
   const paid=entry.fee_mode==='paid'?fee:0;
   const payment=entry.payment_method==='bank'?'Bank / 银行':entry.payment_method==='cash'?'Cash / 现金':'No payment / 未收款';
@@ -5847,7 +5871,8 @@ function employeeBedTransferSessionCardModel(entry={}){
   return {
     beds:`${String(entry.from_bed||entry.bed_from||'')} → ${String(entry.to_bed||entry.bed_to||'')}`,
     detail:[`Bed Transfer / 换床`,`Due AED ${fmtMoney(due)} / 应收${fmtMoney(due)}`,`Paid AED ${fmtMoney(paid)} / 已收${fmtMoney(paid)}`,payment,`Bed Difference AED ${fmtMoney(difference)} / 床价差`,`Reason ${entry.transfer_reason||'-'} / 换床原因`].join(' · '),
-    amount:entry.fee_mode==='paid'?fee:0
+    amount:entry.fee_mode==='paid'?fee:0,
+    amountLabel:entry.fee_mode==='waived'?'AED 0 · Waived':entry.fee_mode==='unpaid'?`Due AED ${fmtMoney(due)} · Unpaid AED ${fmtMoney(due)}`:`+${fmtMoney(paid)}`
   };
 }
 function renderEmployeeBedTransferCanonicalReceipt(receipt={}){
@@ -5910,7 +5935,7 @@ async function saveEntry(){
 }
 const saveEntryWithoutTtlockGate=saveEntry;
 async function saveEntryWithTtlockGate(){
-  if(['TF','E','DR','CO'].includes($('entryType')?.value))return saveEntryWithoutTtlockGate();
+  if(['TF','E','DR','CO'].includes($('entryType')?.value)||employeeLegacyArrearsSelected())return saveEntryWithoutTtlockGate();
   if(state.user&&!(await ensureEntryTtlockReady({auto:false})))return;
   return saveEntryWithoutTtlockGate();
 }
@@ -5929,12 +5954,14 @@ function newSession(){
   toast('已开始新会话');
 }
 function newSessionFinal(){
-  if(hasLocalOnly()&&!confirm('Current session has local entries not uploaded. Discard this ticket and start a new session? / 当前本票尚未上传云端，是否放弃当前本票并新建会话？'))return;
-  if(!hasLocalOnly()&&state.drafts.length&&!confirm('Start a new session and clear the uploaded local ticket? / 开始新会话并清空本机本票？'))return;
+  if(state.drafts.length&&!confirm('Clear this browser Current Session and start a new local session? Cloud history will not be deleted. / 清空当前浏览器本票并开始新会话？云端历史不会删除。'))return;
   state.drafts=[];
   state.sessionId='';
+  state.uploadValidationFailedIndex=null;
+  state.uploadValidationFailedMessage='';
+  try{localStorage.removeItem(employeeStorageKey('empv3:drafts'));localStorage.removeItem(employeeStorageKey('empv3:sessionId'))}catch{}
+  currentSessionId();
   saveDrafts();
-  try{localStorage.removeItem(employeeStorageKey('empv3:sessionId'))}catch{}
   resetForm();
   buildExport();
   refreshSessionViews();
@@ -8247,11 +8274,13 @@ async function commitSessionAndExport(){
     showStatus(`${en} / ${cn}`);
   };
   btns.forEach(b=>{b.dataset.busy='1';b.disabled=true;b.classList.add('disabled');b.innerHTML=renderEmployeeButtonLabel('Validating','正在校验')});
-  const originalDrafts=state.drafts.map(e=>({...e}));
+  const allOriginalDrafts=state.drafts.map(e=>({...e}));
+  const originalDrafts=allOriginalDrafts.filter(entry=>!employeeEntryCloudConfirmed(entry));
+  if(!originalDrafts.length){oldLabels.forEach(([b,html])=>{b.dataset.busy='0';b.innerHTML=html});updateEntrySessionActionState();return;}
   const originalSessionId=state.sessionId;
   const payloadStart=performance.now();
   const includesBedTransfer=originalDrafts.some(entry=>String(entry?.type||'').toUpperCase()==='TF'||String(entry?.event_type||'').toLowerCase()==='bed_transfer');
-  const uploadSessionId=includesBedTransfer?currentSessionId():startRepeatableUploadSessionId();
+  const uploadSessionId=currentSessionId();
   state.sessionId=uploadSessionId;
   const uploadList=prepareRepeatableUploadRows(originalDrafts,uploadSessionId);
   uploadList.forEach(e=>{e.upload_status='VALIDATING';e.upload_validation_error=null;});
@@ -8260,9 +8289,11 @@ async function commitSessionAndExport(){
   buildExport();
   uploadTiming.payload_build_ms=Math.round(performance.now()-payloadStart);
   const canonicalEntries=uploadList.map(normalizeEntryAnchor);
+  const ordinaryCanonicalEntries=canonicalEntries.filter(entry=>String(entry?.type||'').toUpperCase()!=='TF'&&String(entry?.event_type||'').toLowerCase()!=='bed_transfer');
   const session=currentSessionPayload();
   const completedExportText=($('exportText')?.textContent||'').replace(/Sync pending/g,'All synced');
-  const sessionEntriesJson=JSON.stringify({anchor_contract_version:'employee_entry_anchor_v1',entries:canonicalEntries});
+  const ordinarySummary=calculateEmployeeSessionSummary(ordinaryCanonicalEntries);
+  const ordinarySession={...session,cash_handover:ordinarySummary.cashNet,bank_transfer_total:ordinarySummary.bankReceived,bank_transfer_count:ordinarySummary.bankCount,gross_received:ordinarySummary.totalReceived};
   const failed=[];
   const dryRunFailed=[];
   const bedTransferUploadPayloads=[];
@@ -8270,17 +8301,18 @@ async function commitSessionAndExport(){
   for(let i=0;i<uploadList.length;i++){
     const e=uploadList[i];
     const isFinal=i===uploadList.length-1;
+    const isBedTransfer=String(e?.type||'').toUpperCase()==='TF'||String(e?.event_type||'').toLowerCase()==='bed_transfer';
+    const requestEntries=isBedTransfer?[e]:ordinaryCanonicalEntries;
     const sessionForEntry={
-      ...session,
+      ...(isBedTransfer?session:ordinarySession),
       handover_status:isFinal?'COMPLETED':'EXPORTING',
       export_text:isFinal?completedExportText:session.export_text,
-      entries:canonicalEntries,
-      entries_json:sessionEntriesJson
+      entries:requestEntries,
+      entries_json:JSON.stringify({anchor_contract_version:'employee_entry_anchor_v1',entries:requestEntries})
     };
     try{
       e.upload_status='VALIDATING';
       setUploadPhase(`Dry-run validating ${i+1}/${uploadList.length}`,'Validating');
-      const isBedTransfer=String(e?.type||'').toUpperCase()==='TF'||String(e?.event_type||'').toLowerCase()==='bed_transfer';
       const requestPayload=isBedTransfer?employeeBedTransferValidatePayload(e,sessionForEntry):null;
       await validateEmployeeUploadDryRun(requestPayload?.entry||e,requestPayload?.session||sessionForEntry,i,requestPayload?{requestPayload}:{});
       if(isBedTransfer)bedTransferUploadPayloads[i]=employeeBedTransferRecordPayload(requestPayload);
@@ -8297,14 +8329,15 @@ async function commitSessionAndExport(){
   if(dryRunFailed.length){
     const firstDryRunFailure=dryRunFailed[0];
     const failedIndex=Number(firstDryRunFailure.result?.event_index||0);
-    if(originalDrafts[failedIndex]){
-      originalDrafts[failedIndex].sync_status='LOCAL';
-      originalDrafts[failedIndex].upload_status=firstDryRunFailure.result?.error_code==='ARREARS_REF_STALE_REFRESH_REQUIRED'?'STALE':'VALIDATION_FAILED';
-      originalDrafts[failedIndex].upload_validation_error=firstDryRunFailure.result;
-      originalDrafts[failedIndex].upload_validation_error_code=firstDryRunFailure.result?.error_code||'SERVER_DRY_RUN_GENERIC_ERROR';
-      originalDrafts[failedIndex].sync_error=firstDryRunFailure.message;
+    const failedOriginal=allOriginalDrafts.find(row=>String(row.id||row.event_id||'')===String(originalDrafts[failedIndex]?.id||originalDrafts[failedIndex]?.event_id||''));
+    if(failedOriginal){
+      failedOriginal.sync_status='LOCAL';
+      failedOriginal.upload_status=firstDryRunFailure.result?.error_code==='ARREARS_REF_STALE_REFRESH_REQUIRED'?'STALE':'VALIDATION_FAILED';
+      failedOriginal.upload_validation_error=firstDryRunFailure.result;
+      failedOriginal.upload_validation_error_code=firstDryRunFailure.result?.error_code||'SERVER_DRY_RUN_GENERIC_ERROR';
+      failedOriginal.sync_error=firstDryRunFailure.message;
     }
-    state.drafts=originalDrafts;
+    state.drafts=allOriginalDrafts;
     state.sessionId=originalSessionId;
     state.uploadValidationFailedIndex=failedIndex;
     state.uploadValidationFailedMessage=`${firstDryRunFailure.result?.error_code||'SERVER_DRY_RUN_GENERIC_ERROR'}: ${firstDryRunFailure.result?.message||firstDryRunFailure.message||''}`;
@@ -8324,12 +8357,14 @@ async function commitSessionAndExport(){
   for(let i=0;i<uploadList.length;i++){
     const e=uploadList[i];
     const isFinal=i===uploadList.length-1;
+    const isBedTransfer=String(e?.type||'').toUpperCase()==='TF'||String(e?.event_type||'').toLowerCase()==='bed_transfer';
+    const requestEntries=isBedTransfer?[e]:ordinaryCanonicalEntries;
     const sessionForEntry={
-      ...session,
+      ...(isBedTransfer?session:ordinarySession),
       handover_status:isFinal?'COMPLETED':'EXPORTING',
       export_text:isFinal?completedExportText:session.export_text,
-      entries:canonicalEntries,
-      entries_json:sessionEntriesJson
+      entries:requestEntries,
+      entries_json:JSON.stringify({anchor_contract_version:'employee_entry_anchor_v1',entries:requestEntries})
     };
     try{
       e.upload_status='UPLOADING';
@@ -8377,14 +8412,15 @@ async function commitSessionAndExport(){
   if(failed.length){
     const firstUploadFailure=failed[0];
     const failedIndex=Number(firstUploadFailure.index||0);
-    if(originalDrafts[failedIndex]){
-      originalDrafts[failedIndex].sync_status='LOCAL';
-      originalDrafts[failedIndex].upload_status='VALIDATION_FAILED';
-      originalDrafts[failedIndex].upload_validation_error=firstUploadFailure.result;
-      originalDrafts[failedIndex].upload_validation_error_code=firstUploadFailure.result?.error_code||'SERVER_UPLOAD_FAILED';
-      originalDrafts[failedIndex].sync_error=firstUploadFailure.message;
+    const failedOriginal=allOriginalDrafts.find(row=>String(row.id||row.event_id||'')===String(originalDrafts[failedIndex]?.id||originalDrafts[failedIndex]?.event_id||''));
+    if(failedOriginal){
+      failedOriginal.sync_status='LOCAL';
+      failedOriginal.upload_status='VALIDATION_FAILED';
+      failedOriginal.upload_validation_error=firstUploadFailure.result;
+      failedOriginal.upload_validation_error_code=firstUploadFailure.result?.error_code||'SERVER_UPLOAD_FAILED';
+      failedOriginal.sync_error=firstUploadFailure.message;
     }
-    state.drafts=originalDrafts;
+    state.drafts=allOriginalDrafts;
     state.sessionId=originalSessionId;
     state.uploadValidationFailedIndex=failedIndex;
     state.uploadValidationFailedMessage=`${firstUploadFailure.result?.error_code||'SERVER_UPLOAD_FAILED'}: ${firstUploadFailure.result?.message||firstUploadFailure.message||''}`;
@@ -8404,9 +8440,11 @@ async function commitSessionAndExport(){
   saveDrafts();
   const syncCheck=await reconcileEmployeeCloudSyncState({silent:true});
   const cloudConfirmed=entrySessionUploaded();
-  if(cloudConfirmed&&includesBedTransfer){
-    state.drafts=state.drafts.filter(entry=>String(entry?.type||'').toUpperCase()!=='TF'&&String(entry?.event_type||'').toLowerCase()!=='bed_transfer');
-    if(!state.drafts.length){state.sessionId='';try{localStorage.removeItem(employeeStorageKey('empv3:sessionId'))}catch{}}
+  if(cloudConfirmed){
+    state.drafts=[];
+    state.sessionId='';
+    try{localStorage.removeItem(employeeStorageKey('empv3:drafts'));localStorage.removeItem(employeeStorageKey('empv3:sessionId'))}catch{}
+    currentSessionId();
     state.lastSavedBedTransferDraftId=null;
     saveDrafts();
   }
@@ -8916,7 +8954,7 @@ function employeeEnsureEnglishFirstStyle(){
     .employee-system-calculation-toggle::after{content:'▾';color:#64748b}
     .employee-system-calculation.collapsed .employee-system-calculation-body{display:none}
     .employee-system-calculation.collapsed .employee-system-calculation-toggle::after{content:'▸'}
-    .employee-workspace-switch{position:sticky;top:0;z-index:12;display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:0 0 8px;padding:6px 0;background:#f7f9fc}.employee-workspace-switch button{min-height:44px;border:1px solid var(--line);border-radius:10px;background:#f8fafc;color:#475569;font-weight:850}.employee-workspace-switch button.active,.event-chip.active{background:#157347!important;color:#fff!important;border-color:#157347!important}.employee-workspace-switch small{display:block;font-size:10px;opacity:.78}.employee-session-card{display:none}.employee-session-active .employee-entry-card{display:none}.employee-session-active .employee-session-card{display:block}.employee-session-status-bar{width:100%;border:1px solid #d6e7dc;background:#f3fbf5;color:#166534;border-radius:10px;min-height:38px;text-align:left;font-weight:800;padding:8px 10px;margin-bottom:8px}.employee-picker-title{font-weight:900;font-size:14px;margin:0 0 7px}.employee-picker-title small{display:block;color:#64748b;font-size:10px}.employee-entry-card>.head{display:none}.employee-entry-card .step-title{display:none!important}.employee-entry-card .step> .step-title>span{display:none!important}.employee-entry-card #listPrice{display:none!important}.employee-entry-card #listPriceWrap,.employee-entry-card #verifyContextStep,.employee-entry-card .employee-collapsible-step{margin-top:8px}.employee-entry-card #objectHint,.employee-entry-card #entrySummary{display:none!important}.employee-session-card .preview-entry{padding:8px 10px;min-height:0}.employee-session-card .preview-entry .small{font-size:11px}.employee-session-card .preview-entry .preview-tools{margin-top:4px}.employee-session-card .preview-entry .amt{font-size:14px}.employee-session-card #sessionKpis{margin:0}.employee-entry-card #systemCalculation{margin-top:8px}#validationBox[data-pristine="true"]{display:none!important}.employee-entry-card textarea#remark{min-height:64px;max-height:72px}
+    .employee-workspace-switch{position:sticky;top:0;z-index:12;display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:0 0 8px;padding:6px 0;background:#f7f9fc}.employee-workspace-switch button{min-height:44px;border:1px solid var(--line);border-radius:10px;background:#f8fafc;color:#475569;font-weight:850}.employee-workspace-switch button.active,.event-chip.active{background:#157347!important;color:#fff!important;border-color:#157347!important}.employee-workspace-switch small{display:block;font-size:10px;opacity:.78}.employee-session-card{display:none}.employee-session-active .employee-entry-card{display:none}.employee-session-active .employee-session-card{display:block}.employee-session-quick-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:stretch;margin-bottom:12px}.employee-session-status-bar{width:100%;border:1px solid #d6e7dc;background:#fff;color:#166534;border-radius:14px;min-height:48px;text-align:left;font-weight:800;padding:8px 10px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;box-shadow:var(--employee-card-shadow)}.employee-session-status-bar span{display:block;white-space:nowrap}.employee-new-session-quick{min-width:112px!important;border-radius:14px!important}.employee-new-session-quick small{display:block;font-size:10px;opacity:.72}@media(max-width:560px){.employee-session-quick-row{grid-template-columns:1fr}.employee-session-status-bar{font-size:11px}.employee-new-session-quick{width:100%}}.employee-picker-title{font-weight:900;font-size:14px;margin:0 0 7px}.employee-picker-title small{display:block;color:#64748b;font-size:10px}.employee-entry-card>.head{display:none}.employee-entry-card .step-title{display:none!important}.employee-entry-card .step> .step-title>span{display:none!important}.employee-entry-card #listPrice{display:none!important}.employee-entry-card #listPriceWrap,.employee-entry-card #verifyContextStep,.employee-entry-card .employee-collapsible-step{margin-top:8px}.employee-entry-card #objectHint,.employee-entry-card #entrySummary{display:none!important}.employee-session-card .preview-entry{padding:8px 10px;min-height:0}.employee-session-card .preview-entry .small{font-size:11px}.employee-session-card .preview-entry .preview-tools{margin-top:4px}.employee-session-card .preview-entry .amt{font-size:14px}.employee-session-card #sessionKpis{margin:0}.employee-entry-card #systemCalculation{margin-top:8px}#validationBox[data-pristine="true"]{display:none!important}.employee-entry-card textarea#remark{min-height:64px;max-height:72px}
     /* One computed brand-green treatment for every selected or primary entry control. */
     .tab.active,.employee-workspace-switch button.active,.event-chip.active,.pay-option.active,.btn.primary:not(:disabled){background:var(--employee-active-background)!important;border-color:var(--employee-active-border)!important;box-shadow:var(--employee-active-shadow)!important;color:var(--employee-active-text)!important}
     .pay-option.active .label-en{color:rgba(255,255,255,.76)!important}
@@ -8926,6 +8964,7 @@ function employeeEnsureEnglishFirstStyle(){
     /* Employee visual system: a single floating-card language with no card-inside-card treatment. */
     :root{--employee-card-radius:18px;--employee-card-shadow:0 10px 24px rgba(20,32,51,.08);--employee-card-gap:16px}
     .employee-entry-card{background:transparent!important;border:0!important;border-radius:0!important;box-shadow:none!important;margin:0!important}.employee-entry-card>.body{padding:0!important}.employee-entry-card .step{background:transparent!important;border:0!important;border-radius:0!important;box-shadow:none!important;padding:0!important;margin:0 0 var(--employee-card-gap)!important}.employee-entry-card .employee-event-picker,.employee-session-card,.employee-system-calculation{background:#fff!important;border:0!important;border-radius:var(--employee-card-radius)!important;box-shadow:var(--employee-card-shadow)!important}.employee-entry-card .employee-event-picker{padding:16px!important}.employee-session-card{margin:0 0 var(--employee-card-gap)!important}.employee-session-card .head,.employee-session-card .body{padding:16px!important}.employee-entry-card .field{margin-bottom:12px!important}.employee-entry-card .grid{gap:12px!important}.employee-entry-card #verifyContextStep,.employee-entry-card #entrySummary,.employee-entry-card #objectHint,#ttlockEntryStatus,#view-entry .employee-collapsible-step[data-employee-collapsed-step="8"]{display:none!important}.employee-entry-card #listPriceWrap{display:block!important}.employee-entry-card #listPrice{display:none!important}.employee-entry-card #paymentStep,.employee-entry-card #periodStep{padding:0!important}.employee-entry-card #periodStep{margin-bottom:12px!important}.employee-entry-card #systemCalculation{margin:0 0 12px!important;padding:12px!important}.employee-entry-card #exceptionStep{margin-top:0!important}.employee-entry-card textarea#remark{min-height:52px!important;max-height:64px!important}.employee-entry-card #validationBox{margin:0 0 12px!important}.employee-entry-card .row{gap:8px!important}.employee-entry-card .row .btn{min-height:46px!important;padding:10px 14px!important}.employee-session-status-bar{margin:0 0 12px!important}.employee-session-card#employeeSessionSummaryCard .head{display:none!important}.employee-session-card#employeeSessionSummaryCard .body{padding:12px 16px!important}.employee-session-card#employeeSessionSummaryCard .kpi-grid{gap:8px!important}.employee-session-card#employeeSessionSummaryCard .kpi-card{padding:8px!important;box-shadow:none!important;border:0!important;background:#f6f8f7!important}.employee-session-card .preview-entry{border:0!important;border-radius:12px!important;box-shadow:none!important;background:#f8faf9!important}.employee-session-card .preview-list{min-height:0!important}.employee-session-record-details{margin-top:6px}.employee-session-record-details summary{cursor:pointer;font-size:11px;color:#64748b}.employee-entry-card .label-en,.employee-entry-card .step-title,.employee-entry-card .event-chip small,.employee-session-card .label-en{display:none!important}.employee-entry-card .employee-picker-title{font-size:16px!important;margin:0 0 10px!important}.employee-entry-card label{font-size:14px!important;margin-bottom:6px!important}.employee-entry-card input,.employee-entry-card select,.employee-entry-card textarea{font-size:16px!important;border-radius:12px!important}.employee-entry-card .readonly-pill{height:auto!important;min-height:0!important;padding:0!important;border:0!important;background:transparent!important}.employee-entry-card #listPriceWrap{font-size:14px!important;color:#64748b!important}.employee-entry-card #listPriceWrap label::after{content:' · system reference';font-size:12px;color:#94a3b8;font-weight:600}.employee-entry-card #listPriceWrap input{display:none!important}
+    .employee-expense-card-description{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;margin-top:4px;max-width:34rem;color:#263244;font-weight:750;line-height:1.35}
     #periodStep.employee-period-collapsible.collapsed #periodFields{display:none}
     #periodStep.employee-period-collapsible .period-summary-toggle{width:100%;border:0;background:transparent;text-align:left;font-weight:800;color:#3f4d61;cursor:pointer;padding:4px 0}
     #periodStep.employee-period-collapsible.collapsed .period-summary-toggle::after{content:' ▸'}
@@ -9149,7 +9188,8 @@ renderSessionPreview=function(){
     const recordState=employeeSessionRecordState(e,i);
     const failed=['VALIDATION_FAILED','STALE'].includes(recordState.key);
     const transferCard=e.type==='TF'?employeeBedTransferSessionCardModel(e):null;
-    const subject=e.type==='TF'?esc(transferCard.beds):(e.type==='E'?esc(e.expense_category||'Expense'):`#${esc(e.room||'')}`);
+    const expenseDescription=e.type==='E'?String(e.expense_description||e.expense_desc||e.remark||e.note||'Expense').trim():'';
+    const subject=e.type==='TF'?esc(transferCard.beds):(e.type==='E'?'Expense / 支出':`#${esc(e.room||'')}`);
     const detail=[eventLabel(e.type),e.pay_type==='B'?'Bank':'Cash'].filter(Boolean).join(' · ');
     const status=`<span class="status-pill ${esc(recordState.className||'')}">${esc(recordState.label)}</span>`;
     const undo=canUndo(e)?`<button class="mini-btn danger" data-undo="${esc(e.id)}">Undo</button>`:'';
@@ -9178,7 +9218,8 @@ renderSessionPreview=function(){
     const recordState=employeeSessionRecordState(e,i);
     const failed=['VALIDATION_FAILED','STALE'].includes(recordState.key);
     const transferCard=e.type==='TF'?employeeBedTransferSessionCardModel(e):null;
-    const subject=e.type==='TF'?esc(transferCard.beds):(e.type==='E'?esc(e.expense_category||'Expense'):`#${esc(e.room||'')}`);
+    const expenseDescription=e.type==='E'?String(e.expense_description||e.expense_desc||e.remark||e.note||'Expense').trim():'';
+    const subject=e.type==='TF'?esc(transferCard.beds):(e.type==='E'?'Expense / 支出':`#${esc(e.room||'')}`);
     const detail=[eventLabel(e.type),e.pay_type==='B'?'Bank':'Cash'].filter(Boolean).join(' · ');
     const status=`<span class="status-pill ${esc(recordState.className||'')}">${esc(recordState.label)}</span>`;
     const undo=canUndo(e)?`<button class="mini-btn danger" data-undo="${esc(e.id)}">Undo</button>`:'';
@@ -9187,7 +9228,9 @@ renderSessionPreview=function(){
     const failedActions=failed?`<div class="preview-tools">${remove}<button class="mini-btn" data-retry-session-record="${esc(e.id)}">${renderEmployeeButtonLabel('Retry','重试')}</button></div>`:'';
     const failNote=failed?renderSessionRecordValidationDetails(recordState.validation,i):'';
     const cloudReview=renderEmployeeCloudReviewPanel(e,i,recordState);
-    return `<div class="preview-entry ${failed?'upload-validation-failed':''}" data-session-record-index="${recordIndex}" data-entry-id="${esc(e.id)}"><div><b>Record #${recordIndex} · ${subject}</b> ${status}${failedActions}${failNote}${cloudReview}<div class="small">${esc(detail)}</div><details class="employee-session-record-details"><summary>Details</summary><div class="small">Entry ID ${esc(e.id)} · ${esc(e.created_at||'')}</div></details><div class="preview-tools">${undo}${refresh}${failed?'':remove}</div></div><div class="amt ${cls}">${sign}${fmtMoney(e.amount)}</div></div>`;
+    const visibleDescription=e.type==='E'?`<div class="employee-expense-card-description" title="${esc(expenseDescription)}">${esc(expenseDescription)}</div>`:'';
+    const amountText=e.type==='TF'?transferCard.amountLabel:`${sign}${fmtMoney(e.amount)}`;
+    return `<div class="preview-entry ${failed?'upload-validation-failed':''}" data-session-record-index="${recordIndex}" data-entry-id="${esc(e.id)}"><div><b>Record #${recordIndex} · ${subject}</b> ${status}${failedActions}${failNote}${cloudReview}<div class="small">${esc(e.type==='TF'?transferCard.detail:detail)}</div>${visibleDescription}<details class="employee-session-record-details"><summary>Details</summary>${e.type==='E'?`<div class="small">${esc(expenseDescription)}</div>`:''}<div class="small">Entry ID ${esc(e.id)} · ${esc(e.created_at||'')}</div></details><div class="preview-tools">${undo}${refresh}${failed?'':remove}</div></div><div class="amt ${cls}">${esc(amountText)}</div></div>`;
   }).join('');
   document.querySelectorAll('[data-undo]').forEach(btn=>btn.onclick=()=>undoDraft(btn.dataset.undo));
   document.querySelectorAll('[data-remove-session-record]').forEach(btn=>btn.onclick=()=>removeCurrentSessionRecord(btn.dataset.removeSessionRecord,'Invalid record removed'));
@@ -9556,6 +9599,11 @@ function employeeRenderOpenArrearsAlert(){
   if(!box)return;
   const bed=employeeCurrentArrearsBed();
   const type=$('entryType')?.value||'';
+  if(type==='AP'){
+    box.className='open-arrears-core-alert hidden';
+    box.innerHTML='';
+    return;
+  }
   if(!bed){
     box.className='open-arrears-core-alert neutral';
     box.innerHTML=`<div class="open-arrears-title"><div><b>Open Arrears Check</b><small>\u8f93\u5165\u5e8a\u4f4d\u540e\u68c0\u67e5\u672a\u6e05\u6b20\u6b3e</small></div><span class="open-arrears-badge">Waiting</span></div>`;
@@ -9705,8 +9753,7 @@ function employeeSetWorkspace(mode='entry'){
 function employeeRefreshWorkspaceStatus(){
   const summary=calculateEmployeeSessionSummary(state.drafts);
   const count=summary.rows.length;
-  const label=`本票 ${count} 条 · 现金净额 ${fmtDisplayMoney(summary.cashNet)} · 银行 ${fmtDisplayMoney(summary.bankNet)}${summary.outstanding>0?` · 未收 ${fmtDisplayMoney(summary.outstanding)}`:''}    查看本票 >`;
-  if($('employeeSessionStatusBar'))$('employeeSessionStatusBar').textContent=label;
+  if($('employeeSessionStatusBar'))$('employeeSessionStatusBar').innerHTML=`<span>本票 ${count} 条</span><span>现金净额 AED ${fmtDisplayMoney(summary.cashNet)}</span><span>银行收款 AED ${fmtDisplayMoney(summary.bankReceived)}</span>`;
   if($('workspaceSessionCount'))$('workspaceSessionCount').textContent=`Current Session (${count})`;
 }
 const employeeCollapsedLegacyValidate=validate;
@@ -9832,6 +9879,7 @@ const employeeWorkspaceRefreshLegacy=refreshSessionViews;
 refreshSessionViews=function(){employeeWorkspaceRefreshLegacy();employeeRefreshWorkspaceStatus();};
 document.querySelectorAll('[data-employee-workspace]').forEach(btn=>btn.onclick=()=>employeeSetWorkspace(btn.dataset.employeeWorkspace));
 $('employeeSessionStatusBar').onclick=()=>employeeSetWorkspace('session');
+if($('btnNewSessionQuick'))$('btnNewSessionQuick').onclick=newSession;
 $('validationBox').dataset.pristine='true';
 $('btnSaveEntry').addEventListener('click',()=>{$('validationBox').dataset.pristine='false';},{capture:true});
 employeeSetWorkspace('entry');

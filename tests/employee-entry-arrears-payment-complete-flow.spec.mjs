@@ -21,7 +21,8 @@ test("arrears payment hides rent-period and monthly-rent fields", async () => {
   assert.match(html, /\['listPrice','periodStart','periodEnd','periodDays','periodDue','due','paid','entryClr'\]/);
   assert.match(html, /\$\(\'periodStep\'\)\?\.classList\.add\('hidden'\)/);
   assert.match(html, /\$\(\'periodDue\'\)\.value=''/);
-  assert.match(html, /Arrears Payment uses cloud arrears only\. It does not use rent period or monthly rent/);
+  assert.match(html, /Arrears Payment uses cloud open arrears for the selected bed only/);
+  assert.match(html, /Legacy Arrears Payment \/ 历史欠款还款/);
 });
 
 test("arrears payment shows repayment-specific amounts and settlement status", async () => {

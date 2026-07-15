@@ -95,7 +95,7 @@ test("employee UI runs dry-run validation before real upload and surfaces backen
   const commitStart = html.lastIndexOf("async function commitSessionAndExport");
   assert.ok(commitStart >= 0, "effective commitSessionAndExport function must exist");
   const commitBlock = html.slice(commitStart);
-  const dryRunIndex = commitBlock.indexOf("validateEmployeeUploadDryRun(e,sessionForEntry,i)");
+  const dryRunIndex = commitBlock.indexOf("validateEmployeeUploadDryRun(requestPayload?.entry||e,requestPayload?.session||sessionForEntry,i");
   const realUploadIndex = commitBlock.indexOf("apiFetch('/api/employee/entry',{");
 
   assert.match(html, /function formatEmployeeUploadDryRunError\(result,index\)/);
@@ -132,7 +132,7 @@ test("employee UI runs dry-run validation before real upload and surfaces backen
   assert.match(html, /data-remove-session-record/);
   assert.match(html, /removeCurrentSessionRecord\(btn\.dataset\.removeSessionRecord/);
   assert.match(commitBlock, /uploadList\.forEach\(e=>\{e\.upload_status='VALIDATING';e\.upload_validation_error=null;\}\)/);
-  assert.match(commitBlock, /originalDrafts\[failedIndex\]\.upload_status=firstDryRunFailure\.result\?\.error_code==='ARREARS_REF_STALE_REFRESH_REQUIRED'\?'STALE':'VALIDATION_FAILED'/);
+  assert.match(commitBlock, /failedOriginal\.upload_status=firstDryRunFailure\.result\?\.error_code==='ARREARS_REF_STALE_REFRESH_REQUIRED'\?'STALE':'VALIDATION_FAILED'/);
   assert.match(commitBlock, /e\.upload_status='UPLOADING'/);
   assert.match(commitBlock, /e\.sync_status='LOCAL'/);
   assert.match(commitBlock, /e\.upload_status='CHECKING_CLOUD'/);
