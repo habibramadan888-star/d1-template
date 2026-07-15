@@ -206,11 +206,11 @@ test("owner detail decoder reads structured anchors for every employee event typ
   assert.match(owner, /\.\.\.tx/, "owner detail mapper must preserve structured anchor fields");
 });
 
-test("WhatsApp statement renderer is event-specific for seven templates", async () => {
+test("shared Ledger renderer is event-specific for seven templates", async () => {
   const html = await readFile(employeePath, "utf8");
   const typeBlock = functionBlock(html, "entryStatementType");
   const lineBlock = functionBlock(html, "entryStatementLine");
-  const sessionBlock = functionBlock(html, "buildEntrySessionWhatsAppText");
+  const sessionBlock = functionBlock(html, "buildEntrySessionLedgerText");
 
   assert.match(typeBlock, /event_type/);
   assert.match(lineBlock, /type==='rent'/);
@@ -226,7 +226,8 @@ test("WhatsApp statement renderer is event-specific for seven templates", async 
   assert.match(lineBlock, /type==='bed_transfer'/);
   assert.match(lineBlock, /entryStatementBed\(from\)}\\n\$\{entryStatementBed\(to\)}/);
   assert.doesNotMatch(lineBlock, /\[112-111\]|112-111|112->111|112→111/);
-  assert.match(sessionBlock, /Statement/);
+  assert.match(sessionBlock, /HOMELINK LEDGER/);
+  assert.match(sessionBlock, /Core Summary/);
   assert.match(sessionBlock, /Cash Details/);
   assert.match(sessionBlock, /Arrears Details/);
   assert.match(sessionBlock, /Transfer Details/);

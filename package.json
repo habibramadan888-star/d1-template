@@ -4,6 +4,7 @@
   "private": true,
   "description": "Commercial governance and validation tooling for the Homelink finance system.",
   "scripts": {
+    "verify:employee-golden-session": "node scripts/verify-employee-golden-session.mjs",
     "build": "npm run build:lib && npm run build:worker:assets && npm run build:worker:embedded",
     "build:worker:assets": "cd deploy-worker && wrangler deploy --config wrangler.toml --dry-run --outdir ../.wrangler-dryrun/assets",
     "build:worker:embedded": "cd deploy-worker && wrangler deploy --config wrangler.embedded.toml --dry-run --outdir ../.wrangler-dryrun/embedded",
