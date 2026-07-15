@@ -2041,11 +2041,38 @@ async function handleEmployeeMigrate(request,env,user){
   return success({success:true,migrated:true});
 }
 __name(handleEmployeeMigrate,"handleEmployeeMigrate");
+function employeeAccessCardDisplayNote(value){
+  return cleanText(value,1000)
+    .replace(/(?:\+?971|00971)[\s-]*\d(?:[\s-]*\d){6,12}/gi,"")
+    .replace(/\b\d{8,15}\b/g,"")
+    .replace(/\b99099\b/g,"")
+    .trim();
+}
+__name(employeeAccessCardDisplayNote,"employeeAccessCardDisplayNote");
+function employeeLockCardsSafeDto(result={}){
+  const roomsData={};
+  for(const [room,rows] of Object.entries(result.roomsData||{})){
+    const safeRoom=cleanText(room,120);
+    roomsData[safeRoom]=(Array.isArray(rows)?rows:[]).map(row=>({
+      room:cleanText(row?.room||safeRoom,120),
+      access_card_note:employeeAccessCardDisplayNote(row?.remark||row?.cardName||""),
+      endDate:row?.endDate||0
+    }));
+  }
+  return {
+    roomsData,
+    locksCount:Number(result.locksCount||0),
+    loadedAt:cleanText(result.loadedAt||result.observed_at||"",80),
+    data_source:cleanText(result.data_source||"live_api",40),
+    fallback:result.fallback===true
+  };
+}
+__name(employeeLockCardsSafeDto,"employeeLockCardsSafeDto");
 async function handleEmployeeLockCards(request,env,user){
   const result=await empLoadLockCardsWithCacheFallback(env,user,{timeoutMs:8000,limit:500,request_context:ttlockRequestContext(request,env,user,"employee_lock_cards",TTLOCK_READ_CACHE_MAX_AGE_MS)});
   if(result.error)return errorResponse(result.error,result.status||503,result.error);
   await audit(env,user,"employee.lock.cards.load","",{locksCount:result.locksCount,data_source:result.data_source||"live_api",fallback:!!result.fallback}).catch(()=>{});
-  return success(result);
+  return success(employeeLockCardsSafeDto(result));
 }
 __name(handleEmployeeLockCards,"handleEmployeeLockCards");
 function employeeEntryValidationExplanation(errorCode,message){

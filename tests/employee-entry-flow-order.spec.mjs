@@ -13,7 +13,8 @@ test("employee Entry required input flow is ordered before reference sections", 
 
   assert.match(html, /function employeePrioritizeEntryInputs\(\)/);
   assert.match(html, /const legacyFlowEnd=type==='AP'/);
-  assert.match(html, /const flowEnd=templateMount\|\|legacyFlowEnd;/);
+  assert.match(html, /let flowEnd=templateMount\|\|legacyFlowEnd;/);
+  assert.match(html, /if\(exceptionVisible&&exceptionStep&&flowEnd!==exceptionStep\)/);
   assert.match(html, /flowEnd\.insertAdjacentElement\('afterend',mount\)/);
   assert.match(html, /mount\.appendChild\(validation\)/);
   assert.match(html, /mount\.appendChild\(actionRow\)/);

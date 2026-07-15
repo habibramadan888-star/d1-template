@@ -42,7 +42,7 @@ test("entry and current-session visual layers use one card language without dupl
   assert.match(visualSystem, /\.employee-entry-card \.step\{background:transparent!important;border:0!important/);
   assert.match(visualSystem, /\.employee-entry-card #verifyContextStep,.employee-entry-card #entrySummary,.employee-entry-card #objectHint,#ttlockEntryStatus,#view-entry \.employee-collapsible-step\[data-employee-collapsed-step="8"\]\{display:none!important\}/);
   assert.match(visualSystem, /\.employee-session-card#employeeSessionSummaryCard \.head\{display:none!important\}/);
-  assert.match(visualSystem, /\.employee-entry-card #systemCalculation\{margin:0 0 12px!important;padding:12px!important\}/);
+  assert.match(visualSystem, /\.employee-entry-card #systemCalculation\{display:none!important\}/);
 });
 
 test("current-session cards default to a safe compact summary and hide duplicate card-load status", async () => {

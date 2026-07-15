@@ -43,7 +43,7 @@ test("all seven employee Entry templates require bed context", async () => {
 
   const expense = templateBlock(html, "expense");
   assert.match(expense, /fields:\[[^\]]*'genericBedFieldWrap'/, "expense must show Target Bed / Room field");
-  assert.match(expense, /required_fields:\['target_bed','expense_amount','expense_category','payment_method','reason'\]/);
+  assert.match(expense, /required_fields:\['target_bed','expense_amount','payment_method','reason'\]/);
   assert.doesNotMatch(expense, /forbidden_fields:\[[^\]]*'genericBedFieldWrap'/, "expense must not forbid Bed field");
 
   const transfer = templateBlock(html, "bed_transfer");
@@ -63,24 +63,18 @@ test("bed info strip is mounted below Bed and From Bed inputs", async () => {
   assert.match(html, /function employeeScheduleBedInfoStrip\(\)/);
 });
 
-test("bed info strip reads open arrears and access card cache without vendor labels", async () => {
+test("bed info strip shows only the four provider-safe context fields", async () => {
   const html = await readFile(employeePath, "utf8");
   const strip = functionBlock(html, "employeeRenderBedInfoStrip");
-  const taskLookup = functionBlock(html, "employeeOpenTasksForBedValue");
   const cardLookup = functionBlock(html, "employeeFindCardForBedValue");
 
-  assert.match(taskLookup, /state\.tasks/);
-  assert.match(taskLookup, /taskRemain\(t\)>0/);
-  assert.match(taskLookup, /target_bed/);
   assert.match(cardLookup, /state\.lockCards/);
   assert.match(cardLookup, /searchText/);
-  assert.match(strip, /Open Arrears/);
-  assert.match(strip, /No Open Arrears/);
-  assert.match(strip, /Access Card/);
-  assert.match(strip, /Card Until/);
+  assert.match(strip, /Access Card Note:/);
+  assert.match(strip, /Card Expiry:/);
   assert.match(strip, /Status:/);
-  assert.match(strip, /Loading Bed Info/);
-  assert.match(strip, /Bed Info Unavailable/);
+  assert.match(strip, /System Rent:/);
+  assert.doesNotMatch(strip, /Open Arrears|No Open Arrears/);
   assert.doesNotMatch(strip, /TTLock|TT lock|通通锁/);
 });
 
@@ -97,7 +91,7 @@ test("bed required validation covers each event-specific validator", async () =>
     assert.match(functionBlock(html, fn), /Bed is required\./, `${fn} must require bed`);
   }
 
-  assert.match(functionBlock(html, "validateExpenseEntry"), /Target Bed \/ Room is required\./);
+  assert.match(functionBlock(html, "validateExpenseEntry"), /Room Number is required\./);
   assert.match(functionBlock(html, "validateBedTransferEntry"), /From Bed is required\./);
   assert.match(functionBlock(html, "validateBedTransferEntry"), /To Bed is required\./);
 });

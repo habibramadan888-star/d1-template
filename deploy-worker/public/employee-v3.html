@@ -2954,7 +2954,7 @@ label .label-en{
     <button class="tab" data-view="system"><span class="en">System</span><span class="tab-cn">系统</span></button>
   </div>
 </div>
-<div class="employee-workspace-switch" role="tablist" aria-label="Employee workspace"><button type="button" class="active" data-employee-workspace="entry">录入事项 <small>Add Entry</small></button><button type="button" data-employee-workspace="session">本票记录 <small id="workspaceSessionCount">Current Session (0)</small></button></div>
+<div class="employee-workspace-switch" role="tablist" aria-label="Employee workspace"><button type="button" class="active" data-employee-workspace="entry">录入事项 <small>Add Entry</small></button><button type="button" data-employee-workspace="session">本票记录 <small id="workspaceSessionCount">Current Session (0)</small></button><button type="button" class="employee-session-status-bar" id="employeeSessionStatusBar"><span>本票 0 条</span><span>现金净额 AED 0.00</span><span>银行收款 AED 0.00</span></button></div>
 <main class="wrap">
   <section id="view-entry">
     <div class="card employee-session-card" id="employeeSessionSummaryCard">
@@ -2967,11 +2967,9 @@ label .label-en{
       <div class="head"><div class="title">Add Entry<span class="label-en">事件录入</span></div><button class="btn" id="btnLoadLock"><span class="employee-btn-main">Load Cards</span><span class="label-en">加载卡片</span></button></div>
       <div class="body">
         <div class="employee-session-quick-row">
-          <button type="button" class="employee-session-status-bar" id="employeeSessionStatusBar"><span>本票 0 条</span><span>现金净额 AED 0.00</span><span>银行收款 AED 0.00</span></button>
           <button type="button" class="btn employee-new-session-quick" id="btnNewSessionQuick">New Session<small>新会话</small></button>
         </div>
           <div class="step employee-event-picker">
-          <div class="employee-picker-title">选择事项 <small>Select Event</small></div>
           <div class="event-grid" id="eventChips">
             <button class="event-chip" data-type="R"><span>Rent</span><small>收租</small></button>
             <button class="event-chip" data-type="AP"><span>Arrears Payment</span><small>还欠款</small></button>
@@ -3016,7 +3014,7 @@ label .label-en{
           <div class="step-title"><span>5</span><div>Step 5 · Enter Amount<small>第五步：填写金额，系统对比应收和实收</small></div></div>
         <div class="grid">
           <div class="field"><label>实收/支出金额 AMT</label><input id="amount" inputmode="decimal" placeholder="0.00"></div>
-          <div class="field"><label>系统月租 LP（老板端配置）</label><input id="listPrice" inputmode="decimal" placeholder="系统自动读取" readonly></div>
+          <div class="field" id="listPriceWrap"><label>List Price / 系统月租</label><input id="listPrice" type="hidden" readonly><div id="listPriceDisplay" class="readonly-pill" aria-live="polite">Not configured</div></div>
         </div>
         </div>
 
@@ -3110,12 +3108,9 @@ label .label-en{
           <div class="field"><label>Expense Description<span class="label-en">支出说明</span></label><input id="expenseDesc" placeholder="修空调、采购耗材等实际用途"></div>
         </div>
 
-        <div class="employee-system-calculation collapsed" id="systemCalculation">
-          <button type="button" class="employee-system-calculation-toggle" id="systemCalculationToggle" aria-expanded="false"><span>System Calculation <small>系统计算</small></span><span id="systemCalculationCompactStatus">Paid 0.00 · Clear Y ✓</span></button>
-          <div class="grid employee-system-calculation-body">
-            <div class="field"><label>系统计入 paid</label><input id="paid" inputmode="decimal" placeholder="系统自动计算" readonly></div>
-            <div class="field"><label>系统结清 entry_clr</label><select id="entryClr" disabled><option value="Y">Y 已够本期</option><option value="N">N 不足</option><option value="P">P 部分</option></select></div>
-          </div>
+        <div id="systemCalculation" hidden aria-hidden="true">
+          <input id="paid" inputmode="decimal" readonly>
+          <select id="entryClr" disabled><option value="Y">Y</option><option value="N">N</option><option value="P">P</option></select>
         </div>
         <div class="step diffbox hidden" id="exceptionStep">
           <div class="step-title"><span>7</span><div>Step 7 · Handle Exception<small>第七步：处理异常或差额</small></div></div>
@@ -3728,9 +3723,9 @@ function cardRemarkText(card){
   return String(card?.remark||card?.cardText||card?.tenant||card?.searchText||'').trim();
 }
 function normalizeCard(raw){
-  const humanFields=['remark','remarks','cardRemark','memo','note','description','desc','comment','cardName','identityCardName','cardAlias','alias','name','tenant_name','tenant','userName','nickName','keyName','keyboardPwdName'];
+  const humanFields=['access_card_note','remark','remarks','cardRemark','memo','note','description','desc','comment','cardName','identityCardName','cardAlias','alias','name','tenant_name','tenant','userName','nickName','keyName','keyboardPwdName'];
   const nameFields=['cardName','identityCardName','cardAlias','alias','name','tenant_name','tenant','userName','nickName','keyName','keyboardPwdName'];
-  const remarkFields=['remark','remarks','cardRemark','memo','note','description','desc','comment'];
+  const remarkFields=['access_card_note','remark','remarks','cardRemark','memo','note','description','desc','comment'];
   const humanText=lockText(raw,humanFields).join(' ');
   const cardText=lockText(raw,nameFields).join(' ');
   const room=String(raw.room||raw.bed||raw.roomName||'').trim();
@@ -3747,7 +3742,7 @@ function normalizeCard(raw){
   const fullCardText=[remark,cardText,humanText,room].filter(Boolean).join(' ');
   const vacant=isVacantRemark(fullCardText);
   const staff_bed=isStaffRemark(fullCardText);
-  return {bed,remark_bed:anchors.bed,room,tenant,tenant_card_id:String(cid),deposit,start,start_md:anchors.start_md,end,remark,cardText,vacant,staff_bed,followup_class:staff_bed?'staff':(vacant?'vacant':'customer'),searchText:text,remark_parse_ok:anchors.ok,remark_parse_missing:anchors.missing||[],raw};
+  return {bed,remark_bed:anchors.bed,room,tenant,tenant_card_id:String(cid),deposit,start,start_md:anchors.start_md,end,access_card_note:String(raw.access_card_note||remark).trim(),remark,cardText,vacant,staff_bed,followup_class:staff_bed?'staff':(vacant?'vacant':'customer'),searchText:text,remark_parse_ok:anchors.ok,remark_parse_missing:anchors.missing||[],raw};
 }
 function employeeExitEventSelected(type=$('entryType')?.value){return type==='DR'||type==='CO'}
 function lookupBed(){
@@ -3770,8 +3765,7 @@ function lookupBed(){
   const c=state.current||{};
   $('tenantName').value=c.remark||c.cardText||c.tenant||'';
   $('tenantCardId').value=c.tenant_card_id||'';
-  const rent=rentForBed(bed);
-  $('listPrice').value=rent?fmtMoney(rent):'';
+  employeeRenderListPrice(bed);
   if(c.deposit&&$('entryType').value==='D'&&!$('amount').value)$('amount').value=fmtMoney(c.deposit);
   state.depositBalance=null;
   state.depositContext=null;
@@ -4035,19 +4029,25 @@ function employeeRenderBedInfoStrip(el,bedValue,{label='Bed',labelZh='床位'}={
   }
   const card=employeeFindCardForBedValue(bed);
   const status=employeeCardStatus(card);
-  const rawNote=String(card?.remark||card?.cardText||'').trim();
-  const noteMatch=rawNote.match(/^([0-9]{2,5}[Ee]?)(?:\s|$)/);
-  const cardNote=noteMatch?.[1]||String(card?.bed||'Not configured');
+  const cardNote=String(card?.access_card_note||card?.remark||card?.cardText||card?.bed||'Not configured').trim();
   const cardUntil=employeeCardUntilText(card).slice(0,10);
   const systemRent=rentForBed(bed);
   const stripKind=status.kind==='ok'?'ok':(status.kind==='warn'?'warn':'');
   el.className=`bed-info-strip ${stripKind}`.trim();
   el.innerHTML=`<div class="bed-info-rows compact-bed-reference" data-compact-bed-reference="true">
-      <div class="bed-info-row"><b>Access Card Note: ${esc(cardNote)}</b><small>门卡备注：${esc(cardNote)}</small></div>
-      <div class="bed-info-row"><b>Card Expiry: ${esc(cardUntil||'Not configured')}</b><small>截止日期：${esc(cardUntil||'未配置')}</small></div>
-      <div class="bed-info-row"><b>Status: ${esc(status.en)}</b><small>状态：${esc(status.zh)}</small></div>
-      <div class="bed-info-row"><b>System Rent: ${systemRent?`AED ${fmtMoney(systemRent)}`:'Not configured'}</b><small>系统月租：${systemRent?`AED ${fmtMoney(systemRent)}`:'未配置'}</small></div>
+      <div class="bed-info-row"><b>Access Card Note: ${esc(cardNote)}</b></div>
+      <div class="bed-info-row"><b>Card Expiry: ${esc(cardUntil||'Not configured')}</b></div>
+      <div class="bed-info-row"><b>Status: ${esc(status.en)}</b></div>
+      <div class="bed-info-row"><b>System Rent: ${systemRent?`AED ${fmtMoney(systemRent)}`:'Not configured'}</b></div>
     </div>`;
+}
+
+function employeeRenderListPrice(bedValue=$('bed')?.value){
+  const rent=Number(rentForBed(bedValue)||0);
+  const configured=Number.isFinite(rent)&&rent>0;
+  if($('listPrice'))$('listPrice').value=configured?fmtMoney(rent):'';
+  if($('listPriceDisplay'))$('listPriceDisplay').textContent=configured?`AED ${fmtMoney(rent)}`:'Not configured';
+  return configured?rent:null;
 }
 let employeeBedInfoStripTimer=null;
 function renderEmployeeBedInfoStrips(){
@@ -4500,20 +4500,7 @@ function employeeUpdatePeriodDisclosure(){
 }
 function employeeUpdateSystemCalculationDisclosure(){
   const panel=$('systemCalculation');
-  const toggle=$('systemCalculationToggle');
-  const status=$('systemCalculationCompactStatus');
-  if(!panel||!toggle||!status)return;
-  const clear=$('entryClr')?.value||'Y';
-  const marker=clear==='Y'?'✓':clear==='N'?'!':'~';
-  status.textContent=`Paid ${fmtMoney(num($('paid')?.value))} · Clear ${clear} ${marker}`;
-  toggle.setAttribute('aria-expanded',String(!panel.classList.contains('collapsed')));
-  if(!toggle.dataset.bound){
-    toggle.dataset.bound='1';
-    toggle.onclick=()=>{
-      panel.classList.toggle('collapsed');
-      employeeUpdateSystemCalculationDisclosure();
-    };
-  }
+  if(panel){panel.hidden=true;panel.setAttribute('aria-hidden','true')}
 }
 function validateRentEntry(){
   const errors=[],warns=[];
@@ -5453,7 +5440,7 @@ function syncForm(){
   const type=$('entryType').value, c=state.current||{};
   const hasPeriod=['R','TFF'].includes(type);
   const rent=rentForBed();
-  if(type==='R')$('listPrice').value=rent?fmtMoney(rent):'';
+  if(type==='R')employeeRenderListPrice($('bed')?.value);
   if(type==='TF'){
     if(!$('transferFromBed').value.trim()&&$('bed').value.trim())$('transferFromBed').value=$('bed').value.trim().replace(/^#/,'');
   }
@@ -8933,10 +8920,10 @@ function employeeEnsureEnglishFirstStyle(){
     .employee-tabs .tab .tab-cn{font-size:10px!important;font-weight:560!important;letter-spacing:.04em!important;color:#7b8797!important}
     .employee-tabs .tab.active .tab-cn{color:rgba(255,255,255,.72)!important}
     #eventChips{grid-template-columns:repeat(12,minmax(0,1fr))!important;gap:8px!important}
-    #eventChips .event-chip{grid-column:span 3!important;padding:10px 7px!important;border-radius:12px!important;font-size:13px!important;min-height:54px!important}
+    #eventChips .event-chip{grid-column:span 3!important;padding:7px 5px!important;border-radius:12px!important;font-size:13px!important;min-height:48px!important;line-height:1.05!important}
     #eventChips .event-chip[data-type="CO"]{grid-column:2 / span 3!important}
     #eventChips .event-chip>span{font-size:13px!important}
-    #eventChips .event-chip small{font-size:9px!important}
+    #eventChips .event-chip small{display:block!important;font-size:9px!important;line-height:1.05!important;margin-top:3px!important}
     #paymentStep{padding:10px 14px!important;margin-bottom:10px!important}
     #paymentStep .step-title{display:none!important}
     #paymentStep #paymentFields{display:block!important}
@@ -8954,7 +8941,7 @@ function employeeEnsureEnglishFirstStyle(){
     .employee-system-calculation-toggle::after{content:'▾';color:#64748b}
     .employee-system-calculation.collapsed .employee-system-calculation-body{display:none}
     .employee-system-calculation.collapsed .employee-system-calculation-toggle::after{content:'▸'}
-    .employee-workspace-switch{position:sticky;top:0;z-index:12;display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:0 0 8px;padding:6px 0;background:#f7f9fc}.employee-workspace-switch button{min-height:44px;border:1px solid var(--line);border-radius:10px;background:#f8fafc;color:#475569;font-weight:850}.employee-workspace-switch button.active,.event-chip.active{background:#157347!important;color:#fff!important;border-color:#157347!important}.employee-workspace-switch small{display:block;font-size:10px;opacity:.78}.employee-session-card{display:none}.employee-session-active .employee-entry-card{display:none}.employee-session-active .employee-session-card{display:block}.employee-session-quick-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:stretch;margin-bottom:12px}.employee-session-status-bar{width:100%;border:1px solid #d6e7dc;background:#fff;color:#166534;border-radius:14px;min-height:48px;text-align:left;font-weight:800;padding:8px 10px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;box-shadow:var(--employee-card-shadow)}.employee-session-status-bar span{display:block;white-space:nowrap}.employee-new-session-quick{min-width:112px!important;border-radius:14px!important}.employee-new-session-quick small{display:block;font-size:10px;opacity:.72}@media(max-width:560px){.employee-session-quick-row{grid-template-columns:1fr}.employee-session-status-bar{font-size:11px}.employee-new-session-quick{width:100%}}.employee-picker-title{font-weight:900;font-size:14px;margin:0 0 7px}.employee-picker-title small{display:block;color:#64748b;font-size:10px}.employee-entry-card>.head{display:none}.employee-entry-card .step-title{display:none!important}.employee-entry-card .step> .step-title>span{display:none!important}.employee-entry-card #listPrice{display:none!important}.employee-entry-card #listPriceWrap,.employee-entry-card #verifyContextStep,.employee-entry-card .employee-collapsible-step{margin-top:8px}.employee-entry-card #objectHint,.employee-entry-card #entrySummary{display:none!important}.employee-session-card .preview-entry{padding:8px 10px;min-height:0}.employee-session-card .preview-entry .small{font-size:11px}.employee-session-card .preview-entry .preview-tools{margin-top:4px}.employee-session-card .preview-entry .amt{font-size:14px}.employee-session-card #sessionKpis{margin:0}.employee-entry-card #systemCalculation{margin-top:8px}#validationBox[data-pristine="true"]{display:none!important}.employee-entry-card textarea#remark{min-height:64px;max-height:72px}
+    .employee-workspace-switch{position:sticky;top:0;z-index:12;display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:0 0 8px;padding:6px 0;background:#f7f9fc}.employee-workspace-switch button{min-height:44px;border:1px solid var(--line);border-radius:10px;background:#f8fafc;color:#475569;font-weight:850}.employee-workspace-switch button.active,.event-chip.active{background:#157347!important;color:#fff!important;border-color:#157347!important}.employee-workspace-switch small{display:block;font-size:10px;opacity:.78}.employee-workspace-switch>.employee-session-status-bar{grid-column:1/-1;min-height:38px}.employee-session-card{display:none}.employee-session-active .employee-entry-card{display:none}.employee-session-active .employee-session-card{display:block}.employee-session-quick-row{display:flex;justify-content:flex-end;align-items:stretch;margin-bottom:12px}.employee-session-status-bar{width:100%;border:1px solid #d6e7dc;background:#fff;color:#166534;border-radius:12px;min-height:38px;text-align:left;font-weight:800;padding:6px 8px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;box-shadow:var(--employee-card-shadow)}.employee-session-status-bar span{display:block;white-space:nowrap;text-align:center;font-size:11px}.employee-new-session-quick{min-width:112px!important;border-radius:14px!important}.employee-new-session-quick small{display:block;font-size:10px;opacity:.72}@media(max-width:560px){.employee-session-status-bar span{font-size:9.5px}.employee-new-session-quick{width:100%}}.employee-entry-card>.head{display:none}.employee-entry-card .step-title{display:none!important}.employee-entry-card .step> .step-title>span{display:none!important}.employee-entry-card #listPrice{display:none!important}.employee-entry-card #listPriceWrap,.employee-entry-card #verifyContextStep,.employee-entry-card .employee-collapsible-step{margin-top:8px}.employee-entry-card #objectHint,.employee-entry-card #entrySummary{display:none!important}.employee-session-card .preview-entry{padding:8px 10px;min-height:0}.employee-session-card .preview-entry .small{font-size:11px}.employee-session-card .preview-entry .preview-tools{margin-top:4px}.employee-session-card .preview-entry .amt{font-size:14px}.employee-session-card #sessionKpis{margin:0}#validationBox[data-pristine="true"]{display:none!important}.employee-entry-card textarea#remark{min-height:64px;max-height:72px}
     /* One computed brand-green treatment for every selected or primary entry control. */
     .tab.active,.employee-workspace-switch button.active,.event-chip.active,.pay-option.active,.btn.primary:not(:disabled){background:var(--employee-active-background)!important;border-color:var(--employee-active-border)!important;box-shadow:var(--employee-active-shadow)!important;color:var(--employee-active-text)!important}
     .pay-option.active .label-en{color:rgba(255,255,255,.76)!important}
@@ -8963,7 +8950,7 @@ function employeeEnsureEnglishFirstStyle(){
     html,body.employee-ui{overflow:visible!important}.top{z-index:20}.employee-workspace-switch{position:sticky!important;top:var(--employee-global-nav-height,106px)!important;left:auto!important;width:min(1480px,calc(100vw - 20px))!important;z-index:12;isolation:isolate;margin:0 auto 16px!important;padding:6px 0!important;background:var(--bg)!important;box-shadow:none!important}#view-entry{padding-top:0!important}
     /* Employee visual system: a single floating-card language with no card-inside-card treatment. */
     :root{--employee-card-radius:18px;--employee-card-shadow:0 10px 24px rgba(20,32,51,.08);--employee-card-gap:16px}
-    .employee-entry-card{background:transparent!important;border:0!important;border-radius:0!important;box-shadow:none!important;margin:0!important}.employee-entry-card>.body{padding:0!important}.employee-entry-card .step{background:transparent!important;border:0!important;border-radius:0!important;box-shadow:none!important;padding:0!important;margin:0 0 var(--employee-card-gap)!important}.employee-entry-card .employee-event-picker,.employee-session-card,.employee-system-calculation{background:#fff!important;border:0!important;border-radius:var(--employee-card-radius)!important;box-shadow:var(--employee-card-shadow)!important}.employee-entry-card .employee-event-picker{padding:16px!important}.employee-session-card{margin:0 0 var(--employee-card-gap)!important}.employee-session-card .head,.employee-session-card .body{padding:16px!important}.employee-entry-card .field{margin-bottom:12px!important}.employee-entry-card .grid{gap:12px!important}.employee-entry-card #verifyContextStep,.employee-entry-card #entrySummary,.employee-entry-card #objectHint,#ttlockEntryStatus,#view-entry .employee-collapsible-step[data-employee-collapsed-step="8"]{display:none!important}.employee-entry-card #listPriceWrap{display:block!important}.employee-entry-card #listPrice{display:none!important}.employee-entry-card #paymentStep,.employee-entry-card #periodStep{padding:0!important}.employee-entry-card #periodStep{margin-bottom:12px!important}.employee-entry-card #systemCalculation{margin:0 0 12px!important;padding:12px!important}.employee-entry-card #exceptionStep{margin-top:0!important}.employee-entry-card textarea#remark{min-height:52px!important;max-height:64px!important}.employee-entry-card #validationBox{margin:0 0 12px!important}.employee-entry-card .row{gap:8px!important}.employee-entry-card .row .btn{min-height:46px!important;padding:10px 14px!important}.employee-session-status-bar{margin:0 0 12px!important}.employee-session-card#employeeSessionSummaryCard .head{display:none!important}.employee-session-card#employeeSessionSummaryCard .body{padding:12px 16px!important}.employee-session-card#employeeSessionSummaryCard .kpi-grid{gap:8px!important}.employee-session-card#employeeSessionSummaryCard .kpi-card{padding:8px!important;box-shadow:none!important;border:0!important;background:#f6f8f7!important}.employee-session-card .preview-entry{border:0!important;border-radius:12px!important;box-shadow:none!important;background:#f8faf9!important}.employee-session-card .preview-list{min-height:0!important}.employee-session-record-details{margin-top:6px}.employee-session-record-details summary{cursor:pointer;font-size:11px;color:#64748b}.employee-entry-card .label-en,.employee-entry-card .step-title,.employee-entry-card .event-chip small,.employee-session-card .label-en{display:none!important}.employee-entry-card .employee-picker-title{font-size:16px!important;margin:0 0 10px!important}.employee-entry-card label{font-size:14px!important;margin-bottom:6px!important}.employee-entry-card input,.employee-entry-card select,.employee-entry-card textarea{font-size:16px!important;border-radius:12px!important}.employee-entry-card .readonly-pill{height:auto!important;min-height:0!important;padding:0!important;border:0!important;background:transparent!important}.employee-entry-card #listPriceWrap{font-size:14px!important;color:#64748b!important}.employee-entry-card #listPriceWrap label::after{content:' · system reference';font-size:12px;color:#94a3b8;font-weight:600}.employee-entry-card #listPriceWrap input{display:none!important}
+    .employee-entry-card{background:transparent!important;border:0!important;border-radius:0!important;box-shadow:none!important;margin:0!important}.employee-entry-card>.body{padding:0!important}.employee-entry-card .step{background:transparent!important;border:0!important;border-radius:0!important;box-shadow:none!important;padding:0!important;margin:0 0 var(--employee-card-gap)!important}.employee-entry-card .employee-event-picker,.employee-session-card{background:#fff!important;border:0!important;border-radius:var(--employee-card-radius)!important;box-shadow:var(--employee-card-shadow)!important}.employee-entry-card .employee-event-picker{padding:16px!important}.employee-session-card{margin:0 0 var(--employee-card-gap)!important}.employee-session-card .head,.employee-session-card .body{padding:16px!important}.employee-entry-card .field{margin-bottom:12px!important}.employee-entry-card .grid{gap:12px!important}.employee-entry-card #verifyContextStep,.employee-entry-card #entrySummary,.employee-entry-card #objectHint,#ttlockEntryStatus,#view-entry .employee-collapsible-step[data-employee-collapsed-step="8"]{display:none!important}.employee-entry-card #listPriceWrap{display:block!important}.employee-entry-card #listPrice{display:none!important}.employee-entry-card #paymentStep,.employee-entry-card #periodStep{padding:0!important}.employee-entry-card #periodStep{margin-bottom:12px!important}.employee-entry-card #systemCalculation{display:none!important}.employee-entry-card #exceptionStep{margin-top:0!important}.employee-entry-card textarea#remark{min-height:52px!important;max-height:64px!important}.employee-entry-card #validationBox{margin:0 0 12px!important}.employee-entry-card .row{gap:8px!important}.employee-entry-card .row .btn{min-height:46px!important;padding:10px 14px!important}.employee-session-status-bar{margin:0!important}.employee-session-card#employeeSessionSummaryCard .head{display:none!important}.employee-session-card#employeeSessionSummaryCard .body{padding:12px 16px!important}.employee-session-card#employeeSessionSummaryCard .kpi-grid{gap:8px!important}.employee-session-card#employeeSessionSummaryCard .kpi-card{padding:8px!important;box-shadow:none!important;border:0!important;background:#f6f8f7!important}.employee-session-card .preview-entry{border:0!important;border-radius:12px!important;box-shadow:none!important;background:#f8faf9!important}.employee-session-card .preview-list{min-height:0!important}.employee-session-record-details{margin-top:6px}.employee-session-record-details summary{cursor:pointer;font-size:11px;color:#64748b}.employee-entry-card .label-en,.employee-entry-card .step-title,.employee-session-card .label-en{display:none!important}.employee-entry-card label{font-size:14px!important;margin-bottom:6px!important}.employee-entry-card input,.employee-entry-card select,.employee-entry-card textarea{font-size:16px!important;border-radius:12px!important}.employee-entry-card .readonly-pill{height:auto!important;min-height:0!important}.employee-entry-card #listPriceWrap{font-size:14px!important;color:#64748b!important}.employee-entry-card #listPriceWrap label::after{content:' · system reference';font-size:12px;color:#94a3b8;font-weight:600}.employee-entry-card #listPriceDisplay{display:block!important;padding:10px 12px!important;border:1px dashed #d4dde0!important;background:#f2f6f4!important;font-weight:800!important;font-variant-numeric:tabular-nums}.compact-bed-reference .bed-info-row b{white-space:pre-wrap;overflow-wrap:anywhere}
     .employee-expense-card-description{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;margin-top:4px;max-width:34rem;color:#263244;font-weight:750;line-height:1.35}
     #periodStep.employee-period-collapsible.collapsed #periodFields{display:none}
     #periodStep.employee-period-collapsible .period-summary-toggle{width:100%;border:0;background:transparent;text-align:left;font-weight:800;color:#3f4d61;cursor:pointer;padding:4px 0}
@@ -9694,17 +9681,22 @@ function employeePrioritizeEntryInputs(){
   const step3=employeeFindEntryStep(3);
   const step8=employeeFindEntryStep(8);
   const validation=$('validationBox');
+  const exceptionStep=$('exceptionStep');
   const actionRow=$('btnSaveEntry')?.closest('.row');
   if(!step3||!validation||!actionRow)return;
   employeeRenumberRequiredFlowTitles();
   const type=$('entryType')?.value||'';
-  const exceptionVisible=$('exceptionStep')&&!$('exceptionStep').classList.contains('hidden');
+  const exceptionVisible=exceptionStep&&!exceptionStep.classList.contains('hidden');
   const apPanel=$('arrearsPaymentCorePanel');
   const templateMount=employeeTemplateMount();
   const legacyFlowEnd=type==='AP'
     ?(apPanel||fieldWrap('amount')||$('amount')?.closest('.step')||$('paymentStep'))
     :(exceptionVisible?($('remark')?.closest('.field')||$('exceptionStep')):(!$('periodStep')?.classList.contains('hidden')?$('periodStep'):($('amount')?.closest('.step')||$('paymentStep'))));
-  const flowEnd=templateMount||legacyFlowEnd;
+  let flowEnd=templateMount||legacyFlowEnd;
+  if(exceptionVisible&&exceptionStep&&flowEnd!==exceptionStep){
+    if(exceptionStep.previousElementSibling!==flowEnd)flowEnd.insertAdjacentElement('afterend',exceptionStep);
+    flowEnd=exceptionStep;
+  }
   let mount=$('employeeRequiredActionMount');
   if(!mount){
     mount=document.createElement('div');
@@ -9740,7 +9732,7 @@ function employeeUpdateCollapsedStepSummaries(validationResult=null){
   const s8=step8?.querySelector(':scope > .employee-collapsible-step-summary');
   if(s3)s3.innerHTML=employeeStep3SummaryHtml();
   if(s8)s8.innerHTML=employeeStep8SummaryHtml(validationResult);
-  if(!employeeEntryActiveEditable())employeePrioritizeEntryInputs();
+  employeePrioritizeEntryInputs();
   employeeRenderOpenArrearsAlert();
 }
 function employeeSetWorkspace(mode='entry'){

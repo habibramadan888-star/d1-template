@@ -42,6 +42,21 @@ test("historical APT-20260711-Q2R0A1 uses paid cash, bank, and actual expenses e
   );
 });
 
+test("five-entry quick summary fixture shows cash net 720 and bank received 700", async () => {
+  const calculate = await summaryCalculator();
+  const rows = [
+    { type: "R", pay_type: "C", due: 970, paid: 970 },
+    { type: "R", pay_type: "B", due: 700, paid: 700 },
+    { type: "E", pay_type: "C", expense_amount: 250 },
+    { type: "CO", amount: 0 },
+    { type: "TF", fee_mode: "waived", fee_amount_aed: 0 }
+  ];
+  const summary = calculate(rows);
+  assert.equal(rows.length, 5);
+  assert.equal(summary.cashNet, 720);
+  assert.equal(summary.bankReceived, 700);
+});
+
 test("received, outstanding, deposit, arrears, expense, and waived rules remain separate", async () => {
   const calculate = await summaryCalculator();
   const shortPaid = calculate([{ type: "R", pay_type: "C", due: 700, paid: 500 }]);
