@@ -116,7 +116,9 @@ test("Employee sends one aggregate validation request, binds every card by stabl
   assert.equal((aggregate.match(/apiFetch\('\/api\/employee\/entry\/validate'/g) || []).length, 1);
   assert.match(aggregate, /aggregate_preflight:true/);
   assert.match(upload, /validationRequests\.push\(requestPayload\)/);
+  assert.match(upload, /aggregatePreflight\?\.transport_failure===true/);
   assert.match(upload, /aggregatePreflight\?\.validation_results/);
+  assert.match(upload, /aggregateResults\.find\(result=>String\(result\?\.entry_identity/);
   assert.match(upload, /uploadList\.forEach\(validated=>/);
   assert.match(upload, /employeeEntryStableIdentity\(row\)===employeeEntryStableIdentity\(validated\)/);
   const aggregateCall = upload.indexOf("validateEmployeeUploadAggregateDryRun(validationRequests)");
@@ -127,10 +129,14 @@ test("Employee sends one aggregate validation request, binds every card by stabl
 });
 
 test("aggregate errors stay bounded and 067 archive/TTLock reuse remains intact", () => {
-  const fallback = functionBlock(employee, "employeeAggregateValidationFallback");
+  const fallback = functionBlock(employee, "employeeAggregateValidationSessionFailure");
   const canonical = functionBlock(worker, "validateEmployeeBedTransferCanonicalLink");
   const snapshot = functionBlock(worker, "getCanonicalTTLockSnapshot");
-  assert.match(fallback, /SERVER_PROCESSING_TIMEOUT|errorCode/);
+  assert.match(fallback, /transport_failure:true/);
+  assert.match(fallback, /validation_results:\[\]/);
+  assert.match(fallback, /failed_result_count:0/);
+  assert.match(fallback, /Server validation unavailable\. Please retry\./);
+  assert.doesNotMatch(fallback, /validationRequests|\.map\(/);
   assert.doesNotMatch(fallback, /raw_body|Cloudflare|<!DOCTYPE|<html/i);
   assert.match(canonical, /archive_entries_prepared!==true/);
   assert.match(canonical, /archive_parse_count=Number\(requestContext\.archive_parse_count\|\|0\)\+1/);

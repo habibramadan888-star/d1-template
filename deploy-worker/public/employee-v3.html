@@ -3227,7 +3227,7 @@ function readSessionId(userid){
   try{return localStorage.getItem(employeeStorageKey('empv3:sessionId',userid))||''}
   catch{return ''}
 }
-const state={lockCards:[],current:null,depositBalance:null,depositContext:null,rentConfig:{},rentConfigLoaded:false,drafts:[],tasks:[],closedTasks:[],arrearsTasksLoaded:false,arrearTasksError:null,arrearsGatewaySource:'',arrearsGatewayProof:null,employeeDirectives:[],followupItems:[],systemReminderItems:[],systemReminderStatus:'idle',systemReminderSummary:null,systemReminderSources:null,systemReminderLimit:100,sessionId:'',user:null,ttlockStatus:'idle',ttlockLoadedAt:0,ttlockError:'',ttlockDataSource:'',bedTransferCapabilities:{status:'idle',bed_transfer_validate_enabled:false,bed_transfer_write_enabled:false,owner_waiver_ack_enabled:false,controlled_beta_preview:false,canonical_write_path:'/api/employee/entry',production_cutover:'PRODUCTION_NO_GO'},bedTransferContext:{status:'idle',source:null,target:null,requestKey:'',serverValidation:null,validatedRecord:null,recordedResult:null}};
+const state={lockCards:[],current:null,depositBalance:null,depositContext:null,rentConfig:{},rentConfigLoaded:false,drafts:[],tasks:[],closedTasks:[],arrearsTasksLoaded:false,arrearTasksError:null,arrearsGatewaySource:'',arrearsGatewayProof:null,employeeDirectives:[],followupItems:[],systemReminderItems:[],systemReminderStatus:'idle',systemReminderSummary:null,systemReminderSources:null,systemReminderLimit:100,sessionId:'',user:null,aggregateValidationSessionError:null,aggregateValidationOnly:false,ttlockStatus:'idle',ttlockLoadedAt:0,ttlockError:'',ttlockDataSource:'',bedTransferCapabilities:{status:'idle',bed_transfer_validate_enabled:false,bed_transfer_write_enabled:false,owner_waiver_ack_enabled:false,controlled_beta_preview:false,canonical_write_path:'/api/employee/entry',production_cutover:'PRODUCTION_NO_GO'},bedTransferContext:{status:'idle',source:null,target:null,requestKey:'',serverValidation:null,validatedRecord:null,recordedResult:null}};
 const BED_TRANSFER_WRITE_ENABLED=false;
 const BED_TRANSFER_EVENT_LEDGER_MESSAGE='Bed transfer records save event anchors only. This does not directly change bed occupancy, deposit, arrears, or Access Card. 换床记录只保存信息锚点，不会直接改变床位、押金、欠款或门禁卡。';
 const BED_TRANSFER_SUBMITTED_MESSAGE='Bed transfer recorded / 换床记录已保存';
@@ -3549,6 +3549,7 @@ function applyEmployeeUser(user){
   state.user=user||null;
   if(user){
     state.drafts=readDrafts(user.userid);
+    employeeLiftAggregateTransportFailuresToSession();
     state.sessionId=readSessionId(user.userid);
     employeeMarkSyncedDraftsCloudChecking();
     const display=employeeDisplayName(user);
@@ -8233,42 +8234,72 @@ async function validateEmployeeUploadDryRun(entry,sessionForEntry,index,options=
   }
   return data;
 }
-function employeeAggregateValidationFallback(validationRequests,errorCode,message,httpStatus=0){
-  const results=(validationRequests||[]).map((request,index)=>{
-    const entry=request?.entry||request?.entries?.[0]||{};
-    return employeeBindUploadValidationResult({
-      source:'aggregate_dry_run',
-      stage:'aggregate_preflight_request',
-      event_index:index,
-      event_type:entry?.event_type||entryEventType(entry?.type||'entry'),
-      error_code:errorCode,
-      message,
-      message_en:message,
-      missing_fields:[],
-      invalid_fields:httpStatus?['response_body']:[],
-      suggested_action:'Retry Upload Session. No business write was attempted.',
-      last_successful_stage:null,
-      validation_trace:[{stage:'aggregate_preflight_request',function:'validateEmployeeUploadAggregateDryRun',ok:false,event_index:index,event_type:entry?.event_type||entryEventType(entry?.type||'entry'),error_code: errorCode,message,missing_fields:[],invalid_fields:httpStatus?['response_body']:[]}],
-      raw_validation_response:{http_status:httpStatus,no_write:true}
-    },entry,index,message);
+const EMPLOYEE_AGGREGATE_TRANSPORT_ERRORS=new Set(['SERVER_VALIDATE_UNREACHABLE','SERVER_PROCESSING_TIMEOUT','SERVER_VALIDATE_MALFORMED_RESPONSE','SERVER_VALIDATE_AUTH_REQUIRED','SERVER_VALIDATE_ROUTE_NOT_FOUND','SERVER_VALIDATE_REQUEST_SERIALIZATION_FAILED']);
+function employeeAggregateValidationSessionFailure(errorCode,details){
+  details=details||{};
+  return {success:false,ok:false,source:'aggregate_dry_run',stage:'aggregate_preflight_transport',transport_failure:true,session_error:true,error_code:errorCode,message:'Server validation unavailable. Please retry.',message_en:'Server validation unavailable. Please retry.',validation_results:[],validation_result_count:0,failed_result_count:0,passed_result_count:0,no_write:true,write_attempted:false,formal_write_count:0,request_url:'/api/employee/entry/validate',request_method:'POST',credentials_mode:'include',same_origin:true,http_status:Number(details.http_status||0),response_content_type:String(details.response_content_type||''),response_body_kind:String(details.response_body_kind||''),response_error_code:String(details.response_error_code||''),exception_name:String(details.exception_name||''),exception_message:String(details.exception_message||'').slice(0,160),request_body_bytes:Number(details.request_body_bytes||0)};
+}
+function employeeLiftAggregateTransportFailuresToSession(){
+  let lifted=null,changed=false;
+  (state.drafts||[]).forEach(entry=>{
+    const error=entry?.upload_validation_error||{};
+    const code=String(error.error_code||entry?.upload_validation_error_code||'');
+    const source=String(error.source||'');
+    if(!EMPLOYEE_AGGREGATE_TRANSPORT_ERRORS.has(code)||source!=='aggregate_dry_run')return;
+    lifted=lifted||employeeAggregateValidationSessionFailure(code,{http_status:error?.raw_validation_response?.http_status||0});
+    entry.upload_validation_error=null;
+    entry.upload_validation_error_code='';
+    entry.sync_error='';
+    if(String(entry.upload_status||'').toUpperCase()==='VALIDATION_FAILED')entry.upload_status='LOCAL';
+    changed=true;
   });
-  return {success:false,ok:false,source:'aggregate_dry_run',error_code:errorCode,message,validation_results:results,validation_result_count:results.length,failed_result_count:results.length,passed_result_count:0,no_write:true,write_attempted:false,formal_write_count:0};
+  if(lifted)state.aggregateValidationSessionError=lifted;
+  if(changed)saveDrafts();
+  return changed;
+}
+function employeeAggregateValidationEntry(entry){
+  entry=entry||{};
+  const clean={...(entry||{})};
+  ['sync_status','upload_status','cloud_sync_status','cloud_sync_checked_at','upload_validation_error','upload_validation_error_code','sync_error','cloud_entry_id','upload_attempt_id'].forEach(field=>delete clean[field]);
+  return clean;
+}
+function renderEmployeeAggregateSessionError(result){
+  const r=result||{};
+  return `<div class="upload-validation-panel" role="alert" data-aggregate-session-error="true"><div class="uv-title">Server validation unavailable. Please retry.</div><div class="uv-sub">本票服务器预校验暂时不可用；记录未被判定为业务失败。</div><div class="uv-list"><span class="uv-label">Session Error</span><span class="uv-value">${esc(r.error_code||'SERVER_VALIDATE_UNAVAILABLE')}</span></div><div class="preview-tools"><button class="mini-btn" data-retry-aggregate-validation="true">${renderEmployeeButtonLabel('Retry Validation','重试预校验')}</button></div><div class="warn">No business write was attempted. Existing record statuses were preserved.</div></div>`;
+}
+function employeeBindAggregateValidationRetry(){
+  document.querySelectorAll('[data-retry-aggregate-validation]').forEach(btn=>btn.onclick=()=>{state.aggregateValidationOnly=true;commitSessionAndExport()});
 }
 async function validateEmployeeUploadAggregateDryRun(validationRequests){
+  let requestBody='';
+  try{
+    const sanitizedRequests=(validationRequests||[]).map(request=>{
+      const entry=employeeAggregateValidationEntry(request?.entry||request?.entries?.[0]||{});
+      const entries=(request?.entries||[entry]).map(employeeAggregateValidationEntry);
+      const sessionEntries=(request?.session?.entries||entries).map(employeeAggregateValidationEntry);
+      const session={...(request?.session||{}),entries:sessionEntries,entries_json:JSON.stringify({anchor_contract_version:'employee_entry_anchor_v1',entries:sessionEntries})};
+      return {...request,entry,entries,session};
+    });
+    requestBody=JSON.stringify({aggregate_preflight:true,dry_run:true,validate_only:true,no_write:true,validation_requests:sanitizedRequests,diagnostic:employeeDiagnosticAssetMeta()});
+  }
+  catch(error){return employeeAggregateValidationSessionFailure('SERVER_VALIDATE_REQUEST_SERIALIZATION_FAILED',{exception_name:error?.name||'Error',exception_message:error?.message||''})}
   let response;
   try{
-    response=await apiFetch('/api/employee/entry/validate',{method:'POST',body:JSON.stringify({aggregate_preflight:true,dry_run:true,validate_only:true,no_write:true,validation_requests,diagnostic:employeeDiagnosticAssetMeta()})});
-  }catch{
-    return employeeAggregateValidationFallback(validationRequests,'SERVER_VALIDATE_UNREACHABLE','Unable to reach aggregate upload validation.');
+    response=await apiFetch('/api/employee/entry/validate',{method:'POST',body:requestBody});
+  }catch(error){
+    return employeeAggregateValidationSessionFailure('SERVER_VALIDATE_UNREACHABLE',{exception_name:error?.name||'Error',exception_message:error?.message||'',request_body_bytes:new Blob([requestBody]).size});
   }
   const raw=await response.text();
   let data=null;
   try{data=raw?unwrapStandardResponse(JSON.parse(raw)):null}catch{}
   if(Array.isArray(data?.validation_results)&&data.validation_results.length===validationRequests.length)return data;
-  const timeout=response.status===503;
-  return employeeAggregateValidationFallback(validationRequests,timeout?'SERVER_PROCESSING_TIMEOUT':'SERVER_VALIDATE_MALFORMED_RESPONSE',timeout?'Server processing timed out. Please retry.':'Aggregate upload validation returned an unreadable response.',response.status);
+  const contentType=String(response.headers?.get?.('content-type')||'');
+  const errorCode=[401,403].includes(response.status)?'SERVER_VALIDATE_AUTH_REQUIRED':response.status===404?'SERVER_VALIDATE_ROUTE_NOT_FOUND':response.status===503?'SERVER_PROCESSING_TIMEOUT':'SERVER_VALIDATE_MALFORMED_RESPONSE';
+  return employeeAggregateValidationSessionFailure(errorCode,{http_status:response.status,response_content_type:contentType,response_body_kind:contentType.includes('json')?'json':(raw?'non_json':'empty'),response_error_code:data?.error_code||data?.code||'',request_body_bytes:new Blob([requestBody]).size});
 }
 async function commitSessionAndExport(){
+  const validateOnly=state.aggregateValidationOnly===true;
+  state.aggregateValidationOnly=false;
   const uploadT0=performance.now();
   const uploadTiming={payload_build_ms:0,validation_ms:0,api_request_ms:0,response_parse_ms:0,total_ms:0};
   if(state.user&&!state.drafts.length){
@@ -8331,7 +8362,7 @@ async function commitSessionAndExport(){
   };
   btns.forEach(b=>{b.dataset.busy='1';b.disabled=true;b.classList.add('disabled');b.innerHTML=renderEmployeeButtonLabel('Validating','正在校验')});
   const allOriginalDrafts=state.drafts.map(e=>({...e}));
-  const originalDrafts=allOriginalDrafts.filter(entry=>!employeeEntryCloudConfirmed(entry));
+  const originalDrafts=validateOnly?allOriginalDrafts:allOriginalDrafts.filter(entry=>!employeeEntryCloudConfirmed(entry));
   if(!originalDrafts.length){oldLabels.forEach(([b,html])=>{b.dataset.busy='0';b.innerHTML=html});updateEntrySessionActionState();return;}
   const originalSessionId=state.sessionId;
   const payloadStart=performance.now();
@@ -8373,10 +8404,34 @@ async function commitSessionAndExport(){
     if(isBedTransfer)bedTransferUploadPayloads[i]=employeeBedTransferRecordPayload(requestPayload);
   }
   const aggregatePreflight=await validateEmployeeUploadAggregateDryRun(validationRequests);
+  if(aggregatePreflight?.transport_failure===true){
+    state.drafts=allOriginalDrafts;
+    state.sessionId=originalSessionId;
+    state.aggregateValidationSessionError=aggregatePreflight;
+    state.uploadValidationFailedIndex=null;
+    state.uploadValidationFailedEntryId='';
+    state.uploadValidationFailedMessage='';
+    buildExport();
+    refreshSessionViews();
+    oldLabels.forEach(([b,html])=>{b.dataset.busy='0';b.disabled=false;b.classList.remove('disabled');b.innerHTML=html});
+    showStatus('Server validation unavailable. Please retry.','warn');
+    if($('validationBox'))$('validationBox').innerHTML=renderEmployeeAggregateSessionError(aggregatePreflight);
+    employeeBindAggregateValidationRetry();
+    toast('Server validation unavailable. Please retry.',6000);
+    updateEntrySessionActionState();
+    return;
+  }
+  state.aggregateValidationSessionError=null;
   const aggregateResults=Array.isArray(aggregatePreflight?.validation_results)?aggregatePreflight.validation_results:[];
   for(let i=0;i<uploadList.length;i++){
     const e=uploadList[i];
-    const rawResult=aggregateResults[i]||employeeAggregateValidationFallback([validationRequests[i]],'AGGREGATE_RESULT_MISSING','Aggregate preflight did not return this record.',0).validation_results[0];
+    const rawResult=aggregateResults.find(result=>String(result?.entry_identity||result?.record_id||'')===employeeEntryStableIdentity(e));
+    if(!rawResult){
+      state.drafts=allOriginalDrafts;
+      state.sessionId=originalSessionId;
+      state.aggregateValidationSessionError=employeeAggregateValidationSessionFailure('SERVER_VALIDATE_MALFORMED_RESPONSE',{response_body_kind:'missing_validation_result'});
+      buildExport();refreshSessionViews();oldLabels.forEach(([b,html])=>{b.dataset.busy='0';b.disabled=false;b.classList.remove('disabled');b.innerHTML=html});updateEntrySessionActionState();return;
+    }
     if(rawResult?.ok===true){
       e.upload_status='VALIDATION_PASSED';
       e.upload_validation_error=null;
@@ -8418,6 +8473,24 @@ async function commitSessionAndExport(){
     $('validationBox').innerHTML=renderEmployeeUploadDryRunError(firstDryRunFailure.result);
     employeeBindDiagnosticCopyButtons();
     toast(`${dryRunFailed.length} records failed validation / ${dryRunFailed.length} \u6761\u8bb0\u5f55\u6821\u9a8c\u5931\u8d25`,6000);
+    updateEntrySessionActionState();
+    return;
+  }
+  if(validateOnly){
+    uploadList.forEach(validated=>{
+      const original=allOriginalDrafts.find(row=>employeeEntryStableIdentity(row)===employeeEntryStableIdentity(validated));
+      if(!original)return;
+      original.upload_status='VALIDATION_PASSED';
+      original.upload_validation_error=null;
+      original.upload_validation_error_code='';
+      original.sync_error='';
+    });
+    state.drafts=allOriginalDrafts;
+    state.sessionId=originalSessionId;
+    saveDrafts();buildExport();refreshSessionViews();
+    oldLabels.forEach(([b,html])=>{b.dataset.busy='0';b.disabled=false;b.classList.remove('disabled');b.innerHTML=html});
+    showStatus(`Validation completed for ${aggregateResults.length} records. No business write was attempted.`);
+    if($('validationBox'))$('validationBox').innerHTML='<div class="ok">Session validation completed. No business write was attempted.</div>';
     updateEntrySessionActionState();
     return;
   }
@@ -9313,7 +9386,9 @@ renderSessionPreview=function(){
   }).join('');
   document.querySelectorAll('[data-undo]').forEach(btn=>btn.onclick=()=>undoDraft(btn.dataset.undo));
   document.querySelectorAll('[data-remove-session-record]').forEach(btn=>btn.onclick=()=>removeCurrentSessionRecord(btn.dataset.removeSessionRecord,'Invalid record removed'));
+  if(state.aggregateValidationSessionError)$('sessionPreview').insertAdjacentHTML('afterbegin',renderEmployeeAggregateSessionError(state.aggregateValidationSessionError));
   document.querySelectorAll('[data-retry-session-record]').forEach(btn=>btn.onclick=()=>commitSessionAndExport());
+  employeeBindAggregateValidationRetry();
   document.querySelectorAll('[data-remove-cloud-local]').forEach(btn=>btn.onclick=()=>removeCurrentSessionRecord(btn.dataset.removeCloudLocal,'Local cloud-state copy removed. No cloud data was changed.'));
   document.querySelectorAll('[data-request-owner-reupload]').forEach(btn=>btn.onclick=()=>employeeRequestOwnerReuploadApproval(btn.dataset.requestOwnerReupload));
   document.querySelectorAll('[data-view-cloud-state]').forEach(btn=>btn.onclick=()=>employeeViewCloudState(btn.dataset.viewCloudState));
