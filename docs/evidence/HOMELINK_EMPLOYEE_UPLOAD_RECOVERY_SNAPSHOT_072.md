@@ -63,3 +63,63 @@ The target-session-only preflight reported no transfer anchor, but the post-writ
 - No hard delete, void, correction, TTLock change, or further business write was performed after discovery.
 - The new duplicate anchor remains raw and effective in D1 until the Owner explicitly authorizes an additive void/correction. Worker rollback does not revert D1.
 - Task 072 must remain `PARTIAL`; production business data changed and requires a separately authorized, exact cleanup.
+
+## Authorized duplicate cleanup and idempotency closure
+
+Completed: 2026-07-16 Asia/Dubai
+
+The Owner authorized exactly one additive void for the newer duplicate transfer and required the older canonical transfer to remain effective.
+
+### Exact additive void
+
+| Field | Verified value |
+|---|---|
+| New duplicate target | `0f369f3c-9fc0-492a-b5eb-f5c5e98f9cea` |
+| Preserved active anchor | `046190bb-e111-46e0-8d61-abfcac46823f` |
+| Void session | `owner-tf-void-session-d0dc8e71-4cee-4d1e-87de-fcf2c6709227` |
+| Void anchor | `owner-tf-void-anchor-2770d339-c773-4554-b451-98a2b25d5149` |
+| Void fingerprint | `btv-c8bcd6d0` |
+| Void event type | `void_transfer` |
+| Void session status | `TRANSFER_VOID_APPLIED` |
+| Hard delete | `false` |
+| TTLock mutated | `false` |
+
+The void was inserted as immutable canonical archive evidence. No original anchor was deleted or rewritten, and no transaction, arrears, deposit, TTLock, schema, migration, secret, D1 binding, or KV binding was changed.
+
+### Post-cleanup canonical and Finance facts
+
+- Canonical fingerprint `bt-02d88a84`: raw transfer count 2; effective transfer count 1.
+- Raw transfer fee: AED 100; effective transfer fee: AED 50.
+- `046190bb-e111-46e0-8d61-abfcac46823f`: active, effective AED 50.
+- `0f369f3c-9fc0-492a-b5eb-f5c5e98f9cea`: voided, effective AED 0.
+- Owner Finance effective Bed Transfer fee total returned from AED 150 before cleanup to AED 100 after cleanup, removing the duplicate AED 50 while preserving the older valid transfer.
+- Target mixed Session `S20260713-jkqj7` remains `COMPLETED` with eight canonical entries.
+- Today Todo shows exactly one `112 -> 111` TTLock transfer task; no duplicate task was introduced.
+
+### Owner projection acceptance
+
+- Owner History shows two separate `112 -> 111` business records: the old anchor as `ACTIVE` and the newer duplicate as `Voided / 已撤销`.
+- Both cards show Due AED 50.00, Paid AED 50.00, and CASH.
+- The standalone void session and void anchor are not rendered as independent business cards.
+- The voided transfer Audit Trail contains both `0f369f3c-9fc0-492a-b5eb-f5c5e98f9cea` and `owner-tf-void-anchor-2770d339-c773-4554-b451-98a2b25d5149`.
+- No `Detail Render Mismatch`, core 503, or authentication redirect loop was observed during repeated authenticated Owner navigation.
+
+### Global fingerprint idempotency protection
+
+Runtime commit `79d096f48e9435626b8fec9c67d54e5286bb242e` (`fix: enforce global transfer fingerprint idempotency`) adds fail-closed cross-Session canonical fingerprint checks to aggregate prevalidation and formal write:
+
+- a prior effective anchor is recognized even when its legacy archive entry has no `entry_identity`;
+- the same canonical business fingerprint returns existing/idempotent success without a second write;
+- multiple effective matches fail closed before D1 mutation;
+- a precisely voided duplicate is ignored while the preserved anchor remains the sole effective match;
+- Entry ID remains stable for request/result association but is no longer the only persistence proof.
+
+Focused tests: 62 passed, 0 failed. The set covered cross-Session fingerprint reuse, multiple-match fail-closed behavior, exact-void handling, authentication recovery, the 13-record mixed aggregate flow, Bed Transfer timeout and legacy-genesis regressions, TTLock call reduction, Exit Event zero external TTLock calls, Owner transfer void behavior, and Worker/Employee syntax. `git diff --check` passed.
+
+### Production deployment closure
+
+- Fixed runtime first deployed as `ce5ecd3e-fde6-4be0-9688-4c7e2d7e31a1`.
+- Owner void gate was temporarily enabled only for the exact cleanup in `f126895d-97df-48fc-b4ce-d10efe5ab639`.
+- Final production version is `84ee2023-f550-47e0-9e4f-3caa161a3431` at 100% traffic.
+- Final version uses `APP_ENV=internal_beta`, preserves the existing D1/KV bindings, and does not contain `BED_TRANSFER_OWNER_VOID_ENABLED`; the temporary gate is closed.
+- Production business data changed only through the authorized additive void. Raw audit history increased by one void anchor; the duplicate effective AED 50 impact was removed.
