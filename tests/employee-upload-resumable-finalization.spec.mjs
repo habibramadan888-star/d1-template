@@ -3,6 +3,7 @@ import {readFile} from 'node:fs/promises';
 import test from 'node:test';
 import vm from 'node:vm';
 import {classifyExistingCanonicalTransfer,prepareCanonicalTransferArchiveWrite} from '../modules/employees/bed-transfer-canonical-archive-write.mjs';
+import {findEffectiveBedTransferAnchor} from '../modules/owner-todo/bed-transfer-owner-todo.mjs';
 
 const worker=await readFile('deploy-worker/src/index.js','utf8');
 const employee=await readFile('deploy-worker/public/employee-v3.html','utf8');
@@ -25,12 +26,12 @@ function block(source,name,last=false){
 
 const preview={event_type:'bed_transfer',type:'TF',from_bed:'112',to_bed:'111',transfer_reason:'room_issue',corpid:'corp',source_context_mode:'server_verified_legacy_genesis',lineage_genesis:true,owner_confirmation_scope:'INTERNAL_BETA',source_context_anchor_refs:[],carried_arrears_refs:[],rent_coverage_ref:'rent-ref',deposit_context_ref:'deposit-ref',expiry_context_ref:'expiry-ref',snapshot_fingerprint:'snapshot',ttlock_sequence:'employee_first_pre_move',source_snapshot_fingerprint:'source-snapshot',target_snapshot_fingerprint:'target-snapshot',physical_state_before_submission:{source:'not_marked_vacant',target:'vacant'},continuity_checks:{corpid:'matched'},fee_mode:'paid',fee_amount_aed:50,payment_method:'cash'};
 
-function persistenceHarness(){
+function persistenceHarness(globalFinder=async()=>({status:'missing',matches:[]})){
   const sessionId='S20260713-jkqj7';
   const entries=Array.from({length:7},(_,index)=>({event_type:'rent',type:'R',id:`persisted-${index+1}`,event_id:`persisted-${index+1}`}));
   const row={id:sessionId,anchor_id:'EMPV3-anchor',entries_count:7,entries_json:JSON.stringify({anchor_contract_version:'employee_entry_anchor_v1',entries}),handover_status:'EXPORTING',voided_at:null};
   let updates=0,ids=0;
-  const context={prepareCanonicalTransferArchiveWrite,classifyExistingCanonicalTransfer,cleanId:value=>String(value||''),cleanText:value=>String(value||''),empNow:()=> '2026-07-15T12:00:00+04:00',cleanDate:value=>String(value||'').slice(0,10),bedTransferWriteApproved:env=>env.BED_TRANSFER_WRITE_APPROVED==='true',crypto:{randomUUID:()=>`00000000-0000-4000-8000-${String(++ids).padStart(12,'0')}`},json:(body,status)=>({body,status}),success:body=>body};
+  const context={prepareCanonicalTransferArchiveWrite,classifyExistingCanonicalTransfer,findEffectiveCanonicalTransferByFingerprint:globalFinder,cleanId:value=>String(value||''),cleanText:value=>String(value||''),empNow:()=> '2026-07-15T12:00:00+04:00',cleanDate:value=>String(value||'').slice(0,10),bedTransferWriteApproved:env=>env.BED_TRANSFER_WRITE_APPROVED==='true',crypto:{randomUUID:()=>`00000000-0000-4000-8000-${String(++ids).padStart(12,'0')}`},json:(body,status)=>({body,status}),success:body=>body};
   vm.createContext(context);
   vm.runInContext(`${block(worker,'persistEmployeeBedTransferCanonicalArchive')};this.persist=persistEmployeeBedTransferCanonicalArchive`,context);
   const env={APP_ENV:'internal_beta',BED_TRANSFER_WRITE_APPROVED:'true',DB:{prepare:sql=>({bind:(...args)=>({
@@ -78,6 +79,63 @@ test('same-session archive matches are idempotent while a missing transfer remai
   assert.match(duplicate,/incoming\.event_id&&stored\.event_id===incoming\.event_id/);
   assert.match(duplicate,/canonical_fingerprint_persistence:'COMPLETE'/);
   assert.match(duplicate,/if\(existing\.same_session\)continue/);
+});
+
+test('canonical Bed Transfer validation and write both enforce the effective global business fingerprint',()=>{
+  const validate=block(worker,'validateEmployeeEntryUploadPayload');
+  const persist=block(worker,'persistEmployeeBedTransferCanonicalArchive');
+  const lookup=block(worker,'findEffectiveCanonicalTransferByFingerprint');
+  assert.match(validate,/prepareCanonicalTransferArchiveWrite[\s\S]*findEffectiveCanonicalTransferByFingerprint/);
+  assert.match(validate,/canonical_fingerprint_persistence:"COMPLETE_GLOBAL"/);
+  assert.match(validate,/BED_TRANSFER_CANONICAL_FINGERPRINT_CONFLICT/);
+  assert.ok(persist.indexOf('findEffectiveCanonicalTransferByFingerprint')<persist.indexOf("const readExisting="));
+  assert.match(persist,/already_accepted:true,no_write:true,canonical_fingerprint_persistence:'COMPLETE_GLOBAL'/);
+  assert.match(lookup,/canonical_request_fingerprint/);
+  assert.match(lookup,/findEffectiveBedTransferAnchor/);
+  assert.doesNotMatch(lookup,/entry_identity/);
+});
+
+test('a cross-session effective fingerprint without entry_identity returns existing idempotent success',async()=>{
+  const oldEntry={...prepareCanonicalTransferArchiveWrite({validated_anchor:preview,session_id:'old-session',accepted_at:'2026-07-15T12:00:00+04:00',operator_reference:'employee'},{idFactory:name=>name==='transfer_anchor_id'?'old-anchor':'old-lineage'}).entry};
+  delete oldEntry.id;delete oldEntry.event_id;delete oldEntry.entry_identity;
+  const h=persistenceHarness(async(_env,_user,fingerprint)=>({status:'accepted',matches:[{entry:oldEntry}],entry:oldEntry,existing_anchor:'old-anchor',existing_session_id:'old-session',fingerprint}));
+  const result=await h.context.persist(h.env,{corpid:'corp',userid:'employee',employee_name:'Employee'},{entry_identity:'new-entry',entry:{id:'new-entry'},session:{id:'new-session'}},{bed_transfer_phase1_preview:preview});
+  assert.equal(result.ok,true);
+  assert.equal(result.idempotent,true);
+  assert.equal(result.already_accepted,true);
+  assert.equal(result.no_write,true);
+  assert.equal(result.existing_session_id,'old-session');
+  assert.equal(result.existing_anchor,'old-anchor');
+  assert.equal(result.canonical_entry.entry_identity,undefined);
+  assert.equal(h.updates,0);
+});
+
+test('multiple effective anchors with one canonical fingerprint fail closed before mutation',async()=>{
+  const h=persistenceHarness(async()=>({status:'conflict',matches:[{existing_anchor:'a'},{existing_anchor:'b'}]}));
+  const result=await h.context.persist(h.env,{corpid:'corp',userid:'employee'},{entry_identity:'new-entry',entry:{id:'new-entry'},session:{id:'new-session'}},{bed_transfer_phase1_preview:preview});
+  assert.equal(result.status,409);
+  assert.equal(result.body.error_code,'BED_TRANSFER_CANONICAL_FINGERPRINT_CONFLICT');
+  assert.equal(result.body.write_attempted,false);
+  assert.equal(h.updates,0);
+});
+
+test('global fingerprint lookup ignores the precisely voided duplicate and keeps the older anchor effective',async()=>{
+  const oldAnchor={event_type:'bed_transfer',transfer_anchor_id:'old-anchor',canonical_request_fingerprint:'bt-same',corpid:'corp'};
+  const newAnchor={event_type:'bed_transfer',transfer_anchor_id:'new-anchor',canonical_request_fingerprint:'bt-same',corpid:'corp',entry_identity:'new-entry'};
+  const voidAnchor={event_type:'void_transfer',void_anchor_id:'void-new',target_transfer_anchor_id:'new-anchor',corpid:'corp'};
+  const items=[{session:{id:'old-session'},anchor:oldAnchor},{session:{id:'new-session'},anchor:newAnchor},{session:{id:'void-session'},anchor:voidAnchor}];
+  const context={cleanText:(value,max=1000)=>String(value??'').trim().slice(0,max),employeeEntryExistingSessionAnchors:async()=>items,findEffectiveBedTransferAnchor};
+  vm.createContext(context);
+  vm.runInContext(`${block(worker,'findEffectiveCanonicalTransferByFingerprint')};this.lookup=findEffectiveCanonicalTransferByFingerprint`,context);
+  const cleaned=await context.lookup({}, {corpid:'corp'}, 'bt-same');
+  assert.equal(cleaned.status,'accepted');
+  assert.equal(cleaned.matches.length,1);
+  assert.equal(cleaned.existing_anchor,'old-anchor');
+  assert.equal(cleaned.existing_session_id,'old-session');
+  items.pop();
+  const conflicted=await context.lookup({}, {corpid:'corp'}, 'bt-same');
+  assert.equal(conflicted.status,'conflict');
+  assert.equal(conflicted.matches.length,2);
 });
 
 test('resumable finalization appends exactly one transfer and retry is idempotent',async()=>{

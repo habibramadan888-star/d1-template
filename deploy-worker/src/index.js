@@ -3201,7 +3201,7 @@ async function validateEmployeeEntryUploadPayload(env,user,body,opts={}){
   }
   const session=body?.session||{};
   const entry=employeeEntryValidationEntryFromBody(body,eventIndex);
-  const duplicateGuard=await checkEmployeeEntryDuplicates(env,user,body,{event_index:eventIndex});
+  let duplicateGuard=await checkEmployeeEntryDuplicates(env,user,body,{event_index:eventIndex,request_context:opts.request_context});
   if(!duplicateGuard.ok)return employeeEntryDuplicateValidationFailure(duplicateGuard,eventIndex);
   if(duplicateGuard.idempotent){
     return {
@@ -3286,6 +3286,18 @@ async function validateEmployeeEntryUploadPayload(env,user,body,opts={}){
     console.log(JSON.stringify({event:"bed_transfer_validate_metrics",route_category:cleanText(context.route_category||"employee_entry_validate",80),ok:phase1?.ok===true,error_code:cleanText(phase1?.error_code||"",120),duration_ms:Math.max(0,Date.now()-Number(context.started_at_ms||Date.now())),archive_read_count:Number(context.archive_read_count||0),archive_parse_count:Number(context.archive_parse_count||0),bed_context_count:Number(context.bed_context_count||0),ttlock_external_call_count:Number(context.ttlock_external_call_count||0),ttlock_cache_state:cleanText(context.ttlock_cache_state||"",20),kv_read_count:Number(context.kv_read_count||0),kv_write_count:Number(context.kv_write_count||0),last_successful_stage:cleanText(context.last_successful_stage||"request_started",80)}));
     if(!phase1.ok)return employeeEntryValidationFailure("bed_transfer_phase1_contract",phase1.error_code,phase1.message||"Bed Transfer Phase 1 contract rejected the dry-run payload.",{event_index:eventIndex,event_type:"bed_transfer",missing_fields:phase1.missing_fields||[],invalid_fields:phase1.invalid_fields||[],anchor_preview:{...anchorPreview,phase1_contract:phase1}});
     bedTransferPhase1Preview=phase1;
+    const fingerprintPreview=prepareCanonicalTransferArchiveWrite({
+      validated_anchor:phase1,
+      session_id:cleanId(session.id||session.session_id),
+      entry_identity:cleanText(entry.id||entry.event_id||entry.anchor_id||"",120),
+      accepted_at:"",
+      operator_reference:cleanText(user?.userid||"",120)
+    });
+    if(fingerprintPreview.ok){
+      const globalExisting=await findEffectiveCanonicalTransferByFingerprint(env,user,fingerprintPreview.request_fingerprint,{request_context:opts.request_context});
+      if(globalExisting.status==="conflict")return employeeEntryValidationFailure("duplicate_validation","BED_TRANSFER_CANONICAL_FINGERPRINT_CONFLICT","Multiple effective Bed Transfer anchors share the same canonical business fingerprint.",{event_index:eventIndex,event_type:"bed_transfer",invalid_fields:["canonical_request_fingerprint"],anchor_preview:{...anchorPreview,canonical_request_fingerprint:fingerprintPreview.request_fingerprint,effective_match_count:globalExisting.matches.length}});
+      if(globalExisting.status==="accepted")duplicateGuard={ok:true,idempotent:true,existing_session_id:globalExisting.existing_session_id,existing_anchor:globalExisting.existing_anchor,canonical_fingerprint_persistence:"COMPLETE_GLOBAL",canonical_request_fingerprint:fingerprintPreview.request_fingerprint};
+    }
   }
   if(normalized.validation_status!=="valid"){
     return employeeEntryValidationFailure("anchor_validation","ANCHOR_CONTRACT_MISSING_FIELDS","Entry anchor is missing required fields.",{
@@ -3657,12 +3669,15 @@ function employeeBedTransferSingleEntryFailure(body={}){
   return null;
 }
 __name(employeeBedTransferSingleEntryFailure,"employeeBedTransferSingleEntryFailure");
-async function persistEmployeeBedTransferCanonicalArchive(env,user,body,validationResult){
+async function persistEmployeeBedTransferCanonicalArchive(env,user,body,validationResult,requestContext=null){
   const session=body?.session||{},sessionId=cleanId(session.id||session.session_id);
   const preview=validationResult?.bed_transfer_phase1_preview||{};
   const entryIdentity=cleanText(body?.entry_identity||body?.entry?.id||body?.entry?.event_id||body?.entry?.anchor_id||'',120);
   const base=prepareCanonicalTransferArchiveWrite({validated_anchor:preview,session_id:sessionId,entry_identity:entryIdentity,accepted_at:empNow(),operator_reference:cleanText(user?.userid||'',120)});
   if(!base.ok)return json({success:false,ok:false,error_code:base.error_code,no_write:true},422);
+  const globalExisting=await findEffectiveCanonicalTransferByFingerprint(env,user,base.request_fingerprint,{request_context:requestContext});
+  if(globalExisting.status==='conflict')return json({success:false,ok:false,error_code:'BED_TRANSFER_CANONICAL_FINGERPRINT_CONFLICT',no_write:true,write_attempted:false,effective_match_count:globalExisting.matches.length},409);
+  if(globalExisting.status==='accepted')return success({success:true,ok:true,idempotent:true,already_accepted:true,no_write:true,canonical_fingerprint_persistence:'COMPLETE_GLOBAL',requested_session_id:sessionId,session_id:globalExisting.existing_session_id,existing_session_id:globalExisting.existing_session_id,existing_anchor:globalExisting.existing_anchor,canonical_entry:globalExisting.entry});
   const readExisting=()=>env.DB.prepare('SELECT id, anchor_id, entries_count, entries_json, handover_status, voided_at FROM sessions WHERE id=? AND corpid=? LIMIT 1').bind(sessionId,user.corpid).first().catch(()=>null);
   const existing=await readExisting();
   if(existing){
@@ -3744,7 +3759,7 @@ async function handleEmployeeEntry(request,env,user){
   body=normalizeEmployeeEntryBodyForValidation(body||{});
   const validationResult=await validateEmployeeEntryUploadPayload(env,user,body,{event_index:body?.event_index,canonical_transfer_link_anchor:["TF","TFF"].includes(writeGateType),request_context,legacy_genesis_gate:request_context.legacy_genesis_gate});
   if(!validationResult.ok)return json({success:false,...validationResult},422);
-  if(["TF","TFF"].includes(writeGateType))return persistEmployeeBedTransferCanonicalArchive(env,user,body,validationResult);
+  if(["TF","TFF"].includes(writeGateType))return persistEmployeeBedTransferCanonicalArchive(env,user,body,validationResult,request_context);
   if(validationResult.idempotent){
     const entry=body?.entry||{};
     return success({
@@ -4812,6 +4827,26 @@ async function employeeEntryExistingSessionAnchors(env,user,incomingSessionId,op
   return anchors;
 }
 __name(employeeEntryExistingSessionAnchors,"employeeEntryExistingSessionAnchors");
+async function findEffectiveCanonicalTransferByFingerprint(env,user,fingerprint,opts={}){
+  const wanted=cleanText(fingerprint||"",120);
+  if(!wanted)return {status:"missing",matches:[]};
+  const existing=await employeeEntryExistingSessionAnchors(env,user,"",opts);
+  const archiveEntries=existing.map(item=>({...item.anchor,corpid:item.anchor?.corpid||user?.corpid||""}));
+  const byAnchorId=new Map();
+  for(const item of existing){
+    const anchor=item.anchor||{};
+    const eventType=String(anchor.event_type||anchor.type||"").trim().toLowerCase();
+    const anchorId=cleanText(anchor.transfer_anchor_id||anchor.anchor_id||anchor.event_id||"",180);
+    if(eventType!=="bed_transfer"||!anchorId||cleanText(anchor.canonical_request_fingerprint||"",120)!==wanted||byAnchorId.has(anchorId))continue;
+    if(!findEffectiveBedTransferAnchor(archiveEntries,anchorId))continue;
+    byAnchorId.set(anchorId,{entry:anchor,existing_anchor:anchorId,existing_session_id:cleanText(item.session?.id||"",160)});
+  }
+  const matches=[...byAnchorId.values()];
+  if(matches.length>1)return {status:"conflict",matches};
+  if(matches.length===1)return {status:"accepted",matches,...matches[0]};
+  return {status:"missing",matches:[]};
+}
+__name(findEffectiveCanonicalTransferByFingerprint,"findEffectiveCanonicalTransferByFingerprint");
 async function checkEmployeeEntryDuplicates(env,user,body,opts={}){
   const session=body?.session||{};
   const incomingSessionId=cleanText(session.id||session.session_id||"",120);
