@@ -144,7 +144,8 @@ test("canonical validate and employee entry routes remain the only Phase 1 path"
   assert.doesNotMatch(validateHandler, /\.run\(|\.batch\(|empInsertDynamic/);
   assert.match(classifier, /bed_transfer:"TF"/);
   assert.match(dispatch, /TF:validateBedTransferUploadFields/);
-  assert.match(validatePayload, /validateEmployeeBedTransferPhase1\(env,user,entry,normalized\)/);
+  assert.match(validatePayload, /validateEmployeeBedTransferCanonicalLink\(env,user,entry,normalized,opts\)/);
+  assert.match(validatePayload, /validateEmployeeBedTransferPhase1\(env,user,entry,normalized,opts\)/);
   assert.match(validatePayload, /const sessionEntriesJson=JSON\.stringify/);
   assert.match(validatePayload, /employeeEntryExportTextWithAnchors/);
   assert.match(entryHandler, /entries_json:cleanText\(sessionEntriesJson,50000\)/);

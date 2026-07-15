@@ -2817,12 +2817,25 @@ function bedTransferSafeSnapshotFingerprint(user={},gateway={}){
   return `bed_transfer_access_${accessSnapshotRuntimeHash(parts.join("|"))}`;
 }
 __name(bedTransferSafeSnapshotFingerprint,"bedTransferSafeSnapshotFingerprint");
-function resolveEmployeeOwnerConfirmedLegacyGenesis(env,user,fromBed,toBed,sourceGateway,targetGateway,baseResolution){
+function employeeBedTransferLegacyGenesisGate(env={},user={}){
+  const capabilities=bedTransferDeploymentCapabilities(env);
+  const appEnv=cleanText(env.APP_ENV||"",40).toLowerCase();
+  const role=cleanText(user?.role||"",40).toLowerCase();
+  const employeeAuthorized=["staff","employee"].includes(role)&&!!cleanText(user?.corpid||"",120);
+  const legacyGenesisMode=cleanText(env.BED_TRANSFER_LEGACY_GENESIS_MODE||"",40).toLowerCase();
+  const validateEnabled=capabilities.bed_transfer_validate_enabled===true;
+  const writeEnabled=capabilities.bed_transfer_write_enabled===true;
+  const serverVerifiedPermission=appEnv==="internal_beta"&&employeeAuthorized&&validateEnabled&&writeEnabled&&legacyGenesisMode==="server_verified";
+  return {app_env:appEnv,bed_transfer_validate_enabled:validateEnabled,bed_transfer_write_enabled:writeEnabled,legacy_genesis_mode:legacyGenesisMode,employee_authorized:employeeAuthorized,server_verified_permission:serverVerifiedPermission};
+}
+__name(employeeBedTransferLegacyGenesisGate,"employeeBedTransferLegacyGenesisGate");
+function resolveEmployeeOwnerConfirmedLegacyGenesis(env,user,fromBed,toBed,sourceGateway,targetGateway,baseResolution,gate=employeeBedTransferLegacyGenesisGate(env,user)){
   const context=(gateway={})=>{
     const occupancy=gateway.occupancy_gateway||{},access=gateway.access_snapshot_context||{};
     return {corpid:cleanText(user?.corpid||"",120),physical_bed_status:cleanText(occupancy.physical_bed_status||"",40),parsed_vacancy_marker:access.parsed_vacancy_marker===true,candidate_count:access.candidate_count??0,ambiguous:access.ambiguous===true,conflict:access.conflict===true,stale:access.stale===true,parsed_deposit_amount:occupancy.deposit_recorded_amount??access.parsed_deposit_amount??null,parsed_checkin_mmdd:cleanText(access.parsed_checkin_mmdd||"",20),parsed_valid_until_mmdd:cleanText(access.parsed_valid_until_mmdd||"",20),normalized_expiry_value:cleanText(access.normalized_expiry_value||"",80),snapshot_fingerprint:bedTransferSafeSnapshotFingerprint(user,gateway)};
   };
-  return resolveOwnerConfirmedLegacyGenesis({base_resolution:baseResolution,corpid:user?.corpid||"",from_bed:fromBed,to_bed:toBed,app_env:env.APP_ENV,write_approved:bedTransferWriteApproved(env),legacy_genesis_mode:env.BED_TRANSFER_LEGACY_GENESIS_MODE,allowed_source_beds:bedTransferLegacyGenesisAllowlist(env),source_context:context(sourceGateway),target_context:context(targetGateway),open_arrears:sourceGateway?.open_arrears||[]});
+  const writeApproved=gate.app_env==="internal_beta"?gate.server_verified_permission:gate.bed_transfer_write_enabled;
+  return resolveOwnerConfirmedLegacyGenesis({base_resolution:baseResolution,corpid:user?.corpid||"",from_bed:fromBed,to_bed:toBed,app_env:gate.app_env,write_approved:writeApproved,legacy_genesis_mode:gate.legacy_genesis_mode,allowed_source_beds:bedTransferLegacyGenesisAllowlist(env),source_context:context(sourceGateway),target_context:context(targetGateway),open_arrears:sourceGateway?.open_arrears||[]});
 }
 __name(resolveEmployeeOwnerConfirmedLegacyGenesis,"resolveEmployeeOwnerConfirmedLegacyGenesis");
 async function validateEmployeeBedTransferCanonicalLink(env,user,entry={},normalized={},opts={}){
@@ -2834,8 +2847,9 @@ async function validateEmployeeBedTransferCanonicalLink(env,user,entry={},normal
     canonicalBedContextGateway(env,user,{bed:toBed,limit:1000,strict_access_snapshot:true,archive_snapshot:archiveSnapshot,request_context:opts.request_context,max_age_ms:TTLOCK_STRICT_CACHE_MAX_AGE_MS})
   ]);
   const fee=employeeEntryBedTransferFee(entry,normalized);
+  const legacyGenesisGate=employeeBedTransferLegacyGenesisGate(env,user);
   let resolved=await resolveEmployeeBedTransferSourceContext(env,user,fromBed,sourceGateway,{archive_snapshot:archiveSnapshot});
-  if(resolved.resolution_status!=="resolved")resolved=resolveEmployeeOwnerConfirmedLegacyGenesis(env,user,fromBed,toBed,sourceGateway,targetGateway,resolved);
+  if(resolved.resolution_status!=="resolved")resolved=resolveEmployeeOwnerConfirmedLegacyGenesis(env,user,fromBed,toBed,sourceGateway,targetGateway,resolved,legacyGenesisGate);
   if(resolved.resolution_status!=="resolved")return {ok:false,error_code:resolved.error_code||"BED_TRANSFER_SOURCE_CONTEXT_AMBIGUOUS",message:"Canonical source context could not be resolved.",invalid_fields:["source_context"],source_context_resolution:resolved};
   const sourceAccess=sourceGateway?.access_snapshot_context||{},targetAccess=targetGateway?.access_snapshot_context||{};
   const source={...resolved,corpid:user?.corpid||"",physical_bed_status:sourceGateway?.occupancy_gateway?.physical_bed_status||"unknown",parsed_vacancy_marker:sourceAccess.parsed_vacancy_marker===true,snapshot_fingerprint:resolved.snapshot_fingerprint||bedTransferSafeSnapshotFingerprint(user,sourceGateway),candidate_count:sourceAccess.candidate_count??1,ambiguous:sourceAccess.ambiguous===true,conflict:sourceAccess.conflict===true,stale:sourceAccess.stale===true,parse_status:sourceAccess.parse_status||"parsed",parsed_deposit_amount:sourceAccess.parsed_deposit_amount,parsed_checkin_mmdd:sourceAccess.parsed_checkin_mmdd,parsed_valid_until_mmdd:sourceAccess.parsed_valid_until_mmdd,normalized_expiry_value:sourceAccess.normalized_expiry_value,active_lineage:resolved.active_transfer_lineage_id?{current_bed:fromBed,transfer_lineage_id:resolved.active_transfer_lineage_id,last_active_transfer_anchor_id:resolved.previous_transfer_anchor_id}:null};
