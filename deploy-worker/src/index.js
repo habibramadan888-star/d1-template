@@ -2852,7 +2852,7 @@ function employeeBedTransferLegacyGenesisGate(env={},user={}){
   const legacyGenesisMode=cleanText(env.BED_TRANSFER_LEGACY_GENESIS_MODE||"",40).toLowerCase();
   const validateEnabled=capabilities.bed_transfer_validate_enabled===true;
   const writeEnabled=capabilities.bed_transfer_write_enabled===true;
-  const serverVerifiedPermission=appEnv==="internal_beta"&&employeeAuthorized&&validateEnabled&&writeEnabled&&legacyGenesisMode==="server_verified";
+  const serverVerifiedPermission=["internal_beta","qa"].includes(appEnv)&&employeeAuthorized&&validateEnabled&&writeEnabled&&legacyGenesisMode==="server_verified"&&(appEnv!=="qa"||qaAcceptanceEnabled(env));
   return {app_env:appEnv,bed_transfer_validate_enabled:validateEnabled,bed_transfer_write_enabled:writeEnabled,legacy_genesis_mode:legacyGenesisMode,employee_authorized:employeeAuthorized,server_verified_permission:serverVerifiedPermission};
 }
 __name(employeeBedTransferLegacyGenesisGate,"employeeBedTransferLegacyGenesisGate");
@@ -2861,7 +2861,7 @@ function resolveEmployeeOwnerConfirmedLegacyGenesis(env,user,fromBed,toBed,sourc
     const occupancy=gateway.occupancy_gateway||{},access=gateway.access_snapshot_context||{};
     return {corpid:cleanText(user?.corpid||"",120),physical_bed_status:cleanText(occupancy.physical_bed_status||"",40),parsed_vacancy_marker:access.parsed_vacancy_marker===true,candidate_count:access.candidate_count??0,ambiguous:access.ambiguous===true,conflict:access.conflict===true,stale:access.stale===true,parsed_deposit_amount:occupancy.deposit_recorded_amount??access.parsed_deposit_amount??null,parsed_checkin_mmdd:cleanText(access.parsed_checkin_mmdd||"",20),parsed_valid_until_mmdd:cleanText(access.parsed_valid_until_mmdd||"",20),normalized_expiry_value:cleanText(access.normalized_expiry_value||"",80),snapshot_fingerprint:bedTransferSafeSnapshotFingerprint(user,gateway)};
   };
-  const writeApproved=gate.app_env==="internal_beta"?gate.server_verified_permission:gate.bed_transfer_write_enabled;
+  const writeApproved=["internal_beta","qa"].includes(gate.app_env)?gate.server_verified_permission:gate.bed_transfer_write_enabled;
   return resolveOwnerConfirmedLegacyGenesis({base_resolution:baseResolution,corpid:user?.corpid||"",from_bed:fromBed,to_bed:toBed,app_env:gate.app_env,write_approved:writeApproved,legacy_genesis_mode:gate.legacy_genesis_mode,allowed_source_beds:bedTransferLegacyGenesisAllowlist(env),source_context:context(sourceGateway),target_context:context(targetGateway),open_arrears:sourceGateway?.open_arrears||[]});
 }
 __name(resolveEmployeeOwnerConfirmedLegacyGenesis,"resolveEmployeeOwnerConfirmedLegacyGenesis");
@@ -6131,13 +6131,14 @@ async function handleOwnerTodayTodos(request,env,user){
 }
 __name(handleOwnerTodayTodos,"handleOwnerTodayTodos");
 function ownerTodayTodoAcknowledgmentWriteEnabled(env={}){
-  return ["1","true","yes","on"].includes(String(env.OWNER_TODAY_TODO_ACK_ENABLED||"").trim().toLowerCase())&&["development","dev","local","test","beta_preview","internal_beta"].includes(String(env.APP_ENV||"").trim().toLowerCase());
+  const appEnv=String(env.APP_ENV||"").trim().toLowerCase();
+  return ["1","true","yes","on"].includes(String(env.OWNER_TODAY_TODO_ACK_ENABLED||"").trim().toLowerCase())&&["development","dev","local","test","beta_preview","internal_beta","qa"].includes(appEnv)&&(appEnv!=="qa"||qaAcceptanceEnabled(env));
 }
 __name(ownerTodayTodoAcknowledgmentWriteEnabled,"ownerTodayTodoAcknowledgmentWriteEnabled");
 function ownerBedTransferVoidWriteEnabled(env={}){
   const appEnv=String(env.APP_ENV||"").trim().toLowerCase();
-  const gate=appEnv==="internal_beta"?env.BED_TRANSFER_OWNER_VOID_ENABLED:env.BED_TRANSFER_VOID_APPROVED;
-  return ["beta_preview","internal_beta"].includes(appEnv)&&String(gate||"").trim().toLowerCase()==="true"&&bedTransferWriteApproved(env);
+  const gate=["internal_beta","qa"].includes(appEnv)?env.BED_TRANSFER_OWNER_VOID_ENABLED:env.BED_TRANSFER_VOID_APPROVED;
+  return ["beta_preview","internal_beta","qa"].includes(appEnv)&&String(gate||"").trim().toLowerCase()==="true"&&bedTransferWriteApproved(env)&&(appEnv!=="qa"||qaAcceptanceEnabled(env));
 }
 __name(ownerBedTransferVoidWriteEnabled,"ownerBedTransferVoidWriteEnabled");
 async function handleOwnerBedTransferVoid(request,env,user){
@@ -8713,6 +8714,7 @@ function bedTransferDeploymentCapabilities(env={}){
     bed_transfer_owner_void_enabled:ownerBedTransferVoidWriteEnabled(env),
     controlled_beta_preview:String(env.APP_ENV||"").trim().toLowerCase()==="beta_preview",
     internal_beta:String(env.APP_ENV||"").trim().toLowerCase()==="internal_beta",
+    qa_acceptance:String(env.APP_ENV||"").trim().toLowerCase()==="qa"&&qaAcceptanceEnabled(env),
     canonical_write_path:"/api/employee/entry",
     production_cutover:"PRODUCTION_NO_GO",
     app_version:cleanText(env.APP_VERSION||"",40)
@@ -11495,8 +11497,249 @@ function ownerBedTransferVoidControlResponse(request,env,claim){
   return new Response(html,{status:200,headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store","Content-Security-Policy":"default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'"}});
 }
 __name(ownerBedTransferVoidControlResponse,"ownerBedTransferVoidControlResponse");
+function qaAcceptanceEnabled(env={}){
+  return String(env.APP_ENV||"").trim().toLowerCase()==="qa"
+    && String(env.QA_ACCEPTANCE_ENABLED||"").trim().toLowerCase()==="true"
+    && String(env.CORPID||"").trim()==="HL-QA";
+}
+__name(qaAcceptanceEnabled,"qaAcceptanceEnabled");
+function qaAcceptanceNotFound(api=false){
+  return api?json({success:false,error_code:"QA_ACCEPTANCE_NOT_AVAILABLE"},404):new Response("Not Found",{status:404,headers:{"Cache-Control":"no-store"}});
+}
+__name(qaAcceptanceNotFound,"qaAcceptanceNotFound");
+function qaAcceptanceRunId(value){
+  const runId=cleanText(value||"",80).toUpperCase();
+  return /^QA-\d{8}-[A-Z0-9]{4,12}$/.test(runId)?runId:"";
+}
+__name(qaAcceptanceRunId,"qaAcceptanceRunId");
+function qaAcceptanceRequestHostAllowed(request,env={}){
+  const host=new URL(request.url).hostname.toLowerCase();
+  const expected=String(env.QA_HOSTNAME||"").trim().toLowerCase();
+  const local=["127.0.0.1","localhost"].includes(host)&&String(env.QA_ALLOW_LOCAL||"").toLowerCase()==="true";
+  return !!expected&&(host===expected||local);
+}
+__name(qaAcceptanceRequestHostAllowed,"qaAcceptanceRequestHostAllowed");
+async function qaAcceptanceBindingIdentity(env={}){
+  const rows=await env.DB.prepare("SELECT key,value FROM qa_environment_identity WHERE key IN ('app_env','corpid','d1_database_id','kv_namespace_id','binding_contract_sha256')").all().catch(()=>({results:[]}));
+  const d1=Object.fromEntries((rows.results||[]).map(row=>[String(row.key||""),String(row.value||"")]));
+  const kv=await env.RATE_LIMIT.get("qa:environment-identity","json").catch(()=>null);
+  const ok=d1.app_env==="qa"
+    &&d1.corpid==="HL-QA"
+    &&d1.d1_database_id===String(env.QA_EXPECTED_D1_ID||"")
+    &&d1.kv_namespace_id===String(env.QA_EXPECTED_KV_ID||"")
+    &&d1.binding_contract_sha256===String(env.QA_BINDING_CONTRACT_SHA256||"")
+    &&String(kv?.app_env||"")==="qa"
+    &&String(kv?.corpid||"")==="HL-QA"
+    &&String(kv?.d1_database_id||"")===String(env.QA_EXPECTED_D1_ID||"")
+    &&String(kv?.kv_namespace_id||"")===String(env.QA_EXPECTED_KV_ID||"")
+    &&String(kv?.binding_contract_sha256||"")===String(env.QA_BINDING_CONTRACT_SHA256||"");
+  return {ok,d1,kv:kv?{app_env:kv.app_env,corpid:kv.corpid,d1_database_id:kv.d1_database_id,kv_namespace_id:kv.kv_namespace_id,binding_contract_sha256:kv.binding_contract_sha256}:null};
+}
+__name(qaAcceptanceBindingIdentity,"qaAcceptanceBindingIdentity");
+async function qaAcceptanceGate(request,env,user,options={}){
+  const api=new URL(request.url).pathname.startsWith("/api/");
+  if(!qaAcceptanceEnabled(env)||!qaAcceptanceRequestHostAllowed(request,env))return qaAcceptanceNotFound(api);
+  if(String(user?.corpid||"")!=="HL-QA")return json({success:false,error_code:"QA_COMPANY_SCOPE_REQUIRED"},403);
+  if(options.manager===true&&!isManagerRoleValue(user?.role))return json({success:false,error_code:"QA_MANAGER_REQUIRED"},403);
+  if(options.staff===true&&!isStaffRoleValue(user?.role)&&!isManagerRoleValue(user?.role))return json({success:false,error_code:"QA_STAFF_REQUIRED"},403);
+  const identity=await qaAcceptanceBindingIdentity(env);
+  if(!identity.ok)return json({success:false,error_code:"QA_BINDING_IDENTITY_MISMATCH",no_write:true},503);
+  return null;
+}
+__name(qaAcceptanceGate,"qaAcceptanceGate");
+function qaAcceptanceLinks(request,runId){
+  const q=encodeURIComponent(runId);
+  return {
+    open_employee_review:`/employee?qa_run_id=${q}#entry`,
+    open_owner_history:`/owner?qa_run_id=${q}#history`,
+    open_owner_detail:`/owner?qa_run_id=${q}#history`,
+    open_finance:`/owner?qa_run_id=${q}#finance`,
+    open_arrears:`/owner?qa_run_id=${q}#arrears`,
+    open_today_todo:`/owner?qa_run_id=${q}#todo`,
+    open_evidence:`/api/qa/acceptance/runs/${q}/evidence`
+  };
+}
+__name(qaAcceptanceLinks,"qaAcceptanceLinks");
+function qaAcceptancePublicRun(request,row={}){
+  return {
+    qa_run_id:row.qa_run_id,
+    mode:row.mode,
+    matrix_version:row.matrix_version,
+    scenario_count:Number(row.scenario_count||0),
+    employee_record_count:Number(row.employee_record_count||0),
+    status:row.status,
+    artifact_sha256:row.artifact_sha256,
+    artifact_commit:row.artifact_commit,
+    qa_worker_version:row.qa_worker_version||"",
+    employee_accepted_by:row.employee_accepted_by||"",
+    employee_accepted_at:row.employee_accepted_at||"",
+    owner_accepted_by:row.owner_accepted_by||"",
+    owner_accepted_at:row.owner_accepted_at||"",
+    cleanup_status:row.cleanup_status||"NOT_RUN",
+    created_at:row.created_at,
+    updated_at:row.updated_at,
+    links:qaAcceptanceLinks(request,row.qa_run_id)
+  };
+}
+__name(qaAcceptancePublicRun,"qaAcceptancePublicRun");
+async function qaAcceptanceReadRun(env,user,runId){
+  return env.DB.prepare("SELECT * FROM qa_acceptance_runs WHERE qa_run_id=? AND corpid=? LIMIT 1").bind(runId,user.corpid).first();
+}
+__name(qaAcceptanceReadRun,"qaAcceptanceReadRun");
+function qaAcceptanceMaterializeMatrix(runId,matrix={}){
+  const scenarios=(Array.isArray(matrix.scenarios)?matrix.scenarios:[]).map((scenario,index)=>{
+    const n=String(index+1).padStart(2,"0"),entryId=`${runId}-E${n}`,sessionId=`${runId}-S${n}`;
+    const input={...(scenario.input||{}),id:entryId,event_id:entryId,source:"employee_entry",operator:"qa-staff",created_at:"2026-07-16T08:00:00.000Z"};
+    if(cleanText(input.arrears_source,40)==="legacy_manual"){
+      const ref=cleanId(`legacy-manual-${sessionId}-${entryId}`);
+      input.linked_task_id=ref;input.arrears_ref=ref;input.original_arrears_id=ref;
+    }
+    return {...scenario,entry_id:entryId,session_id:sessionId,input};
+  });
+  return {...matrix,qa_run_id:runId,scenarios};
+}
+__name(qaAcceptanceMaterializeMatrix,"qaAcceptanceMaterializeMatrix");
+async function qaAcceptanceCreateRun(request,env,user){
+  let body={};try{body=await request.json()}catch{return badRequest("invalid_json")}
+  const mode=String(body.mode||"quick").trim().toLowerCase();
+  if(!["quick","full","recovery"].includes(mode))return json({success:false,error_code:"QA_RUN_MODE_INVALID"},422);
+  const active=await env.DB.prepare("SELECT qa_run_id,status FROM qa_acceptance_runs WHERE corpid=? AND cleanup_status<>'COMPLETED' AND status<>'FINAL_ACCEPTED' ORDER BY created_at DESC LIMIT 1").bind(user.corpid).first();
+  if(active)return json({success:false,error_code:"QA_ACTIVE_RUN_EXISTS",qa_run_id:active.qa_run_id,status:active.status},409);
+  const matrix=await env.RATE_LIMIT.get(`qa:matrix:${mode}:${env.QA_MATRIX_VERSION}`,"json").catch(()=>null);
+  if(!matrix||String(matrix.matrix_version||"")!==String(env.QA_MATRIX_VERSION||""))return json({success:false,error_code:"QA_MATRIX_UNAVAILABLE",no_write:true},503);
+  const runId=`QA-${empTodayDubai().replaceAll("-","")}-${crypto.randomUUID().replaceAll("-","").slice(0,8).toUpperCase()}`;
+  const materialized=qaAcceptanceMaterializeMatrix(runId,matrix),scenarios=materialized.scenarios||[];
+  const artifactManifest=await env.RATE_LIMIT.get("qa:artifact-manifest","json").catch(()=>null);
+  const now=empNow(),status="CREATED",artifact=String(artifactManifest?.candidate_sha256||"");
+  if(!/^[a-f0-9]{64}$/i.test(artifact)||String(artifactManifest?.git_commit||"")!==String(env.QA_ARTIFACT_COMMIT||""))return json({success:false,error_code:"QA_ARTIFACT_SHA_UNAVAILABLE",no_write:true},503);
+  await env.DB.prepare(`INSERT INTO qa_acceptance_runs (qa_run_id,corpid,mode,matrix_version,scenario_count,employee_record_count,status,artifact_sha256,artifact_commit,qa_worker_version,matrix_json,expected_json,created_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(runId,user.corpid,mode,String(matrix.matrix_version),Number(scenarios.length)+Number((materialized.automation_only||materialized.recovery_scenarios||[]).length),scenarios.filter(row=>row.upload_enabled!==false).length,status,artifact,String(env.QA_ARTIFACT_COMMIT||""),String(env.QA_WORKER_VERSION||""),JSON.stringify(materialized),JSON.stringify(materialized.expected_finance||{}),user.userid,now,now).run();
+  return success(qaAcceptancePublicRun(request,await qaAcceptanceReadRun(env,user,runId)));
+}
+__name(qaAcceptanceCreateRun,"qaAcceptanceCreateRun");
+async function qaAcceptanceEmployeeDraft(request,env,user,run){
+  let matrix={};try{matrix=JSON.parse(run.matrix_json||"{}")}catch{}
+  const scenarios=(matrix.scenarios||[]).filter(row=>row.upload_enabled!==false);
+  return success({
+    qa_run_id:run.qa_run_id,
+    mode:run.mode,
+    status:run.status,
+    matrix_version:run.matrix_version,
+    artifact_sha256:run.artifact_sha256,
+    scenario_count:Number(run.scenario_count||0),
+    employee_record_count:scenarios.length,
+    logical_session_id:`${run.qa_run_id}-CURRENT`,
+    entries:scenarios.map(row=>row.input),
+    session_ids_by_entry:Object.fromEntries(scenarios.map(row=>[row.entry_id,row.session_id])),
+    preview_expected:true,
+    auto_upload:false,
+    readonly_manifest:true
+  });
+}
+__name(qaAcceptanceEmployeeDraft,"qaAcceptanceEmployeeDraft");
+async function qaAcceptanceRecordAutomation(request,env,user,run){
+  if(run.status!=="CREATED")return json({success:false,error_code:"QA_RUN_STATE_CONFLICT",status:run.status},409);
+  let body={};try{body=await request.json()}catch{return badRequest("invalid_json")}
+  let matrix={};try{matrix=JSON.parse(run.matrix_json||"{}") }catch{}
+  const expected=(matrix.scenarios||[]).filter(row=>row.upload_enabled!==false).map(row=>String(row.entry_id));
+  const results=Array.isArray(body.validation_results)?body.validation_results:[];
+  const ids=results.map(row=>String(row.entry_identity||""));
+  const valid=results.length===expected.length&&new Set(ids).size===ids.length&&expected.every(id=>ids.includes(id))&&results.every(row=>row.ok===true)&&Number(body.formal_write_count||0)===0;
+  if(!valid)return json({success:false,error_code:"QA_AUTOMATION_RESULT_INVALID",expected_count:expected.length,result_count:results.length,no_write:true},422);
+  const automation={aggregate_http_status:Number(body.aggregate_http_status||200),validation_result_count:results.length,passed_count:results.length,failed_count:0,entry_ids:ids,formal_write_count:0,ttlock_external_calls:Number(body.ttlock_external_calls||0),recorded_at:empNow()};
+  if(automation.ttlock_external_calls!==0)return json({success:false,error_code:"QA_TTLOCK_EXTERNAL_CALL_DETECTED",no_write:true},422);
+  await env.DB.prepare("UPDATE qa_acceptance_runs SET status='AUTOMATION_PASS',automation_json=?,updated_at=? WHERE qa_run_id=? AND corpid=? AND status='CREATED'").bind(JSON.stringify(automation),empNow(),run.qa_run_id,user.corpid).run();
+  return success(qaAcceptancePublicRun(request,await qaAcceptanceReadRun(env,user,run.qa_run_id)));
+}
+__name(qaAcceptanceRecordAutomation,"qaAcceptanceRecordAutomation");
+async function qaAcceptanceAcceptReview(request,env,user,run,kind){
+  const employee=kind==="employee",required=employee?"AUTOMATION_PASS":"UPLOAD_PASS",next=employee?"MANUAL_EMPLOYEE_ACCEPTED":"MANUAL_OWNER_ACCEPTED";
+  if(run.status!==required)return json({success:false,error_code:"QA_RUN_STATE_CONFLICT",required_status:required,status:run.status},409);
+  const now=empNow(),sql=employee
+    ?"UPDATE qa_acceptance_runs SET status=?,employee_accepted_by=?,employee_accepted_at=?,updated_at=? WHERE qa_run_id=? AND corpid=? AND status=?"
+    :"UPDATE qa_acceptance_runs SET status=?,owner_accepted_by=?,owner_accepted_at=?,updated_at=? WHERE qa_run_id=? AND corpid=? AND status=?";
+  await env.DB.prepare(sql).bind(next,user.userid,now,now,run.qa_run_id,user.corpid,required).run();
+  return success(qaAcceptancePublicRun(request,await qaAcceptanceReadRun(env,user,run.qa_run_id)));
+}
+__name(qaAcceptanceAcceptReview,"qaAcceptanceAcceptReview");
+async function qaAcceptanceRecordUpload(request,env,user,run){
+  if(run.status!=="MANUAL_EMPLOYEE_ACCEPTED")return json({success:false,error_code:"QA_RUN_STATE_CONFLICT",required_status:"MANUAL_EMPLOYEE_ACCEPTED",status:run.status},409);
+  const like=`${run.qa_run_id}-%`;
+  const sessions=(await env.DB.prepare("SELECT id,entries_count,handover_status,entries_json,anchor_id FROM sessions WHERE corpid=? AND id LIKE ? AND COALESCE(voided_at,'')='' ORDER BY id").bind(user.corpid,like).all()).results||[];
+  const entries=sessions.flatMap(row=>parseEmployeeEntryAnchorJson(row.entries_json));
+  const expected=Number(run.employee_record_count||0),ids=entries.map(row=>cleanText(row.entry_identity||row.event_id||row.id||"",120)).filter(Boolean);
+  const okUpload=entries.length===expected&&new Set(ids).size===expected&&sessions.every(row=>String(row.handover_status||"").toUpperCase()==="COMPLETED");
+  if(!okUpload)return json({success:false,error_code:"QA_UPLOAD_PERSISTENCE_MISMATCH",expected_count:expected,actual_count:entries.length,duplicate_entry_id_count:ids.length-new Set(ids).size},409);
+  const upload={formal_write_count:entries.length,anchor_count:entries.length,session_count:sessions.length,session_status:"COMPLETED",entry_ids:ids,recorded_at:empNow()};
+  await env.DB.prepare("UPDATE qa_acceptance_runs SET status='UPLOAD_PASS',upload_json=?,updated_at=? WHERE qa_run_id=? AND corpid=? AND status='MANUAL_EMPLOYEE_ACCEPTED'").bind(JSON.stringify(upload),empNow(),run.qa_run_id,user.corpid).run();
+  return success(qaAcceptancePublicRun(request,await qaAcceptanceReadRun(env,user,run.qa_run_id)));
+}
+__name(qaAcceptanceRecordUpload,"qaAcceptanceRecordUpload");
+function qaAcceptanceFinanceComparable(projection={}){
+  const cash=ownerOverviewMoney(projection.cash_received),bank=ownerOverviewMoney(projection.bank_received),cashOut=ownerOverviewMoney(projection.cash_out),bankOut=ownerOverviewMoney(projection.bank_out);
+  return {cash_received:cash,bank_received:bank,total_received:ownerOverviewMoney(projection.gross_received),cash_out:cashOut,bank_out:bankOut,total_expenses:ownerOverviewMoney(cashOut+bankOut),net_funds:ownerOverviewMoney(cash+bank-cashOut-bankOut),cash_net:ownerOverviewMoney(cash-cashOut),bank_net:ownerOverviewMoney(bank-bankOut),outstanding:ownerOverviewMoney(projection.arrears_opened_amount),arrears_opened:ownerOverviewMoney(projection.arrears_opened_amount),arrears_repaid:ownerOverviewMoney(projection.arrears_repaid),deposit_included:ownerOverviewMoney(projection.deposit_received),deposit_refund:ownerOverviewMoney(projection.deposit_refund),expense:ownerOverviewMoney(projection.expenses),bed_transfer_fee:ownerOverviewMoney(projection.bed_transfer_fee),rent_income:ownerOverviewMoney(projection.rent_income)};
+}
+__name(qaAcceptanceFinanceComparable,"qaAcceptanceFinanceComparable");
+async function qaAcceptanceReconcile(request,env,user,run){
+  if(run.status!=="MANUAL_OWNER_ACCEPTED")return json({success:false,error_code:"QA_RUN_STATE_CONFLICT",required_status:"MANUAL_OWNER_ACCEPTED",status:run.status},409);
+  let expected={};try{expected=JSON.parse(run.expected_json||"{}") }catch{}
+  const finance=await canonicalFinanceProjectionBuild(env,user,{start:"2026-01-01",end:"2026-12-31"},{include_voided:false,include_corrections:true});
+  const actual=qaAcceptanceFinanceComparable(finance),expectedKeys=Object.keys(expected||{}),financePass=expectedKeys.length===0||expectedKeys.every(key=>ownerOverviewMoney(actual[key])===ownerOverviewMoney(expected[key]));
+  let upload={};try{upload=JSON.parse(run.upload_json||"{}") }catch{}
+  const reconciliation={finance_expected:expected,finance_actual:actual,finance_result:financePass?"PASS":"FAIL",entry_id_result:Number(upload.anchor_count||0)===Number(run.employee_record_count||0)?"PASS":"FAIL",duplicate_anchor_count:Math.max(0,Number(upload.anchor_count||0)-new Set(upload.entry_ids||[]).size),ttlock_external_calls:0,session_finalization_result:upload.session_status==="COMPLETED"?"PASS":"FAIL",recorded_at:empNow()};
+  const pass=financePass&&reconciliation.entry_id_result==="PASS"&&reconciliation.duplicate_anchor_count===0&&reconciliation.session_finalization_result==="PASS";
+  await env.DB.prepare("UPDATE qa_acceptance_runs SET status=?,reconciliation_json=?,updated_at=? WHERE qa_run_id=? AND corpid=? AND status='MANUAL_OWNER_ACCEPTED'").bind(pass?"FINAL_ACCEPTED":"MANUAL_OWNER_ACCEPTED",JSON.stringify({...reconciliation,result:pass?"PASS":"FAIL"}),empNow(),run.qa_run_id,user.corpid).run();
+  const refreshed=await qaAcceptanceReadRun(env,user,run.qa_run_id);
+  return success({...qaAcceptancePublicRun(request,refreshed),reconciliation:{...reconciliation,result:pass?"PASS":"FAIL"}});
+}
+__name(qaAcceptanceReconcile,"qaAcceptanceReconcile");
+async function qaAcceptanceCleanup(request,env,user,run){
+  let body={};try{body=await request.json()}catch{return badRequest("invalid_json")}
+  if(qaAcceptanceRunId(body.qa_run_id)!==run.qa_run_id)return json({success:false,error_code:"QA_RUN_ID_CONFIRMATION_REQUIRED",no_write:true},422);
+  const like=`${run.qa_run_id}-%`,now=empNow();
+  await env.DB.prepare("UPDATE sessions SET voided_at=?,voided_by=?,void_reason='QA_RUN_CLEANUP',void_source='qa_acceptance',handover_status='VOID' WHERE corpid=? AND id LIKE ? AND COALESCE(voided_at,'')='' ").bind(now,user.userid,user.corpid,like).run();
+  await env.DB.prepare("DELETE FROM transactions WHERE corpid=? AND session_id LIKE ?").bind(user.corpid,like).run();
+  await env.DB.prepare("DELETE FROM arrear_tasks WHERE corpid=? AND (entry_id LIKE ? OR task_id LIKE ?)").bind(user.corpid,like,like).run();
+  await env.DB.prepare("UPDATE qa_acceptance_runs SET cleanup_status='COMPLETED',cleanup_at=?,updated_at=? WHERE qa_run_id=? AND corpid=?").bind(now,now,run.qa_run_id,user.corpid).run();
+  return success(qaAcceptancePublicRun(request,await qaAcceptanceReadRun(env,user,run.qa_run_id)));
+}
+__name(qaAcceptanceCleanup,"qaAcceptanceCleanup");
+async function handleQaAcceptanceApi(request,env,user){
+  const url=new URL(request.url),path=url.pathname,method=request.method;
+  const staffDraft=/^\/api\/qa\/acceptance\/runs\/([^/]+)\/employee-draft$/.exec(path);
+  const gate=await qaAcceptanceGate(request,env,user,{manager:!staffDraft,staff:!!staffDraft});
+  if(gate)return gate;
+  if(path==="/api/qa/acceptance/runs"&&method==="GET"){
+    const rows=(await env.DB.prepare("SELECT * FROM qa_acceptance_runs WHERE corpid=? ORDER BY created_at DESC LIMIT 50").bind(user.corpid).all()).results||[];
+    return success({runs:rows.map(row=>qaAcceptancePublicRun(request,row)),binding_identity:"VERIFIED",production_access:false});
+  }
+  if(path==="/api/qa/acceptance/runs"&&method==="POST")return qaAcceptanceCreateRun(request,env,user);
+  const match=/^\/api\/qa\/acceptance\/runs\/([^/]+)(?:\/(automation|employee-draft|accept-employee|upload-complete|accept-owner|reconcile|cleanup|evidence))?$/.exec(path);
+  if(!match)return qaAcceptanceNotFound(true);
+  const runId=qaAcceptanceRunId(decodeURIComponent(match[1]||""));if(!runId)return badRequest("QA_RUN_ID_INVALID");
+  const run=await qaAcceptanceReadRun(env,user,runId);if(!run)return qaAcceptanceNotFound(true);
+  const action=match[2]||"";
+  if(!action&&method==="GET")return success(qaAcceptancePublicRun(request,run));
+  if(action==="employee-draft"&&method==="GET")return qaAcceptanceEmployeeDraft(request,env,user,run);
+  if(action==="automation"&&method==="POST")return qaAcceptanceRecordAutomation(request,env,user,run);
+  if(action==="accept-employee"&&method==="POST")return qaAcceptanceAcceptReview(request,env,user,run,"employee");
+  if(action==="upload-complete"&&method==="POST")return qaAcceptanceRecordUpload(request,env,user,run);
+  if(action==="accept-owner"&&method==="POST")return qaAcceptanceAcceptReview(request,env,user,run,"owner");
+  if(action==="reconcile"&&method==="POST")return qaAcceptanceReconcile(request,env,user,run);
+  if(action==="cleanup"&&method==="POST")return qaAcceptanceCleanup(request,env,user,run);
+  if(action==="evidence"&&method==="GET")return success({run:qaAcceptancePublicRun(request,run),automation:JSON.parse(run.automation_json||"null"),upload:JSON.parse(run.upload_json||"null"),reconciliation:JSON.parse(run.reconciliation_json||"null"),matrix:JSON.parse(run.matrix_json||"{}"),secrets_included:false});
+  return qaAcceptanceNotFound(true);
+}
+__name(handleQaAcceptanceApi,"handleQaAcceptanceApi");
+
 async function handleAppEntryRoute(request, env, path, method) {
   if (method !== "GET") return null;
+  if(path==="/qa/acceptance"){
+    const claim=await readRouteClaim(request,env);
+    if(!claim)return redirectToRootEntry(request,"owner");
+    const gate=await qaAcceptanceGate(request,env,claim,{manager:true});
+    if(gate)return gate;
+    return fetchStaticAsset(request,env,"/qa-acceptance");
+  }
   // Compatibility-only paths are intercepted before static assets so legacy login UI cannot render.
   if (path === "/" || path === "/home") return fetchStaticAsset(request, env, "/portal");
   if (path === "/login" || path === "/unified-login.html") return redirectToRootEntry(request);
@@ -11571,6 +11814,7 @@ async function handleRequest(request, env, ctx) {
       return authFailureResponse(auth);
     }
     const user = auth.payload;
+    if(path.startsWith("/api/qa/acceptance"))return handleQaAcceptanceApi(request,env,user);
     if(path==="/api/capabilities"&&method==="GET"){
       return success(bedTransferDeploymentCapabilities(env));
     }

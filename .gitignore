@@ -16,6 +16,7 @@ node_modules/
 # Cloudflare / local runtime
 .wrangler/
 .wrangler-dryrun/
+.qa-artifacts/
 reconciliation-output/
 backups/
 *.sqlite

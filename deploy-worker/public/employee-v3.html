@@ -3227,7 +3227,7 @@ function readSessionId(userid){
   try{return localStorage.getItem(employeeStorageKey('empv3:sessionId',userid))||''}
   catch{return ''}
 }
-const state={lockCards:[],current:null,depositBalance:null,depositContext:null,rentConfig:{},rentConfigLoaded:false,drafts:[],tasks:[],closedTasks:[],arrearsTasksLoaded:false,arrearTasksError:null,arrearsGatewaySource:'',arrearsGatewayProof:null,employeeDirectives:[],followupItems:[],systemReminderItems:[],systemReminderStatus:'idle',systemReminderSummary:null,systemReminderSources:null,systemReminderLimit:100,sessionId:'',user:null,aggregateValidationSessionError:null,aggregateValidationOnly:false,ttlockStatus:'idle',ttlockLoadedAt:0,ttlockError:'',ttlockDataSource:'',bedTransferCapabilities:{status:'idle',bed_transfer_validate_enabled:false,bed_transfer_write_enabled:false,owner_waiver_ack_enabled:false,controlled_beta_preview:false,canonical_write_path:'/api/employee/entry',production_cutover:'PRODUCTION_NO_GO'},bedTransferContext:{status:'idle',source:null,target:null,requestKey:'',serverValidation:null,validatedRecord:null,recordedResult:null}};
+const state={lockCards:[],current:null,depositBalance:null,depositContext:null,rentConfig:{},rentConfigLoaded:false,drafts:[],tasks:[],closedTasks:[],arrearsTasksLoaded:false,arrearTasksError:null,arrearsGatewaySource:'',arrearsGatewayProof:null,employeeDirectives:[],followupItems:[],systemReminderItems:[],systemReminderStatus:'idle',systemReminderSummary:null,systemReminderSources:null,systemReminderLimit:100,sessionId:'',user:null,aggregateValidationSessionError:null,aggregateValidationOnly:false,ttlockStatus:'idle',ttlockLoadedAt:0,ttlockError:'',ttlockDataSource:'',qaAcceptance:{runId:'',status:'',mode:'',artifactSha:'',sessionIdsByEntry:{}},bedTransferCapabilities:{status:'idle',bed_transfer_validate_enabled:false,bed_transfer_write_enabled:false,owner_waiver_ack_enabled:false,controlled_beta_preview:false,canonical_write_path:'/api/employee/entry',production_cutover:'PRODUCTION_NO_GO'},bedTransferContext:{status:'idle',source:null,target:null,requestKey:'',serverValidation:null,validatedRecord:null,recordedResult:null}};
 const BED_TRANSFER_WRITE_ENABLED=false;
 const BED_TRANSFER_EVENT_LEDGER_MESSAGE='Bed transfer records save event anchors only. This does not directly change bed occupancy, deposit, arrears, or Access Card. 换床记录只保存信息锚点，不会直接改变床位、押金、欠款或门禁卡。';
 const BED_TRANSFER_SUBMITTED_MESSAGE='Bed transfer recorded / 换床记录已保存';
@@ -8408,9 +8408,11 @@ async function commitSessionAndExport(){
     const e=uploadList[i];
     const isFinal=i===uploadList.length-1;
     const isBedTransfer=String(e?.type||'').toUpperCase()==='TF'||String(e?.event_type||'').toLowerCase()==='bed_transfer';
-    const requestEntries=isBedTransfer?[e]:ordinaryCanonicalEntries;
+    const qaAcceptanceActive=!!state.qaAcceptance?.runId;
+    const requestEntries=(isBedTransfer||qaAcceptanceActive)?[e]:ordinaryCanonicalEntries;
     const sessionForEntry={
       ...(isBedTransfer?session:ordinarySession),
+      id:employeeQaAcceptanceSessionId(e,(isBedTransfer?session:ordinarySession).id),
       handover_status:isFinal?'COMPLETED':'EXPORTING',
       export_text:isFinal?completedExportText:session.export_text,
       entries:requestEntries,
@@ -8535,9 +8537,11 @@ async function commitSessionAndExport(){
     }
     const isFinal=i===writeQueue.length-1;
     const isBedTransfer=String(e?.type||'').toUpperCase()==='TF'||String(e?.event_type||'').toLowerCase()==='bed_transfer';
-    const requestEntries=isBedTransfer?[e]:ordinaryCanonicalEntries;
+    const qaAcceptanceActive=!!state.qaAcceptance?.runId;
+    const requestEntries=(isBedTransfer||qaAcceptanceActive)?[e]:ordinaryCanonicalEntries;
     const sessionForEntry={
       ...(isBedTransfer?session:ordinarySession),
+      id:employeeQaAcceptanceSessionId(e,(isBedTransfer?session:ordinarySession).id),
       handover_status:isFinal?'COMPLETED':'EXPORTING',
       export_text:isFinal?completedExportText:session.export_text,
       entries:requestEntries,
@@ -8619,8 +8623,14 @@ async function commitSessionAndExport(){
   state.uploadValidationFailedEntryId='';
   state.uploadValidationFailedMessage='';
   saveDrafts();
-  const syncCheck=await reconcileEmployeeCloudSyncState({silent:true});
-  const cloudConfirmed=entrySessionUploaded();
+  let syncCheck=null,cloudConfirmed=false;
+  if(state.qaAcceptance?.runId){
+    try{await employeeQaAcceptanceReportUpload(uploadList);cloudConfirmed=true;syncCheck={session_status:'UPLOAD_PASS'}}
+    catch(error){syncCheck={error:String(error?.message||error||'QA_UPLOAD_CONFIRMATION_FAILED')}}
+  }else{
+    syncCheck=await reconcileEmployeeCloudSyncState({silent:true});
+    cloudConfirmed=entrySessionUploaded();
+  }
   if(cloudConfirmed){
     state.drafts=[];
     state.sessionId='';
@@ -9067,6 +9077,7 @@ async function checkEmployeeSession(){
         login_id:me.login_id,
         role:me.role
       });
+      await employeeLoadQaAcceptanceRun();
       $('loginPin').value='';
     }catch(e){
       console.error('[UnifiedLogin] employee local workspace render failed; authentication retained:',e);
@@ -9076,6 +9087,44 @@ async function checkEmployeeSession(){
   }
   if(isOwnerAuthRole(me.role)){location.replace('/owner');return}
   redirectToUnifiedLogin('employee_role_denied');
+}
+function employeeQaAcceptanceRequestedRunId(){
+  const value=new URLSearchParams(location.search).get('qa_run_id')||'';
+  return /^QA-\d{8}-[A-Z0-9]{4,12}$/.test(value.toUpperCase())?value.toUpperCase():'';
+}
+function employeeQaAcceptanceSessionId(entry={},fallback=''){
+  const id=employeeEntryStableIdentity(entry);
+  return String(state.qaAcceptance?.sessionIdsByEntry?.[id]||fallback||'');
+}
+async function employeeLoadQaAcceptanceRun(){
+  const runId=employeeQaAcceptanceRequestedRunId();
+  if(!runId||!state.user)return;
+  try{
+    const response=await apiFetch(`/api/qa/acceptance/runs/${encodeURIComponent(runId)}/employee-draft`);
+    const data=await response.json();
+    if(!response.ok||data?.success===false)throw new Error(data?.error_code||`HTTP_${response.status}`);
+    const entries=Array.isArray(data.entries)?data.entries:[];
+    if(entries.length!==Number(data.employee_record_count||0))throw new Error('QA_EMPLOYEE_COUNT_MISMATCH');
+    if(state.drafts.length&&state.drafts.some(row=>!String(row?.id||'').startsWith(`${runId}-`)))throw new Error('QA_LOCAL_DRAFT_CONFLICT');
+    state.qaAcceptance={runId,status:data.status||'',mode:data.mode||'',artifactSha:data.artifact_sha256||'',sessionIdsByEntry:data.session_ids_by_entry||{}};
+    state.drafts=entries;
+    state.sessionId=data.logical_session_id;
+    saveDrafts();buildExport();refreshSessionViews();
+    let banner=document.getElementById('qaAcceptanceEmployeeBanner');
+    if(!banner){banner=document.createElement('div');banner.id='qaAcceptanceEmployeeBanner';banner.className='context-note';document.querySelector('#view-entry .wrap,#view-entry')?.prepend(banner)}
+    banner.innerHTML=`<strong>QA Run ${esc(runId)}</strong> · ${esc(data.mode)} · ${entries.length} records · ${esc(data.status)} · Review only; Upload Session remains manual.`;
+    showStatus(`QA Run ${runId} loaded with ${entries.length} records. Review and Preview only; upload is not automatic.`,'ok');
+  }catch(error){
+    state.qaAcceptance={runId:'',status:'',mode:'',artifactSha:'',sessionIdsByEntry:{}};
+    showStatus(`QA acceptance draft was not loaded: ${String(error?.message||error)}`,'bad');
+  }
+}
+async function employeeQaAcceptanceReportUpload(uploadList=[]){
+  const runId=state.qaAcceptance?.runId;if(!runId)return;
+  const response=await apiFetch(`/api/qa/acceptance/runs/${encodeURIComponent(runId)}/upload-complete`,{method:'POST',body:JSON.stringify({entry_ids:uploadList.map(employeeEntryStableIdentity)})});
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok||data?.success===false)throw new Error(data?.error_code||'QA_UPLOAD_CONFIRMATION_FAILED');
+  state.qaAcceptance.status='UPLOAD_PASS';
 }
 function employeeUiPair(en,cn){
   return `${esc(en)}<span class="label-en">${esc(cn)}</span>`;

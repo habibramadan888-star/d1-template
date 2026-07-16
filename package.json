@@ -5,6 +5,11 @@
   "description": "Commercial governance and validation tooling for the Homelink finance system.",
   "scripts": {
     "verify:employee-golden-session": "node scripts/verify-employee-golden-session.mjs",
+    "qa:acceptance:build": "node scripts/build-qa-acceptance-artifact.mjs",
+    "qa:acceptance:bootstrap": "node scripts/bootstrap-qa-acceptance-environment.mjs --remote",
+    "qa:acceptance:set-secrets": "node scripts/set-qa-acceptance-secrets.mjs",
+    "qa:acceptance:run": "node scripts/run-qa-acceptance-automation.mjs",
+    "verify:qa-acceptance-platform": "node scripts/verify-qa-acceptance-platform-local.mjs",
     "build": "npm run build:lib && npm run build:worker:assets && npm run build:worker:embedded",
     "build:worker:assets": "cd deploy-worker && wrangler deploy --config wrangler.toml --dry-run --outdir ../.wrangler-dryrun/assets",
     "build:worker:embedded": "cd deploy-worker && wrangler deploy --config wrangler.embedded.toml --dry-run --outdir ../.wrangler-dryrun/embedded",

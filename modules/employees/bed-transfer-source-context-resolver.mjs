@@ -23,7 +23,7 @@ export function resolveOwnerConfirmedLegacyGenesis(raw={}){
   const fail=(code,reasons)=>failure('ambiguous',code,0,reasons);
   const appEnv=clean(input.app_env).toLowerCase(),mode=clean(input.legacy_genesis_mode).toLowerCase();
   const controlledBeta=appEnv==='beta_preview'&&input.write_approved===true;
-  const internalBeta=appEnv==='internal_beta'&&input.write_approved===true&&mode==='server_verified';
+  const internalBeta=['internal_beta','qa'].includes(appEnv)&&input.write_approved===true&&mode==='server_verified';
   if(!controlledBeta&&!internalBeta)return fail('BED_TRANSFER_LEGACY_GENESIS_DISABLED',['legacy_genesis_gate_closed']);
   if(controlledBeta&&!allowlist.has(fromBed))return fail('BED_TRANSFER_LEGACY_GENESIS_NOT_ALLOWLISTED',['source_bed_not_allowlisted']);
   if(controlledBeta&&(fromBed!=='146'||toBed!=='111'))return fail('BED_TRANSFER_LEGACY_GENESIS_SCOPE_MISMATCH',['controlled_beta_pair_required']);
