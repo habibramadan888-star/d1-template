@@ -39,7 +39,7 @@ export async function verifyQaAcceptancePlatformLocal() {
     await kvPut("qa:environment-identity", { app_env: "qa", corpid: "HL-QA", d1_database_id: D1_ID, kv_namespace_id: KV_ID, binding_contract_sha256: BINDING_SHA }, persistTo, tempRoot);
     await kvPut(`qa:matrix:quick:${QA_MATRIX_VERSION}`, qaAcceptanceMatrix("quick"), persistTo, tempRoot);
     await kvPut("qa:artifact-manifest", { candidate_sha256: "a".repeat(64), git_commit: "LOCAL-QA-COMMIT" }, persistTo, tempRoot);
-    await kvPut(`ttlock:snapshot:v2:qa:${accessHash("HL-QA")}`, { ...QA_TTLOCK_SNAPSHOT_V1, observed_at: new Date().toISOString(), loadedAt: new Date().toISOString(), expires_at: new Date(Date.now() + 86400000).toISOString() }, persistTo, tempRoot);
+    await kvPut(`ttlock:snapshot:v2:qa:${accessHash("HL-QA")}`, { ...QA_TTLOCK_SNAPSHOT_V1, observed_at: "2020-01-01T00:00:00.000Z", loadedAt: "2020-01-01T00:00:00.000Z", expires_at: "2099-01-01T00:00:00.000Z" }, persistTo, tempRoot);
     const accounts = [{ userid: "qa-staff", name: "QA Staff", role: "staff", hash: hash(PASSWORD), salt: SALT }, { userid: "qa-owner", name: "QA Owner", role: "manager", hash: hash(`${PASSWORD}-owner`), salt: SALT }];
     const envPath = path.join(tempRoot, "qa.env");
     await writeFile(envPath, [`JWT_SECRET=qa-local-jwt`, `PW_SALT=${SALT}`, `USER_ACCOUNTS='${JSON.stringify(accounts)}'`, "QA_ALLOW_LOCAL=true", "QA_ARTIFACT_COMMIT=LOCAL-QA-COMMIT", "QA_WORKER_VERSION=local-qa"].join("\n"), "utf8");

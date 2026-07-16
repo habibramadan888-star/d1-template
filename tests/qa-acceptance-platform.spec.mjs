@@ -65,6 +65,15 @@ test("QA materialization preserves server-verifiable legacy arrears and server-v
   assert.match(resolver, /\['internal_beta','qa'\]\.includes\(appEnv\)/);
 });
 
+test("QA uses only the versioned frozen TTLock snapshot and never requires a live refresh", async () => {
+  const worker = await read("deploy-worker/src/index.js");
+  assert.match(worker, /cached\?\.snapshot_version==="qa-ttlock-snapshot-v1"/);
+  assert.match(worker, /qaSnapshotHost===qaExpectedHost\|\|qaLocalSnapshot/);
+  assert.match(worker, /qaFrozenSnapshot\|\|age<=maxAgeMs/);
+  assert.match(worker, /data_source:qaFrozenSnapshot\?"qa_frozen_snapshot":"ttl_cache"/);
+  assert.match(worker, /host===TTLOCK_CANONICAL_PRODUCTION_HOST/);
+});
+
 test("QA cleanup is run-scoped and cannot address production bindings", async () => {
   const worker = await read("deploy-worker/src/index.js");
   const start = worker.indexOf("async function qaAcceptanceCleanup");
