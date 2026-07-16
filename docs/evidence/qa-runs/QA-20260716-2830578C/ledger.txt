@@ -1,0 +1,63 @@
+HOMELINK LEDGER
+Date 0716 Time 1718
+Employee QA Staff
+
+💼 ▬▬▬▬▬▬▬▬▬▬▬▬▬ 💼
+Core Summary
+Cash Handover 1,421
+Cash Received / 现金收款 AED 1,620
+Bank Received / 银行收款 AED 880
+Total Received / 本票总收款 AED 2,500
+Expenses / 本票支出 AED 799
+Net Funds / 本票净资金增加 AED 1,701
+Cash Net / 本票现金净额 AED 1,421
+Bank Net / 本票银行净额 AED 280
+Outstanding / 本票未收金额 AED 150
+Deposit Included / 其中押金 AED 200
+
+📊 ▬▬▬▬▬▬▬▬▬▬▬▬▬ 📊
+Breakdown
+Outstanding / 本票未收 AED 150
+Arrears Opened / 本票新增欠款 AED 150
+Arrears Repaid / 本票收回欠款 AED 70
+Deposit 200
+Transfer 100
+Expense 799
+
+💵 ▬▬▬▬▬▬▬▬▬▬▬▬▬ 💵
+Cash Details
+[201] paid 700 cash 0800
+[203] paid 730 cash 0800
+
+🏦 ▬▬▬▬▬▬▬▬▬▬▬▬▬ 🏦
+Bank Details
+[202] paid 700 bank 0800 short 70 DUE:0720 | NOTE:golden short payment
+
+🧾 ▬▬▬▬▬▬▬▬▬▬▬▬▬ 🧾
+Arrears Details
+[204] arrears paid 40 cash 0800 golden formal cloud arrears payment
+[205] arrears paid 30 bank 0800 golden legacy manual arrears payment
+
+🏷️ ▬▬▬▬▬▬▬▬▬▬▬▬▬ 🏷️
+Deposit Details
+[206] deposit 100 cash 0800
+[207] deposit 100 bank 0800
+
+🔄 ▬▬▬▬▬▬▬▬▬▬▬▬▬ 🔄
+Transfer Details
+[301]
+[302]
+transfer 50 cash 0800 golden controlled transfer cash
+[303]
+[304]
+transfer 50 bank 0800 golden controlled transfer bank
+[305]
+[306]
+transfer waived 0800 golden approved waiver
+
+📤 ▬▬▬▬▬▬▬▬▬▬▬▬▬ 📤
+Expense Details
+[208] deposit refund 100 cash 0800 golden deposit refund
+[209] deposit refund 100 bank 0800 golden deposit refund
+[401] expense 99 cash 0800 golden air conditioner repair
+[402] expense 500 bank 0800 golden maintenance invoice

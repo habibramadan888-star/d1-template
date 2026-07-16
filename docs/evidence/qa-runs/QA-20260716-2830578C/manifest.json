@@ -1,0 +1,16 @@
+{
+  "qa_run_id": "QA-20260716-2830578C",
+  "mode": "quick",
+  "status": "AUTOMATION_PASS",
+  "artifact_sha256": "d1e68b40f95728f6dce9078d3c1b4f1f1f99ce18c4180ad703c6c01aa54ac91d",
+  "artifact_commit": "948544aa23de3c7ef7f42cfeee3326327ec46b30",
+  "qa_worker_version": "d1e68b40f957",
+  "qa_worker_deployment": "d3a04b67-1616-4ffa-8d83-722b8374d212",
+  "scenario_count": 16,
+  "employee_record_count": 16,
+  "created_at": "2026-07-16T13:10:30.836Z",
+  "production_business_data_changed": false,
+  "formal_write_count": 0,
+  "manual_employee_status": "PENDING",
+  "cross_browser_delivery": "PASS"
+}
