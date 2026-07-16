@@ -9109,7 +9109,8 @@ async function employeeLoadQaAcceptanceRun(){
     const entries=rawEntries.map(entry=>{
       const id=employeeEntryStableIdentity(entry);
       const payment=String(entry.payment_method||entry.pay_type||'').trim().toLowerCase();
-      return {...entry,session_id:sessionIds[id]||entry.session_id||'',pay_type:payment==='bank'||payment==='b'?'B':payment==='cash'||payment==='c'?'C':entry.pay_type,upload_status:data.status==='AUTOMATION_PASS'?'VALIDATION_PASSED':entry.upload_status};
+      const transferAmount=String(entry.type||'').toUpperCase()==='TF'?(String(entry.fee_mode||'').toLowerCase()==='paid'?Number(entry.fee_amount_aed||0):0):entry.amount;
+      return {...entry,amount:transferAmount,session_id:sessionIds[id]||entry.session_id||'',pay_type:payment==='bank'||payment==='b'?'B':payment==='cash'||payment==='c'?'C':entry.pay_type,upload_status:data.status==='AUTOMATION_PASS'?'VALIDATION_PASSED':entry.upload_status};
     });
     if(entries.length!==Number(data.employee_record_count||0))throw new Error('QA_EMPLOYEE_COUNT_MISMATCH');
     if(state.drafts.length&&state.drafts.some(row=>!String(row?.id||'').startsWith(`${runId}-`)))throw new Error('QA_LOCAL_DRAFT_CONFLICT');
