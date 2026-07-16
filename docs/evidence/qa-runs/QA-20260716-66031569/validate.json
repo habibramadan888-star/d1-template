@@ -1,0 +1,15 @@
+{
+  "status": "AUTOMATION_PASS",
+  "result_origin": "LIVE_SERVER",
+  "aggregate_http_status": 200,
+  "validation_attempt_id": "qa-val-8374f648-db0d-4216-bd32-a8638074ffd1",
+  "trace_id": "qa-trace-416542b8-91a3-4755-804e-0ff650d1d9d1",
+  "validation_result_count": 16,
+  "passed_result_count": 16,
+  "failed_result_count": 0,
+  "formal_write_count": 0,
+  "ttlock_external_calls": 0,
+  "browser_contexts": ["Codex in-app Browser", "independent Chrome context"],
+  "upload_session_clicked": false,
+  "accept_employee_review_clicked": false
+}
