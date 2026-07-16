@@ -42,10 +42,14 @@ test("QA page and every QA API are server gated by environment host company role
   const gateStart = worker.indexOf("async function qaAcceptanceGate");
   const gateEnd = worker.indexOf("__name(qaAcceptanceGate", gateStart);
   const gate = worker.slice(gateStart, gateEnd);
-  assert.match(gate, /qaAcceptanceEnabled/);
-  assert.match(gate, /qaAcceptanceRequestHostAllowed/);
+  const boundaryStart = worker.indexOf("async function qaAcceptanceBoundary");
+  const boundaryEnd = worker.indexOf("__name(qaAcceptanceBoundary", boundaryStart);
+  const boundary = worker.slice(boundaryStart, boundaryEnd);
+  assert.match(gate, /qaAcceptanceBoundary/);
+  assert.match(boundary, /qaAcceptanceEnabled/);
+  assert.match(boundary, /qaAcceptanceRequestHostAllowed/);
   assert.match(gate, /user\?\.corpid.*HL-QA/);
-  assert.match(gate, /qaAcceptanceBindingIdentity/);
+  assert.match(boundary, /qaAcceptanceBindingIdentity/);
   assert.match(gate, /QA_MANAGER_REQUIRED/);
   assert.match(worker, /path==="\/qa\/acceptance"/);
   assert.match(worker, /path\.startsWith\("\/api\/qa\/acceptance"\)/);

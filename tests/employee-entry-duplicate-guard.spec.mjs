@@ -15,6 +15,7 @@ async function loadDuplicateGuardHarness() {
     function __name(fn){ return fn; }
     function cleanText(value,max=10000){ return Array.from(String(value ?? '')).join('').trim().slice(0,max); }
     function cleanDate(value){ return cleanText(value,32).slice(0,10); }
+    const employeeEntryAnchorParseCache=new WeakMap();
     ${worker.slice(start, end)}
     globalThis.buildCanonicalEventFingerprint = buildCanonicalEventFingerprint;
     globalThis.buildEmployeeEntryDuplicateKeys = buildEmployeeEntryDuplicateKeys;
@@ -381,11 +382,11 @@ test("validate and real upload routes both run duplicate guard before writes", a
   assert.match(worker, /function buildEmployeeEntryDuplicateKeys/);
   assert.match(worker, /function buildCanonicalEventFingerprint/);
   assert.match(worker, /async function checkEmployeeEntryDuplicates/);
-  assert.match(worker, /const duplicateGuard=await checkEmployeeEntryDuplicates\(env,user,body,\{event_index:eventIndex\}\)/);
+  assert.match(worker, /let duplicateGuard=await checkEmployeeEntryDuplicates\(env,user,body,\{event_index:eventIndex,request_context:opts\.request_context\}\)/);
   assert.match(worker, /if\(validationResult\.idempotent\)/);
   assert.match(worker, /no_write:true/);
   const validatePayloadStart = worker.indexOf("async function validateEmployeeEntryUploadPayload(env,user,body,opts={})");
-  const duplicateGuardStart = worker.indexOf("const duplicateGuard=await checkEmployeeEntryDuplicates(env,user,body,{event_index:eventIndex})", validatePayloadStart);
+  const duplicateGuardStart = worker.indexOf("let duplicateGuard=await checkEmployeeEntryDuplicates(env,user,body,{event_index:eventIndex,request_context:opts.request_context})", validatePayloadStart);
   const businessValidationStart = worker.indexOf("const eventFieldValidation=validateEmployeeEntryUploadEventFields", validatePayloadStart);
   const shortPaidValidationStart = worker.indexOf('employeeEntryValidationFailure("rent_short_paid","ARREAR_TASK_REQUIRED_FOR_SHORTFALL"', validatePayloadStart);
   assert.ok(duplicateGuardStart > validatePayloadStart && duplicateGuardStart < businessValidationStart, "duplicate preflight must run before event-specific business validation");

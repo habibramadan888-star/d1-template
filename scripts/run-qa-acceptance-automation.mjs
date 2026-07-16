@@ -52,10 +52,10 @@ export async function runQaAcceptanceAutomation({ mode = "quick" } = {}) {
   console.log(`QA_RUN_ID=${runId}`);
   console.log(`QA_RUN_STATUS=DRAFT_READY`);
   console.log(`QA_EMPLOYEE_URL=${baseUrl}/employee?qa_run_id=${runId}#entry`);
-  console.log(`QA_CONSOLE_URL=${baseUrl}/qa/acceptance`);
+  console.log(`QA_CONSOLE_URL=${baseUrl}/qa/acceptance/login?qa_run_id=${runId}`);
   console.log(`FORMAL_WRITE_COUNT=0`);
   console.log(`EVIDENCE_DIRECTORY=${evidenceDir}`);
-  return { run, draft, evidence_directory: evidenceDir, employee_url: `${baseUrl}/employee?qa_run_id=${runId}#entry`, console_url: `${baseUrl}/qa/acceptance` };
+  return { run, draft, evidence_directory: evidenceDir, employee_url: `${baseUrl}/employee?qa_run_id=${runId}#entry`, console_url: `${baseUrl}/qa/acceptance/login?qa_run_id=${runId}` };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) runQaAcceptanceAutomation({ mode: process.env.QA_RUN_MODE || "quick" }).catch(error => { console.error(error?.stack || error); process.exitCode = 1; });

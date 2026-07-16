@@ -3188,8 +3188,8 @@ label .label-en{
 </div>
 <script>
 const EMPLOYEE_ASSET_DIAGNOSTIC={
-  employee_asset_version:'qa-validation-provenance-v1',
-  frontend_asset_version:'qa-validation-provenance-v1',
+  employee_asset_version:'qa-owner-handoff-v1',
+  frontend_asset_version:'qa-owner-handoff-v1',
   commit_hash:'runtime-git-commit',
   worker_version:'runtime-response-header',
   built_at:'2026-07-07T00:00:00+04:00',
@@ -9284,7 +9284,7 @@ function employeeQaAcceptanceBanner({runId,status,mode,count,personalDraftCount,
   const personal=`QA-origin personal draft isolated: ${Number(personalDraftCount||0)} record${Number(personalDraftCount||0)===1?'':'s'}`;
   banner.innerHTML=error
     ?`<strong>QA Run ${esc(runId||'invalid')}</strong> · <span class="bad">QA Run could not be loaded. Your personal draft remains unchanged.</span> · ${esc(personal)} · <a href="/employee#entry">Return to Personal Session</a>`
-    :`<strong>QA Run ${esc(runId)}</strong> · ${esc(mode)} · ${Number(count||0)} Records · ${esc(status)} · ${esc(personal)} · Review only; Upload Session remains manual. · <a href="/employee#entry">Return to Personal Session</a>`;
+    :`<strong>QA Run ${esc(runId)}</strong> · ${esc(mode)} · ${Number(count||0)} Records · ${esc(status)} · ${esc(personal)} · Review only; Upload Session remains manual. · <a href="/qa/acceptance/login?qa_run_id=${encodeURIComponent(runId)}" target="_blank" rel="noopener">Employee review complete? Continue in QA Acceptance Console using the QA Owner account.</a> · <a href="/employee#entry">Return to Personal Session</a>`;
   return banner;
 }
 async function employeeLoadQaAcceptanceRun(){
@@ -9364,12 +9364,13 @@ async function employeeQaAcceptanceReportValidation(aggregate={},uploadList=[]){
     const raw=await response.json().catch(()=>({}));
     const data=raw?.data&&typeof raw.data==='object'?raw.data:raw;
     if(!response.ok||data?.success===false)throw new Error(data?.error_code||'QA_VALIDATION_ATTESTATION_FAILED');
+    const serverAttestation=data?.validation_attestation&&typeof data.validation_attestation==='object'?data.validation_attestation:null;
     qa.status=String(data.status||'AUTOMATION_FAILED');
-    qa.validationAttemptId=validationAttemptId;
+    qa.validationAttemptId=String(serverAttestation?.validation_attempt_id||validationAttemptId);
     results.forEach(result=>employeeStoreQaDiagnosticEnvelope(result.diagnostic_envelope));
-    qa.validationAttestation={...body,passed_count:results.filter(result=>result.ok).length,failed_count:results.filter(result=>!result.ok).length,entry_ids:results.map(result=>result.entry_identity),result_origin:'LIVE_SERVER',expires_at:results[0]?.diagnostic_envelope?.expires_at||''};
+    qa.validationAttestation=serverAttestation||{...body,passed_count:results.filter(result=>result.ok).length,failed_count:results.filter(result=>!result.ok).length,entry_ids:results.map(result=>result.entry_identity),result_origin:'LIVE_SERVER',expires_at:results[0]?.diagnostic_envelope?.expires_at||''};
     const banner=document.getElementById('qaAcceptanceEmployeeBanner');
-    if(banner)banner.innerHTML=`<strong>QA Run ${esc(runId)}</strong> · ${esc(qa.mode||'quick')} · ${Number(uploadList.length||0)} Records · ${esc(qa.status)} · Real same-origin validation recorded · Upload remains locked until manual Employee acceptance.`;
+    if(banner)banner.innerHTML=`<strong>QA Run ${esc(runId)}</strong> · ${esc(qa.mode||'quick')} · ${Number(uploadList.length||0)} Records · ${esc(qa.status)} · ${esc(data.automation_attestation_status==='ALREADY_CURRENT'?'Automation attestation already current':'Real same-origin validation recorded')} · Upload remains locked until manual Employee acceptance. · <a href="/qa/acceptance/login?qa_run_id=${encodeURIComponent(runId)}" target="_blank" rel="noopener">Employee review complete? Continue in QA Acceptance Console using the QA Owner account.</a>`;
     return data;
   }catch(error){
     qa.status='NEEDS_REVALIDATION';

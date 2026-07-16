@@ -25,6 +25,13 @@ function d1Rows(command) {
   return parsed?.[0]?.results || [];
 }
 
+function ensureQaColumns(table, definitions) {
+  const columns = new Set(d1Rows(`PRAGMA table_info(${table})`).map(row => String(row.name)));
+  for (const [name, ddl] of Object.entries(definitions)) {
+    if (!columns.has(name)) run(["d1", "execute", QA_D1, "--remote", "--command", `ALTER TABLE ${table} ADD COLUMN ${name} ${ddl}`]);
+  }
+}
+
 function accessSnapshotRuntimeHash(value) {
   let hash = 2166136261;
   for (const char of String(value || "")) { hash ^= char.charCodeAt(0); hash = Math.imul(hash, 16777619); }
@@ -49,7 +56,16 @@ export async function bootstrapQaAcceptanceEnvironment({ artifactDirectory } = {
   const sessionColumns = new Set(d1Rows("PRAGMA table_info(sessions)").map(row => String(row.name)));
   if (!sessionColumns.has("entries_json")) run(["d1", "execute", QA_D1, "--remote", "--command", "ALTER TABLE sessions ADD COLUMN entries_json TEXT"]);
   if (!sessionColumns.has("summary_json")) run(["d1", "execute", QA_D1, "--remote", "--command", "ALTER TABLE sessions ADD COLUMN summary_json TEXT"]);
+  ensureQaColumns("arrear_tasks", {
+    boss_requested_at: "TEXT",
+    boss_requested_by: "TEXT",
+    boss_requested_due_date: "TEXT",
+    directive_status: "TEXT DEFAULT 'none'",
+    staff_promised_at: "TEXT",
+  });
+  run(["d1", "execute", QA_D1, "--remote", "--command", "CREATE INDEX IF NOT EXISTS idx_arrear_tasks_directive ON arrear_tasks(corpid, directive_status, boss_requested_due_date, promise_date)"]);
   run(["d1", "execute", QA_D1, "--remote", "--file", path.join(rootDir, "migrations/qa/001_qa_acceptance_platform.sql")]);
+  run(["d1", "execute", QA_D1, "--remote", "--file", path.join(rootDir, "migrations/qa/002_qa_owner_handoff.sql")]);
   run(["d1", "execute", QA_D1, "--remote", "--command", "INSERT OR REPLACE INTO app_settings (corpid,key,value,updated_by,updated_at) VALUES ('HL-QA','rent_ref_room','{\"201\":700,\"202\":770,\"203\":700}','qa-bootstrap','2026-07-16T00:00:00.000Z')"]);
   run(["d1", "execute", QA_D1, "--remote", "--command", "INSERT OR REPLACE INTO arrear_tasks (task_id,corpid,userid,entry_id,bed,tenant_name,arrear_amount,arrear_reason,created_at,followup_status,promise_date,promise_amount,actual_received,close_status) VALUES ('GOLDEN-CLOUD-ARREARS-1','HL-QA','qa-staff','QA-SEED-ARREARS','204','QA Fixture',100,'QA formal cloud arrears','2026-07-15T08:00:00.000Z','pending','2026-07-20',100,60,'OPEN')"]);
   const temp = await mkdtemp(path.join(os.tmpdir(), "homelink-qa-bootstrap-"));

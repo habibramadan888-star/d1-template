@@ -108,7 +108,9 @@ test("Run status requires matching real validation attestation and gates Accept 
   const record = functionBlock(worker, "qaAcceptanceRecordAutomation");
   const accept = functionBlock(worker, "qaAcceptanceAcceptReview");
   const report = functionBlock(employee, "employeeQaAcceptanceReportValidation");
-  assert.match(record, /\["DRAFT_READY","AUTOMATION_FAILED"\]/);
+  assert.match(record, /\["DRAFT_READY","AUTOMATION_FAILED","AUTOMATION_PASS"\]/);
+  assert.match(record, /automation_attestation_status:"ALREADY_CURRENT"/);
+  assert.match(record, /status IN \('DRAFT_READY','AUTOMATION_FAILED','AUTOMATION_PASS'\)/);
   for (const field of ["qa_run_id", "artifact_sha256", "qa_worker_version", "matrix_version", "payload_hash"]) assert.match(record, new RegExp(field));
   assert.match(record, /nextStatus=failed===0&&automation\.aggregate_http_status===200\?"AUTOMATION_PASS":"AUTOMATION_FAILED"/);
   assert.match(accept, /QA_REAL_VALIDATION_REQUIRED/);

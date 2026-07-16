@@ -51,7 +51,7 @@ test("session remains device-cookie based and does not bind auth checks to IP", 
   const requireAuthEnd = worker.indexOf("__name(requireAuth", requireAuthStart);
   const requireAuth = worker.slice(requireAuthStart, requireAuthEnd);
 
-  assert.match(requireAuth, /getBearerToken\(request\) \|\| getCookie\(request\)/);
+  assert.match(requireAuth, /getBearerToken\(request\).*\|\| getCookie\(request, cookieName\)/);
   assert.doesNotMatch(requireAuth, /clientIp\(request\)/);
   assert.doesNotMatch(requireAuth, /ip=\?/);
 });
