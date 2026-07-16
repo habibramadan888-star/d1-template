@@ -122,7 +122,7 @@ test("Staff cannot accept and Production has no QA handoff configuration", async
     read("deploy-worker/wrangler.toml"),
   ]);
   const api = functionBlock(worker, "handleQaAcceptanceApi");
-  assert.match(api, /const staffRoute=staffDraft\|\|staffAutomation/);
+  assert.match(api, /const staffRoute=staffDraft\|\|staffAutomation\|\|staffUploadComplete/);
   assert.match(api, /manager:!staffRoute/);
   assert.doesNotMatch(production, /QA_ACCEPTANCE_ENABLED|QA_HOSTNAME|QA_EXPECTED_D1_ID|QA_OWNER/);
   assert.match(worker, /path==="\/qa-owner-acceptance-login"\|\|path==="\/qa-owner-acceptance-login\.html"/);

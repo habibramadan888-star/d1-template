@@ -12,6 +12,24 @@ const configPath = path.join(workerDir, "wrangler.qa.toml");
 const publicRoot = path.join(workerDir, "public");
 
 const sha256 = value => createHash("sha256").update(value).digest("hex");
+const REHYDRATION_SCOPE = "employee_post_acceptance_rehydration_v1";
+
+function option(name, argv = process.argv.slice(2)) {
+  return argv.find(value => value.startsWith(`--${name}=`))?.slice(name.length + 3) || "";
+}
+
+export function qaRehydrationCompatibility(argv = process.argv.slice(2)) {
+  const qaRunId = option("rehydration-compatible-run", argv).toUpperCase();
+  const artifactSha256 = option("rehydration-compatible-artifact", argv).toLowerCase();
+  const gitCommit = option("rehydration-compatible-commit", argv).toLowerCase();
+  const payloadHash = option("rehydration-compatible-payload", argv).toLowerCase();
+  const any = qaRunId || artifactSha256 || gitCommit || payloadHash;
+  if (!any) return [];
+  if (!/^QA-\d{8}-[A-Z0-9]{4,12}$/.test(qaRunId) || !/^[a-f0-9]{64}$/.test(artifactSha256) || !/^[a-f0-9]{40}$/.test(gitCommit) || !/^[a-f0-9]{64}$/.test(payloadHash)) {
+    throw new Error("Complete exact Run artifact commit and payload lineage is required");
+  }
+  return [{ scope: REHYDRATION_SCOPE, qa_run_id: qaRunId, artifact_sha256: artifactSha256, git_commit: gitCommit, payload_hash: payloadHash }];
+}
 
 async function filesUnder(root, relative = "") {
   const dir = path.join(root, relative);
@@ -39,7 +57,7 @@ function dryRun(outdir) {
   ], { cwd: rootDir, stdio: "inherit", env: { ...process.env, WRANGLER_SEND_METRICS: "false" } });
 }
 
-export async function buildQaAcceptanceArtifact() {
+export async function buildQaAcceptanceArtifact({ rehydrationCompatibleArtifacts = qaRehydrationCompatibility() } = {}) {
   await rm(buildRoot, { recursive: true, force: true });
   const first = path.join(buildRoot, "first"), second = path.join(buildRoot, "second");
   await mkdir(first, { recursive: true });
@@ -73,6 +91,7 @@ export async function buildQaAcceptanceArtifact() {
     test_matrix_version: "employee-qa-matrix-v2",
     reproducible_build: true,
     production_promoted: false,
+    rehydration_compatible_artifacts: rehydrationCompatibleArtifacts,
   };
   await writeFile(path.join(target, "artifact-manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
   await rm(buildRoot, { recursive: true, force: true });

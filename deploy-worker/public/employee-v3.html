@@ -3188,8 +3188,8 @@ label .label-en{
 </div>
 <script>
 const EMPLOYEE_ASSET_DIAGNOSTIC={
-  employee_asset_version:'qa-owner-handoff-v1',
-  frontend_asset_version:'qa-owner-handoff-v1',
+  employee_asset_version:'qa-post-acceptance-rehydration-v1',
+  frontend_asset_version:'qa-post-acceptance-rehydration-v1',
   commit_hash:'runtime-git-commit',
   worker_version:'runtime-response-header',
   built_at:'2026-07-07T00:00:00+04:00',
@@ -3285,7 +3285,8 @@ const UNIFIED_LOGIN_DESTINATION='/';
 function unwrapStandardResponse(body){return body&&body.code===0&&body.data?body.data:body}
 async function fetchCurrentAuthUser(){
   const r=await apiFetch('/api/me',{method:'GET'});
-  if(r.status===401||r.status===403)return null;
+  if(r.status===401)return null;
+  if(r.status===403)throw new Error('me_role_forbidden_403');
   if(!r.ok)throw new Error('me_failed_'+r.status);
   return unwrapStandardResponse(await r.json());
 }
@@ -5357,12 +5358,22 @@ updateEntrySessionActionState=function(){
   }
   const exportBtn=$('btnExportSession');
   if(exportBtn&&exportBtn.dataset.busy!=='1'){
-    if(state.qaAcceptance?.runId&&state.qaAcceptance.status!=='MANUAL_EMPLOYEE_ACCEPTED'){
-      exportBtn.innerHTML=renderEmployeeButtonLabel('Upload Locked','Complete QA Employee acceptance first');
-      exportBtn.disabled=true;
-      exportBtn.classList.add('disabled');
-      exportBtn.title='QA validation and manual Employee acceptance are required before Upload Session.';
-      return;
+    if(state.qaAcceptance?.runId){
+      const qaPolicy=employeeQaAcceptanceStatePolicy(state.qaAcceptance.status,state.qaAcceptance.cleanupStatus,state.qaAcceptance.loadStatus);
+      if(qaPolicy.readonly){
+        exportBtn.innerHTML=renderEmployeeButtonLabel('Upload Complete','QA Run is read only');
+        exportBtn.disabled=true;
+        exportBtn.classList.add('disabled');
+        exportBtn.title='This QA Run has already completed Employee upload.';
+        return;
+      }
+      if(!qaPolicy.upload_allowed){
+        exportBtn.innerHTML=renderEmployeeButtonLabel('Upload Locked',state.qaAcceptance.loadStatus==='FAILED'?'Reload QA Run':'Complete QA Employee acceptance first');
+        exportBtn.disabled=true;
+        exportBtn.classList.add('disabled');
+        exportBtn.title=state.qaAcceptance.loadStatus==='FAILED'?'Reload the same QA Run before Upload Session.':'QA validation and manual Employee acceptance are required before Upload Session.';
+        return;
+      }
     }
     const transferWriteBlocked=state.drafts.some(entry=>entry.type==='TF'&&!employeeEntryCloudConfirmed(entry))&&!employeeBedTransferWriteEnabled();
     if(transferWriteBlocked){
@@ -8361,7 +8372,7 @@ async function validateEmployeeUploadAggregateDryRun(validationRequests){
 async function commitSessionAndExport(){
   const validateOnly=state.aggregateValidationOnly===true;
   state.aggregateValidationOnly=false;
-  if(state.qaAcceptance?.runId&&!validateOnly&&state.qaAcceptance.status!=='MANUAL_EMPLOYEE_ACCEPTED'){
+  if(state.qaAcceptance?.runId&&!validateOnly&&!employeeQaAcceptanceStatePolicy(state.qaAcceptance.status,state.qaAcceptance.cleanupStatus,state.qaAcceptance.loadStatus).upload_allowed){
     showStatus('QA Upload is locked until real validation and manual Employee acceptance are complete.','warn');
     updateEntrySessionActionState();
     return;
@@ -9210,6 +9221,7 @@ function employeeStoreQaDiagnosticEnvelope(envelope={}){
 function employeeQaAcceptanceAttestationCurrent(attestation={},context={},ids=[]){
   const attemptId=String(attestation?.validation_attempt_id||'');
   const expiresAt=Date.parse(String(attestation?.expires_at||''));
+  const acceptanceLocked=attestation?.acceptance_locked===true&&Number.isFinite(Date.parse(String(attestation?.acceptance_locked_at||'')));
   const rows=Array.isArray(attestation?.validation_results)?attestation.validation_results:[];
   const sameContext=String(attestation?.qa_run_id||'')===String(context.qa_run_id||'')
     &&String(attestation?.artifact_sha256||'')===String(context.artifact_sha256||'')
@@ -9217,7 +9229,7 @@ function employeeQaAcceptanceAttestationCurrent(attestation={},context={},ids=[]
     &&String(attestation?.matrix_version||'')===String(context.matrix_version||'')
     &&String(attestation?.payload_hash||'')===String(context.payload_hash||'')
     &&/^qa-val-[a-z0-9-]{12,}$/i.test(attemptId)
-    &&Number.isFinite(expiresAt)&&expiresAt>Date.now();
+    &&((Number.isFinite(expiresAt)&&expiresAt>Date.now())||acceptanceLocked);
   const envelopesCurrent=sameContext&&rows.length===ids.length&&rows.every(row=>{
     const envelope=row?.diagnostic_envelope||{};
     return String(envelope.validation_attempt_id||'')===attemptId
@@ -9230,6 +9242,22 @@ function employeeQaAcceptanceAttestationCurrent(attestation={},context={},ids=[]
   });
   const current=envelopesCurrent&&new Set(rows.map(row=>String(row.entry_identity||''))).size===ids.length&&ids.every(id=>rows.some(row=>String(row.entry_identity||'')===id));
   return current?{current:true,stale_reason:'',status:'CURRENT'}:{current:false,stale_reason:sameContext?'ATTESTATION_ENTRY_ORIGIN_MISMATCH':'RUN_ARTIFACT_PAYLOAD_OR_ATTEMPT_MISMATCH',status:'NEEDS_REVALIDATION'};
+}
+function employeeQaAcceptanceStatePolicy(status='',cleanupStatus='NOT_RUN',loadStatus='READY'){
+  const value=String(status||'');
+  const cleaned=String(cleanupStatus||'NOT_RUN')==='COMPLETED';
+  const viewable=['DRAFT_READY','AUTOMATION_FAILED','AUTOMATION_PASS','AUTOMATION_PASS_WITH_RECOVERY_FINDING','MANUAL_EMPLOYEE_ACCEPTED','UPLOAD_PASS'].includes(value)&&!cleaned;
+  const accepted=value==='MANUAL_EMPLOYEE_ACCEPTED';
+  const readonly=value==='UPLOAD_PASS';
+  const ready=String(loadStatus||'READY')==='READY';
+  return {
+    viewable,
+    accepted,
+    readonly,
+    upload_allowed:viewable&&accepted&&ready,
+    reusable_pass:['AUTOMATION_PASS','MANUAL_EMPLOYEE_ACCEPTED','UPLOAD_PASS'].includes(value),
+    reusable_failure:value==='AUTOMATION_FAILED'
+  };
 }
 function employeeQaAcceptanceDeliveryContract(data={},runId=''){
   const rawEntries=Array.isArray(data.entries)?data.entries:[];
@@ -9244,17 +9272,28 @@ function employeeQaAcceptanceDeliveryContract(data={},runId=''){
   const workerVersion=String(data.qa_worker_version||'');
   const matrixVersion=String(data.matrix_version||'');
   const payloadHash=String(data.payload_hash||'');
+  const policy=employeeQaAcceptanceStatePolicy(data.status,data.cleanup_status,'READY');
   if(String(data.qa_run_id||'').toUpperCase()!==runId)throw new Error('QA_RUN_ID_MISMATCH');
-  if(!['DRAFT_READY','AUTOMATION_FAILED','AUTOMATION_PASS','AUTOMATION_PASS_WITH_RECOVERY_FINDING'].includes(String(data.status||'')))throw new Error('QA_RUN_NOT_READY_FOR_EMPLOYEE_REVIEW');
   if(data.cleanup_status==='COMPLETED')throw new Error('QA_RUN_ALREADY_CLEANED');
+  if(!policy.viewable)throw new Error('QA_RUN_NOT_READY_FOR_EMPLOYEE_REVIEW');
   if(data.delivery_contract!=='SERVER_PERSISTED_QA_RUN_V1')throw new Error('QA_DELIVERY_CONTRACT_MISSING');
-  if(!/^[a-f0-9]{64}$/i.test(artifact)||artifact!==currentArtifact)throw new Error('QA_ARTIFACT_MISMATCH');
+  const compatibility=data.artifact_compatibility&&typeof data.artifact_compatibility==='object'?data.artifact_compatibility:{};
+  const directArtifact=artifact===currentArtifact&&compatibility.ok===true&&compatibility.mode==='CURRENT_ARTIFACT';
+  const compatiblePredecessor=artifact!==currentArtifact
+    &&compatibility.ok===true
+    &&compatibility.mode==='REHYDRATION_PREDECESSOR'
+    &&compatibility.scope==='employee_post_acceptance_rehydration_v1'
+    &&String(compatibility.qa_run_id||'')===runId
+    &&String(compatibility.run_artifact_sha256||'')===artifact
+    &&String(compatibility.current_artifact_sha256||'')===currentArtifact;
+  if(!/^[a-f0-9]{64}$/i.test(artifact)||!/^[a-f0-9]{64}$/i.test(currentArtifact)||(!directArtifact&&!compatiblePredecessor))throw new Error('QA_ARTIFACT_MISMATCH');
   if(!workerVersion||!matrixVersion||!/^[a-f0-9]{64}$/i.test(payloadHash))throw new Error('QA_VALIDATION_CONTEXT_MISSING');
   if(expected!==16||rawEntries.length!==expected||Number(data.scenario_count||0)!==16)throw new Error('QA_EMPLOYEE_COUNT_MISMATCH');
   if(ids.some(id=>!id.startsWith(`${runId}-E`))||new Set(ids).size!==ids.length)throw new Error('QA_ENTRY_ID_CONTRACT_INVALID');
   if(mappedSessionIds.some(id=>!id.startsWith(`${runId}-S`))||new Set(mappedSessionIds).size!==mappedSessionIds.length)throw new Error('QA_SESSION_ID_CONTRACT_INVALID');
   if(oracleFields.some(field=>!Number.isFinite(Number(oracle[field]))))throw new Error('QA_FINANCIAL_ORACLE_MISSING');
   const attestation=data.validation_attestation&&typeof data.validation_attestation==='object'?data.validation_attestation:null;
+  if(attestation?.acceptance_locked===true&&!['MANUAL_EMPLOYEE_ACCEPTED','UPLOAD_PASS'].includes(String(data.status||'')))throw new Error('QA_ACCEPTANCE_LOCK_STATE_MISMATCH');
   const attestedIds=Array.isArray(attestation?.entry_ids)?attestation.entry_ids.map(String):[];
   const attestationContextMatches=attestation
     &&String(attestation.qa_run_id||'')===runId
@@ -9270,22 +9309,42 @@ function employeeQaAcceptanceDeliveryContract(data={},runId=''){
     ?employeeQaAcceptanceAttestationCurrent(attestation,{qa_run_id:runId,artifact_sha256:artifact,qa_worker_version:workerVersion,matrix_version:matrixVersion,payload_hash:payloadHash},ids)
     :{current:!!attestationContextMatches,stale_reason:attestationContextMatches?'':'RUN_ARTIFACT_PAYLOAD_OR_ATTEMPT_MISMATCH'};
   const validationAttestation=freshness.current?attestation:null;
-  return {rawEntries,sessionIds,expected,oracle,workerVersion,matrixVersion,payloadHash,validationAttestation,staleReason:freshness.stale_reason};
+  if(Number(data.server_record_count)!==expected)throw new Error('QA_SERVER_RECORD_COUNT_MISMATCH');
+  if(String(data.employee_review_status||'')!==(policy.accepted||policy.readonly?'ACCEPTED':'PENDING'))throw new Error('QA_EMPLOYEE_REVIEW_STATE_MISMATCH');
+  if(data.upload_allowed!==policy.upload_allowed||data.readonly!==policy.readonly)throw new Error('QA_UPLOAD_STATE_MISMATCH');
+  if((policy.accepted||policy.readonly)&&(!validationAttestation||validationAttestation.acceptance_locked!==true))throw new Error('QA_ACCEPTED_ATTESTATION_MISSING');
+  return {rawEntries,sessionIds,expected,oracle,workerVersion,matrixVersion,payloadHash,validationAttestation,staleReason:freshness.stale_reason,policy,serverRecordCount:expected};
 }
-function employeeQaAcceptanceBanner({runId,status,mode,count,personalDraftCount,storageCount=0,error=''}){
+function employeeQaAcceptanceBanner({runId,status,mode,count,personalDraftCount,storageCount=0,serverRecordCount=null,error=''}){
   let banner=document.getElementById('qaAcceptanceEmployeeBanner');
   if(!banner){banner=document.createElement('div');banner.id='qaAcceptanceEmployeeBanner';banner.className='context-note';document.querySelector('#view-entry .wrap,#view-entry')?.prepend(banner)}
   banner.dataset.qaRunId=runId;
   banner.dataset.loadStatus=error?'FAILED':'READY';
   banner.dataset.recordCount=String(count||0);
   banner.dataset.qaStorageCount=String(storageCount||0);
+  banner.dataset.serverRecordCount=Number.isFinite(Number(serverRecordCount))?String(Number(serverRecordCount)):'unknown';
+  banner.dataset.errorCode=String(error||'');
   banner.dataset.personalDraftPreservedCount=String(personalDraftCount||0);
   banner.dataset.storageNamespace=employeeQaAcceptanceStorageKey('empv3:drafts',runId);
   const personal=`QA-origin personal draft isolated: ${Number(personalDraftCount||0)} record${Number(personalDraftCount||0)===1?'':'s'}`;
+  const serverCount=Number.isFinite(Number(serverRecordCount))?`${Number(serverRecordCount)} server records`:'server record count unavailable';
+  const retry=`<a href="/employee?qa_run_id=${encodeURIComponent(runId)}#entry">Retry this QA Run</a>`;
+  const phase=status==='MANUAL_EMPLOYEE_ACCEPTED'?'Employee review accepted; Upload Session is unlocked for the Staff user.':status==='UPLOAD_PASS'?'Employee upload completed; this Run is read only.':'Review only; Upload Session remains locked until manual Employee acceptance.';
   banner.innerHTML=error
-    ?`<strong>QA Run ${esc(runId||'invalid')}</strong> · <span class="bad">QA Run could not be loaded. Your personal draft remains unchanged.</span> · ${esc(personal)} · <a href="/employee#entry">Return to Personal Session</a>`
-    :`<strong>QA Run ${esc(runId)}</strong> · ${esc(mode)} · ${Number(count||0)} Records · ${esc(status)} · ${esc(personal)} · Review only; Upload Session remains manual. · <a href="/qa/acceptance/login?qa_run_id=${encodeURIComponent(runId)}" target="_blank" rel="noopener">Employee review complete? Continue in QA Acceptance Console using the QA Owner account.</a> · <a href="/employee#entry">Return to Personal Session</a>`;
+    ?`<strong>QA Run ${esc(runId||'invalid')}</strong> · <span class="bad">QA Run could not be loaded. Existing records were preserved.</span> · ${esc(serverCount)} · ${Number(count||0)} local records kept · ${retry} · <a href="/employee#entry">Return to Personal Session</a>`
+    :`<strong>QA Run ${esc(runId)}</strong> · ${esc(mode)} · ${Number(count||0)} Records · ${esc(status)} · ${esc(personal)} · ${esc(phase)} · <a href="/qa/acceptance/login?qa_run_id=${encodeURIComponent(runId)}" target="_blank" rel="noopener">Open QA Acceptance Console.</a> · <a href="/employee#entry">Return to Personal Session</a>`;
   return banner;
+}
+function employeeQaAcceptancePreserveLoadFailure(runId,personalDraftCount,error,serverMeta={}){
+  const previous=state.qaAcceptance||{};
+  const preservedSameRun=String(previous.runId||'')===runId&&state.drafts.length>0;
+  const httpStatus=Number(error?.httpStatus||serverMeta.httpStatus||0);
+  state.qaAcceptance={...(preservedSameRun?previous:{}),runId,status:String(serverMeta.status||previous.status||'LOAD_FAILED'),mode:String(serverMeta.mode||previous.mode||''),artifactSha:previous.artifactSha||'',workerVersion:previous.workerVersion||'',matrixVersion:previous.matrixVersion||'',payloadHash:previous.payloadHash||'',sessionIdsByEntry:previous.sessionIdsByEntry||{},validationAttestation:previous.validationAttestation||null,loadStatus:'FAILED',loadError:String(error?.message||error),loadHttpStatus:httpStatus,personalDraftCount,serverRecordCount:serverMeta.serverRecordCount,uploadAllowed:false,readOnly:previous.readOnly===true};
+  buildExport();refreshSessionViews();
+  employeeQaAcceptanceBanner({runId,status:state.qaAcceptance.status,mode:state.qaAcceptance.mode,count:state.drafts.length,personalDraftCount,serverRecordCount:serverMeta.serverRecordCount,error:String(error?.message||error)});
+  showStatus('QA Run could not be loaded. Existing records were preserved. Retry this QA Run.','bad');
+  if(httpStatus===401)redirectToUnifiedLogin('qa_staff_session_required');
+  return {preserved_count:state.drafts.length,http_status:httpStatus,redirected:httpStatus===401};
 }
 async function employeeLoadQaAcceptanceRun(){
   const requested=employeeQaAcceptanceRawRunId();
@@ -9293,43 +9352,43 @@ async function employeeLoadQaAcceptanceRun(){
   const runId=employeeQaAcceptanceRequestedRunId();
   const personalDraftCount=state.drafts.length;
   if(!runId){
-    state.qaAcceptance={runId:requested,status:'LOAD_FAILED',mode:'',artifactSha:'',workerVersion:'',matrixVersion:'',payloadHash:'',sessionIdsByEntry:{},validationAttestation:null,loadStatus:'FAILED',personalDraftCount};
-    state.drafts=[];state.sessionId='';buildExport();refreshSessionViews();
-    employeeQaAcceptanceBanner({runId:requested,status:'LOAD_FAILED',mode:'',count:0,personalDraftCount,error:'QA_RUN_ID_INVALID'});
+    state.qaAcceptance={...(state.qaAcceptance||{}),runId:requested,status:'LOAD_FAILED',mode:'',artifactSha:'',workerVersion:'',matrixVersion:'',payloadHash:'',sessionIdsByEntry:{},validationAttestation:null,loadStatus:'FAILED',personalDraftCount,serverRecordCount:null,uploadAllowed:false,readOnly:false};
+    buildExport();refreshSessionViews();
+    employeeQaAcceptanceBanner({runId:requested,status:'LOAD_FAILED',mode:'',count:state.drafts.length,personalDraftCount,serverRecordCount:null,error:'QA_RUN_ID_INVALID'});
     showStatus('QA Run could not be loaded. Your personal draft remains unchanged.','bad');
     return;
   }
+  let serverMeta={status:'',mode:'',serverRecordCount:null,httpStatus:0,errorCode:''};
   try{
     const response=await apiFetch(`/api/qa/acceptance/runs/${encodeURIComponent(runId)}/employee-draft`);
-    const raw=await response.json();
+    const raw=await response.json().catch(()=>null);
     const data=raw?.data&&typeof raw.data==='object'?raw.data:raw;
-    if(!response.ok||data?.success===false)throw new Error(data?.error_code||`HTTP_${response.status}`);
-    const {rawEntries,sessionIds,workerVersion,matrixVersion,payloadHash,validationAttestation,staleReason}=employeeQaAcceptanceDeliveryContract(data,runId);
+    serverMeta={status:String(data?.status||''),mode:String(data?.mode||''),serverRecordCount:Number.isFinite(Number(data?.server_record_count))?Number(data.server_record_count):null,httpStatus:response.status,errorCode:String(data?.error_code||'')};
+    if(!response.ok||data?.success===false){const failure=new Error(data?.error_code||`HTTP_${response.status}`);failure.httpStatus=response.status;failure.serverMeta=serverMeta;throw failure}
+    const {rawEntries,sessionIds,workerVersion,matrixVersion,payloadHash,validationAttestation,staleReason,policy,serverRecordCount}=employeeQaAcceptanceDeliveryContract(data,runId);
     const attestedById=new Map((validationAttestation?.validation_results||[]).map(result=>[String(result?.entry_identity||''),result]));
     const entries=rawEntries.map(entry=>{
       const id=employeeEntryStableIdentity(entry);
       const payment=String(entry.payment_method||entry.pay_type||'').trim().toLowerCase();
       const transferAmount=String(entry.type||'').toUpperCase()==='TF'?(String(entry.fee_mode||'').toLowerCase()==='paid'?Number(entry.fee_amount_aed||0):0):entry.amount;
       const attested=attestedById.get(id);
-      const reusablePass=data.status==='AUTOMATION_PASS'&&validationAttestation&&attested?.ok===true;
-      const reusableFailure=data.status==='AUTOMATION_FAILED'&&validationAttestation&&attested?.ok===false;
+      const reusablePass=policy.reusable_pass&&validationAttestation&&attested?.ok===true;
+      const reusableFailure=policy.reusable_failure&&validationAttestation&&attested?.ok===false;
       const uploadStatus=reusablePass?'VALIDATION_PASSED':reusableFailure?'VALIDATION_FAILED':data.status==='DRAFT_READY'?'PENDING_VALIDATION':'NEEDS_REVALIDATION';
       const validationError=reusableFailure?{source:'aggregate_dry_run',stage:'qa_browser_validation',event_index:rawEntries.indexOf(entry),event_type:attested.event_type||entry.event_type||'',entry_identity:id,error_code:attested.error_code||'QA_VALIDATION_FAILED',message:'QA real-browser validation failed.',missing_fields:attested.missing_fields||[],invalid_fields:[],no_write:true,write_attempted:false}:null;
       return {...entry,amount:transferAmount,session_id:sessionIds[id]||entry.session_id||'',pay_type:payment==='bank'||payment==='b'?'B':payment==='cash'||payment==='c'?'C':entry.pay_type,upload_status:uploadStatus,upload_validation_error:validationError,upload_validation_error_code:validationError?.error_code||''};
     });
-    state.qaAcceptance={runId,status:data.status||'',mode:data.mode||'',artifactSha:data.artifact_sha256||'',workerVersion,matrixVersion,payloadHash,sessionIdsByEntry:sessionIds,validationAttestation,validationAttemptId:validationAttestation?.validation_attempt_id||'',staleReason:staleReason||'',loadStatus:'READY',personalDraftCount};
+    state.qaAcceptance={runId,status:data.status||'',mode:data.mode||'',artifactSha:data.artifact_sha256||'',currentArtifactSha:data.current_artifact_sha256||'',workerVersion,currentWorkerVersion:data.current_qa_worker_version||'',matrixVersion,payloadHash,sessionIdsByEntry:sessionIds,validationAttestation,validationAttemptId:validationAttestation?.validation_attempt_id||'',staleReason:staleReason||'',loadStatus:'READY',personalDraftCount,cleanupStatus:data.cleanup_status||'NOT_RUN',employeeReviewStatus:data.employee_review_status||'',serverRecordCount,uploadAllowed:policy.upload_allowed,readOnly:policy.readonly,artifactCompatibility:data.artifact_compatibility||null};
     state.drafts=entries;
     state.sessionId=data.logical_session_id;
     saveDrafts();buildExport();refreshSessionViews();
     let storageCount=0;try{storageCount=(JSON.parse(localStorage.getItem(employeeQaAcceptanceStorageKey('empv3:drafts',runId))||'[]')||[]).length}catch{}
-    employeeQaAcceptanceBanner({runId,status:data.status||'',mode:data.mode||'',count:entries.length,personalDraftCount,storageCount});
+    employeeQaAcceptanceBanner({runId,status:data.status||'',mode:data.mode||'',count:entries.length,personalDraftCount,storageCount,serverRecordCount});
     if(staleReason)showStatus(`Previous validation was isolated: ${staleReason}. Needs Revalidation.`,'warn');
-    showStatus(`QA Run ${runId} loaded with ${entries.length} records. Review and Preview only; upload is not automatic.`,'ok');
+    showStatus(`QA Run ${runId} loaded with ${entries.length} records. Upload is ${policy.upload_allowed?'unlocked for manual Staff action':'locked'} and is never automatic.`,'ok');
   }catch(error){
-    state.qaAcceptance={runId,status:'LOAD_FAILED',mode:'',artifactSha:'',workerVersion:'',matrixVersion:'',payloadHash:'',sessionIdsByEntry:{},validationAttestation:null,loadStatus:'FAILED',personalDraftCount};
-    state.drafts=[];state.sessionId='';buildExport();refreshSessionViews();
-    employeeQaAcceptanceBanner({runId,status:'LOAD_FAILED',mode:'',count:0,personalDraftCount,error:String(error?.message||error)});
-    showStatus('QA Run could not be loaded. Your personal draft remains unchanged.','bad');
+    const meta=error?.serverMeta||serverMeta;
+    employeeQaAcceptancePreserveLoadFailure(runId,personalDraftCount,error,meta);
   }
 }
 async function employeeQaAcceptanceReportValidation(aggregate={},uploadList=[]){

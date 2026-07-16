@@ -2217,7 +2217,7 @@ function employeeEntryValidationExplanation(errorCode,message){
   };
 }
 __name(employeeEntryValidationExplanation,"employeeEntryValidationExplanation");
-const HOMELINK_DIAGNOSTIC_ASSET_VERSION="qa-owner-handoff-v1";
+const HOMELINK_DIAGNOSTIC_ASSET_VERSION="qa-post-acceptance-rehydration-v1";
 const HOMELINK_DIAGNOSTIC_COMMIT_HASH="runtime-git-commit";
 const HOMELINK_DIAGNOSTIC_WORKER_VERSION="runtime-response-header";
 const HOMELINK_DIAGNOSTIC_BUILT_AT="2026-07-07T00:00:00+04:00";
@@ -11594,7 +11594,7 @@ async function qaAcceptanceBindingIdentity(env={}){
 }
 __name(qaAcceptanceBindingIdentity,"qaAcceptanceBindingIdentity");
 function qaAcceptanceStaffApiPath(path=""){
-  return /^\/api\/qa\/acceptance\/runs\/[^/]+\/(?:employee-draft|automation)$/.test(String(path||""));
+  return /^\/api\/qa\/acceptance\/runs\/[^/]+\/(?:employee-draft|automation|upload-complete)$/.test(String(path||""));
 }
 __name(qaAcceptanceStaffApiPath,"qaAcceptanceStaffApiPath");
 function qaAcceptanceRunIdFromEmployeeWriteBody(body={}){
@@ -11621,7 +11621,7 @@ function qaAcceptanceEmployeeWriteIdentity(body={}){
 __name(qaAcceptanceEmployeeWriteIdentity,"qaAcceptanceEmployeeWriteIdentity");
 async function qaAcceptanceEmployeeFormalWriteGate(env,user,body={}){
   if(!qaAcceptanceEnabled(env)||String(env.APP_ENV||"").trim().toLowerCase()!=="qa")return null;
-  if(String(user?.corpid||"")!=="HL-QA"||(!isStaffRoleValue(user?.role)&&!isManagerRoleValue(user?.role)))return json({success:false,error_code:"QA_STAFF_REQUIRED",no_write:true,write_attempted:false},403);
+  if(String(user?.corpid||"")!=="HL-QA"||!isStaffRoleValue(user?.role))return json({success:false,error_code:"QA_STAFF_REQUIRED",no_write:true,write_attempted:false},403);
   const runId=qaAcceptanceRunIdFromEmployeeWriteBody(body);
   if(!runId)return json({success:false,error_code:"QA_MANUAL_EMPLOYEE_ACCEPTANCE_REQUIRED",no_write:true,write_attempted:false,formal_write_count:0},409);
   const identity=qaAcceptanceEmployeeWriteIdentity(body);
@@ -11671,7 +11671,7 @@ async function qaAcceptanceGate(request,env,user,options={}){
   if(boundary)return boundary;
   if(String(user?.corpid||"")!=="HL-QA")return json({success:false,error_code:"QA_COMPANY_SCOPE_REQUIRED"},403);
   if(options.manager===true&&!isManagerRoleValue(user?.role))return json({success:false,error_code:"QA_MANAGER_REQUIRED"},403);
-  if(options.staff===true&&!isStaffRoleValue(user?.role)&&!isManagerRoleValue(user?.role))return json({success:false,error_code:"QA_STAFF_REQUIRED"},403);
+  if(options.staff===true&&!isStaffRoleValue(user?.role))return json({success:false,error_code:"QA_STAFF_REQUIRED"},403);
   return null;
 }
 __name(qaAcceptanceGate,"qaAcceptanceGate");
@@ -11811,19 +11811,50 @@ async function qaAcceptanceValidationPayloadHash(matrix={}){
   return hscSha256(JSON.stringify(hscStableValue(qaAcceptanceValidationPayloadBasis(matrix))));
 }
 __name(qaAcceptanceValidationPayloadHash,"qaAcceptanceValidationPayloadHash");
+const QA_REHYDRATION_COMPATIBILITY_SCOPE="employee_post_acceptance_rehydration_v1";
+function qaAcceptanceArtifactCompatibility(manifest={},run={},payloadHash=""){
+  const runArtifact=String(run.artifact_sha256||"");
+  const runCommit=String(run.artifact_commit||"");
+  const currentArtifact=String(manifest.candidate_sha256||"");
+  const currentCommit=String(manifest.git_commit||"");
+  const direct=/^[a-f0-9]{64}$/i.test(runArtifact)
+    &&runArtifact===currentArtifact
+    &&!!runCommit
+    &&runCommit===currentCommit;
+  if(direct)return {ok:true,mode:"CURRENT_ARTIFACT",scope:"exact",run_artifact_sha256:runArtifact,current_artifact_sha256:currentArtifact};
+  const compatible=Array.isArray(manifest.rehydration_compatible_artifacts)
+    ?manifest.rehydration_compatible_artifacts.find(row=>
+      String(row?.scope||"")===QA_REHYDRATION_COMPATIBILITY_SCOPE
+      &&String(row?.qa_run_id||"")===String(run.qa_run_id||"")
+      &&String(row?.artifact_sha256||"")===runArtifact
+      &&String(row?.git_commit||"")===runCommit
+      &&String(row?.payload_hash||"")===String(payloadHash||""))
+    :null;
+  const predecessor=!!compatible
+    &&/^[a-f0-9]{64}$/i.test(runArtifact)
+    &&/^[a-f0-9]{64}$/i.test(currentArtifact)
+    &&runArtifact!==currentArtifact
+    &&!!currentCommit;
+  return predecessor
+    ?{ok:true,mode:"REHYDRATION_PREDECESSOR",scope:QA_REHYDRATION_COMPATIBILITY_SCOPE,qa_run_id:String(run.qa_run_id||""),run_artifact_sha256:runArtifact,current_artifact_sha256:currentArtifact}
+    :{ok:false,mode:"MISMATCH",scope:"",run_artifact_sha256:runArtifact,current_artifact_sha256:currentArtifact};
+}
+__name(qaAcceptanceArtifactCompatibility,"qaAcceptanceArtifactCompatibility");
 function qaAcceptanceValidationAttestationCurrent(run={},contract={},stored=null){
   const attemptId=cleanText(stored?.validation_attempt_id||"",120);
   const expiresAt=Date.parse(String(stored?.expires_at||""));
   const results=Array.isArray(stored?.validation_results)?stored.validation_results:[];
-  const current=!!stored
+  const expectedIds=(Array.isArray(contract?.scenarios)?contract.scenarios:[]).map(row=>String(row.entry_id||""));
+  const resultIds=results.map(row=>String(row.entry_identity||""));
+  const structurallyCurrent=!!stored
     &&String(stored.qa_run_id||"")===String(run.qa_run_id||"")
     &&String(stored.artifact_sha256||"")===String(run.artifact_sha256||"")
     &&String(stored.qa_worker_version||"")===String(run.qa_worker_version||"")
     &&String(stored.matrix_version||"")===String(run.matrix_version||"")
     &&String(stored.payload_hash||"")===String(contract.payloadHash||"")
     &&/^qa-val-[a-z0-9-]{12,}$/i.test(attemptId)
-    &&Number.isFinite(expiresAt)&&expiresAt>Date.now()
     &&results.length===Number(run.employee_record_count||0)
+    &&(!expectedIds.length||(expectedIds.length===resultIds.length&&new Set(resultIds).size===resultIds.length&&expectedIds.every(id=>resultIds.includes(id))))
     &&results.every(row=>{
       const envelope=row?.diagnostic_envelope||{};
       return String(envelope.validation_attempt_id||"")===attemptId
@@ -11833,7 +11864,21 @@ function qaAcceptanceValidationAttestationCurrent(run={},contract={},stored=null
         &&String(envelope.matrix_version||"")===String(run.matrix_version||"")
         &&String(envelope.payload_hash||"")===String(contract.payloadHash||"");
     });
-  if(current)return {current:true,stale_reason:"",attestation:stored};
+  const acceptedAt=Date.parse(String(run.employee_accepted_at||""));
+  const validatedAt=Date.parse(String(stored?.server_validated_at||stored?.recorded_at||""));
+  const acceptedState=["MANUAL_EMPLOYEE_ACCEPTED","UPLOAD_PASS","MANUAL_OWNER_ACCEPTED","FINAL_ACCEPTED"].includes(String(run.status||""));
+  const acceptanceLocked=structurallyCurrent
+    &&acceptedState
+    &&Number.isFinite(acceptedAt)
+    &&Number.isFinite(validatedAt)
+    &&Number.isFinite(expiresAt)
+    &&acceptedAt>=validatedAt
+    &&acceptedAt<=expiresAt
+    &&Number(stored?.passed_count||0)===Number(run.employee_record_count||0)
+    &&Number(stored?.failed_count||0)===0
+    &&Number(stored?.formal_write_count||0)===0;
+  const current=structurallyCurrent&&((Number.isFinite(expiresAt)&&expiresAt>Date.now())||acceptanceLocked);
+  if(current)return {current:true,stale_reason:"",attestation:stored,acceptance_locked:acceptanceLocked};
   const staleReason=!stored?"NO_SERVER_ATTESTATION"
     :String(stored.qa_run_id||"")!==String(run.qa_run_id||"")?"QA_RUN_ID_MISMATCH"
     :String(stored.artifact_sha256||"")!==String(run.artifact_sha256||"")?"ARTIFACT_MISMATCH"
@@ -11842,7 +11887,7 @@ function qaAcceptanceValidationAttestationCurrent(run={},contract={},stored=null
     :String(stored.payload_hash||"")!==String(contract.payloadHash||"")?"PAYLOAD_HASH_MISMATCH"
     :!attemptId?"VALIDATION_ATTEMPT_MISSING"
     :"ATTESTATION_EXPIRED_OR_INCOMPLETE";
-  return {current:false,stale_reason:staleReason,attestation:null};
+  return {current:false,stale_reason:staleReason,attestation:null,acceptance_locked:false};
 }
 __name(qaAcceptanceValidationAttestationCurrent,"qaAcceptanceValidationAttestationCurrent");
 async function qaAcceptanceResolveValidationContext(env,user,body={}){
@@ -11933,21 +11978,35 @@ async function qaAcceptanceCreateRun(request,env,user){
   return success(qaAcceptancePublicRun(request,await qaAcceptanceReadRun(env,user,runId)));
 }
 __name(qaAcceptanceCreateRun,"qaAcceptanceCreateRun");
-function qaAcceptanceEmployeeDraftUnavailable(errorCode="QA_RUN_DRAFT_UNAVAILABLE",status=409){
-  return json({success:false,error_code:errorCode,message:"QA Run could not be loaded. Your personal draft remains unchanged.",no_write:true,formal_write_count:0},status);
+function qaAcceptanceEmployeeDraftUnavailable(errorCode="QA_RUN_DRAFT_UNAVAILABLE",status=409,run=null){
+  return json({
+    success:false,
+    error_code:errorCode,
+    message:"QA Run could not be loaded. Your personal draft remains unchanged.",
+    qa_run_id:String(run?.qa_run_id||""),
+    status:String(run?.status||"UNKNOWN"),
+    scenario_count:Number(run?.scenario_count||0),
+    employee_record_count:Number(run?.employee_record_count||0),
+    server_record_count:Number(run?.employee_record_count||0),
+    employee_review_status:run?.employee_accepted_at?"ACCEPTED":"PENDING",
+    cleanup_status:String(run?.cleanup_status||"NOT_RUN"),
+    retryable:!["QA_RUN_ALREADY_CLEANED","QA_RUN_ARTIFACT_MISMATCH","QA_RUN_MATRIX_VERSION_MISMATCH","QA_RUN_PAYLOAD_HASH_MISMATCH"].includes(errorCode),
+    no_write:true,
+    formal_write_count:0
+  },status);
 }
 __name(qaAcceptanceEmployeeDraftUnavailable,"qaAcceptanceEmployeeDraftUnavailable");
 async function qaAcceptanceEmployeeDraftContract(env,run){
-  if(!["DRAFT_READY","AUTOMATION_FAILED","AUTOMATION_PASS","AUTOMATION_PASS_WITH_RECOVERY_FINDING","MANUAL_EMPLOYEE_ACCEPTED"].includes(String(run.status||"")))return {ok:false,error_code:"QA_RUN_NOT_ACTIVE"};
+  if(!["DRAFT_READY","AUTOMATION_FAILED","AUTOMATION_PASS","AUTOMATION_PASS_WITH_RECOVERY_FINDING","MANUAL_EMPLOYEE_ACCEPTED","UPLOAD_PASS"].includes(String(run.status||"")))return {ok:false,error_code:"QA_RUN_NOT_ACTIVE"};
   if(String(run.cleanup_status||"NOT_RUN")==="COMPLETED")return {ok:false,error_code:"QA_RUN_ALREADY_CLEANED"};
   const manifest=await env.RATE_LIMIT.get("qa:artifact-manifest","json").catch(()=>null);
-  const artifact=String(run.artifact_sha256||""),currentArtifact=String(manifest?.candidate_sha256||"");
-  if(!/^[a-f0-9]{64}$/i.test(artifact)||artifact!==currentArtifact||String(run.artifact_commit||"")!==String(manifest?.git_commit||""))return {ok:false,error_code:"QA_RUN_ARTIFACT_MISMATCH"};
   if(String(run.matrix_version||"")!==String(env.QA_MATRIX_VERSION||""))return {ok:false,error_code:"QA_RUN_MATRIX_VERSION_MISMATCH"};
   let matrix={},expected={};
   try{matrix=JSON.parse(run.matrix_json||"{}");expected=JSON.parse(run.expected_json||"{}")}catch{return {ok:false,error_code:"QA_RUN_PERSISTED_DRAFT_INVALID"}}
   const payloadHash=await qaAcceptanceValidationPayloadHash(matrix);
   if(!/^[a-f0-9]{64}$/i.test(String(matrix.validation_payload_hash||""))||payloadHash!==String(matrix.validation_payload_hash||""))return {ok:false,error_code:"QA_RUN_PAYLOAD_HASH_MISMATCH"};
+  const artifactCompatibility=qaAcceptanceArtifactCompatibility(manifest||{},run,payloadHash);
+  if(!artifactCompatibility.ok)return {ok:false,error_code:"QA_RUN_ARTIFACT_MISMATCH"};
   const scenarios=(Array.isArray(matrix.scenarios)?matrix.scenarios:[]).filter(row=>row.upload_enabled!==false);
   const ids=scenarios.map(row=>String(row.entry_id||"")),sessionIds=scenarios.map(row=>String(row.session_id||""));
   const expectedCount=Number(run.employee_record_count||0),runPrefix=`${run.qa_run_id}-`;
@@ -11961,17 +12020,19 @@ async function qaAcceptanceEmployeeDraftContract(env,run){
     const fields=["cash_received","bank_received","total_received","total_expenses","net_funds","cash_net","bank_net","outstanding","arrears_opened","arrears_repaid","deposit_included","bed_transfer_fee","rent_income"];
     if(expectedCount!==16||Number(run.scenario_count||0)!==16||fields.some(field=>!Number.isFinite(Number(expected[field]))))return {ok:false,error_code:"QA_RUN_FINANCIAL_ORACLE_MISSING"};
   }
-  return {ok:true,manifest,matrix,expected,scenarios,payloadHash};
+  return {ok:true,manifest,matrix,expected,scenarios,payloadHash,artifactCompatibility};
 }
 __name(qaAcceptanceEmployeeDraftContract,"qaAcceptanceEmployeeDraftContract");
 async function qaAcceptanceEmployeeDraft(request,env,user,run){
   const contract=await qaAcceptanceEmployeeDraftContract(env,run);
-  if(!contract.ok)return qaAcceptanceEmployeeDraftUnavailable(contract.error_code);
-  const {scenarios,expected,manifest,payloadHash}=contract;
+  if(!contract.ok)return qaAcceptanceEmployeeDraftUnavailable(contract.error_code,409,run);
+  const {scenarios,expected,manifest,payloadHash,artifactCompatibility}=contract;
   const stored=qaAcceptanceStoredValidation(run);
   const freshness=qaAcceptanceValidationAttestationCurrent(run,contract,stored);
   const validationAttestation=freshness.current?{
     ...freshness.attestation,
+    acceptance_locked:freshness.acceptance_locked===true,
+    acceptance_locked_at:freshness.acceptance_locked===true?String(run.employee_accepted_at||""):"",
     result_origin:"SERVER_ATTESTATION",
     validation_results:(freshness.attestation.validation_results||[]).map(row=>({...row,diagnostic_envelope:{...(row.diagnostic_envelope||{}),result_origin:"SERVER_ATTESTATION",cache_status:"SERVER_PERSISTED"}}))
   }:null;
@@ -11982,10 +12043,13 @@ async function qaAcceptanceEmployeeDraft(request,env,user,run){
     matrix_version:run.matrix_version,
     artifact_sha256:run.artifact_sha256,
     current_artifact_sha256:String(manifest.candidate_sha256||""),
+    artifact_compatibility:artifactCompatibility,
     qa_worker_version:String(run.qa_worker_version||""),
+    current_qa_worker_version:String(env.CF_VERSION_METADATA?.id||env.QA_WORKER_VERSION||""),
     scenario_count:Number(run.scenario_count||0),
     employee_record_count:Number(run.employee_record_count||0),
     server_draft_count:scenarios.length,
+    server_record_count:scenarios.length,
     logical_session_id:`${run.qa_run_id}-CURRENT`,
     entries:scenarios.map(row=>row.input),
     session_ids_by_entry:Object.fromEntries(scenarios.map(row=>[row.entry_id,row.session_id])),
@@ -11994,6 +12058,9 @@ async function qaAcceptanceEmployeeDraft(request,env,user,run){
     validation_attestation:validationAttestation,
     validation_stale_reason:freshness.stale_reason,
     cleanup_status:run.cleanup_status||"NOT_RUN",
+    employee_review_status:run.employee_accepted_at?"ACCEPTED":"PENDING",
+    upload_allowed:String(run.status||"")==="MANUAL_EMPLOYEE_ACCEPTED"&&String(run.cleanup_status||"NOT_RUN")!=="COMPLETED",
+    readonly:String(run.status||"")==="UPLOAD_PASS",
     delivery_contract:"SERVER_PERSISTED_QA_RUN_V1",
     preview_expected:true,
     auto_upload:false,
@@ -12164,7 +12231,8 @@ async function handleQaAcceptanceApi(request,env,user){
   const url=new URL(request.url),path=url.pathname,method=request.method;
   const staffDraft=/^\/api\/qa\/acceptance\/runs\/([^/]+)\/employee-draft$/.exec(path);
   const staffAutomation=/^\/api\/qa\/acceptance\/runs\/([^/]+)\/automation$/.exec(path);
-  const staffRoute=staffDraft||staffAutomation;
+  const staffUploadComplete=/^\/api\/qa\/acceptance\/runs\/([^/]+)\/upload-complete$/.exec(path);
+  const staffRoute=staffDraft||staffAutomation||staffUploadComplete;
   const gate=await qaAcceptanceGate(request,env,user,{manager:!staffRoute,staff:!!staffRoute});
   if(gate)return gate;
   if(path==="/api/qa/acceptance/runs"&&method==="GET"){

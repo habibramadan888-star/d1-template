@@ -116,7 +116,7 @@ test("Run status requires matching real validation attestation and gates Accept 
   assert.match(accept, /QA_REAL_VALIDATION_REQUIRED/);
   assert.match(report, /\/automation/);
   assert.match(report, /formal_write_count:0/);
-  assert.match(employee, /state\.qaAcceptance\.status!=='MANUAL_EMPLOYEE_ACCEPTED'/);
+  assert.match(employee, /employeeQaAcceptanceStatePolicy\(state\.qaAcceptance\.status,state\.qaAcceptance\.cleanupStatus,state\.qaAcceptance\.loadStatus\)\.upload_allowed/);
   assert.match(consolePage, /acceptEmployee'\)\.disabled=run\.status!=='AUTOMATION_PASS'/);
 });
 
