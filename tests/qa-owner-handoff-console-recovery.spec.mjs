@@ -98,7 +98,7 @@ test("AUTOMATION_PASS re-attestation is idempotent or refreshable without unlock
   ]);
   const record = functionBlock(worker, "qaAcceptanceRecordAutomation");
   const reportStart = employee.indexOf("async function employeeQaAcceptanceReportValidation");
-  const reportEnd = employee.indexOf("async function employeeQaAcceptanceReportUpload", reportStart);
+  const reportEnd = employee.indexOf("async function employeeQaAcceptanceSessionResume", reportStart);
   assert.notEqual(reportStart, -1);
   assert.notEqual(reportEnd, -1);
   const report = employee.slice(reportStart, reportEnd);

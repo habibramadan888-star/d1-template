@@ -24,7 +24,7 @@ test('request reuse and global single-flight are wired',()=>{
   assert.match(worker,/ttlockSnapshotFlights\.has\(flightKey\)/);
   assert.match(worker,/request_context:opts\.request_context/);
   assert.match(worker,/request_context=ttlockRequestContext\(request,env,user,"employee_entry_validate"/);
-  assert.match(worker,/request_context=ttlockRequestContext\(request,env,user,"employee_entry_upload"/);
+  assert.match(worker,/request_context=options\.request_context\|\|ttlockRequestContext\(request,env,user,"employee_entry_upload"/);
 });
 
 test('all TTLock consumers route through the canonical snapshot gateway',()=>{

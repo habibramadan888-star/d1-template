@@ -86,7 +86,7 @@ test("QA client asset version mismatch is blocked before per-record business err
   ]);
   assert.match(worker, /QA_CLIENT_ASSET_STALE/);
   assert.match(employee, /QA_CLIENT_ASSET_STALE/);
-  assert.match(qaConfig, /QA_CLIENT_ASSET_VERSION\s*=\s*"qa-post-acceptance-rehydration-v1"/);
+  assert.match(qaConfig, /QA_CLIENT_ASSET_VERSION\s*=\s*"qa-session-atomic-resume-v1"/);
 });
 
 test("QA diagnostic endpoint and console expose bounded copy bundle only in QA", async () => {

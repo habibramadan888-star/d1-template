@@ -78,6 +78,14 @@ test("13-record aggregate preflight returns every result with one shared request
       return [];
     },
     extractEmployeeEntryAnchorsFromSession: () => [],
+    empTableExists: async () => true,
+    employeeEntryPreloadExistingTransactions: async (_env, _user, _requests, context) => {
+      context.transaction_read_count = 1;
+      context.existing_transactions_by_event_id = new Map();
+      context.transactions_table_exists = true;
+      context.employee_entry_schema_ready = true;
+      return context.existing_transactions_by_event_id;
+    },
     employeeEntryValidationFailure: (stage, error_code, message, extra = {}) => ({ ok: false, stage, error_code, message, missing_fields: extra.missing_fields || [], invalid_fields: extra.invalid_fields || [], event_index: extra.event_index || 0, event_type: extra.event_type || "", record_id: extra.record_id || null }),
     validateEmployeeEntryUploadPayload: async (_env, _user, body, opts) => {
       contexts.add(opts.request_context);
@@ -91,6 +99,7 @@ test("13-record aggregate preflight returns every result with one shared request
     functionBlock(worker, "employeeEntryAggregateValidationRequests"),
     functionBlock(worker, "employeeEntryAggregateResultIdentity"),
     functionBlock(worker, "employeeEntryAggregateRequestMetrics"),
+    functionBlock(worker, "employeeEntryPrepareArchiveSnapshotContext"),
     functionBlock(worker, "validateEmployeeEntryAggregatePreflight")
   ].join("\n"), sandbox);
   const types = ["TF", "D", "AP", "E", "CO", "DR", "R", "R", "D", "AP", "E", "CO", "R"];
@@ -133,6 +142,7 @@ test("Employee sends one aggregate validation request, binds every card by stabl
 test("aggregate errors stay bounded and 067 archive/TTLock reuse remains intact", () => {
   const fallback = functionBlock(employee, "employeeAggregateValidationSessionFailure");
   const canonical = functionBlock(worker, "validateEmployeeBedTransferCanonicalLink");
+  const prepareArchive = functionBlock(worker, "employeeEntryPrepareArchiveSnapshotContext");
   const snapshot = functionBlock(worker, "getCanonicalTTLockSnapshot");
   assert.match(fallback, /transport_failure:true/);
   assert.match(fallback, /validation_results:\[\]/);
@@ -140,8 +150,9 @@ test("aggregate errors stay bounded and 067 archive/TTLock reuse remains intact"
   assert.match(fallback, /Server validation unavailable\. Please retry\./);
   assert.doesNotMatch(fallback, /validationRequests|\.map\(/);
   assert.doesNotMatch(fallback, /raw_body|Cloudflare|<!DOCTYPE|<html/i);
-  assert.match(canonical, /archive_entries_prepared!==true/);
-  assert.match(canonical, /archive_parse_count=Number\(requestContext\.archive_parse_count\|\|0\)\+1/);
+  assert.match(canonical, /employeeEntryPrepareArchiveSnapshotContext\(archiveSnapshot,requestContext\|\|\{\}\)/);
+  assert.match(prepareArchive, /archive_entries_prepared===true/);
+  assert.match(prepareArchive, /archive_parse_count=Number\(context\.archive_parse_count\|\|0\)\+1/);
   assert.equal((canonical.match(/cloudArrearsFetchActiveSessionRows/g) || []).length, 1);
   assert.match(snapshot, /if\(context\.ttlockSnapshotPromise\)/);
   assert.match(snapshot, /ttlock_snapshot_count=Number\(context\.ttlock_snapshot_count\|\|0\)\+1/);

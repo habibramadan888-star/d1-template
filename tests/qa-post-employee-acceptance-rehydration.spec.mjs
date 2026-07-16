@@ -143,7 +143,7 @@ test("accepted server attestation freezes only exact proof accepted within its o
   const ids = Array.from({ length: 16 }, (_, index) => `${qaRunId}-E${String(index + 1).padStart(2, "0")}`);
   const run = { qa_run_id: qaRunId, status: "MANUAL_EMPLOYEE_ACCEPTED", artifact_sha256: "a".repeat(64), artifact_commit: "b".repeat(40), qa_worker_version: "reviewed-worker", matrix_version: "employee-qa-matrix-v2", employee_record_count: 16, employee_accepted_at: "2020-01-01T00:15:00.000Z" };
   const contract = { payloadHash: "c".repeat(64), scenarios: ids.map(entry_id => ({ entry_id })) };
-  const stored = { qa_run_id: qaRunId, artifact_sha256: run.artifact_sha256, qa_worker_version: run.qa_worker_version, matrix_version: run.matrix_version, payload_hash: contract.payloadHash, validation_attempt_id: "qa-val-123456789012", server_validated_at: "2020-01-01T00:00:00.000Z", expires_at: "2020-01-01T00:30:00.000Z", passed_count: 16, failed_count: 0, formal_write_count: 0, validation_results: ids.map(entry_identity => ({ entry_identity, diagnostic_envelope: { validation_attempt_id: "qa-val-123456789012", qa_run_id: qaRunId, artifact_sha256: run.artifact_sha256, worker_version: run.qa_worker_version, matrix_version: run.matrix_version, payload_hash: contract.payloadHash } })) };
+  const stored = { qa_run_id: qaRunId, artifact_sha256: run.artifact_sha256, qa_worker_version: run.qa_worker_version, matrix_version: run.matrix_version, payload_hash: contract.payloadHash, validation_attempt_id: "qa-val-123456789012", server_validated_at: "2020-01-01T00:00:00.000Z", expires_at: "2020-01-01T00:30:00.000Z", passed_count: 16, failed_count: 0, formal_write_count: 0, validation_results: ids.map(entry_identity => ({ entry_identity, ok: true, diagnostic_envelope: { validation_attempt_id: "qa-val-123456789012", qa_run_id: qaRunId, artifact_sha256: run.artifact_sha256, worker_version: run.qa_worker_version, matrix_version: run.matrix_version, payload_hash: contract.payloadHash } })) };
   const locked = current(run, contract, stored);
   assert.equal(locked.current, true);
   assert.equal(locked.acceptance_locked, true);
@@ -155,7 +155,7 @@ test("accepted server attestation freezes only exact proof accepted within its o
 test("artifact compatibility lineage is exact to the accepted Run artifact commit and payload", async () => {
   const worker = await read("deploy-worker/src/index.js");
   const context = vm.createContext({ String });
-  vm.runInContext(`const QA_REHYDRATION_COMPATIBILITY_SCOPE="employee_post_acceptance_rehydration_v1";${functionBlock(worker, "qaAcceptanceArtifactCompatibility")}`, context);
+  vm.runInContext(`const QA_REHYDRATION_COMPATIBILITY_SCOPE="employee_post_acceptance_rehydration_v1";const QA_SESSION_RESUME_COMPATIBILITY_SCOPE="employee_post_acceptance_session_resume_v1";${functionBlock(worker, "qaAcceptanceArtifactCompatibility")}`, context);
   const compatible = vm.runInContext("qaAcceptanceArtifactCompatibility", context);
   const run = { qa_run_id: "QA-20260716-4FB51FAF", artifact_sha256: "a".repeat(64), artifact_commit: "b".repeat(40) };
   const payloadHash = "c".repeat(64);

@@ -3188,12 +3188,12 @@ label .label-en{
 </div>
 <script>
 const EMPLOYEE_ASSET_DIAGNOSTIC={
-  employee_asset_version:'qa-post-acceptance-rehydration-v1',
-  frontend_asset_version:'qa-post-acceptance-rehydration-v1',
+  employee_asset_version:'qa-session-atomic-resume-v1',
+  frontend_asset_version:'qa-session-atomic-resume-v1',
   commit_hash:'runtime-git-commit',
   worker_version:'runtime-response-header',
   built_at:'2026-07-07T00:00:00+04:00',
-  upload_path:'btnExportSession -> commitSessionAndExport -> /api/employee/entry/validate -> /api/employee/entry'
+  upload_path:'btnExportSession -> aggregate preflight -> QA session-resume (single request)'
 };
 window.__EMPLOYEE_ASSET_DIAGNOSTIC=EMPLOYEE_ASSET_DIAGNOSTIC;
 console.info('employee_asset_diagnostic',EMPLOYEE_ASSET_DIAGNOSTIC);
@@ -3240,7 +3240,7 @@ function readSessionId(userid){
   try{return localStorage.getItem(employeeStorageKey('empv3:sessionId',userid))||''}
   catch{return ''}
 }
-const state={lockCards:[],current:null,depositBalance:null,depositContext:null,rentConfig:{},rentConfigLoaded:false,drafts:[],tasks:[],closedTasks:[],arrearsTasksLoaded:false,arrearTasksError:null,arrearsGatewaySource:'',arrearsGatewayProof:null,employeeDirectives:[],followupItems:[],systemReminderItems:[],systemReminderStatus:'idle',systemReminderSummary:null,systemReminderSources:null,systemReminderLimit:100,sessionId:'',user:null,aggregateValidationSessionError:null,aggregateValidationOnly:false,ttlockStatus:'idle',ttlockLoadedAt:0,ttlockError:'',ttlockDataSource:'',qaAcceptance:{runId:'',status:'',mode:'',artifactSha:'',workerVersion:'',matrixVersion:'',payloadHash:'',sessionIdsByEntry:{},validationAttestation:null,validationAttemptId:'',staleReason:'',loadStatus:'',personalDraftCount:0},bedTransferCapabilities:{status:'idle',bed_transfer_validate_enabled:false,bed_transfer_write_enabled:false,owner_waiver_ack_enabled:false,controlled_beta_preview:false,canonical_write_path:'/api/employee/entry',production_cutover:'PRODUCTION_NO_GO'},bedTransferContext:{status:'idle',source:null,target:null,requestKey:'',serverValidation:null,validatedRecord:null,recordedResult:null}};
+const state={lockCards:[],current:null,depositBalance:null,depositContext:null,rentConfig:{},rentConfigLoaded:false,drafts:[],tasks:[],closedTasks:[],arrearsTasksLoaded:false,arrearTasksError:null,arrearsGatewaySource:'',arrearsGatewayProof:null,employeeDirectives:[],followupItems:[],systemReminderItems:[],systemReminderStatus:'idle',systemReminderSummary:null,systemReminderSources:null,systemReminderLimit:100,sessionId:'',user:null,aggregateValidationSessionError:null,aggregateValidationOnly:false,ttlockStatus:'idle',ttlockLoadedAt:0,ttlockError:'',ttlockDataSource:'',qaAcceptance:{runId:'',status:'',mode:'',artifactSha:'',workerVersion:'',matrixVersion:'',payloadHash:'',sessionIdsByEntry:{},scenarioIdsByEntry:{},validationAttestation:null,validationAttemptId:'',staleReason:'',loadStatus:'',personalDraftCount:0,alreadyPersistedCount:0,remainingCount:0,conflictingEntryCount:0,duplicateEntryIdCount:0,resumeRequired:false},bedTransferCapabilities:{status:'idle',bed_transfer_validate_enabled:false,bed_transfer_write_enabled:false,owner_waiver_ack_enabled:false,controlled_beta_preview:false,canonical_write_path:'/api/employee/entry',production_cutover:'PRODUCTION_NO_GO'},bedTransferContext:{status:'idle',source:null,target:null,requestKey:'',serverValidation:null,validatedRecord:null,recordedResult:null}};
 const BED_TRANSFER_WRITE_ENABLED=false;
 const BED_TRANSFER_EVENT_LEDGER_MESSAGE='Bed transfer records save event anchors only. This does not directly change bed occupancy, deposit, arrears, or Access Card. 换床记录只保存信息锚点，不会直接改变床位、押金、欠款或门禁卡。';
 const BED_TRANSFER_SUBMITTED_MESSAGE='Bed transfer recorded / 换床记录已保存';
@@ -5374,6 +5374,21 @@ updateEntrySessionActionState=function(){
         exportBtn.title=state.qaAcceptance.loadStatus==='FAILED'?'Reload the same QA Run before Upload Session.':'QA validation and manual Employee acceptance are required before Upload Session.';
         return;
       }
+      const alreadyPersisted=Math.max(0,Number(state.qaAcceptance.alreadyPersistedCount||0));
+      const remaining=Math.max(0,Number(state.qaAcceptance.remainingCount||0));
+      const conflicts=Math.max(0,Number(state.qaAcceptance.conflictingEntryCount||0));
+      const duplicateEntryIds=Math.max(0,Number(state.qaAcceptance.duplicateEntryIdCount||0));
+      if(conflicts>0||duplicateEntryIds>0){
+        exportBtn.innerHTML=renderEmployeeButtonLabel('Upload Locked','QA persistence conflict');
+        exportBtn.disabled=true;
+        exportBtn.classList.add('disabled');
+        exportBtn.title='QA persistence conflicts must be resolved before Resume Upload.';
+        return;
+      }
+      if(alreadyPersisted>0&&remaining>0){
+        exportBtn.innerHTML=renderEmployeeButtonLabel('Resume Upload',`${alreadyPersisted} saved · ${remaining} remaining`);
+        exportBtn.title=`Resume this QA Run: ${alreadyPersisted} already saved, ${remaining} remaining.`;
+      }
     }
     const transferWriteBlocked=state.drafts.some(entry=>entry.type==='TF'&&!employeeEntryCloudConfirmed(entry))&&!employeeBedTransferWriteEnabled();
     if(transferWriteBlocked){
@@ -5389,7 +5404,7 @@ updateEntrySessionActionState=function(){
       exportBtn.classList.add('disabled');
       return;
     }
-    exportBtn.innerHTML=renderEmployeeButtonLabel('Upload Session','\u786e\u8ba4\u672c\u7968\u5e76\u4e0a\u4f20\u4e91\u7aef');
+    if(!(state.qaAcceptance?.runId&&Number(state.qaAcceptance.alreadyPersistedCount||0)>0&&Number(state.qaAcceptance.remainingCount||0)>0))exportBtn.innerHTML=renderEmployeeButtonLabel('Upload Session','\u786e\u8ba4\u672c\u7968\u5e76\u4e0a\u4f20\u4e91\u7aef');
     exportBtn.disabled=!hasRows;
     exportBtn.classList.toggle('disabled',!hasRows);
   }
@@ -8137,6 +8152,7 @@ function employeeSessionRecordState(entry,index){
   if(status==='PENDING_VALIDATION')return {key:'PENDING_VALIDATION',label:'Pending Validation',className:'pending'};
   if(status==='NEEDS_REVALIDATION')return {key:'NEEDS_REVALIDATION',label:'Needs Revalidation',className:'pending'};
   if(status==='VALIDATION_PASSED')return {key:'VALIDATION_PASSED',label:'Validation Passed',className:'validated'};
+  if(status==='ALREADY_PERSISTED')return {key:'ALREADY_PERSISTED',label:'Already Persisted',className:'validated'};
   if(status==='VALIDATING')return {key:'VALIDATING',label:'Validating',className:'validating'};
   if(status==='UPLOADING')return {key:'UPLOADING',label:'Uploading',className:'uploading'};
   if(entry?.sync_status==='SYNCED'){
@@ -8483,6 +8499,7 @@ async function commitSessionAndExport(){
     };
     const requestPayload=isBedTransfer?employeeBedTransferValidatePayload(e,sessionForEntry):{dry_run:true,validate_only:true,no_write:true,event_index:i,entry:e,entries:[e],session:{...sessionForEntry,entries:[e],entries_json:JSON.stringify({anchor_contract_version:'employee_entry_anchor_v1',entries:[e]})}};
     requestPayload.event_index=i;
+    if(qaAcceptanceActive)Object.assign(requestPayload,employeeQaAcceptanceRequestEnvelope(e,sessionForEntry));
     validationRequests.push(requestPayload);
     if(isBedTransfer)bedTransferUploadPayloads.set(employeeEntryStableIdentity(e),employeeBedTransferRecordPayload(requestPayload));
   }
@@ -8505,6 +8522,13 @@ async function commitSessionAndExport(){
     return;
   }
   state.aggregateValidationSessionError=null;
+  if(state.qaAcceptance?.runId){
+    state.qaAcceptance.alreadyPersistedCount=Math.max(0,Number(aggregatePreflight?.already_persisted_count||0));
+    state.qaAcceptance.remainingCount=Math.max(0,Number(aggregatePreflight?.remaining_count||0));
+    state.qaAcceptance.conflictingEntryCount=Math.max(0,Number(aggregatePreflight?.conflicting_entry_count||0));
+    state.qaAcceptance.duplicateEntryIdCount=Math.max(0,Number(aggregatePreflight?.duplicate_entry_id_count||0));
+    state.qaAcceptance.resumeRequired=state.qaAcceptance.alreadyPersistedCount>0&&state.qaAcceptance.remainingCount>0&&state.qaAcceptance.conflictingEntryCount===0&&state.qaAcceptance.duplicateEntryIdCount===0;
+  }
   const aggregateResults=Array.isArray(aggregatePreflight?.validation_results)?aggregatePreflight.validation_results:[];
   const identityContract=employeeAggregateValidationIdentityContract(aggregateResults,uploadList);
   if(!identityContract.ok){
@@ -8556,7 +8580,7 @@ async function commitSessionAndExport(){
     state.uploadValidationFailedIndex=failedIndex;
     state.uploadValidationFailedEntryId=failedIdentity;
     state.uploadValidationFailedMessage=`${firstDryRunFailure.result?.error_code||'SERVER_DRY_RUN_GENERIC_ERROR'}: ${firstDryRunFailure.result?.message||firstDryRunFailure.message||''}`;
-    await employeeQaAcceptanceReportValidation(aggregatePreflight,uploadList);
+    if(!state.qaAcceptance?.runId||employeeQaAcceptanceMayRecordAutomation(state.qaAcceptance.status))await employeeQaAcceptanceReportValidation(aggregatePreflight,uploadList);
     saveDrafts();
     buildExport();
     refreshSessionViews();
@@ -8580,13 +8604,50 @@ async function commitSessionAndExport(){
     });
     state.drafts=allOriginalDrafts;
     state.sessionId=originalSessionId;
-    await employeeQaAcceptanceReportValidation(aggregatePreflight,uploadList);
+    if(!state.qaAcceptance?.runId||employeeQaAcceptanceMayRecordAutomation(state.qaAcceptance.status))await employeeQaAcceptanceReportValidation(aggregatePreflight,uploadList);
     saveDrafts();buildExport();refreshSessionViews();
     oldLabels.forEach(([b,html])=>{b.dataset.busy='0';b.disabled=false;b.classList.remove('disabled');b.innerHTML=html});
     showStatus(`Validation completed for ${aggregateResults.length} records. No business write was attempted.`);
     if($('validationBox'))$('validationBox').innerHTML='<div class="ok">Session validation completed. No business write was attempted.</div>';
     updateEntrySessionActionState();
     return;
+  }
+  if(state.qaAcceptance?.runId){
+    try{
+      setUploadPhase(`Resuming ${state.qaAcceptance.remainingCount} remaining records`,'Resume Upload');
+      const resumed=await employeeQaAcceptanceSessionResume(aggregatePreflight,uploadList);
+      oldLabels.forEach(([b])=>{b.dataset.busy='0';b.disabled=false;b.classList.remove('disabled')});
+      state.drafts=[];
+      state.sessionId='';
+      state.uploadValidationFailedIndex=null;
+      state.uploadValidationFailedEntryId='';
+      state.uploadValidationFailedMessage='';
+      employeeRemoveActiveDraftStorage({drafts:true,session:true});
+      state.lastSavedBedTransferDraftId=null;
+      buildExport();refreshSessionViews();renderContext();
+      if($('validationBox'))$('validationBox').innerHTML='';
+      showStatus(`QA Upload completed. ${Number(resumed.already_persisted_count||0)} records were already saved and ${Number(resumed.new_write_count||0)} were resumed.`,'ok');
+      toast('QA Upload completed. Continue with Owner review.',6000);
+      updateEntrySessionActionState();
+      return;
+    }catch(error){
+      const result=error?.resumeResult&&typeof error.resumeResult==='object'?error.resumeResult:{};
+      const code=String(error?.message||'QA_SESSION_RESUME_FAILED').slice(0,120);
+      if(Number.isFinite(Number(result.already_persisted_count)))state.qaAcceptance.alreadyPersistedCount=Math.max(0,Number(result.already_persisted_count));
+      if(Number.isFinite(Number(result.remaining_count)))state.qaAcceptance.remainingCount=Math.max(0,Number(result.remaining_count));
+      if(Number.isFinite(Number(result.conflicting_entry_count)))state.qaAcceptance.conflictingEntryCount=Math.max(0,Number(result.conflicting_entry_count));
+      if(Number.isFinite(Number(result.duplicate_entry_id_count)))state.qaAcceptance.duplicateEntryIdCount=Math.max(0,Number(result.duplicate_entry_id_count));
+      state.qaAcceptance.resumeRequired=state.qaAcceptance.alreadyPersistedCount>0&&state.qaAcceptance.remainingCount>0&&state.qaAcceptance.conflictingEntryCount===0&&state.qaAcceptance.duplicateEntryIdCount===0;
+      state.drafts=allOriginalDrafts;
+      state.sessionId=originalSessionId;
+      saveDrafts();buildExport();refreshSessionViews();
+      oldLabels.forEach(([b,html])=>{b.dataset.busy='0';b.disabled=false;b.classList.remove('disabled');b.innerHTML=html});
+      const summary=`${state.qaAcceptance.alreadyPersistedCount} saved · ${state.qaAcceptance.remainingCount} remaining`;
+      showStatus(`${code}: Resume Upload stopped. ${summary}. Your records were preserved.`,'bad');
+      if($('validationBox'))$('validationBox').innerHTML=`<div class="upload-validation-panel" role="alert"><div class="uv-title">Resume Upload stopped</div><div class="uv-list"><span class="uv-label">Error</span><span class="uv-value">${esc(code)}</span></div><div class="uv-sub">${esc(summary)}. No duplicate request was sent by this page.</div></div>`;
+      updateEntrySessionActionState();
+      return;
+    }
   }
   const writeQueue=[...uploadList.filter(entry=>String(entry?.type||'').toUpperCase()!=='TF'),...uploadList.filter(entry=>String(entry?.type||'').toUpperCase()==='TF')];
   const pendingWriteCount=writeQueue.filter(entry=>entry.upload_resume_state!=='ALREADY_PERSISTED').length;
@@ -8688,19 +8749,12 @@ async function commitSessionAndExport(){
   state.uploadValidationFailedEntryId='';
   state.uploadValidationFailedMessage='';
   saveDrafts();
-  let syncCheck=null,cloudConfirmed=false;
-  if(state.qaAcceptance?.runId){
-    try{await employeeQaAcceptanceReportUpload(uploadList);cloudConfirmed=true;syncCheck={session_status:'UPLOAD_PASS'}}
-    catch(error){syncCheck={error:String(error?.message||error||'QA_UPLOAD_CONFIRMATION_FAILED')}}
-  }else{
-    syncCheck=await reconcileEmployeeCloudSyncState({silent:true});
-    cloudConfirmed=entrySessionUploaded();
-  }
+  const syncCheck=await reconcileEmployeeCloudSyncState({silent:true});
+  const cloudConfirmed=entrySessionUploaded();
   if(cloudConfirmed){
     state.drafts=[];
     state.sessionId='';
-    if(state.qaAcceptance?.runId)employeeRemoveActiveDraftStorage({drafts:true,session:true});
-    else try{localStorage.removeItem(employeeStorageKey('empv3:drafts'));localStorage.removeItem(employeeStorageKey('empv3:sessionId'))}catch{}
+    try{localStorage.removeItem(employeeStorageKey('empv3:drafts'));localStorage.removeItem(employeeStorageKey('empv3:sessionId'))}catch{}
     currentSessionId();
     state.lastSavedBedTransferDraftId=null;
     saveDrafts();
@@ -9162,6 +9216,16 @@ function employeeQaAcceptanceSessionId(entry={},fallback=''){
   const id=employeeEntryStableIdentity(entry);
   return String(state.qaAcceptance?.sessionIdsByEntry?.[id]||fallback||'');
 }
+function employeeQaAcceptanceRequestEnvelope(entry={},session={}){
+  const qa=state.qaAcceptance||{},entryIdentity=employeeEntryStableIdentity(entry);
+  if(!qa.runId||!entryIdentity)return {};
+  return {
+    qa_run_id:String(qa.runId),
+    scenario_id:String(qa.scenarioIdsByEntry?.[entryIdentity]||''),
+    entry_identity:entryIdentity,
+    session_identity:String(qa.sessionIdsByEntry?.[entryIdentity]||session.id||session.session_id||'')
+  };
+}
 async function employeeLegacyLoadQaAcceptanceRun(){
   return employeeLoadQaAcceptanceRun();
   const runId=employeeQaAcceptanceRequestedRunId();
@@ -9259,12 +9323,18 @@ function employeeQaAcceptanceStatePolicy(status='',cleanupStatus='NOT_RUN',loadS
     reusable_failure:value==='AUTOMATION_FAILED'
   };
 }
+function employeeQaAcceptanceMayRecordAutomation(status=''){
+  return ['DRAFT_READY','AUTOMATION_FAILED','AUTOMATION_PASS'].includes(String(status||''));
+}
 function employeeQaAcceptanceDeliveryContract(data={},runId=''){
   const rawEntries=Array.isArray(data.entries)?data.entries:[];
   const sessionIds=data.session_ids_by_entry&&typeof data.session_ids_by_entry==='object'?data.session_ids_by_entry:{};
+  const scenarioIds=data.scenario_ids_by_entry&&typeof data.scenario_ids_by_entry==='object'?data.scenario_ids_by_entry:{};
   const expected=Number(data.employee_record_count||0);
   const ids=rawEntries.map(employeeEntryStableIdentity);
   const mappedSessionIds=ids.map(id=>String(sessionIds[id]||''));
+  const scenarioContractPresent=Object.keys(scenarioIds).length>0;
+  const mappedScenarioIds=ids.map(id=>String(scenarioIds[id]||''));
   const oracle=data.expected_finance&&typeof data.expected_finance==='object'?data.expected_finance:{};
   const oracleFields=['cash_received','bank_received','total_received','total_expenses','net_funds','cash_net','bank_net','outstanding','arrears_opened','arrears_repaid','deposit_included','bed_transfer_fee','rent_income'];
   const artifact=String(data.artifact_sha256||'');
@@ -9281,8 +9351,8 @@ function employeeQaAcceptanceDeliveryContract(data={},runId=''){
   const directArtifact=artifact===currentArtifact&&compatibility.ok===true&&compatibility.mode==='CURRENT_ARTIFACT';
   const compatiblePredecessor=artifact!==currentArtifact
     &&compatibility.ok===true
-    &&compatibility.mode==='REHYDRATION_PREDECESSOR'
-    &&compatibility.scope==='employee_post_acceptance_rehydration_v1'
+    &&['REHYDRATION_PREDECESSOR','SESSION_RESUME_PREDECESSOR'].includes(compatibility.mode)
+    &&['employee_post_acceptance_rehydration_v1','employee_post_acceptance_session_resume_v1'].includes(compatibility.scope)
     &&String(compatibility.qa_run_id||'')===runId
     &&String(compatibility.run_artifact_sha256||'')===artifact
     &&String(compatibility.current_artifact_sha256||'')===currentArtifact;
@@ -9291,6 +9361,7 @@ function employeeQaAcceptanceDeliveryContract(data={},runId=''){
   if(expected!==16||rawEntries.length!==expected||Number(data.scenario_count||0)!==16)throw new Error('QA_EMPLOYEE_COUNT_MISMATCH');
   if(ids.some(id=>!id.startsWith(`${runId}-E`))||new Set(ids).size!==ids.length)throw new Error('QA_ENTRY_ID_CONTRACT_INVALID');
   if(mappedSessionIds.some(id=>!id.startsWith(`${runId}-S`))||new Set(mappedSessionIds).size!==mappedSessionIds.length)throw new Error('QA_SESSION_ID_CONTRACT_INVALID');
+  if(scenarioContractPresent&&(mappedScenarioIds.some(id=>!id)||new Set(mappedScenarioIds).size!==mappedScenarioIds.length))throw new Error('QA_SCENARIO_ID_CONTRACT_INVALID');
   if(oracleFields.some(field=>!Number.isFinite(Number(oracle[field]))))throw new Error('QA_FINANCIAL_ORACLE_MISSING');
   const attestation=data.validation_attestation&&typeof data.validation_attestation==='object'?data.validation_attestation:null;
   if(attestation?.acceptance_locked===true&&!['MANUAL_EMPLOYEE_ACCEPTED','UPLOAD_PASS'].includes(String(data.status||'')))throw new Error('QA_ACCEPTANCE_LOCK_STATE_MISMATCH');
@@ -9313,7 +9384,19 @@ function employeeQaAcceptanceDeliveryContract(data={},runId=''){
   if(String(data.employee_review_status||'')!==(policy.accepted||policy.readonly?'ACCEPTED':'PENDING'))throw new Error('QA_EMPLOYEE_REVIEW_STATE_MISMATCH');
   if(data.upload_allowed!==policy.upload_allowed||data.readonly!==policy.readonly)throw new Error('QA_UPLOAD_STATE_MISMATCH');
   if((policy.accepted||policy.readonly)&&(!validationAttestation||validationAttestation.acceptance_locked!==true))throw new Error('QA_ACCEPTED_ATTESTATION_MISSING');
-  return {rawEntries,sessionIds,expected,oracle,workerVersion,matrixVersion,payloadHash,validationAttestation,staleReason:freshness.stale_reason,policy,serverRecordCount:expected};
+  const persistenceContractPresent=Array.isArray(data.persisted_entry_ids)&&Array.isArray(data.missing_entry_ids);
+  const persistedEntryIds=persistenceContractPresent?data.persisted_entry_ids.map(String):(policy.readonly?[...ids]:[]);
+  const missingEntryIds=persistenceContractPresent?data.missing_entry_ids.map(String):(policy.readonly?[]:[...ids]);
+  const persistedSet=new Set(persistedEntryIds),missingSet=new Set(missingEntryIds);
+  const alreadyPersistedCount=persistenceContractPresent?Number(data.already_persisted_count||0):persistedEntryIds.length;
+  const remainingCount=persistenceContractPresent?Number(data.remaining_count||0):missingEntryIds.length;
+  const conflictingEntryCount=Number(data.conflicting_entry_count||0),duplicateEntryIdCount=Number(data.duplicate_entry_id_count||0);
+  const persistenceIds=[...persistedEntryIds,...missingEntryIds];
+  if(persistenceContractPresent&&(alreadyPersistedCount!==persistedEntryIds.length||remainingCount!==missingEntryIds.length||alreadyPersistedCount+remainingCount!==expected))throw new Error('QA_PERSISTENCE_COUNT_MISMATCH');
+  if(persistenceContractPresent&&(persistenceIds.length!==expected||new Set(persistenceIds).size!==expected||ids.some(id=>!persistedSet.has(id)&&!missingSet.has(id))))throw new Error('QA_PERSISTENCE_IDENTITY_MISMATCH');
+  const resumeRequired=policy.accepted&&alreadyPersistedCount>0&&remainingCount>0&&conflictingEntryCount===0&&duplicateEntryIdCount===0;
+  if(persistenceContractPresent&&data.resume_upload_required!==resumeRequired)throw new Error('QA_RESUME_STATE_MISMATCH');
+  return {rawEntries,sessionIds,scenarioIds,expected,oracle,workerVersion,matrixVersion,payloadHash,validationAttestation,staleReason:freshness.stale_reason,policy,serverRecordCount:expected,persistedEntryIds,missingEntryIds,alreadyPersistedCount,remainingCount,conflictingEntryCount,duplicateEntryIdCount,resumeRequired};
 }
 function employeeQaAcceptanceBanner({runId,status,mode,count,personalDraftCount,storageCount=0,serverRecordCount=null,error=''}){
   let banner=document.getElementById('qaAcceptanceEmployeeBanner');
@@ -9339,7 +9422,7 @@ function employeeQaAcceptancePreserveLoadFailure(runId,personalDraftCount,error,
   const previous=state.qaAcceptance||{};
   const preservedSameRun=String(previous.runId||'')===runId&&state.drafts.length>0;
   const httpStatus=Number(error?.httpStatus||serverMeta.httpStatus||0);
-  state.qaAcceptance={...(preservedSameRun?previous:{}),runId,status:String(serverMeta.status||previous.status||'LOAD_FAILED'),mode:String(serverMeta.mode||previous.mode||''),artifactSha:previous.artifactSha||'',workerVersion:previous.workerVersion||'',matrixVersion:previous.matrixVersion||'',payloadHash:previous.payloadHash||'',sessionIdsByEntry:previous.sessionIdsByEntry||{},validationAttestation:previous.validationAttestation||null,loadStatus:'FAILED',loadError:String(error?.message||error),loadHttpStatus:httpStatus,personalDraftCount,serverRecordCount:serverMeta.serverRecordCount,uploadAllowed:false,readOnly:previous.readOnly===true};
+  state.qaAcceptance={...(preservedSameRun?previous:{}),runId,status:String(serverMeta.status||previous.status||'LOAD_FAILED'),mode:String(serverMeta.mode||previous.mode||''),artifactSha:previous.artifactSha||'',workerVersion:previous.workerVersion||'',matrixVersion:previous.matrixVersion||'',payloadHash:previous.payloadHash||'',sessionIdsByEntry:previous.sessionIdsByEntry||{},scenarioIdsByEntry:previous.scenarioIdsByEntry||{},validationAttestation:previous.validationAttestation||null,loadStatus:'FAILED',loadError:String(error?.message||error),loadHttpStatus:httpStatus,personalDraftCount,serverRecordCount:serverMeta.serverRecordCount,uploadAllowed:false,readOnly:previous.readOnly===true,alreadyPersistedCount:Number(previous.alreadyPersistedCount||0),remainingCount:Number(previous.remainingCount||0),conflictingEntryCount:Number(previous.conflictingEntryCount||0),duplicateEntryIdCount:Number(previous.duplicateEntryIdCount||0),resumeRequired:previous.resumeRequired===true};
   buildExport();refreshSessionViews();
   employeeQaAcceptanceBanner({runId,status:state.qaAcceptance.status,mode:state.qaAcceptance.mode,count:state.drafts.length,personalDraftCount,serverRecordCount:serverMeta.serverRecordCount,error:String(error?.message||error)});
   showStatus('QA Run could not be loaded. Existing records were preserved. Retry this QA Run.','bad');
@@ -9365,8 +9448,9 @@ async function employeeLoadQaAcceptanceRun(){
     const data=raw?.data&&typeof raw.data==='object'?raw.data:raw;
     serverMeta={status:String(data?.status||''),mode:String(data?.mode||''),serverRecordCount:Number.isFinite(Number(data?.server_record_count))?Number(data.server_record_count):null,httpStatus:response.status,errorCode:String(data?.error_code||'')};
     if(!response.ok||data?.success===false){const failure=new Error(data?.error_code||`HTTP_${response.status}`);failure.httpStatus=response.status;failure.serverMeta=serverMeta;throw failure}
-    const {rawEntries,sessionIds,workerVersion,matrixVersion,payloadHash,validationAttestation,staleReason,policy,serverRecordCount}=employeeQaAcceptanceDeliveryContract(data,runId);
+    const {rawEntries,sessionIds,scenarioIds,workerVersion,matrixVersion,payloadHash,validationAttestation,staleReason,policy,serverRecordCount,persistedEntryIds,alreadyPersistedCount,remainingCount,conflictingEntryCount,duplicateEntryIdCount,resumeRequired}=employeeQaAcceptanceDeliveryContract(data,runId);
     const attestedById=new Map((validationAttestation?.validation_results||[]).map(result=>[String(result?.entry_identity||''),result]));
+    const persistedSet=new Set(persistedEntryIds||[]);
     const entries=rawEntries.map(entry=>{
       const id=employeeEntryStableIdentity(entry);
       const payment=String(entry.payment_method||entry.pay_type||'').trim().toLowerCase();
@@ -9376,16 +9460,16 @@ async function employeeLoadQaAcceptanceRun(){
       const reusableFailure=policy.reusable_failure&&validationAttestation&&attested?.ok===false;
       const uploadStatus=reusablePass?'VALIDATION_PASSED':reusableFailure?'VALIDATION_FAILED':data.status==='DRAFT_READY'?'PENDING_VALIDATION':'NEEDS_REVALIDATION';
       const validationError=reusableFailure?{source:'aggregate_dry_run',stage:'qa_browser_validation',event_index:rawEntries.indexOf(entry),event_type:attested.event_type||entry.event_type||'',entry_identity:id,error_code:attested.error_code||'QA_VALIDATION_FAILED',message:'QA real-browser validation failed.',missing_fields:attested.missing_fields||[],invalid_fields:[],no_write:true,write_attempted:false}:null;
-      return {...entry,amount:transferAmount,session_id:sessionIds[id]||entry.session_id||'',pay_type:payment==='bank'||payment==='b'?'B':payment==='cash'||payment==='c'?'C':entry.pay_type,upload_status:uploadStatus,upload_validation_error:validationError,upload_validation_error_code:validationError?.error_code||''};
+      return {...entry,amount:transferAmount,session_id:sessionIds[id]||entry.session_id||'',qa_scenario_id:scenarioIds[id]||'',pay_type:payment==='bank'||payment==='b'?'B':payment==='cash'||payment==='c'?'C':entry.pay_type,upload_status:uploadStatus,upload_resume_state:persistedSet.has(id)?'ALREADY_PERSISTED':'VALIDATED',upload_validation_error:validationError,upload_validation_error_code:validationError?.error_code||''};
     });
-    state.qaAcceptance={runId,status:data.status||'',mode:data.mode||'',artifactSha:data.artifact_sha256||'',currentArtifactSha:data.current_artifact_sha256||'',workerVersion,currentWorkerVersion:data.current_qa_worker_version||'',matrixVersion,payloadHash,sessionIdsByEntry:sessionIds,validationAttestation,validationAttemptId:validationAttestation?.validation_attempt_id||'',staleReason:staleReason||'',loadStatus:'READY',personalDraftCount,cleanupStatus:data.cleanup_status||'NOT_RUN',employeeReviewStatus:data.employee_review_status||'',serverRecordCount,uploadAllowed:policy.upload_allowed,readOnly:policy.readonly,artifactCompatibility:data.artifact_compatibility||null};
+    state.qaAcceptance={runId,status:data.status||'',mode:data.mode||'',artifactSha:data.artifact_sha256||'',currentArtifactSha:data.current_artifact_sha256||'',workerVersion,currentWorkerVersion:data.current_qa_worker_version||'',matrixVersion,payloadHash,sessionIdsByEntry:sessionIds,scenarioIdsByEntry:scenarioIds,validationAttestation,validationAttemptId:validationAttestation?.validation_attempt_id||'',staleReason:staleReason||'',loadStatus:'READY',personalDraftCount,cleanupStatus:data.cleanup_status||'NOT_RUN',employeeReviewStatus:data.employee_review_status||'',serverRecordCount,uploadAllowed:policy.upload_allowed,readOnly:policy.readonly,artifactCompatibility:data.artifact_compatibility||null,alreadyPersistedCount,remainingCount,conflictingEntryCount,duplicateEntryIdCount,resumeRequired};
     state.drafts=entries;
     state.sessionId=data.logical_session_id;
     saveDrafts();buildExport();refreshSessionViews();
     let storageCount=0;try{storageCount=(JSON.parse(localStorage.getItem(employeeQaAcceptanceStorageKey('empv3:drafts',runId))||'[]')||[]).length}catch{}
     employeeQaAcceptanceBanner({runId,status:data.status||'',mode:data.mode||'',count:entries.length,personalDraftCount,storageCount,serverRecordCount});
     if(staleReason)showStatus(`Previous validation was isolated: ${staleReason}. Needs Revalidation.`,'warn');
-    showStatus(`QA Run ${runId} loaded with ${entries.length} records. Upload is ${policy.upload_allowed?'unlocked for manual Staff action':'locked'} and is never automatic.`,'ok');
+    showStatus(`QA Run ${runId} loaded with ${entries.length} records. ${alreadyPersistedCount} saved, ${remainingCount} remaining. Upload is ${policy.upload_allowed?'unlocked for manual Staff action':'locked'} and is never automatic.`,'ok');
   }catch(error){
     const meta=error?.serverMeta||serverMeta;
     employeeQaAcceptancePreserveLoadFailure(runId,personalDraftCount,error,meta);
@@ -9439,13 +9523,39 @@ async function employeeQaAcceptanceReportValidation(aggregate={},uploadList=[]){
     return null;
   }
 }
-async function employeeQaAcceptanceReportUpload(uploadList=[]){
-  const runId=state.qaAcceptance?.runId;if(!runId)return;
-  const response=await apiFetch(`/api/qa/acceptance/runs/${encodeURIComponent(runId)}/upload-complete`,{method:'POST',body:JSON.stringify({entry_ids:uploadList.map(employeeEntryStableIdentity)})});
-  const raw=await response.json().catch(()=>({}));
-  const data=raw?.data&&typeof raw.data==='object'?raw.data:raw;
-  if(!response.ok||data?.success===false)throw new Error(data?.error_code||'QA_UPLOAD_CONFIRMATION_FAILED');
-  state.qaAcceptance.status='UPLOAD_PASS';
+async function employeeQaAcceptanceSessionResume(aggregate={},uploadList=[]){
+  const qa=state.qaAcceptance||{},runId=String(qa.runId||'');
+  if(!runId)throw new Error('QA_RUN_ID_MISSING');
+  const entryIdentities=(uploadList||[]).map(employeeEntryStableIdentity);
+  const body={
+    qa_run_id:runId,
+    artifact_sha256:String(qa.artifactSha||''),
+    payload_hash:String(qa.payloadHash||''),
+    validation_attempt_id:String(qa.validationAttemptId||''),
+    resume_intent:'EMPLOYEE_MANUAL_RESUME'
+  };
+  let response;
+  try{response=await apiFetch(`/api/qa/acceptance/runs/${encodeURIComponent(runId)}/session-resume`,{method:'POST',body:JSON.stringify(body)})}
+  catch{const error=new Error('QA_SESSION_RESUME_UNREACHABLE');error.httpStatus=0;throw error}
+  const raw=await response.text();
+  let data={};try{data=raw?unwrapStandardResponse(JSON.parse(raw)):{} }catch{}
+  if(!response.ok||data?.success===false||data?.ok===false){
+    const code=typeof data?.error_code==='string'?data.error_code:`QA_SESSION_RESUME_HTTP_${response.status}`;
+    const error=new Error(code);error.httpStatus=response.status;error.resumeResult=data;throw error;
+  }
+  const alreadyPersistedCount=Number(data.already_persisted_count||0),remainingCount=Number(data.remaining_count||0);
+  const conflictingEntryCount=Number(data.conflicting_entry_count||0),duplicateEntryIdCount=Number(data.duplicate_entry_id_count||0);
+  const resultStatus=String(data.status||(data.idempotent===true?'UPLOAD_PASS':''));
+  if(resultStatus!=='UPLOAD_PASS'||remainingCount!==0||conflictingEntryCount!==0||duplicateEntryIdCount!==0||Number(data.formal_write_count||0)!==entryIdentities.length)throw new Error('QA_SESSION_RESUME_RESPONSE_INVALID');
+  qa.status='UPLOAD_PASS';
+  qa.alreadyPersistedCount=alreadyPersistedCount+Number(data.new_write_count||0);
+  qa.remainingCount=0;
+  qa.conflictingEntryCount=0;
+  qa.duplicateEntryIdCount=0;
+  qa.resumeRequired=false;
+  qa.readOnly=true;
+  qa.uploadAllowed=false;
+  return data;
 }
 function employeeUiPair(en,cn){
   return `${esc(en)}<span class="label-en">${esc(cn)}</span>`;

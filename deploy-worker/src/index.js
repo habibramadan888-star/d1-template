@@ -1078,7 +1078,7 @@ __name(ttlockScopeKey,"ttlockScopeKey");
 function ttlockRequestContext(request,env,user,routeCategory="read",maxAgeMs=TTLOCK_READ_CACHE_MAX_AGE_MS){
   let requestHost="";
   try{requestHost=new URL(request?.url||"").hostname.toLowerCase();}catch{}
-  return {corpid:cleanText(user?.corpid||env?.CORPID||"default",120)||"default",request_host:requestHost,route_category:cleanText(routeCategory,80)||"read",max_age_ms:maxAgeMs,timeout_ms:8000,ttlockSnapshotPromise:null,ttlock_snapshot_count:0,archiveSnapshotPromise:null,archive_entries_prepared:false,archive_read_count:0,archive_parse_count:0,bed_context_count:0,capabilities_read_count:0,ttlock_external_call_count:0,ttlock_cache_state:"",kv_read_count:0,kv_write_count:0,last_successful_stage:"request_started",started_at_ms:Date.now()};
+  return {corpid:cleanText(user?.corpid||env?.CORPID||"default",120)||"default",request_host:requestHost,route_category:cleanText(routeCategory,80)||"read",max_age_ms:maxAgeMs,timeout_ms:8000,ttlockSnapshotPromise:null,ttlock_snapshot_count:0,archiveSnapshotPromise:null,archive_entries_prepared:false,archive_anchor_items:null,bed_transfer_resolver_archive_entries:null,existing_transactions_by_event_id:null,transactions_table_exists:null,sessions_table_exists:null,session_columns:null,employee_entry_schema_ready:null,archive_read_count:0,archive_parse_count:0,transaction_read_count:0,persistence_read_count:0,persistence_parse_count:0,d1_read_count:0,d1_write_count:0,bed_context_count:0,capabilities_read_count:0,ttlock_external_call_count:0,ttlock_cache_state:"",kv_read_count:0,kv_write_count:0,last_successful_stage:"request_started",started_at_ms:Date.now()};
 }
 __name(ttlockRequestContext,"ttlockRequestContext");
 function ttlockLiveFetchAllowed(env={},context={}){
@@ -1708,16 +1708,14 @@ async function canonicalDepositAuditEventsForBed(env,user,bed,opts={}){
   if(!cleanBed)return [];
   const context=opts.request_context||null;
   const sessions=await cloudArrearsFetchActiveSessionRows(env,user,{limit:opts.limit||1000,archive_snapshot:opts.archive_snapshot,request_context:context}).catch(()=>[]);
-  if(context&&context.archive_entries_prepared!==true){
-    for(const session of sessions)extractEmployeeEntryAnchorsFromSession(session);
-    context.archive_entries_prepared=true;
-    context.archive_parse_count=Number(context.archive_parse_count||0)+1;
-  }
+  const archiveContext=context||{};
+  const anchorItems=typeof employeeEntryPrepareArchiveSnapshotContext==="function"
+    ?employeeEntryPrepareArchiveSnapshotContext(sessions,archiveContext)
+    :(sessions||[]).flatMap(session=>extractEmployeeEntryAnchorsFromSession(session).map((anchor,index)=>({session,index,anchor,same_session:false})));
   const events=[];
-  for(const session of sessions||[]){
-    const anchors=extractEmployeeEntryAnchorsFromSession(session);
-    for(let index=0;index<anchors.length;index++){
-      const anchor=normalizeEntryAnchor(anchors[index]);
+  for(const item of anchorItems){
+      const session=item?.session||{},index=Number(item?.index||0);
+      const anchor=normalizeEntryAnchor(item?.anchor||{});
       const type=entryAnchorType(anchor);
       if(type!=="D"&&type!=="DR")continue;
       const anchorBed=cleanText(anchor.bed||anchor.room||"",80).replace(/^#/,"");
@@ -1740,7 +1738,6 @@ async function canonicalDepositAuditEventsForBed(env,user,bed,opts={}){
         payment_method:entryAnchorPaymentMethod(anchor.payment_method||anchor.pay_type||""),
         source:"cloud_deposit_event_audit_only"
       });
-    }
   }
   return events;
 }
@@ -2847,10 +2844,17 @@ async function validateEmployeeBedTransferPhase1(env,user,entry={},normalized={}
 __name(validateEmployeeBedTransferPhase1,"validateEmployeeBedTransferPhase1");
 async function resolveEmployeeBedTransferSourceContext(env,user,fromBed,gateway={},opts={}){
   const sessions=await cloudArrearsFetchActiveSessionRows(env,user,{limit:1000,archive_snapshot:opts.archive_snapshot});
-  const archiveEntries=[];
-  for(const session of sessions||[])for(const raw of extractEmployeeEntryAnchorsFromSession(session)){
-    const anchor=normalizeEntryAnchor(raw),eventType=canonicalFinanceProjectionEventType(anchor);
-    archiveEntries.push({
+  const requestContext=opts.request_context||null;
+  let archiveEntries=Array.isArray(requestContext?.bed_transfer_resolver_archive_entries)?requestContext.bed_transfer_resolver_archive_entries:null;
+  if(!archiveEntries){
+    archiveEntries=[];
+    const anchorItems=Array.isArray(requestContext?.archive_anchor_items)
+      ?requestContext.archive_anchor_items
+      :employeeEntryPrepareArchiveSnapshotContext(sessions||[],requestContext||{});
+    for(const item of anchorItems){
+      const session=item?.session||{},raw=item?.anchor||{};
+      const anchor=normalizeEntryAnchor(raw),eventType=canonicalFinanceProjectionEventType(anchor);
+      archiveEntries.push({
       event_type:eventType,anchor_ref:cleanText(anchor.anchor_id||anchor.event_id||anchor.id||anchor.entry_id||"",160),
       anchor_id:cleanText(anchor.anchor_id||anchor.event_id||anchor.id||anchor.entry_id||"",160),session_id:cleanText(session.id||anchor.session_id||"",160),
       bed:cleanText(anchor.bed||anchor.room||"",80).replace(/^#/,""),from_bed:cleanText(anchor.from_bed||anchor.bed_from||"",80).replace(/^#/,""),to_bed:cleanText(anchor.to_bed||anchor.bed_to||"",80).replace(/^#/,""),
@@ -2861,7 +2865,9 @@ async function resolveEmployeeBedTransferSourceContext(env,user,fromBed,gateway=
       transfer_anchor_id:cleanText(anchor.transfer_anchor_id||"",160),transfer_lineage_id:cleanText(anchor.transfer_lineage_id||"",160),previous_transfer_anchor_id:cleanText(anchor.previous_transfer_anchor_id||"",160)||null,
       target_anchor_id:cleanText(anchor.target_anchor_id||"",160),voided_anchor_id:cleanText(anchor.voided_anchor_id||"",160),target_transfer_anchor_id:cleanText(anchor.target_transfer_anchor_id||"",160),voided_transfer_anchor_id:cleanText(anchor.voided_transfer_anchor_id||"",160),voids_transfer_anchor_id:cleanText(anchor.voids_transfer_anchor_id||"",160),reversal_of_transfer_anchor_id:cleanText(anchor.reversal_of_transfer_anchor_id||"",160),original_event_id:cleanText(anchor.original_event_id||"",160),
       source_context_anchor_refs:Array.isArray(anchor.source_context_anchor_refs)?anchor.source_context_anchor_refs:[]
-    });
+      });
+    }
+    if(requestContext)requestContext.bed_transfer_resolver_archive_entries=archiveEntries;
   }
   const access=gateway?.access_snapshot_context||{};
   return resolveBedTransferSourceContext({corpid:user?.corpid||"",from_bed:fromBed,archive_entries:archiveEntries,transfer_anchors:archiveEntries.filter(row=>row.event_type==="bed_transfer"),void_anchors:archiveEntries.filter(row=>row.event_type==="void_transfer"),open_arrears:gateway?.open_arrears||[],access_snapshot:{parsed_checkin_mmdd:access.parsed_checkin_mmdd,snapshot_fingerprint:access.snapshot_fingerprint}});
@@ -2903,10 +2909,8 @@ async function validateEmployeeBedTransferCanonicalLink(env,user,entry={},normal
   const toBed=cleanText(normalized.to_bed||entry.to_bed||entry.bed_to||entry.roomTo||"",40).replace(/^#+/,"");
   const requestContext=opts.request_context||null;
   const archiveSnapshot=await cloudArrearsFetchActiveSessionRows(env,user,{limit:1000,request_context:requestContext}).catch(()=>[]);
-  if(!requestContext||requestContext.archive_entries_prepared!==true){
-    for(const session of archiveSnapshot)extractEmployeeEntryAnchorsFromSession(session);
-    if(requestContext){requestContext.archive_entries_prepared=true;requestContext.archive_parse_count=Number(requestContext.archive_parse_count||0)+1;requestContext.last_successful_stage="canonical_archive_parsed";}
-  }
+  if(typeof employeeEntryPrepareArchiveSnapshotContext==="function")employeeEntryPrepareArchiveSnapshotContext(archiveSnapshot,requestContext||{});
+  else for(const session of archiveSnapshot)extractEmployeeEntryAnchorsFromSession(session);
   const [sourceGateway,targetGateway]=await Promise.all([
     canonicalBedContextGateway(env,user,{bed:fromBed,limit:1000,strict_access_snapshot:true,archive_snapshot:archiveSnapshot,request_context:requestContext,max_age_ms:TTLOCK_STRICT_CACHE_MAX_AGE_MS,include_stay_context:false}),
     canonicalBedContextGateway(env,user,{bed:toBed,limit:1000,strict_access_snapshot:true,archive_snapshot:archiveSnapshot,request_context:requestContext,max_age_ms:TTLOCK_STRICT_CACHE_MAX_AGE_MS,include_stay_context:false})
@@ -2916,7 +2920,7 @@ async function validateEmployeeBedTransferCanonicalLink(env,user,entry={},normal
   if(accessErrors.some(code=>/TTLOCK_|TIMEOUT|UPSTREAM|UNAVAILABLE/i.test(code)))return {ok:false,error_code:"BED_TRANSFER_CONTEXT_TEMPORARILY_UNAVAILABLE",message:"Bed Transfer context is temporarily unavailable. Retry validation shortly.",invalid_fields:["source_context","target_context"],context_error_codes:[...new Set(accessErrors)]};
   const fee=employeeEntryBedTransferFee(entry,normalized);
   const legacyGenesisGate=opts.legacy_genesis_gate||employeeBedTransferLegacyGenesisGate(env,user);
-  let resolved=await resolveEmployeeBedTransferSourceContext(env,user,fromBed,sourceGateway,{archive_snapshot:archiveSnapshot});
+  let resolved=await resolveEmployeeBedTransferSourceContext(env,user,fromBed,sourceGateway,{archive_snapshot:archiveSnapshot,request_context:requestContext});
   if(resolved.resolution_status!=="resolved")resolved=resolveEmployeeOwnerConfirmedLegacyGenesis(env,user,fromBed,toBed,sourceGateway,targetGateway,resolved,legacyGenesisGate);
   if(resolved.resolution_status!=="resolved")return {ok:false,error_code:resolved.error_code||"BED_TRANSFER_SOURCE_CONTEXT_AMBIGUOUS",message:"Canonical source context could not be resolved.",invalid_fields:["source_context"],source_context_resolution:resolved};
   const sourceAccess=sourceGateway?.access_snapshot_context||{},targetAccess=targetGateway?.access_snapshot_context||{};
@@ -3229,7 +3233,21 @@ async function validateEmployeeEntryUploadPayload(env,user,body,opts={}){
   if(apFirewallFailure)return apFirewallFailure;
   body=normalizeEmployeeEntryBodyForValidation(body||{});
   const eventIndex=Number(opts.event_index ?? body?.event_index ?? 0)||0;
-  if(!await empTableExists(env,"sessions")||!await empTableExists(env,"transactions")){
+  const requestContext=opts.request_context||null;
+  let schemaReady=requestContext?.employee_entry_schema_ready===true;
+  if(!schemaReady){
+    const sessionsExists=requestContext?.sessions_table_exists===true||await empTableExists(env,"sessions").catch(()=>false);
+    const transactionsExists=requestContext?.transactions_table_exists===true||await empTableExists(env,"transactions").catch(()=>false);
+    if(requestContext){
+      if(requestContext.sessions_table_exists!==true)requestContext.d1_read_count=Number(requestContext.d1_read_count||0)+1;
+      if(requestContext.transactions_table_exists!==true)requestContext.d1_read_count=Number(requestContext.d1_read_count||0)+1;
+      requestContext.sessions_table_exists=sessionsExists;
+      requestContext.transactions_table_exists=transactionsExists;
+      requestContext.employee_entry_schema_ready=sessionsExists&&transactionsExists;
+    }
+    schemaReady=sessionsExists&&transactionsExists;
+  }
+  if(!schemaReady){
     return employeeEntryValidationFailure("schema","employee_entry_schema_not_ready","employee_entry_schema_not_ready",{event_index:eventIndex});
   }
   const session=body?.session||{};
@@ -3589,14 +3607,49 @@ function employeeEntryAggregateRequestMetrics(context={}){
     capabilities_read_count:Number(context.capabilities_read_count||0),
     archive_read_count:Number(context.archive_read_count||0),
     entries_json_parse_count:Number(context.archive_parse_count||0),
+    transaction_read_count:Number(context.transaction_read_count||0),
+    persistence_read_count:Number(context.persistence_read_count||0),
+    persistence_parse_count:Number(context.persistence_parse_count||0),
+    d1_read_count:Number(context.d1_read_count||0),
+    d1_write_count:Number(context.d1_write_count||0),
     ttlock_snapshot_count:Number(context.ttlock_snapshot_count||0),
     ttlock_external_call_count:Number(context.ttlock_external_call_count||0),
     kv_read_count:Number(context.kv_read_count||0),
     kv_write_count:Number(context.kv_write_count||0),
-    last_successful_stage:cleanText(context.last_successful_stage||"request_started",80)
+    last_successful_stage:cleanText(context.last_successful_stage||"request_started",80),
+    duration_ms:Math.max(0,Date.now()-Number(context.started_at_ms||Date.now()))
   };
 }
 __name(employeeEntryAggregateRequestMetrics,"employeeEntryAggregateRequestMetrics");
+function employeeEntryPrepareArchiveSnapshotContext(sessions=[],context={}){
+  if(context.archive_entries_prepared===true&&Array.isArray(context.archive_anchor_items)){
+    if(!(context.archive_anchor_items_by_session instanceof Map)){
+      const bySession=new Map();
+      for(const item of context.archive_anchor_items){
+        const sessionId=String(item?.session?.id||"");
+        if(!bySession.has(sessionId))bySession.set(sessionId,[]);
+        bySession.get(sessionId).push(item);
+      }
+      context.archive_anchor_items_by_session=bySession;
+    }
+    return context.archive_anchor_items;
+  }
+  const anchorItems=[];
+  const bySession=new Map();
+  for(const session of sessions||[]){
+    const extracted=extractEmployeeEntryAnchorsFromSession(session);
+    const sessionItems=[];
+    extracted.forEach((anchor,index)=>{const item={session,index,anchor,same_session:false};anchorItems.push(item);sessionItems.push(item)});
+    bySession.set(String(session?.id||""),sessionItems);
+  }
+  context.archive_anchor_items=anchorItems;
+  context.archive_anchor_items_by_session=bySession;
+  context.archive_entries_prepared=true;
+  context.archive_parse_count=Number(context.archive_parse_count||0)+1;
+  context.last_successful_stage="canonical_archive_parsed";
+  return anchorItems;
+}
+__name(employeeEntryPrepareArchiveSnapshotContext,"employeeEntryPrepareArchiveSnapshotContext");
 async function validateEmployeeEntryAggregatePreflight(env,user,body,opts={}){
   const requests=employeeEntryAggregateValidationRequests(body);
   const context=opts.request_context||{};
@@ -3609,13 +3662,13 @@ async function validateEmployeeEntryAggregatePreflight(env,user,body,opts={}){
   if(hasTransfer&&!context.legacy_genesis_gate){context.legacy_genesis_gate=employeeBedTransferLegacyGenesisGate(env,user);context.capabilities_read_count=1;}
   if(requestTypes.some(type=>["TF","TFF","AP","DR","CO"].includes(type))){
     const archiveSnapshot=await cloudArrearsFetchActiveSessionRows(env,user,{limit:1000,request_context:context}).catch(()=>[]);
-    if(context.archive_entries_prepared!==true){
-      for(const session of archiveSnapshot)extractEmployeeEntryAnchorsFromSession(session);
-      context.archive_entries_prepared=true;
-      context.archive_parse_count=Number(context.archive_parse_count||0)+1;
-      context.last_successful_stage="canonical_archive_parsed";
-    }
+    employeeEntryPrepareArchiveSnapshotContext(archiveSnapshot,context);
   }
+  if(context.sessions_table_exists!==true){
+    context.sessions_table_exists=await empTableExists(env,"sessions").catch(()=>false);
+    context.d1_read_count=Number(context.d1_read_count||0)+1;
+  }
+  await employeeEntryPreloadExistingTransactions(env,user,requests,context);
   const validationResults=[];
   for(let index=0;index<requests.length;index++){
     const requestBody=requests[index];
@@ -3651,6 +3704,46 @@ async function validateEmployeeEntryAggregatePreflight(env,user,body,opts={}){
   };
 }
 __name(validateEmployeeEntryAggregatePreflight,"validateEmployeeEntryAggregatePreflight");
+async function qaAcceptanceValidateAcceptedAggregatePreflight(env,user,body,qaContext,requestContext,aggregateRequests=[]){
+  if(qaContext?.ok!==true||String(qaContext.run?.status||"")!=="MANUAL_EMPLOYEE_ACCEPTED")return null;
+  const stored=qaAcceptanceStoredValidation(qaContext.run),freshness=qaAcceptanceValidationAttestationCurrent(qaContext.run,qaContext.contract,stored);
+  if(!freshness.current||freshness.acceptance_locked!==true)return {ok:false,http_status:409,error_code:"QA_ACCEPTED_ATTESTATION_REQUIRED",message:"The accepted Employee validation proof is unavailable. Reload this QA Run; no records were changed.",validation_results:[],validation_result_count:0,failed_result_count:0,passed_result_count:0,no_write:true,write_attempted:false,formal_write_count:0,qa_accepted_resume_preflight:true};
+  const scenarios=qaContext.contract.scenarios||[];
+  requestContext.allow_live_fetch=false;
+  requestContext.archive_session_prefix=`${qaContext.run.qa_run_id}-%`;
+  requestContext.strict_archive_session_prefix=true;
+  requestContext.transaction_session_prefix=requestContext.archive_session_prefix;
+  const archiveSnapshot=await cloudArrearsFetchActiveSessionRows(env,user,{limit:1000,request_context:requestContext}).catch(()=>[]);
+  employeeEntryPrepareArchiveSnapshotContext(archiveSnapshot,requestContext);
+  await employeeEntryPreloadExistingTransactions(env,user,aggregateRequests,requestContext);
+  const sessionPreflight=await qaAcceptanceSessionPreflight(env,user,qaContext.run,qaContext.contract,aggregateRequests,requestContext);
+  if(!sessionPreflight.ok){
+    const persistenceReadFailed=sessionPreflight.persistence?.persistence_read_ok===false;
+    console.log(JSON.stringify({event:"qa_accepted_resume_preflight_rejected",error_code:sessionPreflight.persistence?.error_code||"QA_RUN_PERSISTENCE_CONFLICT",scope_match_count:Number(sessionPreflight.scope_match_count||0),scenario_count:scenarios.length,session_read_ok:sessionPreflight.persistence?.session_read_ok===true,transaction_read_ok:sessionPreflight.persistence?.transaction_read_ok===true,archive_read_ok:requestContext.archive_read_ok===true,archive_snapshot_truncated:requestContext.archive_snapshot_truncated===true,transaction_snapshot_truncated:requestContext.transaction_snapshot_truncated===true,checked_transaction_identity_count:requestContext.existing_transaction_ids_checked instanceof Set?requestContext.existing_transaction_ids_checked.size:0,session_count:Number(sessionPreflight.persistence?.session_count||0),persisted_count:Number(sessionPreflight.persistence?.persisted_count||0),missing_count:Number(sessionPreflight.persistence?.missing_count||0),conflicting_count:Number(sessionPreflight.persistence?.conflicting_count||0)}));
+    return {ok:false,http_status:persistenceReadFailed?503:409,error_code:sessionPreflight.persistence?.error_code||(sessionPreflight.scope_match_count!==scenarios.length?"QA_RUN_ENTRY_SCOPE_MISMATCH":"QA_RUN_PERSISTENCE_CONFLICT"),message:"The accepted QA Run no longer matches its persisted records. No records were changed.",validation_results:[],validation_result_count:0,failed_result_count:0,passed_result_count:0,no_write:true,write_attempted:false,formal_write_count:0,qa_accepted_resume_preflight:true,qa_session_preflight:sessionPreflight,entry_scope_match_count:sessionPreflight.scope_match_count,already_persisted_count:sessionPreflight.persisted_count,remaining_count:sessionPreflight.missing_count,conflicting_entry_count:sessionPreflight.conflicting_count,duplicate_entry_id_count:sessionPreflight.duplicate_entry_id_count};
+  }
+  const persistedIds=new Set(sessionPreflight.persistence.persisted_entry_ids||[]),missingIds=new Set(sessionPreflight.persistence.missing_entry_ids||[]);
+  const missingRequests=aggregateRequests.filter(row=>missingIds.has(String(row.entry_identity||"")));
+  let missingPreflight={ok:true,validation_results:[],error_code:""};
+  if(missingRequests.length)missingPreflight=await validateEmployeeEntryAggregatePreflight(env,user,{aggregate_preflight:true,validation_requests:missingRequests},{request_context:requestContext});
+  const acceptedById=new Map((stored.validation_results||[]).map(row=>[String(row.entry_identity||""),row]));
+  const freshById=new Map((missingPreflight.validation_results||[]).map(row=>[String(row.entry_identity||""),row]));
+  const scopesById=new Map((sessionPreflight.entry_scope.scope_results||[]).map(row=>[String(row.entry_identity||""),row]));
+  const validationResults=scenarios.map((scenario,eventIndex)=>{
+    const id=String(scenario.entry_id||""),scope=scopesById.get(id);
+    if(persistedIds.has(id)){
+      const accepted=acceptedById.get(id);
+      return accepted?{...accepted,event_index:eventIndex,entry_identity:id,record_id:id,entry_scope_match:true,expected_scope_digest:scope?.expected_scope_digest||"",actual_scope_digest:scope?.actual_scope_digest||"",already_persisted:true,idempotent:true,locked_accepted_attestation:true,write_attempted:false,no_write:true}:{entry_identity:id,event_index:eventIndex,ok:false,error_code:"QA_ACCEPTED_ATTESTATION_ENTRY_MISSING",already_persisted:true,write_attempted:false,no_write:true};
+    }
+    const fresh=freshById.get(id);
+    return fresh?{...fresh,event_index:eventIndex,entry_identity:id,record_id:id,entry_scope_match:true,expected_scope_digest:scope?.expected_scope_digest||"",actual_scope_digest:scope?.actual_scope_digest||"",already_persisted:false,idempotent:false,locked_accepted_attestation:false,write_attempted:false,no_write:true}:{entry_identity:id,event_index:eventIndex,ok:false,error_code:"QA_SESSION_PREFLIGHT_RESULT_MISSING",already_persisted:false,write_attempted:false,no_write:true};
+  });
+  const resultIds=validationResults.map(row=>String(row.entry_identity||"")),failed=validationResults.filter(row=>row.ok!==true),complete=resultIds.length===scenarios.length&&new Set(resultIds).size===scenarios.length&&scenarios.every(row=>resultIds.includes(String(row.entry_id||""))),ttlockSafe=Number(requestContext.ttlock_external_call_count||0)===0;
+  const primary=failed[0]||validationResults[0]||{};
+  console.log(JSON.stringify({event:"qa_accepted_resume_preflight_result",ok:missingPreflight.ok===true&&complete&&failed.length===0&&ttlockSafe,validation_result_count:validationResults.length,passed_count:validationResults.length-failed.length,failed_count:failed.length,first_error_code:cleanText(failed[0]?.error_code||"",120),already_persisted_count:sessionPreflight.persisted_count,remaining_count:sessionPreflight.missing_count,conflicting_count:sessionPreflight.conflicting_count,duplicate_entry_id_count:sessionPreflight.duplicate_entry_id_count,ttlock_external_calls:Number(requestContext.ttlock_external_call_count||0),duration_ms:Math.max(0,Date.now()-Number(requestContext.started_at_ms||Date.now()))}));
+  return {...primary,source:"qa_accepted_resume_preflight",ok:missingPreflight.ok===true&&complete&&failed.length===0&&ttlockSafe,error_code:failed[0]?.error_code||(!complete?"QA_SESSION_PREFLIGHT_RESULT_MALFORMED":!ttlockSafe?"QA_TTLOCK_EXTERNAL_CALL_PROHIBITED":""),message:failed.length?failed[0]?.message||"One missing QA record failed fresh validation.":!ttlockSafe?"QA validation attempted a prohibited external TTLock call; no records were changed.":"Persisted records retained their accepted proof; only missing records were freshly validated.",validation_results:validationResults,validation_result_count:validationResults.length,failed_result_count:failed.length,passed_result_count:validationResults.length-failed.length,no_write:true,write_attempted:false,formal_write_count:0,qa_accepted_resume_preflight:true,qa_session_preflight:sessionPreflight,entry_scope_match_count:sessionPreflight.scope_match_count,already_persisted_count:sessionPreflight.persisted_count,remaining_count:sessionPreflight.missing_count,conflicting_entry_count:sessionPreflight.conflicting_count,duplicate_entry_id_count:sessionPreflight.duplicate_entry_id_count,accepted_validation_attempt_id:String(stored.validation_attempt_id||""),accepted_validation_expires_at:String(stored.expires_at||""),ttlock_external_calls:Number(requestContext.ttlock_external_call_count||0),request_context_metrics:employeeEntryAggregateRequestMetrics(requestContext)};
+}
+__name(qaAcceptanceValidateAcceptedAggregatePreflight,"qaAcceptanceValidateAcceptedAggregatePreflight");
 async function handleEmployeeEntryValidate(request,env,user){
   let body;
   try{body=await request.json();}catch{return json({success:false,...employeeEntryValidationFailure("payload","PAYLOAD_PARSE_FAILED","Upload payload could not be parsed.",{
@@ -3669,15 +3762,21 @@ async function handleEmployeeEntryValidate(request,env,user){
   const request_context=ttlockRequestContext(request,env,user,"employee_entry_validate",TTLOCK_STRICT_CACHE_MAX_AGE_MS);
   const aggregateRequested=body?.aggregate_preflight===true||Array.isArray(body?.validation_requests);
   const aggregateRequests=employeeEntryAggregateValidationRequests(body);
+  if(qaValidationContext?.ok===true&&aggregateRequested){
+    request_context.archive_session_prefix=`${qaValidationContext.run.qa_run_id}-%`;
+    request_context.transaction_session_prefix=request_context.archive_session_prefix;
+  }
   const aggregateTypes=aggregateRequests.map(row=>employeeEntryUploadType(employeeEntryValidationEntryFromBody(row,row.event_index)));
   const singleType=employeeEntryUploadType(employeeEntryValidationEntryFromBody(body||{},body?.event_index??0));
   if((aggregateTypes.length&&!aggregateTypes.some(type=>["TF","TFF"].includes(type))&&aggregateTypes.some(type=>["DR","CO"].includes(type)))||(!aggregateTypes.length&&["DR","CO"].includes(singleType)))request_context.allow_live_fetch=false;
   if(!aggregateTypes.length&&["TF","TFF"].includes(singleType)){request_context.legacy_genesis_gate=employeeBedTransferLegacyGenesisGate(env,user);request_context.capabilities_read_count=1;}
-  let result;
+  let result,qaAcceptedResumePreflight=false;
   try{
-    result=aggregateRequested
+    const acceptedResult=aggregateRequested?await qaAcceptanceValidateAcceptedAggregatePreflight(env,user,body,qaValidationContext,request_context,aggregateRequests):null;
+    qaAcceptedResumePreflight=acceptedResult?.qa_accepted_resume_preflight===true;
+    result=acceptedResult||(aggregateRequested
       ?await validateEmployeeEntryAggregatePreflight(env,user,body,{request_context})
-      :await validateEmployeeEntryUploadPayload(env,user,body,{event_index:body?.event_index,canonical_transfer_link_anchor:true,request_context,legacy_genesis_gate:request_context.legacy_genesis_gate});
+      :await validateEmployeeEntryUploadPayload(env,user,body,{event_index:body?.event_index,canonical_transfer_link_anchor:true,request_context,legacy_genesis_gate:request_context.legacy_genesis_gate}));
   }catch(err){
     const eventIndex=Number(body?.event_index||0)||0;
     const eventType=entryAnchorEventType(cleanText(body?.entry?.type||body?.entry?.reason_code||"R",12).toUpperCase());
@@ -3695,16 +3794,31 @@ async function handleEmployeeEntryValidate(request,env,user){
   result={...result,...assetInfo};
   if(Array.isArray(result.validation_results))result.validation_results=result.validation_results.map(row=>({...row,...assetInfo}));
   if(qaValidationContext?.ok===true&&Array.isArray(result.validation_results)){
-    result.validation_results=result.validation_results.map(row=>qaValidationResultWithDiagnosticEnvelope(row,qaValidationContext,request_context));
+    const responseQaContext=qaAcceptedResumePreflight?{...qaValidationContext,validation_attempt_id:result.accepted_validation_attempt_id||qaValidationContext.validation_attempt_id,expires_at:result.accepted_validation_expires_at||qaValidationContext.expires_at}:qaValidationContext;
+    result.validation_results=result.validation_results.map(row=>row.locked_accepted_attestation===true
+      ?{...row,result_origin:"SERVER_ATTESTATION",diagnostic_envelope:{...(row.diagnostic_envelope||{}),result_origin:"SERVER_ATTESTATION",cache_status:"SERVER_PERSISTED"}}
+      :qaValidationResultWithDiagnosticEnvelope(row,responseQaContext,request_context));
     result.trace_id=qaValidationContext.trace_id;
-    result.validation_attempt_id=qaValidationContext.validation_attempt_id;
+    result.validation_attempt_id=responseQaContext.validation_attempt_id;
     result.qa_run_id=qaValidationContext.run.qa_run_id;
     result.payload_hash=qaValidationContext.contract.payloadHash;
     result.server_validated_at=qaValidationContext.server_validated_at;
-    result.expires_at=qaValidationContext.expires_at;
+    result.expires_at=responseQaContext.expires_at;
     result.result_origin="LIVE_SERVER";
+    if(aggregateRequested&&!qaAcceptedResumePreflight){
+      const sessionPreflight=await qaAcceptanceSessionPreflight(env,user,qaValidationContext.run,qaValidationContext.contract,aggregateRequests,request_context);
+      const scopesById=new Map((sessionPreflight.entry_scope.scope_results||[]).map(row=>[String(row.entry_identity||""),row]));
+      const persistedIds=new Set(sessionPreflight.persistence.persisted_entry_ids||[]);
+      result.validation_results=result.validation_results.map(row=>{
+        const id=String(row.entry_identity||""),scope=scopesById.get(id);
+        if(scope&&!scope.ok)return {...row,ok:false,error_code:"QA_RUN_ENTRY_SCOPE_MISMATCH",message:"Record identity changed. Your records are safe; please retry after refresh.",first_different_field:scope.first_different_field,expected_scope_digest:scope.expected_scope_digest,actual_scope_digest:scope.actual_scope_digest,no_write:true,write_attempted:false};
+        return {...row,entry_scope_match:scope?.ok===true,expected_scope_digest:scope?.expected_scope_digest||"",actual_scope_digest:scope?.actual_scope_digest||"",already_persisted:persistedIds.has(id),idempotent:persistedIds.has(id)||row.idempotent===true};
+      });
+      const failed=result.validation_results.filter(row=>row.ok!==true);
+      result={...result,ok:failed.length===0&&sessionPreflight.ok,error_code:failed[0]?.error_code||(sessionPreflight.conflicting_count?"QA_RUN_PERSISTENCE_CONFLICT":""),failed_result_count:failed.length,passed_result_count:result.validation_results.length-failed.length,qa_session_preflight:sessionPreflight,entry_scope_match_count:sessionPreflight.scope_match_count,already_persisted_count:sessionPreflight.persisted_count,remaining_count:sessionPreflight.missing_count,conflicting_entry_count:sessionPreflight.conflicting_count,duplicate_entry_id_count:sessionPreflight.duplicate_entry_id_count};
+    }
   }
-  if(!result.ok)return json({success:false,...result},422);
+  if(!result.ok)return json({success:false,...result},Number(result.http_status||422));
   if(Array.isArray(result.validation_results))return success(result);
   return success({...result,occupancy_candidate_preview:buildEmployeeEntryOccupancyCandidatePreview(user,body)});
 }
@@ -3766,13 +3880,13 @@ async function persistEmployeeBedTransferCanonicalArchive(env,user,body,validati
   return success({success:true,ok:true,idempotent:false,canonical_write_status:'accepted',canonical_persistence_verified:true,session_id:sessionId,canonical_entry:stored});
 }
 __name(persistEmployeeBedTransferCanonicalArchive,"persistEmployeeBedTransferCanonicalArchive");
-async function handleEmployeeEntry(request,env,user){
+async function handleEmployeeEntry(request,env,user,options={}){
   const timingEnabled=request.headers.get("X-Employee-Entry-Timing")==="1";
-  const request_context=ttlockRequestContext(request,env,user,"employee_entry_upload",TTLOCK_STRICT_CACHE_MAX_AGE_MS);
+  const request_context=options.request_context||ttlockRequestContext(request,env,user,"employee_entry_upload",TTLOCK_STRICT_CACHE_MAX_AGE_MS);
   const timing={started_at:Date.now(),d1_write_ms:0,total_ms:0};
-  let body;
-  try{body=await request.json();}catch{return badRequest("invalid_json");}
-  const qaWriteGate=await qaAcceptanceEmployeeFormalWriteGate(env,user,body||{});
+  let body=options.body;
+  if(!body)try{body=await request.json();}catch{return badRequest("invalid_json");}
+  const qaWriteGate=await qaAcceptanceEmployeeFormalWriteGate(env,user,body||{},options);
   if(qaWriteGate)return qaWriteGate;
   if(["DR","CO"].includes(employeeEntryUploadType(employeeEntryValidationEntryFromBody(body||{},body?.event_index??0))))request_context.allow_live_fetch=false;
   const stayGenesisEnvelopeFailure=employeeEntryStayGenesisEnvelopeFailure(body||{},body?.event_index??0);
@@ -3802,10 +3916,10 @@ async function handleEmployeeEntry(request,env,user){
     const boundaryFailure=employeeBedTransferSingleEntryFailure(body||{});
     if(boundaryFailure)return json({success:false,...boundaryFailure},422);
   }
-  if(!await empTableExists(env,"sessions")||(!["TF","TFF"].includes(writeGateType)&&!await empTableExists(env,"transactions")))return errorResponse("employee_entry_schema_not_ready",503,"employee_entry_schema_not_ready");
-  if(["TF","TFF"].includes(writeGateType)&&!(await empTableColumns(env,"sessions")).has("entries_json"))return json({success:false,ok:false,error_code:"CANONICAL_ARCHIVE_SCHEMA_UNAVAILABLE",no_write:true,write_attempted:false,production_cutover:"PRODUCTION_NO_GO"},503);
+  if(options.schema_prechecked!==true&&(!await empTableExists(env,"sessions")||(!["TF","TFF"].includes(writeGateType)&&!await empTableExists(env,"transactions"))))return errorResponse("employee_entry_schema_not_ready",503,"employee_entry_schema_not_ready");
+  if(["TF","TFF"].includes(writeGateType)&&options.schema_prechecked!==true&&!(await empTableColumns(env,"sessions")).has("entries_json"))return json({success:false,ok:false,error_code:"CANONICAL_ARCHIVE_SCHEMA_UNAVAILABLE",no_write:true,write_attempted:false,production_cutover:"PRODUCTION_NO_GO"},503);
   body=normalizeEmployeeEntryBodyForValidation(body||{});
-  const validationResult=await validateEmployeeEntryUploadPayload(env,user,body,{event_index:body?.event_index,canonical_transfer_link_anchor:["TF","TFF"].includes(writeGateType),request_context,legacy_genesis_gate:request_context.legacy_genesis_gate});
+  const validationResult=options.prevalidated_result||await validateEmployeeEntryUploadPayload(env,user,body,{event_index:body?.event_index,canonical_transfer_link_anchor:["TF","TFF"].includes(writeGateType),request_context,legacy_genesis_gate:request_context.legacy_genesis_gate});
   if(!validationResult.ok)return json({success:false,...validationResult},422);
   if(["TF","TFF"].includes(writeGateType))return persistEmployeeBedTransferCanonicalArchive(env,user,body,validationResult,request_context);
   if(validationResult.idempotent){
@@ -4846,8 +4960,58 @@ function employeeEntryDuplicateInPayload(keys){
   return null;
 }
 __name(employeeEntryDuplicateInPayload,"employeeEntryDuplicateInPayload");
-async function employeeEntryExistingTransactionsByEventId(env,user,keys){
+async function employeeEntryPreloadExistingTransactions(env,user,requests=[],context={}){
+  const ids=[...new Set(requests.flatMap((body,index)=>[
+    employeeEntryAggregateResultIdentity(body,index),
+    ...employeeEntryDuplicateIncomingRows(body).map(row=>cleanId(row?.id||row?.event_id||row?.anchor_id||""))
+  ]).map(value=>cleanId(value)).filter(Boolean))].slice(0,100);
+  const rows=context.existing_transactions_by_event_id instanceof Map?context.existing_transactions_by_event_id:new Map();
+  const checked=context.existing_transaction_ids_checked instanceof Set?context.existing_transaction_ids_checked:new Set();
+  if(context.transactions_table_exists===true&&ids.every(id=>checked.has(id))){
+    context.existing_transactions_by_event_id=rows;
+    context.existing_transaction_ids_checked=checked;
+    return rows;
+  }
+  const tableExists=await empTableExists(env,"transactions").catch(()=>false);
+  context.d1_read_count=Number(context.d1_read_count||0)+1;
+  context.transactions_table_exists=tableExists;
+  context.transaction_read_ok=tableExists;
+  if(tableExists){
+    const uncheckedIds=ids.filter(id=>!checked.has(id));
+    const sessionPrefix=cleanText(context.transaction_session_prefix||"",160);
+    if(uncheckedIds.length||sessionPrefix){
+    const placeholders=uncheckedIds.map(()=>"?").join(",");
+    let readOk=true;
+    const selector=sessionPrefix?"session_id LIKE ?":`id IN (${placeholders})`;
+    const selectorParams=sessionPrefix?[sessionPrefix]:uncheckedIds;
+    const statement=env.DB.prepare(`SELECT id, session_id, created_at, type FROM transactions
+      WHERE corpid=? AND ${selector} AND COALESCE(voided_at,'')='' AND COALESCE(status,'ACTIVE')<>'VOID' LIMIT 100`).bind(user.corpid,...selectorParams);
+    const result=await statement.all().catch(()=>{readOk=false;return {results:[]}});
+    context.transaction_read_count=Number(context.transaction_read_count||0)+1;
+    context.d1_read_count=Number(context.d1_read_count||0)+1;
+    const truncated=readOk&&!!sessionPrefix&&(result.results||[]).length>=100;
+    context.transaction_snapshot_truncated=truncated;
+    context.transaction_read_ok=readOk&&!truncated;
+    for(const row of result.results||[])rows.set(cleanId(row?.id||""),row);
+    if(readOk&&!truncated)uncheckedIds.forEach(id=>checked.add(id));
+    }
+  }
+  context.existing_transactions_by_event_id=rows;
+  context.existing_transaction_ids_checked=checked;
+  context.employee_entry_schema_ready=context.sessions_table_exists===true&&context.transactions_table_exists===true;
+  return rows;
+}
+__name(employeeEntryPreloadExistingTransactions,"employeeEntryPreloadExistingTransactions");
+async function employeeEntryExistingTransactionsByEventId(env,user,keys,opts={}){
   const rows=new Map();
+  const preloaded=opts.request_context?.existing_transactions_by_event_id;
+  if(preloaded instanceof Map){
+    for(const key of keys){
+      const row=key.event_id?preloaded.get(key.event_id):null;
+      if(row)rows.set(key.event_id,row);
+    }
+    return rows;
+  }
   for(const key of keys){
     if(!key.event_id||rows.has(key.event_id))continue;
     const row=await env.DB.prepare(`SELECT id, session_id, created_at, type FROM transactions
@@ -4867,10 +5031,15 @@ async function employeeEntryExistingSessionAnchors(env,user,incomingSessionId,op
     :(await env.DB.prepare(`SELECT id, anchor_id, created_at, entries_json, export_text FROM sessions
       WHERE corpid=? AND COALESCE(voided_at,'')='' AND COALESCE(handover_status,'')<>'VOID'
       ORDER BY created_at DESC LIMIT 1000`).bind(user.corpid).all().catch(()=>({results:[]}))).results||[];
-  const anchors=[];
-  for(const session of rows){
-    const extracted=extractEmployeeEntryAnchorsFromSession(session);
-    extracted.forEach((anchor,index)=>anchors.push({session,index,anchor,same_session:!!incomingSessionId&&String(session.id||'')===String(incomingSessionId)}));
+  const cached=opts.request_context?.archive_anchor_items;
+  const anchors=Array.isArray(cached)
+    ?cached.map(item=>({...item,same_session:!!incomingSessionId&&String(item?.session?.id||'')===String(incomingSessionId)}))
+    :[];
+  if(!Array.isArray(cached)){
+    for(const session of rows){
+      const extracted=extractEmployeeEntryAnchorsFromSession(session);
+      extracted.forEach((anchor,index)=>anchors.push({session,index,anchor,same_session:!!incomingSessionId&&String(session.id||'')===String(incomingSessionId)}));
+    }
   }
   return anchors;
 }
@@ -4904,7 +5073,7 @@ async function checkEmployeeEntryDuplicates(env,user,body,opts={}){
   if(inPayload){
     return {ok:false,error_code:"DUPLICATE_EVENT_IN_PAYLOAD",message:"Duplicate records were found inside the current upload payload.",duplicates:[inPayload]};
   }
-  const existingTx=await employeeEntryExistingTransactionsByEventId(env,user,incomingKeys);
+  const existingTx=await employeeEntryExistingTransactionsByEventId(env,user,incomingKeys,opts);
   const txDuplicates=[];
   for(const key of incomingKeys){
     const existing=key.event_id?existingTx.get(key.event_id):null;
@@ -4994,9 +5163,12 @@ __name(parseEmployeeEntryAnchorJson,"parseEmployeeEntryAnchorJson");
 function extractEmployeeEntryAnchorsFromSession(session){
   if(session&&typeof session==="object"&&employeeEntryAnchorParseCache.has(session))return employeeEntryAnchorParseCache.get(session);
   const direct=parseEmployeeEntryAnchorJson(session?.entries_json);
-  const text=String(session?.export_text||"");
-  const block=text.match(/==== ENTRY ANCHORS JSON ====\s*([\s\S]*?)\s*==== END ENTRY ANCHORS JSON ====/i);
-  const fromBlock=block?parseEmployeeEntryAnchorJson(block[1]):[];
+  let fromBlock=[];
+  if(!direct.length){
+    const text=String(session?.export_text||"");
+    const block=text.match(/==== ENTRY ANCHORS JSON ====\s*([\s\S]*?)\s*==== END ENTRY ANCHORS JSON ====/i);
+    fromBlock=block?parseEmployeeEntryAnchorJson(block[1]):[];
+  }
   const canonicalTransferFields=['transfer_anchor_id','transfer_lineage_id','previous_transfer_anchor_id','canonical_accepted_at','transfer_at','canonical_request_fingerprint','source_context_mode','lineage_genesis','owner_confirmation_scope','source_context_anchor_refs','carried_arrears_refs','rent_coverage_ref','deposit_context_ref','expiry_context_ref','ttlock_sequence','physical_state_before_submission','continuity_checks','reconciliation_required'];
   const rows=(direct.length?direct:fromBlock).map(row=>{
     const envelope={session_id:session?.id||row?.session_id||"",corpid:session?.corpid||row?.corpid||"",userid:session?.created_by||session?.operator_id||row?.userid||"",operator_id:session?.operator_id||row?.operator_id||"",operator_name:session?.operator_name||row?.operator_name||"",created_at:session?.created_at||session?.exported_at||row?.created_at||"",ts:session?.exported_at||session?.created_at||row?.ts||"",source:"employee_entry",source_detail:direct.length?"employee_entry_entries_json":"employee_entry_export_anchor_json",...row};
@@ -5144,10 +5316,15 @@ function buildCloudArrearsProjectionFromSessions(sessions=[],opts={}){
   const payments=[];
   let activeSessions=0;
   let scannedAnchors=0;
+  const archiveContext=opts.request_context||{};
+  if(typeof employeeEntryPrepareArchiveSnapshotContext==="function")employeeEntryPrepareArchiveSnapshotContext(sessions,archiveContext);
+  const anchorItemsBySession=archiveContext.archive_anchor_items_by_session instanceof Map
+    ?archiveContext.archive_anchor_items_by_session
+    :new Map((sessions||[]).map(session=>[String(session?.id||""),extractEmployeeEntryAnchorsFromSession(session).map((anchor,index)=>({session,index,anchor,same_session:false}))]));
   for(const session of sessions||[]){
     if(!cloudArrearsSessionIsActive(session))continue;
     activeSessions++;
-    const anchors=extractEmployeeEntryAnchorsFromSession(session);
+    const items=anchorItemsBySession.get(String(session?.id||""))||[],anchors=items.map(item=>item?.anchor||{});
     for(let index=0;index<anchors.length;index++){
       const anchor=normalizeEntryAnchor(anchors[index]);
       const type=entryAnchorType(anchor);
@@ -5193,7 +5370,7 @@ function buildCloudArrearsProjectionFromSessions(sessions=[],opts={}){
   }
   const transferProjection=projectBedTransferFinanceAndArrears({
     corpid:cleanText(opts.corpid||sessions.find(row=>row?.corpid)?.corpid||"",120),
-    archive_entries:ownerHistoryTransferLineageArchiveEntries(sessions,cleanText(opts.corpid||sessions.find(row=>row?.corpid)?.corpid||"",120)),
+    archive_entries:ownerHistoryTransferLineageArchiveEntries(sessions,cleanText(opts.corpid||sessions.find(row=>row?.corpid)?.corpid||"",120),{request_context:archiveContext}),
     existing_arrears:[...itemsByRef.values()]
   });
   if(transferProjection.ok){
@@ -5266,10 +5443,15 @@ async function cloudArrearsFetchActiveSessionRows(env,user,opts={}){
   const context=opts.request_context||null;
   if(context?.archiveSnapshotPromise)return await context.archiveSnapshotPromise;
   const task=(async()=>{
-    if(!await empTableExists(env,"sessions").catch(()=>false))return [];
+    const sessionsExists=await empTableExists(env,"sessions").catch(()=>false);
+    if(context){context.d1_read_count=Number(context.d1_read_count||0)+1;context.sessions_table_exists=sessionsExists;context.archive_read_ok=sessionsExists;}
+    if(!sessionsExists)return [];
     const limit=Math.min(Math.max(Number(opts.limit||1000),1),2000);
     const sessionId=cleanId(opts.session_id||opts.sessionId||"");
+    const sessionPrefix=cleanText(opts.session_prefix||context?.archive_session_prefix||"",160);
+    const strictSessionPrefix=!!sessionPrefix&&(opts.strict_session_prefix===true||context?.strict_archive_session_prefix===true);
     const columns=await empTableColumns(env,"sessions").catch(()=>[]);
+    if(context){context.d1_read_count=Number(context.d1_read_count||0)+1;context.session_columns=columns;}
     const hasEntriesJson=columns.has("entries_json");
     const hasSummaryJson=columns.has("summary_json");
     const params=[user.corpid];
@@ -5280,14 +5462,17 @@ async function cloudArrearsFetchActiveSessionRows(env,user,opts={}){
       ? "corpid=? AND (COALESCE(entries_json,'')<>'' OR COALESCE(export_text,'') LIKE '%ENTRY ANCHORS JSON%' OR COALESCE(export_text,'') LIKE '%CORRECTION ANCHORS JSON%')"
       : "corpid=? AND (COALESCE(export_text,'') LIKE '%ENTRY ANCHORS JSON%' OR COALESCE(export_text,'') LIKE '%CORRECTION ANCHORS JSON%')";
     if(sessionId){where+=" AND id=?";params.push(sessionId);}
+    else if(strictSessionPrefix){where="corpid=? AND id LIKE ?";params.push(sessionPrefix);}
+    else if(sessionPrefix){where=`(${where}) OR (corpid=? AND id LIKE ?)`;params.push(user.corpid,sessionPrefix);}
     const entriesExpr=hasEntriesJson?"entries_json":"'' AS entries_json";
     const summaryExpr=hasSummaryJson?"summary_json":"'' AS summary_json";
+    let readOk=true;
     const rows=await env.DB.prepare(`SELECT id, corpid, anchor_id, date, entries_count, created_by, created_at, operator_id, operator_name, handover_status, exported_at, export_text, source, ${entriesExpr}, ${summaryExpr}, voided_at
       FROM sessions
       WHERE ${where}
-      ORDER BY date ASC, COALESCE(exported_at,created_at,'') ASC
-      LIMIT ?`).bind(...params,limit).all().catch(()=>({results:[]}));
-    if(context){context.archive_read_count=Number(context.archive_read_count||0)+1;context.last_successful_stage="canonical_archive_loaded";}
+      ORDER BY ${sessionPrefix&&!sessionId&&!strictSessionPrefix?"CASE WHEN id LIKE ? THEN 0 ELSE 1 END, ":""}date ASC, COALESCE(exported_at,created_at,'') ASC
+      LIMIT ?`).bind(...params,...(sessionPrefix&&!sessionId&&!strictSessionPrefix?[sessionPrefix]:[]),limit).all().catch(()=>{readOk=false;return {results:[]}});
+    if(context){context.archive_read_count=Number(context.archive_read_count||0)+1;context.d1_read_count=Number(context.d1_read_count||0)+1;context.archive_read_ok=readOk;context.archive_snapshot_truncated=readOk&&(rows.results||[]).length>=limit;context.last_successful_stage=readOk?"canonical_archive_loaded":"canonical_archive_read_failed";}
     return rows.results||[];
   })();
   if(context)context.archiveSnapshotPromise=task;
@@ -5577,13 +5762,15 @@ async function canonicalOccupancyArchiveEventsForBed(env,user,bed,opts={}){
   const context=opts.request_context||null;
   const buildEvents=async()=>{
     const sessions=await cloudArrearsFetchActiveSessionRows(env,user,{limit:opts.limit||1000,archive_snapshot:opts.archive_snapshot,request_context:context}).catch(()=>[]);
+    const archiveContext=context||{};
+    const anchorItems=typeof employeeEntryPrepareArchiveSnapshotContext==="function"
+      ?employeeEntryPrepareArchiveSnapshotContext(sessions,archiveContext)
+      :(sessions||[]).flatMap(session=>extractEmployeeEntryAnchorsFromSession(session).map((anchor,index)=>({session,index,anchor,same_session:false})));
     const events=[];
-    for(const session of sessions||[]){
-      for(const raw of extractEmployeeEntryAnchorsFromSession(session)){
-        const anchor=normalizeEntryAnchor(raw);
+    for(const item of anchorItems){
+        const session=item?.session||{},anchor=normalizeEntryAnchor(item?.anchor||{});
         const type=canonicalFinanceProjectionEventType(anchor);
         if(["rent","checkout","left_with_arrears","bed_transfer","bed_transfer_fee"].includes(type))events.push(canonicalOccupancyEventView(anchor,session));
-      }
     }
     return events.sort(canonicalOccupancyCompareEventDate);
   };
@@ -9226,11 +9413,15 @@ function ownerHistoryTransferLineageAnchorRef(row={}){
   return cleanText(row.transfer_anchor_id||row.anchor_ref||row.anchor_id||row.event_id||row.entry_ref||row.entry_id||row.id||"",180);
 }
 __name(ownerHistoryTransferLineageAnchorRef,"ownerHistoryTransferLineageAnchorRef");
-function ownerHistoryTransferLineageArchiveEntries(sessions=[],corpid=""){
+function ownerHistoryTransferLineageArchiveEntries(sessions=[],corpid="",opts={}){
   const entries=[];
+  const anchorItemsBySession=opts.request_context?.archive_anchor_items_by_session;
   for(const session of sessions||[]){
     const archiveState=canonicalOwnerHistoryArchiveState(session);
-    for(const anchor of extractEmployeeEntryAnchorsFromSession(session)){
+    const anchors=anchorItemsBySession instanceof Map
+      ?(anchorItemsBySession.get(String(session?.id||""))||[]).map(item=>item?.anchor||{})
+      :extractEmployeeEntryAnchorsFromSession(session);
+    for(const anchor of anchors){
       entries.push({
         ...anchor,
         corpid:cleanText(session.corpid||corpid,120),
@@ -11594,7 +11785,7 @@ async function qaAcceptanceBindingIdentity(env={}){
 }
 __name(qaAcceptanceBindingIdentity,"qaAcceptanceBindingIdentity");
 function qaAcceptanceStaffApiPath(path=""){
-  return /^\/api\/qa\/acceptance\/runs\/[^/]+\/(?:employee-draft|automation|upload-complete)$/.test(String(path||""));
+  return /^\/api\/qa\/acceptance\/runs\/[^/]+\/(?:employee-draft|automation|upload-complete|session-resume)$/.test(String(path||""));
 }
 __name(qaAcceptanceStaffApiPath,"qaAcceptanceStaffApiPath");
 function qaAcceptanceRunIdFromEmployeeWriteBody(body={}){
@@ -11614,31 +11805,109 @@ function qaAcceptanceRunIdFromEmployeeWriteBody(body={}){
 __name(qaAcceptanceRunIdFromEmployeeWriteBody,"qaAcceptanceRunIdFromEmployeeWriteBody");
 function qaAcceptanceEmployeeWriteIdentity(body={}){
   const entries=[body?.entry,...(Array.isArray(body?.entries)?body.entries:[]),...(Array.isArray(body?.session?.entries)?body.session.entries:[])].filter(Boolean);
-  const entryIds=new Set(entries.flatMap(row=>[row?.id,row?.event_id]).map(value=>cleanText(value||"",120)).filter(Boolean));
+  const outerEntryIdentity=cleanText(body?.entry_identity||"",120);
+  const entryIds=new Set([outerEntryIdentity,...entries.flatMap(row=>[row?.id,row?.entry_id,row?.event_id])].map(value=>cleanText(value||"",120)).filter(Boolean));
   const sessionIds=new Set([body?.session?.id,body?.session?.session_id,...entries.map(row=>row?.session_id)].map(value=>cleanText(value||"",120)).filter(Boolean));
-  return {entries,entry_id:entryIds.size===1?[...entryIds][0]:"",session_id:sessionIds.size===1?[...sessionIds][0]:""};
+  return {entries,entry_identity:outerEntryIdentity,entry_id:entryIds.size===1?[...entryIds][0]:"",session_id:sessionIds.size===1?[...sessionIds][0]:""};
 }
 __name(qaAcceptanceEmployeeWriteIdentity,"qaAcceptanceEmployeeWriteIdentity");
-async function qaAcceptanceEmployeeFormalWriteGate(env,user,body={}){
+function qaAcceptanceEntryBusinessScope(row={},user={}){
+  const normalized=normalizeEntryAnchor(row||{}),type=employeeEntryUploadType(row)||entryAnchorType(normalized),eventType=entryAnchorEventType(type);
+  if(["TF","TFF"].includes(type)){
+    const fee=employeeEntryBedTransferFee(row,normalized);
+    return hscStableValue({
+      event_type:"bed_transfer",
+      from_bed:cleanText(normalized.from_bed||row.from_bed||row.bed_from||"",40).replace(/^#+/,""),
+      to_bed:cleanText(normalized.to_bed||row.to_bed||row.bed_to||"",40).replace(/^#+/,""),
+      transfer_reason:cleanText(normalized.transfer_reason||row.transfer_reason||row.reason||row.note||"",240),
+      fee_mode:cleanText(row.fee_mode||fee.fee_choice||"",40).toLowerCase(),
+      fee_amount_aed:employeeEntryFingerprintMoney(row.fee_amount_aed??fee.fee_amount??0),
+      payment_method:cleanText(row.payment_method||fee.payment_method||"",40).toLowerCase(),
+      fee_waiver_reason:cleanText(row.fee_waiver_reason||fee.waiver_reason||"",240),
+      fee_due_date:cleanDate(row.fee_due_date||""),
+      bed_price_difference_mode:cleanText(row.bed_price_difference_mode||"none",40).toLowerCase(),
+      bed_price_difference_amount_aed:employeeEntryFingerprintMoney(row.bed_price_difference_amount_aed||0),
+      bed_price_difference_due_date:cleanDate(row.bed_price_difference_due_date||""),
+      bed_price_difference_payment_method:cleanText(row.bed_price_difference_payment_method||"",40).toLowerCase(),
+      bed_price_difference_reason:cleanText(row.bed_price_difference_reason||"",240)
+    });
+  }
+  return {event_type:eventType,canonical_business_fingerprint:buildCanonicalEventFingerprint(row,user)};
+}
+__name(qaAcceptanceEntryBusinessScope,"qaAcceptanceEntryBusinessScope");
+function qaAcceptanceEntryScopeValue(runId,scenario={},body={},user={}){
+  const identity=qaAcceptanceEmployeeWriteIdentity(body),entry=identity.entries.find(row=>cleanText(row?.id||row?.entry_id||row?.event_id||"",120)===identity.entry_id)||identity.entries[0]||{};
+  return {
+    qa_run_id:qaAcceptanceRunIdFromEmployeeWriteBody(body),
+    entry_identity:identity.entry_identity,
+    entry_id:identity.entry_id,
+    session_id:identity.session_id,
+    scenario_id:cleanText(body?.scenario_id||body?.qa_scenario_id||"",120),
+    event_type:entryAnchorEventType(employeeEntryUploadType(entry)||cleanText(entry?.event_type||"entry",40)),
+    business_scope:qaAcceptanceEntryBusinessScope(entry,user)
+  };
+}
+__name(qaAcceptanceEntryScopeValue,"qaAcceptanceEntryScopeValue");
+function qaAcceptanceExpectedEntryScope(runId,scenario={},user={}){
+  const input=scenario?.input||{};
+  return {
+    qa_run_id:String(runId||""),
+    entry_identity:String(scenario.entry_id||""),
+    entry_id:String(scenario.entry_id||""),
+    session_id:String(scenario.session_id||""),
+    scenario_id:String(scenario.case_id||""),
+    event_type:entryAnchorEventType(employeeEntryUploadType(input)||cleanText(scenario.event_type||input.event_type||"entry",40)),
+    business_scope:qaAcceptanceEntryBusinessScope(input,user)
+  };
+}
+__name(qaAcceptanceExpectedEntryScope,"qaAcceptanceExpectedEntryScope");
+function qaAcceptanceCompareEntryScope(runId,scenario={},body={},user={}){
+  const expected=qaAcceptanceExpectedEntryScope(runId,scenario,user),actual=qaAcceptanceEntryScopeValue(runId,scenario,body,user);
+  const ordered=["qa_run_id","entry_identity","entry_id","session_id","scenario_id","event_type"];
+  let firstDifferentField=ordered.find(field=>String(actual[field]||"")!==String(expected[field]||""))||"";
+  if(!firstDifferentField){
+    const expectedBusiness=expected.business_scope||{},actualBusiness=actual.business_scope||{};
+    const keys=[...new Set([...Object.keys(expectedBusiness),...Object.keys(actualBusiness)])].sort();
+    const different=keys.find(key=>JSON.stringify(actualBusiness[key]??null)!==JSON.stringify(expectedBusiness[key]??null));
+    if(different)firstDifferentField=`business_scope.${different}`;
+  }
+  return {ok:!firstDifferentField,expected,actual,first_different_field:firstDifferentField};
+}
+__name(qaAcceptanceCompareEntryScope,"qaAcceptanceCompareEntryScope");
+async function qaAcceptanceVerifyEntryScopes(run={},contract={},requests=[],user={}){
+  const scenarios=Array.isArray(contract?.scenarios)?contract.scenarios:[],expectedIds=scenarios.map(row=>String(row.entry_id||""));
+  const byEntry=new Map(),duplicateEntryIds=[];
+  for(const body of requests||[]){
+    const identity=qaAcceptanceEmployeeWriteIdentity(body),id=identity.entry_identity||identity.entry_id;
+    if(byEntry.has(id))duplicateEntryIds.push(id);else byEntry.set(id,body);
+  }
+  const results=await Promise.all(scenarios.map(async scenario=>{
+    const body=byEntry.get(String(scenario.entry_id||""))||{};
+    const compared=qaAcceptanceCompareEntryScope(run.qa_run_id,scenario,body,user);
+    const [expectedScopeDigest,actualScopeDigest]=await Promise.all([hscSha256(JSON.stringify(hscStableValue(compared.expected))),hscSha256(JSON.stringify(hscStableValue(compared.actual)))]);
+    return {entry_identity:String(scenario.entry_id||""),scenario_id:String(scenario.case_id||""),...compared,expected_scope_digest:expectedScopeDigest,actual_scope_digest:actualScopeDigest};
+  }));
+  const unknownIds=[...byEntry.keys()].filter(id=>!expectedIds.includes(id));
+  const scopeMatchCount=results.filter(row=>row.ok).length;
+  return {ok:requests.length===scenarios.length&&!duplicateEntryIds.length&&!unknownIds.length&&scopeMatchCount===scenarios.length,scope_match_count:scopeMatchCount,scope_mismatch_count:results.length-scopeMatchCount,duplicate_entry_id_count:duplicateEntryIds.length,unknown_entry_ids:unknownIds,scope_results:results};
+}
+__name(qaAcceptanceVerifyEntryScopes,"qaAcceptanceVerifyEntryScopes");
+const QA_SESSION_RESUME_INTERNAL=Symbol("qa_session_resume_internal");
+async function qaAcceptanceEmployeeFormalWriteGate(env,user,body={},options={}){
   if(!qaAcceptanceEnabled(env)||String(env.APP_ENV||"").trim().toLowerCase()!=="qa")return null;
+  if(options.internal_token===QA_SESSION_RESUME_INTERNAL)return null;
   if(String(user?.corpid||"")!=="HL-QA"||!isStaffRoleValue(user?.role))return json({success:false,error_code:"QA_STAFF_REQUIRED",no_write:true,write_attempted:false},403);
   const runId=qaAcceptanceRunIdFromEmployeeWriteBody(body);
   if(!runId)return json({success:false,error_code:"QA_MANUAL_EMPLOYEE_ACCEPTANCE_REQUIRED",no_write:true,write_attempted:false,formal_write_count:0},409);
   const identity=qaAcceptanceEmployeeWriteIdentity(body);
-  const run=await env.DB.prepare("SELECT status,matrix_json FROM qa_acceptance_runs WHERE qa_run_id=? AND corpid='HL-QA' LIMIT 1").bind(runId).first();
+  const run=await qaAcceptanceReadRun(env,user,runId);
   const allowed=["MANUAL_EMPLOYEE_ACCEPTED","UPLOAD_PASS","MANUAL_OWNER_ACCEPTED","FINAL_ACCEPTED"].includes(String(run?.status||""));
   if(!allowed)return json({success:false,error_code:"QA_MANUAL_EMPLOYEE_ACCEPTANCE_REQUIRED",qa_run_id:runId,status:run?.status||"NOT_FOUND",no_write:true,write_attempted:false,formal_write_count:0},409);
   let matrix={};try{matrix=JSON.parse(run.matrix_json||"{}")}catch{}
   const scenario=(Array.isArray(matrix.scenarios)?matrix.scenarios:[]).find(row=>row.upload_enabled!==false&&String(row.entry_id||row?.input?.id||"")===identity.entry_id&&String(row.session_id||row?.input?.session_id||"")===identity.session_id);
-  const incoming=identity.entries.find(row=>cleanText(row?.id||row?.event_id||"",120)===identity.entry_id)||identity.entries[0];
-  const expected=scenario?.input||scenario;
-  const fingerprintMatch=!!scenario&&!!incoming&&buildCanonicalEventFingerprint(incoming,user)===buildCanonicalEventFingerprint(expected,user);
-  if(!identity.entry_id||!identity.session_id||!fingerprintMatch)return json({success:false,error_code:"QA_RUN_ENTRY_SCOPE_MISMATCH",qa_run_id:runId,no_write:true,write_attempted:false,formal_write_count:0},403);
-  if(String(run.status||"")!=="MANUAL_EMPLOYEE_ACCEPTED"){
-    const persisted=await env.DB.prepare("SELECT id FROM sessions WHERE id=? AND corpid='HL-QA' LIMIT 1").bind(identity.session_id).first();
-    if(!persisted)return json({success:false,error_code:"QA_RUN_ALREADY_FINALIZED",qa_run_id:runId,no_write:true,write_attempted:false,formal_write_count:0},409);
-  }
-  return null;
+  const compared=scenario?qaAcceptanceCompareEntryScope(runId,scenario,body,user):{ok:false,first_different_field:"entry_id"};
+  if(!identity.entry_id||!identity.session_id||!compared.ok)return json({success:false,error_code:"QA_RUN_ENTRY_SCOPE_MISMATCH",qa_run_id:runId,first_different_field:compared.first_different_field||"entry_id",message:`Record identity changed. Your records are safe; use Resume Upload after refresh.`,no_write:true,write_attempted:false,formal_write_count:0},403);
+  return json({success:false,error_code:"QA_SESSION_RESUME_ROUTE_REQUIRED",qa_run_id:runId,message:"This accepted QA Run must use the atomic Resume Upload route.",no_write:true,write_attempted:false,formal_write_count:0},409);
 }
 __name(qaAcceptanceEmployeeFormalWriteGate,"qaAcceptanceEmployeeFormalWriteGate");
 async function qaAcceptanceRequestAuth(request,env,path=""){
@@ -11812,6 +12081,7 @@ async function qaAcceptanceValidationPayloadHash(matrix={}){
 }
 __name(qaAcceptanceValidationPayloadHash,"qaAcceptanceValidationPayloadHash");
 const QA_REHYDRATION_COMPATIBILITY_SCOPE="employee_post_acceptance_rehydration_v1";
+const QA_SESSION_RESUME_COMPATIBILITY_SCOPE="employee_post_acceptance_session_resume_v1";
 function qaAcceptanceArtifactCompatibility(manifest={},run={},payloadHash=""){
   const runArtifact=String(run.artifact_sha256||"");
   const runCommit=String(run.artifact_commit||"");
@@ -11822,9 +12092,10 @@ function qaAcceptanceArtifactCompatibility(manifest={},run={},payloadHash=""){
     &&!!runCommit
     &&runCommit===currentCommit;
   if(direct)return {ok:true,mode:"CURRENT_ARTIFACT",scope:"exact",run_artifact_sha256:runArtifact,current_artifact_sha256:currentArtifact};
+  const allowedScopes=new Set([QA_REHYDRATION_COMPATIBILITY_SCOPE,QA_SESSION_RESUME_COMPATIBILITY_SCOPE]);
   const compatible=Array.isArray(manifest.rehydration_compatible_artifacts)
     ?manifest.rehydration_compatible_artifacts.find(row=>
-      String(row?.scope||"")===QA_REHYDRATION_COMPATIBILITY_SCOPE
+      allowedScopes.has(String(row?.scope||""))
       &&String(row?.qa_run_id||"")===String(run.qa_run_id||"")
       &&String(row?.artifact_sha256||"")===runArtifact
       &&String(row?.git_commit||"")===runCommit
@@ -11836,7 +12107,7 @@ function qaAcceptanceArtifactCompatibility(manifest={},run={},payloadHash=""){
     &&runArtifact!==currentArtifact
     &&!!currentCommit;
   return predecessor
-    ?{ok:true,mode:"REHYDRATION_PREDECESSOR",scope:QA_REHYDRATION_COMPATIBILITY_SCOPE,qa_run_id:String(run.qa_run_id||""),run_artifact_sha256:runArtifact,current_artifact_sha256:currentArtifact}
+    ?{ok:true,mode:String(compatible?.scope||"")===QA_SESSION_RESUME_COMPATIBILITY_SCOPE?"SESSION_RESUME_PREDECESSOR":"REHYDRATION_PREDECESSOR",scope:String(compatible?.scope||""),qa_run_id:String(run.qa_run_id||""),run_artifact_sha256:runArtifact,current_artifact_sha256:currentArtifact}
     :{ok:false,mode:"MISMATCH",scope:"",run_artifact_sha256:runArtifact,current_artifact_sha256:currentArtifact};
 }
 __name(qaAcceptanceArtifactCompatibility,"qaAcceptanceArtifactCompatibility");
@@ -11876,7 +12147,8 @@ function qaAcceptanceValidationAttestationCurrent(run={},contract={},stored=null
     &&acceptedAt<=expiresAt
     &&Number(stored?.passed_count||0)===Number(run.employee_record_count||0)
     &&Number(stored?.failed_count||0)===0
-    &&Number(stored?.formal_write_count||0)===0;
+    &&Number(stored?.formal_write_count||0)===0
+    &&results.every(row=>row?.ok===true);
   const current=structurallyCurrent&&((Number.isFinite(expiresAt)&&expiresAt>Date.now())||acceptanceLocked);
   if(current)return {current:true,stale_reason:"",attestation:stored,acceptance_locked:acceptanceLocked};
   const staleReason=!stored?"NO_SERVER_ATTESTATION"
@@ -12023,10 +12295,112 @@ async function qaAcceptanceEmployeeDraftContract(env,run){
   return {ok:true,manifest,matrix,expected,scenarios,payloadHash,artifactCompatibility};
 }
 __name(qaAcceptanceEmployeeDraftContract,"qaAcceptanceEmployeeDraftContract");
+function qaAcceptanceScenarioRequestBody(run={},scenario={},index=0,total=1){
+  const entry=JSON.parse(JSON.stringify(scenario?.input||{}));
+  const sessionId=String(scenario.session_id||entry.session_id||"");
+  entry.id=String(scenario.entry_id||entry.id||"");
+  entry.event_id=entry.id;
+  entry.session_id=sessionId;
+  const entries=[entry];
+  return {
+    qa_run_id:String(run.qa_run_id||""),
+    scenario_id:String(scenario.case_id||""),
+    entry_identity:entry.id,
+    event_index:index,
+    entry,
+    entries,
+    session:{id:sessionId,session_id:sessionId,source:"employee_entry",handover_status:index===total-1?"COMPLETED":"EXPORTING",entries,entries_json:JSON.stringify({anchor_contract_version:"employee_entry_anchor_v1",entries})}
+  };
+}
+__name(qaAcceptanceScenarioRequestBody,"qaAcceptanceScenarioRequestBody");
+async function qaAcceptanceRunPersistenceSnapshot(env,user,run={},contract={},context=null,{fresh=false}={}){
+  const scenarios=Array.isArray(contract?.scenarios)?contract.scenarios:[],expectedSessionIds=new Set(scenarios.map(row=>String(row.session_id||""))),expectedEntryIds=new Set(scenarios.map(row=>String(row.entry_id||""))),runPrefix=`${run.qa_run_id}-`,like=`${runPrefix}%`;
+  let sessionReadOk=true,transactionReadOk=true;
+  let sessions=[],sharedArchive=false;
+  if(!fresh&&context?.archiveSnapshotPromise){
+    sharedArchive=true;
+    try{sessions=(await context.archiveSnapshotPromise).filter(row=>String(row?.id||"").startsWith(runPrefix));}
+    catch{sessionReadOk=false;sessions=[];}
+    if(context.archive_read_ok===false||context.archive_snapshot_truncated===true)sessionReadOk=false;
+  }
+  else{
+    const rows=await env.DB.prepare("SELECT id,anchor_id,entries_count,handover_status,entries_json,created_at,voided_at FROM sessions WHERE corpid=? AND id LIKE ? ORDER BY id").bind(user.corpid,like).all().catch(()=>{sessionReadOk=false;return {results:[]}});
+    sessions=rows.results||[];
+    if(context){context.d1_read_count=Number(context.d1_read_count||0)+1;context.persistence_read_count=Number(context.persistence_read_count||0)+1;if(sessionReadOk)context.sessions_table_exists=true;}
+  }
+  let transactions=new Map();
+  if(!fresh&&context?.existing_transactions_by_event_id instanceof Map){
+    transactions=context.existing_transactions_by_event_id;
+    const checked=context.existing_transaction_ids_checked;
+    transactionReadOk=context.transaction_read_ok!==false&&context.transaction_snapshot_truncated!==true&&checked instanceof Set&&[...expectedEntryIds].every(id=>checked.has(id));
+  }
+  else{
+    const rows=await env.DB.prepare("SELECT id,session_id,type,status,voided_at FROM transactions WHERE corpid=? AND session_id LIKE ? ORDER BY id").bind(user.corpid,like).all().catch(()=>{transactionReadOk=false;return {results:[]}});
+    for(const row of rows.results||[])transactions.set(cleanId(row?.id||""),row);
+    if(context){
+      context.d1_read_count=Number(context.d1_read_count||0)+1;
+      context.persistence_read_count=Number(context.persistence_read_count||0)+1;
+      if(transactionReadOk){
+        context.transactions_table_exists=true;
+        context.existing_transactions_by_event_id=transactions;
+        context.existing_transaction_ids_checked=new Set(expectedEntryIds);
+      }
+    }
+  }
+  if(context&&sessionReadOk&&transactionReadOk)context.employee_entry_schema_ready=true;
+  const sessionsById=new Map(sessions.map(row=>[String(row.id||""),row])),entryLocations=new Map(),duplicateEntryIds=[],invalidSessionIds=[];
+  let cachedEntriesBySession=null;
+  if(sharedArchive&&Array.isArray(context?.archive_anchor_items)){
+    cachedEntriesBySession=new Map();
+    for(const item of context.archive_anchor_items){
+      const sessionId=String(item?.session?.id||"");
+      if(!sessionId.startsWith(runPrefix))continue;
+      if(!cachedEntriesBySession.has(sessionId))cachedEntriesBySession.set(sessionId,[]);
+      cachedEntriesBySession.get(sessionId).push(item?.anchor||{});
+    }
+  }
+  if(context&&!cachedEntriesBySession)context.persistence_parse_count=Number(context.persistence_parse_count||0)+1;
+  for(const session of sessions){
+    const sessionId=String(session.id||"");
+    const entries=cachedEntriesBySession?cachedEntriesBySession.get(sessionId)||[]:parseEmployeeEntryAnchorJson(session.entries_json);
+    if(expectedSessionIds.has(sessionId)&&(entries.length!==1||Number(session.entries_count||0)!==entries.length))invalidSessionIds.push(sessionId);
+    for(const entry of entries){
+      const id=cleanText(entry?.entry_identity||entry?.event_id||entry?.id||"",120);
+      if(!id)continue;
+      if(entryLocations.has(id))duplicateEntryIds.push(id);else entryLocations.set(id,{session,entry});
+    }
+  }
+  const persisted=[],missing=[],conflicting=[];
+  for(const scenario of scenarios){
+    const entryId=String(scenario.entry_id||""),sessionId=String(scenario.session_id||""),expectedType=employeeEntryUploadType(scenario.input||{}),session=sessionsById.get(sessionId),located=entryLocations.get(entryId),tx=transactions.get(entryId);
+    if(!session&&!located&&!tx){missing.push(entryId);continue;}
+    const expectedScope=qaAcceptanceEntryBusinessScope(scenario.input||{},user),actualScope=located?qaAcceptanceEntryBusinessScope(located.entry||{},user):null;
+    const sessionActive=!!session&&!String(session.voided_at||"").trim()&&String(session.handover_status||"").toUpperCase()!=="VOID"&&!invalidSessionIds.includes(sessionId);
+    const transactionActive=!!tx&&!String(tx.voided_at||"").trim()&&String(tx.status||"ACTIVE").toUpperCase()!=="VOID";
+    const archiveExact=sessionActive&&!!located&&String(located.session?.id||"")===sessionId&&JSON.stringify(actualScope)===JSON.stringify(expectedScope);
+    const transactionExact=["TF","TFF"].includes(expectedType)?!tx:transactionActive&&String(tx.session_id||"")===sessionId;
+    if(archiveExact&&transactionExact)persisted.push(entryId);
+    else conflicting.push({entry_identity:entryId,session_id:sessionId,archive_present:!!located,transaction_present:!!tx,first_different_field:!session?"session_id":!sessionActive?"session_state":!located?"entry_id":JSON.stringify(actualScope)!==JSON.stringify(expectedScope)?"business_scope":!transactionExact?"transaction_scope":"unknown"});
+  }
+  const unexpectedSessions=sessions.filter(row=>!expectedSessionIds.has(String(row.id||""))).map(row=>String(row.id||""));
+  const unexpectedEntries=[...entryLocations.keys()].filter(id=>!expectedEntryIds.has(id));
+  const unexpectedTransactions=[...transactions.keys()].filter(id=>!expectedEntryIds.has(id));
+  const readOk=sessionReadOk&&transactionReadOk;
+  const ok=readOk&&!conflicting.length&&!duplicateEntryIds.length&&!invalidSessionIds.length&&!unexpectedSessions.length&&!unexpectedEntries.length&&!unexpectedTransactions.length;
+  return {ok,error_code:readOk?ok?"":"QA_RUN_PERSISTENCE_CONFLICT":"QA_RUN_PERSISTENCE_READ_FAILED",persistence_read_ok:readOk,session_read_ok:sessionReadOk,transaction_read_ok:transactionReadOk,persisted_entry_ids:persisted,missing_entry_ids:missing,conflicting_entries:conflicting,duplicate_entry_ids:[...new Set(duplicateEntryIds)],invalid_session_ids:[...new Set(invalidSessionIds)],unexpected_session_ids:unexpectedSessions,unexpected_entry_ids:unexpectedEntries,unexpected_transaction_ids:unexpectedTransactions,persisted_count:persisted.length,missing_count:missing.length,conflicting_count:conflicting.length+invalidSessionIds.length+unexpectedSessions.length+unexpectedEntries.length+unexpectedTransactions.length,duplicate_count:new Set(duplicateEntryIds).size,session_count:sessions.length,completed_session_count:sessions.filter(row=>!String(row.voided_at||"").trim()&&String(row.handover_status||"").toUpperCase()==="COMPLETED").length};
+}
+__name(qaAcceptanceRunPersistenceSnapshot,"qaAcceptanceRunPersistenceSnapshot");
+async function qaAcceptanceSessionPreflight(env,user,run={},contract={},requests=[],context={}){
+  const scope=await qaAcceptanceVerifyEntryScopes(run,contract,requests,user);
+  const persistence=await qaAcceptanceRunPersistenceSnapshot(env,user,run,contract,context);
+  return {ok:scope.ok&&persistence.ok,entry_scope:scope,persistence,scope_match_count:scope.scope_match_count,persisted_count:persistence.persisted_count,missing_count:persistence.missing_count,conflicting_count:persistence.conflicting_count,duplicate_entry_id_count:persistence.duplicate_count};
+}
+__name(qaAcceptanceSessionPreflight,"qaAcceptanceSessionPreflight");
 async function qaAcceptanceEmployeeDraft(request,env,user,run){
   const contract=await qaAcceptanceEmployeeDraftContract(env,run);
   if(!contract.ok)return qaAcceptanceEmployeeDraftUnavailable(contract.error_code,409,run);
   const {scenarios,expected,manifest,payloadHash,artifactCompatibility}=contract;
+  const persistence=await qaAcceptanceRunPersistenceSnapshot(env,user,run,contract,null,{fresh:true});
   const stored=qaAcceptanceStoredValidation(run);
   const freshness=qaAcceptanceValidationAttestationCurrent(run,contract,stored);
   const validationAttestation=freshness.current?{
@@ -12053,6 +12427,7 @@ async function qaAcceptanceEmployeeDraft(request,env,user,run){
     logical_session_id:`${run.qa_run_id}-CURRENT`,
     entries:scenarios.map(row=>row.input),
     session_ids_by_entry:Object.fromEntries(scenarios.map(row=>[row.entry_id,row.session_id])),
+    scenario_ids_by_entry:Object.fromEntries(scenarios.map(row=>[row.entry_id,row.case_id])),
     expected_finance:expected,
     payload_hash:payloadHash,
     validation_attestation:validationAttestation,
@@ -12060,6 +12435,13 @@ async function qaAcceptanceEmployeeDraft(request,env,user,run){
     cleanup_status:run.cleanup_status||"NOT_RUN",
     employee_review_status:run.employee_accepted_at?"ACCEPTED":"PENDING",
     upload_allowed:String(run.status||"")==="MANUAL_EMPLOYEE_ACCEPTED"&&String(run.cleanup_status||"NOT_RUN")!=="COMPLETED",
+    resume_upload_required:String(run.status||"")==="MANUAL_EMPLOYEE_ACCEPTED"&&persistence.persisted_count>0&&persistence.missing_count>0&&!persistence.conflicting_count,
+    already_persisted_count:persistence.persisted_count,
+    remaining_count:persistence.missing_count,
+    conflicting_entry_count:persistence.conflicting_count,
+    duplicate_entry_id_count:persistence.duplicate_count,
+    persisted_entry_ids:persistence.persisted_entry_ids,
+    missing_entry_ids:persistence.missing_entry_ids,
     readonly:String(run.status||"")==="UPLOAD_PASS",
     delivery_contract:"SERVER_PERSISTED_QA_RUN_V1",
     preview_expected:true,
@@ -12153,6 +12535,95 @@ async function qaAcceptanceRecordUpload(request,env,user,run){
   return success(qaAcceptancePublicRun(request,await qaAcceptanceReadRun(env,user,run.qa_run_id)));
 }
 __name(qaAcceptanceRecordUpload,"qaAcceptanceRecordUpload");
+async function qaAcceptanceSessionResume(request,env,user,run){
+  const startedAt=Date.now(),stageMs={},mark=(name,start)=>{stageMs[name]=Math.max(0,Date.now()-start)};
+  if(!["MANUAL_EMPLOYEE_ACCEPTED","UPLOAD_PASS"].includes(String(run.status||"")))return json({success:false,error_code:"QA_RUN_STATE_CONFLICT",required_status:"MANUAL_EMPLOYEE_ACCEPTED",status:run.status,no_write:true},409);
+  if(String(run.cleanup_status||"NOT_RUN")==="COMPLETED")return json({success:false,error_code:"QA_RUN_ALREADY_CLEANED",no_write:true},409);
+  let body={};try{body=await request.json()}catch{return badRequest("invalid_json")}
+  const contractStart=Date.now(),contract=await qaAcceptanceEmployeeDraftContract(env,run);mark("run_contract_ms",contractStart);
+  if(!contract.ok)return json({success:false,error_code:contract.error_code,no_write:true},409);
+  const resumeArtifactAuthorized=contract.artifactCompatibility?.mode==="CURRENT_ARTIFACT"||contract.artifactCompatibility?.scope===QA_SESSION_RESUME_COMPATIBILITY_SCOPE;
+  if(!resumeArtifactAuthorized)return json({success:false,error_code:"QA_SESSION_RESUME_ARTIFACT_SCOPE_REQUIRED",no_write:true},409);
+  const stored=qaAcceptanceStoredValidation(run),freshness=qaAcceptanceValidationAttestationCurrent(run,contract,stored);
+  if(!freshness.current||freshness.acceptance_locked!==true)return json({success:false,error_code:"QA_ACCEPTED_ATTESTATION_REQUIRED",no_write:true},409);
+  const confirmationValid=qaAcceptanceRunId(body.qa_run_id)===run.qa_run_id
+    &&String(body.artifact_sha256||"")===String(run.artifact_sha256||"")
+    &&String(body.payload_hash||"")===String(contract.payloadHash||"")
+    &&String(body.validation_attempt_id||"")===String(stored.validation_attempt_id||"");
+  if(!confirmationValid)return json({success:false,error_code:"QA_SESSION_RESUME_CONFIRMATION_MISMATCH",no_write:true},409);
+  const scenarios=contract.scenarios||[],requests=scenarios.map((scenario,index)=>qaAcceptanceScenarioRequestBody(run,scenario,index,scenarios.length));
+  const requestContext=ttlockRequestContext(request,env,user,"qa_acceptance_session_resume",TTLOCK_STRICT_CACHE_MAX_AGE_MS);
+  requestContext.allow_live_fetch=false;
+  requestContext.archive_session_prefix=`${run.qa_run_id}-%`;
+  requestContext.strict_archive_session_prefix=true;
+  requestContext.transaction_session_prefix=requestContext.archive_session_prefix;
+  const archiveSnapshot=await cloudArrearsFetchActiveSessionRows(env,user,{limit:1000,request_context:requestContext}).catch(()=>[]);
+  employeeEntryPrepareArchiveSnapshotContext(archiveSnapshot,requestContext);
+  await employeeEntryPreloadExistingTransactions(env,user,requests,requestContext);
+  const scopeStart=Date.now(),sessionPreflight=await qaAcceptanceSessionPreflight(env,user,run,contract,requests,requestContext);mark("scope_and_persistence_ms",scopeStart);
+  if(!sessionPreflight.ok){
+    const status=sessionPreflight.persistence?.persistence_read_ok===false?503:409;
+    const errorCode=sessionPreflight.persistence?.error_code||(sessionPreflight.scope_match_count!==scenarios.length?"QA_RUN_ENTRY_SCOPE_MISMATCH":"QA_RUN_PERSISTENCE_CONFLICT");
+    return json({success:false,error_code:errorCode,qa_run_id:run.qa_run_id,entry_scope_match_count:sessionPreflight.scope_match_count,already_persisted_count:sessionPreflight.persisted_count,remaining_count:sessionPreflight.missing_count,conflicting_entry_count:sessionPreflight.conflicting_count,duplicate_entry_id_count:sessionPreflight.duplicate_entry_id_count,no_write:true,write_attempted:false,formal_write_count:sessionPreflight.persisted_count},status);
+  }
+  const acceptedById=new Map((stored.validation_results||[]).map(row=>[String(row.entry_identity||""),row]));
+  const missingIds=new Set(sessionPreflight.persistence.missing_entry_ids||[]),missingRequests=requests.filter(row=>missingIds.has(String(row.entry_identity||"")));
+  let missingPreflight={ok:true,validation_results:[],error_code:""};
+  if(missingRequests.length){
+    const preflightStart=Date.now();
+    missingPreflight=await validateEmployeeEntryAggregatePreflight(env,user,{aggregate_preflight:true,validation_requests:missingRequests},{request_context:requestContext});
+    mark("aggregate_preflight_ms",preflightStart);
+  }else stageMs.aggregate_preflight_ms=0;
+  const freshById=new Map((missingPreflight.validation_results||[]).map(row=>[String(row.entry_identity||""),row]));
+  const validationResults=scenarios.map(scenario=>{
+    const id=String(scenario.entry_id||"");
+    if(missingIds.has(id))return freshById.get(id)||{entry_identity:id,ok:false,error_code:"QA_SESSION_PREFLIGHT_RESULT_MISSING"};
+    const accepted=acceptedById.get(id);
+    return accepted?{...accepted,entry_identity:id,already_persisted:true,idempotent:true}:{entry_identity:id,ok:false,error_code:"QA_ACCEPTED_ATTESTATION_ENTRY_MISSING"};
+  });
+  const resultIds=validationResults.map(row=>String(row.entry_identity||"")),passed=validationResults.filter(row=>row.ok===true).length;
+  const preflightOk=missingPreflight.ok===true
+    &&validationResults.length===scenarios.length
+    &&new Set(resultIds).size===scenarios.length
+    &&scenarios.every(row=>resultIds.includes(String(row.entry_id||"")))
+    &&passed===scenarios.length
+    &&Number(requestContext.ttlock_external_call_count||0)===0;
+  const base={qa_run_id:run.qa_run_id,validation_result_count:validationResults.length,passed_count:passed,failed_count:validationResults.length-passed,entry_scope_match_count:sessionPreflight.scope_match_count,already_persisted_count:sessionPreflight.persisted_count,remaining_count:sessionPreflight.missing_count,conflicting_entry_count:sessionPreflight.conflicting_count,duplicate_entry_id_count:sessionPreflight.duplicate_entry_id_count,formal_write_count:Number(run.status==="UPLOAD_PASS"?scenarios.length:sessionPreflight.persisted_count),new_write_count:0,write_attempted:false,no_write:true,ttlock_external_calls:Number(requestContext.ttlock_external_call_count||0),request_context_metrics:employeeEntryAggregateRequestMetrics(requestContext),stage_duration_ms:stageMs};
+  if(!preflightOk)return json({success:false,error_code:missingPreflight.error_code||"QA_SESSION_PREFLIGHT_FAILED",...base,validation_results:validationResults.map(row=>({entry_identity:row.entry_identity,ok:row.ok===true,error_code:row.error_code||""}))},422);
+  if(body.validate_only===true||body.no_write===true)return success({...base,ok:true,preflight_ok:true,resume_allowed:run.status==="MANUAL_EMPLOYEE_ACCEPTED",no_write:true,total_duration_ms:Date.now()-startedAt});
+  if(String(body.resume_intent||"")!=="EMPLOYEE_MANUAL_RESUME")return json({success:false,error_code:"QA_SESSION_RESUME_INTENT_REQUIRED",...base},422);
+  if(run.status==="UPLOAD_PASS"){
+    if(sessionPreflight.missing_count!==0||sessionPreflight.persistence.completed_session_count!==scenarios.length)return json({success:false,error_code:"QA_RUN_UPLOAD_STATE_CONFLICT",...base},409);
+    return success({...base,ok:true,idempotent:true,no_write:true,formal_write_count:scenarios.length,completed_session_count:sessionPreflight.persistence.completed_session_count,total_duration_ms:Date.now()-startedAt});
+  }
+  const sessionColumns=requestContext.session_columns instanceof Set?requestContext.session_columns:await empTableColumns(env,"sessions").catch(()=>new Set());
+  if(!(sessionColumns instanceof Set)||!sessionColumns.has("entries_json"))return json({success:false,error_code:"CANONICAL_ARCHIVE_SCHEMA_UNAVAILABLE",...base},503);
+  const resultById=new Map(validationResults.map(row=>[String(row.entry_identity||""),row])),scenarioById=new Map(scenarios.map((row,index)=>[String(row.entry_id||""),{row,index}]));
+  const writeResults=[];
+  for(const entryId of sessionPreflight.persistence.missing_entry_ids){
+    const found=scenarioById.get(entryId);if(!found)return json({success:false,error_code:"QA_RUN_ENTRY_SCOPE_MISMATCH",...base},409);
+    const requestBody=qaAcceptanceScenarioRequestBody(run,found.row,found.index,scenarios.length),validated=resultById.get(entryId);
+    const writeStart=Date.now(),response=await handleEmployeeEntry(request,env,user,{body:requestBody,request_context:requestContext,prevalidated_result:validated,schema_prechecked:true,internal_token:QA_SESSION_RESUME_INTERNAL});
+    const payload=await response.json().catch(()=>({})),data=payload?.data&&typeof payload.data==="object"?payload.data:payload;mark(`write_${entryId}_ms`,writeStart);
+    if(!response.ok||data?.success===false)return json({success:false,error_code:data?.error_code||"QA_SESSION_RESUME_WRITE_FAILED",...base,write_attempted:true,no_write:false,new_write_count:writeResults.filter(row=>row.new_write).length,failed_entry_identity:entryId,saved_count:sessionPreflight.persisted_count+writeResults.length,remaining_count:Math.max(0,sessionPreflight.missing_count-writeResults.length)},response.status||500);
+    writeResults.push({entry_identity:entryId,new_write:data?.idempotent!==true&&data?.already_accepted!==true,idempotent:data?.idempotent===true||data?.already_accepted===true});
+  }
+  requestContext.d1_write_count=Number(requestContext.d1_write_count||0)+writeResults.filter(row=>row.new_write).length;
+  const verifyStart=Date.now(),verified=await qaAcceptanceRunPersistenceSnapshot(env,user,run,contract,requestContext,{fresh:true});mark("post_write_verification_ms",verifyStart);
+  if(!verified.ok||verified.persisted_count!==scenarios.length||verified.missing_count!==0)return json({success:false,error_code:"QA_UPLOAD_PERSISTENCE_MISMATCH",...base,write_attempted:true,no_write:false,new_write_count:writeResults.filter(row=>row.new_write).length,already_persisted_count:verified.persisted_count,remaining_count:verified.missing_count,conflicting_entry_count:verified.conflicting_count},409);
+  const sessionIds=scenarios.map(row=>String(row.session_id||"")),placeholders=sessionIds.map(()=>"?").join(","),finalizeStart=Date.now();
+  await env.DB.prepare(`UPDATE sessions SET handover_status='COMPLETED' WHERE corpid=? AND id IN (${placeholders}) AND COALESCE(voided_at,'')=''`).bind(user.corpid,...sessionIds).run();
+  requestContext.d1_write_count=Number(requestContext.d1_write_count||0)+1;
+  const finalized=await qaAcceptanceRunPersistenceSnapshot(env,user,run,contract,requestContext,{fresh:true});
+  if(finalized.completed_session_count!==scenarios.length)return json({success:false,error_code:"QA_SESSION_FINALIZATION_MISMATCH",...base,write_attempted:true,no_write:false,new_write_count:writeResults.filter(row=>row.new_write).length,completed_session_count:finalized.completed_session_count},409);
+  const upload={formal_write_count:scenarios.length,anchor_count:scenarios.length,session_count:scenarios.length,session_status:"COMPLETED",entry_ids:scenarios.map(row=>String(row.entry_id||"")),resume_new_write_count:writeResults.filter(row=>row.new_write).length,recorded_at:empNow()};
+  const update=await env.DB.prepare("UPDATE qa_acceptance_runs SET status='UPLOAD_PASS',upload_json=?,updated_at=? WHERE qa_run_id=? AND corpid=? AND status='MANUAL_EMPLOYEE_ACCEPTED'").bind(JSON.stringify(upload),empNow(),run.qa_run_id,user.corpid).run();
+  requestContext.d1_write_count=Number(requestContext.d1_write_count||0)+1;mark("session_and_run_finalization_ms",finalizeStart);
+  const current=await qaAcceptanceReadRun(env,user,run.qa_run_id);
+  if(Number(update?.meta?.changes??update?.changes??0)!==1&&String(current?.status||"")!=="UPLOAD_PASS")return json({success:false,error_code:"QA_RUN_STATE_CONFLICT",...base,write_attempted:true,no_write:false},409);
+  return success({ok:true,qa_run_id:run.qa_run_id,status:"UPLOAD_PASS",already_persisted_count:sessionPreflight.persisted_count,remaining_count:0,conflicting_entry_count:0,duplicate_entry_id_count:0,formal_write_count:scenarios.length,new_write_count:writeResults.filter(row=>row.new_write).length,write_attempted:writeResults.some(row=>row.new_write),no_write:!writeResults.some(row=>row.new_write),idempotent:!writeResults.some(row=>row.new_write),completed_session_count:finalized.completed_session_count,ttlock_external_calls:Number(requestContext.ttlock_external_call_count||0),request_context_metrics:employeeEntryAggregateRequestMetrics(requestContext),stage_duration_ms:stageMs,total_duration_ms:Date.now()-startedAt});
+}
+__name(qaAcceptanceSessionResume,"qaAcceptanceSessionResume");
 function qaAcceptanceFinanceComparable(projection={}){
   const cash=ownerOverviewMoney(projection.cash_received),bank=ownerOverviewMoney(projection.bank_received),cashOut=ownerOverviewMoney(projection.cash_out),bankOut=ownerOverviewMoney(projection.bank_out);
   return {cash_received:cash,bank_received:bank,total_received:ownerOverviewMoney(projection.gross_received),cash_out:cashOut,bank_out:bankOut,total_expenses:ownerOverviewMoney(cashOut+bankOut),net_funds:ownerOverviewMoney(cash+bank-cashOut-bankOut),cash_net:ownerOverviewMoney(cash-cashOut),bank_net:ownerOverviewMoney(bank-bankOut),outstanding:ownerOverviewMoney(projection.arrears_opened_amount),arrears_opened:ownerOverviewMoney(projection.arrears_opened_amount),arrears_repaid:ownerOverviewMoney(projection.arrears_repaid),deposit_included:ownerOverviewMoney(projection.deposit_received),deposit_refund:ownerOverviewMoney(projection.deposit_refund),expense:ownerOverviewMoney(projection.expenses),bed_transfer_fee:ownerOverviewMoney(projection.bed_transfer_fee),rent_income:ownerOverviewMoney(projection.rent_income)};
@@ -12232,7 +12703,8 @@ async function handleQaAcceptanceApi(request,env,user){
   const staffDraft=/^\/api\/qa\/acceptance\/runs\/([^/]+)\/employee-draft$/.exec(path);
   const staffAutomation=/^\/api\/qa\/acceptance\/runs\/([^/]+)\/automation$/.exec(path);
   const staffUploadComplete=/^\/api\/qa\/acceptance\/runs\/([^/]+)\/upload-complete$/.exec(path);
-  const staffRoute=staffDraft||staffAutomation||staffUploadComplete;
+  const staffSessionResume=/^\/api\/qa\/acceptance\/runs\/([^/]+)\/session-resume$/.exec(path);
+  const staffRoute=staffDraft||staffAutomation||staffUploadComplete||staffSessionResume;
   const gate=await qaAcceptanceGate(request,env,user,{manager:!staffRoute,staff:!!staffRoute});
   if(gate)return gate;
   if(path==="/api/qa/acceptance/runs"&&method==="GET"){
@@ -12240,7 +12712,7 @@ async function handleQaAcceptanceApi(request,env,user){
     return success({runs:rows.map(row=>qaAcceptancePublicRun(request,row)),binding_identity:"VERIFIED",production_access:false});
   }
   if(path==="/api/qa/acceptance/runs"&&method==="POST")return qaAcceptanceCreateRun(request,env,user);
-  const match=/^\/api\/qa\/acceptance\/runs\/([^/]+)(?:\/(automation|employee-draft|accept-employee|upload-complete|accept-owner|reconcile|cleanup|evidence|diagnostics))?$/.exec(path);
+  const match=/^\/api\/qa\/acceptance\/runs\/([^/]+)(?:\/(automation|employee-draft|accept-employee|upload-complete|session-resume|accept-owner|reconcile|cleanup|evidence|diagnostics))?$/.exec(path);
   if(!match)return qaAcceptanceNotFound(true);
   const runId=qaAcceptanceRunId(decodeURIComponent(match[1]||""));if(!runId)return badRequest("QA_RUN_ID_INVALID");
   const run=await qaAcceptanceReadRun(env,user,runId);if(!run)return qaAcceptanceNotFound(true);
@@ -12250,6 +12722,7 @@ async function handleQaAcceptanceApi(request,env,user){
   if(action==="automation"&&method==="POST")return qaAcceptanceRecordAutomation(request,env,user,run);
   if(action==="accept-employee"&&method==="POST")return qaAcceptanceAcceptReview(request,env,user,run,"employee");
   if(action==="upload-complete"&&method==="POST")return qaAcceptanceRecordUpload(request,env,user,run);
+  if(action==="session-resume"&&method==="POST")return qaAcceptanceSessionResume(request,env,user,run);
   if(action==="accept-owner"&&method==="POST")return qaAcceptanceAcceptReview(request,env,user,run,"owner");
   if(action==="reconcile"&&method==="POST")return qaAcceptanceReconcile(request,env,user,run);
   if(action==="cleanup"&&method==="POST")return qaAcceptanceCleanup(request,env,user,run);

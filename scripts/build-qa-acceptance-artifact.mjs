@@ -13,6 +13,7 @@ const publicRoot = path.join(workerDir, "public");
 
 const sha256 = value => createHash("sha256").update(value).digest("hex");
 const REHYDRATION_SCOPE = "employee_post_acceptance_rehydration_v1";
+const SESSION_RESUME_SCOPE = "employee_post_acceptance_session_resume_v1";
 
 function option(name, argv = process.argv.slice(2)) {
   return argv.find(value => value.startsWith(`--${name}=`))?.slice(name.length + 3) || "";
@@ -23,12 +24,13 @@ export function qaRehydrationCompatibility(argv = process.argv.slice(2)) {
   const artifactSha256 = option("rehydration-compatible-artifact", argv).toLowerCase();
   const gitCommit = option("rehydration-compatible-commit", argv).toLowerCase();
   const payloadHash = option("rehydration-compatible-payload", argv).toLowerCase();
+  const scope = option("compatibility-scope", argv) || REHYDRATION_SCOPE;
   const any = qaRunId || artifactSha256 || gitCommit || payloadHash;
   if (!any) return [];
-  if (!/^QA-\d{8}-[A-Z0-9]{4,12}$/.test(qaRunId) || !/^[a-f0-9]{64}$/.test(artifactSha256) || !/^[a-f0-9]{40}$/.test(gitCommit) || !/^[a-f0-9]{64}$/.test(payloadHash)) {
+  if (!/^QA-\d{8}-[A-Z0-9]{4,12}$/.test(qaRunId) || !/^[a-f0-9]{64}$/.test(artifactSha256) || !/^[a-f0-9]{40}$/.test(gitCommit) || !/^[a-f0-9]{64}$/.test(payloadHash) || ![REHYDRATION_SCOPE, SESSION_RESUME_SCOPE].includes(scope)) {
     throw new Error("Complete exact Run artifact commit and payload lineage is required");
   }
-  return [{ scope: REHYDRATION_SCOPE, qa_run_id: qaRunId, artifact_sha256: artifactSha256, git_commit: gitCommit, payload_hash: payloadHash }];
+  return [{ scope, qa_run_id: qaRunId, artifact_sha256: artifactSha256, git_commit: gitCommit, payload_hash: payloadHash }];
 }
 
 async function filesUnder(root, relative = "") {

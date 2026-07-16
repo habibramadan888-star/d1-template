@@ -103,14 +103,14 @@ test("Employee QA loader uses the formal page and never auto-clicks Upload Sessi
   assert.match(employee, /employeeQaAcceptanceSessionId/);
   assert.match(worker, /auto_upload:false/);
   assert.match(employee, /Upload is \$\{policy\.upload_allowed\?'unlocked for manual Staff action':'locked'\} and is never automatic/);
-  assert.match(employee, /employeeQaAcceptanceReportUpload/);
+  assert.match(employee, /employeeQaAcceptanceSessionResume/);
   assert.match(employee, /raw\?\.data&&typeof raw\.data==='object'\?raw\.data:raw/);
   assert.match(employee, /session_id:sessionIds\[id\]\|\|entry\.session_id\|\|''/);
   assert.match(employee, /payment==='bank'\|\|payment==='b'\?'B'/);
   assert.match(employee, /entry\.fee_mode\|\|''\)\.toLowerCase\(\)==='paid'\?Number\(entry\.fee_amount_aed\|\|0\):0/);
   assert.match(employee, /reusablePass=policy\.reusable_pass&&validationAttestation&&attested\?\.ok===true/);
   assert.match(employee, /data\.status==='DRAFT_READY'\?'PENDING_VALIDATION':'NEEDS_REVALIDATION'/);
-  const loader = employee.slice(employee.indexOf("async function employeeLoadQaAcceptanceRun"), employee.indexOf("async function employeeQaAcceptanceReportUpload"));
+  const loader = employee.slice(employee.indexOf("async function employeeLoadQaAcceptanceRun"), employee.indexOf("async function employeeQaAcceptanceSessionResume"));
   assert.doesNotMatch(loader, /commitSessionAndExport\(|btnExportSession\.click|\/api\/employee\/entry['"]/);
 });
 
