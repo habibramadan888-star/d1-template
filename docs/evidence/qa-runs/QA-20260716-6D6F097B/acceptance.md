@@ -27,7 +27,9 @@
 - Observed Current Session cards: AED 50 cash and AED 50 bank
 - Observed Ledger defect: both paid Bed Transfers render as `transfer waived`; Breakdown renders `Transfer 0`
 - Observed Ledger Outstanding/Arrears Opened: 70/70 versus the full oracle 150/150
-- Employee manual acceptance: pending
+- Employee manual acceptance: rejected with findings
+- MANUAL_EMPLOYEE_STATUS: REJECTED_WITH_FINDINGS
+- Remote cleanup status: COMPLETED
 - Upload: not executed
 - Owner manual acceptance: pending
 - Final reconciliation: pending
@@ -37,6 +39,10 @@
 The QA Run remains at `AUTOMATION_PASS`. No reviewer button was clicked. The paid
 Bed Transfer Ledger mismatch is preserved as an explicit manual-review finding;
 it is not hidden by the passing aggregate validation result.
+
+This Run was rejected for Employee acceptance. It must not enter
+`MANUAL_EMPLOYEE_ACCEPTED`, `UPLOAD_PASS`, `MANUAL_OWNER_ACCEPTED`, or
+`FINAL_ACCEPTED`. Its evidence and artifact manifest remain immutable.
 
 ## Verification
 
