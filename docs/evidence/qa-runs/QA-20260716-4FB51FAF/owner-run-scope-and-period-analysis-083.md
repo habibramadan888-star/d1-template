@@ -77,4 +77,87 @@ The five Owner read gateways now accept `qa_run_id` only when all of these are t
 
 ## Live QA verification
 
-Pending deployment of the final QA-only artifact and authenticated read-only verification. The first QA deployment confirmed server filtering `16/16`, Finance oracle parity, Arrears source truth `2 open / AED 150`, and Today Todo `13`; it also supplied the two read-adapter findings above. Owner manual acceptance remains pending and must be performed by the user.
+### Credential and session safety
+
+- The QA Owner temporary password, signing material, and QA account credential were rotated in the QA environment only.
+- The prior QA Owner browser session and prior password were invalidated; the stale session returned a real `401`.
+- No credential value is present in this evidence, Git, screenshots, or command output.
+- Production authentication, accounts, sessions, secrets, and bindings were not accessed or changed.
+
+### Locked QA deployment
+
+- Current QA artifact SHA-256: `f81ecc993782350dec281eaf5a73c54302cefb6d66a218d9b6be6fd33f0bfa70`.
+- Current QA Worker version: `37c4546d-4ae9-44a7-8d58-065ad62fa878` at `100%` QA traffic.
+- Run-reviewed artifact remains immutable: `a49ac3590b25a8567a6bf8362cf7968fdf17f4cabae476218eb437342113b304`.
+- Run state remains `UPLOAD_PASS`; Employee review is accepted and Owner review is pending.
+- This closure performed `0` formal business writes, no upload, no cleanup, no reconciliation, and no manual acceptance action.
+
+### Exact server identity contract
+
+- Expected Entry IDs: `16`.
+- Expected canonical anchors: `16`.
+- Expected Session IDs: `16`.
+- Expected transaction legs: `13`.
+- Expected Period Analysis business rows: `16`.
+- Imported Entry IDs: the exact same `16` expected IDs.
+- Missing Entry IDs: `[]`.
+- Extra Entry IDs: `[]`.
+- Duplicate Entry IDs: `[]`.
+- Duplicate anchor IDs: `[]`.
+- Misgrouped Session IDs: `[]`.
+- Orphan transaction IDs: `[]`.
+- Server set equality: `true`.
+- First divergence function: `client.loadAnalysis`.
+- First divergence field: `analysis_cache_namespace`.
+
+Every row uses importer source `session_detail:structured_entries_json`, duplicate and rendered identity `entry:<Entry ID>`, and import decision `KEEP`. The versioned cache namespace contains the QA Run ID, current artifact SHA, Worker version, data version `649d217eca6be3a407ed4fdb7f52be9edd734263a94dacf593cf968eb7c4f155`, and Run update time `2026-07-16T20:42:15.479Z` before the row identity.
+
+| Entry ID | Session ID | Canonical anchor | Event | Transaction IDs |
+|---|---|---|---|---|
+| `QA-20260716-4FB51FAF-E01` | `QA-20260716-4FB51FAF-S01` | `QA-20260716-4FB51FAF-E01` | rent | `QA-20260716-4FB51FAF-E01` |
+| `QA-20260716-4FB51FAF-E02` | `QA-20260716-4FB51FAF-S02` | `QA-20260716-4FB51FAF-E02` | rent | `QA-20260716-4FB51FAF-E02` |
+| `QA-20260716-4FB51FAF-E03` | `QA-20260716-4FB51FAF-S03` | `QA-20260716-4FB51FAF-E03` | rent | `QA-20260716-4FB51FAF-E03` |
+| `QA-20260716-4FB51FAF-E04` | `QA-20260716-4FB51FAF-S04` | `QA-20260716-4FB51FAF-E04` | arrears_payment | `QA-20260716-4FB51FAF-E04` |
+| `QA-20260716-4FB51FAF-E05` | `QA-20260716-4FB51FAF-S05` | `QA-20260716-4FB51FAF-E05` | arrears_payment | `QA-20260716-4FB51FAF-E05` |
+| `QA-20260716-4FB51FAF-E06` | `QA-20260716-4FB51FAF-S06` | `QA-20260716-4FB51FAF-E06` | deposit_in | `QA-20260716-4FB51FAF-E06` |
+| `QA-20260716-4FB51FAF-E07` | `QA-20260716-4FB51FAF-S07` | `QA-20260716-4FB51FAF-E07` | deposit_in | `QA-20260716-4FB51FAF-E07` |
+| `QA-20260716-4FB51FAF-E08` | `QA-20260716-4FB51FAF-S08` | `QA-20260716-4FB51FAF-E08` | deposit_out | `QA-20260716-4FB51FAF-E08` |
+| `QA-20260716-4FB51FAF-E09` | `QA-20260716-4FB51FAF-S09` | `QA-20260716-4FB51FAF-E09` | deposit_out | `QA-20260716-4FB51FAF-E09` |
+| `QA-20260716-4FB51FAF-E10` | `QA-20260716-4FB51FAF-S10` | `QA-20260716-4FB51FAF-E10` | checkout | `QA-20260716-4FB51FAF-E10` |
+| `QA-20260716-4FB51FAF-E11` | `QA-20260716-4FB51FAF-S11` | `QA-20260716-4FB51FAF-E11` | left_with_arrears | `QA-20260716-4FB51FAF-E11` |
+| `QA-20260716-4FB51FAF-E12` | `QA-20260716-4FB51FAF-S12` | `QA-20260716-4FB51FAF-E12` | expense | `QA-20260716-4FB51FAF-E12` |
+| `QA-20260716-4FB51FAF-E13` | `QA-20260716-4FB51FAF-S13` | `QA-20260716-4FB51FAF-E13` | expense | `QA-20260716-4FB51FAF-E13` |
+| `QA-20260716-4FB51FAF-E14` | `QA-20260716-4FB51FAF-S14` | `0ebecf22-f7e6-416f-88f0-056c9b0f3f40` | bed_transfer | `[]` |
+| `QA-20260716-4FB51FAF-E15` | `QA-20260716-4FB51FAF-S15` | `26aa3304-3adc-4d28-8821-140718295add` | bed_transfer | `[]` |
+| `QA-20260716-4FB51FAF-E16` | `QA-20260716-4FB51FAF-S16` | `f3844436-bd4d-4ff9-8a25-d50139ef54b3` | bed_transfer | `[]` |
+
+### Authenticated mobile Owner verification
+
+A fresh QA Owner context at `390 x 844` loaded the versioned QA asset without relying on a browser cache-clear dialog.
+
+- History: `16/16` business records and `16` Detail actions; no baseline rows.
+- Session Detail: the selected canonical Bed Transfer rendered its structured anchor and Audit Trail with no `Detail Render Mismatch`.
+- Period Analysis: History selector `16`, selected `16/16`, import success `16`, failure `0`, loaded `16/16` Sessions and `16` business transactions.
+- Period Analysis finance: Cash `AED 1,620`, Bank `AED 880`, Total received `AED 2,500`, other expenses `AED 599`, Deposit Out `AED 200`, Cash Net `AED 1,421`, Bank Net `AED 280`, Net Funds `AED 1,701`.
+- Finance projection: Rent `AED 2,130`, Bed Transfer fee `AED 100`, generic arrears repaid `AED 70`.
+- Arrears: exactly two Run records, `AED 70 + AED 80 = AED 150`.
+- Today Todo: exactly `13` Run-derived items.
+- Mobile width: History body `375 <= 390`; Period/Overview body `390 <= 390`; no horizontal overflow.
+- Core Owner pages returned controlled application UI with no `503` or Cloudflare HTML.
+- TTLock external calls: `0`.
+
+Screenshot evidence:
+
+- `screenshots/owner-history-083a.png`
+- `screenshots/owner-detail-083a.png`
+- `screenshots/owner-period-analysis-083a.png`
+
+### Production invariants
+
+- Production version before and after: `84ee2023-f550-47e0-9e4f-3caa161a3431` at `100%`.
+- Production traffic changed: no.
+- Production business data changed: no.
+- Production migration applied: no.
+- Production authentication changed: no.
+
+The correct pause state is `PARTIAL_AWAITING_MANUAL_OWNER_ACCEPTANCE`. Owner manual acceptance remains pending and must be performed by the user. Full, Negative, and Recovery Runs have not started.
