@@ -6349,7 +6349,7 @@ async function handleOwnerTodayTodos(request,env,user){
       qa_run_id:qaScope.run_id||""
     });
     if(qaScope.requested)payload.qa_run_scope=qaAcceptanceOwnerRunScopeMeta(qaScope);
-    return success(payload);
+    return success(payload,200,qaAcceptanceNoStoreHeaders(qaScope));
   }catch(e){
     return json({
       code:ErrorCodes.INTERNAL_SERVER,
@@ -9098,7 +9098,7 @@ async function handleOwnerCloudArrearsProjection(request,env,user){
     readonly:true,
     production_cutover:"PRODUCTION_NO_GO",
     ...(qaScope.requested?{qa_run_scope:qaAcceptanceOwnerRunScopeMeta(qaScope)}:{})
-  }));
+  }),200,qaAcceptanceNoStoreHeaders(qaScope));
 }
 __name(handleOwnerCloudArrearsProjection,"handleOwnerCloudArrearsProjection");
 function ownerCorrectionPreviewMoney(value){
@@ -10839,7 +10839,7 @@ async function handleOwnerFinanceProjection(request,env,user){
   const includeVoided=url.searchParams.get("include_voided")!=="0";
   const projection=await canonicalFinanceProjectionBuild(env,user,range,{include_voided:includeVoided,include_corrections:url.searchParams.get("include_corrections")!=="0",sessions:qaScope.requested?qaScope.sessions:undefined});
   if(qaScope.requested)projection.qa_run_scope=qaAcceptanceOwnerRunScopeMeta(qaScope);
-  return success(projection);
+  return success(projection,200,qaAcceptanceNoStoreHeaders(qaScope));
 }
 __name(handleOwnerFinanceProjection,"handleOwnerFinanceProjection");
 function ownerOverviewDelta(current,comparison){
@@ -11805,6 +11805,11 @@ function qaAcceptanceOwnerRunScopeMeta(scope={}){
   return {
     qa_run_id:String(scope.run_id||scope.run?.qa_run_id||""),
     status:String(scope.run?.status||""),
+    run_artifact_sha256:String(scope.run?.artifact_sha256||""),
+    current_artifact_sha256:String(scope.current_artifact_sha256||""),
+    current_worker_version:String(scope.current_worker_version||""),
+    data_version:String(scope.data_version||""),
+    data_updated_at:String(scope.run?.updated_at||""),
     expected_session_count:Number(scope.session_ids?.size||0),
     actual_session_count:Number(scope.sessions?.length||0),
     entry_id_count:Number(scope.entry_ids?.size||0),
@@ -11814,6 +11819,10 @@ function qaAcceptanceOwnerRunScopeMeta(scope={}){
   };
 }
 __name(qaAcceptanceOwnerRunScopeMeta,"qaAcceptanceOwnerRunScopeMeta");
+function qaAcceptanceNoStoreHeaders(scope={}){
+  return scope.requested?{"Cache-Control":"no-store, no-cache, max-age=0, must-revalidate","Pragma":"no-cache"}:{};
+}
+__name(qaAcceptanceNoStoreHeaders,"qaAcceptanceNoStoreHeaders");
 async function qaAcceptanceOwnerRunScope(request,env,user){
   const url=new URL(request.url);
   const raw=cleanText(url.searchParams.get("qa_run_id")||"",100);
@@ -11844,7 +11853,17 @@ async function qaAcceptanceOwnerRunScope(request,env,user){
   }
   let expected={};
   try{expected=JSON.parse(String(run.expected_json||"{}"))||{};}catch{}
-  return {requested:true,run_id:runId,run,matrix,scenarios,session_ids:sessionIds,entry_ids:entryIds,anchor_ids:anchorIds,sessions,expected};
+  const artifactManifest=env.RATE_LIMIT&&typeof env.RATE_LIMIT.get==="function"
+    ?await env.RATE_LIMIT.get("qa:artifact-manifest","json").catch(()=>null)
+    :null;
+  const currentArtifactSha=String(artifactManifest?.candidate_sha256||"");
+  const currentWorkerVersion=String(env.CF_VERSION_METADATA?.id||env.QA_WORKER_VERSION||"");
+  const dataVersion=await hscSha256(JSON.stringify({
+    qa_run_id:runId,
+    updated_at:String(run.updated_at||""),
+    sessions:sessions.map(row=>({id:String(row.id||""),created_at:String(row.created_at||""),entries_json:String(row.entries_json||"")}))
+  }));
+  return {requested:true,run_id:runId,run,matrix,scenarios,session_ids:sessionIds,entry_ids:entryIds,anchor_ids:anchorIds,sessions,expected,current_artifact_sha256:currentArtifactSha,current_worker_version:currentWorkerVersion,data_version:dataVersion};
 }
 __name(qaAcceptanceOwnerRunScope,"qaAcceptanceOwnerRunScope");
 function qaAcceptanceRequestHostAllowed(request,env={}){
@@ -12905,6 +12924,109 @@ function qaAcceptanceDiagnosticBundle(request,run={}){
   };
 }
 __name(qaAcceptanceDiagnosticBundle,"qaAcceptanceDiagnosticBundle");
+async function qaAcceptanceOwnerPeriodAnalysisDiagnostic(request,env,user,run={}){
+  const scopedUrl=new URL(request.url);
+  scopedUrl.searchParams.set("qa_run_id",String(run.qa_run_id||""));
+  const scope=await qaAcceptanceOwnerRunScope(new Request(scopedUrl.toString(),{headers:request.headers}),env,user);
+  if(scope.response)return scope.response;
+  const sessionIds=[...scope.session_ids];
+  const placeholders=sessionIds.map(()=>"?").join(",");
+  const transactionRows=sessionIds.length&&await empTableExists(env,"transactions")
+    ?(await env.DB.prepare(`SELECT id,session_id,type FROM transactions WHERE corpid=? AND session_id IN (${placeholders}) ORDER BY session_id,id`).bind(user.corpid,...sessionIds).all()).results||[]
+    :[];
+  const transactionsBySession=new Map();
+  for(const row of transactionRows){
+    const sessionId=String(row?.session_id||"");
+    if(!transactionsBySession.has(sessionId))transactionsBySession.set(sessionId,[]);
+    transactionsBySession.get(sessionId).push(String(row?.id||""));
+  }
+  const sessionsById=new Map(scope.sessions.map(row=>[String(row?.id||""),row]));
+  const expectedSessionByEntry=new Map(scope.scenarios.map(row=>[
+    cleanText(row?.entry_id||row?.input?.id||row?.input?.entry_id||"",180),
+    cleanText(row?.session_id||row?.input?.session_id||"",160)
+  ]));
+  const currentArtifact=String(scope.current_artifact_sha256||scope.run?.artifact_sha256||"");
+  const cacheNamespace=[scope.run_id,currentArtifact,String(scope.current_worker_version||""),String(scope.data_version||""),String(scope.run?.updated_at||"")]
+    .map(value=>String(value||"").replace(/[^A-Za-z0-9_.:-]/g,"_"))
+    .join(":");
+  const mapping=scope.scenarios.map(scenario=>{
+    const entryId=cleanText(scenario?.entry_id||scenario?.input?.id||scenario?.input?.entry_id||"",180);
+    const sessionId=cleanText(scenario?.session_id||scenario?.input?.session_id||"",160);
+    const session=sessionsById.get(sessionId)||null;
+    const anchors=session?extractEmployeeEntryAnchorsFromSession(session):[];
+    const matching=anchors.filter(anchor=>cleanText(anchor?.entry_id||anchor?.event_id||anchor?.id||"",180)===entryId);
+    const anchor=matching.length===1?matching[0]:null;
+    const canonicalAnchorId=cleanText(anchor?.transfer_anchor_id||anchor?.anchor_id||anchor?.event_id||anchor?.id||"",180);
+    const eventType=cleanText(scenario?.event_type||scenario?.input?.event_type||anchor?.event_type||anchor?.type||"",80).toLowerCase();
+    const transactionIds=transactionsBySession.get(sessionId)||[];
+    const decision=!session?"REJECT_MISSING_SESSION":matching.length!==1?"REJECT_ENTRY_ANCHOR_CARDINALITY":anchors.length!==1?"REJECT_SESSION_ENTRY_CARDINALITY":"KEEP";
+    const renderedRowIdentity=`entry:${entryId}`;
+    return {
+      entry_id:entryId,
+      session_id:sessionId,
+      anchor_id:canonicalAnchorId,
+      event_type:eventType,
+      transaction_ids:transactionIds,
+      importer_source:"session_detail:structured_entries_json",
+      cache_key:`${cacheNamespace}:${renderedRowIdentity}`,
+      duplicate_key:renderedRowIdentity,
+      import_decision:decision,
+      rendered_row_identity:renderedRowIdentity,
+      actual_entry_array_count:anchors.length
+    };
+  });
+  const expectedEntryIds=[...scope.entry_ids].sort();
+  const importedEntryIds=mapping.filter(row=>row.import_decision==="KEEP").map(row=>row.entry_id).sort();
+  const importedCounts=new Map();
+  for(const id of importedEntryIds)importedCounts.set(id,Number(importedCounts.get(id)||0)+1);
+  const expectedSet=new Set(expectedEntryIds),importedSet=new Set(importedEntryIds);
+  const expectedSessionMap=new Map([...expectedSessionByEntry.entries()]);
+  const missingEntryIds=expectedEntryIds.filter(id=>!importedSet.has(id));
+  const extraEntryIds=importedEntryIds.filter(id=>!expectedSet.has(id));
+  const duplicateEntryIds=[...importedCounts].filter(([,count])=>count>1).map(([id])=>id).sort();
+  const misgroupedSessionIds=mapping.filter(row=>expectedSessionMap.get(row.entry_id)!==row.session_id||row.actual_entry_array_count!==1).map(row=>row.session_id).filter(Boolean).sort();
+  const orphanTransactionIds=transactionRows.filter(row=>!expectedSet.has(String(row?.id||""))||expectedSessionMap.get(String(row?.id||""))!==String(row?.session_id||"")).map(row=>String(row?.id||"")).filter(Boolean).sort();
+  const anchorIds=mapping.map(row=>row.anchor_id).filter(Boolean);
+  const anchorCounts=new Map();for(const id of anchorIds)anchorCounts.set(id,Number(anchorCounts.get(id)||0)+1);
+  const duplicateAnchorIds=[...anchorCounts].filter(([,count])=>count>1).map(([id])=>id).sort();
+  const serverSetEqual=missingEntryIds.length===0&&extraEntryIds.length===0&&duplicateEntryIds.length===0&&misgroupedSessionIds.length===0&&orphanTransactionIds.length===0&&duplicateAnchorIds.length===0&&mapping.length===expectedEntryIds.length;
+  return success({
+    diagnostic_version:"qa-period-analysis-identity-v1",
+    classification:"PERIOD_ANALYSIS_IDENTITY_SET_MISMATCH",
+    qa_run_id:scope.run_id,
+    run_status:String(scope.run?.status||""),
+    cache_contract:{
+      qa_run_id:scope.run_id,
+      run_artifact_sha256:String(scope.run?.artifact_sha256||""),
+      artifact_sha256:currentArtifact,
+      worker_version:String(scope.current_worker_version||""),
+      data_version:String(scope.data_version||""),
+      data_updated_at:String(scope.run?.updated_at||""),
+      namespace:cacheNamespace
+    },
+    expected_entry_id_count:expectedEntryIds.length,
+    expected_canonical_anchor_count:anchorIds.length,
+    expected_session_id_count:scope.session_ids.size,
+    expected_transaction_leg_count:transactionRows.length,
+    expected_period_analysis_business_row_count:expectedEntryIds.length,
+    expected_entry_ids:expectedEntryIds,
+    imported_entry_ids:importedEntryIds,
+    missing_entry_ids:missingEntryIds,
+    extra_entry_ids:extraEntryIds,
+    duplicate_entry_ids:duplicateEntryIds,
+    duplicate_anchor_ids:duplicateAnchorIds,
+    misgrouped_session_ids:misgroupedSessionIds,
+    orphan_transaction_ids:orphanTransactionIds,
+    server_set_equal:serverSetEqual,
+    first_divergence_function:serverSetEqual?"client.loadAnalysis":"server.qaAcceptanceOwnerPeriodAnalysisDiagnostic",
+    first_divergence_field:serverSetEqual?"analysis_cache_namespace":"entry_id",
+    mapping,
+    no_write:true,
+    ttlock_external_calls:0,
+    production_access:false
+  },200,{"Cache-Control":"no-store, no-cache, max-age=0, must-revalidate","Pragma":"no-cache"});
+}
+__name(qaAcceptanceOwnerPeriodAnalysisDiagnostic,"qaAcceptanceOwnerPeriodAnalysisDiagnostic");
 async function handleQaAcceptanceApi(request,env,user){
   const url=new URL(request.url),path=url.pathname,method=request.method;
   const staffDraft=/^\/api\/qa\/acceptance\/runs\/([^/]+)\/employee-draft$/.exec(path);
@@ -12919,7 +13041,7 @@ async function handleQaAcceptanceApi(request,env,user){
     return success({runs:rows.map(row=>qaAcceptancePublicRun(request,row)),binding_identity:"VERIFIED",production_access:false});
   }
   if(path==="/api/qa/acceptance/runs"&&method==="POST")return qaAcceptanceCreateRun(request,env,user);
-  const match=/^\/api\/qa\/acceptance\/runs\/([^/]+)(?:\/(automation|employee-draft|accept-employee|upload-complete|session-resume|accept-owner|reconcile|cleanup|evidence|diagnostics))?$/.exec(path);
+  const match=/^\/api\/qa\/acceptance\/runs\/([^/]+)(?:\/(automation|employee-draft|accept-employee|upload-complete|session-resume|accept-owner|reconcile|cleanup|evidence|diagnostics|period-analysis-diagnostic))?$/.exec(path);
   if(!match)return qaAcceptanceNotFound(true);
   const runId=qaAcceptanceRunId(decodeURIComponent(match[1]||""));if(!runId)return badRequest("QA_RUN_ID_INVALID");
   const run=await qaAcceptanceReadRun(env,user,runId);if(!run)return qaAcceptanceNotFound(true);
@@ -12935,6 +13057,7 @@ async function handleQaAcceptanceApi(request,env,user){
   if(action==="cleanup"&&method==="POST")return qaAcceptanceCleanup(request,env,user,run);
   if(action==="evidence"&&method==="GET")return success({run:qaAcceptancePublicRun(request,run),automation:JSON.parse(run.automation_json||"null"),upload:JSON.parse(run.upload_json||"null"),reconciliation:JSON.parse(run.reconciliation_json||"null"),matrix:JSON.parse(run.matrix_json||"{}"),secrets_included:false});
   if(action==="diagnostics"&&method==="GET")return success(qaAcceptanceDiagnosticBundle(request,run));
+  if(action==="period-analysis-diagnostic"&&method==="GET")return qaAcceptanceOwnerPeriodAnalysisDiagnostic(request,env,user,run);
   return qaAcceptanceNotFound(true);
 }
 __name(handleQaAcceptanceApi,"handleQaAcceptanceApi");
@@ -13598,7 +13721,7 @@ async function handleRequest(request, env, ctx) {
       if(!await empTableExists(env,"sessions")){
         const data=[];
         const transferLineage=requestedBed?projectOwnerHistoryTransferLineage({corpid:user.corpid,requested_bed:requestedBed,archive_entries:[]}):null;
-        return transferLineage||qaScope.requested?json({...ok(data),...(transferLineage?{transfer_lineage:transferLineage}:{}),...(qaScope.requested?{qa_run_scope:qaAcceptanceOwnerRunScopeMeta(qaScope)}:{})}):success(data);
+        return transferLineage||qaScope.requested?json({...ok(data),...(transferLineage?{transfer_lineage:transferLineage}:{}),...(qaScope.requested?{qa_run_scope:qaAcceptanceOwnerRunScopeMeta(qaScope)}:{})},200,qaAcceptanceNoStoreHeaders(qaScope)):success(data);
       }
       const includeVoided = url.searchParams.get("include_voided") === "1";
       const rawLimit = Number(url.searchParams.get("limit") || 0);
@@ -13630,7 +13753,7 @@ async function handleRequest(request, env, ctx) {
           :await ownerHistoryTransferLineageForRequest(env,user,url)
         :null;
       return transferLineage||qaScope.requested
-        ?json({...ok(data),...(transferLineage?{transfer_lineage:transferLineage}:{}),...(qaScope.requested?{qa_run_scope:qaAcceptanceOwnerRunScopeMeta(qaScope)}:{})})
+        ?json({...ok(data),...(transferLineage?{transfer_lineage:transferLineage}:{}),...(qaScope.requested?{qa_run_scope:qaAcceptanceOwnerRunScopeMeta(qaScope)}:{})},200,qaAcceptanceNoStoreHeaders(qaScope))
         :success(data);
     }
     if (path === "/api/session_detail" && method === "GET") {
@@ -13667,13 +13790,13 @@ async function handleRequest(request, env, ctx) {
           if(includeCorrections){
             return ownerHistoryDetailAdditiveResponse(env,user,sessionRow,detailChoice.rows,lineageFields);
           }
-          return json({...ok(detailChoice.rows),...ownerHistoryDetailJsonSafeValue(canonicalOwnerHistoryDetailGatewayFields(sessionRow,detailChoice.rows,null,detailChoice.source)),...ownerHistoryDetailJsonSafeValue(lineageFields),...qaFields});
+          return json({...ok(detailChoice.rows),...ownerHistoryDetailJsonSafeValue(canonicalOwnerHistoryDetailGatewayFields(sessionRow,detailChoice.rows,null,detailChoice.source)),...ownerHistoryDetailJsonSafeValue(lineageFields),...qaFields},200,qaAcceptanceNoStoreHeaders(qaScope));
         }
       }
       if(includeCorrections&&sessionRow){
         return ownerHistoryDetailAdditiveResponse(env,user,sessionRow,results,lineageFields);
       }
-      return json({...ok(results),...ownerHistoryDetailJsonSafeValue(sessionRow?canonicalOwnerHistoryDetailGatewayFields(sessionRow,results,null,"transactions"): {archive_gateway:{ok:false,gateway:"canonical_owner_history_archive_gateway",archive_state:"missing",source_proof:{gateway:"canonical_owner_history_archive_gateway",source_layer:"L1 Canonical Event Archive"}}}),...ownerHistoryDetailJsonSafeValue(lineageFields),...qaFields});
+      return json({...ok(results),...ownerHistoryDetailJsonSafeValue(sessionRow?canonicalOwnerHistoryDetailGatewayFields(sessionRow,results,null,"transactions"): {archive_gateway:{ok:false,gateway:"canonical_owner_history_archive_gateway",archive_state:"missing",source_proof:{gateway:"canonical_owner_history_archive_gateway",source_layer:"L1 Canonical Event Archive"}}}),...ownerHistoryDetailJsonSafeValue(lineageFields),...qaFields},200,qaAcceptanceNoStoreHeaders(qaScope));
     }
     return errorResponse("not_found", 404, "not_found");
   }

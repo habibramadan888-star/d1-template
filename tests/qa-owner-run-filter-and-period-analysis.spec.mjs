@@ -60,18 +60,23 @@ test("all sixteen Quick identities survive a first Period Analysis import", () =
 
 test("Run analysis cache rejects stale parsed rows and retains canonical Entry-linked rows", () => {
   const block = functionBlock(ownerSource, "qaRunAnalysisSessionIntegrity");
-  const context = { ownerQaRunId: () => "QA-20260716-4FB51FAF" };
+  const runId = "QA-20260716-4FB51FAF";
+  const mapping = [
+    { entry_id: `${runId}-E01`, session_id: `${runId}-S01`, anchor_id: `${runId}-E01` },
+    { entry_id: `${runId}-E14`, session_id: `${runId}-S14`, anchor_id: "canonical-transfer-anchor" },
+  ];
+  const context = { ownerQaRunId: () => runId, _qaRunAnalysisContract: { qa_run_id: runId, mapping } };
   vm.createContext(context);
   vm.runInContext(block, context);
   const check = context.qaRunAnalysisSessionIntegrity;
   assert.equal(check({qa_run_id:"QA-20260716-4FB51FAF",anchorId:"QA-20260716-4FB51FAF-E01",entries:[{id:"legacy-random-id"}]}), false);
   assert.equal(check({id:"QA-20260716-4FB51FAF-S01",anchorId:"QA-20260716-4FB51FAF-E01",entries:[{id:"legacy-random-id"}]}), false);
   assert.equal(check({anchorId:"QA-20260716-4FB51FAF-E01",entries:[{id:"legacy-random-id"}]}), false);
-  assert.equal(check({anchorId:"QA-20260716-4FB51FAF-E01",entries:[{entry_id:"QA-20260716-4FB51FAF-E01"}]}), true);
+  assert.equal(check({id:`${runId}-S01`,qa_run_id:runId,anchorId:`${runId}-E01`,entries:[{entry_id:`${runId}-E01`,anchor_id:`${runId}-E01`}]}), true);
   assert.equal(check({anchorId:"QA-20260716-4FB51FAF-E01",entries:[{entry_id:"QA-20260716-4FB51FAF-E01"},{id:"legacy-summary-entry"}]}), false);
-  assert.equal(check({anchorId:"QA-20260716-4FB51FAF-E01",entriesCount:2,entries:[{entry_id:"QA-20260716-4FB51FAF-E01"}]}), false);
-  assert.equal(check({qa_run_id:"QA-20260716-4FB51FAF",anchorId:"QA-20260716-4FB51FAF-E01",entries:[{entry_id:"QA-20260716-4FB51FAF-E01"}]}), true);
-  assert.equal(check({qa_run_id:"QA-20260716-4FB51FAF",anchorId:"canonical-transfer-anchor",entries:[{entry_id:"QA-20260716-4FB51FAF-E14"}]}), true);
+  assert.equal(check({id:`${runId}-S01`,qa_run_id:runId,entriesCount:99,entries:[{entry_id:`${runId}-E01`,anchor_id:`${runId}-E01`}]}), true);
+  assert.equal(check({id:`${runId}-S14`,qa_run_id:runId,anchorId:"canonical-transfer-anchor",entries:[{entry_id:`${runId}-E14`,canonical_anchor_id:"canonical-transfer-anchor"}]}), true);
+  assert.equal(check({id:`${runId}-S14`,qa_run_id:runId,anchorId:"canonical-transfer-anchor",entries:[{entry_id:`${runId}-E14`,canonical_anchor_id:"wrong-anchor"}]}), false);
 });
 
 test("Quick Period Analysis cash and bank nets match the shared Finance oracle", () => {
@@ -91,8 +96,13 @@ test("Quick Period Analysis cash and bank nets match the shared Finance oracle",
 });
 
 test("QA Period Analysis uses Run-namespaced storage and performs no cloud sync write", () => {
-  assert.match(ownerSource, /analysis:index:\$\{runId\}/);
-  assert.match(ownerSource, /anchor:\$\{runId\}:\$\{identity\}/);
+  const namespace = functionBlock(ownerSource, "qaRunAnalysisCacheNamespace");
+  for (const field of ["qa_run_id", "artifact_sha256", "worker_version", "data_version", "data_updated_at"]) assert.match(namespace, new RegExp(field));
+  assert.match(ownerSource, /analysis:index:\$\{namespace\|\|/);
+  assert.match(ownerSource, /anchor:\$\{namespace\|\|/);
+  assert.match(functionBlock(ownerSource, "loadQaRunAnalysisContract"), /period-analysis-diagnostic/);
+  assert.match(functionBlock(ownerSource, "ownerHydrateHistoryForClientCredit"), /state\.analysisSessions=\[\]/);
+  assert.match(functionBlock(ownerSource, "ownerHydrateHistoryForClientCredit"), /QA_PERIOD_ANALYSIS_IDENTITY_SET_MISMATCH/);
   const sync = functionBlock(ownerSource, "syncImportedSessionsToCloud");
   assert.match(sync, /if\(ownerQaRunId\(\)\)return\{ok:0,fail:0,errors:\[\],readonly:true/);
   assert.ok(sync.indexOf("ownerQaRunId()") < sync.indexOf("/api/save_session"));
@@ -121,7 +131,7 @@ test("Owner five-page calls carry the current QA Run while normal URLs stay unch
   ]) assert.match(ownerSource, new RegExp(`ownerRunScopedApi\\([^\\n]*${route.replaceAll("/", "\\/")}`));
   assert.match(ownerSource, /const limit=ownerQaRunId\(\)\?100:/);
   assert.match(ownerSource, /source:ownerQaRunId\(\)\?'employee_entry'/);
-  assert.match(ownerHtml, /index-51-main\.js\?v=qa-owner-run-filter-083-final-integrity/);
+  assert.match(ownerHtml, /index-51-main\.js\?v=qa-owner-period-identity-083a/);
 });
 
 test("server Run scope is QA-host gated and built from persisted matrix Session and Entry IDs", () => {
@@ -159,7 +169,8 @@ test("server Run scope resolves only persisted sessions from the requested accep
     forbidden: () => ({ status: 403 }),
     json: (body, status) => ({ body, status }),
     extractEmployeeEntryAnchorsFromSession: session => JSON.parse(session.entries_json).entries,
-    env: { DB: { prepare: () => ({ bind: () => ({ all: async () => ({ results: sessions }) }) }) } },
+    hscSha256: async () => "data-version",
+    env: { CF_VERSION_METADATA: { id: "worker-version" }, RATE_LIMIT: { get: async () => ({ candidate_sha256: "b".repeat(64) }) }, DB: { prepare: () => ({ bind: () => ({ all: async () => ({ results: sessions }) }) }) } },
     user: { corpid: "HL-QA", role: "manager" },
   };
   vm.createContext(context);
@@ -174,6 +185,47 @@ test("server Run scope resolves only persisted sessions from the requested accep
   context.qaAcceptanceEnabled = () => false;
   const production = await vm.runInContext("qaAcceptanceOwnerRunScope", context)({ url: `https://homelink-finance.example/owner?qa_run_id=${runId}` }, context.env, context.user);
   assert.equal(production.response.status, 404);
+});
+
+test("server diagnostic maps exact Entry Session anchor and transaction identities without count forcing", async () => {
+  const runId = "QA-20260716-4FB51FAF";
+  const scenarios = [
+    { entry_id: `${runId}-E01`, session_id: `${runId}-S01`, event_type: "rent" },
+    { entry_id: `${runId}-E02`, session_id: `${runId}-S02`, event_type: "bed_transfer" },
+  ];
+  const sessions = scenarios.map((row, index) => ({ id: row.session_id, entries_json: JSON.stringify({ entries: [{ id: row.entry_id, event_id: row.entry_id, anchor_id: index ? "transfer-anchor" : row.entry_id }] }) }));
+  const scope = {
+    requested: true, run_id: runId,
+    run: { qa_run_id: runId, status: "UPLOAD_PASS", artifact_sha256: "a".repeat(64), updated_at: "2026-07-16T20:42:15.479Z" },
+    scenarios, sessions, session_ids: new Set(scenarios.map(row => row.session_id)), entry_ids: new Set(scenarios.map(row => row.entry_id)),
+    current_artifact_sha256: "b".repeat(64), current_worker_version: "worker-v", data_version: "data-v",
+  };
+  const transactions = [{ id: `${runId}-E01`, session_id: `${runId}-S01`, type: "R" }];
+  const context = {
+    URL, Request,
+    qaAcceptanceOwnerRunScope: async () => scope,
+    empTableExists: async () => true,
+    cleanText: value => String(value || "").trim(),
+    extractEmployeeEntryAnchorsFromSession: session => JSON.parse(session.entries_json).entries,
+    success: data => data,
+    env: { DB: { prepare: () => ({ bind: () => ({ all: async () => ({ results: transactions }) }) }) } },
+    user: { corpid: "HL-QA" },
+  };
+  vm.createContext(context);
+  vm.runInContext(functionBlock(workerSource, "qaAcceptanceOwnerPeriodAnalysisDiagnostic"), context);
+  const diagnostic = await context.qaAcceptanceOwnerPeriodAnalysisDiagnostic(new Request(`https://homelink-finance-qa.example/api/qa/acceptance/runs/${runId}/period-analysis-diagnostic`), context.env, context.user, scope.run);
+  assert.equal(diagnostic.server_set_equal, true);
+  assert.equal(diagnostic.expected_entry_id_count, 2);
+  assert.equal(diagnostic.expected_canonical_anchor_count, 2);
+  assert.equal(diagnostic.expected_session_id_count, 2);
+  assert.equal(diagnostic.expected_transaction_leg_count, 1);
+  assert.equal(diagnostic.expected_period_analysis_business_row_count, 2);
+  const plain = value => JSON.parse(JSON.stringify(value));
+  assert.deepEqual(plain(diagnostic.missing_entry_ids), []);
+  assert.deepEqual(plain(diagnostic.extra_entry_ids), []);
+  assert.deepEqual(plain(diagnostic.duplicate_entry_ids), []);
+  assert.deepEqual(plain(diagnostic.orphan_transaction_ids), []);
+  assert.deepEqual(plain(diagnostic.mapping.map(row => row.duplicate_key)), scenarios.map(row => `entry:${row.entry_id}`));
 });
 
 test("History Detail Finance Arrears and Todo enforce the shared server Run scope", () => {
@@ -206,4 +258,5 @@ test("QA Owner Run HTML uses versioned no-store asset fetch without changing nor
   assert.match(block, /qa_asset_version=/);
   assert.match(block, /if \(qaOwnerRunAsset\)/);
   assert.match(block, /no-store, no-cache, max-age=0, must-revalidate/);
+  assert.match(functionBlock(workerSource, "qaAcceptanceNoStoreHeaders"), /no-store, no-cache, max-age=0, must-revalidate/);
 });

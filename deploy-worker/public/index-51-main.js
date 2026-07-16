@@ -57,6 +57,27 @@ function ownerRunScopedApi(url){
   target.searchParams.set('qa_run_id',runId);
   return `${target.pathname}${target.search}${target.hash}`;
 }
+let _qaRunAnalysisContract=null;
+function qaRunAnalysisCacheNamespace(){
+  const runId=ownerQaRunId();
+  const contract=_qaRunAnalysisContract?.cache_contract||{};
+  if(!runId||String(contract.qa_run_id||'')!==runId)return'';
+  return [runId,contract.artifact_sha256,contract.worker_version,contract.data_version,contract.data_updated_at]
+    .map(value=>String(value||'').replace(/[^A-Za-z0-9_.:-]/g,'_'))
+    .join(':');
+}
+async function loadQaRunAnalysisContract(){
+  const runId=ownerQaRunId();
+  if(!runId){_qaRunAnalysisContract=null;return null;}
+  const response=await apiFetch(`/api/qa/acceptance/runs/${encodeURIComponent(runId)}/period-analysis-diagnostic`);
+  if(!response.ok)throw new Error(`QA_PERIOD_ANALYSIS_CONTRACT_HTTP_${response.status}`);
+  const contract=await response.json();
+  if(String(contract?.qa_run_id||'')!==runId||contract?.server_set_equal!==true)throw new Error('QA_PERIOD_ANALYSIS_CONTRACT_MISMATCH');
+  const expected=Array.isArray(contract.expected_entry_ids)?contract.expected_entry_ids:[];
+  if(!expected.length||expected.length!==Number(contract.expected_period_analysis_business_row_count||0))throw new Error('QA_PERIOD_ANALYSIS_EXPECTED_SET_INVALID');
+  _qaRunAnalysisContract=contract;
+  return contract;
+}
 async function apiFetch(url, opts = {}) {
   const headers={ 'Content-Type':'application/json', ...(opts.headers||{}) };
   const token=LS.get('homelink:cloud_token');
@@ -913,11 +934,14 @@ function toast(msg,type='ok'){
 
 /* ── PERSISTENCE ── */
 function saveCur(){LS.set('current-session',JSON.stringify(state.session));}
-function analysisIndexStorageKey(){const runId=ownerQaRunId();return runId?`analysis:index:${runId}`:'analysis:index';}
+function analysisIndexStorageKey(){
+  const runId=ownerQaRunId(),namespace=qaRunAnalysisCacheNamespace();
+  return runId?`analysis:index:${namespace||`${runId}:unverified`}`:'analysis:index';
+}
 function analysisSessionStorageKey(session={}){
-  const runId=ownerQaRunId();
+  const runId=ownerQaRunId(),namespace=qaRunAnalysisCacheNamespace();
   const identity=ledgerSessionIdentity(session).replace(/[^A-Za-z0-9_.:-]/g,'_');
-  return runId?`anchor:${runId}:${identity}`:`anchor:${session.anchorId||identity}`;
+  return runId?`anchor:${namespace||`${runId}:unverified`}:${identity}`:`anchor:${session.anchorId||identity}`;
 }
 function saveAnalysis(){
   state.analysisSessions=normalizeLedgerSessions(state.analysisSessions);
@@ -958,6 +982,7 @@ function rmAnalysis(anchorId){
 async function loadAll(){
   try{const cur=LS.get('current-session');if(cur){const p=JSON.parse(cur);if(p&&Array.isArray(p.entries))state.session=p;}}catch{}
   try{const keys=LS.keys('session:');const arr=[];for(const k of keys){try{const r=LS.get(k);if(r)arr.push(JSON.parse(r));}catch{}}arr.sort((a,b)=>(b.date||'').localeCompare(a.date||''));state.saved=arr;}catch{}
+  if(isOwnerShellRole()&&ownerQaRunId())await loadQaRunAnalysisContract();
   state.analysisSessions=isOwnerShellRole()?loadAnalysis():[];
   // Load customers from authenticated cloud storage first; keep sessionStorage only as a short-lived fallback.
   state.customers=[];
@@ -6056,16 +6081,19 @@ function ledgerSessionIdentity(s={}){
 
 function qaRunAnalysisSessionIntegrity(s={}){
   const runId=ownerQaRunId();
+  if(!runId)return true;
+  const mapping=Array.isArray(_qaRunAnalysisContract?.mapping)?_qaRunAnalysisContract.mapping:[];
+  if(!_qaRunAnalysisContract||String(_qaRunAnalysisContract.qa_run_id||'')!==runId||!mapping.length)return false;
   const explicitRun=String(s?.qa_run_id||'').trim().toUpperCase();
   const sessionId=String(s?.id||s?.session_id||'').trim().toUpperCase();
-  const declared=String(s?.entryId||s?.entry_id||s?.canonicalAnchorId||s?.canonical_anchor_id||s?.anchorId||s?.anchor_id||'').trim().toUpperCase();
-  const belongsToRun=explicitRun===runId||sessionId.startsWith(`${runId}-S`)||declared.startsWith(`${runId}-E`);
-  if(!runId||!belongsToRun)return true;
   const entries=Array.isArray(s?.entries)?s.entries:[];
-  const declaredCount=Number(s?.entriesCount||s?.entries_count||entries.length||0);
-  const entryIds=entries.map(row=>String(row?.entry_id||row?.id||row?.event_id||'').trim().toUpperCase()).filter(id=>id.startsWith(`${runId}-E`));
-  if(declared.startsWith(`${runId}-E`))return declaredCount===1&&entries.length===1&&entryIds.length===1&&entryIds[0]===declared;
-  return declaredCount===1&&entries.length===1&&entryIds.length===1;
+  if(entries.length!==1)return false;
+  const entry=entries[0];
+  const entryId=String(entry?.entry_id||entry?.event_id||entry?.id||'').trim().toUpperCase();
+  const expected=mapping.find(row=>String(row?.entry_id||'').trim().toUpperCase()===entryId);
+  if(!expected||explicitRun!==runId||sessionId!==String(expected.session_id||'').trim().toUpperCase())return false;
+  const canonicalAnchor=String(entry?.transfer_anchor_id||entry?.canonical_anchor_id||entry?.anchor_id||entry?.event_id||entry?.id||'').trim().toUpperCase();
+  return canonicalAnchor===String(expected.anchor_id||'').trim().toUpperCase();
 }
 
 function isDuplicate(s){
@@ -6855,6 +6883,15 @@ function ownerCoreDataStatusLabel(){
 }
 async function ownerHydrateHistoryForClientCredit(force=false){
   _ownerCoreReadDataStatus.history='loading';
+  const qaRunId=ownerQaRunId();
+  const qaMapping=Array.isArray(_qaRunAnalysisContract?.mapping)?_qaRunAnalysisContract.mapping:[];
+  if(qaRunId){
+    if(!_qaRunAnalysisContract||String(_qaRunAnalysisContract.qa_run_id||'')!==qaRunId||!qaMapping.length)throw new Error('QA_PERIOD_ANALYSIS_CONTRACT_UNAVAILABLE');
+    // A QA Run is an immutable server-filtered review set. Never append a
+    // previous browser cache to it; rebuild the client projection from the
+    // exact structured History rows on every hydration.
+    state.analysisSessions=[];
+  }
   const oldLimit=state.historyLimit;
   if(force||Number(state.historyLimit||0)<OWNER_CORE_HISTORY_AUTOLOAD_LIMIT)state.historyLimit=OWNER_CORE_HISTORY_AUTOLOAD_LIMIT;
   try{await updateHistCount();}
@@ -6872,8 +6909,12 @@ async function ownerHydrateHistoryForClientCredit(force=false){
         id:cs.id,
         date:cs.date||'',
         anchorId:cs.anchorId||cs.anchor_id||mkAnchor(cs.id,(cs.date||'').slice(0,10)),
+        canonicalAnchorId:cs.canonicalAnchorId||cs.canonical_anchor_id||'',
+        entryId:cs.entryId||cs.entry_id||'',
         entries,
-        export_text:ledgerSessionRawText(normalized)
+        export_text:ledgerSessionRawText(normalized),
+        source:qaRunId?'employee_entry':normalized.source,
+        qa_run_id:qaRunId||cs.qa_run_id||''
       });
       if(session.entries&&session.entries.length&&!isDuplicate(session)){
         state.analysisSessions.push(session);
@@ -6884,7 +6925,15 @@ async function ownerHydrateHistoryForClientCredit(force=false){
       _ownerCoreReadDataStatus.errors.push(`history:${cs?.id||cs?.anchorId||'unknown'}`);
     }
   }
-  if(added)saveAnalysis();
+  if(qaRunId){
+    const actualIds=state.analysisSessions.flatMap(session=>(session.entries||[]).map(entry=>String(entry?.entry_id||entry?.event_id||entry?.id||'').trim().toUpperCase())).filter(Boolean);
+    const expectedIds=(Array.isArray(_qaRunAnalysisContract.expected_entry_ids)?_qaRunAnalysisContract.expected_entry_ids:[]).map(id=>String(id||'').trim().toUpperCase()).sort();
+    const uniqueActual=[...new Set(actualIds)].sort();
+    const exact=actualIds.length===expectedIds.length&&uniqueActual.length===expectedIds.length&&JSON.stringify(uniqueActual)===JSON.stringify(expectedIds);
+    window.__qaPeriodAnalysisIdentitySummary={qa_run_id:qaRunId,expected_entry_ids:expectedIds,actual_entry_ids:uniqueActual,missing_entry_ids:expectedIds.filter(id=>!uniqueActual.includes(id)),extra_entry_ids:uniqueActual.filter(id=>!expectedIds.includes(id)),duplicate_entry_ids:[...new Set(actualIds.filter((id,index)=>actualIds.indexOf(id)!==index))],session_count:state.analysisSessions.length,transaction_leg_count:state.analysisSessions.reduce((sum,session)=>sum+(session.entries||[]).length,0),exact};
+    if(!exact)throw new Error('QA_PERIOD_ANALYSIS_IDENTITY_SET_MISMATCH');
+    saveAnalysis();
+  }else if(added)saveAnalysis();
   _ownerCoreReadDataStatus.history=rc_allLedgerSessions().length?'ready':'missing';
   return added;
 }
