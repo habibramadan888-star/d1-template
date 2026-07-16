@@ -9101,7 +9101,8 @@ async function employeeLoadQaAcceptanceRun(){
   if(!runId||!state.user)return;
   try{
     const response=await apiFetch(`/api/qa/acceptance/runs/${encodeURIComponent(runId)}/employee-draft`);
-    const data=await response.json();
+    const raw=await response.json();
+    const data=raw?.data&&typeof raw.data==='object'?raw.data:raw;
     if(!response.ok||data?.success===false)throw new Error(data?.error_code||`HTTP_${response.status}`);
     const entries=Array.isArray(data.entries)?data.entries:[];
     if(entries.length!==Number(data.employee_record_count||0))throw new Error('QA_EMPLOYEE_COUNT_MISMATCH');
@@ -9122,7 +9123,8 @@ async function employeeLoadQaAcceptanceRun(){
 async function employeeQaAcceptanceReportUpload(uploadList=[]){
   const runId=state.qaAcceptance?.runId;if(!runId)return;
   const response=await apiFetch(`/api/qa/acceptance/runs/${encodeURIComponent(runId)}/upload-complete`,{method:'POST',body:JSON.stringify({entry_ids:uploadList.map(employeeEntryStableIdentity)})});
-  const data=await response.json().catch(()=>({}));
+  const raw=await response.json().catch(()=>({}));
+  const data=raw?.data&&typeof raw.data==='object'?raw.data:raw;
   if(!response.ok||data?.success===false)throw new Error(data?.error_code||'QA_UPLOAD_CONFIRMATION_FAILED');
   state.qaAcceptance.status='UPLOAD_PASS';
 }

@@ -29,6 +29,14 @@ test("QA bootstrap is rerunnable and scopes archive columns to the dedicated QA 
   assert.match(migration, /CREATE TABLE IF NOT EXISTS qa_acceptance_runs/);
 });
 
+test("QA credential setup rotates secrets and seeds only the QA Employee authentication table", async () => {
+  const setup = await read("scripts/set-qa-acceptance-secrets.mjs");
+  assert.match(setup, /const qaD1 = "homelink-finance-qa"/);
+  assert.match(setup, /INSERT OR REPLACE INTO employee_users/);
+  assert.match(setup, /seedQaEmployee\(hash\(staffPassword\)\)/);
+  assert.doesNotMatch(setup, /homelink-finance(?:['"]|\s)/);
+});
+
 test("QA page and every QA API are server gated by environment host company role and binding identity", async () => {
   const worker = await read("deploy-worker/src/index.js");
   const gateStart = worker.indexOf("async function qaAcceptanceGate");
@@ -92,6 +100,7 @@ test("Employee QA loader uses the formal page and never auto-clicks Upload Sessi
   assert.match(worker, /auto_upload:false/);
   assert.match(employee, /Review and Preview only; upload is not automatic/);
   assert.match(employee, /employeeQaAcceptanceReportUpload/);
+  assert.match(employee, /raw\?\.data&&typeof raw\.data==='object'\?raw\.data:raw/);
   const loader = employee.slice(employee.indexOf("async function employeeLoadQaAcceptanceRun"), employee.indexOf("async function employeeQaAcceptanceReportUpload"));
   assert.doesNotMatch(loader, /commitSessionAndExport\(|btnExportSession\.click|\/api\/employee\/entry['"]/);
 });
