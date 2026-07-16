@@ -1,0 +1,25 @@
+# QA Acceptance QA-20260716-B9CA9E42
+
+- Mode: quick
+- Status: AUTOMATION_PASS
+- QA Run status: AUTOMATION_PASS
+- Real Employee Validate Session: HTTP 200, 16/16 passed
+- Employee manual acceptance: pending
+- Browser A: Server/Memory/QA storage/Header/Sticky/DOM = 16/16/16/16/16/16
+- Browser B: 16/16 passed after first load and three consecutive reloads
+- Unmatched results: 0
+- Duplicate Entry IDs: 0
+- Record #5 legacy manual arrears: passed with immutable Run Session and Entry ID ref
+- Record #11 Left With Arrears: passed with `note` and AED 80
+- Artifact: `19bb6cac992367d5be0032622e52914d18487c0adef7f0c897f1d48e8c0173ec`
+- QA Worker deployment: `8c486be6-d976-40ce-96c6-aebd64f0e656`
+- Payload hash: `a20260f16501138882bc7c61b09ef1e4668e32359c55b1736755bebe4193574d`
+- TTLock external calls: 0
+- Financial oracle: PASS (Cash 1620, Bank 880, Total 2500, Expenses 799, Net 1701, Cash Net 1421, Bank Net 280, Outstanding 150, Arrears Opened 150, Arrears Repaid 70, Deposit 200, Transfer 100, Rent 2130)
+- Screenshots: `employee-validated-ledger.png`, `employee-second-browser.png`
+- Upload: not executed
+- Owner manual acceptance: pending
+- Final reconciliation: pending
+- Formal write count: 0
+- Accept Employee Review: not clicked
+- Production business data changed: no

@@ -1,0 +1,23 @@
+{
+  "qa_run_id": "QA-20260716-B9CA9E42",
+  "mode": "quick",
+  "status": "AUTOMATION_PASS",
+  "artifact_sha256": "19bb6cac992367d5be0032622e52914d18487c0adef7f0c897f1d48e8c0173ec",
+  "artifact_commit": "e971cb28180b143d8283db4c5045540b8dee7107",
+  "qa_worker_version": "19bb6cac9923",
+  "scenario_count": 16,
+  "employee_record_count": 16,
+  "payload_hash": "a20260f16501138882bc7c61b09ef1e4668e32359c55b1736755bebe4193574d",
+  "qa_worker_deployment": "8c486be6-d976-40ce-96c6-aebd64f0e656",
+  "created_at": "2026-07-16T14:51:16.141Z",
+  "aggregate_http_status": 200,
+  "validation_result_count": 16,
+  "validation_passed_count": 16,
+  "validation_failed_count": 0,
+  "unmatched_result_count": 0,
+  "duplicate_entry_id_count": 0,
+  "ttlock_external_calls": 0,
+  "formal_write_count": 0,
+  "manual_employee_status": "PENDING",
+  "production_business_data_changed": false
+}
