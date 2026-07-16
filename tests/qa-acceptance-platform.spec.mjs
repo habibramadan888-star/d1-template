@@ -54,11 +54,11 @@ test("QA page and every QA API are server gated by environment host company role
 
 test("QA run state machine preserves both human gates and formal upload verification", async () => {
   const worker = await read("deploy-worker/src/index.js");
-  for (const state of ["AUTOMATION_PASS", "MANUAL_EMPLOYEE_ACCEPTED", "UPLOAD_PASS", "MANUAL_OWNER_ACCEPTED", "FINAL_ACCEPTED"]) assert.match(worker, new RegExp(state));
+  for (const state of ["DRAFT_READY", "AUTOMATION_FAILED", "AUTOMATION_PASS", "MANUAL_EMPLOYEE_ACCEPTED", "UPLOAD_PASS", "MANUAL_OWNER_ACCEPTED", "FINAL_ACCEPTED"]) assert.match(worker, new RegExp(state));
   assert.match(worker, /QA_UPLOAD_PERSISTENCE_MISMATCH/);
   assert.match(worker, /parseEmployeeEntryAnchorJson/);
   assert.match(worker, /canonicalFinanceProjectionBuild/);
-  assert.match(worker, /status='AUTOMATION_PASS'/);
+  assert.match(worker, /nextStatus=failed===0&&automation\.aggregate_http_status===200\?"AUTOMATION_PASS":"AUTOMATION_FAILED"/);
   assert.match(worker, /status='MANUAL_EMPLOYEE_ACCEPTED'/);
   assert.match(worker, /status='MANUAL_OWNER_ACCEPTED'/);
 });
@@ -104,7 +104,8 @@ test("Employee QA loader uses the formal page and never auto-clicks Upload Sessi
   assert.match(employee, /session_id:sessionIds\[id\]\|\|entry\.session_id\|\|''/);
   assert.match(employee, /payment==='bank'\|\|payment==='b'\?'B'/);
   assert.match(employee, /entry\.fee_mode\|\|''\)\.toLowerCase\(\)==='paid'\?Number\(entry\.fee_amount_aed\|\|0\):0/);
-  assert.match(employee, /data\.status==='AUTOMATION_PASS'\?'VALIDATION_PASSED'/);
+  assert.match(employee, /reusablePass=data\.status==='AUTOMATION_PASS'&&validationAttestation&&attested\?\.ok===true/);
+  assert.match(employee, /data\.status==='DRAFT_READY'\?'PENDING_VALIDATION':'NEEDS_REVALIDATION'/);
   const loader = employee.slice(employee.indexOf("async function employeeLoadQaAcceptanceRun"), employee.indexOf("async function employeeQaAcceptanceReportUpload"));
   assert.doesNotMatch(loader, /commitSessionAndExport\(|btnExportSession\.click|\/api\/employee\/entry['"]/);
 });

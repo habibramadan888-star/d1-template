@@ -1,7 +1,7 @@
 {
   "qa_run_id": "QA-20260716-2830578C",
   "mode": "quick",
-  "status": "AUTOMATION_PASS",
+  "status": "AUTOMATION_FAILED",
   "artifact_sha256": "d1e68b40f95728f6dce9078d3c1b4f1f1f99ce18c4180ad703c6c01aa54ac91d",
   "artifact_commit": "948544aa23de3c7ef7f42cfeee3326327ec46b30",
   "qa_worker_version": "d1e68b40f957",
@@ -11,6 +11,24 @@
   "created_at": "2026-07-16T13:10:30.836Z",
   "production_business_data_changed": false,
   "formal_write_count": 0,
-  "manual_employee_status": "PENDING",
-  "cross_browser_delivery": "PASS"
+  "manual_employee_status": "REJECTED_WITH_FINDINGS",
+  "cross_browser_delivery": "PASS",
+  "real_browser_validation": {
+    "passed_count": 14,
+    "failed_count": 2,
+    "formal_write_count": 0,
+    "failures": [
+      {
+        "record": 5,
+        "error_code": "LEGACY_ARREARS_CANONICAL_REF_INVALID"
+      },
+      {
+        "record": 11,
+        "error_code": "LEFT_WITH_ARREARS_REQUIRED_FIELDS_MISSING",
+        "missing_fields": [
+          "note"
+        ]
+      }
+    ]
+  }
 }

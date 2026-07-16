@@ -84,7 +84,7 @@ test("server delivery response is accepted only with active matching artifact ID
   const sessions = Object.fromEntries(entries.map((entry, index) => [entry.id, `${runId}-S${String(index + 1).padStart(2, "0")}`]));
   const oracle = Object.fromEntries(["cash_received","bank_received","total_received","total_expenses","net_funds","cash_net","bank_net","outstanding","arrears_opened","arrears_repaid","deposit_included","bed_transfer_fee","rent_income"].map(key => [key, 0]));
   const artifact = "a".repeat(64);
-  const valid = { qa_run_id: runId, status: "AUTOMATION_PASS", cleanup_status: "NOT_RUN", delivery_contract: "SERVER_PERSISTED_QA_RUN_V1", artifact_sha256: artifact, current_artifact_sha256: artifact, scenario_count: 16, employee_record_count: 16, entries, session_ids_by_entry: sessions, expected_finance: oracle };
+  const valid = { qa_run_id: runId, status: "DRAFT_READY", cleanup_status: "NOT_RUN", delivery_contract: "SERVER_PERSISTED_QA_RUN_V1", artifact_sha256: artifact, current_artifact_sha256: artifact, qa_worker_version: "qa-worker-v2", matrix_version: "employee-qa-matrix-v2", payload_hash: "b".repeat(64), scenario_count: 16, employee_record_count: 16, entries, session_ids_by_entry: sessions, expected_finance: oracle };
   assert.equal(vm.runInContext("employeeQaAcceptanceDeliveryContract", context)(valid, runId).expected, 16);
   assert.throws(() => vm.runInContext("employeeQaAcceptanceDeliveryContract", context)({ ...valid, current_artifact_sha256: "b".repeat(64) }, runId), /QA_ARTIFACT_MISMATCH/);
   assert.throws(() => vm.runInContext("employeeQaAcceptanceDeliveryContract", context)({ ...valid, entries: [...entries.slice(0, 15), entries[0]] }, runId), /QA_ENTRY_ID_CONTRACT_INVALID/);
@@ -110,6 +110,8 @@ test("cross-browser loader always fetches server state and never falls back to p
   assert.match(worker, /QA_RUN_SESSION_ID_INVALID/);
   assert.match(worker, /QA_RUN_FINANCIAL_ORACLE_MISSING/);
   assert.match(worker, /formal_write_count:0/);
+  assert.match(loader, /upload_status:uploadStatus/);
+  assert.doesNotMatch(loader, /upload_status:'VALIDATION_PASSED'/);
 });
 
 test("old failed handoff remains preserved and cannot be mistaken for acceptance", async () => {

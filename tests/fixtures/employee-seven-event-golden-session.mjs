@@ -115,7 +115,7 @@ export const EMPLOYEE_SEVEN_EVENT_GOLDEN_SCENARIOS = Object.freeze([
     event_type: "left_with_arrears",
     session_id: "GOLDEN-S11-LEFT-WITH-ARREARS",
     entry_id: "GOLDEN-E11",
-    input: { id: "GOLDEN-E11", type: "CO", event_type: "left_with_arrears", room: "211", bed: "211", amount: 0, checkout_date: "2026-07-16", checkout_type: "left_with_arrears", checkout_mode: "left_with_arrears", left_with_arrears: true, customer_left: true, deposit_refund: 0, outstanding_arrears: 80, open_arrears_amount: 80, arrears_amount: 80, left_arrears_amount: 80, owner_approval_required: false, owner_approval_status: "not_required", belongings_held: false, final_note: "golden left with arrears", ttlock_context: "", operator: "golden-staff", created_at: CREATED_AT },
+    input: { id: "GOLDEN-E11", type: "CO", event_type: "left_with_arrears", room: "211", bed: "211", amount: 0, checkout_date: "2026-07-16", checkout_type: "left_with_arrears", checkout_mode: "left_with_arrears", left_with_arrears: true, customer_left: true, deposit_refund: 0, outstanding_arrears: 80, open_arrears_amount: 80, arrears_amount: 80, left_arrears_amount: 80, owner_approval_required: false, owner_approval_status: "not_required", belongings_held: false, note: "QA left with arrears fixture", final_note: "QA left with arrears fixture", ttlock_context: "", operator: "golden-staff", created_at: CREATED_AT },
     expected_anchor_type: "left_with_arrears",
     expected_finance_delta: { cash_received: 0, bank_received: 0, arrears_opened: 80 },
     expected_arrears_delta: { opened: 80, repaid: 0 },

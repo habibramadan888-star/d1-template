@@ -1,0 +1,29 @@
+{
+  "qa_run_id": "QA-20260716-2830578C",
+  "qa_run_status": "AUTOMATION_FAILED",
+  "manual_employee_status": "REJECTED_WITH_FINDINGS",
+  "cross_browser_delivery_count": 16,
+  "header_count": 16,
+  "sticky_count": 16,
+  "dom_card_count": 16,
+  "reported_validation_passed_count": 16,
+  "real_validation_passed_count": 14,
+  "real_validation_failed_count": 2,
+  "failures": [
+    {
+      "record": 5,
+      "error_code": "LEGACY_ARREARS_CANONICAL_REF_INVALID"
+    },
+    {
+      "record": 11,
+      "error_code": "LEFT_WITH_ARREARS_REQUIRED_FIELDS_MISSING",
+      "missing_fields": [
+        "note"
+      ]
+    }
+  ],
+  "formal_write_count": 0,
+  "upload_session_clicked": false,
+  "accept_employee_review_clicked": false,
+  "evidence_source": "user real-browser Employee validation finding"
+}

@@ -1,8 +1,8 @@
 # QA Acceptance QA-20260716-2830578C
 
-- TASK_STATUS: PARTIAL_AWAITING_MANUAL_EMPLOYEE_ACCEPTANCE
-- QA_RUN_STATUS: AUTOMATION_PASS
-- MANUAL_EMPLOYEE_STATUS: PENDING
+- TASK_STATUS: AUTOMATION_FAILED
+- QA_RUN_STATUS: AUTOMATION_FAILED
+- MANUAL_EMPLOYEE_STATUS: REJECTED_WITH_FINDINGS
 - Mode: quick
 - Artifact SHA-256: `d1e68b40f95728f6dce9078d3c1b4f1f1f99ce18c4180ad703c6c01aa54ac91d`
 - Artifact commit: `948544aa23de3c7ef7f42cfeee3326327ec46b30`
@@ -17,13 +17,14 @@
 - Three reload counts: 16, 16, 16
 - Browser B independent DOM count: 16
 - Browser B independent QA storage count: 16
-- Validation Passed: 16/16 in both browsers
+- Cross-browser delivery count: 16/16 in both browsers
+- Real Employee Validate Session result: 14 passed, 2 failed
+- Record #5: `LEGACY_ARREARS_CANONICAL_REF_INVALID`
+- Record #11: `LEFT_WITH_ARREARS_REQUIRED_FIELDS_MISSING` (`note`)
+- Prior reported 16/16 was a stale/pre-recorded validation-state false positive
 - Stable Entry IDs: 16 unique and Run-scoped
 - Stable Session IDs: 16 unique and Run-scoped
-- Personal Production draft before QA: 1 record, `#622`
-- Personal Production draft during QA: 1 record, `#622`, isolated in its original tab and origin
-- Personal Production draft after QA: 1 record, `#622`
-- Personal draft mixed into QA Run: no
+- Production Employee draft `#622` was not part of this QA Run and is not claimed as verified by this Run
 - Paid Bed Transfer cash: AED 50
 - Paid Bed Transfer bank: AED 50
 - Ledger Transfer total: AED 100
@@ -62,5 +63,8 @@
 - Secret hygiene: passed.
 - Wrangler dry-run and artifact reproducibility: passed.
 
-The Run is intentionally paused at the manual Employee acceptance gate. No
-reviewer button or Upload Session button was clicked.
+The Run is permanently rejected with real-browser validation findings. The
+cross-browser delivery itself succeeded (Header, Sticky, DOM, memory, and QA
+storage each showed 16), but the live Employee aggregate validation exposed two
+fixture/transport-integrity failures. No reviewer button or Upload Session
+button was clicked, and formal write count remained zero.

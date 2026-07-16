@@ -11592,7 +11592,7 @@ __name(qaAcceptanceReadRun,"qaAcceptanceReadRun");
 function qaAcceptanceMaterializeMatrix(runId,matrix={}){
   const scenarios=(Array.isArray(matrix.scenarios)?matrix.scenarios:[]).map((scenario,index)=>{
     const n=String(index+1).padStart(2,"0"),entryId=`${runId}-E${n}`,sessionId=`${runId}-S${n}`;
-    const input={...(scenario.input||{}),id:entryId,event_id:entryId,source:"employee_entry",operator:"qa-staff",created_at:"2026-07-16T08:00:00.000Z"};
+    const input={...(scenario.input||{}),id:entryId,event_id:entryId,session_id:sessionId,source:"employee_entry",operator:"qa-staff",created_at:"2026-07-16T08:00:00.000Z"};
     if(cleanText(input.arrears_source,40)==="legacy_manual"){
       const ref=cleanId(`legacy-manual-${sessionId}-${entryId}`);
       input.linked_task_id=ref;input.arrears_ref=ref;input.original_arrears_id=ref;
@@ -11602,6 +11602,22 @@ function qaAcceptanceMaterializeMatrix(runId,matrix={}){
   return {...matrix,qa_run_id:runId,scenarios};
 }
 __name(qaAcceptanceMaterializeMatrix,"qaAcceptanceMaterializeMatrix");
+function qaAcceptanceValidationPayloadBasis(matrix={}){
+  return (Array.isArray(matrix.scenarios)?matrix.scenarios:[]).filter(row=>row.upload_enabled!==false).map(row=>({
+    entry_id:String(row.entry_id||""),
+    session_id:String(row.session_id||""),
+    input:hscStableValue(row.input||{})
+  }));
+}
+__name(qaAcceptanceValidationPayloadBasis,"qaAcceptanceValidationPayloadBasis");
+async function qaAcceptanceValidationPayloadHash(matrix={}){
+  return hscSha256(JSON.stringify(hscStableValue(qaAcceptanceValidationPayloadBasis(matrix))));
+}
+__name(qaAcceptanceValidationPayloadHash,"qaAcceptanceValidationPayloadHash");
+function qaAcceptanceStoredValidation(run={}){
+  try{return JSON.parse(run.automation_json||"null")}catch{return null}
+}
+__name(qaAcceptanceStoredValidation,"qaAcceptanceStoredValidation");
 async function qaAcceptanceCreateRun(request,env,user){
   let body={};try{body=await request.json()}catch{return badRequest("invalid_json")}
   const mode=String(body.mode||"quick").trim().toLowerCase();
@@ -11612,8 +11628,9 @@ async function qaAcceptanceCreateRun(request,env,user){
   if(!matrix||String(matrix.matrix_version||"")!==String(env.QA_MATRIX_VERSION||""))return json({success:false,error_code:"QA_MATRIX_UNAVAILABLE",no_write:true},503);
   const runId=`QA-${empTodayDubai().replaceAll("-","")}-${crypto.randomUUID().replaceAll("-","").slice(0,8).toUpperCase()}`;
   const materialized=qaAcceptanceMaterializeMatrix(runId,matrix),scenarios=materialized.scenarios||[];
+  materialized.validation_payload_hash=await qaAcceptanceValidationPayloadHash(materialized);
   const artifactManifest=await env.RATE_LIMIT.get("qa:artifact-manifest","json").catch(()=>null);
-  const now=empNow(),status="CREATED",artifact=String(artifactManifest?.candidate_sha256||"");
+  const now=empNow(),status="DRAFT_READY",artifact=String(artifactManifest?.candidate_sha256||"");
   if(!/^[a-f0-9]{64}$/i.test(artifact)||String(artifactManifest?.git_commit||"")!==String(env.QA_ARTIFACT_COMMIT||""))return json({success:false,error_code:"QA_ARTIFACT_SHA_UNAVAILABLE",no_write:true},503);
   await env.DB.prepare(`INSERT INTO qa_acceptance_runs (qa_run_id,corpid,mode,matrix_version,scenario_count,employee_record_count,status,artifact_sha256,artifact_commit,qa_worker_version,matrix_json,expected_json,created_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(runId,user.corpid,mode,String(matrix.matrix_version),Number(scenarios.length)+Number((materialized.automation_only||materialized.recovery_scenarios||[]).length),scenarios.filter(row=>row.upload_enabled!==false).length,status,artifact,String(env.QA_ARTIFACT_COMMIT||""),String(env.QA_WORKER_VERSION||""),JSON.stringify(materialized),JSON.stringify(materialized.expected_finance||{}),user.userid,now,now).run();
   return success(qaAcceptancePublicRun(request,await qaAcceptanceReadRun(env,user,runId)));
@@ -11624,7 +11641,7 @@ function qaAcceptanceEmployeeDraftUnavailable(errorCode="QA_RUN_DRAFT_UNAVAILABL
 }
 __name(qaAcceptanceEmployeeDraftUnavailable,"qaAcceptanceEmployeeDraftUnavailable");
 async function qaAcceptanceEmployeeDraftContract(env,run){
-  if(!["CREATED","AUTOMATION_PASS","MANUAL_EMPLOYEE_ACCEPTED"].includes(String(run.status||"")))return {ok:false,error_code:"QA_RUN_NOT_ACTIVE"};
+  if(!["DRAFT_READY","AUTOMATION_FAILED","AUTOMATION_PASS","MANUAL_EMPLOYEE_ACCEPTED"].includes(String(run.status||"")))return {ok:false,error_code:"QA_RUN_NOT_ACTIVE"};
   if(String(run.cleanup_status||"NOT_RUN")==="COMPLETED")return {ok:false,error_code:"QA_RUN_ALREADY_CLEANED"};
   const manifest=await env.RATE_LIMIT.get("qa:artifact-manifest","json").catch(()=>null);
   const artifact=String(run.artifact_sha256||""),currentArtifact=String(manifest?.candidate_sha256||"");
@@ -11632,6 +11649,8 @@ async function qaAcceptanceEmployeeDraftContract(env,run){
   if(String(run.matrix_version||"")!==String(env.QA_MATRIX_VERSION||""))return {ok:false,error_code:"QA_RUN_MATRIX_VERSION_MISMATCH"};
   let matrix={},expected={};
   try{matrix=JSON.parse(run.matrix_json||"{}");expected=JSON.parse(run.expected_json||"{}")}catch{return {ok:false,error_code:"QA_RUN_PERSISTED_DRAFT_INVALID"}}
+  const payloadHash=await qaAcceptanceValidationPayloadHash(matrix);
+  if(!/^[a-f0-9]{64}$/i.test(String(matrix.validation_payload_hash||""))||payloadHash!==String(matrix.validation_payload_hash||""))return {ok:false,error_code:"QA_RUN_PAYLOAD_HASH_MISMATCH"};
   const scenarios=(Array.isArray(matrix.scenarios)?matrix.scenarios:[]).filter(row=>row.upload_enabled!==false);
   const ids=scenarios.map(row=>String(row.entry_id||"")),sessionIds=scenarios.map(row=>String(row.session_id||""));
   const expectedCount=Number(run.employee_record_count||0),runPrefix=`${run.qa_run_id}-`;
@@ -11645,13 +11664,21 @@ async function qaAcceptanceEmployeeDraftContract(env,run){
     const fields=["cash_received","bank_received","total_received","total_expenses","net_funds","cash_net","bank_net","outstanding","arrears_opened","arrears_repaid","deposit_included","bed_transfer_fee","rent_income"];
     if(expectedCount!==16||Number(run.scenario_count||0)!==16||fields.some(field=>!Number.isFinite(Number(expected[field]))))return {ok:false,error_code:"QA_RUN_FINANCIAL_ORACLE_MISSING"};
   }
-  return {ok:true,manifest,matrix,expected,scenarios};
+  return {ok:true,manifest,matrix,expected,scenarios,payloadHash};
 }
 __name(qaAcceptanceEmployeeDraftContract,"qaAcceptanceEmployeeDraftContract");
 async function qaAcceptanceEmployeeDraft(request,env,user,run){
   const contract=await qaAcceptanceEmployeeDraftContract(env,run);
   if(!contract.ok)return qaAcceptanceEmployeeDraftUnavailable(contract.error_code);
-  const {scenarios,expected,manifest}=contract;
+  const {scenarios,expected,manifest,payloadHash}=contract;
+  const stored=qaAcceptanceStoredValidation(run);
+  const validationAttestation=stored
+    &&String(stored.qa_run_id||"")===String(run.qa_run_id||"")
+    &&String(stored.artifact_sha256||"")===String(run.artifact_sha256||"")
+    &&String(stored.qa_worker_version||"")===String(run.qa_worker_version||"")
+    &&String(stored.matrix_version||"")===String(run.matrix_version||"")
+    &&String(stored.payload_hash||"")===payloadHash
+      ?stored:null;
   return success({
     qa_run_id:run.qa_run_id,
     mode:run.mode,
@@ -11659,6 +11686,7 @@ async function qaAcceptanceEmployeeDraft(request,env,user,run){
     matrix_version:run.matrix_version,
     artifact_sha256:run.artifact_sha256,
     current_artifact_sha256:String(manifest.candidate_sha256||""),
+    qa_worker_version:String(run.qa_worker_version||""),
     scenario_count:Number(run.scenario_count||0),
     employee_record_count:Number(run.employee_record_count||0),
     server_draft_count:scenarios.length,
@@ -11666,6 +11694,8 @@ async function qaAcceptanceEmployeeDraft(request,env,user,run){
     entries:scenarios.map(row=>row.input),
     session_ids_by_entry:Object.fromEntries(scenarios.map(row=>[row.entry_id,row.session_id])),
     expected_finance:expected,
+    payload_hash:payloadHash,
+    validation_attestation:validationAttestation,
     cleanup_status:run.cleanup_status||"NOT_RUN",
     delivery_contract:"SERVER_PERSISTED_QA_RUN_V1",
     preview_expected:true,
@@ -11675,23 +11705,45 @@ async function qaAcceptanceEmployeeDraft(request,env,user,run){
 }
 __name(qaAcceptanceEmployeeDraft,"qaAcceptanceEmployeeDraft");
 async function qaAcceptanceRecordAutomation(request,env,user,run){
-  if(run.status!=="CREATED")return json({success:false,error_code:"QA_RUN_STATE_CONFLICT",status:run.status},409);
+  if(!["DRAFT_READY","AUTOMATION_FAILED"].includes(String(run.status||"")))return json({success:false,error_code:"QA_RUN_STATE_CONFLICT",status:run.status},409);
   let body={};try{body=await request.json()}catch{return badRequest("invalid_json")}
   let matrix={};try{matrix=JSON.parse(run.matrix_json||"{}") }catch{}
   const expected=(matrix.scenarios||[]).filter(row=>row.upload_enabled!==false).map(row=>String(row.entry_id));
   const results=Array.isArray(body.validation_results)?body.validation_results:[];
   const ids=results.map(row=>String(row.entry_identity||""));
-  const valid=results.length===expected.length&&new Set(ids).size===ids.length&&expected.every(id=>ids.includes(id))&&results.every(row=>row.ok===true)&&Number(body.formal_write_count||0)===0;
-  if(!valid)return json({success:false,error_code:"QA_AUTOMATION_RESULT_INVALID",expected_count:expected.length,result_count:results.length,no_write:true},422);
-  const automation={aggregate_http_status:Number(body.aggregate_http_status||200),validation_result_count:results.length,passed_count:results.length,failed_count:0,entry_ids:ids,formal_write_count:0,ttlock_external_calls:Number(body.ttlock_external_calls||0),recorded_at:empNow()};
+  const payloadHash=await qaAcceptanceValidationPayloadHash(matrix);
+  const contextValid=String(body.qa_run_id||"")===String(run.qa_run_id||"")
+    &&String(body.artifact_sha256||"")===String(run.artifact_sha256||"")
+    &&String(body.qa_worker_version||"")===String(run.qa_worker_version||"")
+    &&String(body.matrix_version||"")===String(run.matrix_version||"")
+    &&String(body.payload_hash||"")===payloadHash;
+  const identityValid=results.length===expected.length&&new Set(ids).size===ids.length&&expected.every(id=>ids.includes(id));
+  if(!contextValid||!identityValid||Number(body.formal_write_count||0)!==0)return json({success:false,error_code:"QA_AUTOMATION_RESULT_INVALID",expected_count:expected.length,result_count:results.length,no_write:true},422);
+  const passed=results.filter(row=>row.ok===true).length,failed=results.length-passed;
+  const automation={qa_run_id:run.qa_run_id,artifact_sha256:run.artifact_sha256,qa_worker_version:run.qa_worker_version||"",matrix_version:run.matrix_version,payload_hash:payloadHash,aggregate_http_status:Number(body.aggregate_http_status||0),validation_result_count:results.length,passed_count:passed,failed_count:failed,entry_ids:ids,validation_results:results.map(row=>({entry_identity:String(row.entry_identity||""),event_type:cleanText(row.event_type||"",80),ok:row.ok===true,error_code:cleanText(row.error_code||"",120),missing_fields:Array.isArray(row.missing_fields)?row.missing_fields.map(value=>cleanText(value,80)).filter(Boolean):[]})),formal_write_count:0,ttlock_external_calls:Number(body.ttlock_external_calls||0),recorded_at:empNow()};
   if(automation.ttlock_external_calls!==0)return json({success:false,error_code:"QA_TTLOCK_EXTERNAL_CALL_DETECTED",no_write:true},422);
-  await env.DB.prepare("UPDATE qa_acceptance_runs SET status='AUTOMATION_PASS',automation_json=?,updated_at=? WHERE qa_run_id=? AND corpid=? AND status='CREATED'").bind(JSON.stringify(automation),empNow(),run.qa_run_id,user.corpid).run();
+  const nextStatus=failed===0&&automation.aggregate_http_status===200?"AUTOMATION_PASS":"AUTOMATION_FAILED";
+  await env.DB.prepare("UPDATE qa_acceptance_runs SET status=?,automation_json=?,updated_at=? WHERE qa_run_id=? AND corpid=? AND status IN ('DRAFT_READY','AUTOMATION_FAILED')").bind(nextStatus,JSON.stringify(automation),empNow(),run.qa_run_id,user.corpid).run();
   return success(qaAcceptancePublicRun(request,await qaAcceptanceReadRun(env,user,run.qa_run_id)));
 }
 __name(qaAcceptanceRecordAutomation,"qaAcceptanceRecordAutomation");
 async function qaAcceptanceAcceptReview(request,env,user,run,kind){
   const employee=kind==="employee",required=employee?"AUTOMATION_PASS":"UPLOAD_PASS",next=employee?"MANUAL_EMPLOYEE_ACCEPTED":"MANUAL_OWNER_ACCEPTED";
   if(run.status!==required)return json({success:false,error_code:"QA_RUN_STATE_CONFLICT",required_status:required,status:run.status},409);
+  if(employee){
+    const contract=await qaAcceptanceEmployeeDraftContract(env,run),stored=qaAcceptanceStoredValidation(run);
+    const valid=contract.ok&&stored
+      &&String(stored.qa_run_id||"")===String(run.qa_run_id||"")
+      &&String(stored.artifact_sha256||"")===String(run.artifact_sha256||"")
+      &&String(stored.qa_worker_version||"")===String(run.qa_worker_version||"")
+      &&String(stored.matrix_version||"")===String(run.matrix_version||"")
+      &&String(stored.payload_hash||"")===String(contract.payloadHash||"")
+      &&Number(stored.validation_result_count||0)===Number(run.employee_record_count||0)
+      &&Number(stored.passed_count||0)===Number(run.employee_record_count||0)
+      &&Number(stored.failed_count||0)===0
+      &&Number(stored.formal_write_count||0)===0;
+    if(!valid)return json({success:false,error_code:"QA_REAL_VALIDATION_REQUIRED",no_write:true},409);
+  }
   const now=empNow(),sql=employee
     ?"UPDATE qa_acceptance_runs SET status=?,employee_accepted_by=?,employee_accepted_at=?,updated_at=? WHERE qa_run_id=? AND corpid=? AND status=?"
     :"UPDATE qa_acceptance_runs SET status=?,owner_accepted_by=?,owner_accepted_at=?,updated_at=? WHERE qa_run_id=? AND corpid=? AND status=?";
@@ -11744,7 +11796,9 @@ __name(qaAcceptanceCleanup,"qaAcceptanceCleanup");
 async function handleQaAcceptanceApi(request,env,user){
   const url=new URL(request.url),path=url.pathname,method=request.method;
   const staffDraft=/^\/api\/qa\/acceptance\/runs\/([^/]+)\/employee-draft$/.exec(path);
-  const gate=await qaAcceptanceGate(request,env,user,{manager:!staffDraft,staff:!!staffDraft});
+  const staffAutomation=/^\/api\/qa\/acceptance\/runs\/([^/]+)\/automation$/.exec(path);
+  const staffRoute=staffDraft||staffAutomation;
+  const gate=await qaAcceptanceGate(request,env,user,{manager:!staffRoute,staff:!!staffRoute});
   if(gate)return gate;
   if(path==="/api/qa/acceptance/runs"&&method==="GET"){
     const rows=(await env.DB.prepare("SELECT * FROM qa_acceptance_runs WHERE corpid=? ORDER BY created_at DESC LIMIT 50").bind(user.corpid).all()).results||[];

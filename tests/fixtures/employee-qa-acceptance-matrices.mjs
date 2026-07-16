@@ -4,7 +4,7 @@ import {
 } from "./employee-seven-event-golden-session.mjs";
 import { GOLDEN_FINANCE_EXPECTED } from "../helpers/employee-golden-session-oracle.mjs";
 
-export const QA_MATRIX_VERSION = "employee-qa-matrix-v1";
+export const QA_MATRIX_VERSION = "employee-qa-matrix-v2";
 
 const clone = value => structuredClone(value);
 

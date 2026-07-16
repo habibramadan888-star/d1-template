@@ -70,7 +70,7 @@ export async function buildQaAcceptanceArtifact() {
     assets,
     binding_contract_sha256: "aaa5d370f52b103b17718432596e0dae3db5b7500150d4081bad27ef0cad9afd",
     schema_version_qa: "qa-acceptance-schema-v1",
-    test_matrix_version: "employee-qa-matrix-v1",
+    test_matrix_version: "employee-qa-matrix-v2",
     reproducible_build: true,
     production_promoted: false,
   };
