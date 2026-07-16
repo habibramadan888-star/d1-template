@@ -1,0 +1,12 @@
+{
+  "qa_run_id": "QA-20260716-6D6F097B",
+  "mode": "quick",
+  "status": "AUTOMATION_PASS",
+  "artifact_sha256": "b294f7a323496db8027c1b32e5ee7eab2d96d92ced9c9ad5e867e8b56b084b17",
+  "artifact_commit": "d99f34d6ecf1f856d432c925cb8e404fc981d020",
+  "qa_worker_version": "b294f7a32349",
+  "scenario_count": 16,
+  "employee_record_count": 16,
+  "created_at": "2026-07-16T12:06:35.393Z",
+  "production_business_data_changed": false
+}
