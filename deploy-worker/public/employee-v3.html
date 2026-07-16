@@ -5147,7 +5147,7 @@ function applyEntryAnchors(e){
     const description=e.expense_description||e.expense_desc||e.note||e.remark||e.reason||'';
     Object.assign(e,{expense_amount:num(e.amount),expense_category:e.expense_category||e.reason_code||'EXPENSE',target_bed:e.room||'',reason:description,note:description,evidence_ref:e.evidence_ref||e.receipt_ref||''});
   }else if(type==='TF'){
-    Object.assign(e,{from_bed:e.from_bed||'',to_bed:e.to_bed||'',fee_amount_aed:num(e.fee_amount_aed),fee_amount_fils:num(e.fee_amount_fils),fee_mode:e.fee_mode||'',fee_due_date:e.fee_due_date||'',payment_method:e.payment_method||'',fee_waiver_reason:e.fee_waiver_reason||'',bed_price_difference_mode:e.bed_price_difference_mode||'none',bed_price_difference_amount_aed:num(e.bed_price_difference_amount_aed),bed_price_difference_due_date:e.bed_price_difference_due_date||'',bed_price_difference_payment_method:e.bed_price_difference_payment_method||'',bed_price_difference_reason:e.bed_price_difference_reason||'',transfer_reason:e.transfer_reason||'',note:e.note||''});
+    Object.assign(e,{from_bed:e.from_bed||'',to_bed:e.to_bed||'',fee_amount_aed:num(e.fee_amount_aed),fee_amount_fils:num(e.fee_amount_fils),fee_mode:e.fee_mode||e.payment_status||e.fee_status||'',fee_due_date:e.fee_due_date||'',payment_method:e.payment_method||'',fee_waiver_reason:e.fee_waiver_reason||'',bed_price_difference_mode:e.bed_price_difference_mode||'none',bed_price_difference_amount_aed:num(e.bed_price_difference_amount_aed),bed_price_difference_due_date:e.bed_price_difference_due_date||'',bed_price_difference_payment_method:e.bed_price_difference_payment_method||'',bed_price_difference_reason:e.bed_price_difference_reason||'',transfer_reason:e.transfer_reason||'',note:e.note||''});
   }
   if(typeof sanitizeCanonicalEmployeeEntry==='function')sanitizeCanonicalEmployeeEntry(entryEventType(type),e);
   e.raw_display_line=buildEntryRawDisplayLine(e);
@@ -5188,20 +5188,32 @@ function employeeSessionValue(entry,fields){
   }
   return 0;
 }
+function employeeBedTransferPaymentStatus(entry){
+  const raw=String(entry?.payment_status||entry?.fee_status||entry?.fee_mode||'').trim().toLowerCase();
+  if(raw==='waived')return 'waived';
+  if(['paid','charged','collected','received'].includes(raw))return 'paid';
+  if(['unpaid','due','pending'].includes(raw))return 'unpaid';
+  return 'unpaid';
+}
+function employeeBedTransferFeeAmount(entry){
+  return Math.max(0,employeeSessionValue(entry,['fee_amount_aed','fee_amount','paid_amount','paid','amount']));
+}
 function employeeSessionPaymentMethod(entry){
   const raw=String(entry?.payment_method||entry?.pay_type||'').trim().toLowerCase();
   return raw==='c'||raw==='cash'?'cash':raw==='b'||raw==='bank'?'bank':'none';
 }
 function employeeSessionIsBusinessRow(entry){
   const type=String(entry?.type||entry?.event_type||'').trim().toUpperCase();
-  return !!type&&!['SUMMARY','SESSION_SUMMARY','TOTAL'].includes(type)&&entry?.is_summary!==true&&entry?.summary_row!==true;
+  const status=String(entry?.status||entry?.effective_status||'').trim().toLowerCase();
+  const inactive=entry?.effective===false||entry?.is_effective===false||entry?.voided===true||['voided','reversed','inactive'].includes(status);
+  return !!type&&!inactive&&!['SUMMARY','SESSION_SUMMARY','TOTAL'].includes(type)&&entry?.is_summary!==true&&entry?.summary_row!==true;
 }
 function employeeSessionReceivedAmount(entry){
   const type=String(entry?.type||'').trim().toUpperCase();
   if(type==='R')return employeeSessionValue(entry,['paid_amount','paid','amount']);
   if(type==='AP')return employeeSessionValue(entry,['payment_amount','paid_amount','paid','amount']);
   if(type==='D')return employeeSessionValue(entry,['deposit_paid_amount','deposit_amount','paid_amount','paid','amount']);
-  if(type==='TF')return String(entry?.fee_mode||entry?.fee_status||'').toLowerCase()==='paid'?employeeSessionValue(entry,['fee_amount_aed','fee_amount','paid_amount','paid','amount']):0;
+  if(type==='TF')return employeeBedTransferPaymentStatus(entry)==='paid'?employeeBedTransferFeeAmount(entry):0;
   if(type==='TFF')return employeeSessionValue(entry,['paid_amount','paid','amount']);
   return 0;
 }
@@ -5215,6 +5227,7 @@ function employeeSessionOutstandingAmount(entry){
   const type=String(entry?.type||'').trim().toUpperCase();
   if(type==='R')return Math.max(0,employeeSessionValue(entry,['expected_rent','period_due','due'])-employeeSessionReceivedAmount(entry));
   if(type==='TF')return Math.max(0,employeeSessionValue(entry,['fee_due_amount','fee_amount_aed','due'])-employeeSessionReceivedAmount(entry));
+  if(type==='CO'&&(String(entry?.event_type||'').toLowerCase()==='left_with_arrears'||entry?.left_with_arrears===true))return Math.max(0,employeeSessionValue(entry,['left_arrears_amount','arrears_amount','outstanding_arrears','open_arrears_amount']));
   return 0;
 }
 function calculateEmployeeSessionSummary(entries=state.drafts){
@@ -5232,7 +5245,7 @@ function calculateEmployeeSessionSummary(entries=state.drafts){
     summary.totalExpenses+=expense;
     const outstanding=employeeSessionOutstandingAmount(entry);
     summary.outstanding+=outstanding;
-    if(type==='R')summary.arrearsOpened+=outstanding;
+    if(type==='R'||(type==='CO'&&(String(entry?.event_type||'').toLowerCase()==='left_with_arrears'||entry?.left_with_arrears===true)))summary.arrearsOpened+=outstanding;
     if(type==='D')summary.depositIncluded+=received;
     if(type==='R')summary.rentIn+=received;
     if(type==='AP'){summary.arrearsIn+=received;summary.arrearsRepaid+=received;}
@@ -6994,7 +7007,7 @@ function entryWhatsappPayment(e){
   if(pay==='b'||pay==='bank')return 'bank';
   if(pay==='c'||pay==='cash')return 'cash';
   if(pay==='none'||pay==='n')return 'none';
-  if(e?.type==='TF'&&(e?.fee_status==='waived'||e?.fee_mode==='waived'||Number(e?.amount||0)===0))return 'none';
+  if(e?.type==='TF'&&employeeBedTransferPaymentStatus(e)!=='paid')return 'none';
   return pay||'cash';
 }
 function entryWhatsappBedToken(value,fallback='item'){
@@ -7012,6 +7025,7 @@ function entryWhatsappBed(e){
 }
 function entryWhatsappAmount(e){
   if(e?.type==='R')return num(e?.paid||e?.amount);
+  if(e?.type==='TF')return employeeBedTransferPaymentStatus(e)==='paid'?employeeBedTransferFeeAmount(e):0;
   return num(e?.amount);
 }
 function entryWhatsappShortDate(value){
@@ -7025,9 +7039,10 @@ function entryWhatsappLine(e,i){
   const pay=entryWhatsappPayment(e);
   const amount=fmtMoney(entryWhatsappAmount(e));
   if(type==='bed_transfer'){
-    const waived=e?.fee_status==='waived'||e?.fee_mode==='waived'||e?.fee_paid==='N'||entryWhatsappAmount(e)===0;
+    const paymentStatus=employeeBedTransferPaymentStatus(e);
+    const waived=paymentStatus==='waived';
     const reason=entryWhatsappSafe(e?.waiver_reason||e?.fee_waiver_reason||e?.transfer_reason||e?.reason||e?.note||e?.remark||'bed_transfer');
-    return `${i+1}. ${bed.anchor} ${bed.inline} bed_transfer ${waived?'waived ':''}${amount} ${pay} ${reason}`.trim();
+    return `${i+1}. ${bed.anchor} ${bed.inline} bed_transfer ${waived?'waived ':paymentStatus==='unpaid'?'unpaid ':''}${amount} ${pay} ${reason}`.trim();
   }
   const start=e?.period_start||e?.startDate||e?.start_date;
   const end=e?.period_end||e?.endDate||e?.end_date;
@@ -7050,9 +7065,10 @@ function entryWhatsappLine(e,i){
   const pay=entryWhatsappPayment(e);
   const amount=fmtMoney(entryWhatsappAmount(e));
   if(type==='bed_transfer'){
-    const waived=e?.fee_status==='waived'||e?.fee_mode==='waived'||e?.fee_paid==='N'||entryWhatsappAmount(e)===0;
+    const paymentStatus=employeeBedTransferPaymentStatus(e);
+    const waived=paymentStatus==='waived';
     const reason=entryWhatsappSafe(e?.waiver_reason||e?.fee_waiver_reason||e?.transfer_reason||e?.reason||e?.note||e?.remark||'bed_transfer');
-    return `${i+1}. ${bed.anchor} bed_transfer ${waived?'waived ':''}${amount} ${pay} ${reason}`.trim();
+    return `${i+1}. ${bed.anchor} bed_transfer ${waived?'waived ':paymentStatus==='unpaid'?'unpaid ':''}${amount} ${pay} ${reason}`.trim();
   }
   const start=e?.period_start||e?.startDate||e?.start_date;
   const end=e?.period_end||e?.endDate||e?.end_date;
@@ -7158,9 +7174,9 @@ function entryStatementLine(e){
   if(type==='bed_transfer'){
     const from=e?.bed_from||e?.from_bed||e?.fromBed||e?.room;
     const to=e?.bed_to||e?.to_bed||e?.toBed||e?.roomTo;
-    const waived=e?.fee_status==='waived'||e?.fee_mode==='waived'||e?.fee_paid==='N'||entryWhatsappAmount(e)===0;
+    const paymentStatus=employeeBedTransferPaymentStatus(e);
     const reason=entryStatementNote(e?.waiver_reason||e?.fee_waiver_reason||e?.transfer_reason||e?.reason||e?.note||'');
-    const fee=waived?'waived':`${entryStatementAmount(e?.fee_amount||e?.amount)} ${pay}`;
+    const fee=paymentStatus==='waived'?'waived':paymentStatus==='unpaid'?'unpaid 0':`${entryStatementAmount(employeeBedTransferFeeAmount(e))} ${pay}`;
     return `${entryStatementBed(from)}\n${entryStatementBed(to)}\ntransfer ${fee} ${entryStatementTimeAndNote(time,reason)}`.trim();
   }
   if(type==='deposit_out'){
@@ -7205,7 +7221,7 @@ function buildEntrySessionLedgerTextLegacy(){
   const cashReceived=sum(rentCash,row=>row.paid_amount||row.paid||row.amount);
   const arrearsTotal=sum(arrears,row=>row.payment_amount||row.amount);
   const depositTotal=sum(deposits,row=>row.deposit_amount||row.amount);
-  const transferTotal=sum(transfers,row=>row.fee_status==='waived'||row.fee_mode==='waived'||row.fee_paid==='N'?0:(row.fee_amount||row.amount));
+  const transferTotal=summary.transferFee;
   const expenseTotal=sum(expenses,row=>row.expense_amount||row.refund_amount||row.amount);
   const sections=[
     entryStatementSection([
@@ -7263,7 +7279,7 @@ function buildEntrySessionLedgerText(){
   const cashReceived=sum(rentCash,row=>row.paid_amount||row.paid||row.amount);
   const arrearsTotal=sum(arrears,row=>row.payment_amount||row.amount);
   const depositTotal=sum(deposits,row=>row.deposit_amount||row.amount);
-  const transferTotal=sum(transfers,row=>row.fee_status==='waived'||row.fee_mode==='waived'||row.fee_paid==='N'?0:(row.fee_amount||row.amount));
+  const transferTotal=summary.transferFee;
   const sections=[
     entryStatementSection([
       `Cash Handover ${entryStatementAmount(summary.cashNet)}`,

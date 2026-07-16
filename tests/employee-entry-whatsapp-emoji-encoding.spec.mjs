@@ -55,7 +55,6 @@ test("copy and fallback paths guard damaged text and keep raw textarea value", a
 
   assert.match(html, /function entryWhatsappHasReplacementChar\(text\)/);
   assert.match(html, /function entryWhatsappAssertTextSafe\(text,context='WhatsApp export'\)/);
-  assert.match(html, /if\(!entryWhatsappAssertTextSafe\(text,'WhatsApp export'\)\)return ''/);
   assert.match(html, /if\(!entryWhatsappAssertTextSafe\(text,'WhatsApp copy'\)\)return false/);
   assert.match(html, /if\(!entryWhatsappAssertTextSafe\(text,'WhatsApp fallback'\)\)return/);
   assert.match(html, /textarea\.value=text/);

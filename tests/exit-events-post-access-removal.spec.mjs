@@ -32,10 +32,12 @@ test("exit-event snapshot policy makes zero external calls for empty, expired, u
   let cached = null;
   const counts = { load: 0, oauth: 0, lockList: 0, identityCardList: 0, fetch: 0, writes: 0 };
   const getSnapshot = new Function(
-    "ttlockScopeKey", "ttlockKvReadJson", "ttlockSafeLog", "ttlockLiveFetchAllowed",
+    "cleanText", "qaAcceptanceEnabled", "ttlockScopeKey", "ttlockKvReadJson", "ttlockSafeLog", "ttlockLiveFetchAllowed",
     "ttlockSnapshotFlights", "loadLockCards", "ttlockKvWriteJson", "TTLOCK_READ_CACHE_MAX_AGE_MS",
     `${block}; return getCanonicalTTLockSnapshot;`
   )(
+    value => String(value || "").trim(),
+    () => false,
     () => "scope",
     async () => cached,
     () => {},

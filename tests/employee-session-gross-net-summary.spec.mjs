@@ -3,6 +3,9 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import vm from "node:vm";
 
+import { EMPLOYEE_SEVEN_EVENT_GOLDEN_SCENARIOS } from "./fixtures/employee-seven-event-golden-session.mjs";
+import { GOLDEN_FINANCE_EXPECTED } from "./helpers/employee-golden-session-oracle.mjs";
+
 const employeePath = "deploy-worker/public/employee-v3.html";
 
 async function summaryCalculator() {
@@ -120,4 +123,43 @@ test("short-paid rent exposes outstanding, arrears opened, and arrears repaid in
   assert.equal(summary.outstanding, 70);
   assert.equal(summary.arrearsOpened, 70);
   assert.equal(summary.arrearsRepaid, 0);
+});
+
+test("Quick 16 Ledger summary exactly matches the shared Finance oracle", async () => {
+  const calculate = await summaryCalculator();
+  const rows = EMPLOYEE_SEVEN_EVENT_GOLDEN_SCENARIOS.map(row => structuredClone(row.input));
+  const summary = calculate(rows);
+  assert.deepEqual(
+    {
+      cash_received: summary.cashReceived,
+      bank_received: summary.bankReceived,
+      total_received: summary.totalReceived,
+      cash_out: summary.cashExpenses,
+      bank_out: summary.bankExpenses,
+      total_expenses: summary.totalExpenses,
+      net_funds: summary.netFunds,
+      cash_net: summary.cashNet,
+      bank_net: summary.bankNet,
+      outstanding: summary.outstanding,
+      arrears_opened: summary.arrearsOpened,
+      arrears_repaid: summary.arrearsRepaid,
+      deposit_included: summary.depositIncluded,
+      deposit_refund: summary.depRefund,
+      expense: summary.expenses,
+      bed_transfer_fee: summary.transferFee,
+      rent_income: summary.rentIn
+    },
+    GOLDEN_FINANCE_EXPECTED
+  );
+});
+
+test("voided or ineffective arrears evidence never enters the shared Ledger totals", async () => {
+  const calculate = await summaryCalculator();
+  const summary = calculate([
+    { type: "CO", event_type: "left_with_arrears", left_with_arrears: true, left_arrears_amount: 80 },
+    { type: "CO", event_type: "left_with_arrears", left_with_arrears: true, left_arrears_amount: 900, effective: false },
+    { type: "R", due: 900, paid: 0, status: "voided" }
+  ]);
+  assert.equal(summary.outstanding, 80);
+  assert.equal(summary.arrearsOpened, 80);
 });

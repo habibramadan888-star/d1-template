@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { buildWhatsappTextWithDrafts } from "./helpers/employee-entry-whatsapp-helper.mjs";
 
-test("Current Session WhatsApp baseline uses final Statement format", async () => {
+test("Current Session Preview and Copy use the formal HOMELINK LEDGER format", async () => {
   const text = await buildWhatsappTextWithDrafts([
     {
       type: "R",
@@ -28,7 +28,7 @@ test("Current Session WhatsApp baseline uses final Statement format", async () =
     }
   ]);
 
-  assert.match(text, /^Statement\nDate 0602 Time \d{4}\nEmployee Abdul/m);
+  assert.match(text, /^HOMELINK LEDGER\nDate 0602 Time \d{4}\nEmployee Abdul/m);
   assert.match(text, /💼 ▬+ 💼\nCore Summary/);
   assert.match(text, /📊 ▬+ 📊\nBreakdown/);
   assert.match(text, /💵 ▬+ 💵\nCash Details/);
@@ -83,7 +83,7 @@ test("Rent short paid WhatsApp export preserves arrears anchor", async () => {
     }
   ]);
 
-  assert.match(text, /\[144\] paid 700 cash 2243 short 70 due 0610 customer pays later/);
+  assert.match(text, /\[144\] paid 700 cash 2243 short 70 DUE:0610 \| NOTE:customer pays later/);
   assert.doesNotMatch(text, /expected/);
   assert.doesNotMatch(text, /short_paid/);
   assert.doesNotMatch(text, /2026-06-10/);
