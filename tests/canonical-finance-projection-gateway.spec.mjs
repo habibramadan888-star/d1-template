@@ -187,9 +187,9 @@ test("live owner read routes expose finance gateway and cap history list scans",
 
   assert.match(liveRoutes, /path === "\/api\/owner\/finance\/projection"/);
   assert.match(liveRoutes, /handleOwnerFinanceProjection\(request, env, user\)/);
-  assert.match(liveRoutes, /Math\.min\(Math\.floor\(rawLimit\), 30\)/);
-  assert.match(liveRoutes, /: 30/);
-  assert.doesNotMatch(liveRoutes, /Math\.min\(Math\.floor\(rawLimit\), 100\)/);
+  assert.match(liveRoutes, /const maxLimit=qaScope\.requested\?100:30/);
+  assert.match(liveRoutes, /Math\.min\(Math\.floor\(rawLimit\), maxLimit\)/);
+  assert.match(liveRoutes, /: maxLimit/);
 });
 
 test("canonical finance gateway remains read-only", async () => {

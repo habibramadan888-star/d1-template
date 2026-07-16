@@ -35,6 +35,6 @@ test("owner density keeps employee visual shell and avoids oversized backend dis
 test("financial formula remains unchanged", async () => {
   const js = await readFile("deploy-worker/public/index-51-main.js", "utf8");
 
-  assert.match(js, /cashBal:r2\(ci-ro-eo\),total:r2\(ci\+bi\)/);
+  assert.match(js, /cashBal:r2\(ci-cashOut\),bankBal:r2\(bi-bankOut\),total:r2\(ci\+bi\)/);
   assert.match(js, /const netIncome=t\.total/);
 });

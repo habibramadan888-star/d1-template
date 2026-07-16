@@ -140,7 +140,7 @@ test("owner dashboard calls today todo endpoint and renders returned todos with 
   const preview = functionBlock(ui, "ownerOverviewShowTodayActionsPreview");
   const row = functionBlock(ui, "ownerBedTransferTodoRowHtml");
 
-  assert.match(load, /ownerGatewayJson\('\/api\/owner\/today-todos\?limit=50'/);
+  assert.match(load, /ownerGatewayJson\(ownerRunScopedApi\('\/api\/owner\/today-todos\?limit=50'\)/);
   assert.match(guard, /content-type/);
   assert.match(guard, /NON_JSON/);
   assert.match(load, /state\.ownerTodayTodos=null/);

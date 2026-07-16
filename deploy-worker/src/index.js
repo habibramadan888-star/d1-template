@@ -6256,7 +6256,8 @@ async function buildOwnerTodayTodoGateway(env,user,opts={}){
   const includeResolved=opts.include_resolved===true||opts.includeResolved===true;
   const filters={includeResolved,severity:cleanText(opts.severity||"",40),category:cleanText(opts.category||"",80)};
   const started=Date.now();
-  const sessions=await cloudArrearsFetchActiveSessionRows(env,user,{limit:Math.min(limit,500)}).catch(()=>[]);
+  const runScoped=opts.qa_run_scope===true&&Array.isArray(opts.archive_snapshot);
+  const sessions=runScoped?opts.archive_snapshot:await cloudArrearsFetchActiveSessionRows(env,user,{limit:Math.min(limit,500)}).catch(()=>[]);
   const archiveByBed=ownerTodayTodoArchiveContextFromSessions(sessions);
   const lockResult=await empLoadLockCardsWithCacheFallback(env,user,{timeoutMs:6000,limit:500,request_context:opts.request_context,max_age_ms:opts.max_age_ms}).catch(e=>({roomsData:{},error:empTtlockReadErrorCode(e)}));
   const accessByBed=ownerTodayTodoAccessCandidates(lockResult,user);
@@ -6277,12 +6278,14 @@ async function buildOwnerTodayTodoGateway(env,user,opts={}){
     if(!openArrearsByBed.has(bed))openArrearsByBed.set(bed,[]);
     openArrearsByBed.get(bed).push(item);
   }
-  const candidateBedSet=new Set([...archiveByBed.keys(),...accessByBed.keys(),...openArrearsByBed.keys()]);
+  const candidateBedSet=new Set(runScoped?[...archiveByBed.keys(),...openArrearsByBed.keys()]:[...archiveByBed.keys(),...accessByBed.keys(),...openArrearsByBed.keys()]);
   if(opts.bed)candidateBedSet.add(cleanText(opts.bed,80).replace(/^#/,""));
   const candidates=[...candidateBedSet].filter(Boolean).slice(0,limit).map(bed=>({bed}));
   const todos=[];
   if(transferTodos.ok)for(const todo of transferTodos.todos||[])ownerTodayTodoPush(todos,todo,filters);
-  const receivables=await resolveConsoleReceivablesSot(env,user,{limit:Math.min(limit,100),ttlockTimeoutMs:6000,request_context:opts.request_context,max_age_ms:opts.max_age_ms}).catch(()=>null);
+  const receivables=runScoped
+    ?{all_rows:(arrearsProjection.open_items||[]).map(row=>({...row,amount:row.remaining_arrears,remaining_arrears:row.remaining_arrears,entry_id:row.source_entry_id||row.event_id||""}))}
+    :await resolveConsoleReceivablesSot(env,user,{limit:Math.min(limit,100),ttlockTimeoutMs:6000,request_context:opts.request_context,max_age_ms:opts.max_age_ms}).catch(()=>null);
   if(receivables)ownerTodayTodoBuildReceivables(todos,receivables,filters);
   for(const candidate of candidates){
     const bed=candidate.bed;
@@ -6320,7 +6323,7 @@ async function buildOwnerTodayTodoGateway(env,user,opts={}){
     todos:items,
     items,
     empty_state:"No todo items from canonical gateways",
-    source_proof:ownerTodayTodoSourceProof("owner_today_todo_gateway",{candidate_beds:candidates.length,active_sessions_scanned:sessions.length,access_snapshot_loaded:!lockResult?.error,bed_transfer_projection_status:transferTodos.ok?"projected":"fail_closed",bounded_session_limit:Math.min(limit,500),duration_ms:Date.now()-started}),
+    source_proof:ownerTodayTodoSourceProof("owner_today_todo_gateway",{candidate_beds:candidates.length,active_sessions_scanned:sessions.length,access_snapshot_loaded:!lockResult?.error,bed_transfer_projection_status:transferTodos.ok?"projected":"fail_closed",bounded_session_limit:Math.min(limit,500),qa_run_id:cleanText(opts.qa_run_id||"",100),server_filtered:runScoped,duration_ms:Date.now()-started}),
     readonly:true,
     no_write:true,
     production_cutover:"PRODUCTION_NO_GO"
@@ -6331,6 +6334,8 @@ async function handleOwnerTodayTodos(request,env,user){
   if(!canReadOwnerData(user))return forbidden();
   const url=new URL(request.url);
   try{
+    const qaScope=await qaAcceptanceOwnerRunScope(request,env,user);
+    if(qaScope.response)return qaScope.response;
     const payload=await buildOwnerTodayTodoGateway(env,user,{
       date:url.searchParams.get("date")||"",
       include_resolved:url.searchParams.get("include_resolved")==="1",
@@ -6338,8 +6343,12 @@ async function handleOwnerTodayTodos(request,env,user){
       category:url.searchParams.get("category")||"",
       bed:url.searchParams.get("bed")||"",
       limit:url.searchParams.get("limit")||100,
-      request_context:ttlockRequestContext(request,env,user,"owner_today_todo",TTLOCK_READ_CACHE_MAX_AGE_MS)
+      request_context:ttlockRequestContext(request,env,user,"owner_today_todo",TTLOCK_READ_CACHE_MAX_AGE_MS),
+      archive_snapshot:qaScope.requested?qaScope.sessions:undefined,
+      qa_run_scope:qaScope.requested,
+      qa_run_id:qaScope.run_id||""
     });
+    if(qaScope.requested)payload.qa_run_scope=qaAcceptanceOwnerRunScopeMeta(qaScope);
     return success(payload);
   }catch(e){
     return json({
@@ -9067,20 +9076,28 @@ async function handleOwnerCloudArrearsProjection(request,env,user){
   const bed=cleanText(url.searchParams.get("bed")||"",80).replace(/^#/,"");
   const sessionId=cleanId(url.searchParams.get("session_id")||url.searchParams.get("sessionId")||"");
   const limit=Math.min(Math.max(Number(url.searchParams.get("limit")||1000),1),2000);
-  const projection=sessionId
-    ? await updateCloudArrearsProjectionForSession(env,user,sessionId,{limit,bed})
-    : bed
-      ? await rebuildCloudArrearsForBed(env,user,bed,{limit})
-      : await rebuildAllCloudArrears(env,user,{limit});
+  const qaScope=await qaAcceptanceOwnerRunScope(request,env,user);
+  if(qaScope.response)return qaScope.response;
+  const projection=qaScope.requested
+    ?buildCloudArrearsProjectionFromSessions(qaScope.sessions,{limit,bed,corpid:user.corpid})
+    :sessionId
+      ? await updateCloudArrearsProjectionForSession(env,user,sessionId,{limit,bed})
+      : bed
+        ? await rebuildCloudArrearsForBed(env,user,bed,{limit})
+        : await rebuildAllCloudArrears(env,user,{limit});
   return success(providerIdentityResponseFirewall({
     success:true,
     projection,
     open_items:projection.open_items||[],
     closed_items:projection.closed_items||[],
+    total_remaining:projection.total_remaining||0,
+    open_count:projection.open_count||0,
+    partial_count:projection.partial_count||0,
     source:"cloud_arrears_projection",
     materialized_from:"sessions.entries_json",
     readonly:true,
-    production_cutover:"PRODUCTION_NO_GO"
+    production_cutover:"PRODUCTION_NO_GO",
+    ...(qaScope.requested?{qa_run_scope:qaAcceptanceOwnerRunScopeMeta(qaScope)}:{})
   }));
 }
 __name(handleOwnerCloudArrearsProjection,"handleOwnerCloudArrearsProjection");
@@ -9344,6 +9361,14 @@ async function canonicalOwnerHistorySessionRowForList(env,user,sessionRow={}){
   }
 }
 __name(canonicalOwnerHistorySessionRowForList,"canonicalOwnerHistorySessionRowForList");
+function canonicalOwnerHistoryIdentityFields(session={}){
+  const anchors=extractEmployeeEntryAnchorsFromSession(session);
+  const first=anchors[0]||{};
+  const entryId=cleanText(first.entry_id||first.id||first.event_id||first.anchor_id||"",180);
+  const canonicalAnchorId=cleanText(first.transfer_anchor_id||first.anchor_id||first.event_id||first.id||session?.anchor_id||session?.id||"",180);
+  return {entry_id:entryId,canonical_anchor_id:canonicalAnchorId};
+}
+__name(canonicalOwnerHistoryIdentityFields,"canonicalOwnerHistoryIdentityFields");
 async function canonicalOwnerHistorySessionRowsForList(env,user,rows=[]){
   // History already has the corpid-scoped session snapshot.  Keep this list
   // projection in-memory: detail/correction reads belong to explicit detail
@@ -9354,7 +9379,7 @@ async function canonicalOwnerHistorySessionRowsForList(env,user,rows=[]){
   const transferVoidSessionIds=new Set();
   for(const row of rows||[]){
     const sessionId=String(row?.id||"");
-    projectedBySessionId.set(sessionId,canonicalOwnerHistorySessionRow(row));
+    projectedBySessionId.set(sessionId,canonicalOwnerHistorySessionRow({...row,...canonicalOwnerHistoryIdentityFields(row)}));
     for(const anchor of extractEmployeeEntryAnchorsFromSession(row)){
       const eventType=String(anchor?.event_type||anchor?.type||"").trim().toLowerCase();
       const anchorId=cleanText(anchor?.transfer_anchor_id||anchor?.anchor_id||anchor?.event_id||"",180);
@@ -10624,6 +10649,7 @@ function canonicalFinanceProjectionApplyCorrectionEffectiveTotals(totals,summary
 }
 __name(canonicalFinanceProjectionApplyCorrectionEffectiveTotals,"canonicalFinanceProjectionApplyCorrectionEffectiveTotals");
 async function canonicalFinanceProjectionFetchSessions(env,user,range={},options={}){
+  if(Array.isArray(options.sessions))return options.sessions;
   if(!await phase0TableExists(env,"sessions"))return [];
   const includeVoided=options.include_voided!==false;
   const columns=await empTableColumns(env,"sessions").catch(()=>new Set());
@@ -10798,6 +10824,8 @@ __name(canonicalFinanceProjectionToOverviewSummary,"canonicalFinanceProjectionTo
 async function handleOwnerFinanceProjection(request,env,user){
   if(!canReadOwnerData(user))return forbidden();
   const url=new URL(request.url);
+  const qaScope=await qaAcceptanceOwnerRunScope(request,env,user);
+  if(qaScope.response)return qaScope.response;
   const today=empTodayDubai();
   let range={start:url.searchParams.get("start")||"",end:url.searchParams.get("end")||""};
   if(!range.start||!range.end){
@@ -10809,7 +10837,8 @@ async function handleOwnerFinanceProjection(request,env,user){
     }
   }
   const includeVoided=url.searchParams.get("include_voided")!=="0";
-  const projection=await canonicalFinanceProjectionBuild(env,user,range,{include_voided:includeVoided,include_corrections:url.searchParams.get("include_corrections")!=="0"});
+  const projection=await canonicalFinanceProjectionBuild(env,user,range,{include_voided:includeVoided,include_corrections:url.searchParams.get("include_corrections")!=="0",sessions:qaScope.requested?qaScope.sessions:undefined});
+  if(qaScope.requested)projection.qa_run_scope=qaAcceptanceOwnerRunScopeMeta(qaScope);
   return success(projection);
 }
 __name(handleOwnerFinanceProjection,"handleOwnerFinanceProjection");
@@ -11719,8 +11748,14 @@ __name(readRouteClaim, "readRouteClaim");
 async function fetchStaticAsset(request, env, pathname) {
   if (!env.ASSETS) return null;
   const assetUrl = new URL(request.url);
+  const requestUrl = new URL(request.url);
+  const qaOwnerRunAsset = String(env.APP_ENV || "").trim().toLowerCase() === "qa"
+    && (pathname === "/index-51" || pathname === "/index-51.html")
+    && !!requestUrl.searchParams.get("qa_run_id");
   assetUrl.pathname = pathname;
-  assetUrl.search = "";
+  assetUrl.search = qaOwnerRunAsset
+    ? `?qa_asset_version=${encodeURIComponent(String(env.CF_VERSION_METADATA?.id || "current"))}`
+    : "";
   const response = await env.ASSETS.fetch(new Request(assetUrl.toString(), {
     method: "GET",
     headers: {
@@ -11733,6 +11768,12 @@ async function fetchStaticAsset(request, env, pathname) {
     headers.set("Pragma", "no-cache");
     headers.set("X-Employee-Asset-Version", HOMELINK_DIAGNOSTIC_ASSET_VERSION);
     headers.set("X-Employee-Asset-Commit", HOMELINK_DIAGNOSTIC_COMMIT_HASH);
+    return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+  }
+  if (qaOwnerRunAsset) {
+    const headers = new Headers(response.headers);
+    headers.set("Cache-Control", "no-store, no-cache, max-age=0, must-revalidate");
+    headers.set("Pragma", "no-cache");
     return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
   }
   return response;
@@ -11760,6 +11801,52 @@ function qaAcceptanceRunId(value){
   return /^QA-\d{8}-[A-Z0-9]{4,12}$/.test(runId)?runId:"";
 }
 __name(qaAcceptanceRunId,"qaAcceptanceRunId");
+function qaAcceptanceOwnerRunScopeMeta(scope={}){
+  return {
+    qa_run_id:String(scope.run_id||scope.run?.qa_run_id||""),
+    status:String(scope.run?.status||""),
+    expected_session_count:Number(scope.session_ids?.size||0),
+    actual_session_count:Number(scope.sessions?.length||0),
+    entry_id_count:Number(scope.entry_ids?.size||0),
+    canonical_anchor_count:Number(scope.anchor_ids?.size||0),
+    server_filtered:true,
+    baseline_rows_excluded:true
+  };
+}
+__name(qaAcceptanceOwnerRunScopeMeta,"qaAcceptanceOwnerRunScopeMeta");
+async function qaAcceptanceOwnerRunScope(request,env,user){
+  const url=new URL(request.url);
+  const raw=cleanText(url.searchParams.get("qa_run_id")||"",100);
+  if(!raw)return {requested:false};
+  if(!qaAcceptanceEnabled(env)||!qaAcceptanceRequestHostAllowed(request,env))return {requested:true,response:qaAcceptanceNotFound(true)};
+  if(!canReadOwnerData(user)||String(user?.corpid||"")!=="HL-QA")return {requested:true,response:forbidden()};
+  const runId=qaAcceptanceRunId(raw);
+  if(!runId)return {requested:true,response:json({success:false,error_code:"QA_RUN_ID_INVALID"},404)};
+  const run=await qaAcceptanceReadRun(env,user,runId);
+  if(!run)return {requested:true,response:json({success:false,error_code:"QA_RUN_NOT_FOUND"},404)};
+  if(!["UPLOAD_PASS","MANUAL_OWNER_ACCEPTED","FINAL_ACCEPTED"].includes(String(run.status||""))){
+    return {requested:true,response:json({success:false,error_code:"QA_OWNER_RUN_NOT_REVIEWABLE",qa_run_id:runId,status:run.status||""},409)};
+  }
+  let matrix={};
+  try{matrix=JSON.parse(String(run.matrix_json||"{}"))||{};}catch{return {requested:true,response:json({success:false,error_code:"QA_RUN_MATRIX_INVALID"},409)}}
+  const scenarios=Array.isArray(matrix.scenarios)?matrix.scenarios:[];
+  const sessionIds=new Set(scenarios.map(row=>cleanText(row?.session_id||row?.input?.session_id||"",160)).filter(Boolean));
+  const entryIds=new Set(scenarios.map(row=>cleanText(row?.entry_id||row?.input?.id||row?.input?.entry_id||"",180)).filter(Boolean));
+  if(!sessionIds.size||sessionIds.size!==entryIds.size)return {requested:true,response:json({success:false,error_code:"QA_RUN_SCOPE_INVALID",qa_run_id:runId},409)};
+  const placeholders=[...sessionIds].map(()=>"?").join(",");
+  const result=await env.DB.prepare(`SELECT * FROM sessions WHERE corpid=? AND id IN (${placeholders}) ORDER BY created_at DESC`).bind(user.corpid,...sessionIds).all().catch(()=>({results:[]}));
+  const byId=new Map((result.results||[]).map(row=>[String(row.id||""),row]));
+  const sessions=[...sessionIds].map(id=>byId.get(id)).filter(Boolean);
+  const anchorIds=new Set();
+  for(const session of sessions)for(const anchor of extractEmployeeEntryAnchorsFromSession(session)){
+    const id=cleanText(anchor?.transfer_anchor_id||anchor?.anchor_id||anchor?.event_id||anchor?.id||"",180);
+    if(id)anchorIds.add(id);
+  }
+  let expected={};
+  try{expected=JSON.parse(String(run.expected_json||"{}"))||{};}catch{}
+  return {requested:true,run_id:runId,run,matrix,scenarios,session_ids:sessionIds,entry_ids:entryIds,anchor_ids:anchorIds,sessions,expected};
+}
+__name(qaAcceptanceOwnerRunScope,"qaAcceptanceOwnerRunScope");
 function qaAcceptanceRequestHostAllowed(request,env={}){
   const host=new URL(request.url).hostname.toLowerCase();
   const expected=String(env.QA_HOSTNAME||"").trim().toLowerCase();
@@ -13506,46 +13593,64 @@ async function handleRequest(request, env, ctx) {
     if (path === "/api/history") {
       const requestedBed=ownerHistoryTransferLineageRequestedBed(url);
       if(requestedBed&&!canReadOwnerData(user))return forbidden();
+      const qaScope=await qaAcceptanceOwnerRunScope(request,env,user);
+      if(qaScope.response)return qaScope.response;
       if(!await empTableExists(env,"sessions")){
         const data=[];
         const transferLineage=requestedBed?projectOwnerHistoryTransferLineage({corpid:user.corpid,requested_bed:requestedBed,archive_entries:[]}):null;
-        return transferLineage?json({...ok(data),transfer_lineage:transferLineage}):success(data);
+        return transferLineage||qaScope.requested?json({...ok(data),...(transferLineage?{transfer_lineage:transferLineage}:{}),...(qaScope.requested?{qa_run_scope:qaAcceptanceOwnerRunScopeMeta(qaScope)}:{})}):success(data);
       }
       const includeVoided = url.searchParams.get("include_voided") === "1";
       const rawLimit = Number(url.searchParams.get("limit") || 0);
       const rawOffset = Number(url.searchParams.get("offset") || 0);
-      const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(Math.floor(rawLimit), 30) : 30;
+      const maxLimit=qaScope.requested?100:30;
+      const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(Math.floor(rawLimit), maxLimit) : maxLimit;
       const offset = Number.isFinite(rawOffset) && rawOffset > 0 ? Math.floor(rawOffset) : 0;
-      // Keep the normal History page's legacy active-row window intact. Transfer
-      // void anchors use TRANSFER_VOID_APPLIED (not VOID), so the same one-row
-      // snapshot still contains the immutable audit evidence needed by the
-      // lightweight Map projection without crowding out ordinary history rows.
-      const baseSql = includeVoided
-        ? "SELECT * FROM sessions WHERE corpid=? ORDER BY created_at DESC"
-        : "SELECT * FROM sessions WHERE corpid=? AND COALESCE(voided_at,'')='' AND COALESCE(handover_status,'')<>'VOID' ORDER BY created_at DESC";
-      if (limit) {
-        const { results } = await env.DB.prepare(`${baseSql} LIMIT ? OFFSET ?`).bind(user.corpid, limit, offset).all();
-        const data=await canonicalOwnerHistorySessionRowsForList(env,user,results||[]);
-        const transferLineage=requestedBed?await ownerHistoryTransferLineageForRequest(env,user,url):null;
-        return transferLineage?json({...ok(data),transfer_lineage:transferLineage}):success(data);
+      let results=[];
+      if(qaScope.requested){
+        results=qaScope.sessions
+          .filter(row=>includeVoided||(!cleanText(row?.voided_at||"",80)&&cleanText(row?.handover_status||"",40).toUpperCase()!=="VOID"))
+          .sort((a,b)=>String(b?.created_at||"").localeCompare(String(a?.created_at||"")))
+          .slice(offset,offset+limit);
+      }else{
+        // Keep the normal History page's legacy active-row window intact. Transfer
+        // void anchors use TRANSFER_VOID_APPLIED (not VOID), so the same one-row
+        // snapshot still contains the immutable audit evidence needed by the
+        // lightweight Map projection without crowding out ordinary history rows.
+        const baseSql = includeVoided
+          ? "SELECT * FROM sessions WHERE corpid=? ORDER BY created_at DESC"
+          : "SELECT * FROM sessions WHERE corpid=? AND COALESCE(voided_at,'')='' AND COALESCE(handover_status,'')<>'VOID' ORDER BY created_at DESC";
+        results=(await env.DB.prepare(`${baseSql} LIMIT ? OFFSET ?`).bind(user.corpid,limit,offset).all()).results||[];
       }
-      const { results } = await env.DB.prepare(
-        baseSql
-      ).bind(user.corpid).all();
-      const data=await canonicalOwnerHistorySessionRowsForList(env,user,results||[]);
-      const transferLineage=requestedBed?await ownerHistoryTransferLineageForRequest(env,user,url):null;
-      return transferLineage?json({...ok(data),transfer_lineage:transferLineage}):success(data);
+      let data=await canonicalOwnerHistorySessionRowsForList(env,user,results||[]);
+      if(qaScope.requested)data=data.map(row=>({...row,qa_run_id:qaScope.run_id}));
+      const transferLineage=requestedBed
+        ?qaScope.requested
+          ?projectOwnerHistoryTransferLineage({corpid:user.corpid,requested_bed:requestedBed,archive_entries:ownerHistoryTransferLineageArchiveEntries(qaScope.sessions,user.corpid)})
+          :await ownerHistoryTransferLineageForRequest(env,user,url)
+        :null;
+      return transferLineage||qaScope.requested
+        ?json({...ok(data),...(transferLineage?{transfer_lineage:transferLineage}:{}),...(qaScope.requested?{qa_run_scope:qaAcceptanceOwnerRunScopeMeta(qaScope)}:{})})
+        :success(data);
     }
     if (path === "/api/session_detail" && method === "GET") {
       const requestedBed=ownerHistoryTransferLineageRequestedBed(url);
       if(requestedBed&&!canReadOwnerData(user))return forbidden();
+      const qaScope=await qaAcceptanceOwnerRunScope(request,env,user);
+      if(qaScope.response)return qaScope.response;
       const sid = cleanId(url.searchParams.get("id"));
       if (!sid) return badRequest("bad_request");
+      if(qaScope.requested&&!qaScope.session_ids.has(sid))return json({success:false,error_code:"QA_RUN_DETAIL_OUT_OF_SCOPE",qa_run_id:qaScope.run_id},404);
       const includeVoided = url.searchParams.get("include_voided") === "1";
       const includeCorrections = ["1","true","yes","on"].includes(String(url.searchParams.get("include_corrections")||"").trim().toLowerCase());
-      const sessionRow=await env.DB.prepare("SELECT * FROM sessions WHERE id=? AND corpid=? LIMIT 1").bind(sid,user.corpid).first();
-      const transferLineage=requestedBed?await ownerHistoryTransferLineageForRequest(env,user,url):null;
+      const sessionRow=qaScope.requested?qaScope.sessions.find(row=>String(row?.id||"")===sid):await env.DB.prepare("SELECT * FROM sessions WHERE id=? AND corpid=? LIMIT 1").bind(sid,user.corpid).first();
+      const transferLineage=requestedBed
+        ?qaScope.requested
+          ?projectOwnerHistoryTransferLineage({corpid:user.corpid,requested_bed:requestedBed,archive_entries:ownerHistoryTransferLineageArchiveEntries(qaScope.sessions,user.corpid)})
+          :await ownerHistoryTransferLineageForRequest(env,user,url)
+        :null;
       const lineageFields=transferLineage?{transfer_lineage:transferLineage}:{};
+      const qaFields=qaScope.requested?{qa_run_scope:qaAcceptanceOwnerRunScopeMeta(qaScope)}:{};
       const hasTransactions=await empTableExists(env,"transactions");
       const results=hasTransactions?(await env.DB.prepare(
           includeVoided||includeCorrections
@@ -13555,18 +13660,20 @@ async function handleRequest(request, env, ctx) {
       if(sessionRow&&isEmployeeEntrySession(sessionRow)){
         const anchorRows=extractEmployeeEntryAnchorsFromSession(sessionRow);
         const exportRows=parseEmployeeEntryExportRows(sessionRow);
-        const detailChoice=chooseOwnerEmployeeSessionDetailRows(sessionRow,results,anchorRows,exportRows);
+        const detailChoice=qaScope.requested&&anchorRows.length
+          ?{source:"structured",rows:anchorRows,reconciliation:ownerEmployeeDetailRowsReconcileSession(sessionRow,anchorRows)}
+          :chooseOwnerEmployeeSessionDetailRows(sessionRow,results,anchorRows,exportRows);
         if(detailChoice.rows.length){
           if(includeCorrections){
             return ownerHistoryDetailAdditiveResponse(env,user,sessionRow,detailChoice.rows,lineageFields);
           }
-          return json({...ok(detailChoice.rows),...ownerHistoryDetailJsonSafeValue(canonicalOwnerHistoryDetailGatewayFields(sessionRow,detailChoice.rows,null,detailChoice.source)),...ownerHistoryDetailJsonSafeValue(lineageFields)});
+          return json({...ok(detailChoice.rows),...ownerHistoryDetailJsonSafeValue(canonicalOwnerHistoryDetailGatewayFields(sessionRow,detailChoice.rows,null,detailChoice.source)),...ownerHistoryDetailJsonSafeValue(lineageFields),...qaFields});
         }
       }
       if(includeCorrections&&sessionRow){
         return ownerHistoryDetailAdditiveResponse(env,user,sessionRow,results,lineageFields);
       }
-      return json({...ok(results),...ownerHistoryDetailJsonSafeValue(sessionRow?canonicalOwnerHistoryDetailGatewayFields(sessionRow,results,null,"transactions"): {archive_gateway:{ok:false,gateway:"canonical_owner_history_archive_gateway",archive_state:"missing",source_proof:{gateway:"canonical_owner_history_archive_gateway",source_layer:"L1 Canonical Event Archive"}}}),...ownerHistoryDetailJsonSafeValue(lineageFields)});
+      return json({...ok(results),...ownerHistoryDetailJsonSafeValue(sessionRow?canonicalOwnerHistoryDetailGatewayFields(sessionRow,results,null,"transactions"): {archive_gateway:{ok:false,gateway:"canonical_owner_history_archive_gateway",archive_state:"missing",source_proof:{gateway:"canonical_owner_history_archive_gateway",source_layer:"L1 Canonical Event Archive"}}}),...ownerHistoryDetailJsonSafeValue(lineageFields),...qaFields});
     }
     return errorResponse("not_found", 404, "not_found");
   }

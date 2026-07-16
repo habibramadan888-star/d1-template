@@ -16,7 +16,8 @@ function functionBlock(name) {
 test('canonical Owner History routes add transfer_lineage without replacing data', () => {
   assert.match(worker, /path === "\/api\/history"/);
   assert.match(worker, /path === "\/api\/session_detail"/);
-  assert.match(worker, /\.\.\.ok\(data\),transfer_lineage:transferLineage/);
+  assert.match(worker, /transferLineage\?\{transfer_lineage:transferLineage\}:\{\}/);
+  assert.match(worker, /qa_run_scope:qaAcceptanceOwnerRunScopeMeta\(qaScope\)/);
   assert.match(worker, /\.\.\.ok\(detailChoice\.rows\)/);
 });
 
@@ -25,7 +26,8 @@ test('lineage query is owner-only while non-lineage history behavior is retained
   assert.match(requestBed, /requested_bed/);
   assert.match(requestBed, /searchParams.*bed/);
   assert.match(worker, /requestedBed&&!canReadOwnerData\(user\).*forbidden/);
-  assert.match(worker, /transferLineage\?json\([^\n]+\):success\(data\)/);
+  assert.match(worker, /transferLineage\|\|qaScope\.requested/);
+  assert.match(worker, /:success\(data\)/);
 });
 
 test('Gateway reads only corpid-scoped canonical sessions and entries_json anchors', () => {

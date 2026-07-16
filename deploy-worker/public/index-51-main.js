@@ -46,6 +46,17 @@ function apiUrl(url){
   }
   return raw.startsWith('/')?raw:`/${raw.replace(/^\/+/, '')}`;
 }
+function ownerQaRunId(){
+  const runId=String(new URLSearchParams(location.search).get('qa_run_id')||'').trim().toUpperCase();
+  return /^QA-\d{8}-[A-Z0-9]{4,12}$/.test(runId)?runId:'';
+}
+function ownerRunScopedApi(url){
+  const runId=ownerQaRunId();
+  if(!runId)return url;
+  const target=new URL(apiUrl(url),location.origin);
+  target.searchParams.set('qa_run_id',runId);
+  return `${target.pathname}${target.search}${target.hash}`;
+}
 async function apiFetch(url, opts = {}) {
   const headers={ 'Content-Type':'application/json', ...(opts.headers||{}) };
   const token=LS.get('homelink:cloud_token');
@@ -277,7 +288,7 @@ const cssEsc=v=>(window.CSS&&typeof CSS.escape==='function')?CSS.escape(String(v
 
 /* ── STORAGE ── */
 const SENSITIVE_STORAGE_KEYS=['current-session','analysis:index',ARREARS_KEY,CUSTOMER_KEY];
-const isSensitiveStorageKey=k=>SENSITIVE_STORAGE_KEYS.includes(k)||String(k||'').startsWith('session:')||String(k||'').startsWith('anchor:');
+const isSensitiveStorageKey=k=>SENSITIVE_STORAGE_KEYS.includes(k)||String(k||'').startsWith('analysis:index')||String(k||'').startsWith('session:')||String(k||'').startsWith('anchor:');
 const LS={
   get(k){
     try{
@@ -715,12 +726,16 @@ function totals(entries){
   const sum=c=>r2(entries.filter(e=>e.cat===c)
     .reduce((s,e)=>s+Number(e.amount||0),0));
   const ci=sum('cash'),bi=sum('bank'),ro=sum('refund'),eo=sum('expense');
-  return{cashIn:ci,bankIn:bi,refundOut:ro,expOut:eo,cashOut:r2(ro+eo),netFunds:r2(ci+bi-ro-eo),
-    cashBal:r2(ci-ro-eo),total:r2(ci+bi)}; // 总收入=现金+银行（不扣退款/支出），现金结余=现金-退款-支出
+  const outflows=entries.filter(e=>e.cat==='refund'||e.cat==='expense');
+  const bankOut=r2(outflows.filter(e=>['bank','b'].includes(String(e.payType||e.payment_method||'').trim().toLowerCase())).reduce((s,e)=>s+Number(e.amount||0),0));
+  const cashOut=r2(ro+eo-bankOut);
+  return{cashIn:ci,bankIn:bi,refundOut:ro,expOut:eo,cashOut,bankOut,netFunds:r2(ci+bi-ro-eo),
+    cashBal:r2(ci-cashOut),bankBal:r2(bi-bankOut),total:r2(ci+bi)}; // 总收入=现金+银行；净额按各自支付渠道扣除支出
 }
 
 function balanceTotalFromTotals(t){
-  return Math.round((Number(t?.cashBal||0)+Number(t?.bankIn||0))*100)/100;
+  const bankNet=Number.isFinite(Number(t?.bankBal))?Number(t.bankBal):Number(t?.bankIn||0);
+  return Math.round((Number(t?.cashBal||0)+bankNet)*100)/100;
 }
 
 function historyDetailMismatchHtml(session,renderedCount){
@@ -898,32 +913,48 @@ function toast(msg,type='ok'){
 
 /* ── PERSISTENCE ── */
 function saveCur(){LS.set('current-session',JSON.stringify(state.session));}
+function analysisIndexStorageKey(){const runId=ownerQaRunId();return runId?`analysis:index:${runId}`:'analysis:index';}
+function analysisSessionStorageKey(session={}){
+  const runId=ownerQaRunId();
+  const identity=ledgerSessionIdentity(session).replace(/[^A-Za-z0-9_.:-]/g,'_');
+  return runId?`anchor:${runId}:${identity}`:`anchor:${session.anchorId||identity}`;
+}
 function saveAnalysis(){
   state.analysisSessions=normalizeLedgerSessions(state.analysisSessions);
   _ccCache=null; // 分析流水变更后，客户信用评分必须重建
-  LS.set('analysis:index',JSON.stringify(state.analysisSessions.map(s=>s.anchorId)));
-  state.analysisSessions.forEach(s=>LS.set(`anchor:${s.anchorId}`,JSON.stringify(s)));
+  LS.set(analysisIndexStorageKey(),JSON.stringify(state.analysisSessions.map(analysisSessionStorageKey)));
+  state.analysisSessions.forEach(s=>LS.set(analysisSessionStorageKey(s),JSON.stringify(s)));
 }
 function loadAnalysis(){
   try{
-    const idx=JSON.parse(LS.get('analysis:index')||'[]');
-    const raw=idx.map(aid=>{try{const r=LS.get(`anchor:${aid}`);return r?JSON.parse(r):null;}catch{return null;}}).filter(Boolean);
-    // 加载时自动去重：按内容指纹去重，只保留每份流水第一次出现的
+    const idx=JSON.parse(LS.get(analysisIndexStorageKey())||'[]');
+    const loaded=idx.map(key=>{try{const r=LS.get(String(key).startsWith('anchor:')?key:`anchor:${key}`);return r?JSON.parse(r):null;}catch{return null;}}).filter(Boolean);
+    const raw=loaded.filter(session=>{
+      if(qaRunAnalysisSessionIntegrity(session))return true;
+      LS.del(analysisSessionStorageKey(session));
+      return false;
+    });
+    // 加载时只按正式身份去重；不同 Entry ID 的合法同额业务必须分别保留。
     const seen=new Set();
     const deduped=[];
     normalizeLedgerSessions(raw).forEach(s=>{
-      const fp=contentFP(s);
-      if(!seen.has(fp)){seen.add(fp);deduped.push(s);}
-      else{LS.del(`anchor:${s.anchorId}`);}// 删除多余的
+      const identity=ledgerSessionIdentity(s);
+      if(!seen.has(identity)){seen.add(identity);deduped.push(s);}
+      else{LS.del(analysisSessionStorageKey(s));}// 删除同一正式身份的重复缓存
     });
     // 如有清理，更新索引
-    if(deduped.length<raw.length){
-      LS.set('analysis:index',JSON.stringify(deduped.map(s=>s.anchorId)));
+    if(deduped.length<loaded.length){
+      LS.set(analysisIndexStorageKey(),JSON.stringify(deduped.map(analysisSessionStorageKey)));
     }
     return deduped;
   }catch{return[];}
 }
-function rmAnalysis(anchorId){state.analysisSessions=state.analysisSessions.filter(s=>s.anchorId!==anchorId);LS.del(`anchor:${anchorId}`);saveAnalysis();}
+function rmAnalysis(anchorId){
+  const removed=state.analysisSessions.filter(s=>s.anchorId===anchorId);
+  state.analysisSessions=state.analysisSessions.filter(s=>s.anchorId!==anchorId);
+  removed.forEach(s=>LS.del(analysisSessionStorageKey(s)));
+  saveAnalysis();
+}
 async function loadAll(){
   try{const cur=LS.get('current-session');if(cur){const p=JSON.parse(cur);if(p&&Array.isArray(p.entries))state.session=p;}}catch{}
   try{const keys=LS.keys('session:');const arr=[];for(const k of keys){try{const r=LS.get(k);if(r)arr.push(JSON.parse(r));}catch{}}arr.sort((a,b)=>(b.date||'').localeCompare(a.date||''));state.saved=arr;}catch{}
@@ -1346,6 +1377,16 @@ function isArrearTaskOpen(a){
 }
 async function loadExistingArrearsForOwner({limit=ARREARS_PAGE_SIZE,timeoutMs=ARREARS_FETCH_TIMEOUT_MS}={}){
   const safeLimit=Math.min(Math.max(Number(limit)||ARREARS_PAGE_SIZE,1),100);
+  const qaRunId=ownerQaRunId();
+  if(qaRunId){
+    const response=await ownerGatewayJson(ownerRunScopedApi('/api/owner/cloud-arrears/projection'),{},timeoutMs);
+    const projection=response?.projection||response;
+    const projectedOpen=Array.isArray(projection?.open_items)?projection.open_items:[];
+    const projectedClosed=Array.isArray(projection?.closed_items)?projection.closed_items:[];
+    const rows=projectedOpen.map(normalizeArrearFromCloud);
+    const payload={tasks:rows,all_tasks:rows,preview_tasks:rows.slice(0,ARREARS_OVERVIEW_PAGE_SIZE),canonical_projection:projection,qa_run_id:qaRunId,summary:{total_count:rows.length,canonical_projection_total_remaining:projection.total_remaining,canonical_projection_open_count:projection.open_count,canonical_projection_partial_count:projection.partial_count}};
+    return {rows,meta:payload,payload,closedRows:projectedClosed.map(normalizeArrearFromCloud)};
+  }
   const [legacy,projection]=await Promise.all([
     ownerGatewayJson(`/api/boss/arrears/followup-tasks?limit=${safeLimit}`,{},timeoutMs),
     ownerGatewayJson('/api/owner/cloud-arrears/projection',{},timeoutMs)
@@ -2830,7 +2871,7 @@ async function renderHistory(){
     if(s._cloud&&(!s.entries||!s.entries.length)&&(!ledgerSessionRawText(s)||s._voided||Number(s.entriesCount||s.entries_count||0))){
       wrap.innerHTML='<div style="text-align:center;padding:40px;color:var(--text3)">加载中...</div>';
       try{
-        const detailUrl=`/api/session_detail?id=${encodeURIComponent(s.id)}${s._voided?'&include_voided=1&include_corrections=1':''}${state.historyBedQuery?`&bed=${encodeURIComponent(state.historyBedQuery)}`:''}`;
+        const detailUrl=ownerRunScopedApi(`/api/session_detail?id=${encodeURIComponent(s.id)}${s._voided?'&include_voided=1&include_corrections=1':''}${state.historyBedQuery?`&bed=${encodeURIComponent(state.historyBedQuery)}`:''}`);
         const detailPayload=await ownerGatewayJson(detailUrl,{},HISTORY_FETCH_TIMEOUT_MS);
         const rows=Array.isArray(detailPayload)?detailPayload:(Array.isArray(detailPayload?.data)?detailPayload.data:[]);
         if(!Array.isArray(rows)){wrap.innerHTML='<div class="card" style="padding:24px;text-align:center;color:var(--red)">历史详情格式异常</div>';return;}
@@ -2928,7 +2969,7 @@ async function renderHistory(){
   }
 
   // 会话列表：云端 + 本地合并。先显示骨架，避免历史页 15-20 秒空白。
-  const limit=state.historyLimit||HISTORY_PAGE_SIZE;
+  const limit=ownerQaRunId()?100:(state.historyLimit||HISTORY_PAGE_SIZE);
   wrap.innerHTML=`${ownerHistoryBedControlsHtml()}<div class="owner-history-skeleton history-skeleton card" style="padding:18px">
     <div class="hist-toolbar"><span>正在加载最近 ${limit} 条历史...</span><span class="hist-order">LOADING</span></div>
     <div class="hist-grid">
@@ -2937,7 +2978,7 @@ async function renderHistory(){
   </div>`;
   let cloud=[];
   try{
-    const historyUrl=`/api/history?limit=${encodeURIComponent(limit)}${state.showDeletedHistory?'&include_voided=1':''}${state.historyBedQuery?`&bed=${encodeURIComponent(state.historyBedQuery)}`:''}`;
+    const historyUrl=ownerRunScopedApi(`/api/history?limit=${encodeURIComponent(limit)}${state.showDeletedHistory?'&include_voided=1':''}${state.historyBedQuery?`&bed=${encodeURIComponent(state.historyBedQuery)}`:''}`);
     cloud=await ownerGatewayJson(historyUrl,{},HISTORY_FETCH_TIMEOUT_MS);
     if(!Array.isArray(cloud))throw new Error('OWNER_HISTORY_GATEWAY_SHAPE_INVALID');
     state.ownerHistoryTransferLineage=state.historyBedQuery?(cloud?.transfer_lineage||null):null;
@@ -3078,7 +3119,7 @@ async function renderHistory(){
         try{
           a.disabled=true;
           a.textContent='Voiding...';
-          const detail=await ownerGatewayJson(`/api/session_detail?id=${encodeURIComponent(id)}`,{},HISTORY_FETCH_TIMEOUT_MS);
+          const detail=await ownerGatewayJson(ownerRunScopedApi(`/api/session_detail?id=${encodeURIComponent(id)}`),{},HISTORY_FETCH_TIMEOUT_MS);
           const rows=Array.isArray(detail)?detail:(Array.isArray(detail?.data)?detail.data:[]);
           const transfers=rows.filter(row=>String(row?.event_type||row?.type||'').toLowerCase()==='bed_transfer');
           if(rows.length!==1||transfers.length!==1)throw new Error('BED_TRANSFER_VOID_EXACT_SESSION_REQUIRED');
@@ -3159,7 +3200,7 @@ function computeAna(sessions){
     const d=(s.date||'').slice(0,10);
     return{date:d,
       cashBal:r2(st.cashBal), bankIn:r2(st.bankIn),
-      balanceTotal:r2(st.cashBal+st.bankIn),
+      balanceTotal:balanceTotalFromTotals(st),
       refundOut:r2(st.refundOut), expOut:r2(st.expOut),
       totalIn:r2(st.cashIn+st.bankIn),
       newCount:s.entries.map(normalizeEntry).filter(e=>e.tag==='New').length,
@@ -3177,7 +3218,7 @@ function renderAnalysisChips(){
     return `<span class="chip${inf?'':' dim'}" data-anchor="${esc(s.anchorId)}">${esc((s.date||'').slice(0,10))} · ${s.entries.length}笔${s.isLegacy?' 旧':''}<button class="chip-x" data-act="rm"><svg class="ico" style="width:11px;height:11px"><use href="#i-x"/></svg></button></span>`;
   }).join('')+`<button class="btn btn-ghost" id="btnClearAna" style="margin-left:auto;padding:5px 10px;font-size:11px"><svg class="ico"><use href="#i-trash"/></svg>清空</button>`;
   wrap.querySelectorAll('.chip').forEach(c=>{c.querySelector('.chip-x')?.addEventListener('click',()=>{rmAnalysis(c.dataset.anchor);renderFilterControls();renderAnalysis();});});
-  document.getElementById('btnClearAna').onclick=()=>{if(!confirm('清空所有分析数据？'))return;state.analysisSessions.forEach(s=>LS.del(`anchor:${s.anchorId}`));state.analysisSessions=[];saveAnalysis();renderFilterControls();renderAnalysis();};
+  document.getElementById('btnClearAna').onclick=()=>{if(!confirm('清空所有分析数据？'))return;state.analysisSessions.forEach(s=>LS.del(analysisSessionStorageKey(s)));state.analysisSessions=[];saveAnalysis();renderFilterControls();renderAnalysis();};
 }
 /* ══════════════════════════════════════════════════════════════════
    租金连续性检查模块 v4（全量 Bug 修复版）
@@ -3206,7 +3247,7 @@ function analysisRemoveAnchors(anchorIds){
   if(!ids.size)return;
   state.analysisSessions=normalizeLedgerSessions(state.analysisSessions).filter(s=>{
     const keep=!ids.has(s.anchorId);
-    if(!keep)LS.del(`anchor:${s.anchorId}`);
+    if(!keep)LS.del(analysisSessionStorageKey(s));
     return keep;
   });
   saveAnalysis();
@@ -3286,7 +3327,7 @@ function renderAnalysisChips(){
   wrap.querySelectorAll('[data-analysis-period-remove]').forEach(btn=>btn.onclick=()=>{const key=btn.dataset.analysisPeriodRemove;const g=groups.find(x=>x.info.key===key);if(!g)return;if(!confirm(`移除 ${g.info.label} 的 ${g.sessions.length} 票流水？`))return;analysisRemoveAnchors(g.sessions.map(s=>s.anchorId));});
   wrap.querySelectorAll('[data-analysis-date-remove]').forEach(btn=>btn.onclick=()=>{const date=btn.dataset.analysisDateRemove;const sessions=state.analysisSessions.filter(s=>(s.date||'').slice(0,10)===date);if(!sessions.length)return;if(!confirm(`移除 ${date} 的 ${sessions.length} 票流水？`))return;analysisRemoveAnchors(sessions.map(s=>s.anchorId));});
   wrap.querySelectorAll('[data-analysis-session-remove]').forEach(btn=>btn.onclick=()=>analysisRemoveAnchors([btn.dataset.analysisSessionRemove]));
-  document.getElementById('btnClearAna').onclick=()=>{if(!confirm('清空所有分析数据？'))return;state.analysisSessions.forEach(s=>LS.del(`anchor:${s.anchorId}`));state.analysisSessions=[];saveAnalysis();renderFilterControls();renderAnalysis();};
+  document.getElementById('btnClearAna').onclick=()=>{if(!confirm('清空所有分析数据？'))return;state.analysisSessions.forEach(s=>LS.del(analysisSessionStorageKey(s)));state.analysisSessions=[];saveAnalysis();renderFilterControls();renderAnalysis();};
 }
 
 const RC_KEY='apt:rentRef';
@@ -5105,7 +5146,7 @@ function renderAnalysis(){
   const balanceTotal=balanceTotalFromTotals(a.totals);
   wrap.innerHTML=`
   <div class="card" style="margin-top:14px"><div class="card-head"><div><div class="card-title">${esc(pl)}</div><div class="card-sub">${a.n} 个会话 · ${a.all.length} 笔交易</div></div><div style="text-align:right"><div class="card-sub">期间总收入</div><div style="font-size:26px;font-weight:800;color:#1a9e3f;font-family:JetBrains Mono,monospace;letter-spacing:0">${fmtMoney(a.totals.total)} <span style="font-size:12px;color:var(--text3)">AED</span></div></div></div>
-  <div class="card-body"><div class="ana-kpi-grid">${[['现金收入',a.totals.cashIn,'#c8902a'],['银行收入',a.totals.bankIn,'#1a8a4a'],['押金退款',a.totals.refundOut,'#e06c00'],['其他支出',a.totals.expOut,'#d93025'],['现金结余',a.totals.cashIn-a.totals.refundOut-a.totals.expOut,'#5b7fa6'],['结余总计',balanceTotal,'#0f766e']].map(([l,v,c])=>`<div class="ana-kpi"><div class="ana-kpi-lbl">${l}</div><div class="ana-kpi-val" style="color:${c}">${fmtMoney(v)}</div></div>`).join('')}</div>
+  <div class="card-body"><div class="ana-kpi-grid">${[['现金收入',a.totals.cashIn,'#c8902a'],['银行收入',a.totals.bankIn,'#1a8a4a'],['押金退款',a.totals.refundOut,'#e06c00'],['其他支出',a.totals.expOut,'#d93025'],['现金结余',a.totals.cashBal,'#5b7fa6'],['结余总计',balanceTotal,'#0f766e']].map(([l,v,c])=>`<div class="ana-kpi"><div class="ana-kpi-lbl">${l}</div><div class="ana-kpi-val" style="color:${c}">${fmtMoney(v)}</div></div>`).join('')}</div>
   <div class="hint" style="text-align:left;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">平均每次交接 <b style="color:var(--accent)">${fmtMoney(a.avg)} AED</b></div></div></div>
   ${anaPanelHtml('session','逐会话对比','排查核账专用 · 默认收起','<div id="anaSessionBreakdown"></div>')}
   ${anaPanelHtml('finance','财务趋势','每次交接 · 默认收起',financeBody)}
@@ -5416,7 +5457,7 @@ async function loadOwnerTodayTodos(){
   state.ownerTodayTodosError='';
   state.ownerTodayTodos=null;
   try{
-    const data=await ownerGatewayJson('/api/owner/today-todos?limit=50',{},10000);
+    const data=await ownerGatewayJson(ownerRunScopedApi('/api/owner/today-todos?limit=50'),{},10000);
     state.ownerTodayTodos=data||{};
     state.ownerTodayTodosStatus='success';
     renderOwnerOverview();
@@ -5820,8 +5861,19 @@ async function loadOwnerOverviewComparativeSummary(){
   state.overviewComparativeError='';
   renderOwnerOverviewComparativePanel();
   try{
-    const res=await apiFetch('/api/owner/overview/comparative-summary?period=month&include_last_month=true&include_same_month_last_year=true&include_quarter=true');
+    const qaRunId=ownerQaRunId();
+    const [res,qaArrears]=await Promise.all([
+      apiFetch('/api/owner/overview/comparative-summary?period=month&include_last_month=true&include_same_month_last_year=true&include_quarter=true'),
+      qaRunId?ownerGatewayJson(ownerRunScopedApi('/api/owner/cloud-arrears/projection'),{},10000).catch(()=>null):Promise.resolve(null)
+    ]);
     const data=await res.json();
+    if(qaArrears){
+      const scopedArrears=qaArrears.projection||qaArrears;
+      data.arrears=data.arrears||{};
+      data.arrears.cloud_arrears_collection={total_remaining:Number(scopedArrears.total_remaining||0),open_count:Number(scopedArrears.open_count||0),partial_count:Number(scopedArrears.partial_count||0),details:Array.isArray(scopedArrears.open_items)?scopedArrears.open_items:[]};
+      data.arrears.cloud_arrears_details=data.arrears.cloud_arrears_collection.details;
+      data.qa_run_scope=qaArrears.qa_run_scope||{qa_run_id:qaRunId};
+    }
     state.overviewComparative=data||{};
     state.overviewComparativeStatus='success';
     renderOwnerOverview();
@@ -5856,7 +5908,7 @@ function renderOwnerFinancePanel(){
 async function loadOwnerFinanceProjection(){
   if(state.ownerFinanceStatus==='loading')return false;
   state.ownerFinanceStatus='loading';state.ownerFinanceError='';state.ownerFinance=null;renderOwnerFinancePanel();
-  try{state.ownerFinance=await ownerGatewayJson('/api/owner/finance/projection',{},10000);state.ownerFinanceStatus='success';renderOwnerFinancePanel();return true;}
+  try{state.ownerFinance=await ownerGatewayJson(ownerRunScopedApi('/api/owner/finance/projection'),{},10000);state.ownerFinanceStatus='success';renderOwnerFinancePanel();return true;}
   catch(error){state.ownerFinance=null;state.ownerFinanceStatus='error';state.ownerFinanceError=error?.message||String(error||'');if(error?.authFailure)clearLegacyAuthStorage();renderOwnerFinancePanel();return false;}
 }
 function ensureOwnerFinanceAsync(){renderOwnerFinancePanel();if(['loading','success'].includes(state.ownerFinanceStatus))return;setTimeout(()=>loadOwnerFinanceProjection(),0);}
@@ -5969,7 +6021,7 @@ function renderOwnerOverview(){
   ensureOwnerTodayTodosAsync();
 }
 
-/* ── ANALYSIS IMPORT — 双重去重：锚点ID + 内容指纹 ── */
+/* ── ANALYSIS IMPORT — 正式身份去重 ── */
 
 // 内容指纹：日期 + 笔数 + 各类总额（四舍五入到分）
 // 只要是同一份流水，无论从哪条路径导入，指纹必然相同
@@ -5989,14 +6041,40 @@ function stableAnchor(s){
   return `STA-${d.replace(/-/g,'')}-${Math.abs(h).toString(36).toUpperCase().padStart(6,'0')}`;
 }
 
+function ledgerSessionIdentity(s={}){
+  const normalized=normalizeLedgerSession(s);
+  const entryIds=(normalized.entries||[]).map(row=>String(row?.entry_id||row?.id||row?.event_id||'').trim()).filter(Boolean).sort();
+  if(entryIds.length)return `entry:${entryIds.join(',')}`;
+  const canonical=String(normalized.canonicalAnchorId||normalized.canonical_anchor_id||'').trim();
+  if(canonical)return `canonical:${canonical}`;
+  const sessionId=String(normalized.id||normalized.session_id||'').trim();
+  if(sessionId)return `session:${sessionId}`;
+  const anchor=String(normalized.anchorId||normalized.anchor_id||'').trim();
+  if(anchor)return `anchor:${anchor}`;
+  return `content:${contentFP(normalized)}`;
+}
+
+function qaRunAnalysisSessionIntegrity(s={}){
+  const runId=ownerQaRunId();
+  const explicitRun=String(s?.qa_run_id||'').trim().toUpperCase();
+  const sessionId=String(s?.id||s?.session_id||'').trim().toUpperCase();
+  const declared=String(s?.entryId||s?.entry_id||s?.canonicalAnchorId||s?.canonical_anchor_id||s?.anchorId||s?.anchor_id||'').trim().toUpperCase();
+  const belongsToRun=explicitRun===runId||sessionId.startsWith(`${runId}-S`)||declared.startsWith(`${runId}-E`);
+  if(!runId||!belongsToRun)return true;
+  const entries=Array.isArray(s?.entries)?s.entries:[];
+  const declaredCount=Number(s?.entriesCount||s?.entries_count||entries.length||0);
+  const entryIds=entries.map(row=>String(row?.entry_id||row?.id||row?.event_id||'').trim().toUpperCase()).filter(id=>id.startsWith(`${runId}-E`));
+  if(declared.startsWith(`${runId}-E`))return declaredCount===1&&entries.length===1&&entryIds.length===1&&entryIds[0]===declared;
+  return declaredCount===1&&entries.length===1&&entryIds.length===1;
+}
+
 function isDuplicate(s){
-  const fp=contentFP(s);
-  return state.analysisSessions.some(x=>
-    x.anchorId===s.anchorId || contentFP(x)===fp
-  );
+  const identity=ledgerSessionIdentity(s);
+  return state.analysisSessions.some(x=>ledgerSessionIdentity(x)===identity);
 }
 
 async function syncImportedSessionsToCloud(sessions){
+  if(ownerQaRunId())return{ok:0,fail:0,errors:[],readonly:true,qa_run_id:ownerQaRunId()};
   if(denyReadonlyAdminWrite())return{ok:0,fail:sessions?.length||0,errors:['readonly_admin_denied']};
   if(!sessions||!sessions.length)return{ok:0,fail:0,errors:[]};
   sessions=normalizeLedgerSessions(sessions);
@@ -6042,7 +6120,7 @@ function tryAdd(text){
       s.anchorId=stableAnchor(s);
       if(!isDuplicate(s)){
         state.analysisSessions.push(s);
-        LS.set(`anchor:${s.anchorId}`,JSON.stringify(s));
+        LS.set(analysisSessionStorageKey(s),JSON.stringify(s));
         addedSessions.push(s);
         added++;
       } else dup++;
@@ -6078,8 +6156,8 @@ async function updateHistCount(){
   if(listEl) listEl.innerHTML='<div style="text-align:center;padding:20px;color:var(--text3);font-size:13px">加载中...</div>';
   let cloud=[];
   try{
-    const limit=Math.max(state.historyLimit||HISTORY_PAGE_SIZE,HISTORY_PAGE_SIZE);
-    const r=await apiFetch(`/api/history?limit=${encodeURIComponent(limit)}`);
+    const limit=ownerQaRunId()?100:Math.max(state.historyLimit||HISTORY_PAGE_SIZE,HISTORY_PAGE_SIZE);
+    const r=await apiFetch(ownerRunScopedApi(`/api/history?limit=${encodeURIComponent(limit)}`));
     if(r.status===401){showAuthExpired();if(listEl)listEl.innerHTML='<div style="text-align:center;padding:20px;color:var(--red);font-size:13px">登录已过期</div>';return;}
     if(r.status===403){if(listEl)listEl.innerHTML='<div style="text-align:center;padding:20px;color:var(--red);font-size:13px">老板账户才能导入历史</div>';toast('老板账户才能导入历史','err');return;}
     if(!r.ok){if(listEl)listEl.innerHTML=`<div style="text-align:center;padding:20px;color:var(--red);font-size:13px">历史加载失败：${r.status}</div>`;return;}
@@ -6092,7 +6170,7 @@ async function updateHistCount(){
   const cloudIds=new Set(cloud.map(s=>s.id));
   const localExtra=state.saved.filter(s=>!cloudIds.has(s.id));
   window._histSessions=normalizeLedgerSessions([
-    ...cloud.map(s=>({id:s.id,date:s.date,anchorId:s.anchor_id,entries:[],entriesCount:s.entries_count,export_text:s.export_text||'',createdBy:s.created_by||'',_cloud:true})),
+    ...cloud.map(s=>({id:s.id,date:s.date,anchorId:s.canonical_anchor_id||s.entry_id||s.anchor_id||s.id,canonicalAnchorId:s.canonical_anchor_id||'',entryId:s.entry_id||'',entries:[],entriesCount:s.entries_count,export_text:s.export_text||'',createdBy:s.created_by||'',source:ownerQaRunId()?'employee_entry':(s.source||''),qa_run_id:s.qa_run_id||ownerQaRunId(),_cloud:true})),
     ...localExtra.map(s=>({id:s.id,date:s.date,anchorId:s.anchorId,entries:s.entries||[],entriesCount:(s.entries||[]).length,export_text:s.export_text||'',createdBy:'',_cloud:false}))
   ]);
   const total=window._histSessions.length;
@@ -6430,7 +6508,8 @@ function renderHistoryImportProgress(job){
 async function loadHistoryImportEntries(cs,job){
   const started=performance.now();
   const normalizedCs=normalizeLedgerSession(cs);
-  if(normalizedCs.entries&&normalizedCs.entries.length){
+  const runScopedCanonical=!!(ownerQaRunId()&&cs?._cloud&&String(cs?.qa_run_id||'')===ownerQaRunId());
+  if(!runScopedCanonical&&normalizedCs.entries&&normalizedCs.entries.length){
     job.timings.historyFetchMs+=performance.now()-started;
     return normalizedCs.entries;
   }
@@ -6439,23 +6518,40 @@ async function loadHistoryImportEntries(cs,job){
     job.currentController=controller;
     const timer=setTimeout(()=>controller.abort(new DOMException('History detail timed out','TimeoutError')),HISTORY_IMPORT_ITEM_TIMEOUT_MS);
     try{
-      const r=await apiFetch(`/api/session_detail?id=${encodeURIComponent(cs.id)}`,{signal:controller.signal});
+      const r=await apiFetch(ownerRunScopedApi(`/api/session_detail?id=${encodeURIComponent(cs.id)}`),{signal:controller.signal});
       if(r.status===401){showAuthExpired();job.cancelled=true;throw new Error('登录已过期');}
       if(r.status===403)throw new Error('老板账户才能导入历史详情');
       if(!r.ok)throw new Error(`历史详情加载失败：${r.status}`);
       const rows=await r.json();
       if(!Array.isArray(rows))throw new Error('历史详情格式异常');
       job.timings.historyFetchMs+=performance.now()-started;
-      return rows.map(tx=>({
-        id:tx.id,cat:tx.cat,room:tx.room,amount:tx.amount,
-        due:tx.due||0,paid:tx.paid||0,deficit:tx.deficit||0,
-        tag:normTag(tx.tag),note:tx.note||'',
-        roomTo:tx.room_to||undefined,startDate:tx.start_date||undefined,
-        depDue:tx.dep_due||0,depPaid:tx.dep_paid||0,depDef:tx.dep_def||0,
-        dueDate:tx.due_date||undefined,depDate:tx.dep_date||undefined,
-        payType:tx.pay_type||undefined,discountReason:tx.discount_reason||undefined,
-        depositCollection:tx.deposit_collection===1
-      }));
+      return rows.map(tx=>{
+        const eventType=String(tx.event_type||tx.type||tx.reason_code||'').toLowerCase();
+        const isTransfer=eventType==='bed_transfer'||String(tx.type||'').toUpperCase()==='TF';
+        const isExpense=eventType==='expense'||String(tx.type||'').toUpperCase()==='E';
+        const isRefund=eventType==='deposit_out'||String(tx.type||'').toUpperCase()==='DR';
+        const payment=String(tx.payment_method||tx.pay_type||tx.cat||'').toLowerCase();
+        const amount=Number(isTransfer?(tx.fee_amount_aed??tx.fee_amount??tx.fee_paid_amount??0):isExpense?(tx.expense_amount??tx.amount??0):isRefund?(tx.actual_refund_amount??tx.refund_amount??tx.amount??0):(tx.paid_amount??tx.payment_amount??tx.deposit_paid_amount??tx.deposit_amount??tx.amount??tx.paid??0));
+        const due=Number(isTransfer?(tx.fee_due_amount??tx.fee_amount_aed??tx.fee_amount??amount):(tx.expected_rent??tx.expected_amount??tx.period_due??tx.due??amount));
+        return {
+          ...tx,
+          id:tx.id||tx.entry_id||tx.event_id||tx.anchor_id,
+          entry_id:tx.entry_id||tx.id||tx.event_id||'',
+          canonical_anchor_id:tx.transfer_anchor_id||tx.anchor_id||tx.event_id||tx.id||'',
+          cat:isExpense?'expense':isRefund?'refund':(payment==='bank'||payment==='b'?'bank':'cash'),
+          room:tx.room||tx.bed||tx.from_bed||tx.target_bed||'',
+          amount:Number.isFinite(amount)?amount:0,
+          due:Number.isFinite(due)?due:0,
+          paid:Number(tx.paid??tx.paid_amount??tx.payment_amount??(isTransfer?amount:amount))||0,
+          deficit:Number(tx.deficit??tx.arrears_amount??Math.max(0,due-amount))||0,
+          tag:normTag(tx.tag||(isTransfer?'Transfer':'Old')),note:tx.note||tx.expense_desc||tx.arrears_note||tx.final_note||'',
+          roomTo:tx.room_to||tx.to_bed||undefined,startDate:tx.start_date||tx.period_start||undefined,
+          depDue:tx.dep_due||0,depPaid:tx.dep_paid||0,depDef:tx.dep_def||0,
+          dueDate:tx.due_date||undefined,depDate:tx.dep_date||undefined,
+          payType:tx.pay_type||tx.payment_method||undefined,discountReason:tx.discount_reason||undefined,
+          depositCollection:tx.deposit_collection===1||eventType==='deposit_in'
+        };
+      });
     }finally{
       clearTimeout(timer);
       if(job.currentController===controller)job.currentController=null;
@@ -6490,7 +6586,8 @@ async function importHistorySessions(selected,{retry=false}={}){
         if(!entries.length){await setHistoryImportItemStatus(job,item,'fail','没有可导入的流水明细');fail++;continue;}
         await setHistoryImportItemStatus(job,item,'parsing');
         const normalizeStarted=performance.now();
-        const s=normalizeLedgerSession({id:cs.id,date:cs.date||'',anchorId:cs.anchorId||mkAnchor(cs.id,(cs.date||'').slice(0,10)),entries,export_text:ledgerSessionRawText(normalizedCs)});
+        const runScopedCanonical=!!(ownerQaRunId()&&cs?._cloud&&String(cs?.qa_run_id||'')===ownerQaRunId());
+        const s=normalizeLedgerSession({id:cs.id,date:cs.date||'',anchorId:cs.anchorId||mkAnchor(cs.id,(cs.date||'').slice(0,10)),entries,export_text:ledgerSessionRawText(normalizedCs),source:runScopedCanonical?'employee_entry':normalizedCs.source,qa_run_id:cs.qa_run_id||''});
         const aid=stableAnchor(s);
         const entry={...s,anchorId:aid};
         job.timings.normalizeMs+=performance.now()-normalizeStarted;
@@ -6498,7 +6595,7 @@ async function importHistorySessions(selected,{retry=false}={}){
           await setHistoryImportItemStatus(job,item,'updating');
           const appendStarted=performance.now();
           state.analysisSessions.push(entry);
-          LS.set(`anchor:${aid}`,JSON.stringify(entry));
+        LS.set(analysisSessionStorageKey(entry),JSON.stringify(entry));
           job.timings.appendMs+=performance.now()-appendStarted;
           added++;
           addedSessions.push(entry);
@@ -6612,7 +6709,7 @@ function getClientCreditBillingPeriod(dateValue=new Date()){
 function dedupSessions(sessions){
   const seen=new Set();
   return sessions.filter(s=>{
-    const k=s.anchorId||s.id;
+    const k=ledgerSessionIdentity(s);
     if(seen.has(k))return false;
     seen.add(k);return true;
   });
