@@ -2,6 +2,8 @@
 
 - Mode: quick
 - Status: AUTOMATION_PASS
+- Handoff status: superseded by `QA-20260716-4FB51FAF` after task 076 runtime/artifact change
+- QA cleanup status: COMPLETED; original evidence preserved
 - Artifact SHA-256: `cf20a0d9f46c2c0e92d6b6f278dfe048f92e40011fad397ca9b83acb65aad5a5`
 - QA Worker version: `95f79676-99ae-4c91-ae3b-bed2acdd80ad` (artifact marker `cf20a0d9f46c`)
 - Real Employee Validate Session: PASS in in-app Browser and independent Chrome context
