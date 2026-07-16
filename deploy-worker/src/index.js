@@ -2214,7 +2214,7 @@ function employeeEntryValidationExplanation(errorCode,message){
   };
 }
 __name(employeeEntryValidationExplanation,"employeeEntryValidationExplanation");
-const HOMELINK_DIAGNOSTIC_ASSET_VERSION="qa-post-acceptance-rehydration-v1";
+const HOMELINK_DIAGNOSTIC_ASSET_VERSION="qa-idempotent-finalization-v1";
 const HOMELINK_DIAGNOSTIC_COMMIT_HASH="runtime-git-commit";
 const HOMELINK_DIAGNOSTIC_WORKER_VERSION="runtime-response-header";
 const HOMELINK_DIAGNOSTIC_BUILT_AT="2026-07-07T00:00:00+04:00";
@@ -11815,15 +11815,16 @@ function qaAcceptanceEntryBusinessScope(row={},user={}){
   const normalized=normalizeEntryAnchor(row||{}),type=employeeEntryUploadType(row)||entryAnchorType(normalized),eventType=entryAnchorEventType(type);
   if(["TF","TFF"].includes(type)){
     const fee=employeeEntryBedTransferFee(row,normalized);
+    const feeMode=cleanText(row.fee_mode||fee.fee_choice||"",40).toLowerCase();
     return hscStableValue({
       event_type:"bed_transfer",
       from_bed:cleanText(normalized.from_bed||row.from_bed||row.bed_from||"",40).replace(/^#+/,""),
       to_bed:cleanText(normalized.to_bed||row.to_bed||row.bed_to||"",40).replace(/^#+/,""),
       transfer_reason:cleanText(normalized.transfer_reason||row.transfer_reason||row.reason||row.note||"",240),
-      fee_mode:cleanText(row.fee_mode||fee.fee_choice||"",40).toLowerCase(),
+      fee_mode:feeMode,
       fee_amount_aed:employeeEntryFingerprintMoney(row.fee_amount_aed??fee.fee_amount??0),
       payment_method:cleanText(row.payment_method||fee.payment_method||"",40).toLowerCase(),
-      fee_waiver_reason:cleanText(row.fee_waiver_reason||fee.waiver_reason||"",240),
+      fee_waiver_reason:feeMode==="waived"?cleanText(row.fee_waiver_reason||fee.waiver_reason||"",240):"",
       fee_due_date:cleanDate(row.fee_due_date||""),
       bed_price_difference_mode:cleanText(row.bed_price_difference_mode||"none",40).toLowerCase(),
       bed_price_difference_amount_aed:employeeEntryFingerprintMoney(row.bed_price_difference_amount_aed||0),
@@ -12385,6 +12386,10 @@ async function qaAcceptanceRunPersistenceSnapshot(env,user,run={},contract={},co
   const unexpectedSessions=sessions.filter(row=>!expectedSessionIds.has(String(row.id||""))).map(row=>String(row.id||""));
   const unexpectedEntries=[...entryLocations.keys()].filter(id=>!expectedEntryIds.has(id));
   const unexpectedTransactions=[...transactions.keys()].filter(id=>!expectedEntryIds.has(id));
+  if(context){
+    context.qa_persisted_entry_locations=entryLocations;
+    context.qa_persisted_sessions_by_id=sessionsById;
+  }
   const readOk=sessionReadOk&&transactionReadOk;
   const ok=readOk&&!conflicting.length&&!duplicateEntryIds.length&&!invalidSessionIds.length&&!unexpectedSessions.length&&!unexpectedEntries.length&&!unexpectedTransactions.length;
   return {ok,error_code:readOk?ok?"":"QA_RUN_PERSISTENCE_CONFLICT":"QA_RUN_PERSISTENCE_READ_FAILED",persistence_read_ok:readOk,session_read_ok:sessionReadOk,transaction_read_ok:transactionReadOk,persisted_entry_ids:persisted,missing_entry_ids:missing,conflicting_entries:conflicting,duplicate_entry_ids:[...new Set(duplicateEntryIds)],invalid_session_ids:[...new Set(invalidSessionIds)],unexpected_session_ids:unexpectedSessions,unexpected_entry_ids:unexpectedEntries,unexpected_transaction_ids:unexpectedTransactions,persisted_count:persisted.length,missing_count:missing.length,conflicting_count:conflicting.length+invalidSessionIds.length+unexpectedSessions.length+unexpectedEntries.length+unexpectedTransactions.length,duplicate_count:new Set(duplicateEntryIds).size,session_count:sessions.length,completed_session_count:sessions.filter(row=>!String(row.voided_at||"").trim()&&String(row.handover_status||"").toUpperCase()==="COMPLETED").length};
@@ -12396,6 +12401,111 @@ async function qaAcceptanceSessionPreflight(env,user,run={},contract={},requests
   return {ok:scope.ok&&persistence.ok,entry_scope:scope,persistence,scope_match_count:scope.scope_match_count,persisted_count:persistence.persisted_count,missing_count:persistence.missing_count,conflicting_count:persistence.conflicting_count,duplicate_entry_id_count:persistence.duplicate_count};
 }
 __name(qaAcceptanceSessionPreflight,"qaAcceptanceSessionPreflight");
+function qaAcceptanceFinalizationFinanceCheck(run={},contract={},context={}){
+  const scenarios=Array.isArray(contract?.scenarios)?contract.scenarios:[];
+  const locations=context?.qa_persisted_entry_locations;
+  if(!(locations instanceof Map))return {ok:false,error_code:"QA_RUN_FINANCE_SOURCE_UNAVAILABLE",expected:{},actual:{},mismatched_fields:[]};
+  const entries=[];
+  for(const scenario of scenarios){
+    const located=locations.get(String(scenario.entry_id||""));
+    if(!located?.entry)return {ok:false,error_code:"QA_RUN_FINANCE_SOURCE_INCOMPLETE",expected:contract?.expected||{},actual:{},mismatched_fields:[String(scenario.entry_id||"")]};
+    const row={...(located.entry||{})};
+    const type=canonicalFinanceProjectionEventType(row);
+    if(type==="bed_transfer"||type==="bed_transfer_fee"){
+      row.fee_amount=row.fee_amount??row.fee_amount_aed??0;
+      row.fee_status=row.fee_status||row.fee_mode||"";
+    }
+    entries.push(row);
+  }
+  const totals=canonicalFinanceProjectionZeroTotals();
+  for(const entry of entries)canonicalFinanceProjectionApplyAnchor(totals,entry);
+  const projection=canonicalFinanceProjectionRoundTotals(totals);
+  projection.net_cash=ownerOverviewMoney(projection.cash_received-projection.cash_out);
+  const actual=qaAcceptanceFinanceComparable(projection),expected=contract?.expected&&typeof contract.expected==="object"?contract.expected:{};
+  const requiredFields=["cash_received","bank_received","total_received","total_expenses","net_funds","cash_net","bank_net","outstanding","arrears_opened","arrears_repaid","deposit_included","bed_transfer_fee","rent_income"];
+  const expectedFields=[...new Set([...requiredFields,...Object.keys(expected).filter(field=>Number.isFinite(Number(expected[field])))])];
+  const missingExpected=requiredFields.filter(field=>!Number.isFinite(Number(expected[field])));
+  const mismatched=missingExpected.length?missingExpected:expectedFields.filter(field=>ownerOverviewMoney(actual[field])!==ownerOverviewMoney(expected[field]));
+  return {ok:mismatched.length===0,error_code:mismatched.length?missingExpected.length?"QA_RUN_FINANCIAL_ORACLE_MISSING":"QA_RUN_FINANCIAL_ORACLE_MISMATCH":"",expected:Object.fromEntries(expectedFields.map(field=>[field,ownerOverviewMoney(expected[field])])),actual:Object.fromEntries(expectedFields.map(field=>[field,ownerOverviewMoney(actual[field])])),mismatched_fields:mismatched,entry_count:entries.length};
+}
+__name(qaAcceptanceFinalizationFinanceCheck,"qaAcceptanceFinalizationFinanceCheck");
+async function qaAcceptanceStableUploadReceipt(run={},contract={},stored={},finance={},recordedAt="",context={},stageMs={},startedAt=Date.now()){
+  const entryIds=(contract.scenarios||[]).map(row=>String(row.entry_id||""));
+  const sessionIds=(contract.scenarios||[]).map(row=>String(row.session_id||""));
+  const locations=context?.qa_persisted_entry_locations instanceof Map?context.qa_persisted_entry_locations:new Map();
+  const anchorIds=entryIds.map(entryId=>{const entry=locations.get(entryId)?.entry||{};return String(entry.transfer_anchor_id||entry.anchor_id||entry.event_id||entry.id||"")});
+  const basis={qa_run_id:String(run.qa_run_id||""),artifact_sha256:String(run.artifact_sha256||""),payload_hash:String(contract.payloadHash||""),validation_attempt_id:String(stored.validation_attempt_id||""),entry_ids:entryIds,anchor_ids:anchorIds,completed_session_ids:sessionIds};
+  const digest=await hscSha256(JSON.stringify(hscStableValue(basis)));
+  return {
+    receipt_version:"qa-upload-receipt-v1",
+    receipt_id:`QA-UPLOAD-${digest.slice(0,24).toUpperCase()}`,
+    ...basis,
+    formal_write_count:entryIds.length,
+    total_count:entryIds.length,
+    already_persisted_count:entryIds.length,
+    new_write_count:0,
+    anchor_count:entryIds.length,
+    session_count:entryIds.length,
+    session_status:"COMPLETED",
+    entry_ids:entryIds,
+    resume_new_write_count:0,
+    canonical_write_count:0,
+    transaction_write_count:0,
+    anchor_write_count:0,
+    business_write_count:0,
+    finance_result:"PASS",
+    finance_actual:finance.actual||{},
+    stage_duration_ms:{...stageMs},
+    pre_finalization_duration_ms:Math.max(0,Date.now()-Number(startedAt||Date.now())),
+    finalization_only:true,
+    recorded_at:recordedAt
+  };
+}
+__name(qaAcceptanceStableUploadReceipt,"qaAcceptanceStableUploadReceipt");
+function qaAcceptanceStoredUploadReceipt(run={}){
+  try{const parsed=JSON.parse(run.upload_json||"null");return parsed&&typeof parsed==="object"?parsed:null}catch{return null}
+}
+__name(qaAcceptanceStoredUploadReceipt,"qaAcceptanceStoredUploadReceipt");
+async function qaAcceptanceFinalizePersistedRun(env,user,run,contract,stored,sessionPreflight,requestContext,startedAt=Date.now(),stageMs={}){
+  const scenarios=contract.scenarios||[],expectedCount=scenarios.length,persistence=sessionPreflight?.persistence||{};
+  const base={qa_run_id:run.qa_run_id,entry_scope_match_count:Number(sessionPreflight?.scope_match_count||0),already_persisted_count:Number(persistence.persisted_count||0),remaining_count:Number(persistence.missing_count||0),conflicting_entry_count:Number(persistence.conflicting_count||0),duplicate_entry_id_count:Number(persistence.duplicate_count||sessionPreflight?.duplicate_entry_id_count||0),formal_write_count:expectedCount,new_write_count:0,canonical_write_count:0,transaction_write_count:0,anchor_write_count:0,business_write_count:0,write_attempted:false,no_write:true,ttlock_external_calls:Number(requestContext.ttlock_external_call_count||0)};
+  const exact=expectedCount>0
+    &&Number(sessionPreflight?.scope_match_count||0)===expectedCount
+    &&Number(persistence.persisted_count||0)===expectedCount
+    &&Number(persistence.missing_count||0)===0
+    &&Number(persistence.conflicting_count||0)===0
+    &&Number(persistence.duplicate_count||0)===0
+    &&Number(persistence.session_count||0)===expectedCount;
+  if(!exact)return json({success:false,error_code:"QA_RUN_NOT_READY_FOR_FINALIZATION",...base,message:"The accepted QA Run is not fully and uniquely persisted. No business records or Run state were changed."},409);
+  const finance=qaAcceptanceFinalizationFinanceCheck(run,contract,requestContext);
+  if(!finance.ok)return json({success:false,error_code:finance.error_code||"QA_RUN_FINANCIAL_ORACLE_MISMATCH",...base,finance_result:"FAIL",finance_mismatched_fields:finance.mismatched_fields||[],message:"The persisted QA Run does not match its accepted financial oracle. No Run state was changed."},409);
+  const receipt=await qaAcceptanceStableUploadReceipt(run,contract,stored,finance,empNow(),requestContext,stageMs,startedAt);
+  if(String(run.status||"")==="UPLOAD_PASS"){
+    const existing=qaAcceptanceStoredUploadReceipt(run);
+    const receiptMatches=existing&&String(existing.receipt_id||"")===receipt.receipt_id&&Number(existing.anchor_count||0)===expectedCount&&new Set(existing.entry_ids||[]).size===expectedCount;
+    if(!receiptMatches||Number(persistence.completed_session_count||0)!==expectedCount)return json({success:false,error_code:"QA_RUN_UPLOAD_RECEIPT_CONFLICT",...base},409);
+    return success({ok:true,status:"UPLOAD_PASS",idempotent:true,upload_receipt:existing,completed_session_count:expectedCount,...base,request_context_metrics:employeeEntryAggregateRequestMetrics(requestContext),stage_duration_ms:stageMs,total_duration_ms:Date.now()-startedAt});
+  }
+  if(String(run.status||"")!=="MANUAL_EMPLOYEE_ACCEPTED"||!run.employee_accepted_at)return json({success:false,error_code:"QA_MANUAL_EMPLOYEE_ACCEPTANCE_REQUIRED",...base},409);
+  const sessionIds=scenarios.map(row=>String(row.session_id||"")),placeholders=sessionIds.map(()=>"?").join(","),recordedAt=receipt.recorded_at;
+  const completeSessions=env.DB.prepare(`UPDATE sessions SET handover_status='COMPLETED' WHERE corpid=? AND id IN (${placeholders}) AND COALESCE(voided_at,'')='' AND COALESCE(handover_status,'')<>'COMPLETED'`).bind(user.corpid,...sessionIds);
+  const completeRun=env.DB.prepare("UPDATE qa_acceptance_runs SET status='UPLOAD_PASS',upload_json=?,updated_at=? WHERE qa_run_id=? AND corpid=? AND status='MANUAL_EMPLOYEE_ACCEPTED' AND COALESCE(cleanup_status,'NOT_RUN')<>'COMPLETED'").bind(JSON.stringify(receipt),recordedAt,run.qa_run_id,user.corpid);
+  try{await env.DB.batch([completeSessions,completeRun])}catch{return json({success:false,error_code:"QA_RUN_FINALIZATION_FAILED",...base,message:"QA Run finalization did not complete; no canonical, transaction, or anchor write was attempted."},503)}
+  requestContext.d1_write_count=Number(requestContext.d1_write_count||0)+2;
+  const finalized=await qaAcceptanceRunPersistenceSnapshot(env,user,run,contract,requestContext,{fresh:true});
+  const current=await qaAcceptanceReadRun(env,user,run.qa_run_id),storedReceipt=qaAcceptanceStoredUploadReceipt(current||{});
+  const verified=finalized.ok
+    &&finalized.persisted_count===expectedCount
+    &&finalized.missing_count===0
+    &&finalized.conflicting_count===0
+    &&finalized.duplicate_count===0
+    &&finalized.completed_session_count===expectedCount
+    &&String(current?.status||"")==="UPLOAD_PASS"
+    &&String(storedReceipt?.receipt_id||"")===receipt.receipt_id;
+  if(!verified)return json({success:false,error_code:"QA_RUN_FINALIZATION_VERIFICATION_FAILED",...base,completed_session_count:Number(finalized.completed_session_count||0)},409);
+  return success({ok:true,status:"UPLOAD_PASS",idempotent:false,upload_receipt:storedReceipt,completed_session_count:expectedCount,...base,request_context_metrics:employeeEntryAggregateRequestMetrics(requestContext),stage_duration_ms:stageMs,total_duration_ms:Date.now()-startedAt});
+}
+__name(qaAcceptanceFinalizePersistedRun,"qaAcceptanceFinalizePersistedRun");
 async function qaAcceptanceEmployeeDraft(request,env,user,run){
   const contract=await qaAcceptanceEmployeeDraftContract(env,run);
   if(!contract.ok)return qaAcceptanceEmployeeDraftUnavailable(contract.error_code,409,run);
@@ -12557,6 +12667,14 @@ async function qaAcceptanceSessionResume(request,env,user,run){
   requestContext.archive_session_prefix=`${run.qa_run_id}-%`;
   requestContext.strict_archive_session_prefix=true;
   requestContext.transaction_session_prefix=requestContext.archive_session_prefix;
+  if(String(body.resume_intent||"")==="EMPLOYEE_FINALIZE_PERSISTED_RUN"){
+    const finalizationPreflightStart=Date.now(),finalizationPreflight=await qaAcceptanceSessionPreflight(env,user,run,contract,requests,requestContext);mark("finalization_preflight_ms",finalizationPreflightStart);
+    if(!finalizationPreflight.ok){
+      const persistenceReadFailed=finalizationPreflight.persistence?.persistence_read_ok===false;
+      return json({success:false,error_code:finalizationPreflight.persistence?.error_code||(finalizationPreflight.scope_match_count!==scenarios.length?"QA_RUN_ENTRY_SCOPE_MISMATCH":"QA_RUN_PERSISTENCE_CONFLICT"),qa_run_id:run.qa_run_id,entry_scope_match_count:finalizationPreflight.scope_match_count,already_persisted_count:finalizationPreflight.persisted_count,remaining_count:finalizationPreflight.missing_count,conflicting_entry_count:finalizationPreflight.conflicting_count,duplicate_entry_id_count:finalizationPreflight.duplicate_entry_id_count,formal_write_count:finalizationPreflight.persisted_count,new_write_count:0,canonical_write_count:0,transaction_write_count:0,anchor_write_count:0,business_write_count:0,no_write:true,write_attempted:false},persistenceReadFailed?503:409);
+    }
+    return qaAcceptanceFinalizePersistedRun(env,user,run,contract,stored,finalizationPreflight,requestContext,startedAt,stageMs);
+  }
   const archiveSnapshot=await cloudArrearsFetchActiveSessionRows(env,user,{limit:1000,request_context:requestContext}).catch(()=>[]);
   employeeEntryPrepareArchiveSnapshotContext(archiveSnapshot,requestContext);
   await employeeEntryPreloadExistingTransactions(env,user,requests,requestContext);
@@ -12591,6 +12709,8 @@ async function qaAcceptanceSessionResume(request,env,user,run){
   const base={qa_run_id:run.qa_run_id,validation_result_count:validationResults.length,passed_count:passed,failed_count:validationResults.length-passed,entry_scope_match_count:sessionPreflight.scope_match_count,already_persisted_count:sessionPreflight.persisted_count,remaining_count:sessionPreflight.missing_count,conflicting_entry_count:sessionPreflight.conflicting_count,duplicate_entry_id_count:sessionPreflight.duplicate_entry_id_count,formal_write_count:Number(run.status==="UPLOAD_PASS"?scenarios.length:sessionPreflight.persisted_count),new_write_count:0,write_attempted:false,no_write:true,ttlock_external_calls:Number(requestContext.ttlock_external_call_count||0),request_context_metrics:employeeEntryAggregateRequestMetrics(requestContext),stage_duration_ms:stageMs};
   if(!preflightOk)return json({success:false,error_code:missingPreflight.error_code||"QA_SESSION_PREFLIGHT_FAILED",...base,validation_results:validationResults.map(row=>({entry_identity:row.entry_identity,ok:row.ok===true,error_code:row.error_code||""}))},422);
   if(body.validate_only===true||body.no_write===true)return success({...base,ok:true,preflight_ok:true,resume_allowed:run.status==="MANUAL_EMPLOYEE_ACCEPTED",no_write:true,total_duration_ms:Date.now()-startedAt});
+  const fullyPersisted=sessionPreflight.persisted_count===scenarios.length&&sessionPreflight.missing_count===0&&sessionPreflight.conflicting_count===0&&sessionPreflight.duplicate_entry_id_count===0;
+  if(run.status==="MANUAL_EMPLOYEE_ACCEPTED"&&fullyPersisted&&String(body.resume_intent||"")!=="EMPLOYEE_FINALIZE_PERSISTED_RUN")return json({success:false,error_code:"QA_FINALIZATION_INTENT_REQUIRED",...base,new_write_count:0,canonical_write_count:0,transaction_write_count:0,anchor_write_count:0,business_write_count:0,write_attempted:false,no_write:true,message:"All QA records are already persisted. Use Complete Upload to perform state-only finalization."},409);
   if(String(body.resume_intent||"")!=="EMPLOYEE_MANUAL_RESUME")return json({success:false,error_code:"QA_SESSION_RESUME_INTENT_REQUIRED",...base},422);
   if(run.status==="UPLOAD_PASS"){
     if(sessionPreflight.missing_count!==0||sessionPreflight.persistence.completed_session_count!==scenarios.length)return json({success:false,error_code:"QA_RUN_UPLOAD_STATE_CONFLICT",...base},409);

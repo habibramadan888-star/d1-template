@@ -4,6 +4,7 @@ import test from "node:test";
 import vm from "node:vm";
 
 import { QA_QUICK_SCENARIOS } from "./fixtures/employee-qa-acceptance-matrices.mjs";
+import { GOLDEN_FINANCE_EXPECTED } from "./helpers/employee-golden-session-oracle.mjs";
 
 const worker = await readFile("deploy-worker/src/index.js", "utf8");
 const employee = await readFile("deploy-worker/public/employee-v3.html", "utf8");
@@ -188,6 +189,40 @@ test("all 16 records share one bounded aggregate preflight and immutable E14/E15
   );
   assert.equal(result.validation_results[13].entry_identity, `${RUN_ID}-E14`);
   assert.equal(result.validation_results[14].entry_identity, `${RUN_ID}-E15`);
+});
+
+test("QA persistence scope ignores waiver-only text for paid transfers but preserves waived semantics", () => {
+  const scenarios = materializedScenarios();
+  const sandbox = {
+    cleanText: value => String(value ?? "").trim(),
+    cleanDate: value => String(value ?? "").trim(),
+    normalizeEntryAnchor: row => ({ ...row }),
+    employeeEntryUploadType: row => String(row?.type || ""),
+    entryAnchorType: row => String(row?.type || ""),
+    entryAnchorEventType: type => String(type || "").toUpperCase() === "TF" ? "bed_transfer" : String(type || "").toLowerCase(),
+    employeeEntryBedTransferFee: row => ({ fee_choice: row.fee_mode, fee_amount: Number(row.fee_amount_aed || 0), payment_method: row.payment_method, waiver_reason: row.fee_waiver_reason }),
+    employeeEntryFingerprintMoney: value => Number(value || 0).toFixed(2),
+    hscStableValue: value => Object.fromEntries(Object.entries(value).sort(([left], [right]) => left.localeCompare(right))),
+  };
+  vm.createContext(sandbox);
+  vm.runInContext(`${functionBlock(worker, "qaAcceptanceEntryBusinessScope")}\nthis.scope=qaAcceptanceEntryBusinessScope`, sandbox);
+
+  for (const scenario of scenarios.slice(13, 15)) {
+    const persisted = { ...structuredClone(scenario.input), fee_waiver_reason: "" };
+    assert.deepEqual(
+      structuredClone(sandbox.scope(scenario.input, { corpid: "HL-QA" })),
+      structuredClone(sandbox.scope(persisted, { corpid: "HL-QA" })),
+      `${scenario.entry_id} paid scope must not conflict on non-operative waiver text`,
+    );
+  }
+
+  const waived = scenarios[15].input;
+  const changedWaiver = { ...structuredClone(waived), fee_waiver_reason: "different approved waiver" };
+  assert.notDeepEqual(
+    structuredClone(sandbox.scope(waived, { corpid: "HL-QA" })),
+    structuredClone(sandbox.scope(changedWaiver, { corpid: "HL-QA" })),
+    "waived transfer scope must retain the operative waiver reason",
+  );
 });
 
 for (const oneBasedPosition of [1, 8, 14, 16]) {
@@ -655,16 +690,19 @@ test("Bed Transfer safe serializer preserves outer E14/E15 identity and exact bu
   assert.equal(rejected.first_different_field, "entry_identity");
 });
 
-function resumeHarness({ initiallyPersisted = 13, failIndex = -1 } = {}) {
+function resumeHarness({ initiallyPersisted = 13, failIndex = -1, intent = "EMPLOYEE_MANUAL_RESUME", financeOk = true, conflicting = 0, duplicate = 0 } = {}) {
   const scenarios = materializedScenarios();
   const persisted = new Set(scenarios.slice(0, initiallyPersisted).map(row => row.entry_id));
   const writes = [];
+  const stateBatches = [];
   let finalized = false;
   const run = {
     qa_run_id: RUN_ID,
     status: "MANUAL_EMPLOYEE_ACCEPTED",
     cleanup_status: "NOT_RUN",
     artifact_sha256: ARTIFACT_SHA,
+    employee_accepted_at: "2026-07-16T17:19:15.416Z",
+    upload_json: null,
   };
   const validationAttemptId = "qa-val-079-accepted-proof";
   const contract = {
@@ -678,13 +716,13 @@ function resumeHarness({ initiallyPersisted = 13, failIndex = -1 } = {}) {
     ok: true,
     persisted_entry_ids: scenarios.map(row => row.entry_id).filter(id => persisted.has(id)),
     missing_entry_ids: scenarios.map(row => row.entry_id).filter(id => !persisted.has(id)),
-    conflicting_entries: [],
-    duplicate_entry_ids: [],
+    conflicting_entries: Array.from({ length: conflicting }, (_, index) => ({ entry_identity: scenarios[index].entry_id })),
+    duplicate_entry_ids: Array.from({ length: duplicate }, (_, index) => scenarios[index].entry_id),
     unexpected_session_ids: [],
     persisted_count: persisted.size,
     missing_count: scenarios.length - persisted.size,
-    conflicting_count: 0,
-    duplicate_count: 0,
+    conflicting_count: conflicting,
+    duplicate_count: duplicate,
     session_count: persisted.size,
     completed_session_count: finalized ? persisted.size : 0,
   });
@@ -755,10 +793,14 @@ function resumeHarness({ initiallyPersisted = 13, failIndex = -1 } = {}) {
       const validation_results = scenarios.map((row, index) => ({ entry_identity: row.entry_id, ok: index !== failIndex, error_code: index === failIndex ? `FAIL_AT_${index + 1}` : "" }));
       return { ok: failIndex < 0, error_code: failIndex < 0 ? "" : `FAIL_AT_${failIndex + 1}`, validation_results };
     },
-    qaAcceptanceSessionPreflight: async () => {
+    qaAcceptanceSessionPreflight: async (_env, _user, _run, _contract, _requests, context) => {
       const persistence = snapshot();
-      return { ok: true, persistence, scope_match_count: 16, persisted_count: persistence.persisted_count, missing_count: persistence.missing_count, conflicting_count: 0, duplicate_entry_id_count: 0 };
+      context.qa_persisted_entry_locations = new Map(scenarios.filter(row => persisted.has(row.entry_id)).map(row => [row.entry_id, { entry: { ...row.input, anchor_id: row.entry_id } }]));
+      return { ok: conflicting === 0 && duplicate === 0, persistence, scope_match_count: 16, persisted_count: persistence.persisted_count, missing_count: persistence.missing_count, conflicting_count: conflicting, duplicate_entry_id_count: duplicate };
     },
+    qaAcceptanceFinalizationFinanceCheck: () => ({ ok: financeOk, error_code: financeOk ? "" : "QA_RUN_FINANCIAL_ORACLE_MISMATCH", actual: { total_received: 2500 }, mismatched_fields: financeOk ? [] : ["total_received"] }),
+    qaAcceptanceStableUploadReceipt: async (_run, _contract, _stored, finance, recordedAt, _context, stageMs) => ({ receipt_version: "qa-upload-receipt-v1", receipt_id: "QA-UPLOAD-STABLE-RECEIPT", formal_write_count: 16, total_count: 16, already_persisted_count: 16, new_write_count: 0, anchor_count: 16, session_count: 16, session_status: "COMPLETED", entry_ids: scenarios.map(row => row.entry_id), anchor_ids: scenarios.map(row => row.entry_id), completed_session_ids: scenarios.map(row => row.session_id), canonical_write_count: 0, transaction_write_count: 0, anchor_write_count: 0, business_write_count: 0, finance_result: "PASS", finance_actual: finance.actual, stage_duration_ms: { ...stageMs }, pre_finalization_duration_ms: 1, finalization_only: true, recorded_at: recordedAt }),
+    qaAcceptanceStoredUploadReceipt: value => value?.upload_json ? JSON.parse(value.upload_json) : null,
     empTableColumns: async () => new Set(["entries_json"]),
     handleEmployeeEntry: async (_request, _env, _user, options) => {
       const id = String(options?.body?.entry_identity || "");
@@ -775,16 +817,22 @@ function resumeHarness({ initiallyPersisted = 13, failIndex = -1 } = {}) {
       DB: {
         prepare(sql) {
           return {
-            bind() {
+            bind(...args) {
               return {
                 async run() {
                   if (/UPDATE sessions SET handover_status='COMPLETED'/.test(sql)) finalized = true;
-                  if (/UPDATE qa_acceptance_runs SET status='UPLOAD_PASS'/.test(sql)) run.status = "UPLOAD_PASS";
+                  if (/UPDATE qa_acceptance_runs SET status='UPLOAD_PASS'/.test(sql)) { run.status = "UPLOAD_PASS"; run.upload_json = args[0]; }
                   return { meta: { changes: 1 } };
                 },
               };
             },
           };
+        },
+        async batch(statements) {
+          stateBatches.push(statements.length);
+          const results = [];
+          for (const statement of statements) results.push(await statement.run());
+          return results;
         },
       },
     },
@@ -793,6 +841,7 @@ function resumeHarness({ initiallyPersisted = 13, failIndex = -1 } = {}) {
   vm.runInContext([
     functionBlock(worker, "employeeEntryAggregateRequestMetrics"),
     functionBlock(worker, "qaAcceptanceScenarioRequestBody"),
+    functionBlock(worker, "qaAcceptanceFinalizePersistedRun"),
     functionBlock(worker, "qaAcceptanceSessionResume"),
     "this.resume=qaAcceptanceSessionResume",
   ].join("\n"), sandbox);
@@ -800,13 +849,13 @@ function resumeHarness({ initiallyPersisted = 13, failIndex = -1 } = {}) {
     new Request(`https://qa.example/api/qa/acceptance/runs/${RUN_ID}/session-resume`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ qa_run_id: RUN_ID, artifact_sha256: ARTIFACT_SHA, payload_hash: PAYLOAD_HASH, validation_attempt_id: validationAttemptId, resume_intent: "EMPLOYEE_MANUAL_RESUME" }),
+      body: JSON.stringify({ qa_run_id: RUN_ID, artifact_sha256: ARTIFACT_SHA, payload_hash: PAYLOAD_HASH, validation_attempt_id: validationAttemptId, resume_intent: intent }),
     }),
     sandbox.env,
     { userid: "qa-staff", role: "staff", corpid: "HL-QA" },
     run,
   );
-  return { invoke, persisted, writes, run };
+  return { invoke, persisted, writes, run, stateBatches };
 }
 
 test("13 persisted plus E14/E15/E16 resumes only three writes and response-loss retry is idempotent", async () => {
@@ -838,6 +887,177 @@ test("13 persisted plus E14/E15/E16 resumes only three writes and response-loss 
   assert.equal(second.new_write_count, 0);
   assert.equal(harness.writes.length, 3);
   assert.equal(harness.persisted.size, 16);
+});
+
+test("fully persisted accepted Run finalizes with one state batch and zero business writes", async () => {
+  const harness = resumeHarness({ initiallyPersisted: 16, intent: "EMPLOYEE_FINALIZE_PERSISTED_RUN" });
+  const firstResponse = await harness.invoke();
+  const firstRaw = await firstResponse.json();
+  const first = firstRaw.data || firstRaw;
+  assert.equal(firstResponse.status, 200);
+  assert.equal(first.status, "UPLOAD_PASS");
+  assert.equal(first.already_persisted_count, 16);
+  assert.equal(first.remaining_count, 0);
+  assert.equal(first.formal_write_count, 16);
+  assert.equal(first.new_write_count, 0);
+  assert.equal(first.canonical_write_count, 0);
+  assert.equal(first.transaction_write_count, 0);
+  assert.equal(first.anchor_write_count, 0);
+  assert.equal(first.business_write_count, 0);
+  assert.equal(first.write_attempted, false);
+  assert.equal(first.completed_session_count, 16);
+  assert.equal(first.upload_receipt.receipt_id, "QA-UPLOAD-STABLE-RECEIPT");
+  assert.equal(first.upload_receipt.total_count, 16);
+  assert.equal(first.upload_receipt.already_persisted_count, 16);
+  assert.equal(first.upload_receipt.new_write_count, 0);
+  assert.equal(first.upload_receipt.anchor_ids.length, 16);
+  assert.equal(first.upload_receipt.completed_session_ids.length, 16);
+  assert.equal(typeof first.upload_receipt.stage_duration_ms.finalization_preflight_ms, "number");
+  assert.deepEqual(harness.writes, []);
+  assert.deepEqual(harness.stateBatches, [2]);
+
+  // A response-loss retry returns the stored receipt and performs no second batch.
+  const retryResponse = await harness.invoke();
+  const retryRaw = await retryResponse.json();
+  const retry = retryRaw.data || retryRaw;
+  assert.equal(retryResponse.status, 200);
+  assert.equal(retry.idempotent, true);
+  assert.equal(retry.upload_receipt.receipt_id, first.upload_receipt.receipt_id);
+  assert.deepEqual(harness.writes, []);
+  assert.deepEqual(harness.stateBatches, [2]);
+});
+
+test("finalization-only intent fails closed when one record is missing", async () => {
+  const harness = resumeHarness({ initiallyPersisted: 15, intent: "EMPLOYEE_FINALIZE_PERSISTED_RUN" });
+  const response = await harness.invoke();
+  const raw = await response.json();
+  const body = raw.data || raw;
+  assert.equal(response.status, 409);
+  assert.equal(body.error_code, "QA_RUN_NOT_READY_FOR_FINALIZATION");
+  assert.equal(body.remaining_count, 1);
+  assert.equal(body.new_write_count, 0);
+  assert.equal(body.write_attempted, false);
+  assert.deepEqual(harness.writes, []);
+  assert.deepEqual(harness.stateBatches, []);
+});
+
+test("legacy manual resume cannot finalize a fully persisted accepted Run", async () => {
+  const harness = resumeHarness({ initiallyPersisted: 16, intent: "EMPLOYEE_MANUAL_RESUME" });
+  const response = await harness.invoke();
+  const raw = await response.json();
+  const body = raw.data || raw;
+  assert.equal(response.status, 409);
+  assert.equal(body.error_code, "QA_FINALIZATION_INTENT_REQUIRED");
+  assert.equal(body.already_persisted_count, 16);
+  assert.equal(body.remaining_count, 0);
+  assert.equal(body.new_write_count, 0);
+  assert.equal(body.canonical_write_count, 0);
+  assert.equal(body.transaction_write_count, 0);
+  assert.equal(body.anchor_write_count, 0);
+  assert.equal(body.business_write_count, 0);
+  assert.equal(body.write_attempted, false);
+  assert.equal(harness.run.status, "MANUAL_EMPLOYEE_ACCEPTED");
+  assert.equal(harness.run.upload_json, null);
+  assert.deepEqual(harness.writes, []);
+  assert.deepEqual(harness.stateBatches, []);
+});
+
+for (const [label, options] of [
+  ["a persistence conflict", { conflicting: 1 }],
+  ["a duplicate Entry ID", { duplicate: 1 }],
+]) {
+  test(`finalization-only intent rejects ${label} before state or business writes`, async () => {
+    const harness = resumeHarness({ initiallyPersisted: 16, intent: "EMPLOYEE_FINALIZE_PERSISTED_RUN", ...options });
+    const response = await harness.invoke();
+    const raw = await response.json();
+    const body = raw.data || raw;
+    assert.equal(response.status, 409);
+    assert.equal(body.error_code, "QA_RUN_PERSISTENCE_CONFLICT");
+    assert.equal(body.new_write_count, 0);
+    assert.equal(body.write_attempted, false);
+    assert.deepEqual(harness.writes, []);
+    assert.deepEqual(harness.stateBatches, []);
+  });
+}
+
+test("finalization-only intent fails closed on financial oracle mismatch", async () => {
+  const harness = resumeHarness({ initiallyPersisted: 16, intent: "EMPLOYEE_FINALIZE_PERSISTED_RUN", financeOk: false });
+  const response = await harness.invoke();
+  const raw = await response.json();
+  const body = raw.data || raw;
+  assert.equal(response.status, 409);
+  assert.equal(body.error_code, "QA_RUN_FINANCIAL_ORACLE_MISMATCH");
+  assert.deepEqual(body.finance_mismatched_fields, ["total_received"]);
+  assert.deepEqual(harness.writes, []);
+  assert.deepEqual(harness.stateBatches, []);
+});
+
+test("finalization finance check derives the complete Quick oracle from the 16 persisted anchors", () => {
+  const scenarios = materializedScenarios();
+  const sandbox = { Map, Number, Object, String, entryAnchorContract: { R: [], AP: [], D: [], DR: [], CO: [], E: [], TF: [], TFF: [] } };
+  vm.createContext(sandbox);
+  vm.runInContext([
+    functionBlock(worker, "ownerOverviewMoney"),
+    functionBlock(worker, "entryAnchorType"),
+    functionBlock(worker, "entryAnchorEventType"),
+    functionBlock(worker, "canonicalFinanceProjectionZeroTotals"),
+    functionBlock(worker, "canonicalFinanceProjectionRoundTotals"),
+    functionBlock(worker, "canonicalFinanceProjectionPaymentMethod"),
+    functionBlock(worker, "canonicalFinanceProjectionAmount"),
+    functionBlock(worker, "canonicalFinanceProjectionEventType"),
+    functionBlock(worker, "canonicalFinanceProjectionAddInflow"),
+    functionBlock(worker, "canonicalFinanceProjectionAddOutflow"),
+    functionBlock(worker, "canonicalFinanceProjectionApplyAnchor"),
+    functionBlock(worker, "qaAcceptanceFinanceComparable"),
+    functionBlock(worker, "qaAcceptanceFinalizationFinanceCheck"),
+    "this.check=qaAcceptanceFinalizationFinanceCheck",
+  ].join("\n"), sandbox);
+  const context = { qa_persisted_entry_locations: new Map(scenarios.map(row => [row.entry_id, { entry: structuredClone(row.input) }])) };
+  const result = sandbox.check({ qa_run_id: RUN_ID }, { scenarios, expected: GOLDEN_FINANCE_EXPECTED }, context);
+  assert.equal(result.ok, true, result.mismatched_fields.join(","));
+  assert.equal(result.entry_count, 16);
+  assert.deepEqual({ ...result.actual }, GOLDEN_FINANCE_EXPECTED);
+
+  const tampered = structuredClone(scenarios);
+  tampered[0].input.paid_amount = 699;
+  tampered[0].input.paid = 699;
+  tampered[0].input.amount = 699;
+  const badContext = { qa_persisted_entry_locations: new Map(tampered.map(row => [row.entry_id, { entry: row.input }])) };
+  const mismatch = sandbox.check({ qa_run_id: RUN_ID }, { scenarios, expected: GOLDEN_FINANCE_EXPECTED }, badContext);
+  assert.equal(mismatch.ok, false);
+  assert.equal(mismatch.error_code, "QA_RUN_FINANCIAL_ORACLE_MISMATCH");
+  assert.equal(mismatch.mismatched_fields.includes("total_received"), true);
+});
+
+test("stable finalization receipt binds all Entry, anchor, Session, oracle, and timing evidence", async () => {
+  const scenarios = materializedScenarios();
+  const sandbox = { Date, JSON, Map, Math, Number, Object, String, hscStableValue: value => value, hscSha256: async () => "a".repeat(64) };
+  vm.createContext(sandbox);
+  vm.runInContext(`${functionBlock(worker, "qaAcceptanceStableUploadReceipt")}\nthis.receipt=qaAcceptanceStableUploadReceipt`, sandbox);
+  const context = { qa_persisted_entry_locations: new Map(scenarios.map(row => [row.entry_id, { entry: { ...row.input, anchor_id: `ANCHOR-${row.entry_id}` } }])) };
+  const receipt = await sandbox.receipt(
+    { qa_run_id: RUN_ID, artifact_sha256: ARTIFACT_SHA },
+    { payloadHash: PAYLOAD_HASH, scenarios },
+    { validation_attempt_id: "qa-val-stable" },
+    { actual: GOLDEN_FINANCE_EXPECTED },
+    "2026-07-16T20:00:00.000Z",
+    context,
+    { finalization_preflight_ms: 12 },
+    Date.now() - 20,
+  );
+  assert.equal(receipt.receipt_id, `QA-UPLOAD-${"A".repeat(24)}`);
+  assert.equal(receipt.total_count, 16);
+  assert.equal(receipt.already_persisted_count, 16);
+  assert.equal(receipt.new_write_count, 0);
+  assert.equal(receipt.entry_ids.length, 16);
+  assert.equal(receipt.anchor_ids.length, 16);
+  assert.equal(receipt.completed_session_ids.length, 16);
+  assert.equal(receipt.canonical_write_count, 0);
+  assert.equal(receipt.transaction_write_count, 0);
+  assert.equal(receipt.anchor_write_count, 0);
+  assert.equal(receipt.finance_result, "PASS");
+  assert.equal(receipt.stage_duration_ms.finalization_preflight_ms, 12);
+  assert.equal(receipt.pre_finalization_duration_ms >= 0, true);
 });
 
 for (const oneBasedPosition of [1, 8, 14, 16]) {
@@ -876,6 +1096,12 @@ test("QA atomic resume route is Staff-only, server-sourced, bounded, and the onl
   assert.match(resume, /ttlock_external_call_count\|\|0\)===0/);
   assert.match(resume, /sessionPreflight\.persistence\.missing_entry_ids/);
   assert.match(resume, /QA_SESSION_RESUME_INTERNAL/);
+  assert.match(resume, /EMPLOYEE_FINALIZE_PERSISTED_RUN/);
+  assert.match(worker, /QA_RUN_NOT_READY_FOR_FINALIZATION/);
+  assert.match(resume, /QA_FINALIZATION_INTENT_REQUIRED/);
+  assert.match(worker, /canonical_write_count:0/);
+  assert.match(worker, /transaction_write_count:0/);
+  assert.match(worker, /anchor_write_count:0/);
   assert.match(resume, /if\(run\.status==="UPLOAD_PASS"\)/);
   assert.match(resume, /sessionPreflight\.missing_count!==0/);
   assert.match(resume, /idempotent:true/);
