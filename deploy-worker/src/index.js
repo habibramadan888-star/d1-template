@@ -38,6 +38,12 @@ import { ErrorCodes } from "../../dist/lib/constants/error-codes.js";
 import { fail, ok } from "../../dist/lib/lib/api-response.js";
 import { logger } from "../../dist/lib/lib/logger.js";
 import { requestIdMiddleware } from "../../dist/lib/lib/request-id.js";
+import {
+  EMPLOYEE_VALIDATION_ERROR_CATALOG,
+  EMPLOYEE_VALIDATION_ERROR_CODE_COUNT,
+  employeeValidationErrorCatalogEntry,
+  normalizeEmployeeValidationErrorCode
+} from "../../modules/employees/validation-error-catalog.mjs";
 
 // src/lib/jwt.js
 var ALGO = { name: "HMAC", hash: "SHA-256" };
@@ -2187,14 +2193,14 @@ function employeeEntryValidationExplanation(errorCode,message){
   };
 }
 __name(employeeEntryValidationExplanation,"employeeEntryValidationExplanation");
-const HOMELINK_DIAGNOSTIC_ASSET_VERSION="upload-diagnostic-trace-20260707-001";
+const HOMELINK_DIAGNOSTIC_ASSET_VERSION="qa-validation-provenance-v1";
 const HOMELINK_DIAGNOSTIC_COMMIT_HASH="runtime-git-commit";
 const HOMELINK_DIAGNOSTIC_WORKER_VERSION="runtime-response-header";
 const HOMELINK_DIAGNOSTIC_BUILT_AT="2026-07-07T00:00:00+04:00";
-function employeeEntryDiagnosticAssetInfo(body={}){
+function employeeEntryDiagnosticAssetInfo(body={},env={}){
   const diagnostic=body?.diagnostic&&typeof body.diagnostic==="object"?body.diagnostic:{};
   const frontendAssetVersion=cleanText(diagnostic.frontend_asset_version||diagnostic.employee_asset_version||"",120);
-  const expected=HOMELINK_DIAGNOSTIC_ASSET_VERSION;
+  const expected=qaAcceptanceEnabled(env)?cleanText(env.QA_CLIENT_ASSET_VERSION||HOMELINK_DIAGNOSTIC_ASSET_VERSION,120):HOMELINK_DIAGNOSTIC_ASSET_VERSION;
   const stale=!!frontendAssetVersion&&frontendAssetVersion!==expected;
   return {
     frontend_asset_version:frontendAssetVersion||null,
@@ -3632,7 +3638,10 @@ async function handleEmployeeEntryValidate(request,env,user){
     suggested_action_en:"Refresh the page and try Upload Session again. If it repeats, copy the diagnostic response.",
     suggested_action_zh:"请刷新页面后重新上传；如果重复出现，请复制诊断返回。"
   })},400);}
-  const assetInfo=employeeEntryDiagnosticAssetInfo(body);
+  const assetInfo=employeeEntryDiagnosticAssetInfo(body,env);
+  const qaValidationContext=await qaAcceptanceResolveValidationContext(env,user,body);
+  if(qaValidationContext?.ok===false)return json({success:false,error_code:qaValidationContext.error_code,message:"QA validation context is not current. Reload this QA Run before validating.",result_origin:"UNKNOWN",no_write:true,write_attempted:false,formal_write_count:0},409);
+  if(qaValidationContext?.ok===true&&assetInfo.stale_frontend_asset)return json({success:false,error_code:"QA_CLIENT_ASSET_STALE",message:"This QA page was loaded from an older client asset. Reload before validating.",result_origin:"STALE_LOCAL",stale_reason:"CLIENT_ASSET_VERSION_MISMATCH",expected_frontend_asset_version:assetInfo.expected_frontend_asset_version,frontend_asset_version:assetInfo.frontend_asset_version,no_write:true,write_attempted:false,formal_write_count:0},409);
   const request_context=ttlockRequestContext(request,env,user,"employee_entry_validate",TTLOCK_STRICT_CACHE_MAX_AGE_MS);
   const aggregateRequested=body?.aggregate_preflight===true||Array.isArray(body?.validation_requests);
   const aggregateRequests=employeeEntryAggregateValidationRequests(body);
@@ -3661,6 +3670,16 @@ async function handleEmployeeEntryValidate(request,env,user){
   }
   result={...result,...assetInfo};
   if(Array.isArray(result.validation_results))result.validation_results=result.validation_results.map(row=>({...row,...assetInfo}));
+  if(qaValidationContext?.ok===true&&Array.isArray(result.validation_results)){
+    result.validation_results=result.validation_results.map(row=>qaValidationResultWithDiagnosticEnvelope(row,qaValidationContext,request_context));
+    result.trace_id=qaValidationContext.trace_id;
+    result.validation_attempt_id=qaValidationContext.validation_attempt_id;
+    result.qa_run_id=qaValidationContext.run.qa_run_id;
+    result.payload_hash=qaValidationContext.contract.payloadHash;
+    result.server_validated_at=qaValidationContext.server_validated_at;
+    result.expires_at=qaValidationContext.expires_at;
+    result.result_origin="LIVE_SERVER";
+  }
   if(!result.ok)return json({success:false,...result},422);
   if(Array.isArray(result.validation_results))return success(result);
   return success({...result,occupancy_candidate_preview:buildEmployeeEntryOccupancyCandidatePreview(user,body)});
@@ -11614,6 +11633,106 @@ async function qaAcceptanceValidationPayloadHash(matrix={}){
   return hscSha256(JSON.stringify(hscStableValue(qaAcceptanceValidationPayloadBasis(matrix))));
 }
 __name(qaAcceptanceValidationPayloadHash,"qaAcceptanceValidationPayloadHash");
+function qaAcceptanceValidationAttestationCurrent(run={},contract={},stored=null){
+  const attemptId=cleanText(stored?.validation_attempt_id||"",120);
+  const expiresAt=Date.parse(String(stored?.expires_at||""));
+  const results=Array.isArray(stored?.validation_results)?stored.validation_results:[];
+  const current=!!stored
+    &&String(stored.qa_run_id||"")===String(run.qa_run_id||"")
+    &&String(stored.artifact_sha256||"")===String(run.artifact_sha256||"")
+    &&String(stored.qa_worker_version||"")===String(run.qa_worker_version||"")
+    &&String(stored.matrix_version||"")===String(run.matrix_version||"")
+    &&String(stored.payload_hash||"")===String(contract.payloadHash||"")
+    &&/^qa-val-[a-z0-9-]{12,}$/i.test(attemptId)
+    &&Number.isFinite(expiresAt)&&expiresAt>Date.now()
+    &&results.length===Number(run.employee_record_count||0)
+    &&results.every(row=>{
+      const envelope=row?.diagnostic_envelope||{};
+      return String(envelope.validation_attempt_id||"")===attemptId
+        &&String(envelope.qa_run_id||"")===String(run.qa_run_id||"")
+        &&String(envelope.artifact_sha256||"")===String(run.artifact_sha256||"")
+        &&String(envelope.worker_version||"")===String(run.qa_worker_version||"")
+        &&String(envelope.matrix_version||"")===String(run.matrix_version||"")
+        &&String(envelope.payload_hash||"")===String(contract.payloadHash||"");
+    });
+  if(current)return {current:true,stale_reason:"",attestation:stored};
+  const staleReason=!stored?"NO_SERVER_ATTESTATION"
+    :String(stored.qa_run_id||"")!==String(run.qa_run_id||"")?"QA_RUN_ID_MISMATCH"
+    :String(stored.artifact_sha256||"")!==String(run.artifact_sha256||"")?"ARTIFACT_MISMATCH"
+    :String(stored.qa_worker_version||"")!==String(run.qa_worker_version||"")?"WORKER_VERSION_MISMATCH"
+    :String(stored.matrix_version||"")!==String(run.matrix_version||"")?"MATRIX_VERSION_MISMATCH"
+    :String(stored.payload_hash||"")!==String(contract.payloadHash||"")?"PAYLOAD_HASH_MISMATCH"
+    :!attemptId?"VALIDATION_ATTEMPT_MISSING"
+    :"ATTESTATION_EXPIRED_OR_INCOMPLETE";
+  return {current:false,stale_reason:staleReason,attestation:null};
+}
+__name(qaAcceptanceValidationAttestationCurrent,"qaAcceptanceValidationAttestationCurrent");
+async function qaAcceptanceResolveValidationContext(env,user,body={}){
+  const requested=body?.qa_validation_context&&typeof body.qa_validation_context==="object"?body.qa_validation_context:null;
+  if(!requested)return null;
+  if(!qaAcceptanceEnabled(env))return {ok:false,error_code:"QA_VALIDATION_CONTEXT_NOT_AVAILABLE"};
+  const runId=qaAcceptanceRunId(requested.qa_run_id);
+  if(!runId)return {ok:false,error_code:"QA_RUN_ID_INVALID"};
+  const run=await qaAcceptanceReadRun(env,user,runId);
+  if(!run)return {ok:false,error_code:"QA_RUN_NOT_FOUND"};
+  const contract=await qaAcceptanceEmployeeDraftContract(env,run);
+  if(!contract.ok)return {ok:false,error_code:contract.error_code};
+  const valid=String(requested.artifact_sha256||"")===String(run.artifact_sha256||"")
+    &&String(requested.qa_worker_version||"")===String(run.qa_worker_version||"")
+    &&String(requested.matrix_version||"")===String(run.matrix_version||"")
+    &&String(requested.payload_hash||"")===String(contract.payloadHash||"");
+  if(!valid)return {ok:false,error_code:"QA_VALIDATION_CONTEXT_MISMATCH"};
+  return {
+    ok:true,
+    run,
+    contract,
+    trace_id:`qa-trace-${crypto.randomUUID()}`,
+    validation_attempt_id:`qa-val-${crypto.randomUUID()}`,
+    server_validated_at:empNow(),
+    expires_at:new Date(Date.now()+30*60*1000).toISOString()
+  };
+}
+__name(qaAcceptanceResolveValidationContext,"qaAcceptanceResolveValidationContext");
+function qaValidationDiagnosticEnvelope(result={},qaContext={},requestContext={}){
+  const rawCode=result?.ok===true?"":result?.error_code;
+  const errorCode=normalizeEmployeeValidationErrorCode(rawCode);
+  const catalog=errorCode?employeeValidationErrorCatalogEntry(errorCode):null;
+  const entryId=cleanText(result?.entry_identity||result?.record_id||"",120);
+  return {
+    trace_id:qaContext.trace_id,
+    validation_attempt_id:qaContext.validation_attempt_id,
+    qa_run_id:qaContext.run.qa_run_id,
+    qa_run_mode:qaContext.run.mode,
+    matrix_version:qaContext.run.matrix_version,
+    artifact_sha256:qaContext.run.artifact_sha256,
+    worker_version:qaContext.run.qa_worker_version||"",
+    session_id:cleanText(qaContext.contract?.matrix?.scenarios?.find(row=>String(row.entry_id||"")===entryId)?.session_id||"",120),
+    entry_id:entryId,
+    event_type:cleanText(result?.event_type||"entry",80),
+    event_index:Number(result?.event_index||0),
+    payload_hash:qaContext.contract.payloadHash,
+    validator_stage:cleanText(result?.stage||"employee_entry_validation",120),
+    validator_function:employeeEntryValidationFunctionForStage(result?.stage||"employee_entry_validation",result?.event_type||""),
+    error_code:errorCode,
+    error_category:catalog?.category||"none",
+    result_origin:"LIVE_SERVER",
+    server_validated_at:qaContext.server_validated_at,
+    client_received_at:"",
+    expires_at:qaContext.expires_at,
+    snapshot_version:cleanText(requestContext?.snapshot_version||"request-scope",120),
+    cache_status:Number(requestContext?.ttlock_external_call_count||0)===0?"WARM_OR_FROZEN":"COLD_FETCH",
+    stale_reason:"",
+    retryable:catalog?.retryable===true,
+    suggested_user_action:catalog?.expected_action||"Continue only if this attestation remains current.",
+    safe_engineering_hint:catalog?.engineering_cause||"Validation passed at the registered server boundary."
+  };
+}
+__name(qaValidationDiagnosticEnvelope,"qaValidationDiagnosticEnvelope");
+function qaValidationResultWithDiagnosticEnvelope(result={},qaContext={},requestContext={}){
+  const diagnostic_envelope=qaValidationDiagnosticEnvelope(result,qaContext,requestContext);
+  return {...result,error_code:diagnostic_envelope.error_code,diagnostic_envelope};
+}
+__name(qaValidationResultWithDiagnosticEnvelope,"qaValidationResultWithDiagnosticEnvelope");
 function qaAcceptanceStoredValidation(run={}){
   try{return JSON.parse(run.automation_json||"null")}catch{return null}
 }
@@ -11641,7 +11760,7 @@ function qaAcceptanceEmployeeDraftUnavailable(errorCode="QA_RUN_DRAFT_UNAVAILABL
 }
 __name(qaAcceptanceEmployeeDraftUnavailable,"qaAcceptanceEmployeeDraftUnavailable");
 async function qaAcceptanceEmployeeDraftContract(env,run){
-  if(!["DRAFT_READY","AUTOMATION_FAILED","AUTOMATION_PASS","MANUAL_EMPLOYEE_ACCEPTED"].includes(String(run.status||"")))return {ok:false,error_code:"QA_RUN_NOT_ACTIVE"};
+  if(!["DRAFT_READY","AUTOMATION_FAILED","AUTOMATION_PASS","AUTOMATION_PASS_WITH_RECOVERY_FINDING","MANUAL_EMPLOYEE_ACCEPTED"].includes(String(run.status||"")))return {ok:false,error_code:"QA_RUN_NOT_ACTIVE"};
   if(String(run.cleanup_status||"NOT_RUN")==="COMPLETED")return {ok:false,error_code:"QA_RUN_ALREADY_CLEANED"};
   const manifest=await env.RATE_LIMIT.get("qa:artifact-manifest","json").catch(()=>null);
   const artifact=String(run.artifact_sha256||""),currentArtifact=String(manifest?.candidate_sha256||"");
@@ -11672,13 +11791,12 @@ async function qaAcceptanceEmployeeDraft(request,env,user,run){
   if(!contract.ok)return qaAcceptanceEmployeeDraftUnavailable(contract.error_code);
   const {scenarios,expected,manifest,payloadHash}=contract;
   const stored=qaAcceptanceStoredValidation(run);
-  const validationAttestation=stored
-    &&String(stored.qa_run_id||"")===String(run.qa_run_id||"")
-    &&String(stored.artifact_sha256||"")===String(run.artifact_sha256||"")
-    &&String(stored.qa_worker_version||"")===String(run.qa_worker_version||"")
-    &&String(stored.matrix_version||"")===String(run.matrix_version||"")
-    &&String(stored.payload_hash||"")===payloadHash
-      ?stored:null;
+  const freshness=qaAcceptanceValidationAttestationCurrent(run,contract,stored);
+  const validationAttestation=freshness.current?{
+    ...freshness.attestation,
+    result_origin:"SERVER_ATTESTATION",
+    validation_results:(freshness.attestation.validation_results||[]).map(row=>({...row,diagnostic_envelope:{...(row.diagnostic_envelope||{}),result_origin:"SERVER_ATTESTATION",cache_status:"SERVER_PERSISTED"}}))
+  }:null;
   return success({
     qa_run_id:run.qa_run_id,
     mode:run.mode,
@@ -11696,6 +11814,7 @@ async function qaAcceptanceEmployeeDraft(request,env,user,run){
     expected_finance:expected,
     payload_hash:payloadHash,
     validation_attestation:validationAttestation,
+    validation_stale_reason:freshness.stale_reason,
     cleanup_status:run.cleanup_status||"NOT_RUN",
     delivery_contract:"SERVER_PERSISTED_QA_RUN_V1",
     preview_expected:true,
@@ -11712,15 +11831,32 @@ async function qaAcceptanceRecordAutomation(request,env,user,run){
   const results=Array.isArray(body.validation_results)?body.validation_results:[];
   const ids=results.map(row=>String(row.entry_identity||""));
   const payloadHash=await qaAcceptanceValidationPayloadHash(matrix);
+  const validationAttemptId=cleanText(body.validation_attempt_id||"",120);
   const contextValid=String(body.qa_run_id||"")===String(run.qa_run_id||"")
     &&String(body.artifact_sha256||"")===String(run.artifact_sha256||"")
     &&String(body.qa_worker_version||"")===String(run.qa_worker_version||"")
     &&String(body.matrix_version||"")===String(run.matrix_version||"")
-    &&String(body.payload_hash||"")===payloadHash;
+    &&String(body.payload_hash||"")===payloadHash
+    &&/^qa-val-[a-z0-9-]{12,}$/i.test(validationAttemptId);
   const identityValid=results.length===expected.length&&new Set(ids).size===ids.length&&expected.every(id=>ids.includes(id));
-  if(!contextValid||!identityValid||Number(body.formal_write_count||0)!==0)return json({success:false,error_code:"QA_AUTOMATION_RESULT_INVALID",expected_count:expected.length,result_count:results.length,no_write:true},422);
+  const envelopeValid=results.every(row=>{
+    const envelope=row?.diagnostic_envelope||{};
+    return String(envelope.validation_attempt_id||"")===validationAttemptId
+      &&String(envelope.qa_run_id||"")===String(run.qa_run_id||"")
+      &&String(envelope.artifact_sha256||"")===String(run.artifact_sha256||"")
+      &&String(envelope.worker_version||"")===String(run.qa_worker_version||"")
+      &&String(envelope.matrix_version||"")===String(run.matrix_version||"")
+      &&String(envelope.payload_hash||"")===payloadHash
+      &&String(envelope.result_origin||"")==="LIVE_SERVER";
+  });
+  if(!contextValid||!identityValid||!envelopeValid||Number(body.formal_write_count||0)!==0)return json({success:false,error_code:"QA_AUTOMATION_RESULT_INVALID",expected_count:expected.length,result_count:results.length,no_write:true},422);
   const passed=results.filter(row=>row.ok===true).length,failed=results.length-passed;
-  const automation={qa_run_id:run.qa_run_id,artifact_sha256:run.artifact_sha256,qa_worker_version:run.qa_worker_version||"",matrix_version:run.matrix_version,payload_hash:payloadHash,aggregate_http_status:Number(body.aggregate_http_status||0),validation_result_count:results.length,passed_count:passed,failed_count:failed,entry_ids:ids,validation_results:results.map(row=>({entry_identity:String(row.entry_identity||""),event_type:cleanText(row.event_type||"",80),ok:row.ok===true,error_code:cleanText(row.error_code||"",120),missing_fields:Array.isArray(row.missing_fields)?row.missing_fields.map(value=>cleanText(value,80)).filter(Boolean):[]})),formal_write_count:0,ttlock_external_calls:Number(body.ttlock_external_calls||0),recorded_at:empNow()};
+  const previous=qaAcceptanceStoredValidation(run)||{};
+  const recordedAt=empNow(),firstEnvelope=results[0]?.diagnostic_envelope||{};
+  const validationResults=results.map(row=>({entry_identity:String(row.entry_identity||""),event_type:cleanText(row.event_type||"",80),ok:row.ok===true,error_code:normalizeEmployeeValidationErrorCode(row.error_code),missing_fields:Array.isArray(row.missing_fields)?row.missing_fields.map(value=>cleanText(value,80)).filter(Boolean):[],diagnostic_envelope:{...(row.diagnostic_envelope||{}),client_received_at:cleanText(row?.diagnostic_envelope?.client_received_at||body.client_received_at||"",80)}}));
+  const attemptSummary={validation_attempt_id:validationAttemptId,trace_id:cleanText(body.trace_id||firstEnvelope.trace_id||"",120),payload_hash:payloadHash,artifact_sha256:run.artifact_sha256,qa_worker_version:run.qa_worker_version||"",matrix_version:run.matrix_version,passed_count:passed,failed_count:failed,result_origin:"LIVE_SERVER",recorded_at:recordedAt};
+  const attemptHistory=[...(Array.isArray(previous.attempt_history)?previous.attempt_history:[]),attemptSummary].slice(-20);
+  const automation={qa_run_id:run.qa_run_id,artifact_sha256:run.artifact_sha256,qa_worker_version:run.qa_worker_version||"",matrix_version:run.matrix_version,payload_hash:payloadHash,validation_attempt_id:validationAttemptId,trace_id:attemptSummary.trace_id,server_validated_at:cleanText(firstEnvelope.server_validated_at||recordedAt,80),expires_at:cleanText(firstEnvelope.expires_at||"",80),result_origin:"LIVE_SERVER",aggregate_http_status:Number(body.aggregate_http_status||0),validation_result_count:results.length,passed_count:passed,failed_count:failed,entry_ids:ids,validation_results:validationResults,attempt_history:attemptHistory,formal_write_count:0,ttlock_external_calls:Number(body.ttlock_external_calls||0),recorded_at:recordedAt};
   if(automation.ttlock_external_calls!==0)return json({success:false,error_code:"QA_TTLOCK_EXTERNAL_CALL_DETECTED",no_write:true},422);
   const nextStatus=failed===0&&automation.aggregate_http_status===200?"AUTOMATION_PASS":"AUTOMATION_FAILED";
   await env.DB.prepare("UPDATE qa_acceptance_runs SET status=?,automation_json=?,updated_at=? WHERE qa_run_id=? AND corpid=? AND status IN ('DRAFT_READY','AUTOMATION_FAILED')").bind(nextStatus,JSON.stringify(automation),empNow(),run.qa_run_id,user.corpid).run();
@@ -11732,12 +11868,8 @@ async function qaAcceptanceAcceptReview(request,env,user,run,kind){
   if(run.status!==required)return json({success:false,error_code:"QA_RUN_STATE_CONFLICT",required_status:required,status:run.status},409);
   if(employee){
     const contract=await qaAcceptanceEmployeeDraftContract(env,run),stored=qaAcceptanceStoredValidation(run);
-    const valid=contract.ok&&stored
-      &&String(stored.qa_run_id||"")===String(run.qa_run_id||"")
-      &&String(stored.artifact_sha256||"")===String(run.artifact_sha256||"")
-      &&String(stored.qa_worker_version||"")===String(run.qa_worker_version||"")
-      &&String(stored.matrix_version||"")===String(run.matrix_version||"")
-      &&String(stored.payload_hash||"")===String(contract.payloadHash||"")
+    const freshness=contract.ok?qaAcceptanceValidationAttestationCurrent(run,contract,stored):{current:false};
+    const valid=contract.ok&&freshness.current&&stored
       &&Number(stored.validation_result_count||0)===Number(run.employee_record_count||0)
       &&Number(stored.passed_count||0)===Number(run.employee_record_count||0)
       &&Number(stored.failed_count||0)===0
@@ -11793,6 +11925,51 @@ async function qaAcceptanceCleanup(request,env,user,run){
   return success(qaAcceptancePublicRun(request,await qaAcceptanceReadRun(env,user,run.qa_run_id)));
 }
 __name(qaAcceptanceCleanup,"qaAcceptanceCleanup");
+function qaAcceptanceDiagnosticBundle(request,run={}){
+  let matrix={},automation={};
+  try{matrix=JSON.parse(run.matrix_json||"{}")}catch{}
+  try{automation=JSON.parse(run.automation_json||"{}")}catch{}
+  const requestedEntry=cleanText(new URL(request.url).searchParams.get("entry_id")||"",120);
+  const scenarios=(Array.isArray(matrix.scenarios)?matrix.scenarios:[]).filter(row=>!requestedEntry||String(row.entry_id||"")===requestedEntry);
+  const resultById=new Map((automation.validation_results||[]).map(row=>[String(row.entry_identity||""),row]));
+  const entries=scenarios.map(row=>{
+    const input=row.input||{},result=resultById.get(String(row.entry_id||""))||null;
+    const code=normalizeEmployeeValidationErrorCode(result?.error_code||"");
+    return {
+      qa_run_id:run.qa_run_id,
+      session_id:row.session_id||"",
+      entry_id:row.entry_id||"",
+      event_type:row.event_type||input.event_type||"",
+      payload_hash:automation.payload_hash||matrix.validation_payload_hash||"",
+      result_origin:result?.diagnostic_envelope?.result_origin||automation.result_origin||"UNKNOWN",
+      validation_attempt_id:result?.diagnostic_envelope?.validation_attempt_id||automation.validation_attempt_id||"",
+      server_validated_at:result?.diagnostic_envelope?.server_validated_at||automation.server_validated_at||"",
+      expires_at:result?.diagnostic_envelope?.expires_at||automation.expires_at||"",
+      stale_current:qaAcceptanceValidationAttestationCurrent(run,{payloadHash:matrix.validation_payload_hash||""},automation).current?"CURRENT":"STALE",
+      stale_reason:result?.diagnostic_envelope?.stale_reason||"",
+      field_lineage:{
+        arrears_ref:cleanText(input.arrears_ref||"",160),
+        checkout_type:cleanText(input.checkout_type||"",80),
+        left_arrears_amount:Number(input.left_arrears_amount||0),
+        note:cleanText(input.note||"",240)
+      },
+      validation_result:result?{ok:result.ok===true,error_code:code,missing_fields:result.missing_fields||[],diagnostic_envelope:result.diagnostic_envelope||null}:null,
+      error_catalog:code?employeeValidationErrorCatalogEntry(code):null,
+      browser_state_source:"SERVER_ATTESTATION_IS_DISPLAY_AUTHORITY"
+    };
+  });
+  return {
+    diagnostic_bundle_version:"qa-validation-diagnostic-v1",
+    run_manifest:{qa_run_id:run.qa_run_id,mode:run.mode,matrix_version:run.matrix_version,artifact_sha256:run.artifact_sha256,worker_version:run.qa_worker_version,status:run.status,scenario_count:Number(run.scenario_count||0)},
+    latest_validation_attempt:{validation_attempt_id:automation.validation_attempt_id||"",trace_id:automation.trace_id||"",payload_hash:automation.payload_hash||"",result_origin:automation.result_origin||"UNKNOWN",server_validated_at:automation.server_validated_at||automation.recorded_at||"",expires_at:automation.expires_at||"",attempt_history:automation.attempt_history||[]},
+    entries,
+    error_catalog:{registered_error_code_count:EMPLOYEE_VALIDATION_ERROR_CODE_COUNT,entries:EMPLOYEE_VALIDATION_ERROR_CATALOG},
+    state_lineage:["scenario_manifest","server_run_draft","server_validation_attestation","qa_run_storage","employee_memory","validation_request","validator_input","aggregate_response","dom"],
+    secrets_included:false,
+    production_data_included:false
+  };
+}
+__name(qaAcceptanceDiagnosticBundle,"qaAcceptanceDiagnosticBundle");
 async function handleQaAcceptanceApi(request,env,user){
   const url=new URL(request.url),path=url.pathname,method=request.method;
   const staffDraft=/^\/api\/qa\/acceptance\/runs\/([^/]+)\/employee-draft$/.exec(path);
@@ -11805,7 +11982,7 @@ async function handleQaAcceptanceApi(request,env,user){
     return success({runs:rows.map(row=>qaAcceptancePublicRun(request,row)),binding_identity:"VERIFIED",production_access:false});
   }
   if(path==="/api/qa/acceptance/runs"&&method==="POST")return qaAcceptanceCreateRun(request,env,user);
-  const match=/^\/api\/qa\/acceptance\/runs\/([^/]+)(?:\/(automation|employee-draft|accept-employee|upload-complete|accept-owner|reconcile|cleanup|evidence))?$/.exec(path);
+  const match=/^\/api\/qa\/acceptance\/runs\/([^/]+)(?:\/(automation|employee-draft|accept-employee|upload-complete|accept-owner|reconcile|cleanup|evidence|diagnostics))?$/.exec(path);
   if(!match)return qaAcceptanceNotFound(true);
   const runId=qaAcceptanceRunId(decodeURIComponent(match[1]||""));if(!runId)return badRequest("QA_RUN_ID_INVALID");
   const run=await qaAcceptanceReadRun(env,user,runId);if(!run)return qaAcceptanceNotFound(true);
@@ -11819,6 +11996,7 @@ async function handleQaAcceptanceApi(request,env,user){
   if(action==="reconcile"&&method==="POST")return qaAcceptanceReconcile(request,env,user,run);
   if(action==="cleanup"&&method==="POST")return qaAcceptanceCleanup(request,env,user,run);
   if(action==="evidence"&&method==="GET")return success({run:qaAcceptancePublicRun(request,run),automation:JSON.parse(run.automation_json||"null"),upload:JSON.parse(run.upload_json||"null"),reconciliation:JSON.parse(run.reconciliation_json||"null"),matrix:JSON.parse(run.matrix_json||"{}"),secrets_included:false});
+  if(action==="diagnostics"&&method==="GET")return success(qaAcceptanceDiagnosticBundle(request,run));
   return qaAcceptanceNotFound(true);
 }
 __name(handleQaAcceptanceApi,"handleQaAcceptanceApi");

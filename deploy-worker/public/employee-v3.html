@@ -3188,8 +3188,8 @@ label .label-en{
 </div>
 <script>
 const EMPLOYEE_ASSET_DIAGNOSTIC={
-  employee_asset_version:'upload-diagnostic-trace-20260707-001',
-  frontend_asset_version:'upload-diagnostic-trace-20260707-001',
+  employee_asset_version:'qa-validation-provenance-v1',
+  frontend_asset_version:'qa-validation-provenance-v1',
   commit_hash:'runtime-git-commit',
   worker_version:'runtime-response-header',
   built_at:'2026-07-07T00:00:00+04:00',
@@ -3240,7 +3240,7 @@ function readSessionId(userid){
   try{return localStorage.getItem(employeeStorageKey('empv3:sessionId',userid))||''}
   catch{return ''}
 }
-const state={lockCards:[],current:null,depositBalance:null,depositContext:null,rentConfig:{},rentConfigLoaded:false,drafts:[],tasks:[],closedTasks:[],arrearsTasksLoaded:false,arrearTasksError:null,arrearsGatewaySource:'',arrearsGatewayProof:null,employeeDirectives:[],followupItems:[],systemReminderItems:[],systemReminderStatus:'idle',systemReminderSummary:null,systemReminderSources:null,systemReminderLimit:100,sessionId:'',user:null,aggregateValidationSessionError:null,aggregateValidationOnly:false,ttlockStatus:'idle',ttlockLoadedAt:0,ttlockError:'',ttlockDataSource:'',qaAcceptance:{runId:'',status:'',mode:'',artifactSha:'',workerVersion:'',matrixVersion:'',payloadHash:'',sessionIdsByEntry:{},validationAttestation:null,loadStatus:'',personalDraftCount:0},bedTransferCapabilities:{status:'idle',bed_transfer_validate_enabled:false,bed_transfer_write_enabled:false,owner_waiver_ack_enabled:false,controlled_beta_preview:false,canonical_write_path:'/api/employee/entry',production_cutover:'PRODUCTION_NO_GO'},bedTransferContext:{status:'idle',source:null,target:null,requestKey:'',serverValidation:null,validatedRecord:null,recordedResult:null}};
+const state={lockCards:[],current:null,depositBalance:null,depositContext:null,rentConfig:{},rentConfigLoaded:false,drafts:[],tasks:[],closedTasks:[],arrearsTasksLoaded:false,arrearTasksError:null,arrearsGatewaySource:'',arrearsGatewayProof:null,employeeDirectives:[],followupItems:[],systemReminderItems:[],systemReminderStatus:'idle',systemReminderSummary:null,systemReminderSources:null,systemReminderLimit:100,sessionId:'',user:null,aggregateValidationSessionError:null,aggregateValidationOnly:false,ttlockStatus:'idle',ttlockLoadedAt:0,ttlockError:'',ttlockDataSource:'',qaAcceptance:{runId:'',status:'',mode:'',artifactSha:'',workerVersion:'',matrixVersion:'',payloadHash:'',sessionIdsByEntry:{},validationAttestation:null,validationAttemptId:'',staleReason:'',loadStatus:'',personalDraftCount:0},bedTransferCapabilities:{status:'idle',bed_transfer_validate_enabled:false,bed_transfer_write_enabled:false,owner_waiver_ack_enabled:false,controlled_beta_preview:false,canonical_write_path:'/api/employee/entry',production_cutover:'PRODUCTION_NO_GO'},bedTransferContext:{status:'idle',source:null,target:null,requestKey:'',serverValidation:null,validatedRecord:null,recordedResult:null}};
 const BED_TRANSFER_WRITE_ENABLED=false;
 const BED_TRANSFER_EVENT_LEDGER_MESSAGE='Bed transfer records save event anchors only. This does not directly change bed occupancy, deposit, arrears, or Access Card. 换床记录只保存信息锚点，不会直接改变床位、押金、欠款或门禁卡。';
 const BED_TRANSFER_SUBMITTED_MESSAGE='Bed transfer recorded / 换床记录已保存';
@@ -8278,10 +8278,11 @@ async function validateEmployeeUploadDryRun(entry,sessionForEntry,index,options=
   }
   return data;
 }
-const EMPLOYEE_AGGREGATE_TRANSPORT_ERRORS=new Set(['SERVER_VALIDATE_UNREACHABLE','SERVER_PROCESSING_TIMEOUT','SERVER_VALIDATE_MALFORMED_RESPONSE','SERVER_VALIDATE_AUTH_REQUIRED','SERVER_VALIDATE_ROUTE_NOT_FOUND','SERVER_VALIDATE_REQUEST_SERIALIZATION_FAILED']);
+const EMPLOYEE_AGGREGATE_TRANSPORT_ERRORS=new Set(['SERVER_VALIDATE_UNREACHABLE','SERVER_PROCESSING_TIMEOUT','SERVER_VALIDATE_MALFORMED_RESPONSE','SERVER_VALIDATE_AUTH_REQUIRED','SERVER_VALIDATE_ROUTE_NOT_FOUND','SERVER_VALIDATE_REQUEST_SERIALIZATION_FAILED','QA_CLIENT_ASSET_STALE']);
 function employeeAggregateValidationSessionFailure(errorCode,details){
   details=details||{};
-  return {success:false,ok:false,source:'aggregate_dry_run',stage:'aggregate_preflight_transport',transport_failure:true,session_error:true,error_code:errorCode,message:'Server validation unavailable. Please retry.',message_en:'Server validation unavailable. Please retry.',validation_results:[],validation_result_count:Number(details.validation_result_count||0),failed_result_count:0,passed_result_count:0,unmatched_result_count:Number(details.unmatched_result_count||0),duplicate_entry_id_count:Number(details.duplicate_entry_id_count||0),no_write:true,write_attempted:false,formal_write_count:0,request_url:'/api/employee/entry/validate',request_method:'POST',credentials_mode:'include',same_origin:true,http_status:Number(details.http_status||0),response_content_type:String(details.response_content_type||''),response_body_kind:String(details.response_body_kind||''),response_error_code:String(details.response_error_code||''),exception_name:String(details.exception_name||''),exception_message:String(details.exception_message||'').slice(0,160),request_body_bytes:Number(details.request_body_bytes||0)};
+  const stale=errorCode==='QA_CLIENT_ASSET_STALE';
+  return {success:false,ok:false,source:'aggregate_dry_run',stage:'aggregate_preflight_transport',transport_failure:true,session_error:true,error_code:errorCode,message:stale?'This QA page uses an older client asset. Reload before validating.':'Server validation unavailable. Please retry.',message_en:stale?'This QA page uses an older client asset. Reload before validating.':'Server validation unavailable. Please retry.',result_origin:stale?'STALE_LOCAL':'UNKNOWN',stale_reason:stale?'CLIENT_ASSET_VERSION_MISMATCH':'',validation_results:[],validation_result_count:Number(details.validation_result_count||0),failed_result_count:0,passed_result_count:0,unmatched_result_count:Number(details.unmatched_result_count||0),duplicate_entry_id_count:Number(details.duplicate_entry_id_count||0),no_write:true,write_attempted:false,formal_write_count:0,request_url:'/api/employee/entry/validate',request_method:'POST',credentials_mode:'include',same_origin:true,http_status:Number(details.http_status||0),response_content_type:String(details.response_content_type||''),response_body_kind:String(details.response_body_kind||''),response_error_code:String(details.response_error_code||''),exception_name:String(details.exception_name||''),exception_message:String(details.exception_message||'').slice(0,160),request_body_bytes:Number(details.request_body_bytes||0)};
 }
 function employeeLiftAggregateTransportFailuresToSession(){
   let lifted=null,changed=false;
@@ -8321,10 +8322,11 @@ function employeeAggregateValidationIdentityContract(validationResults,uploadLis
 }
 function renderEmployeeAggregateSessionError(result){
   const r=result||{};
-  return `<div class="upload-validation-panel" role="alert" data-aggregate-session-error="true"><div class="uv-title">Server validation unavailable. Please retry.</div><div class="uv-sub">本票服务器预校验暂时不可用；记录未被判定为业务失败。</div><div class="uv-list"><span class="uv-label">Session Error</span><span class="uv-value">${esc(r.error_code||'SERVER_VALIDATE_UNAVAILABLE')}</span></div><div class="preview-tools"><button class="mini-btn" data-retry-aggregate-validation="true">${renderEmployeeButtonLabel('Retry Validation','重试预校验')}</button></div><div class="warn">No business write was attempted. Existing record statuses were preserved.</div></div>`;
+  const stale=r.error_code==='QA_CLIENT_ASSET_STALE';
+  return `<div class="upload-validation-panel" role="alert" data-aggregate-session-error="true"><div class="uv-title">${esc(stale?'QA page update required. Reload before validating.':'Server validation unavailable. Please retry.')}</div><div class="uv-sub">${esc(stale?'当前页面资源与QA Run不匹配，旧结果已隔离。':'本票服务器预校验暂时不可用；记录未被判定为业务失败。')}</div><div class="uv-list"><span class="uv-label">Session Error</span><span class="uv-value">${esc(r.error_code||'SERVER_VALIDATE_UNAVAILABLE')}</span></div><div class="preview-tools"><button class="mini-btn" data-retry-aggregate-validation="true">${renderEmployeeButtonLabel(stale?'Reload Page':'Retry Validation',stale?'重新加载':'重试预校验')}</button></div><div class="warn">No business write was attempted. Existing record statuses were preserved.</div></div>`;
 }
 function employeeBindAggregateValidationRetry(){
-  document.querySelectorAll('[data-retry-aggregate-validation]').forEach(btn=>btn.onclick=()=>{state.aggregateValidationOnly=true;commitSessionAndExport()});
+  document.querySelectorAll('[data-retry-aggregate-validation]').forEach(btn=>btn.onclick=()=>{if(state.aggregateValidationSessionError?.error_code==='QA_CLIENT_ASSET_STALE'){location.reload();return}state.aggregateValidationOnly=true;commitSessionAndExport()});
 }
 async function validateEmployeeUploadAggregateDryRun(validationRequests){
   let requestBody='';
@@ -8336,7 +8338,9 @@ async function validateEmployeeUploadAggregateDryRun(validationRequests){
       const session={...(request?.session||{}),entries:sessionEntries,entries_json:JSON.stringify({anchor_contract_version:'employee_entry_anchor_v1',entries:sessionEntries})};
       return {...request,entry,entries,session};
     });
-    requestBody=JSON.stringify({aggregate_preflight:true,dry_run:true,validate_only:true,no_write:true,validation_requests:sanitizedRequests,diagnostic:employeeDiagnosticAssetMeta()});
+    const qa=typeof state==='object'?(state.qaAcceptance||{}):{};
+    const qaValidationContext=qa.runId?{qa_run_id:qa.runId,artifact_sha256:qa.artifactSha,qa_worker_version:qa.workerVersion,matrix_version:qa.matrixVersion,payload_hash:qa.payloadHash}:undefined;
+    requestBody=JSON.stringify({aggregate_preflight:true,dry_run:true,validate_only:true,no_write:true,validation_requests:sanitizedRequests,diagnostic:employeeDiagnosticAssetMeta(),qa_validation_context:qaValidationContext});
   }
   catch(error){return employeeAggregateValidationSessionFailure('SERVER_VALIDATE_REQUEST_SERIALIZATION_FAILED',{exception_name:error?.name||'Error',exception_message:error?.message||''})}
   let response;
@@ -8350,7 +8354,8 @@ async function validateEmployeeUploadAggregateDryRun(validationRequests){
   try{data=raw?unwrapStandardResponse(JSON.parse(raw)):null}catch{}
   if(Array.isArray(data?.validation_results)&&data.validation_results.length===validationRequests.length)return {...data,aggregate_http_status:response.status};
   const contentType=String(response.headers?.get?.('content-type')||'');
-  const errorCode=[401,403].includes(response.status)?'SERVER_VALIDATE_AUTH_REQUIRED':response.status===404?'SERVER_VALIDATE_ROUTE_NOT_FOUND':response.status===503?'SERVER_PROCESSING_TIMEOUT':'SERVER_VALIDATE_MALFORMED_RESPONSE';
+  const serverErrorCode=typeof data?.error_code==='string'?data.error_code:'';
+  const errorCode=serverErrorCode==='QA_CLIENT_ASSET_STALE'?'QA_CLIENT_ASSET_STALE':[401,403].includes(response.status)?'SERVER_VALIDATE_AUTH_REQUIRED':response.status===404?'SERVER_VALIDATE_ROUTE_NOT_FOUND':response.status===503?'SERVER_PROCESSING_TIMEOUT':'SERVER_VALIDATE_MALFORMED_RESPONSE';
   return employeeAggregateValidationSessionFailure(errorCode,{http_status:response.status,response_content_type:contentType,response_body_kind:contentType.includes('json')?'json':(raw?'non_json':'empty'),response_error_code:data?.error_code||data?.code||'',request_body_bytes:new Blob([requestBody]).size});
 }
 async function commitSessionAndExport(){
@@ -9180,6 +9185,52 @@ async function employeeLegacyLoadQaAcceptanceRun(){
 function employeeQaAcceptanceRawRunId(){
   return String(new URLSearchParams(location.search).get('qa_run_id')||'').trim().toUpperCase();
 }
+function employeeQaDiagnosticStorageKey(qaRunId='',entryId=''){
+  const run=String(qaRunId||'').toUpperCase().replace(/[^A-Z0-9-]/g,'');
+  const entry=String(entryId||'').replace(/[^A-Za-z0-9-]/g,'');
+  return `empv3:qa-diagnostic:${state.user?.userid||'locked'}:${run}:${entry}`;
+}
+function employeeQaDiagnosticEnvelopeCurrent(envelope={},qa=state.qaAcceptance||{},entryId=''){
+  const scoped=String(envelope.qa_run_id||'')===String(qa.runId||'')
+    &&String(envelope.entry_id||'')===String(entryId||'')
+    &&String(envelope.artifact_sha256||'')===String(qa.artifactSha||'')
+    &&String(envelope.worker_version||'')===String(qa.workerVersion||'')
+    &&String(envelope.payload_hash||'')===String(qa.payloadHash||'')
+    &&String(envelope.validation_attempt_id||'')===String(qa.validationAttemptId||'');
+  return scoped
+    ?{current:true,result_origin:envelope.result_origin||'STALE_LOCAL',stale_reason:'LOCAL_DIAGNOSTIC_NOT_DISPLAY_AUTHORITY'}
+    :{current:false,result_origin:envelope.qa_run_id?'STALE_LOCAL':'LEGACY_UNSCOPED',stale_reason:'QA_DIAGNOSTIC_SCOPE_MISMATCH'};
+}
+function employeeStoreQaDiagnosticEnvelope(envelope={}){
+  const entryId=String(envelope.entry_id||'');
+  if(!state.qaAcceptance?.runId||!entryId)return;
+  const safe={...envelope,client_received_at:new Date().toISOString()};
+  try{localStorage.setItem(employeeQaDiagnosticStorageKey(state.qaAcceptance.runId,entryId),JSON.stringify(safe))}catch{}
+}
+function employeeQaAcceptanceAttestationCurrent(attestation={},context={},ids=[]){
+  const attemptId=String(attestation?.validation_attempt_id||'');
+  const expiresAt=Date.parse(String(attestation?.expires_at||''));
+  const rows=Array.isArray(attestation?.validation_results)?attestation.validation_results:[];
+  const sameContext=String(attestation?.qa_run_id||'')===String(context.qa_run_id||'')
+    &&String(attestation?.artifact_sha256||'')===String(context.artifact_sha256||'')
+    &&String(attestation?.qa_worker_version||'')===String(context.qa_worker_version||'')
+    &&String(attestation?.matrix_version||'')===String(context.matrix_version||'')
+    &&String(attestation?.payload_hash||'')===String(context.payload_hash||'')
+    &&/^qa-val-[a-z0-9-]{12,}$/i.test(attemptId)
+    &&Number.isFinite(expiresAt)&&expiresAt>Date.now();
+  const envelopesCurrent=sameContext&&rows.length===ids.length&&rows.every(row=>{
+    const envelope=row?.diagnostic_envelope||{};
+    return String(envelope.validation_attempt_id||'')===attemptId
+      &&String(envelope.qa_run_id||'')===String(context.qa_run_id||'')
+      &&String(envelope.artifact_sha256||'')===String(context.artifact_sha256||'')
+      &&String(envelope.worker_version||'')===String(context.qa_worker_version||'')
+      &&String(envelope.matrix_version||'')===String(context.matrix_version||'')
+      &&String(envelope.payload_hash||'')===String(context.payload_hash||'')
+      &&['SERVER_ATTESTATION','LIVE_SERVER'].includes(String(envelope.result_origin||''));
+  });
+  const current=envelopesCurrent&&new Set(rows.map(row=>String(row.entry_identity||''))).size===ids.length&&ids.every(id=>rows.some(row=>String(row.entry_identity||'')===id));
+  return current?{current:true,stale_reason:'',status:'CURRENT'}:{current:false,stale_reason:sameContext?'ATTESTATION_ENTRY_ORIGIN_MISMATCH':'RUN_ARTIFACT_PAYLOAD_OR_ATTEMPT_MISMATCH',status:'NEEDS_REVALIDATION'};
+}
 function employeeQaAcceptanceDeliveryContract(data={},runId=''){
   const rawEntries=Array.isArray(data.entries)?data.entries:[];
   const sessionIds=data.session_ids_by_entry&&typeof data.session_ids_by_entry==='object'?data.session_ids_by_entry:{};
@@ -9194,7 +9245,7 @@ function employeeQaAcceptanceDeliveryContract(data={},runId=''){
   const matrixVersion=String(data.matrix_version||'');
   const payloadHash=String(data.payload_hash||'');
   if(String(data.qa_run_id||'').toUpperCase()!==runId)throw new Error('QA_RUN_ID_MISMATCH');
-  if(!['DRAFT_READY','AUTOMATION_FAILED','AUTOMATION_PASS'].includes(String(data.status||'')))throw new Error('QA_RUN_NOT_READY_FOR_EMPLOYEE_REVIEW');
+  if(!['DRAFT_READY','AUTOMATION_FAILED','AUTOMATION_PASS','AUTOMATION_PASS_WITH_RECOVERY_FINDING'].includes(String(data.status||'')))throw new Error('QA_RUN_NOT_READY_FOR_EMPLOYEE_REVIEW');
   if(data.cleanup_status==='COMPLETED')throw new Error('QA_RUN_ALREADY_CLEANED');
   if(data.delivery_contract!=='SERVER_PERSISTED_QA_RUN_V1')throw new Error('QA_DELIVERY_CONTRACT_MISSING');
   if(!/^[a-f0-9]{64}$/i.test(artifact)||artifact!==currentArtifact)throw new Error('QA_ARTIFACT_MISMATCH');
@@ -9205,16 +9256,21 @@ function employeeQaAcceptanceDeliveryContract(data={},runId=''){
   if(oracleFields.some(field=>!Number.isFinite(Number(oracle[field]))))throw new Error('QA_FINANCIAL_ORACLE_MISSING');
   const attestation=data.validation_attestation&&typeof data.validation_attestation==='object'?data.validation_attestation:null;
   const attestedIds=Array.isArray(attestation?.entry_ids)?attestation.entry_ids.map(String):[];
-  const validationAttestation=attestation
+  const attestationContextMatches=attestation
     &&String(attestation.qa_run_id||'')===runId
     &&String(attestation.artifact_sha256||'')===artifact
     &&String(attestation.qa_worker_version||'')===workerVersion
     &&String(attestation.matrix_version||'')===matrixVersion
     &&String(attestation.payload_hash||'')===payloadHash
+    &&/^qa-val-[a-z0-9-]{12,}$/i.test(String(attestation.validation_attempt_id||''))
     &&attestedIds.length===ids.length
     &&new Set(attestedIds).size===attestedIds.length
-    &&ids.every(id=>attestedIds.includes(id))?attestation:null;
-  return {rawEntries,sessionIds,expected,oracle,workerVersion,matrixVersion,payloadHash,validationAttestation};
+    &&ids.every(id=>attestedIds.includes(id));
+  const freshness=typeof employeeQaAcceptanceAttestationCurrent==='function'
+    ?employeeQaAcceptanceAttestationCurrent(attestation,{qa_run_id:runId,artifact_sha256:artifact,qa_worker_version:workerVersion,matrix_version:matrixVersion,payload_hash:payloadHash},ids)
+    :{current:!!attestationContextMatches,stale_reason:attestationContextMatches?'':'RUN_ARTIFACT_PAYLOAD_OR_ATTEMPT_MISMATCH'};
+  const validationAttestation=freshness.current?attestation:null;
+  return {rawEntries,sessionIds,expected,oracle,workerVersion,matrixVersion,payloadHash,validationAttestation,staleReason:freshness.stale_reason};
 }
 function employeeQaAcceptanceBanner({runId,status,mode,count,personalDraftCount,storageCount=0,error=''}){
   let banner=document.getElementById('qaAcceptanceEmployeeBanner');
@@ -9248,7 +9304,7 @@ async function employeeLoadQaAcceptanceRun(){
     const raw=await response.json();
     const data=raw?.data&&typeof raw.data==='object'?raw.data:raw;
     if(!response.ok||data?.success===false)throw new Error(data?.error_code||`HTTP_${response.status}`);
-    const {rawEntries,sessionIds,workerVersion,matrixVersion,payloadHash,validationAttestation}=employeeQaAcceptanceDeliveryContract(data,runId);
+    const {rawEntries,sessionIds,workerVersion,matrixVersion,payloadHash,validationAttestation,staleReason}=employeeQaAcceptanceDeliveryContract(data,runId);
     const attestedById=new Map((validationAttestation?.validation_results||[]).map(result=>[String(result?.entry_identity||''),result]));
     const entries=rawEntries.map(entry=>{
       const id=employeeEntryStableIdentity(entry);
@@ -9261,12 +9317,13 @@ async function employeeLoadQaAcceptanceRun(){
       const validationError=reusableFailure?{source:'aggregate_dry_run',stage:'qa_browser_validation',event_index:rawEntries.indexOf(entry),event_type:attested.event_type||entry.event_type||'',entry_identity:id,error_code:attested.error_code||'QA_VALIDATION_FAILED',message:'QA real-browser validation failed.',missing_fields:attested.missing_fields||[],invalid_fields:[],no_write:true,write_attempted:false}:null;
       return {...entry,amount:transferAmount,session_id:sessionIds[id]||entry.session_id||'',pay_type:payment==='bank'||payment==='b'?'B':payment==='cash'||payment==='c'?'C':entry.pay_type,upload_status:uploadStatus,upload_validation_error:validationError,upload_validation_error_code:validationError?.error_code||''};
     });
-    state.qaAcceptance={runId,status:data.status||'',mode:data.mode||'',artifactSha:data.artifact_sha256||'',workerVersion,matrixVersion,payloadHash,sessionIdsByEntry:sessionIds,validationAttestation,loadStatus:'READY',personalDraftCount};
+    state.qaAcceptance={runId,status:data.status||'',mode:data.mode||'',artifactSha:data.artifact_sha256||'',workerVersion,matrixVersion,payloadHash,sessionIdsByEntry:sessionIds,validationAttestation,validationAttemptId:validationAttestation?.validation_attempt_id||'',staleReason:staleReason||'',loadStatus:'READY',personalDraftCount};
     state.drafts=entries;
     state.sessionId=data.logical_session_id;
     saveDrafts();buildExport();refreshSessionViews();
     let storageCount=0;try{storageCount=(JSON.parse(localStorage.getItem(employeeQaAcceptanceStorageKey('empv3:drafts',runId))||'[]')||[]).length}catch{}
     employeeQaAcceptanceBanner({runId,status:data.status||'',mode:data.mode||'',count:entries.length,personalDraftCount,storageCount});
+    if(staleReason)showStatus(`Previous validation was isolated: ${staleReason}. Needs Revalidation.`,'warn');
     showStatus(`QA Run ${runId} loaded with ${entries.length} records. Review and Preview only; upload is not automatic.`,'ok');
   }catch(error){
     state.qaAcceptance={runId,status:'LOAD_FAILED',mode:'',artifactSha:'',workerVersion:'',matrixVersion:'',payloadHash:'',sessionIdsByEntry:{},validationAttestation:null,loadStatus:'FAILED',personalDraftCount};
@@ -9278,12 +9335,15 @@ async function employeeLoadQaAcceptanceRun(){
 async function employeeQaAcceptanceReportValidation(aggregate={},uploadList=[]){
   const qa=state.qaAcceptance||{},runId=qa.runId;
   if(!runId)return null;
+  const receivedAt=new Date().toISOString();
+  const validationAttemptId=String(aggregate.validation_attempt_id||aggregate?.validation_results?.[0]?.diagnostic_envelope?.validation_attempt_id||'');
   const results=(Array.isArray(aggregate.validation_results)?aggregate.validation_results:[]).map(result=>({
     entry_identity:String(result?.entry_identity||''),
     event_type:String(result?.event_type||''),
     ok:result?.ok===true,
-    error_code:String(result?.error_code||''),
-    missing_fields:Array.isArray(result?.missing_fields)?result.missing_fields.map(String):[]
+    error_code:typeof result?.error_code==='string'?result.error_code:'UNREGISTERED_VALIDATION_ERROR',
+    missing_fields:Array.isArray(result?.missing_fields)?result.missing_fields.map(String):[],
+    diagnostic_envelope:{...(result?.diagnostic_envelope||{}),client_received_at:receivedAt}
   }));
   const body={
     qa_run_id:runId,
@@ -9291,6 +9351,9 @@ async function employeeQaAcceptanceReportValidation(aggregate={},uploadList=[]){
     qa_worker_version:qa.workerVersion,
     matrix_version:qa.matrixVersion,
     payload_hash:qa.payloadHash,
+    validation_attempt_id:validationAttemptId,
+    trace_id:String(aggregate.trace_id||results[0]?.diagnostic_envelope?.trace_id||''),
+    client_received_at:receivedAt,
     aggregate_http_status:Number(aggregate.aggregate_http_status||0),
     validation_results:results,
     formal_write_count:0,
@@ -9302,7 +9365,9 @@ async function employeeQaAcceptanceReportValidation(aggregate={},uploadList=[]){
     const data=raw?.data&&typeof raw.data==='object'?raw.data:raw;
     if(!response.ok||data?.success===false)throw new Error(data?.error_code||'QA_VALIDATION_ATTESTATION_FAILED');
     qa.status=String(data.status||'AUTOMATION_FAILED');
-    qa.validationAttestation={...body,passed_count:results.filter(result=>result.ok).length,failed_count:results.filter(result=>!result.ok).length,entry_ids:results.map(result=>result.entry_identity)};
+    qa.validationAttemptId=validationAttemptId;
+    results.forEach(result=>employeeStoreQaDiagnosticEnvelope(result.diagnostic_envelope));
+    qa.validationAttestation={...body,passed_count:results.filter(result=>result.ok).length,failed_count:results.filter(result=>!result.ok).length,entry_ids:results.map(result=>result.entry_identity),result_origin:'LIVE_SERVER',expires_at:results[0]?.diagnostic_envelope?.expires_at||''};
     const banner=document.getElementById('qaAcceptanceEmployeeBanner');
     if(banner)banner.innerHTML=`<strong>QA Run ${esc(runId)}</strong> · ${esc(qa.mode||'quick')} · ${Number(uploadList.length||0)} Records · ${esc(qa.status)} · Real same-origin validation recorded · Upload remains locked until manual Employee acceptance.`;
     return data;

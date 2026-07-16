@@ -1,10 +1,10 @@
 # QA Acceptance QA-20260716-B9CA9E42
 
 - Mode: quick
-- Status: AUTOMATION_PASS
-- QA Run status: AUTOMATION_PASS
+- Status: AUTOMATION_FAILED
+- QA Run status: AUTOMATION_FAILED
 - Real Employee Validate Session: HTTP 200, 16/16 passed
-- Employee manual acceptance: pending
+- Employee manual acceptance: REJECTED_WITH_FINDINGS
 - Browser A: Server/Memory/QA storage/Header/Sticky/DOM = 16/16/16/16/16/16
 - Browser B: 16/16 passed after first load and three consecutive reloads
 - Unmatched results: 0
@@ -22,4 +22,7 @@
 - Final reconciliation: pending
 - Formal write count: 0
 - Accept Employee Review: not clicked
+- Recovery finding: STALE_CLIENT_VALIDATION_STATE
+- Root classification: STALE_DOM_MEMORY_FROM_LEGACY_UNSCOPED_RUN
+- The persisted current-Run attestation was 16/16; the two reported failure codes existed only in old Run `QA-20260716-2830578C` and had no Run/artifact/payload/attempt envelope.
 - Production business data changed: no

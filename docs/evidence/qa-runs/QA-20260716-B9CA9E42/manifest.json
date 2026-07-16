@@ -1,7 +1,7 @@
 {
   "qa_run_id": "QA-20260716-B9CA9E42",
   "mode": "quick",
-  "status": "AUTOMATION_PASS",
+  "status": "AUTOMATION_FAILED",
   "artifact_sha256": "19bb6cac992367d5be0032622e52914d18487c0adef7f0c897f1d48e8c0173ec",
   "artifact_commit": "e971cb28180b143d8283db4c5045540b8dee7107",
   "qa_worker_version": "19bb6cac9923",
@@ -18,6 +18,8 @@
   "duplicate_entry_id_count": 0,
   "ttlock_external_calls": 0,
   "formal_write_count": 0,
-  "manual_employee_status": "PENDING",
+  "manual_employee_status": "REJECTED_WITH_FINDINGS",
+  "recovery_finding_open": "STALE_CLIENT_VALIDATION_STATE",
+  "root_classification": "STALE_DOM_MEMORY_FROM_LEGACY_UNSCOPED_RUN",
   "production_business_data_changed": false
 }
