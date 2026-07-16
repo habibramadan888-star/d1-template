@@ -101,6 +101,9 @@ test("Employee QA loader uses the formal page and never auto-clicks Upload Sessi
   assert.match(employee, /Review and Preview only; upload is not automatic/);
   assert.match(employee, /employeeQaAcceptanceReportUpload/);
   assert.match(employee, /raw\?\.data&&typeof raw\.data==='object'\?raw\.data:raw/);
+  assert.match(employee, /session_id:sessionIds\[id\]\|\|entry\.session_id\|\|''/);
+  assert.match(employee, /payment==='bank'\|\|payment==='b'\?'B'/);
+  assert.match(employee, /data\.status==='AUTOMATION_PASS'\?'VALIDATION_PASSED'/);
   const loader = employee.slice(employee.indexOf("async function employeeLoadQaAcceptanceRun"), employee.indexOf("async function employeeQaAcceptanceReportUpload"));
   assert.doesNotMatch(loader, /commitSessionAndExport\(|btnExportSession\.click|\/api\/employee\/entry['"]/);
 });
