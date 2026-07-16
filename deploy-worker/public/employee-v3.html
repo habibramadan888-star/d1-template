@@ -3209,6 +3209,19 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 function employeeStorageKey(base,userid=state.user?.userid){
   return userid?`${base}:${userid}`:`${base}:locked`;
 }
+function employeeQaAcceptanceStorageKey(base,runId=state.qaAcceptance?.runId,userid=state.user?.userid){
+  const safeRunId=/^QA-\d{8}-[A-Z0-9]{4,12}$/.test(String(runId||'').toUpperCase())?String(runId).toUpperCase():'invalid';
+  return userid?`${base}:qa-run:${userid}:${safeRunId}`:`${base}:qa-run:locked:${safeRunId}`;
+}
+function employeeActiveStorageKey(base){
+  return state.qaAcceptance?.runId?employeeQaAcceptanceStorageKey(base):employeeStorageKey(base);
+}
+function employeeRemoveActiveDraftStorage({drafts=false,session=false}={}){
+  try{
+    if(drafts)localStorage.removeItem(employeeActiveStorageKey('empv3:drafts'));
+    if(session)localStorage.removeItem(employeeActiveStorageKey('empv3:sessionId'));
+  }catch{}
+}
 function readDrafts(userid){
   try{
     const key=employeeStorageKey('empv3:drafts',userid);
@@ -3227,7 +3240,7 @@ function readSessionId(userid){
   try{return localStorage.getItem(employeeStorageKey('empv3:sessionId',userid))||''}
   catch{return ''}
 }
-const state={lockCards:[],current:null,depositBalance:null,depositContext:null,rentConfig:{},rentConfigLoaded:false,drafts:[],tasks:[],closedTasks:[],arrearsTasksLoaded:false,arrearTasksError:null,arrearsGatewaySource:'',arrearsGatewayProof:null,employeeDirectives:[],followupItems:[],systemReminderItems:[],systemReminderStatus:'idle',systemReminderSummary:null,systemReminderSources:null,systemReminderLimit:100,sessionId:'',user:null,aggregateValidationSessionError:null,aggregateValidationOnly:false,ttlockStatus:'idle',ttlockLoadedAt:0,ttlockError:'',ttlockDataSource:'',qaAcceptance:{runId:'',status:'',mode:'',artifactSha:'',sessionIdsByEntry:{}},bedTransferCapabilities:{status:'idle',bed_transfer_validate_enabled:false,bed_transfer_write_enabled:false,owner_waiver_ack_enabled:false,controlled_beta_preview:false,canonical_write_path:'/api/employee/entry',production_cutover:'PRODUCTION_NO_GO'},bedTransferContext:{status:'idle',source:null,target:null,requestKey:'',serverValidation:null,validatedRecord:null,recordedResult:null}};
+const state={lockCards:[],current:null,depositBalance:null,depositContext:null,rentConfig:{},rentConfigLoaded:false,drafts:[],tasks:[],closedTasks:[],arrearsTasksLoaded:false,arrearTasksError:null,arrearsGatewaySource:'',arrearsGatewayProof:null,employeeDirectives:[],followupItems:[],systemReminderItems:[],systemReminderStatus:'idle',systemReminderSummary:null,systemReminderSources:null,systemReminderLimit:100,sessionId:'',user:null,aggregateValidationSessionError:null,aggregateValidationOnly:false,ttlockStatus:'idle',ttlockLoadedAt:0,ttlockError:'',ttlockDataSource:'',qaAcceptance:{runId:'',status:'',mode:'',artifactSha:'',sessionIdsByEntry:{},loadStatus:'',personalDraftCount:0},bedTransferCapabilities:{status:'idle',bed_transfer_validate_enabled:false,bed_transfer_write_enabled:false,owner_waiver_ack_enabled:false,controlled_beta_preview:false,canonical_write_path:'/api/employee/entry',production_cutover:'PRODUCTION_NO_GO'},bedTransferContext:{status:'idle',source:null,target:null,requestKey:'',serverValidation:null,validatedRecord:null,recordedResult:null}};
 const BED_TRANSFER_WRITE_ENABLED=false;
 const BED_TRANSFER_EVENT_LEDGER_MESSAGE='Bed transfer records save event anchors only. This does not directly change bed occupancy, deposit, arrears, or Access Card. 换床记录只保存信息锚点，不会直接改变床位、押金、欠款或门禁卡。';
 const BED_TRANSFER_SUBMITTED_MESSAGE='Bed transfer recorded / 换床记录已保存';
@@ -3409,8 +3422,8 @@ function setOperator(v){try{localStorage.setItem('empv3:operator',v||'EMP')}catc
 function saveDrafts(){
   if(!state.user?.userid)return false;
   try{
-    localStorage.setItem(employeeStorageKey('empv3:drafts'),JSON.stringify(state.drafts));
-    if(state.sessionId)localStorage.setItem(employeeStorageKey('empv3:sessionId'),state.sessionId);
+    localStorage.setItem(employeeActiveStorageKey('empv3:drafts'),JSON.stringify(state.drafts));
+    if(state.sessionId)localStorage.setItem(employeeActiveStorageKey('empv3:sessionId'),state.sessionId);
     return true;
   }
   catch{return false}
@@ -3482,14 +3495,14 @@ function currentSessionId(){
   if(!state.user?.userid)return '';
   if(!state.sessionId){
     state.sessionId=uid('S');
-    try{localStorage.setItem(employeeStorageKey('empv3:sessionId'),state.sessionId)}catch{}
+    try{localStorage.setItem(employeeActiveStorageKey('empv3:sessionId'),state.sessionId)}catch{}
   }
   return state.sessionId;
 }
 function startRepeatableUploadSessionId(){
   const id=uid('S');
   state.sessionId=id;
-  try{localStorage.setItem(employeeStorageKey('empv3:sessionId'),id)}catch{}
+  try{localStorage.setItem(employeeActiveStorageKey('empv3:sessionId'),id)}catch{}
   return id;
 }
 function cloneEntryForUpload(entry,sessionId,attemptId,index){
@@ -5868,7 +5881,8 @@ function resetEmployeeEntryForm(){
     state.lastSavedBedTransferDraftId=null;
     if(!state.drafts.length){
       state.sessionId='';
-      try{localStorage.removeItem(employeeStorageKey('empv3:sessionId'))}catch{}
+      if(state.qaAcceptance?.runId)employeeRemoveActiveDraftStorage({session:true});
+      else try{localStorage.removeItem(employeeStorageKey('empv3:sessionId'))}catch{}
     }
     saveDrafts();
     refreshSessionViews();
@@ -5975,7 +5989,8 @@ function newSession(){
   state.drafts=[];
   state.sessionId='';
   saveDrafts();
-  try{localStorage.removeItem(employeeStorageKey('empv3:sessionId'))}catch{}
+  if(state.qaAcceptance?.runId)employeeRemoveActiveDraftStorage({session:true});
+  else try{localStorage.removeItem(employeeStorageKey('empv3:sessionId'))}catch{}
   resetForm();
   buildExport();
   toast('已开始新会话');
@@ -5987,7 +6002,8 @@ function newSessionFinal(){
   state.uploadValidationFailedIndex=null;
   state.uploadValidationFailedEntryId='';
   state.uploadValidationFailedMessage='';
-  try{localStorage.removeItem(employeeStorageKey('empv3:drafts'));localStorage.removeItem(employeeStorageKey('empv3:sessionId'))}catch{}
+  if(state.qaAcceptance?.runId)employeeRemoveActiveDraftStorage({drafts:true,session:true});
+  else try{localStorage.removeItem(employeeStorageKey('empv3:drafts'));localStorage.removeItem(employeeStorageKey('empv3:sessionId'))}catch{}
   currentSessionId();
   saveDrafts();
   resetForm();
@@ -8650,7 +8666,8 @@ async function commitSessionAndExport(){
   if(cloudConfirmed){
     state.drafts=[];
     state.sessionId='';
-    try{localStorage.removeItem(employeeStorageKey('empv3:drafts'));localStorage.removeItem(employeeStorageKey('empv3:sessionId'))}catch{}
+    if(state.qaAcceptance?.runId)employeeRemoveActiveDraftStorage({drafts:true,session:true});
+    else try{localStorage.removeItem(employeeStorageKey('empv3:drafts'));localStorage.removeItem(employeeStorageKey('empv3:sessionId'))}catch{}
     currentSessionId();
     state.lastSavedBedTransferDraftId=null;
     saveDrafts();
@@ -9112,7 +9129,8 @@ function employeeQaAcceptanceSessionId(entry={},fallback=''){
   const id=employeeEntryStableIdentity(entry);
   return String(state.qaAcceptance?.sessionIdsByEntry?.[id]||fallback||'');
 }
-async function employeeLoadQaAcceptanceRun(){
+async function employeeLegacyLoadQaAcceptanceRun(){
+  return employeeLoadQaAcceptanceRun();
   const runId=employeeQaAcceptanceRequestedRunId();
   if(!runId||!state.user)return;
   try{
@@ -9129,7 +9147,6 @@ async function employeeLoadQaAcceptanceRun(){
       return {...entry,amount:transferAmount,session_id:sessionIds[id]||entry.session_id||'',pay_type:payment==='bank'||payment==='b'?'B':payment==='cash'||payment==='c'?'C':entry.pay_type,upload_status:data.status==='AUTOMATION_PASS'?'VALIDATION_PASSED':entry.upload_status};
     });
     if(entries.length!==Number(data.employee_record_count||0))throw new Error('QA_EMPLOYEE_COUNT_MISMATCH');
-    if(state.drafts.length&&state.drafts.some(row=>!String(row?.id||'').startsWith(`${runId}-`)))throw new Error('QA_LOCAL_DRAFT_CONFLICT');
     state.qaAcceptance={runId,status:data.status||'',mode:data.mode||'',artifactSha:data.artifact_sha256||'',sessionIdsByEntry:sessionIds};
     state.drafts=entries;
     state.sessionId=data.logical_session_id;
@@ -9141,6 +9158,83 @@ async function employeeLoadQaAcceptanceRun(){
   }catch(error){
     state.qaAcceptance={runId:'',status:'',mode:'',artifactSha:'',sessionIdsByEntry:{}};
     showStatus(`QA acceptance draft was not loaded: ${String(error?.message||error)}`,'bad');
+  }
+}
+function employeeQaAcceptanceRawRunId(){
+  return String(new URLSearchParams(location.search).get('qa_run_id')||'').trim().toUpperCase();
+}
+function employeeQaAcceptanceDeliveryContract(data={},runId=''){
+  const rawEntries=Array.isArray(data.entries)?data.entries:[];
+  const sessionIds=data.session_ids_by_entry&&typeof data.session_ids_by_entry==='object'?data.session_ids_by_entry:{};
+  const expected=Number(data.employee_record_count||0);
+  const ids=rawEntries.map(employeeEntryStableIdentity);
+  const mappedSessionIds=ids.map(id=>String(sessionIds[id]||''));
+  const oracle=data.expected_finance&&typeof data.expected_finance==='object'?data.expected_finance:{};
+  const oracleFields=['cash_received','bank_received','total_received','total_expenses','net_funds','cash_net','bank_net','outstanding','arrears_opened','arrears_repaid','deposit_included','bed_transfer_fee','rent_income'];
+  const artifact=String(data.artifact_sha256||'');
+  const currentArtifact=String(data.current_artifact_sha256||'');
+  if(String(data.qa_run_id||'').toUpperCase()!==runId)throw new Error('QA_RUN_ID_MISMATCH');
+  if(data.status!=='AUTOMATION_PASS')throw new Error('QA_RUN_NOT_READY_FOR_EMPLOYEE_REVIEW');
+  if(data.cleanup_status==='COMPLETED')throw new Error('QA_RUN_ALREADY_CLEANED');
+  if(data.delivery_contract!=='SERVER_PERSISTED_QA_RUN_V1')throw new Error('QA_DELIVERY_CONTRACT_MISSING');
+  if(!/^[a-f0-9]{64}$/i.test(artifact)||artifact!==currentArtifact)throw new Error('QA_ARTIFACT_MISMATCH');
+  if(expected!==16||rawEntries.length!==expected||Number(data.scenario_count||0)!==16)throw new Error('QA_EMPLOYEE_COUNT_MISMATCH');
+  if(ids.some(id=>!id.startsWith(`${runId}-E`))||new Set(ids).size!==ids.length)throw new Error('QA_ENTRY_ID_CONTRACT_INVALID');
+  if(mappedSessionIds.some(id=>!id.startsWith(`${runId}-S`))||new Set(mappedSessionIds).size!==mappedSessionIds.length)throw new Error('QA_SESSION_ID_CONTRACT_INVALID');
+  if(oracleFields.some(field=>!Number.isFinite(Number(oracle[field]))))throw new Error('QA_FINANCIAL_ORACLE_MISSING');
+  return {rawEntries,sessionIds,expected,oracle};
+}
+function employeeQaAcceptanceBanner({runId,status,mode,count,personalDraftCount,storageCount=0,error=''}){
+  let banner=document.getElementById('qaAcceptanceEmployeeBanner');
+  if(!banner){banner=document.createElement('div');banner.id='qaAcceptanceEmployeeBanner';banner.className='context-note';document.querySelector('#view-entry .wrap,#view-entry')?.prepend(banner)}
+  banner.dataset.qaRunId=runId;
+  banner.dataset.loadStatus=error?'FAILED':'READY';
+  banner.dataset.recordCount=String(count||0);
+  banner.dataset.qaStorageCount=String(storageCount||0);
+  banner.dataset.personalDraftPreservedCount=String(personalDraftCount||0);
+  banner.dataset.storageNamespace=employeeQaAcceptanceStorageKey('empv3:drafts',runId);
+  const personal=`Personal draft preserved: ${Number(personalDraftCount||0)} record${Number(personalDraftCount||0)===1?'':'s'}`;
+  banner.innerHTML=error
+    ?`<strong>QA Run ${esc(runId||'invalid')}</strong> · <span class="bad">QA Run could not be loaded. Your personal draft remains unchanged.</span> · ${esc(personal)} · <a href="/employee#entry">Return to Personal Session</a>`
+    :`<strong>QA Run ${esc(runId)}</strong> · ${esc(mode)} · ${Number(count||0)} Records · ${esc(status)} · ${esc(personal)} · Review only; Upload Session remains manual. · <a href="/employee#entry">Return to Personal Session</a>`;
+  return banner;
+}
+async function employeeLoadQaAcceptanceRun(){
+  const requested=employeeQaAcceptanceRawRunId();
+  if(!requested||!state.user)return;
+  const runId=employeeQaAcceptanceRequestedRunId();
+  const personalDraftCount=state.drafts.length;
+  if(!runId){
+    state.qaAcceptance={runId:requested,status:'LOAD_FAILED',mode:'',artifactSha:'',sessionIdsByEntry:{},loadStatus:'FAILED',personalDraftCount};
+    state.drafts=[];state.sessionId='';buildExport();refreshSessionViews();
+    employeeQaAcceptanceBanner({runId:requested,status:'LOAD_FAILED',mode:'',count:0,personalDraftCount,error:'QA_RUN_ID_INVALID'});
+    showStatus('QA Run could not be loaded. Your personal draft remains unchanged.','bad');
+    return;
+  }
+  try{
+    const response=await apiFetch(`/api/qa/acceptance/runs/${encodeURIComponent(runId)}/employee-draft`);
+    const raw=await response.json();
+    const data=raw?.data&&typeof raw.data==='object'?raw.data:raw;
+    if(!response.ok||data?.success===false)throw new Error(data?.error_code||`HTTP_${response.status}`);
+    const {rawEntries,sessionIds}=employeeQaAcceptanceDeliveryContract(data,runId);
+    const entries=rawEntries.map(entry=>{
+      const id=employeeEntryStableIdentity(entry);
+      const payment=String(entry.payment_method||entry.pay_type||'').trim().toLowerCase();
+      const transferAmount=String(entry.type||'').toUpperCase()==='TF'?(String(entry.fee_mode||'').toLowerCase()==='paid'?Number(entry.fee_amount_aed||0):0):entry.amount;
+      return {...entry,amount:transferAmount,session_id:sessionIds[id]||entry.session_id||'',pay_type:payment==='bank'||payment==='b'?'B':payment==='cash'||payment==='c'?'C':entry.pay_type,upload_status:'VALIDATION_PASSED'};
+    });
+    state.qaAcceptance={runId,status:data.status||'',mode:data.mode||'',artifactSha:data.artifact_sha256||'',sessionIdsByEntry:sessionIds,loadStatus:'READY',personalDraftCount};
+    state.drafts=entries;
+    state.sessionId=data.logical_session_id;
+    saveDrafts();buildExport();refreshSessionViews();
+    let storageCount=0;try{storageCount=(JSON.parse(localStorage.getItem(employeeQaAcceptanceStorageKey('empv3:drafts',runId))||'[]')||[]).length}catch{}
+    employeeQaAcceptanceBanner({runId,status:data.status||'',mode:data.mode||'',count:entries.length,personalDraftCount,storageCount});
+    showStatus(`QA Run ${runId} loaded with ${entries.length} records. Review and Preview only; upload is not automatic.`,'ok');
+  }catch(error){
+    state.qaAcceptance={runId,status:'LOAD_FAILED',mode:'',artifactSha:'',sessionIdsByEntry:{},loadStatus:'FAILED',personalDraftCount};
+    state.drafts=[];state.sessionId='';buildExport();refreshSessionViews();
+    employeeQaAcceptanceBanner({runId,status:'LOAD_FAILED',mode:'',count:0,personalDraftCount,error:String(error?.message||error)});
+    showStatus('QA Run could not be loaded. Your personal draft remains unchanged.','bad');
   }
 }
 async function employeeQaAcceptanceReportUpload(uploadList=[]){
@@ -9403,7 +9497,8 @@ function removeCurrentSessionRecord(id,reason=''){
   state.uploadValidationFailedMessage='';
   if(!state.drafts.length){
     state.sessionId='';
-    try{localStorage.removeItem(employeeStorageKey('empv3:drafts'));localStorage.removeItem(employeeStorageKey('empv3:sessionId'))}catch{}
+    if(state.qaAcceptance?.runId)employeeRemoveActiveDraftStorage({drafts:true,session:true});
+    else try{localStorage.removeItem(employeeStorageKey('empv3:drafts'));localStorage.removeItem(employeeStorageKey('empv3:sessionId'))}catch{}
   }else saveDrafts();
   refreshSessionViews();
   buildExport();

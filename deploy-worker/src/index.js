@@ -11619,20 +11619,55 @@ async function qaAcceptanceCreateRun(request,env,user){
   return success(qaAcceptancePublicRun(request,await qaAcceptanceReadRun(env,user,runId)));
 }
 __name(qaAcceptanceCreateRun,"qaAcceptanceCreateRun");
+function qaAcceptanceEmployeeDraftUnavailable(errorCode="QA_RUN_DRAFT_UNAVAILABLE",status=409){
+  return json({success:false,error_code:errorCode,message:"QA Run could not be loaded. Your personal draft remains unchanged.",no_write:true,formal_write_count:0},status);
+}
+__name(qaAcceptanceEmployeeDraftUnavailable,"qaAcceptanceEmployeeDraftUnavailable");
+async function qaAcceptanceEmployeeDraftContract(env,run){
+  if(!["CREATED","AUTOMATION_PASS","MANUAL_EMPLOYEE_ACCEPTED"].includes(String(run.status||"")))return {ok:false,error_code:"QA_RUN_NOT_ACTIVE"};
+  if(String(run.cleanup_status||"NOT_RUN")==="COMPLETED")return {ok:false,error_code:"QA_RUN_ALREADY_CLEANED"};
+  const manifest=await env.RATE_LIMIT.get("qa:artifact-manifest","json").catch(()=>null);
+  const artifact=String(run.artifact_sha256||""),currentArtifact=String(manifest?.candidate_sha256||"");
+  if(!/^[a-f0-9]{64}$/i.test(artifact)||artifact!==currentArtifact||String(run.artifact_commit||"")!==String(manifest?.git_commit||""))return {ok:false,error_code:"QA_RUN_ARTIFACT_MISMATCH"};
+  if(String(run.matrix_version||"")!==String(env.QA_MATRIX_VERSION||""))return {ok:false,error_code:"QA_RUN_MATRIX_VERSION_MISMATCH"};
+  let matrix={},expected={};
+  try{matrix=JSON.parse(run.matrix_json||"{}");expected=JSON.parse(run.expected_json||"{}")}catch{return {ok:false,error_code:"QA_RUN_PERSISTED_DRAFT_INVALID"}}
+  const scenarios=(Array.isArray(matrix.scenarios)?matrix.scenarios:[]).filter(row=>row.upload_enabled!==false);
+  const ids=scenarios.map(row=>String(row.entry_id||"")),sessionIds=scenarios.map(row=>String(row.session_id||""));
+  const expectedCount=Number(run.employee_record_count||0),runPrefix=`${run.qa_run_id}-`;
+  if(!expectedCount||scenarios.length!==expectedCount||Number(run.scenario_count||0)<expectedCount)return {ok:false,error_code:"QA_RUN_SCENARIO_COUNT_MISMATCH"};
+  if(ids.some(id=>!id.startsWith(`${runPrefix}E`))||new Set(ids).size!==ids.length)return {ok:false,error_code:"QA_RUN_ENTRY_ID_INVALID"};
+  if(sessionIds.some(id=>!id.startsWith(`${runPrefix}S`))||new Set(sessionIds).size!==sessionIds.length)return {ok:false,error_code:"QA_RUN_SESSION_ID_INVALID"};
+  if(scenarios.some(row=>!row.input||String(row.input.id||"")!==String(row.entry_id||"")))return {ok:false,error_code:"QA_RUN_ENTRY_PAYLOAD_INVALID"};
+  const serialized=JSON.stringify(scenarios.map(row=>row.input));
+  if(/password|\bpin\b|token|cookie|secret|tenant_?card|card_?id|provider|phone|99099/i.test(serialized))return {ok:false,error_code:"QA_RUN_DRAFT_PRIVACY_VIOLATION"};
+  if(String(run.mode||"")==="quick"){
+    const fields=["cash_received","bank_received","total_received","total_expenses","net_funds","cash_net","bank_net","outstanding","arrears_opened","arrears_repaid","deposit_included","bed_transfer_fee","rent_income"];
+    if(expectedCount!==16||Number(run.scenario_count||0)!==16||fields.some(field=>!Number.isFinite(Number(expected[field]))))return {ok:false,error_code:"QA_RUN_FINANCIAL_ORACLE_MISSING"};
+  }
+  return {ok:true,manifest,matrix,expected,scenarios};
+}
+__name(qaAcceptanceEmployeeDraftContract,"qaAcceptanceEmployeeDraftContract");
 async function qaAcceptanceEmployeeDraft(request,env,user,run){
-  let matrix={};try{matrix=JSON.parse(run.matrix_json||"{}")}catch{}
-  const scenarios=(matrix.scenarios||[]).filter(row=>row.upload_enabled!==false);
+  const contract=await qaAcceptanceEmployeeDraftContract(env,run);
+  if(!contract.ok)return qaAcceptanceEmployeeDraftUnavailable(contract.error_code);
+  const {scenarios,expected,manifest}=contract;
   return success({
     qa_run_id:run.qa_run_id,
     mode:run.mode,
     status:run.status,
     matrix_version:run.matrix_version,
     artifact_sha256:run.artifact_sha256,
+    current_artifact_sha256:String(manifest.candidate_sha256||""),
     scenario_count:Number(run.scenario_count||0),
-    employee_record_count:scenarios.length,
+    employee_record_count:Number(run.employee_record_count||0),
+    server_draft_count:scenarios.length,
     logical_session_id:`${run.qa_run_id}-CURRENT`,
     entries:scenarios.map(row=>row.input),
     session_ids_by_entry:Object.fromEntries(scenarios.map(row=>[row.entry_id,row.session_id])),
+    expected_finance:expected,
+    cleanup_status:run.cleanup_status||"NOT_RUN",
+    delivery_contract:"SERVER_PERSISTED_QA_RUN_V1",
     preview_expected:true,
     auto_upload:false,
     readonly_manifest:true

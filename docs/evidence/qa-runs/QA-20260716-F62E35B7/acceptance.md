@@ -2,7 +2,10 @@
 
 - Mode: quick
 - Status: AUTOMATION_PASS
-- Manual Employee status: PENDING
+- Manual Employee status: DELIVERY_FAILED
+- QA_RUN_STATUS: AUTOMATION_PASS
+- MANUAL_EMPLOYEE_STATUS: DELIVERY_FAILED
+- MANUAL_EMPLOYEE_DELIVERY_RESULT: FAILED_CROSS_BROWSER_STATE
 - Artifact SHA-256: `142c8131ea3819d9508aa4b901365b3d05cacff1482c0fc65f013ba0557ce194`
 - Artifact commit: `96bea977e18db8ca477f9729415d19a0a6123801`
 - QA Worker deployment: `35e355d9-2222-446a-aef8-d1baaa9f3d98`
@@ -54,4 +57,7 @@
 - Wrangler dry-run and artifact reproducibility: passed
 
 No reviewer button was clicked. The Run is intentionally paused at the manual
-Employee acceptance gate.
+Employee acceptance gate. The first manual handoff was rejected because the
+user's independent browser preserved its personal one-record draft instead of
+loading the server QA Run. The automation evidence remains valid and preserved;
+this Run was never uploaded or manually accepted.
