@@ -60,6 +60,9 @@ test("Full uses distinct legal business identities instead of weakening global i
   assert.equal(byCase.get("rent-cash-full").rent_period_start, "2026-07-17");
   assert.equal(byCase.get("rent-cash-full-custom-period").rent_period_start, "2026-07-18");
   assert.equal(byCase.get("rent-cash-full-mismatch-period-reviewed").rent_period_start, "2026-08-17");
+  assert.equal(byCase.get("deposit-in-cash").bed, "512");
+  assert.equal(byCase.get("deposit-in-bank").bed, "513");
+  assert.match(byCase.get("bed-transfer-paid-cash").transfer_reason, /full matrix$/);
   assert.equal(byCase.get("arrears-payment-cash-cloud").arrears_ref, "FULL-CLOUD-ARREARS-1");
   assert.equal(byCase.get("arrears-payment-cash-cloud-bank-cloud").arrears_ref, "FULL-CLOUD-ARREARS-2");
   assert.equal(byCase.get("arrears-payment-bank-legacy-cash-legacy").payment_amount, 10);

@@ -78,6 +78,17 @@ function isolateFullScenario(row) {
   }
   if (scenario.event_type === "deposit_out") input.refund_date = "2026-07-17";
   if (["checkout", "left_with_arrears"].includes(scenario.event_type)) input.checkout_date = "2026-07-17";
+  if (scenario.case_id === "deposit-in-cash") {
+    input.room = "512";
+    input.bed = "512";
+    input.linked_tenant = "full-context-512";
+  }
+  if (scenario.case_id === "deposit-in-bank") {
+    input.room = "513";
+    input.bed = "513";
+    input.linked_tenant = "full-context-513";
+  }
+  if (scenario.event_type === "bed_transfer") input.transfer_reason = `${input.transfer_reason} full matrix`;
   if (scenario.case_id === "arrears-payment-cash-cloud") {
     input.linked_task_id = "FULL-CLOUD-ARREARS-1";
     input.arrears_ref = "FULL-CLOUD-ARREARS-1";
