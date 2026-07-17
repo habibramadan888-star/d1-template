@@ -69,6 +69,10 @@ test('employee capability failure disables Bed Transfer fields, local save and f
   assert.match(employee, /status:'error',bed_transfer_validate_enabled:false,bed_transfer_write_enabled:false/);
 });
 
+test('Bed Transfer capability gate clears stale auth-lock accessibility state when validation is enabled', () => {
+  assert.match(employee, /if\(gate\.validate_enabled\)chip\.removeAttribute\('aria-disabled'\);else chip\.setAttribute\('aria-disabled','true'\)/);
+});
+
 test('owner capability failure hides waiver acknowledgment and blocks direct invocation', () => {
   assert.match(owner, /ownerCapabilities:\{status:'idle',owner_waiver_ack_enabled:false/);
   assert.match(owner, /catch\{\s*state\.ownerCapabilities=\{status:'error',owner_waiver_ack_enabled:false/s);

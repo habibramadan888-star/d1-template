@@ -3396,7 +3396,7 @@ function applyEmployeeBedTransferUiGate(){
   const gate=employeeBedTransferUiGateState();
   document.querySelectorAll('#transferFields input,#transferFields select,#transferFields textarea').forEach(control=>{control.disabled=!gate.fields_enabled});
   const chip=document.querySelector('.event-chip[data-type="TF"]');
-  if(chip){chip.disabled=!gate.validate_enabled;chip.title=gate.validate_enabled?'':gate.error_code;}
+  if(chip){chip.disabled=!gate.validate_enabled;chip.title=gate.validate_enabled?'':gate.error_code;if(gate.validate_enabled)chip.removeAttribute('aria-disabled');else chip.setAttribute('aria-disabled','true');}
   const saveButton=$('btnSaveEntry');
   if(saveButton&&$('entryType')?.value==='TF'){
     const contextReady=state.bedTransferContext?.status==='ready';
