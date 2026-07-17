@@ -3552,13 +3552,7 @@ async function validateEmployeeEntryUploadPayload(env,user,body,opts={}){
   if(type==="CO"&&depositDeduction>depositBalance+0.01){
     return employeeEntryValidationFailure("checkout_validation","DEPOSIT_DEDUCTION_EXCEEDS_BALANCE","Deposit deduction exceeds deposit balance.",{event_index:eventIndex,event_type:"checkout",invalid_fields:["deposit_deduction"],anchor_preview:{...anchorPreview,deposit_balance:depositBalance,deposit_deduction:depositDeduction}});
   }
-  const summary={
-    cash_handover:Number(String(session.cash_handover||0).replace(/,/g,"")),
-    bank_transfer_total:Number(String(session.bank_transfer_total||0).replace(/,/g,"")),
-    bank_transfer_count:Number(session.bank_transfer_count||0),
-    gross_received:Number(String(session.gross_received||0).replace(/,/g,"")),
-    balance_total:entryAnchorMoney(Number(String(session.cash_handover||0).replace(/,/g,""))+Number(String(session.bank_transfer_total||0).replace(/,/g,"")))
-  };
+  const summary=canonicalSessionSummaryWithClientDiagnostic(session,sessionAnchorEntries,sessionAnchorEntries,[]);
   return {
     trace_id:homelinkDiagnosticTraceId("emp-upload"),
     action:"employee_upload_validation",
@@ -3583,6 +3577,7 @@ async function validateEmployeeEntryUploadPayload(env,user,body,opts={}){
       source:cleanText(session.source||"employee_entry",40)
     },
     summary,
+    summary_diagnostic:summary.client_summary_diagnostic,
     entries_count:sessionAnchorEntries.length||1,
     export_text_preview:String(sessionExportText||"").slice(0,1000),
     anchor_types:sessionAnchorEntries.map(row=>row.event_type||entryAnchorEventType(entryAnchorType(row))),
@@ -3889,7 +3884,8 @@ async function persistEmployeeBedTransferCanonicalArchive(env,user,body,validati
     const prepared=prepareCanonicalTransferArchiveWrite({validated_anchor:preview,session_id:sessionId,entry_identity:entryIdentity,accepted_at:empNow(),operator_reference:cleanText(user?.userid||'',120)},{idFactory:()=>crypto.randomUUID()});
     const mergedEntries=[...existingEntries,prepared.entry];
     const mergedJson=JSON.stringify({anchor_contract_version:'employee_entry_anchor_v1',entries:mergedEntries});
-    const update=await env.DB.prepare(`UPDATE sessions SET entries_json=?, entries_count=?, handover_status='COMPLETED', exported_at=? WHERE id=? AND corpid=? AND COALESCE(voided_at,'')='' AND UPPER(COALESCE(handover_status,''))='EXPORTING'`).bind(mergedJson,mergedEntries.length,prepared.entry.canonical_accepted_at,sessionId,user.corpid).run();
+    const mergedSummary=canonicalSessionSummaryWithClientDiagnostic(session,mergedEntries,mergedEntries,[]),mergedSummaryFields=canonicalSessionSummaryPersistenceFields(mergedSummary);
+    const update=await env.DB.prepare(`UPDATE sessions SET entries_json=?, entries_count=?, cash_handover=?, bank_transfer_total=?, bank_transfer_count=?, gross_received=?, summary_json=?, handover_status='COMPLETED', exported_at=? WHERE id=? AND corpid=? AND COALESCE(voided_at,'')='' AND UPPER(COALESCE(handover_status,''))='EXPORTING'`).bind(mergedJson,mergedEntries.length,mergedSummaryFields.cash_handover,mergedSummaryFields.bank_transfer_total,mergedSummaryFields.bank_transfer_count,mergedSummaryFields.gross_received,mergedSummaryFields.summary_json,prepared.entry.canonical_accepted_at,sessionId,user.corpid).run();
     if(Number(update?.meta?.changes??update?.changes??0)!==1){
       const raced=await readExisting(),racedClassified=classifyExistingCanonicalTransfer(raced?.entries_json,prepared.request_fingerprint);
       if(racedClassified.status==='accepted')return success({success:true,ok:true,idempotent:true,already_accepted:true,session_finalized:true,session_id:sessionId,canonical_entry:racedClassified.entry});
@@ -3904,9 +3900,10 @@ async function persistEmployeeBedTransferCanonicalArchive(env,user,body,validati
     return success({success:true,ok:true,idempotent:false,canonical_write_status:'accepted',canonical_persistence_verified:true,session_finalized:true,resumable_finalization:true,session_id:sessionId,canonical_entry:matching[0]});
   }
   const prepared=prepareCanonicalTransferArchiveWrite({validated_anchor:preview,session_id:sessionId,entry_identity:entryIdentity,accepted_at:empNow(),operator_reference:cleanText(user?.userid||'',120)},{idFactory:()=>crypto.randomUUID()});
+  const preparedSummary=canonicalSessionSummaryWithClientDiagnostic(session,[prepared.entry],[prepared.entry],[]),preparedSummaryFields=canonicalSessionSummaryPersistenceFields(preparedSummary);
   try{
-    await env.DB.prepare(`INSERT INTO sessions (id,corpid,anchor_id,date,entries_count,created_by,created_at,operator_id,operator_name,cash_handover,bank_transfer_total,bank_transfer_count,gross_received,handover_status,exported_at,export_text,source,entries_json)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(sessionId,user.corpid,prepared.entry.transfer_anchor_id,cleanDate(session.date||prepared.entry.canonical_accepted_at),1,user.userid,prepared.entry.canonical_accepted_at,user.userid,cleanText(user.employee_name||user.userid,120),0,0,0,0,'COMPLETED',prepared.entry.canonical_accepted_at,'','employee_entry',prepared.entries_json).run();
+    await env.DB.prepare(`INSERT INTO sessions (id,corpid,anchor_id,date,entries_count,created_by,created_at,operator_id,operator_name,cash_handover,bank_transfer_total,bank_transfer_count,gross_received,handover_status,exported_at,export_text,source,entries_json,summary_json)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(sessionId,user.corpid,prepared.entry.transfer_anchor_id,cleanDate(session.date||prepared.entry.canonical_accepted_at),1,user.userid,prepared.entry.canonical_accepted_at,user.userid,cleanText(user.employee_name||user.userid,120),preparedSummaryFields.cash_handover,preparedSummaryFields.bank_transfer_total,preparedSummaryFields.bank_transfer_count,preparedSummaryFields.gross_received,'COMPLETED',prepared.entry.canonical_accepted_at,'','employee_entry',prepared.entries_json,preparedSummaryFields.summary_json).run();
   }catch(error){const raced=await readExisting();if(!raced)throw error;const classified=classifyExistingCanonicalTransfer(raced.entries_json,base.request_fingerprint);if(classified.status==='conflict')return json({success:false,ok:false,error_code:classified.error_code,no_write:true},409);return success({success:true,ok:true,idempotent:true,already_accepted:true,session_id:sessionId,canonical_entry:classified.entry});}
   const persisted=await readExisting(),classified=classifyExistingCanonicalTransfer(persisted?.entries_json,prepared.request_fingerprint),stored=classified.entry;
   const persistenceVerified=classified.status==='accepted'&&persisted?.anchor_id===prepared.entry.transfer_anchor_id&&stored?.transfer_anchor_id===prepared.entry.transfer_anchor_id&&stored?.canonical_request_fingerprint===prepared.request_fingerprint&&stored?.from_bed===prepared.entry.from_bed&&stored?.to_bed===prepared.entry.to_bed;
@@ -4170,13 +4167,8 @@ async function handleEmployeeEntry(request,env,user,options={}){
     :(Array.isArray(session.entries)?session.entries:[]);
   const sessionAnchorEntries=buildEmployeeEntryEntriesWithOccupancyCandidateMetadata(user,body,canonicalInputEntries);
   const sessionEntriesJson=JSON.stringify({anchor_contract_version:"employee_entry_anchor_v1",entries:sessionAnchorEntries});
-  const sessionSummaryJson=JSON.stringify({
-    cash_handover:Number(String(session.cash_handover||0).replace(/,/g,"")),
-    bank_transfer_total:Number(String(session.bank_transfer_total||0).replace(/,/g,"")),
-    bank_transfer_count:Number(session.bank_transfer_count||0),
-    gross_received:Number(String(session.gross_received||0).replace(/,/g,"")),
-    balance_total:entryAnchorMoney(Number(String(session.cash_handover||0).replace(/,/g,""))+Number(String(session.bank_transfer_total||0).replace(/,/g,"")))
-  });
+  const sessionSummary=canonicalSessionSummaryWithClientDiagnostic(session,sessionAnchorEntries,sessionAnchorEntries,[]);
+  const sessionSummaryFields=canonicalSessionSummaryPersistenceFields(sessionSummary);
   const sessionExportText=employeeEntryExportTextWithAnchors(session.export_text||"",sessionAnchorEntries,{...session,id:sessionId});
   await empInsertDynamic(env,"sessions",{
     id:sessionId,
@@ -4188,16 +4180,16 @@ async function handleEmployeeEntry(request,env,user,options={}){
     created_at:now,
     operator_id:authOperatorId,
     operator_name:operatorName,
-    cash_handover:Number(String(session.cash_handover||0).replace(/,/g,"")),
-    bank_transfer_total:Number(String(session.bank_transfer_total||0).replace(/,/g,"")),
-    bank_transfer_count:Number(session.bank_transfer_count||0),
-    gross_received:Number(String(session.gross_received||0).replace(/,/g,"")),
+    cash_handover:sessionSummaryFields.cash_handover,
+    bank_transfer_total:sessionSummaryFields.bank_transfer_total,
+    bank_transfer_count:sessionSummaryFields.bank_transfer_count,
+    gross_received:sessionSummaryFields.gross_received,
     handover_status:cleanText(session.handover_status||"EXPORTING",40),
     exported_at:cleanText(session.exported_at||now,40),
     export_text:cleanText(sessionExportText,50000),
     source:cleanText(session.source||"employee_entry",40)||"employee_entry",
     entries_json:cleanText(sessionEntriesJson,50000),
-    summary_json:cleanText(sessionSummaryJson,5000)
+    summary_json:cleanText(sessionSummaryFields.summary_json,5000)
   },EMP_SESSION_COLUMNS,request_context);
   const inserted=await empInsertDynamic(env,"transactions",{
     id:entryId,corpid:user.corpid,userid:user.userid,session_id:sessionId,cat:cleanText(entry.cat||"cash",20),
@@ -6864,8 +6856,11 @@ function canonicalOwnerHistorySessionRow(session={},correctionFields=null){
   const archiveState=canonicalOwnerHistoryArchiveState(session,correctionFields);
   const active=canonicalOwnerHistoryActiveForTotals(archiveState);
   const summary=correctionFields?.correction_summary||null;
+  const sessionSummary=canonicalSessionSummaryRead(session);
   return {
     ...session,
+    ...(sessionSummary||{}),
+    session_summary:sessionSummary,
     archive_state:archiveState,
     canonical_archive_gateway:"canonical_owner_history_archive_gateway",
     active_archive_record:active,
@@ -6883,7 +6878,10 @@ __name(canonicalOwnerHistorySessionRow,"canonicalOwnerHistorySessionRow");
 function canonicalOwnerHistoryDetailGatewayFields(session={},rows=[],correctionFields=null,detailSource=""){
   const archiveState=canonicalOwnerHistoryArchiveState(session,correctionFields);
   const anchors=extractEmployeeEntryAnchorsFromSession(session);
+  const sessionSummary=canonicalSessionSummaryRead(session);
   return {
+    ...(sessionSummary||{}),
+    session_summary:sessionSummary,
     archive_gateway:{
       ok:true,
       gateway:"canonical_owner_history_archive_gateway",
@@ -10675,6 +10673,105 @@ function canonicalFinanceProjectionApplyAnchor(totals,anchor={}){
   }
 }
 __name(canonicalFinanceProjectionApplyAnchor,"canonicalFinanceProjectionApplyAnchor");
+function canonicalSessionSummaryEntryIdentity(entry={}){
+  return cleanText(entry?.entry_identity||entry?.event_id||entry?.id||entry?.anchor_id||entry?.transfer_anchor_id||"",160);
+}
+__name(canonicalSessionSummaryEntryIdentity,"canonicalSessionSummaryEntryIdentity");
+function canonicalSessionSummaryNormalizeAnchor(anchor={},transaction=null){
+  const normalized={...(transaction&&typeof transaction==="object"?transaction:{}),...(anchor&&typeof anchor==="object"?anchor:{})};
+  const type=canonicalFinanceProjectionEventType(normalized);
+  if(type==="bed_transfer"||type==="bed_transfer_fee"){
+    normalized.fee_amount=normalized.fee_amount??normalized.fee_amount_aed??normalized.fee_paid_amount??0;
+    normalized.fee_status=normalized.fee_status||normalized.payment_status||normalized.fee_mode||normalized.fee_choice||"";
+  }
+  return normalized;
+}
+__name(canonicalSessionSummaryNormalizeAnchor,"canonicalSessionSummaryNormalizeAnchor");
+function calculateCanonicalSessionSummary(entries=[],anchors=[],transactions=[]){
+  const canonicalRows=(Array.isArray(anchors)&&anchors.length?anchors:Array.isArray(entries)?entries:[]).filter(row=>row&&typeof row==="object");
+  const transactionRows=Array.isArray(transactions)?transactions.filter(row=>row&&typeof row==="object"):[];
+  const transactionsById=new Map(transactionRows.map(row=>[canonicalSessionSummaryEntryIdentity(row),row]).filter(([id])=>id));
+  const totals=canonicalFinanceProjectionZeroTotals(),seen=new Set();
+  let bankTransferCount=0,transactionMatchCount=0;
+  for(const raw of canonicalRows){
+    const identity=canonicalSessionSummaryEntryIdentity(raw)||`anonymous-${seen.size+1}`;
+    if(seen.has(identity))continue;
+    seen.add(identity);
+    const transaction=transactionsById.get(identity)||null;
+    if(transaction)transactionMatchCount+=1;
+    const anchor=canonicalSessionSummaryNormalizeAnchor(raw,transaction);
+    const bankBefore=ownerOverviewMoney(totals.bank_received);
+    canonicalFinanceProjectionApplyAnchor(totals,anchor);
+    if(ownerOverviewMoney(totals.bank_received)>bankBefore)bankTransferCount+=1;
+  }
+  const projection=canonicalFinanceProjectionRoundTotals(totals),comparable=qaAcceptanceFinanceComparable(projection);
+  return {
+    summary_contract_version:"canonical-session-summary-v1",
+    source:"server_canonical_finance_projection",
+    server_authoritative:true,
+    entry_count:seen.size,
+    canonical_anchor_count:seen.size,
+    transaction_match_count:transactionMatchCount,
+    cash_received:comparable.cash_received,
+    bank_received:comparable.bank_received,
+    total_received:comparable.total_received,
+    cash_out:comparable.cash_out,
+    bank_out:comparable.bank_out,
+    total_expenses:comparable.total_expenses,
+    net_funds:comparable.net_funds,
+    cash_net:comparable.cash_net,
+    net_cash:comparable.cash_net,
+    bank_net:comparable.bank_net,
+    outstanding:comparable.outstanding,
+    arrears_opened:comparable.arrears_opened,
+    arrears_repaid:comparable.arrears_repaid,
+    deposit_included:comparable.deposit_included,
+    deposit_refund:comparable.deposit_refund,
+    expense:comparable.expense,
+    bed_transfer_fee:comparable.bed_transfer_fee,
+    rent_income:comparable.rent_income,
+    cash_handover:comparable.cash_net,
+    bank_transfer_total:comparable.bank_received,
+    bank_transfer_count:bankTransferCount,
+    gross_received:comparable.total_received,
+    balance_total:comparable.net_funds
+  };
+}
+__name(calculateCanonicalSessionSummary,"calculateCanonicalSessionSummary");
+function canonicalSessionSummaryClientDiagnostic(session={},serverSummary={}){
+  const pairs={cash_handover:"cash_handover",bank_transfer_total:"bank_transfer_total",bank_transfer_count:"bank_transfer_count",gross_received:"gross_received",balance_total:"balance_total"};
+  let nested=session?.summary&&typeof session.summary==="object"&&!Array.isArray(session.summary)?session.summary:null;
+  if(!nested&&session?.summary_json)try{nested=JSON.parse(session.summary_json)}catch{nested=null}
+  if(!nested||typeof nested!=="object"||Array.isArray(nested))nested={};
+  const hasValue=field=>(Object.prototype.hasOwnProperty.call(session||{},field)&&String(session?.[field]??"").trim()!=="")||(Object.prototype.hasOwnProperty.call(nested||{},field)&&String(nested?.[field]??"").trim()!=="");
+  const valueFor=field=>Object.prototype.hasOwnProperty.call(session||{},field)?session?.[field]:nested?.[field];
+  const provided=Object.keys(pairs).filter(hasValue);
+  const mismatched=provided.filter(field=>Math.abs(ownerOverviewMoney(valueFor(field))-ownerOverviewMoney(serverSummary?.[pairs[field]]))>=0.01);
+  return {client_summary_present:provided.length>0,provided_fields:provided,mismatch:mismatched.length>0,mismatched_fields:mismatched,client_values_accepted_for_persistence:false,server_authoritative:true};
+}
+__name(canonicalSessionSummaryClientDiagnostic,"canonicalSessionSummaryClientDiagnostic");
+function canonicalSessionSummaryWithClientDiagnostic(session={},entries=[],anchors=[],transactions=[]){
+  const summary=calculateCanonicalSessionSummary(entries,anchors,transactions);
+  return {...summary,client_summary_diagnostic:canonicalSessionSummaryClientDiagnostic(session,summary)};
+}
+__name(canonicalSessionSummaryWithClientDiagnostic,"canonicalSessionSummaryWithClientDiagnostic");
+function canonicalSessionSummaryPersistenceFields(summary={}){
+  return {
+    cash_handover:ownerOverviewMoney(summary.cash_handover),
+    bank_transfer_total:ownerOverviewMoney(summary.bank_transfer_total),
+    bank_transfer_count:Number(summary.bank_transfer_count||0),
+    gross_received:ownerOverviewMoney(summary.gross_received),
+    summary_json:JSON.stringify(summary)
+  };
+}
+__name(canonicalSessionSummaryPersistenceFields,"canonicalSessionSummaryPersistenceFields");
+function canonicalSessionSummaryRead(session={}){
+  try{
+    const parsed=JSON.parse(session?.summary_json||"null");
+    return parsed&&parsed.summary_contract_version==="canonical-session-summary-v1"&&parsed.server_authoritative===true?parsed:null;
+  }catch{return null}
+}
+__name(canonicalSessionSummaryRead,"canonicalSessionSummaryRead");
 function canonicalFinanceProjectionApplyCorrectionEffectiveTotals(totals,summary={}){
   const effective=summary.archive_effective_totals||{};
   const depositLiability=ownerOverviewMoney(effective.deposit_liability);
@@ -12481,7 +12578,7 @@ async function qaAcceptanceRunPersistenceSnapshot(env,user,run={},contract={},co
     if(context.archive_read_ok===false||context.archive_snapshot_truncated===true)sessionReadOk=false;
   }
   else{
-    const sessionReadStartedAt=Date.now(),rows=await env.DB.prepare("SELECT id,anchor_id,entries_count,handover_status,entries_json,created_at,voided_at FROM sessions WHERE corpid=? AND id LIKE ? ORDER BY id").bind(user.corpid,like).all().catch(()=>{sessionReadOk=false;return {results:[]}});
+    const sessionReadStartedAt=Date.now(),rows=await env.DB.prepare("SELECT id,anchor_id,entries_count,cash_handover,bank_transfer_total,bank_transfer_count,gross_received,summary_json,handover_status,entries_json,created_at,voided_at FROM sessions WHERE corpid=? AND id LIKE ? ORDER BY id").bind(user.corpid,like).all().catch(()=>{sessionReadOk=false;return {results:[]}});
     sessions=rows.results||[];
     if(context){context.d1_read_count=Number(context.d1_read_count||0)+1;context.d1_read_duration_ms=Number(context.d1_read_duration_ms||0)+Math.max(0,Date.now()-sessionReadStartedAt);context.persistence_read_count=Number(context.persistence_read_count||0)+1;if(sessionReadOk)context.sessions_table_exists=true;}
   }
@@ -12492,7 +12589,7 @@ async function qaAcceptanceRunPersistenceSnapshot(env,user,run={},contract={},co
     transactionReadOk=context.transaction_read_ok!==false&&context.transaction_snapshot_truncated!==true&&checked instanceof Set&&[...expectedEntryIds].every(id=>checked.has(id));
   }
   else{
-    const transactionReadStartedAt=Date.now(),rows=await env.DB.prepare("SELECT id,session_id,type,status,voided_at FROM transactions WHERE corpid=? AND session_id LIKE ? ORDER BY id").bind(user.corpid,like).all().catch(()=>{transactionReadOk=false;return {results:[]}});
+    const transactionReadStartedAt=Date.now(),rows=await env.DB.prepare("SELECT * FROM transactions WHERE corpid=? AND session_id LIKE ? ORDER BY id").bind(user.corpid,like).all().catch(()=>{transactionReadOk=false;return {results:[]}});
     for(const row of rows.results||[])transactions.set(cleanId(row?.id||""),row);
     if(context){
       context.d1_read_count=Number(context.d1_read_count||0)+1;
@@ -12546,6 +12643,7 @@ async function qaAcceptanceRunPersistenceSnapshot(env,user,run={},contract={},co
   if(context){
     context.qa_persisted_entry_locations=entryLocations;
     context.qa_persisted_sessions_by_id=sessionsById;
+    context.qa_persisted_transactions_by_id=transactions;
   }
   const readOk=sessionReadOk&&transactionReadOk;
   const ok=readOk&&!conflicting.length&&!duplicateEntryIds.length&&!invalidSessionIds.length&&!unexpectedSessions.length&&!unexpectedEntries.length&&!unexpectedTransactions.length;
@@ -12586,12 +12684,76 @@ function qaAcceptanceFinalizationFinanceCheck(run={},contract={},context={}){
   return {ok:mismatched.length===0,error_code:mismatched.length?missingExpected.length?"QA_RUN_FINANCIAL_ORACLE_MISSING":"QA_RUN_FINANCIAL_ORACLE_MISMATCH":"",expected:Object.fromEntries(expectedFields.map(field=>[field,ownerOverviewMoney(expected[field])])),actual:Object.fromEntries(expectedFields.map(field=>[field,ownerOverviewMoney(actual[field])])),mismatched_fields:mismatched,entry_count:entries.length};
 }
 __name(qaAcceptanceFinalizationFinanceCheck,"qaAcceptanceFinalizationFinanceCheck");
+const QA_SESSION_SUMMARY_PARITY_FIELDS=["cash_received","bank_received","total_received","cash_out","bank_out","total_expenses","net_funds","cash_net","net_cash","bank_net","outstanding","arrears_opened","arrears_repaid","deposit_included","deposit_refund","expense","bed_transfer_fee","rent_income","cash_handover","bank_transfer_total","bank_transfer_count","gross_received","balance_total"];
+function qaAcceptanceCanonicalSessionSummaryPlan(contract={},context={}){
+  const scenarios=Array.isArray(contract?.scenarios)?contract.scenarios:[],locations=context?.qa_persisted_entry_locations,transactions=context?.qa_persisted_transactions_by_id,sessions=context?.qa_persisted_sessions_by_id;
+  if(!(locations instanceof Map)||!(transactions instanceof Map)||!(sessions instanceof Map))return {ok:false,error_code:"QA_SESSION_SUMMARY_SOURCE_UNAVAILABLE",rows:[]};
+  const bySession=new Map(),expectedEntryIds=new Set();
+  for(const scenario of scenarios){
+    const entryId=String(scenario.entry_id||""),sessionId=String(scenario.session_id||"");
+    if(!entryId||!sessionId||expectedEntryIds.has(entryId))return {ok:false,error_code:"QA_SESSION_SUMMARY_ENTRY_ID_INVALID",rows:[]};
+    expectedEntryIds.add(entryId);
+    const located=locations.get(entryId);
+    if(!located?.entry||String(located?.session?.id||"")!==sessionId)return {ok:false,error_code:"QA_SESSION_SUMMARY_ENTRY_SOURCE_INCOMPLETE",rows:[]};
+    if(!bySession.has(sessionId))bySession.set(sessionId,{session:sessions.get(sessionId)||located.session,entries:[],transactions:[]});
+    const group=bySession.get(sessionId);
+    group.entries.push(located.entry);
+    const transaction=transactions.get(entryId);
+    if(transaction)group.transactions.push(transaction);
+  }
+  if(expectedEntryIds.size!==scenarios.length||bySession.size!==new Set(scenarios.map(row=>String(row.session_id||""))).size)return {ok:false,error_code:"QA_SESSION_SUMMARY_SCOPE_MISMATCH",rows:[]};
+  const rows=[];
+  for(const [sessionId,group] of bySession){
+    const summary=calculateCanonicalSessionSummary(group.entries,group.entries,group.transactions),persisted=canonicalSessionSummaryRead(group.session);
+    summary.client_summary_diagnostic=persisted?.client_summary_diagnostic||{client_summary_present:false,provided_fields:[],mismatch:false,mismatched_fields:[],client_values_accepted_for_persistence:false,server_authoritative:true};
+    summary.finalized_from_persisted_canonical_entries=true;
+    rows.push({session_id:sessionId,session:group.session,entries:group.entries,transactions:group.transactions,summary,fields:canonicalSessionSummaryPersistenceFields(summary)});
+  }
+  return {ok:true,error_code:"",rows,entry_count:expectedEntryIds.size,session_count:rows.length};
+}
+__name(qaAcceptanceCanonicalSessionSummaryPlan,"qaAcceptanceCanonicalSessionSummaryPlan");
+function qaAcceptanceSessionSummaryParity(contract={},context={}){
+  const plan=qaAcceptanceCanonicalSessionSummaryPlan(contract,context);
+  if(!plan.ok)return {...plan,parity_count:0,mismatch_count:Number(contract?.scenarios?.length||0),mismatches:[]};
+  const mismatches=[];
+  for(const row of plan.rows){
+    const stored=canonicalSessionSummaryRead(row.session),fields=row.fields;
+    const different=[];
+    if(ownerOverviewMoney(row.session?.cash_handover)!==ownerOverviewMoney(fields.cash_handover))different.push("cash_handover");
+    if(ownerOverviewMoney(row.session?.bank_transfer_total)!==ownerOverviewMoney(fields.bank_transfer_total))different.push("bank_transfer_total");
+    if(Number(row.session?.bank_transfer_count||0)!==Number(fields.bank_transfer_count||0))different.push("bank_transfer_count");
+    if(ownerOverviewMoney(row.session?.gross_received)!==ownerOverviewMoney(fields.gross_received))different.push("gross_received");
+    if(!stored)different.push("summary_json");
+    else for(const field of QA_SESSION_SUMMARY_PARITY_FIELDS)if(ownerOverviewMoney(stored?.[field])!==ownerOverviewMoney(row.summary?.[field]))different.push(`summary_json.${field}`);
+    if(different.length)mismatches.push({session_id:row.session_id,first_different_field:different[0],different_fields:[...new Set(different)]});
+  }
+  return {...plan,parity_count:plan.rows.length-mismatches.length,mismatch_count:mismatches.length,mismatches,ok:mismatches.length===0,error_code:mismatches.length?"QA_SESSION_SUMMARY_PARITY_MISMATCH":""};
+}
+__name(qaAcceptanceSessionSummaryParity,"qaAcceptanceSessionSummaryParity");
+async function qaAcceptancePersistCanonicalSessionSummaries(env,user,contract={},context={},{complete=false}={}){
+  const plan=qaAcceptanceCanonicalSessionSummaryPlan(contract,context);
+  if(!plan.ok)return {...plan,parity_count:0,mismatch_count:Number(contract?.scenarios?.length||0)};
+  const statements=plan.rows.map(row=>env.DB.prepare(`UPDATE sessions SET cash_handover=?,bank_transfer_total=?,bank_transfer_count=?,gross_received=?,summary_json=?${complete?",handover_status='COMPLETED'":""} WHERE id=? AND corpid=? AND COALESCE(voided_at,'')=''`).bind(row.fields.cash_handover,row.fields.bank_transfer_total,row.fields.bank_transfer_count,row.fields.gross_received,row.fields.summary_json,row.session_id,user.corpid));
+  const startedAt=Date.now();
+  try{if(statements.length)await env.DB.batch(statements)}catch{return {ok:false,error_code:"QA_SESSION_SUMMARY_PERSISTENCE_FAILED",rows:plan.rows,parity_count:0,mismatch_count:plan.rows.length}}
+  const duration=Math.max(0,Date.now()-startedAt);
+  context.d1_write_count=Number(context.d1_write_count||0)+statements.length;
+  context.d1_write_duration_ms=Number(context.d1_write_duration_ms||0)+duration;
+  context.d1_batch_count=Number(context.d1_batch_count||0)+(statements.length?1:0);
+  context.d1_batch_duration_ms=Number(context.d1_batch_duration_ms||0)+duration;
+  for(const row of plan.rows)Object.assign(row.session,row.fields,{summary_json:row.fields.summary_json,...(complete?{handover_status:"COMPLETED"}:{})});
+  const parity=qaAcceptanceSessionSummaryParity(contract,context);
+  context.qa_session_summary_result={summary_contract_version:"canonical-session-summary-v1",entry_count:plan.entry_count,session_count:plan.session_count,parity_count:parity.parity_count,mismatch_count:parity.mismatch_count,rebuild_duration_ms:duration};
+  return {...parity,rebuild_duration_ms:duration};
+}
+__name(qaAcceptancePersistCanonicalSessionSummaries,"qaAcceptancePersistCanonicalSessionSummaries");
 async function qaAcceptanceStableUploadReceipt(run={},contract={},stored={},finance={},recordedAt="",context={},stageMs={},startedAt=Date.now()){
   const entryIds=(contract.scenarios||[]).map(row=>String(row.entry_id||""));
   const sessionIds=(contract.scenarios||[]).map(row=>String(row.session_id||""));
   const locations=context?.qa_persisted_entry_locations instanceof Map?context.qa_persisted_entry_locations:new Map();
   const anchorIds=entryIds.map(entryId=>{const entry=locations.get(entryId)?.entry||{};return String(entry.transfer_anchor_id||entry.anchor_id||entry.event_id||entry.id||"")});
-  const basis={qa_run_id:String(run.qa_run_id||""),artifact_sha256:String(run.artifact_sha256||""),payload_hash:String(contract.payloadHash||""),validation_attempt_id:String(stored.validation_attempt_id||""),entry_ids:entryIds,anchor_ids:anchorIds,completed_session_ids:sessionIds};
+  const summaryResult=context?.qa_session_summary_result||{};
+  const basis={qa_run_id:String(run.qa_run_id||""),artifact_sha256:String(run.artifact_sha256||""),payload_hash:String(contract.payloadHash||""),validation_attempt_id:String(stored.validation_attempt_id||""),entry_ids:entryIds,anchor_ids:anchorIds,completed_session_ids:sessionIds,session_summary_contract_version:String(summaryResult.summary_contract_version||""),session_summary_parity_count:Number(summaryResult.parity_count||0)};
   const digest=await hscSha256(JSON.stringify(hscStableValue(basis)));
   return {
     receipt_version:"qa-upload-receipt-v1",
@@ -12612,6 +12774,7 @@ async function qaAcceptanceStableUploadReceipt(run={},contract={},stored={},fina
     business_write_count:0,
     finance_result:"PASS",
     finance_actual:finance.actual||{},
+    session_summary_result:{...summaryResult},
     stage_duration_ms:{...stageMs},
     pre_finalization_duration_ms:Math.max(0,Date.now()-Number(startedAt||Date.now())),
     finalization_only:true,
@@ -12636,20 +12799,22 @@ async function qaAcceptanceFinalizePersistedRun(env,user,run,contract,stored,ses
   if(!exact)return json({success:false,error_code:"QA_RUN_NOT_READY_FOR_FINALIZATION",...base,message:"The accepted QA Run is not fully and uniquely persisted. No business records or Run state were changed."},409);
   const finance=qaAcceptanceFinalizationFinanceCheck(run,contract,requestContext);
   if(!finance.ok)return json({success:false,error_code:finance.error_code||"QA_RUN_FINANCIAL_ORACLE_MISMATCH",...base,finance_result:"FAIL",finance_mismatched_fields:finance.mismatched_fields||[],message:"The persisted QA Run does not match its accepted financial oracle. No Run state was changed."},409);
-  const receipt=await qaAcceptanceStableUploadReceipt(run,contract,stored,finance,empNow(),requestContext,stageMs,startedAt);
   if(String(run.status||"")==="UPLOAD_PASS"){
     const existing=qaAcceptanceStoredUploadReceipt(run);
-    const receiptMatches=existing&&String(existing.receipt_id||"")===receipt.receipt_id&&Number(existing.anchor_count||0)===expectedCount&&new Set(existing.entry_ids||[]).size===expectedCount;
+    const receiptMatches=existing&&Number(existing.anchor_count||0)===expectedCount&&new Set(existing.entry_ids||[]).size===expectedCount;
     if(!receiptMatches||Number(persistence.completed_session_count||0)!==expectedCount)return json({success:false,error_code:"QA_RUN_UPLOAD_RECEIPT_CONFLICT",...base},409);
     return success({ok:true,status:"UPLOAD_PASS",idempotent:true,upload_receipt:existing,completed_session_count:expectedCount,...base,request_context_metrics:employeeEntryAggregateRequestMetrics(requestContext),stage_duration_ms:stageMs,total_duration_ms:Date.now()-startedAt});
   }
   if(String(run.status||"")!=="MANUAL_EMPLOYEE_ACCEPTED"||!run.employee_accepted_at)return json({success:false,error_code:"QA_MANUAL_EMPLOYEE_ACCEPTANCE_REQUIRED",...base},409);
-  const sessionIds=scenarios.map(row=>String(row.session_id||"")),placeholders=sessionIds.map(()=>"?").join(","),recordedAt=receipt.recorded_at;
-  const completeSessions=env.DB.prepare(`UPDATE sessions SET handover_status='COMPLETED' WHERE corpid=? AND id IN (${placeholders}) AND COALESCE(voided_at,'')='' AND COALESCE(handover_status,'')<>'COMPLETED'`).bind(user.corpid,...sessionIds);
+  const summaryStartedAt=Date.now(),summaryResult=await qaAcceptancePersistCanonicalSessionSummaries(env,user,contract,requestContext,{complete:true});
+  stageMs.session_summary_rebuild_ms=Math.max(0,Date.now()-summaryStartedAt);
+  if(!summaryResult.ok||Number(summaryResult.parity_count||0)!==expectedCount)return json({success:false,error_code:summaryResult.error_code||"QA_SESSION_SUMMARY_PARITY_MISMATCH",...base,session_summary_result:requestContext.qa_session_summary_result||null,message:"Server-authoritative Session summaries did not persist with exact canonical parity. The QA Run was not finalized."},409);
+  const receipt=await qaAcceptanceStableUploadReceipt(run,contract,stored,finance,empNow(),requestContext,stageMs,startedAt),recordedAt=receipt.recorded_at;
   const completeRun=env.DB.prepare("UPDATE qa_acceptance_runs SET status='UPLOAD_PASS',upload_json=?,updated_at=? WHERE qa_run_id=? AND corpid=? AND status='MANUAL_EMPLOYEE_ACCEPTED' AND COALESCE(cleanup_status,'NOT_RUN')<>'COMPLETED'").bind(JSON.stringify(receipt),recordedAt,run.qa_run_id,user.corpid);
-  try{await env.DB.batch([completeSessions,completeRun])}catch{return json({success:false,error_code:"QA_RUN_FINALIZATION_FAILED",...base,message:"QA Run finalization did not complete; no canonical, transaction, or anchor write was attempted."},503)}
-  requestContext.d1_write_count=Number(requestContext.d1_write_count||0)+2;
+  try{await completeRun.run()}catch{return json({success:false,error_code:"QA_RUN_FINALIZATION_FAILED",...base,message:"QA Run finalization did not complete; no canonical, transaction, or anchor write was attempted."},503)}
+  requestContext.d1_write_count=Number(requestContext.d1_write_count||0)+1;
   const finalized=await qaAcceptanceRunPersistenceSnapshot(env,user,run,contract,requestContext,{fresh:true});
+  const finalSummaryParity=qaAcceptanceSessionSummaryParity(contract,requestContext);
   const current=await qaAcceptanceReadRun(env,user,run.qa_run_id),storedReceipt=qaAcceptanceStoredUploadReceipt(current||{});
   const verified=finalized.ok
     &&finalized.persisted_count===expectedCount
@@ -12657,9 +12822,11 @@ async function qaAcceptanceFinalizePersistedRun(env,user,run,contract,stored,ses
     &&finalized.conflicting_count===0
     &&finalized.duplicate_count===0
     &&finalized.completed_session_count===expectedCount
+    &&finalSummaryParity.ok
+    &&Number(finalSummaryParity.parity_count||0)===expectedCount
     &&String(current?.status||"")==="UPLOAD_PASS"
     &&String(storedReceipt?.receipt_id||"")===receipt.receipt_id;
-  if(!verified)return json({success:false,error_code:"QA_RUN_FINALIZATION_VERIFICATION_FAILED",...base,completed_session_count:Number(finalized.completed_session_count||0)},409);
+  if(!verified)return json({success:false,error_code:"QA_RUN_FINALIZATION_VERIFICATION_FAILED",...base,completed_session_count:Number(finalized.completed_session_count||0),session_summary_parity_count:Number(finalSummaryParity.parity_count||0)},409);
   return success({ok:true,status:"UPLOAD_PASS",idempotent:false,upload_receipt:storedReceipt,completed_session_count:expectedCount,...base,request_context_metrics:employeeEntryAggregateRequestMetrics(requestContext),stage_duration_ms:stageMs,total_duration_ms:Date.now()-startedAt});
 }
 __name(qaAcceptanceFinalizePersistedRun,"qaAcceptanceFinalizePersistedRun");
@@ -12942,15 +13109,14 @@ async function qaAcceptanceSessionResume(request,env,user,run){
   stageMs.write_entry_max_ms=entryDurations.length?Math.max(...entryDurations):0;
   const verifyStart=Date.now(),verified=await qaAcceptanceRunPersistenceSnapshot(env,user,run,contract,requestContext,{fresh:true});mark("post_write_verification_ms",verifyStart);
   if(!verified.ok||verified.persisted_count!==scenarios.length||verified.missing_count!==0)return json({success:false,error_code:"QA_UPLOAD_PERSISTENCE_MISMATCH",...base,write_attempted:true,no_write:false,new_write_count:writeResults.filter(row=>row.new_write).length,already_persisted_count:verified.persisted_count,remaining_count:verified.missing_count,conflicting_entry_count:verified.conflicting_count},409);
-  const sessionIds=scenarios.map(row=>String(row.session_id||"")),placeholders=sessionIds.map(()=>"?").join(","),finalizeStart=Date.now();
-  const completionWriteStartedAt=Date.now();
-  await env.DB.prepare(`UPDATE sessions SET handover_status='COMPLETED' WHERE corpid=? AND id IN (${placeholders}) AND COALESCE(voided_at,'')=''`).bind(user.corpid,...sessionIds).run();
-  requestContext.d1_write_count=Number(requestContext.d1_write_count||0)+1;
-  requestContext.d1_write_duration_ms=Number(requestContext.d1_write_duration_ms||0)+Math.max(0,Date.now()-completionWriteStartedAt);
+  const finalizeStart=Date.now(),summaryResult=await qaAcceptancePersistCanonicalSessionSummaries(env,user,contract,requestContext,{complete:true});
+  stageMs.session_summary_rebuild_ms=Math.max(0,Date.now()-finalizeStart);
+  if(!summaryResult.ok||Number(summaryResult.parity_count||0)!==scenarios.length)return json({success:false,error_code:summaryResult.error_code||"QA_SESSION_SUMMARY_PARITY_MISMATCH",...base,write_attempted:true,no_write:false,new_write_count:writeResults.filter(row=>row.new_write).length,session_summary_result:requestContext.qa_session_summary_result||null},409);
   const finalized=await qaAcceptanceRunPersistenceSnapshot(env,user,run,contract,requestContext,{fresh:true});
-  if(finalized.completed_session_count!==scenarios.length)return json({success:false,error_code:"QA_SESSION_FINALIZATION_MISMATCH",...base,write_attempted:true,no_write:false,new_write_count:writeResults.filter(row=>row.new_write).length,completed_session_count:finalized.completed_session_count},409);
+  const finalSummaryParity=qaAcceptanceSessionSummaryParity(contract,requestContext);
+  if(finalized.completed_session_count!==scenarios.length||!finalSummaryParity.ok||Number(finalSummaryParity.parity_count||0)!==scenarios.length)return json({success:false,error_code:finalized.completed_session_count!==scenarios.length?"QA_SESSION_FINALIZATION_MISMATCH":"QA_SESSION_SUMMARY_PARITY_MISMATCH",...base,write_attempted:true,no_write:false,new_write_count:writeResults.filter(row=>row.new_write).length,completed_session_count:finalized.completed_session_count,session_summary_parity_count:Number(finalSummaryParity.parity_count||0)},409);
   mark("session_completion_and_verify_ms",finalizeStart);
-  const recordedAt=empNow(),upload={formal_write_count:scenarios.length,anchor_count:scenarios.length,session_count:scenarios.length,session_status:"COMPLETED",entry_ids:scenarios.map(row=>String(row.entry_id||"")),resume_new_write_count:writeResults.filter(row=>row.new_write).length,stage_duration_ms:{...stageMs},request_context_metrics:employeeEntryAggregateRequestMetrics(requestContext),pre_receipt_server_ms:Math.max(0,Date.now()-startedAt),recorded_at:recordedAt};
+  const recordedAt=empNow(),upload={formal_write_count:scenarios.length,anchor_count:scenarios.length,session_count:scenarios.length,session_status:"COMPLETED",entry_ids:scenarios.map(row=>String(row.entry_id||"")),resume_new_write_count:writeResults.filter(row=>row.new_write).length,session_summary_result:{...(requestContext.qa_session_summary_result||{})},stage_duration_ms:{...stageMs},request_context_metrics:employeeEntryAggregateRequestMetrics(requestContext),pre_receipt_server_ms:Math.max(0,Date.now()-startedAt),recorded_at:recordedAt};
   const receiptWriteStart=Date.now(),update=await env.DB.prepare("UPDATE qa_acceptance_runs SET status='UPLOAD_PASS',upload_json=?,updated_at=? WHERE qa_run_id=? AND corpid=? AND status='MANUAL_EMPLOYEE_ACCEPTED'").bind(JSON.stringify(upload),recordedAt,run.qa_run_id,user.corpid).run();
   requestContext.d1_write_count=Number(requestContext.d1_write_count||0)+1;requestContext.d1_write_duration_ms=Number(requestContext.d1_write_duration_ms||0)+Math.max(0,Date.now()-receiptWriteStart);mark("receipt_write_ms",receiptWriteStart);mark("session_and_run_finalization_ms",finalizeStart);
   const current=await qaAcceptanceReadRun(env,user,run.qa_run_id);

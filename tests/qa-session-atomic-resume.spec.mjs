@@ -854,6 +854,14 @@ function resumeHarness({ initiallyPersisted = 13, failIndex = -1, intent = "EMPL
       return { ok: conflicting === 0 && duplicate === 0, persistence, scope_match_count: 16, persisted_count: persistence.persisted_count, missing_count: persistence.missing_count, conflicting_count: conflicting, duplicate_entry_id_count: duplicate };
     },
     qaAcceptanceFinalizationFinanceCheck: () => ({ ok: financeOk, error_code: financeOk ? "" : "QA_RUN_FINANCIAL_ORACLE_MISMATCH", actual: { total_received: 2500 }, mismatched_fields: financeOk ? [] : ["total_received"] }),
+    qaAcceptancePersistCanonicalSessionSummaries: async (env, _user, acceptedContract, context) => {
+      const statements = acceptedContract.scenarios.map(() => ({ run: async () => ({ meta: { changes: 1 } }) }));
+      await env.DB.batch(statements);
+      finalized = true;
+      context.qa_session_summary_result = { summary_contract_version: "canonical-session-summary-v1", entry_count: 16, session_count: 16, parity_count: 16, mismatch_count: 0 };
+      return { ok: true, parity_count: 16, mismatch_count: 0 };
+    },
+    qaAcceptanceSessionSummaryParity: () => ({ ok: true, parity_count: 16, mismatch_count: 0 }),
     qaAcceptanceStableUploadReceipt: async (_run, _contract, _stored, finance, recordedAt, _context, stageMs) => ({ receipt_version: "qa-upload-receipt-v1", receipt_id: "QA-UPLOAD-STABLE-RECEIPT", formal_write_count: 16, total_count: 16, already_persisted_count: 16, new_write_count: 0, anchor_count: 16, session_count: 16, session_status: "COMPLETED", entry_ids: scenarios.map(row => row.entry_id), anchor_ids: scenarios.map(row => row.entry_id), completed_session_ids: scenarios.map(row => row.session_id), canonical_write_count: 0, transaction_write_count: 0, anchor_write_count: 0, business_write_count: 0, finance_result: "PASS", finance_actual: finance.actual, stage_duration_ms: { ...stageMs }, pre_finalization_duration_ms: 1, finalization_only: true, recorded_at: recordedAt }),
     qaAcceptanceStoredUploadReceipt: value => value?.upload_json ? JSON.parse(value.upload_json) : null,
     empTableColumns: async () => new Set(["entries_json"]),
@@ -948,7 +956,7 @@ test("13 persisted plus E14/E15/E16 resumes only three writes and response-loss 
   assert.equal(harness.persisted.size, 16);
 });
 
-test("fully persisted accepted Run finalizes with one state batch and zero business writes", async () => {
+test("fully persisted accepted Run batches authoritative summaries and performs zero business writes", async () => {
   const harness = resumeHarness({ initiallyPersisted: 16, intent: "EMPLOYEE_FINALIZE_PERSISTED_RUN" });
   const firstResponse = await harness.invoke();
   const firstRaw = await firstResponse.json();
@@ -973,7 +981,7 @@ test("fully persisted accepted Run finalizes with one state batch and zero busin
   assert.equal(first.upload_receipt.completed_session_ids.length, 16);
   assert.equal(typeof first.upload_receipt.stage_duration_ms.finalization_preflight_ms, "number");
   assert.deepEqual(harness.writes, []);
-  assert.deepEqual(harness.stateBatches, [2]);
+  assert.deepEqual(harness.stateBatches, [16]);
 
   // A response-loss retry returns the stored receipt and performs no second batch.
   const retryResponse = await harness.invoke();
@@ -983,7 +991,7 @@ test("fully persisted accepted Run finalizes with one state batch and zero busin
   assert.equal(retry.idempotent, true);
   assert.equal(retry.upload_receipt.receipt_id, first.upload_receipt.receipt_id);
   assert.deepEqual(harness.writes, []);
-  assert.deepEqual(harness.stateBatches, [2]);
+  assert.deepEqual(harness.stateBatches, [16]);
 });
 
 test("finalization-only intent fails closed when one record is missing", async () => {

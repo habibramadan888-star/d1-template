@@ -31,14 +31,14 @@ function persistenceHarness(globalFinder=async()=>({status:'missing',matches:[]}
   const entries=Array.from({length:7},(_,index)=>({event_type:'rent',type:'R',id:`persisted-${index+1}`,event_id:`persisted-${index+1}`}));
   const row={id:sessionId,anchor_id:'EMPV3-anchor',entries_count:7,entries_json:JSON.stringify({anchor_contract_version:'employee_entry_anchor_v1',entries}),handover_status:'EXPORTING',voided_at:null};
   let updates=0,ids=0;
-  const context={prepareCanonicalTransferArchiveWrite,classifyExistingCanonicalTransfer,findEffectiveCanonicalTransferByFingerprint:globalFinder,cleanId:value=>String(value||''),cleanText:value=>String(value||''),empNow:()=> '2026-07-15T12:00:00+04:00',cleanDate:value=>String(value||'').slice(0,10),bedTransferWriteApproved:env=>env.BED_TRANSFER_WRITE_APPROVED==='true',crypto:{randomUUID:()=>`00000000-0000-4000-8000-${String(++ids).padStart(12,'0')}`},json:(body,status)=>({body,status}),success:body=>body};
+  const context={prepareCanonicalTransferArchiveWrite,classifyExistingCanonicalTransfer,findEffectiveCanonicalTransferByFingerprint:globalFinder,canonicalSessionSummaryWithClientDiagnostic:(_session,nextEntries)=>({cash_handover:50,bank_transfer_total:0,bank_transfer_count:0,gross_received:50,entry_count:nextEntries.length,server_authoritative:true}),canonicalSessionSummaryPersistenceFields:summary=>({cash_handover:summary.cash_handover,bank_transfer_total:summary.bank_transfer_total,bank_transfer_count:summary.bank_transfer_count,gross_received:summary.gross_received,summary_json:JSON.stringify(summary)}),cleanId:value=>String(value||''),cleanText:value=>String(value||''),empNow:()=> '2026-07-15T12:00:00+04:00',cleanDate:value=>String(value||'').slice(0,10),bedTransferWriteApproved:env=>env.BED_TRANSFER_WRITE_APPROVED==='true',crypto:{randomUUID:()=>`00000000-0000-4000-8000-${String(++ids).padStart(12,'0')}`},json:(body,status)=>({body,status}),success:body=>body};
   vm.createContext(context);
   vm.runInContext(`${block(worker,'persistEmployeeBedTransferCanonicalArchive')};this.persist=persistEmployeeBedTransferCanonicalArchive`,context);
   const env={APP_ENV:'internal_beta',BED_TRANSFER_WRITE_APPROVED:'true',DB:{prepare:sql=>({bind:(...args)=>({
     first:async()=>row,
     run:async()=>{
       if(/^UPDATE sessions SET entries_json=/.test(sql)){
-        row.entries_json=args[0];row.entries_count=args[1];row.handover_status='COMPLETED';row.exported_at=args[2];updates+=1;return{meta:{changes:1}};
+        row.entries_json=args[0];row.entries_count=args[1];row.cash_handover=args[2];row.bank_transfer_total=args[3];row.bank_transfer_count=args[4];row.gross_received=args[5];row.summary_json=args[6];row.handover_status='COMPLETED';row.exported_at=args[7];updates+=1;return{meta:{changes:1}};
       }
       throw new Error(`unexpected write: ${sql}`);
     }
