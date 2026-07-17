@@ -59,6 +59,7 @@ function harness() {
   let statusMessage = "";
   let fetchSequence = [];
   let fetchCalls = 0;
+  let syncFormCalls = 0;
   const context = vm.createContext({
     state,
     EMPLOYEE_AUTH_STATES: Object.freeze({ REHYDRATING: "AUTH_REHYDRATING", AUTHENTICATED: "AUTHENTICATED", REQUIRED: "AUTH_REQUIRED", TRANSIENT_ERROR: "AUTH_TRANSIENT_ERROR" }),
@@ -81,6 +82,7 @@ function harness() {
     isOwnerAuthRole: role => ["owner", "manager", "admin"].includes(String(role || "").toLowerCase()),
     applyEmployeeUser(user) { state.user = user; state.drafts = structuredClone(scopedDrafts.get(user.userid) || []); },
     async employeeLoadQaAcceptanceRun() {},
+    syncForm() { syncFormCalls += 1; },
     refreshSessionViews() {
       elements.workspaceSessionCount.textContent = `Current Session (${state.drafts.length})`;
       elements.employeeIdentityName.textContent = state.user?.userid || "";
@@ -119,6 +121,7 @@ function harness() {
     check: options => vm.runInContext("checkEmployeeSession", context)(options),
     authError: (code, status) => vm.runInContext("employeeAuthError", context)(code, status),
     get fetchCalls() { return fetchCalls; },
+    get syncFormCalls() { return syncFormCalls; },
     get redirects() { return redirects; },
     get statusMessage() { return statusMessage; },
   };
@@ -134,6 +137,7 @@ test("initial 200 restores the verified employee draft without exposing last-use
   assert.equal(h.state.drafts[0].id, "ENTRY-A");
   assert.equal(h.elements.workspaceSessionCount.textContent, "Current Session (1)");
   assert.equal(h.elements.employeeAuthState.hidden, true);
+  assert.equal(h.syncFormCalls, 1);
   assert.equal(h.redirects, 0);
 });
 

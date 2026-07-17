@@ -9390,6 +9390,7 @@ async function checkEmployeeSession(options){
         });
         await employeeLoadQaAcceptanceRun();
         setEmployeeAuthState(EMPLOYEE_AUTH_STATES.AUTHENTICATED,{attempt:state.authState?.attempt||1});
+        syncForm();
         refreshSessionViews();
         $('loginPin').value='';
       }catch(e){
