@@ -12395,9 +12395,12 @@ async function qaAcceptanceEmployeeDraftContract(env,run){
   if(scenarios.some(row=>!row.input||String(row.input.id||"")!==String(row.entry_id||"")))return {ok:false,error_code:"QA_RUN_ENTRY_PAYLOAD_INVALID"};
   const serialized=JSON.stringify(scenarios.map(row=>row.input));
   if(/password|\bpin\b|token|cookie|secret|tenant_?card|card_?id|provider|phone|99099/i.test(serialized))return {ok:false,error_code:"QA_RUN_DRAFT_PRIVACY_VIOLATION"};
-  if(String(run.mode||"")==="quick"){
+  if(["quick","full"].includes(String(run.mode||""))){
     const fields=["cash_received","bank_received","total_received","total_expenses","net_funds","cash_net","bank_net","outstanding","arrears_opened","arrears_repaid","deposit_included","bed_transfer_fee","rent_income"];
-    if(expectedCount!==16||Number(run.scenario_count||0)!==16||fields.some(field=>!Number.isFinite(Number(expected[field]))))return {ok:false,error_code:"QA_RUN_FINANCIAL_ORACLE_MISSING"};
+    const countValid=String(run.mode||"")==="quick"
+      ?expectedCount===16&&Number(run.scenario_count||0)===16
+      :expectedCount>=35&&Number(run.scenario_count||0)>=expectedCount;
+    if(!countValid||fields.some(field=>!Number.isFinite(Number(expected[field]))))return {ok:false,error_code:"QA_RUN_FINANCIAL_ORACLE_MISSING"};
   }
   return {ok:true,manifest,matrix,expected,scenarios,payloadHash,artifactCompatibility};
 }

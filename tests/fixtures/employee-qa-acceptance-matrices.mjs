@@ -68,6 +68,31 @@ const FULL_EXTENSIONS = [
 
 export const QA_FULL_SCENARIOS = Object.freeze([...QA_QUICK_SCENARIOS.map(clone), ...FULL_EXTENSIONS]);
 
+function aggregateScenarioFinanceExpected(scenarios = []) {
+  const totals = {};
+  for (const scenario of scenarios) {
+    for (const [field, value] of Object.entries(scenario.expected_finance_delta || {})) {
+      totals[field] = Number(totals[field] || 0) + Number(value || 0);
+    }
+  }
+  const cashReceived = Number(totals.cash_received || 0);
+  const bankReceived = Number(totals.bank_received || 0);
+  const cashOut = Number(totals.cash_out || 0);
+  const bankOut = Number(totals.bank_out || 0);
+  const arrearsOpened = Number(totals.arrears_opened || 0);
+  return {
+    ...totals,
+    total_received: cashReceived + bankReceived,
+    total_expenses: cashOut + bankOut,
+    net_funds: cashReceived + bankReceived - cashOut - bankOut,
+    cash_net: cashReceived - cashOut,
+    bank_net: bankReceived - bankOut,
+    outstanding: arrearsOpened,
+  };
+}
+
+export const QA_FULL_FINANCE_EXPECTED = Object.freeze(aggregateScenarioFinanceExpected(QA_FULL_SCENARIOS));
+
 export const QA_FULL_AUTOMATION_ONLY = Object.freeze([
   { case_id: "bed-transfer-source-vacant-rejected", event_type: "bed_transfer", expected_validation: "fail", expected_error_code: "BED_TRANSFER_SOURCE_CONTEXT_UNAVAILABLE" },
   { case_id: "bed-transfer-target-occupied-rejected", event_type: "bed_transfer", expected_validation: "fail", expected_error_code: "BED_TRANSFER_TARGET_NOT_VACANT" },
@@ -122,7 +147,7 @@ export const QA_TTLOCK_SNAPSHOT_V1 = Object.freeze({
 export function qaAcceptanceMatrix(mode = "quick") {
   const normalized = String(mode).toLowerCase();
   if (normalized === "quick") return { mode: "quick", matrix_version: QA_MATRIX_VERSION, scenarios: clone(QA_QUICK_SCENARIOS), automation_only: [], expected_finance: clone(GOLDEN_FINANCE_EXPECTED) };
-  if (normalized === "full") return { mode: "full", matrix_version: QA_MATRIX_VERSION, scenarios: clone(QA_FULL_SCENARIOS), automation_only: clone(QA_FULL_AUTOMATION_ONLY), expected_finance: null };
+  if (normalized === "full") return { mode: "full", matrix_version: QA_MATRIX_VERSION, scenarios: clone(QA_FULL_SCENARIOS), automation_only: clone(QA_FULL_AUTOMATION_ONLY), expected_finance: clone(QA_FULL_FINANCE_EXPECTED) };
   if (normalized === "recovery") return { mode: "recovery", matrix_version: QA_MATRIX_VERSION, scenarios: [], recovery_scenarios: clone(QA_RECOVERY_SCENARIOS), expected_finance: null };
   throw new Error(`unsupported QA mode: ${mode}`);
 }

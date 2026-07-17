@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   QA_FULL_AUTOMATION_ONLY,
+  QA_FULL_FINANCE_EXPECTED,
   QA_FULL_SCENARIOS,
   QA_MATRIX_VERSION,
   QA_QUICK_SCENARIOS,
@@ -26,4 +27,28 @@ test("Full derives at least 35 legal upload scenarios plus explicit automation-o
 test("Full fixtures contain no real identity provider or secret material", () => {
   const text = JSON.stringify(QA_FULL_SCENARIOS);
   assert.doesNotMatch(text, /\+971|00971|99099|tenant_card|card_id|provider|access_token|client_secret|password/i);
+});
+
+test("Full publishes one shared financial oracle derived from every legal upload scenario", () => {
+  const matrix = qaAcceptanceMatrix("full");
+  assert.deepEqual(matrix.expected_finance, QA_FULL_FINANCE_EXPECTED);
+  assert.deepEqual(QA_FULL_FINANCE_EXPECTED, {
+    cash_received: 3820,
+    bank_received: 2620,
+    rent_income: 5360,
+    arrears_opened: 300,
+    outstanding: 300,
+    arrears_repaid: 180,
+    deposit_included: 700,
+    cash_out: 999,
+    bank_out: 799,
+    deposit_refund: 500,
+    expense: 1298,
+    bed_transfer_fee: 200,
+    total_received: 6440,
+    total_expenses: 1798,
+    net_funds: 4642,
+    cash_net: 2821,
+    bank_net: 1821,
+  });
 });
