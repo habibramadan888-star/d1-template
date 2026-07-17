@@ -33,22 +33,36 @@ test("Full publishes one shared financial oracle derived from every legal upload
   const matrix = qaAcceptanceMatrix("full");
   assert.deepEqual(matrix.expected_finance, QA_FULL_FINANCE_EXPECTED);
   assert.deepEqual(QA_FULL_FINANCE_EXPECTED, {
-    cash_received: 3820,
+    cash_received: 3800,
     bank_received: 2620,
     rent_income: 5360,
     arrears_opened: 300,
     outstanding: 300,
-    arrears_repaid: 180,
+    arrears_repaid: 160,
     deposit_included: 700,
     cash_out: 999,
     bank_out: 799,
     deposit_refund: 500,
     expense: 1298,
     bed_transfer_fee: 200,
-    total_received: 6440,
+    total_received: 6420,
     total_expenses: 1798,
-    net_funds: 4642,
-    cash_net: 2821,
+    net_funds: 4622,
+    cash_net: 2801,
     bank_net: 1821,
   });
+});
+
+test("Full uses distinct legal business identities instead of weakening global idempotency", () => {
+  const matrix = qaAcceptanceMatrix("full");
+  const byCase = new Map(matrix.scenarios.map(row => [row.case_id, row.input]));
+  for (const row of matrix.scenarios) assert.equal(row.input.created_at, "2026-07-17T08:00:00.000Z");
+  assert.equal(byCase.get("rent-cash-full").rent_period_start, "2026-07-17");
+  assert.equal(byCase.get("rent-cash-full-custom-period").rent_period_start, "2026-07-18");
+  assert.equal(byCase.get("rent-cash-full-mismatch-period-reviewed").rent_period_start, "2026-08-17");
+  assert.equal(byCase.get("arrears-payment-cash-cloud").arrears_ref, "FULL-CLOUD-ARREARS-1");
+  assert.equal(byCase.get("arrears-payment-cash-cloud-bank-cloud").arrears_ref, "FULL-CLOUD-ARREARS-2");
+  assert.equal(byCase.get("arrears-payment-bank-legacy-cash-legacy").payment_amount, 10);
+  assert.equal(byCase.get("arrears-payment-cash-cloud-partial-cloud").arrears_ref, "FULL-CLOUD-ARREARS-3");
+  assert.equal(byCase.get("arrears-payment-cash-cloud-partial-cloud").remaining_arrears_after_payment, 20);
 });

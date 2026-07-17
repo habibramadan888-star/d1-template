@@ -42,11 +42,11 @@ const FULL_EXTENSIONS = [
   variant("rent-cash-full", "bank-full", { payment_method: "bank", pay_type: "bank" }, { expected_finance_delta: { bank_received: 700, rent_income: 700 } }),
   variant("rent-bank-short", "cash-short", { payment_method: "cash", pay_type: "cash" }, { expected_finance_delta: { cash_received: 700, outstanding: 70, arrears_opened: 70, rent_income: 700 } }),
   variant("rent-cash-excess", "bank-excess", { payment_method: "bank", pay_type: "bank" }, { expected_finance_delta: { bank_received: 730, rent_income: 730 } }),
-  variant("rent-cash-full", "custom-period", { cycle: "CUST", period_day_count: 10, period_start: "2026-07-16", period_end: "2026-07-25", due: 400, paid: 400, amount: 400, expected_rent: 400, paid_amount: 400 }, { expected_finance_delta: { cash_received: 400, rent_income: 400 } }),
-  variant("rent-cash-full", "mismatch-period-reviewed", { cycle: "1M", note: "qa period mismatch manually confirmed" }),
-  variant("arrears-payment-cash-cloud", "bank-cloud", { payment_method: "bank", pay_type: "bank" }, { expected_finance_delta: { bank_received: 60, arrears_repaid: 60, rent_income: 0 } }),
-  variant("arrears-payment-bank-legacy", "cash-legacy", { payment_method: "cash", pay_type: "cash" }, { expected_finance_delta: { cash_received: 10, arrears_repaid: 10, rent_income: 0 } }),
-  variant("arrears-payment-cash-cloud", "partial-cloud", { amount: 40, payment_amount: 40, paid_amount: 40 }, { expected_finance_delta: { cash_received: 40, arrears_repaid: 40, rent_income: 0 } }),
+  variant("rent-cash-full", "custom-period", { cycle: "CUST", period_day_count: 10, period_start: "2026-07-18", period_end: "2026-07-27", rent_period_start: "2026-07-18", rent_period_end: "2026-07-27", due: 400, period_due: 400, paid: 400, amount: 400, expected_rent: 400, paid_amount: 400 }, { expected_finance_delta: { cash_received: 400, rent_income: 400 } }),
+  variant("rent-cash-full", "mismatch-period-reviewed", { cycle: "1M", period_start: "2026-08-17", period_end: "2026-09-17", rent_period_start: "2026-08-17", rent_period_end: "2026-09-17", note: "qa period mismatch manually confirmed" }),
+  variant("arrears-payment-cash-cloud", "bank-cloud", { amount: 60, payment_amount: 60, paid_amount: 60, payment_method: "bank", pay_type: "bank", linked_task_id: "FULL-CLOUD-ARREARS-2", arrears_ref: "FULL-CLOUD-ARREARS-2", original_arrears_id: "FULL-CLOUD-ARREARS-2", original_arrears_amount: 100, already_paid_amount: 40, remaining_arrears_before_payment: 60, remaining_arrears_after_payment: 0, remaining_arrears: 0, settlement_status: "settled" }, { expected_finance_delta: { bank_received: 60, arrears_repaid: 60, rent_income: 0 } }),
+  variant("arrears-payment-bank-legacy", "cash-legacy", { amount: 10, payment_amount: 10, paid_amount: 10, payment_method: "cash", pay_type: "cash", original_arrears_amount: 30, already_paid_amount: 0, remaining_arrears_before_payment: 30, remaining_arrears_after_payment: 20, remaining_arrears: 20, settlement_status: "partial" }, { expected_finance_delta: { cash_received: 10, arrears_repaid: 10, rent_income: 0 } }),
+  variant("arrears-payment-cash-cloud", "partial-cloud", { amount: 20, payment_amount: 20, paid_amount: 20, linked_task_id: "FULL-CLOUD-ARREARS-3", arrears_ref: "FULL-CLOUD-ARREARS-3", original_arrears_id: "FULL-CLOUD-ARREARS-3", original_arrears_amount: 100, already_paid_amount: 60, remaining_arrears_before_payment: 40, remaining_arrears_after_payment: 20, remaining_arrears: 20, settlement_status: "partial" }, { expected_finance_delta: { cash_received: 20, arrears_repaid: 20, rent_income: 0 } }),
   variant("deposit-in-cash", "d0", { room: "501", bed: "501", amount: 100, deposit_amount: 100 }),
   variant("deposit-in-bank", "expired", { room: "502", bed: "502", amount: 200, deposit_amount: 200 }, { expected_finance_delta: { bank_received: 200, deposit_included: 200 } }),
   variant("deposit-in-cash", "removed", { room: "503", bed: "503", amount: 200, deposit_amount: 200 }, { expected_finance_delta: { cash_received: 200, deposit_included: 200 } }),
@@ -66,7 +66,28 @@ const FULL_EXTENSIONS = [
   variant("bed-transfer-waived", "pair-2", { from_bed: "311", to_bed: "312" }),
 ];
 
-export const QA_FULL_SCENARIOS = Object.freeze([...QA_QUICK_SCENARIOS.map(clone), ...FULL_EXTENSIONS]);
+function isolateFullScenario(row) {
+  const scenario = clone(row);
+  const input = scenario.input || {};
+  input.created_at = "2026-07-17T08:00:00.000Z";
+  if (scenario.event_type === "rent" && !scenario.case_id.endsWith("custom-period") && !scenario.case_id.endsWith("mismatch-period-reviewed")) {
+    input.period_start = "2026-07-17";
+    input.period_end = "2026-08-17";
+    input.rent_period_start = "2026-07-17";
+    input.rent_period_end = "2026-08-17";
+  }
+  if (scenario.event_type === "deposit_out") input.refund_date = "2026-07-17";
+  if (["checkout", "left_with_arrears"].includes(scenario.event_type)) input.checkout_date = "2026-07-17";
+  if (scenario.case_id === "arrears-payment-cash-cloud") {
+    input.linked_task_id = "FULL-CLOUD-ARREARS-1";
+    input.arrears_ref = "FULL-CLOUD-ARREARS-1";
+    input.original_arrears_id = "FULL-CLOUD-ARREARS-1";
+  }
+  scenario.input = input;
+  return scenario;
+}
+
+export const QA_FULL_SCENARIOS = Object.freeze([...QA_QUICK_SCENARIOS, ...FULL_EXTENSIONS].map(isolateFullScenario));
 
 function aggregateScenarioFinanceExpected(scenarios = []) {
   const totals = {};

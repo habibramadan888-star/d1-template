@@ -12165,7 +12165,8 @@ __name(qaAcceptanceReadRun,"qaAcceptanceReadRun");
 function qaAcceptanceMaterializeMatrix(runId,matrix={}){
   const scenarios=(Array.isArray(matrix.scenarios)?matrix.scenarios:[]).map((scenario,index)=>{
     const n=String(index+1).padStart(2,"0"),entryId=`${runId}-E${n}`,sessionId=`${runId}-S${n}`;
-    const input={...(scenario.input||{}),id:entryId,event_id:entryId,session_id:sessionId,source:"employee_entry",operator:"qa-staff",created_at:"2026-07-16T08:00:00.000Z"};
+    const createdAt=cleanText(scenario?.input?.created_at||"",40)||"2026-07-16T08:00:00.000Z";
+    const input={...(scenario.input||{}),id:entryId,event_id:entryId,session_id:sessionId,source:"employee_entry",operator:"qa-staff",created_at:createdAt};
     if(cleanText(input.arrears_source,40)==="legacy_manual"){
       const ref=cleanId(`legacy-manual-${sessionId}-${entryId}`);
       input.linked_task_id=ref;input.arrears_ref=ref;input.original_arrears_id=ref;

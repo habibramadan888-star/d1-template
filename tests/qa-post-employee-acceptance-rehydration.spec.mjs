@@ -48,6 +48,7 @@ function clientFixture(status = "MANUAL_EMPLOYEE_ACCEPTED") {
   const oracle = Object.fromEntries(["cash_received", "bank_received", "total_received", "total_expenses", "net_funds", "cash_net", "bank_net", "outstanding", "arrears_opened", "arrears_repaid", "deposit_included", "bed_transfer_fee", "rent_income"].map(field => [field, 0]));
   return {
     qa_run_id: qaRunId,
+    mode: "quick",
     status,
     cleanup_status: "NOT_RUN",
     delivery_contract: "SERVER_PERSISTED_QA_RUN_V1",
