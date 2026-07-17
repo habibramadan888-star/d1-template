@@ -1,0 +1,19 @@
+{
+  "cash_received": 3800,
+  "bank_received": 2620,
+  "total_received": 6420,
+  "cash_out": 999,
+  "bank_out": 799,
+  "total_expenses": 1798,
+  "net_funds": 4622,
+  "cash_net": 2801,
+  "bank_net": 1821,
+  "outstanding": 300,
+  "arrears_opened": 300,
+  "arrears_repaid": 160,
+  "deposit_included": 700,
+  "deposit_refund": 500,
+  "expense": 1298,
+  "bed_transfer_fee": 200,
+  "rent_income": 5360
+}
