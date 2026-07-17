@@ -11,7 +11,7 @@ test("QA topology contract pins distinct resource classes and triple gates", asy
     read("deploy-worker/wrangler.toml"),
   ]);
   assert.match(contract, /homelink-finance-qa/);
-  assert.match(contract, /homelink-finance-qa` database/);
+  assert.match(contract, /homelink-finance-qa-auth086/);
   assert.match(contract, /HOMELINK_FINANCE_QA/);
   assert.match(contract, /APP_ENV === "internal_beta"/);
   assert.match(contract, /QA_ACCEPTANCE_ENABLED === "true"/);

@@ -37,6 +37,6 @@ CREATE INDEX IF NOT EXISTS idx_qa_acceptance_runs_created
 INSERT OR REPLACE INTO qa_environment_identity (key,value,created_at) VALUES
   ('app_env','qa','2026-07-16T00:00:00.000Z'),
   ('corpid','HL-QA','2026-07-16T00:00:00.000Z'),
-  ('d1_database_id','33c63b22-728d-45fe-a0cb-60b533f6055c','2026-07-16T00:00:00.000Z'),
+  ('d1_database_id','44bacad0-9de9-4a27-a6ca-9f74d40db1ba','2026-07-16T00:00:00.000Z'),
   ('kv_namespace_id','4fba90660a0f4c02ad6e4114f179e929','2026-07-16T00:00:00.000Z'),
-  ('binding_contract_sha256','aaa5d370f52b103b17718432596e0dae3db5b7500150d4081bad27ef0cad9afd','2026-07-16T00:00:00.000Z');
+  ('binding_contract_sha256','7a3b133331e698544c819aa314f33a7d28aa98c53256c86ff8e3277544f47ebd','2026-07-16T00:00:00.000Z');

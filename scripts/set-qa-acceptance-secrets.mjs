@@ -9,7 +9,7 @@ import { rootDir, wranglerBin } from "./local-worker-utils.mjs";
 const credentialDir = path.join(os.tmpdir(), "homelink-qa-acceptance-074");
 export const qaCredentialPath = path.join(credentialDir, "credentials.json");
 const config = path.join(rootDir, "deploy-worker", "wrangler.qa.toml");
-const qaD1 = "homelink-finance-qa";
+const qaD1 = "homelink-finance-qa-auth086";
 const random = () => randomBytes(24).toString("base64url");
 
 function secretPut(name, value) {

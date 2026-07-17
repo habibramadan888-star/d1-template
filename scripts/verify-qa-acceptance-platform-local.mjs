@@ -11,12 +11,12 @@ import { fetchWithRetry, removeDirWithRetries, rootDir, startWorker, stopProcess
 import { QA_MATRIX_VERSION, QA_TTLOCK_SNAPSHOT_V1, qaAcceptanceMatrix } from "../tests/fixtures/employee-qa-acceptance-matrices.mjs";
 
 const PASSWORD = "qa-local-acceptance-password", SALT = "qa-local-acceptance-salt";
-const D1_ID = "33c63b22-728d-45fe-a0cb-60b533f6055c", KV_ID = "4fba90660a0f4c02ad6e4114f179e929", BINDING_SHA = "aaa5d370f52b103b17718432596e0dae3db5b7500150d4081bad27ef0cad9afd";
+const D1_ID = "44bacad0-9de9-4a27-a6ca-9f74d40db1ba", KV_ID = "4fba90660a0f4c02ad6e4114f179e929", BINDING_SHA = "7a3b133331e698544c819aa314f33a7d28aa98c53256c86ff8e3277544f47ebd";
 const hash = value => pbkdf2Sync(value, SALT, 100000, 32, "sha256").toString("hex");
 
 function freePort() { return new Promise((resolve, reject) => { const server = createServer(); server.once("error", reject); server.listen(0, "127.0.0.1", () => { const address = server.address(); server.close(() => resolve(address.port)); }); }); }
 function runWrangler(args) { return execFileSync(process.execPath, [wranglerBin, ...args], { cwd: rootDir, encoding: "utf8", env: { ...process.env, WRANGLER_SEND_METRICS: "false" } }); }
-function runQaD1(args, persistTo) { return runWrangler(["d1", "execute", "homelink-finance-qa", "--local", "--persist-to", persistTo, "--config", "deploy-worker/wrangler.qa.toml", ...args]); }
+function runQaD1(args, persistTo) { return runWrangler(["d1", "execute", "homelink-finance-qa-auth086", "--local", "--persist-to", persistTo, "--config", "deploy-worker/wrangler.qa.toml", ...args]); }
 async function migrateQaD1(persistTo) {
   const localDir = path.join(rootDir, "migrations", "local");
   for (const name of (await readdir(localDir)).filter(value => value.endsWith(".sql")).sort()) runQaD1(["--file", path.join(localDir, name)], persistTo);

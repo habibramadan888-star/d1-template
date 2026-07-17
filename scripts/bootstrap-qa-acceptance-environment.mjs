@@ -10,10 +10,10 @@ import {
   qaAcceptanceMatrix,
 } from "../tests/fixtures/employee-qa-acceptance-matrices.mjs";
 
-const QA_D1 = "homelink-finance-qa";
-const QA_D1_ID = "33c63b22-728d-45fe-a0cb-60b533f6055c";
+const QA_D1 = "homelink-finance-qa-auth086";
+const QA_D1_ID = "44bacad0-9de9-4a27-a6ca-9f74d40db1ba";
 const QA_KV_ID = "4fba90660a0f4c02ad6e4114f179e929";
-const BINDING_SHA = "aaa5d370f52b103b17718432596e0dae3db5b7500150d4081bad27ef0cad9afd";
+const BINDING_SHA = "7a3b133331e698544c819aa314f33a7d28aa98c53256c86ff8e3277544f47ebd";
 const config = path.join(rootDir, "deploy-worker", "wrangler.qa.toml");
 
 function run(args, options = {}) {

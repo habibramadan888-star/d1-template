@@ -8,12 +8,13 @@ const read = relative => readFile(new URL(relative, root), "utf8");
 test("QA deployment config binds only the dedicated D1 and KV with exact gates", async () => {
   const [qa, production] = await Promise.all([read("deploy-worker/wrangler.qa.toml"), read("deploy-worker/wrangler.toml")]);
   assert.match(qa, /name = "homelink-finance-qa"/);
-  assert.match(qa, /database_id = "33c63b22-728d-45fe-a0cb-60b533f6055c"/);
+  assert.match(qa, /database_name = "homelink-finance-qa-auth086"/);
+  assert.match(qa, /database_id = "44bacad0-9de9-4a27-a6ca-9f74d40db1ba"/);
   assert.match(qa, /id = "4fba90660a0f4c02ad6e4114f179e929"/);
   assert.match(qa, /APP_ENV = "internal_beta"/);
   assert.match(qa, /CORPID = "HL-QA"/);
   assert.match(qa, /QA_ACCEPTANCE_ENABLED = "true"/);
-  assert.doesNotMatch(production, /33c63b22-728d-45fe-a0cb-60b533f6055c|4fba90660a0f4c02ad6e4114f179e929|QA_ACCEPTANCE_ENABLED/);
+  assert.doesNotMatch(production, /44bacad0-9de9-4a27-a6ca-9f74d40db1ba|4fba90660a0f4c02ad6e4114f179e929|QA_ACCEPTANCE_ENABLED/);
 });
 
 test("QA bootstrap is rerunnable and scopes archive columns to the dedicated QA database", async () => {
@@ -24,14 +25,14 @@ test("QA bootstrap is rerunnable and scopes archive columns to the dedicated QA 
   assert.match(bootstrap, /PRAGMA table_info\(sessions\)/);
   assert.match(bootstrap, /if \(!sessionColumns\.has\("entries_json"\)\)/);
   assert.match(bootstrap, /if \(!sessionColumns\.has\("summary_json"\)\)/);
-  assert.match(bootstrap, /const QA_D1 = "homelink-finance-qa"/);
+  assert.match(bootstrap, /const QA_D1 = "homelink-finance-qa-auth086"/);
   assert.doesNotMatch(migration, /ALTER TABLE sessions/);
   assert.match(migration, /CREATE TABLE IF NOT EXISTS qa_acceptance_runs/);
 });
 
 test("QA credential setup rotates secrets and seeds only the QA Employee authentication table", async () => {
   const setup = await read("scripts/set-qa-acceptance-secrets.mjs");
-  assert.match(setup, /const qaD1 = "homelink-finance-qa"/);
+  assert.match(setup, /const qaD1 = "homelink-finance-qa-auth086"/);
   assert.match(setup, /INSERT OR REPLACE INTO employee_users/);
   assert.match(setup, /seedQaEmployee\(hash\(staffPassword\)\)/);
   assert.doesNotMatch(setup, /homelink-finance(?:['"]|\s)/);

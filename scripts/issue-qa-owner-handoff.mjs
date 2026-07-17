@@ -5,7 +5,7 @@ import path from "node:path";
 
 import { rootDir, wranglerBin } from "./local-worker-utils.mjs";
 
-const QA_D1 = "homelink-finance-qa";
+const QA_D1 = "homelink-finance-qa-auth086";
 const QA_CORPID = "HL-QA";
 const QA_OWNER = "qa-owner";
 const config = path.join(rootDir, "deploy-worker", "wrangler.qa.toml");

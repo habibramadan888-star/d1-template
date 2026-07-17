@@ -24,7 +24,7 @@ The production version at contract creation is `84ee2023-f550-47e0-9e4f-3caa161a
 | --- | --- |
 | Worker | `homelink-finance-qa` |
 | Hostname | Dedicated `homelink-finance-qa` hostname reported after creation |
-| D1 binding | `DB` -> new `homelink-finance-qa` database; ID must differ from every Production and staging D1 ID |
+| D1 binding | `DB` -> `homelink-finance-qa-auth086`; a fresh certification database isolated from Production, staging, and prior QA archives |
 | KV binding | `RATE_LIMIT` -> new `HOMELINK_FINANCE_QA` namespace; ID must differ from every Production and staging KV ID |
 | APP_ENV | exactly `internal_beta`, matching the Production internal-beta runtime contract |
 | Company scope | exactly `HL-QA` |
