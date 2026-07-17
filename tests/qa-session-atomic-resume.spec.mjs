@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import vm from "node:vm";
 
-import { QA_QUICK_SCENARIOS } from "./fixtures/employee-qa-acceptance-matrices.mjs";
+import { QA_FULL_SCENARIOS, QA_QUICK_SCENARIOS } from "./fixtures/employee-qa-acceptance-matrices.mjs";
 import { GOLDEN_FINANCE_EXPECTED } from "./helpers/employee-golden-session-oracle.mjs";
 
 const worker = await readFile("deploy-worker/src/index.js", "utf8");
@@ -79,6 +79,59 @@ function validationRequests(scenarios = materializedScenarios()) {
     },
   }));
 }
+
+test("41-entry Full upload uses bounded dependency-safe write batches and preserves Bed Transfer serialization", () => {
+  const runId = "QA-20260717-PERFORMANCE";
+  const scenarios = QA_FULL_SCENARIOS.map((template, index) => {
+    const number = String(index + 1).padStart(2, "0");
+    return { ...structuredClone(template), entry_id: `${runId}-E${number}`, session_id: `${runId}-S${number}` };
+  });
+  const sandbox = {
+    Map,
+    Set,
+    Number,
+    String,
+    QA_ACCEPTANCE_WRITE_BATCH_SIZE: 6,
+    cleanText: (value, max = 160) => String(value ?? "").trim().slice(0, max),
+    employeeEntryUploadType: row => String(row?.type || "").toUpperCase(),
+  };
+  vm.createContext(sandbox);
+  vm.runInContext([
+    functionBlock(worker, "qaAcceptanceScenarioWriteDependencyKeys"),
+    functionBlock(worker, "qaAcceptanceBuildWriteBatches"),
+    "this.keys=qaAcceptanceScenarioWriteDependencyKeys;this.batches=qaAcceptanceBuildWriteBatches",
+  ].join("\n"), sandbox);
+  const byId = new Map(scenarios.map((row, index) => [row.entry_id, { row, index }]));
+  const batches = sandbox.batches(scenarios.map(row => row.entry_id), byId, 6);
+  assert.equal(batches.flat().length, 41);
+  assert.equal(new Set(batches.flat()).size, 41);
+  assert.ok(batches.length < 41, "ordinary writes must no longer be serialized one-by-one");
+  for (const batch of batches) {
+    assert.ok(batch.length <= 6);
+    const used = new Set();
+    let bedTransferCount = 0;
+    for (const entryId of batch) {
+      const scenario = byId.get(entryId).row;
+      const keys = sandbox.keys(scenario);
+      assert.equal([...keys].some(key => used.has(key)), false, `dependency overlap in ${entryId}`);
+      for (const key of keys) used.add(key);
+      if (String(scenario.input?.type || "").toUpperCase() === "TF") bedTransferCount += 1;
+    }
+    assert.ok(bedTransferCount <= 1, "canonical Bed Transfer writers remain serialized");
+  }
+  const resume = functionBlock(worker, "qaAcceptanceSessionResume");
+  assert.match(resume, /Promise\.all\(batch\.map/);
+  assert.match(resume, /write_batch_wall_ms/);
+  assert.match(resume, /d1_batch_duration_ms/);
+  assert.match(resume, /post_write_verification_ms/);
+});
+
+test("an uploaded Run awaiting Owner review remains immutable while a replacement performance Run may be created", () => {
+  const createRun = functionBlock(worker, "qaAcceptanceCreateRun");
+  assert.match(createRun, /status NOT IN \('FINAL_ACCEPTED','UPLOAD_PASS','MANUAL_OWNER_ACCEPTED'\)/);
+  assert.match(createRun, /cleanup_status<>'COMPLETED'/);
+  assert.doesNotMatch(createRun, /UPDATE qa_acceptance_runs/);
+});
 
 function aggregateHarness(failIndex = -1) {
   let archiveLoads = 0;
@@ -738,8 +791,10 @@ function resumeHarness({ initiallyPersisted = 13, failIndex = -1, intent = "EMPL
     Symbol,
     QA_SESSION_RESUME_COMPATIBILITY_SCOPE: RESUME_SCOPE,
     QA_SESSION_RESUME_INTERNAL: Symbol("qa_session_resume_internal"),
+    QA_ACCEPTANCE_WRITE_BATCH_SIZE: 6,
     TTLOCK_STRICT_CACHE_MAX_AGE_MS: 60_000,
     cleanText: value => String(value ?? "").trim(),
+    employeeEntryUploadType: row => String(row?.type || ""),
     qaAcceptanceRunId: value => String(value || "").toUpperCase() === RUN_ID ? RUN_ID : "",
     qaAcceptanceEmployeeDraftContract: async () => contract,
     qaAcceptanceStoredValidation: () => ({
@@ -802,6 +857,8 @@ function resumeHarness({ initiallyPersisted = 13, failIndex = -1, intent = "EMPL
     qaAcceptanceStableUploadReceipt: async (_run, _contract, _stored, finance, recordedAt, _context, stageMs) => ({ receipt_version: "qa-upload-receipt-v1", receipt_id: "QA-UPLOAD-STABLE-RECEIPT", formal_write_count: 16, total_count: 16, already_persisted_count: 16, new_write_count: 0, anchor_count: 16, session_count: 16, session_status: "COMPLETED", entry_ids: scenarios.map(row => row.entry_id), anchor_ids: scenarios.map(row => row.entry_id), completed_session_ids: scenarios.map(row => row.session_id), canonical_write_count: 0, transaction_write_count: 0, anchor_write_count: 0, business_write_count: 0, finance_result: "PASS", finance_actual: finance.actual, stage_duration_ms: { ...stageMs }, pre_finalization_duration_ms: 1, finalization_only: true, recorded_at: recordedAt }),
     qaAcceptanceStoredUploadReceipt: value => value?.upload_json ? JSON.parse(value.upload_json) : null,
     empTableColumns: async () => new Set(["entries_json"]),
+    ensureAuditLogSchema: async (_env, context) => { context.audit_schema_ready = true; },
+    empRentConfig: async () => ({}),
     handleEmployeeEntry: async (_request, _env, _user, options) => {
       const id = String(options?.body?.entry_identity || "");
       const newWrite = !persisted.has(id);
@@ -841,6 +898,8 @@ function resumeHarness({ initiallyPersisted = 13, failIndex = -1, intent = "EMPL
   vm.runInContext([
     functionBlock(worker, "employeeEntryAggregateRequestMetrics"),
     functionBlock(worker, "qaAcceptanceScenarioRequestBody"),
+    functionBlock(worker, "qaAcceptanceScenarioWriteDependencyKeys"),
+    functionBlock(worker, "qaAcceptanceBuildWriteBatches"),
     functionBlock(worker, "qaAcceptanceFinalizePersistedRun"),
     functionBlock(worker, "qaAcceptanceSessionResume"),
     "this.resume=qaAcceptanceSessionResume",

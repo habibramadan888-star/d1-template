@@ -8374,8 +8374,32 @@ function renderEmployeeAggregateSessionError(result){
 function employeeBindAggregateValidationRetry(){
   document.querySelectorAll('[data-retry-aggregate-validation]').forEach(btn=>btn.onclick=()=>{if(state.aggregateValidationSessionError?.error_code==='QA_CLIENT_ASSET_STALE'){location.reload();return}state.aggregateValidationOnly=true;commitSessionAndExport()});
 }
+function employeeQaStoreUploadPerformance(aggregate={},resume={},uploadStartedAt=0){
+  const validationTiming=aggregate?.client_timing&&typeof aggregate.client_timing==='object'?aggregate.client_timing:{};
+  const resumeTiming=resume?.client_timing&&typeof resume.client_timing==='object'?resume.client_timing:{};
+  const validateReceived=Date.parse(String(validationTiming.response_received_at||''));
+  const uploadRequested=Date.parse(String(resumeTiming.request_started_at||''));
+  const result={
+    qa_run_id:String(state.qaAcceptance?.runId||''),
+    client_preparation_duration_ms:Math.max(0,Number(validationTiming.client_prepare_ms||0)),
+    aggregate_validate_http_duration_ms:Math.max(0,Number(validationTiming.http_duration_ms||0)),
+    validate_server_duration_ms:Math.max(0,Number(aggregate?.total_duration_ms||aggregate?.stage_duration_ms?.total_ms||0)),
+    validate_upload_inter_request_ms:Number.isFinite(validateReceived)&&Number.isFinite(uploadRequested)?Math.max(0,uploadRequested-validateReceived):null,
+    upload_http_duration_ms:Math.max(0,Number(resumeTiming.http_duration_ms||0)),
+    upload_response_parse_ms:Math.max(0,Number(resumeTiming.response_parse_ms||0)),
+    upload_server_duration_ms:Math.max(0,Number(resume?.total_duration_ms||resume?.stage_duration_ms?.total_ms||0)),
+    upload_stage_duration_ms:resume?.stage_duration_ms&&typeof resume.stage_duration_ms==='object'?resume.stage_duration_ms:{},
+    request_context_metrics:resume?.request_context_metrics&&typeof resume.request_context_metrics==='object'?resume.request_context_metrics:{},
+    total_browser_observed_duration_ms:uploadStartedAt?Math.max(0,Math.round(performance.now()-uploadStartedAt)):null,
+    recorded_at:new Date().toISOString()
+  };
+  window.__qaLastUploadPerformance=result;
+  try{sessionStorage.setItem(employeeStorageKey('qa:lastUploadPerformance'),JSON.stringify(result))}catch{}
+  return result;
+}
 async function validateEmployeeUploadAggregateDryRun(validationRequests){
-  let requestBody='';
+  let requestBody='',clientPrepareMs=0;
+  const clientPrepareStart=performance.now();
   try{
     const sanitizedRequests=(validationRequests||[]).map(request=>{
       const entry=employeeAggregateValidationEntry(request?.entry||request?.entries?.[0]||{});
@@ -8387,22 +8411,26 @@ async function validateEmployeeUploadAggregateDryRun(validationRequests){
     const qa=typeof state==='object'?(state.qaAcceptance||{}):{};
     const qaValidationContext=qa.runId?{qa_run_id:qa.runId,artifact_sha256:qa.artifactSha,qa_worker_version:qa.workerVersion,matrix_version:qa.matrixVersion,payload_hash:qa.payloadHash}:undefined;
     requestBody=JSON.stringify({aggregate_preflight:true,dry_run:true,validate_only:true,no_write:true,validation_requests:sanitizedRequests,diagnostic:employeeDiagnosticAssetMeta(),qa_validation_context:qaValidationContext});
+    clientPrepareMs=Math.max(0,Math.round(performance.now()-clientPrepareStart));
   }
   catch(error){return employeeAggregateValidationSessionFailure('SERVER_VALIDATE_REQUEST_SERIALIZATION_FAILED',{exception_name:error?.name||'Error',exception_message:error?.message||''})}
   let response;
+  const requestStartedAt=Date.now(),requestStart=performance.now();
   try{
     response=await apiFetch('/api/employee/entry/validate',{method:'POST',body:requestBody});
   }catch(error){
     return employeeAggregateValidationSessionFailure('SERVER_VALIDATE_UNREACHABLE',{exception_name:error?.name||'Error',exception_message:error?.message||'',request_body_bytes:new Blob([requestBody]).size});
   }
-  const raw=await response.text();
+  const responseHeadersAt=performance.now(),responseReceivedAt=Date.now(),raw=await response.text();
+  const parseStart=performance.now();
   let data=null;
   try{data=raw?unwrapStandardResponse(JSON.parse(raw)):null}catch{}
-  if(Array.isArray(data?.validation_results)&&data.validation_results.length===validationRequests.length)return {...data,aggregate_http_status:response.status};
+  const clientTiming={client_prepare_ms:clientPrepareMs,http_duration_ms:Math.max(0,Math.round(responseHeadersAt-requestStart)),response_parse_ms:Math.max(0,Math.round(performance.now()-parseStart)),request_started_at:new Date(requestStartedAt).toISOString(),response_received_at:new Date(responseReceivedAt).toISOString()};
+  if(Array.isArray(data?.validation_results)&&data.validation_results.length===validationRequests.length)return {...data,aggregate_http_status:response.status,client_timing:clientTiming};
   const contentType=String(response.headers?.get?.('content-type')||'');
   const serverErrorCode=typeof data?.error_code==='string'?data.error_code:'';
   const errorCode=serverErrorCode==='QA_CLIENT_ASSET_STALE'?'QA_CLIENT_ASSET_STALE':[401,403].includes(response.status)?'SERVER_VALIDATE_AUTH_REQUIRED':response.status===404?'SERVER_VALIDATE_ROUTE_NOT_FOUND':response.status===503?'SERVER_PROCESSING_TIMEOUT':'SERVER_VALIDATE_MALFORMED_RESPONSE';
-  return employeeAggregateValidationSessionFailure(errorCode,{http_status:response.status,response_content_type:contentType,response_body_kind:contentType.includes('json')?'json':(raw?'non_json':'empty'),response_error_code:data?.error_code||data?.code||'',request_body_bytes:new Blob([requestBody]).size});
+  return employeeAggregateValidationSessionFailure(errorCode,{http_status:response.status,response_content_type:contentType,response_body_kind:contentType.includes('json')?'json':(raw?'non_json':'empty'),response_error_code:data?.error_code||data?.code||'',request_body_bytes:new Blob([requestBody]).size,client_timing:clientTiming});
 }
 async function commitSessionAndExport(){
   const validateOnly=state.aggregateValidationOnly===true;
@@ -8671,6 +8699,7 @@ async function commitSessionAndExport(){
     try{
       setUploadPhase(`Resuming ${state.qaAcceptance.remainingCount} remaining records`,'Resume Upload');
       const resumed=await employeeQaAcceptanceSessionResume(aggregatePreflight,uploadList);
+      employeeQaStoreUploadPerformance(aggregatePreflight,resumed,uploadT0);
       oldLabels.forEach(([b])=>{b.dataset.busy='0';b.disabled=false;b.classList.remove('disabled')});
       state.drafts=[];
       state.sessionId='';
@@ -9603,10 +9632,13 @@ async function employeeQaAcceptanceSessionResume(aggregate={},uploadList=[],opti
     resume_intent:finalizationOnly?'EMPLOYEE_FINALIZE_PERSISTED_RUN':'EMPLOYEE_MANUAL_RESUME'
   };
   let response;
+  const monotonicNow=()=>typeof performance!=='undefined'&&typeof performance.now==='function'?performance.now():Date.now();
+  const requestStartedAt=Date.now(),requestStart=monotonicNow();
   try{response=await apiFetch(`/api/qa/acceptance/runs/${encodeURIComponent(runId)}/session-resume`,{method:'POST',body:JSON.stringify(body)})}
   catch{const error=new Error('QA_SESSION_RESUME_UNREACHABLE');error.httpStatus=0;throw error}
-  const raw=await response.text();
+  const responseHeadersAt=monotonicNow(),responseReceivedAt=Date.now(),raw=await response.text(),parseStart=monotonicNow();
   let data={};try{data=raw?unwrapStandardResponse(JSON.parse(raw)):{} }catch{}
+  data.client_timing={http_duration_ms:Math.max(0,Math.round(responseHeadersAt-requestStart)),response_parse_ms:Math.max(0,Math.round(monotonicNow()-parseStart)),request_started_at:new Date(requestStartedAt).toISOString(),response_received_at:new Date(responseReceivedAt).toISOString()};
   if(!response.ok||data?.success===false||data?.ok===false){
     const code=typeof data?.error_code==='string'?data.error_code:`QA_SESSION_RESUME_HTTP_${response.status}`;
     const error=new Error(code);error.httpStatus=response.status;error.resumeResult=data;throw error;

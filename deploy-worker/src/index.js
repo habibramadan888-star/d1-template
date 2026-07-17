@@ -877,20 +877,32 @@ function requireManager(user) {
   return canWriteOwnerData(user);
 }
 __name(requireManager, "requireManager");
-async function audit(env, user, action, target = "", detail = {}) {
+async function ensureAuditLogSchema(env,requestContext=null){
+  if(requestContext?.audit_schema_ready===true)return;
+  if(requestContext?.audit_schema_promise)return requestContext.audit_schema_promise;
+  const startedAt=Date.now(),pending=env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS audit_logs (
+      id TEXT PRIMARY KEY,
+      corpid TEXT NOT NULL,
+      userid TEXT NOT NULL,
+      role TEXT NOT NULL,
+      action TEXT NOT NULL,
+      target TEXT DEFAULT '',
+      detail TEXT DEFAULT '{}',
+      created_at DATETIME DEFAULT (datetime('now'))
+    )`
+  ).run().then(result=>{
+    if(requestContext){requestContext.audit_schema_ready=true;requestContext.d1_write_count=Number(requestContext.d1_write_count||0)+1;requestContext.d1_write_duration_ms=Number(requestContext.d1_write_duration_ms||0)+Math.max(0,Date.now()-startedAt);}
+    return result;
+  });
+  if(requestContext)requestContext.audit_schema_promise=pending;
+  return pending;
+}
+__name(ensureAuditLogSchema,"ensureAuditLogSchema");
+async function audit(env, user, action, target = "", detail = {}, requestContext=null) {
   try {
-    await env.DB.prepare(
-      `CREATE TABLE IF NOT EXISTS audit_logs (
-        id TEXT PRIMARY KEY,
-        corpid TEXT NOT NULL,
-        userid TEXT NOT NULL,
-        role TEXT NOT NULL,
-        action TEXT NOT NULL,
-        target TEXT DEFAULT '',
-        detail TEXT DEFAULT '{}',
-        created_at DATETIME DEFAULT (datetime('now'))
-      )`
-    ).run();
+    await ensureAuditLogSchema(env,requestContext);
+    const writeStartedAt=Date.now();
     await env.DB.prepare(
       `INSERT INTO audit_logs (id, corpid, userid, role, action, target, detail)
        VALUES (?, ?, ?, ?, ?, ?, ?)`
@@ -903,6 +915,7 @@ async function audit(env, user, action, target = "", detail = {}) {
       target,
       JSON.stringify(detail || {})
     ).run();
+    if(requestContext){requestContext.d1_write_count=Number(requestContext.d1_write_count||0)+1;requestContext.d1_write_duration_ms=Number(requestContext.d1_write_duration_ms||0)+Math.max(0,Date.now()-writeStartedAt);}
   } catch (e) {
     logger.warn({ action, err: e }, "Audit log failed");
   }
@@ -1078,7 +1091,7 @@ __name(ttlockScopeKey,"ttlockScopeKey");
 function ttlockRequestContext(request,env,user,routeCategory="read",maxAgeMs=TTLOCK_READ_CACHE_MAX_AGE_MS){
   let requestHost="";
   try{requestHost=new URL(request?.url||"").hostname.toLowerCase();}catch{}
-  return {corpid:cleanText(user?.corpid||env?.CORPID||"default",120)||"default",request_host:requestHost,route_category:cleanText(routeCategory,80)||"read",max_age_ms:maxAgeMs,timeout_ms:8000,ttlockSnapshotPromise:null,ttlock_snapshot_count:0,archiveSnapshotPromise:null,archive_entries_prepared:false,archive_anchor_items:null,bed_transfer_resolver_archive_entries:null,existing_transactions_by_event_id:null,transactions_table_exists:null,sessions_table_exists:null,session_columns:null,employee_entry_schema_ready:null,archive_read_count:0,archive_parse_count:0,transaction_read_count:0,persistence_read_count:0,persistence_parse_count:0,d1_read_count:0,d1_write_count:0,bed_context_count:0,capabilities_read_count:0,ttlock_external_call_count:0,ttlock_cache_state:"",kv_read_count:0,kv_write_count:0,last_successful_stage:"request_started",started_at_ms:Date.now()};
+  return {corpid:cleanText(user?.corpid||env?.CORPID||"default",120)||"default",request_host:requestHost,route_category:cleanText(routeCategory,80)||"read",max_age_ms:maxAgeMs,timeout_ms:8000,ttlockSnapshotPromise:null,ttlock_snapshot_count:0,archiveSnapshotPromise:null,archive_entries_prepared:false,archive_anchor_items:null,bed_transfer_resolver_archive_entries:null,existing_transactions_by_event_id:null,transactions_table_exists:null,sessions_table_exists:null,session_columns:null,employee_entry_schema_ready:null,table_columns_by_name:null,table_column_promises:null,rent_config_promise:null,audit_schema_promise:null,audit_schema_ready:false,archive_read_count:0,archive_parse_count:0,transaction_read_count:0,persistence_read_count:0,persistence_parse_count:0,d1_read_count:0,d1_write_count:0,d1_batch_count:0,d1_read_duration_ms:0,d1_write_duration_ms:0,d1_batch_duration_ms:0,bed_context_count:0,capabilities_read_count:0,ttlock_external_call_count:0,ttlock_cache_state:"",kv_read_count:0,kv_write_count:0,last_successful_stage:"request_started",started_at_ms:Date.now()};
 }
 __name(ttlockRequestContext,"ttlockRequestContext");
 function ttlockLiveFetchAllowed(env={},context={}){
@@ -1283,9 +1296,20 @@ const BED_TRANSFER_EVENT_COLUMNS = [
   "old_lock_valid_from","old_lock_valid_until","new_lock_valid_from","new_lock_valid_until","reason","note",
   "operator_employee","status","audit_id","trace_id","entry_event_id","qa_tag","created_at","updated_at"
 ];
-async function empTableColumns(env, table){
-  const r=await env.DB.prepare(`PRAGMA table_info(${table})`).all();
-  return new Set((r.results||[]).map(x=>x.name));
+async function empTableColumns(env, table, requestContext=null){
+  const cache=requestContext?(requestContext.table_columns_by_name instanceof Map?requestContext.table_columns_by_name:new Map()):null;
+  const promises=requestContext?(requestContext.table_column_promises instanceof Map?requestContext.table_column_promises:new Map()):null;
+  if(requestContext){requestContext.table_columns_by_name=cache;requestContext.table_column_promises=promises;}
+  if(cache?.has(table))return cache.get(table);
+  if(promises?.has(table))return promises.get(table);
+  const startedAt=Date.now(),pending=env.DB.prepare(`PRAGMA table_info(${table})`).all().then(r=>{
+    const columns=new Set((r.results||[]).map(x=>x.name));
+    cache?.set(table,columns);
+    if(requestContext){requestContext.d1_read_count=Number(requestContext.d1_read_count||0)+1;requestContext.d1_read_duration_ms=Number(requestContext.d1_read_duration_ms||0)+Math.max(0,Date.now()-startedAt);}
+    return columns;
+  });
+  promises?.set(table,pending);
+  try{return await pending}finally{promises?.delete(table)}
 }
 __name(empTableColumns,"empTableColumns");
 async function empTableExists(env, table){
@@ -1554,15 +1578,17 @@ function normalizeDirectiveStatusForEmployee(status){
   return ["assigned","viewed","followed_up","needs_review","closed","cancelled","overdue"].includes(raw)?raw:"none";
 }
 __name(normalizeDirectiveStatusForEmployee,"normalizeDirectiveStatusForEmployee");
-async function empInsertDynamic(env, table, values, allowed){
-  const cols=await empTableColumns(env,table);
+async function empInsertDynamic(env, table, values, allowed, requestContext=null){
+  const cols=await empTableColumns(env,table,requestContext);
   const names=[];
   const vals=[];
   for(const k of allowed){
     if(cols.has(k)&&values[k]!==void 0){names.push(k);vals.push(values[k]);}
   }
   if(!names.length)return {inserted:false,columns:[]};
+  const writeStartedAt=Date.now();
   await env.DB.prepare(`INSERT OR REPLACE INTO ${table} (${names.join(",")}) VALUES (${names.map(()=>"?").join(",")})`).bind(...vals).run();
+  if(requestContext){requestContext.d1_write_count=Number(requestContext.d1_write_count||0)+1;requestContext.d1_write_duration_ms=Number(requestContext.d1_write_duration_ms||0)+Math.max(0,Date.now()-writeStartedAt);}
   return {inserted:true,columns:names};
 }
 __name(empInsertDynamic,"empInsertDynamic");
@@ -1579,12 +1605,12 @@ async function empInsertDynamicMode(env, table, values, allowed, mode="INSERT"){
   return {inserted:Number(result?.meta?.changes??result?.changes??0)>0,columns:names};
 }
 __name(empInsertDynamicMode,"empInsertDynamicMode");
-async function empEvent(env,user,event){
+async function empEvent(env,user,event,requestContext=null){
   await empInsertDynamic(env,"entry_events",{
     event_id:empId("evt"),corpid:user.corpid,userid:user.userid,ref_id:event.ref_id,ref_type:event.ref_type,
     event_type:event.event_type,field_name:event.field_name||"",old_value:event.old_value==null?"":String(event.old_value),
     new_value:event.new_value==null?"":String(event.new_value),operator_id:event.operator_id||user.userid||"",ts:event.ts||empNow()
-  },EMP_EVENT_COLUMNS);
+  },EMP_EVENT_COLUMNS,requestContext);
 }
 __name(empEvent,"empEvent");
 async function empDepositBalance(env, corpid, tenantCardId){
@@ -2042,21 +2068,29 @@ async function empEnsureOpenArrearTaskForPayment(env,user,taskId,operatorId,now,
   return created;
 }
 __name(empEnsureOpenArrearTaskForPayment,"empEnsureOpenArrearTaskForPayment");
-async function empRentConfig(env, corpid){
-  await env.DB.prepare(`CREATE TABLE IF NOT EXISTS app_settings (
-      corpid TEXT NOT NULL,
-      key TEXT NOT NULL,
-      value TEXT DEFAULT '{}',
-      updated_by TEXT DEFAULT '',
-      updated_at DATETIME DEFAULT (datetime('now')),
-      PRIMARY KEY (corpid, key)
-    )`).run();
-  const row=await env.DB.prepare("SELECT value FROM app_settings WHERE corpid=? AND key=? LIMIT 1").bind(corpid,"rent_ref_room").first();
-  try{return row?.value?JSON.parse(row.value):{};}catch{return {};}
+async function empRentConfig(env, corpid, requestContext=null){
+  if(requestContext?.rent_config_promise)return requestContext.rent_config_promise;
+  const pending=(async()=>{
+    const schemaStartedAt=Date.now();
+    await env.DB.prepare(`CREATE TABLE IF NOT EXISTS app_settings (
+        corpid TEXT NOT NULL,
+        key TEXT NOT NULL,
+        value TEXT DEFAULT '{}',
+        updated_by TEXT DEFAULT '',
+        updated_at DATETIME DEFAULT (datetime('now')),
+        PRIMARY KEY (corpid, key)
+      )`).run();
+    if(requestContext){requestContext.d1_write_count=Number(requestContext.d1_write_count||0)+1;requestContext.d1_write_duration_ms=Number(requestContext.d1_write_duration_ms||0)+Math.max(0,Date.now()-schemaStartedAt);}
+    const readStartedAt=Date.now(),row=await env.DB.prepare("SELECT value FROM app_settings WHERE corpid=? AND key=? LIMIT 1").bind(corpid,"rent_ref_room").first();
+    if(requestContext){requestContext.d1_read_count=Number(requestContext.d1_read_count||0)+1;requestContext.d1_read_duration_ms=Number(requestContext.d1_read_duration_ms||0)+Math.max(0,Date.now()-readStartedAt);}
+    try{return row?.value?JSON.parse(row.value):{};}catch{return {};}
+  })();
+  if(requestContext)requestContext.rent_config_promise=pending;
+  return pending;
 }
 __name(empRentConfig,"empRentConfig");
-async function empRentForBed(env, corpid, bed){
-  const cfg=await empRentConfig(env,corpid);
+async function empRentForBed(env, corpid, bed, requestContext=null){
+  const cfg=await empRentConfig(env,corpid,requestContext);
   const key=String(bed||"").trim();
   const value=Number(cfg[key]);
   return Number.isFinite(value)&&value>0?Math.round(value*100)/100:0;
@@ -3612,6 +3646,10 @@ function employeeEntryAggregateRequestMetrics(context={}){
     persistence_parse_count:Number(context.persistence_parse_count||0),
     d1_read_count:Number(context.d1_read_count||0),
     d1_write_count:Number(context.d1_write_count||0),
+    d1_batch_count:Number(context.d1_batch_count||0),
+    d1_read_duration_ms:Number(context.d1_read_duration_ms||0),
+    d1_write_duration_ms:Number(context.d1_write_duration_ms||0),
+    d1_batch_duration_ms:Number(context.d1_batch_duration_ms||0),
     ttlock_snapshot_count:Number(context.ttlock_snapshot_count||0),
     ttlock_external_call_count:Number(context.ttlock_external_call_count||0),
     kv_read_count:Number(context.kv_read_count||0),
@@ -3990,7 +4028,11 @@ async function handleEmployeeEntry(request,env,user,options={}){
   const entryAnchorId=cleanId(entry.anchor_id||entry.event_id||entry.id)||entryId;
   const authOperatorId=cleanText(user.userid,80);
   const operatorName=cleanText(user.employee_name||user.userid,120);
-  const existingTx=await env.DB.prepare("SELECT id,session_id,type,linked_task_id FROM transactions WHERE id=? AND corpid=? LIMIT 1").bind(entryId,user.corpid).first();
+  const preloadedTransactions=request_context.existing_transactions_by_event_id;
+  const checkedTransactionIds=request_context.existing_transaction_ids_checked;
+  const transactionWasPreloaded=preloadedTransactions instanceof Map&&checkedTransactionIds instanceof Set&&checkedTransactionIds.has(entryId),existingTransactionReadStartedAt=Date.now();
+  const existingTx=transactionWasPreloaded?(preloadedTransactions.get(entryId)||null):await env.DB.prepare("SELECT id,session_id,type,linked_task_id FROM transactions WHERE id=? AND corpid=? LIMIT 1").bind(entryId,user.corpid).first();
+  if(!transactionWasPreloaded){request_context.d1_read_count=Number(request_context.d1_read_count||0)+1;request_context.d1_read_duration_ms=Number(request_context.d1_read_duration_ms||0)+Math.max(0,Date.now()-existingTransactionReadStartedAt);}
   if(existingTx){
     let arrearTask=null;
     if(existingTx.type==="AP"&&existingTx.linked_task_id&&!String(existingTx.linked_task_id).startsWith("legacy-manual-")){
@@ -4026,7 +4068,7 @@ async function handleEmployeeEntry(request,env,user,options={}){
     const cleanPeriodEnd=cleanDate(periodEnd);
     if(!cleanPeriodStart||!cleanPeriodEnd)return badRequest("period_dates_required");
     if(cleanPeriodEnd<cleanPeriodStart)return badRequest("period_end_before_start");
-    const configuredRent=await empRentForBed(env,user.corpid,room);
+    const configuredRent=await empRentForBed(env,user.corpid,room,request_context);
     if(cycle==="1M"){
       if(!configuredRent)return badRequest("rent_config_missing");
       if(cleanPeriodEnd!==empAddMonths(cleanPeriodStart,1))return badRequest("period_end_invalid_for_1m");
@@ -4110,7 +4152,7 @@ async function handleEmployeeEntry(request,env,user,options={}){
   const seedLegacyDeposit=tenantCardId&&["DR","CO"].includes(type)&&depositBalance<=0&&depositHeldInput>0;
   if(["DR","CO"].includes(type)&&depositBalance<=0&&depositHeldInput>0)depositBalance=depositHeldInput;
   if(type==="CO"&&!entry.left_with_arrears){
-    const openArrears=room?await getOpenCloudArrearsForBed(env,user,room,{limit:2000}).catch(()=>[]):[];
+    const openArrears=room?await getOpenCloudArrearsForBed(env,user,room,{limit:2000,request_context}).catch(()=>[]):[];
     if(openArrears.length)return badRequest("checkout_open_arrears_owner_approval_required");
   }
   if(type==="CO"&&depositDeduction>depositBalance+0.01)return badRequest("deposit_deduction_exceeds_balance");
@@ -4156,7 +4198,7 @@ async function handleEmployeeEntry(request,env,user,options={}){
     source:cleanText(session.source||"employee_entry",40)||"employee_entry",
     entries_json:cleanText(sessionEntriesJson,50000),
     summary_json:cleanText(sessionSummaryJson,5000)
-  },EMP_SESSION_COLUMNS);
+  },EMP_SESSION_COLUMNS,request_context);
   const inserted=await empInsertDynamic(env,"transactions",{
     id:entryId,corpid:user.corpid,userid:user.userid,session_id:sessionId,cat:cleanText(entry.cat||"cash",20),
     room,amount,due,paid,deficit:Math.max(0,due-paid),
@@ -4178,7 +4220,9 @@ async function handleEmployeeEntry(request,env,user,options={}){
     linked_task_id:cleanText(entry.linked_task_id,80),original_period_start:cleanText(entry.original_period_start,20),
     original_period_end:cleanText(entry.original_period_end,20),
     arrear_promise_date:arrearPromiseDate,arrear_reason_detail:arrearReasonDetail,promise_amount:Number.isFinite(promiseAmount)?promiseAmount:0
-  },EMP_TX_COLUMNS);
+  },EMP_TX_COLUMNS,request_context);
+  if(request_context.existing_transactions_by_event_id instanceof Map)request_context.existing_transactions_by_event_id.set(entryId,{id:entryId,session_id:sessionId,type,linked_task_id:cleanText(entry.linked_task_id,80)});
+  if(request_context.existing_transaction_ids_checked instanceof Set)request_context.existing_transaction_ids_checked.add(entryId);
   let depositLedger=null;
   if(tenantCardId&&type==="D"){
     depositLedger=await empDepositMove(env,user,{tenant_card_id:tenantCardId,tenant_name:tenantName,bed:room,entry_id:entryId,type,amount,delta:amount,note:cleanText(entry.note,240),operator_id:authOperatorId,ts:now});
@@ -4221,7 +4265,7 @@ async function handleEmployeeEntry(request,env,user,options={}){
           original_period_start:periodStart,original_period_end:periodEnd,updated_by:authOperatorId,updated_at:now,
           source_type:"employee_entry_short_paid",source_ref:entryId,
           source_fingerprint:[user.corpid,room,periodStart,periodEnd,entryId].join("|"),materialized_from:"employee_entry"
-        },EMP_TASK_COLUMNS);
+        },EMP_TASK_COLUMNS,request_context);
         arrearTask={task_id:taskId,arrear_amount:remain,period_due:periodDue};
       }
     }
@@ -4251,8 +4295,8 @@ async function handleEmployeeEntry(request,env,user,options={}){
     deposit_deduction:depositDeduction,type,tenant_card_id:tenantCardId,tenant_name:tenantName,
     arrear_handling:arrearHandling,arrear_promise_date:arrearPromiseDate,arrear_reason_detail:arrearReasonDetail,operator_name:operatorName
   };
-  await empEvent(env,user,{ref_id:entryId,ref_type:"transaction",event_type:"create",field_name:"*",new_value:JSON.stringify(finalEntryForAudit),operator_id:authOperatorId,ts:now});
-  await audit(env,user,"employee.entry.create",entryId,{room,amount}).catch(()=>{});
+  await empEvent(env,user,{ref_id:entryId,ref_type:"transaction",event_type:"create",field_name:"*",new_value:JSON.stringify(finalEntryForAudit),operator_id:authOperatorId,ts:now},request_context);
+  await audit(env,user,"employee.entry.create",entryId,{room,amount},request_context).catch(()=>{});
   let stayRegistryResult=null;
   if(preparedStayGenesis){
     try{
@@ -4972,8 +5016,9 @@ async function employeeEntryPreloadExistingTransactions(env,user,requests=[],con
     context.existing_transaction_ids_checked=checked;
     return rows;
   }
-  const tableExists=await empTableExists(env,"transactions").catch(()=>false);
+  const tableReadStartedAt=Date.now(),tableExists=await empTableExists(env,"transactions").catch(()=>false);
   context.d1_read_count=Number(context.d1_read_count||0)+1;
+  context.d1_read_duration_ms=Number(context.d1_read_duration_ms||0)+Math.max(0,Date.now()-tableReadStartedAt);
   context.transactions_table_exists=tableExists;
   context.transaction_read_ok=tableExists;
   if(tableExists){
@@ -4986,9 +5031,10 @@ async function employeeEntryPreloadExistingTransactions(env,user,requests=[],con
     const selectorParams=sessionPrefix?[sessionPrefix]:uncheckedIds;
     const statement=env.DB.prepare(`SELECT id, session_id, created_at, type FROM transactions
       WHERE corpid=? AND ${selector} AND COALESCE(voided_at,'')='' AND COALESCE(status,'ACTIVE')<>'VOID' LIMIT 100`).bind(user.corpid,...selectorParams);
-    const result=await statement.all().catch(()=>{readOk=false;return {results:[]}});
+    const transactionReadStartedAt=Date.now(),result=await statement.all().catch(()=>{readOk=false;return {results:[]}});
     context.transaction_read_count=Number(context.transaction_read_count||0)+1;
     context.d1_read_count=Number(context.d1_read_count||0)+1;
+    context.d1_read_duration_ms=Number(context.d1_read_duration_ms||0)+Math.max(0,Date.now()-transactionReadStartedAt);
     const truncated=readOk&&!!sessionPrefix&&(result.results||[]).length>=100;
     context.transaction_snapshot_truncated=truncated;
     context.transaction_read_ok=readOk&&!truncated;
@@ -5443,15 +5489,15 @@ async function cloudArrearsFetchActiveSessionRows(env,user,opts={}){
   const context=opts.request_context||null;
   if(context?.archiveSnapshotPromise)return await context.archiveSnapshotPromise;
   const task=(async()=>{
-    const sessionsExists=await empTableExists(env,"sessions").catch(()=>false);
-    if(context){context.d1_read_count=Number(context.d1_read_count||0)+1;context.sessions_table_exists=sessionsExists;context.archive_read_ok=sessionsExists;}
+    const tableReadStartedAt=Date.now(),sessionsExists=await empTableExists(env,"sessions").catch(()=>false);
+    if(context){context.d1_read_count=Number(context.d1_read_count||0)+1;context.d1_read_duration_ms=Number(context.d1_read_duration_ms||0)+Math.max(0,Date.now()-tableReadStartedAt);context.sessions_table_exists=sessionsExists;context.archive_read_ok=sessionsExists;}
     if(!sessionsExists)return [];
     const limit=Math.min(Math.max(Number(opts.limit||1000),1),2000);
     const sessionId=cleanId(opts.session_id||opts.sessionId||"");
     const sessionPrefix=cleanText(opts.session_prefix||context?.archive_session_prefix||"",160);
     const strictSessionPrefix=!!sessionPrefix&&(opts.strict_session_prefix===true||context?.strict_archive_session_prefix===true);
-    const columns=await empTableColumns(env,"sessions").catch(()=>[]);
-    if(context){context.d1_read_count=Number(context.d1_read_count||0)+1;context.session_columns=columns;}
+    const columns=await empTableColumns(env,"sessions",context).catch(()=>[]);
+    if(context)context.session_columns=columns;
     const hasEntriesJson=columns.has("entries_json");
     const hasSummaryJson=columns.has("summary_json");
     const params=[user.corpid];
@@ -5467,12 +5513,12 @@ async function cloudArrearsFetchActiveSessionRows(env,user,opts={}){
     const entriesExpr=hasEntriesJson?"entries_json":"'' AS entries_json";
     const summaryExpr=hasSummaryJson?"summary_json":"'' AS summary_json";
     let readOk=true;
-    const rows=await env.DB.prepare(`SELECT id, corpid, anchor_id, date, entries_count, created_by, created_at, operator_id, operator_name, handover_status, exported_at, export_text, source, ${entriesExpr}, ${summaryExpr}, voided_at
+    const archiveReadStartedAt=Date.now(),rows=await env.DB.prepare(`SELECT id, corpid, anchor_id, date, entries_count, created_by, created_at, operator_id, operator_name, handover_status, exported_at, export_text, source, ${entriesExpr}, ${summaryExpr}, voided_at
       FROM sessions
       WHERE ${where}
       ORDER BY ${sessionPrefix&&!sessionId&&!strictSessionPrefix?"CASE WHEN id LIKE ? THEN 0 ELSE 1 END, ":""}date ASC, COALESCE(exported_at,created_at,'') ASC
       LIMIT ?`).bind(...params,...(sessionPrefix&&!sessionId&&!strictSessionPrefix?[sessionPrefix]:[]),limit).all().catch(()=>{readOk=false;return {results:[]}});
-    if(context){context.archive_read_count=Number(context.archive_read_count||0)+1;context.d1_read_count=Number(context.d1_read_count||0)+1;context.archive_read_ok=readOk;context.archive_snapshot_truncated=readOk&&(rows.results||[]).length>=limit;context.last_successful_stage=readOk?"canonical_archive_loaded":"canonical_archive_read_failed";}
+    if(context){context.archive_read_count=Number(context.archive_read_count||0)+1;context.d1_read_count=Number(context.d1_read_count||0)+1;context.d1_read_duration_ms=Number(context.d1_read_duration_ms||0)+Math.max(0,Date.now()-archiveReadStartedAt);context.archive_read_ok=readOk;context.archive_snapshot_truncated=readOk&&(rows.results||[]).length>=limit;context.last_successful_stage=readOk?"canonical_archive_loaded":"canonical_archive_read_failed";}
     return rows.results||[];
   })();
   if(context)context.archiveSnapshotPromise=task;
@@ -12344,7 +12390,7 @@ async function qaAcceptanceCreateRun(request,env,user){
   let body={};try{body=await request.json()}catch{return badRequest("invalid_json")}
   const mode=String(body.mode||"quick").trim().toLowerCase();
   if(!["quick","full","recovery"].includes(mode))return json({success:false,error_code:"QA_RUN_MODE_INVALID"},422);
-  const active=await env.DB.prepare("SELECT qa_run_id,status FROM qa_acceptance_runs WHERE corpid=? AND cleanup_status<>'COMPLETED' AND status<>'FINAL_ACCEPTED' ORDER BY created_at DESC LIMIT 1").bind(user.corpid).first();
+  const active=await env.DB.prepare("SELECT qa_run_id,status FROM qa_acceptance_runs WHERE corpid=? AND cleanup_status<>'COMPLETED' AND status NOT IN ('FINAL_ACCEPTED','UPLOAD_PASS','MANUAL_OWNER_ACCEPTED') ORDER BY created_at DESC LIMIT 1").bind(user.corpid).first();
   if(active)return json({success:false,error_code:"QA_ACTIVE_RUN_EXISTS",qa_run_id:active.qa_run_id,status:active.status},409);
   const matrix=await env.RATE_LIMIT.get(`qa:matrix:${mode}:${env.QA_MATRIX_VERSION}`,"json").catch(()=>null);
   if(!matrix||String(matrix.matrix_version||"")!==String(env.QA_MATRIX_VERSION||""))return json({success:false,error_code:"QA_MATRIX_UNAVAILABLE",no_write:true},503);
@@ -12435,9 +12481,9 @@ async function qaAcceptanceRunPersistenceSnapshot(env,user,run={},contract={},co
     if(context.archive_read_ok===false||context.archive_snapshot_truncated===true)sessionReadOk=false;
   }
   else{
-    const rows=await env.DB.prepare("SELECT id,anchor_id,entries_count,handover_status,entries_json,created_at,voided_at FROM sessions WHERE corpid=? AND id LIKE ? ORDER BY id").bind(user.corpid,like).all().catch(()=>{sessionReadOk=false;return {results:[]}});
+    const sessionReadStartedAt=Date.now(),rows=await env.DB.prepare("SELECT id,anchor_id,entries_count,handover_status,entries_json,created_at,voided_at FROM sessions WHERE corpid=? AND id LIKE ? ORDER BY id").bind(user.corpid,like).all().catch(()=>{sessionReadOk=false;return {results:[]}});
     sessions=rows.results||[];
-    if(context){context.d1_read_count=Number(context.d1_read_count||0)+1;context.persistence_read_count=Number(context.persistence_read_count||0)+1;if(sessionReadOk)context.sessions_table_exists=true;}
+    if(context){context.d1_read_count=Number(context.d1_read_count||0)+1;context.d1_read_duration_ms=Number(context.d1_read_duration_ms||0)+Math.max(0,Date.now()-sessionReadStartedAt);context.persistence_read_count=Number(context.persistence_read_count||0)+1;if(sessionReadOk)context.sessions_table_exists=true;}
   }
   let transactions=new Map();
   if(!fresh&&context?.existing_transactions_by_event_id instanceof Map){
@@ -12446,10 +12492,11 @@ async function qaAcceptanceRunPersistenceSnapshot(env,user,run={},contract={},co
     transactionReadOk=context.transaction_read_ok!==false&&context.transaction_snapshot_truncated!==true&&checked instanceof Set&&[...expectedEntryIds].every(id=>checked.has(id));
   }
   else{
-    const rows=await env.DB.prepare("SELECT id,session_id,type,status,voided_at FROM transactions WHERE corpid=? AND session_id LIKE ? ORDER BY id").bind(user.corpid,like).all().catch(()=>{transactionReadOk=false;return {results:[]}});
+    const transactionReadStartedAt=Date.now(),rows=await env.DB.prepare("SELECT id,session_id,type,status,voided_at FROM transactions WHERE corpid=? AND session_id LIKE ? ORDER BY id").bind(user.corpid,like).all().catch(()=>{transactionReadOk=false;return {results:[]}});
     for(const row of rows.results||[])transactions.set(cleanId(row?.id||""),row);
     if(context){
       context.d1_read_count=Number(context.d1_read_count||0)+1;
+      context.d1_read_duration_ms=Number(context.d1_read_duration_ms||0)+Math.max(0,Date.now()-transactionReadStartedAt);
       context.persistence_read_count=Number(context.persistence_read_count||0)+1;
       if(transactionReadOk){
         context.transactions_table_exists=true;
@@ -12755,6 +12802,32 @@ async function qaAcceptanceRecordUpload(request,env,user,run){
   return success(qaAcceptancePublicRun(request,await qaAcceptanceReadRun(env,user,run.qa_run_id)));
 }
 __name(qaAcceptanceRecordUpload,"qaAcceptanceRecordUpload");
+const QA_ACCEPTANCE_WRITE_BATCH_SIZE=6;
+function qaAcceptanceScenarioWriteDependencyKeys(scenario={}){
+  const input=scenario?.input||{},keys=new Set();
+  const add=(prefix,value)=>{const clean=cleanText(value||"",160);if(clean)keys.add(`${prefix}:${clean}`)};
+  if(employeeEntryUploadType(input)==="TF")keys.add("event-type:bed-transfer");
+  add("session",scenario.session_id);add("entry",scenario.entry_id);add("task",input.linked_task_id||input.arrears_ref||input.cloud_arrears_ref);add("tenant",input.tenant_card_id);
+  for(const bed of [input.bed,input.room,input.from_bed,input.to_bed,input.bed_from,input.bed_to,input.target_bed])add("bed",String(bed||"").replace(/^#+/,""));
+  if(cleanText(input.period_start||"",40)||cleanText(input.period_end||"",40))add("period",[input.bed||input.room,input.period_start,input.period_end].join("|"));
+  return keys;
+}
+__name(qaAcceptanceScenarioWriteDependencyKeys,"qaAcceptanceScenarioWriteDependencyKeys");
+function qaAcceptanceBuildWriteBatches(entryIds=[],scenarioById=new Map(),maxBatchSize=QA_ACCEPTANCE_WRITE_BATCH_SIZE){
+  const pending=[...entryIds],batches=[],limit=Math.max(1,Math.min(8,Number(maxBatchSize)||QA_ACCEPTANCE_WRITE_BATCH_SIZE));
+  while(pending.length){
+    const batch=[],used=new Set();
+    for(let index=0;index<pending.length&&batch.length<limit;){
+      const entryId=pending[index],found=scenarioById.get(entryId),keys=found?qaAcceptanceScenarioWriteDependencyKeys(found.row):new Set([`entry:${entryId}`]);
+      if([...keys].some(key=>used.has(key))){index+=1;continue}
+      pending.splice(index,1);batch.push(entryId);for(const key of keys)used.add(key);
+    }
+    if(!batch.length)batch.push(pending.shift());
+    batches.push(batch);
+  }
+  return batches;
+}
+__name(qaAcceptanceBuildWriteBatches,"qaAcceptanceBuildWriteBatches");
 async function qaAcceptanceSessionResume(request,env,user,run){
   const startedAt=Date.now(),stageMs={},mark=(name,start)=>{stageMs[name]=Math.max(0,Date.now()-start)};
   if(!["MANUAL_EMPLOYEE_ACCEPTED","UPLOAD_PASS"].includes(String(run.status||"")))return json({success:false,error_code:"QA_RUN_STATE_CONFLICT",required_status:"MANUAL_EMPLOYEE_ACCEPTED",status:run.status,no_write:true},409);
@@ -12785,9 +12858,9 @@ async function qaAcceptanceSessionResume(request,env,user,run){
     }
     return qaAcceptanceFinalizePersistedRun(env,user,run,contract,stored,finalizationPreflight,requestContext,startedAt,stageMs);
   }
-  const archiveSnapshot=await cloudArrearsFetchActiveSessionRows(env,user,{limit:1000,request_context:requestContext}).catch(()=>[]);
+  const archiveStart=Date.now(),archiveSnapshot=await cloudArrearsFetchActiveSessionRows(env,user,{limit:1000,request_context:requestContext}).catch(()=>[]);mark("archive_snapshot_ms",archiveStart);
   employeeEntryPrepareArchiveSnapshotContext(archiveSnapshot,requestContext);
-  await employeeEntryPreloadExistingTransactions(env,user,requests,requestContext);
+  const transactionPreloadStart=Date.now();await employeeEntryPreloadExistingTransactions(env,user,requests,requestContext);mark("transaction_preload_ms",transactionPreloadStart);
   const scopeStart=Date.now(),sessionPreflight=await qaAcceptanceSessionPreflight(env,user,run,contract,requests,requestContext);mark("scope_and_persistence_ms",scopeStart);
   if(!sessionPreflight.ok){
     const status=sessionPreflight.persistence?.persistence_read_ok===false?503:409;
@@ -12826,32 +12899,63 @@ async function qaAcceptanceSessionResume(request,env,user,run){
     if(sessionPreflight.missing_count!==0||sessionPreflight.persistence.completed_session_count!==scenarios.length)return json({success:false,error_code:"QA_RUN_UPLOAD_STATE_CONFLICT",...base},409);
     return success({...base,ok:true,idempotent:true,no_write:true,formal_write_count:scenarios.length,completed_session_count:sessionPreflight.persistence.completed_session_count,total_duration_ms:Date.now()-startedAt});
   }
-  const sessionColumns=requestContext.session_columns instanceof Set?requestContext.session_columns:await empTableColumns(env,"sessions").catch(()=>new Set());
+  const sessionColumns=requestContext.session_columns instanceof Set?requestContext.session_columns:await empTableColumns(env,"sessions",requestContext).catch(()=>new Set());
   if(!(sessionColumns instanceof Set)||!sessionColumns.has("entries_json"))return json({success:false,error_code:"CANONICAL_ARCHIVE_SCHEMA_UNAVAILABLE",...base},503);
   const resultById=new Map(validationResults.map(row=>[String(row.entry_identity||""),row])),scenarioById=new Map(scenarios.map((row,index)=>[String(row.entry_id||""),{row,index}]));
+  const writeContextStart=Date.now();
+  await Promise.all([
+    empTableColumns(env,"sessions",requestContext),
+    empTableColumns(env,"transactions",requestContext),
+    empTableColumns(env,"entry_events",requestContext),
+    empTableColumns(env,"arrear_tasks",requestContext),
+    ensureAuditLogSchema(env,requestContext),
+    scenarios.some(row=>employeeEntryUploadType(row?.input||{})==="R")?empRentConfig(env,user.corpid,requestContext):Promise.resolve({})
+  ]);
+  mark("write_context_preload_ms",writeContextStart);
   const writeResults=[];
-  for(const entryId of sessionPreflight.persistence.missing_entry_ids){
-    const found=scenarioById.get(entryId);if(!found)return json({success:false,error_code:"QA_RUN_ENTRY_SCOPE_MISMATCH",...base},409);
-    const requestBody=qaAcceptanceScenarioRequestBody(run,found.row,found.index,scenarios.length),validated=resultById.get(entryId);
-    const writeStart=Date.now(),response=await handleEmployeeEntry(request,env,user,{body:requestBody,request_context:requestContext,prevalidated_result:validated,schema_prechecked:true,internal_token:QA_SESSION_RESUME_INTERNAL});
-    const payload=await response.json().catch(()=>({})),data=payload?.data&&typeof payload.data==="object"?payload.data:payload;mark(`write_${entryId}_ms`,writeStart);
-    if(!response.ok||data?.success===false)return json({success:false,error_code:data?.error_code||"QA_SESSION_RESUME_WRITE_FAILED",...base,write_attempted:true,no_write:false,new_write_count:writeResults.filter(row=>row.new_write).length,failed_entry_identity:entryId,saved_count:sessionPreflight.persisted_count+writeResults.length,remaining_count:Math.max(0,sessionPreflight.missing_count-writeResults.length)},response.status||500);
-    writeResults.push({entry_identity:entryId,new_write:data?.idempotent!==true&&data?.already_accepted!==true,idempotent:data?.idempotent===true||data?.already_accepted===true});
+  const writeBatches=qaAcceptanceBuildWriteBatches(sessionPreflight.persistence.missing_entry_ids,scenarioById,QA_ACCEPTANCE_WRITE_BATCH_SIZE),writeBatchStart=Date.now(),entryDurations=[];
+  stageMs.write_batch_count=writeBatches.length;
+  requestContext.d1_batch_count=Number(requestContext.d1_batch_count||0)+writeBatches.length;
+  for(let batchIndex=0;batchIndex<writeBatches.length;batchIndex++){
+    const batchStart=Date.now(),batch=writeBatches[batchIndex];
+    const batchResults=await Promise.all(batch.map(async entryId=>{
+      const found=scenarioById.get(entryId);if(!found)return {entryId,response:null,data:{error_code:"QA_RUN_ENTRY_SCOPE_MISMATCH"},durationMs:0};
+      const requestBody=qaAcceptanceScenarioRequestBody(run,found.row,found.index,scenarios.length),validated=resultById.get(entryId),writeStart=Date.now();
+      const response=await handleEmployeeEntry(request,env,user,{body:requestBody,request_context:requestContext,prevalidated_result:validated,schema_prechecked:true,internal_token:QA_SESSION_RESUME_INTERNAL});
+      const payload=await response.json().catch(()=>({})),data=payload?.data&&typeof payload.data==="object"?payload.data:payload;
+      return {entryId,response,data,durationMs:Math.max(0,Date.now()-writeStart)};
+    }));
+    stageMs[`write_batch_${batchIndex+1}_ms`]=Math.max(0,Date.now()-batchStart);
+    requestContext.d1_batch_duration_ms=Number(requestContext.d1_batch_duration_ms||0)+stageMs[`write_batch_${batchIndex+1}_ms`];
+    entryDurations.push(...batchResults.map(row=>row.durationMs));
+    const failedRow=batchResults.find(row=>!row.response||!row.response.ok||row.data?.success===false);
+    if(failedRow){
+      for(const item of batchResults.filter(row=>row.response?.ok&&row.data?.success!==false))writeResults.push({entry_identity:item.entryId,new_write:item.data?.idempotent!==true&&item.data?.already_accepted!==true,idempotent:item.data?.idempotent===true||item.data?.already_accepted===true});
+      return json({success:false,error_code:failedRow.data?.error_code||"QA_SESSION_RESUME_WRITE_FAILED",...base,write_attempted:true,no_write:false,new_write_count:writeResults.filter(item=>item.new_write).length,failed_entry_identity:failedRow.entryId,saved_count:sessionPreflight.persisted_count+writeResults.length,remaining_count:Math.max(0,sessionPreflight.missing_count-writeResults.length),stage_duration_ms:stageMs},failedRow.response?.status||500);
+    }
+    for(const row of batchResults){
+      writeResults.push({entry_identity:row.entryId,new_write:row.data?.idempotent!==true&&row.data?.already_accepted!==true,idempotent:row.data?.idempotent===true||row.data?.already_accepted===true});
+    }
   }
-  requestContext.d1_write_count=Number(requestContext.d1_write_count||0)+writeResults.filter(row=>row.new_write).length;
+  stageMs.write_batch_wall_ms=Math.max(0,Date.now()-writeBatchStart);
+  stageMs.write_entry_sum_ms=entryDurations.reduce((sum,value)=>sum+value,0);
+  stageMs.write_entry_max_ms=entryDurations.length?Math.max(...entryDurations):0;
   const verifyStart=Date.now(),verified=await qaAcceptanceRunPersistenceSnapshot(env,user,run,contract,requestContext,{fresh:true});mark("post_write_verification_ms",verifyStart);
   if(!verified.ok||verified.persisted_count!==scenarios.length||verified.missing_count!==0)return json({success:false,error_code:"QA_UPLOAD_PERSISTENCE_MISMATCH",...base,write_attempted:true,no_write:false,new_write_count:writeResults.filter(row=>row.new_write).length,already_persisted_count:verified.persisted_count,remaining_count:verified.missing_count,conflicting_entry_count:verified.conflicting_count},409);
   const sessionIds=scenarios.map(row=>String(row.session_id||"")),placeholders=sessionIds.map(()=>"?").join(","),finalizeStart=Date.now();
+  const completionWriteStartedAt=Date.now();
   await env.DB.prepare(`UPDATE sessions SET handover_status='COMPLETED' WHERE corpid=? AND id IN (${placeholders}) AND COALESCE(voided_at,'')=''`).bind(user.corpid,...sessionIds).run();
   requestContext.d1_write_count=Number(requestContext.d1_write_count||0)+1;
+  requestContext.d1_write_duration_ms=Number(requestContext.d1_write_duration_ms||0)+Math.max(0,Date.now()-completionWriteStartedAt);
   const finalized=await qaAcceptanceRunPersistenceSnapshot(env,user,run,contract,requestContext,{fresh:true});
   if(finalized.completed_session_count!==scenarios.length)return json({success:false,error_code:"QA_SESSION_FINALIZATION_MISMATCH",...base,write_attempted:true,no_write:false,new_write_count:writeResults.filter(row=>row.new_write).length,completed_session_count:finalized.completed_session_count},409);
-  const upload={formal_write_count:scenarios.length,anchor_count:scenarios.length,session_count:scenarios.length,session_status:"COMPLETED",entry_ids:scenarios.map(row=>String(row.entry_id||"")),resume_new_write_count:writeResults.filter(row=>row.new_write).length,recorded_at:empNow()};
-  const update=await env.DB.prepare("UPDATE qa_acceptance_runs SET status='UPLOAD_PASS',upload_json=?,updated_at=? WHERE qa_run_id=? AND corpid=? AND status='MANUAL_EMPLOYEE_ACCEPTED'").bind(JSON.stringify(upload),empNow(),run.qa_run_id,user.corpid).run();
-  requestContext.d1_write_count=Number(requestContext.d1_write_count||0)+1;mark("session_and_run_finalization_ms",finalizeStart);
+  mark("session_completion_and_verify_ms",finalizeStart);
+  const recordedAt=empNow(),upload={formal_write_count:scenarios.length,anchor_count:scenarios.length,session_count:scenarios.length,session_status:"COMPLETED",entry_ids:scenarios.map(row=>String(row.entry_id||"")),resume_new_write_count:writeResults.filter(row=>row.new_write).length,stage_duration_ms:{...stageMs},request_context_metrics:employeeEntryAggregateRequestMetrics(requestContext),pre_receipt_server_ms:Math.max(0,Date.now()-startedAt),recorded_at:recordedAt};
+  const receiptWriteStart=Date.now(),update=await env.DB.prepare("UPDATE qa_acceptance_runs SET status='UPLOAD_PASS',upload_json=?,updated_at=? WHERE qa_run_id=? AND corpid=? AND status='MANUAL_EMPLOYEE_ACCEPTED'").bind(JSON.stringify(upload),recordedAt,run.qa_run_id,user.corpid).run();
+  requestContext.d1_write_count=Number(requestContext.d1_write_count||0)+1;requestContext.d1_write_duration_ms=Number(requestContext.d1_write_duration_ms||0)+Math.max(0,Date.now()-receiptWriteStart);mark("receipt_write_ms",receiptWriteStart);mark("session_and_run_finalization_ms",finalizeStart);
   const current=await qaAcceptanceReadRun(env,user,run.qa_run_id);
   if(Number(update?.meta?.changes??update?.changes??0)!==1&&String(current?.status||"")!=="UPLOAD_PASS")return json({success:false,error_code:"QA_RUN_STATE_CONFLICT",...base,write_attempted:true,no_write:false},409);
-  return success({ok:true,qa_run_id:run.qa_run_id,status:"UPLOAD_PASS",already_persisted_count:sessionPreflight.persisted_count,remaining_count:0,conflicting_entry_count:0,duplicate_entry_id_count:0,formal_write_count:scenarios.length,new_write_count:writeResults.filter(row=>row.new_write).length,write_attempted:writeResults.some(row=>row.new_write),no_write:!writeResults.some(row=>row.new_write),idempotent:!writeResults.some(row=>row.new_write),completed_session_count:finalized.completed_session_count,ttlock_external_calls:Number(requestContext.ttlock_external_call_count||0),request_context_metrics:employeeEntryAggregateRequestMetrics(requestContext),stage_duration_ms:stageMs,total_duration_ms:Date.now()-startedAt});
+  return success({ok:true,qa_run_id:run.qa_run_id,status:"UPLOAD_PASS",already_persisted_count:sessionPreflight.persisted_count,remaining_count:0,conflicting_entry_count:0,duplicate_entry_id_count:0,formal_write_count:scenarios.length,new_write_count:writeResults.filter(row=>row.new_write).length,write_attempted:writeResults.some(row=>row.new_write),no_write:!writeResults.some(row=>row.new_write),idempotent:!writeResults.some(row=>row.new_write),completed_session_count:finalized.completed_session_count,ttlock_external_calls:Number(requestContext.ttlock_external_call_count||0),upload_receipt:upload,request_context_metrics:employeeEntryAggregateRequestMetrics(requestContext),stage_duration_ms:stageMs,total_duration_ms:Date.now()-startedAt});
 }
 __name(qaAcceptanceSessionResume,"qaAcceptanceSessionResume");
 function qaAcceptanceFinanceComparable(projection={}){

@@ -112,3 +112,42 @@ test("Complete Upload bypasses aggregate validation while missing-record Resume 
   assert.ok(resumeCall > aggregateCall);
   assert.match(upload, /employeeQaAcceptanceFinalizeOnlyReady\(uploadList\.length\)/);
 });
+
+test("QA upload performance evidence separates validation, inter-request wait, write, and receipt timing", () => {
+  const stored = new Map();
+  const sandbox = {
+    Date,
+    JSON,
+    Math,
+    Number,
+    String,
+    state: { qaAcceptance: { runId: "QA-20260717-PERFORMANCE" } },
+    performance: { now: () => 12_000 },
+    window: {},
+    sessionStorage: { setItem: (key, value) => stored.set(key, value) },
+    employeeStorageKey: key => `qa:${key}`,
+  };
+  vm.createContext(sandbox);
+  vm.runInContext(`${functionBlock(employee, "employeeQaStoreUploadPerformance")};this.store=employeeQaStoreUploadPerformance`, sandbox);
+  const result = sandbox.store({
+    total_duration_ms: 4_200,
+    client_timing: { client_prepare_ms: 35, http_duration_ms: 4_350, response_received_at: "2026-07-17T10:59:29.000Z" },
+  }, {
+    total_duration_ms: 19_500,
+    stage_duration_ms: { write_batch_wall_ms: 12_000, session_and_run_finalization_ms: 2_000, receipt_write_ms: 120 },
+    request_context_metrics: { d1_read_count: 8, d1_write_count: 126, d1_batch_count: 9 },
+    client_timing: { http_duration_ms: 19_680, response_parse_ms: 4, request_started_at: "2026-07-17T10:59:31.000Z" },
+  }, 1_000);
+  assert.equal(result.client_preparation_duration_ms, 35);
+  assert.equal(result.aggregate_validate_http_duration_ms, 4_350);
+  assert.equal(result.validate_server_duration_ms, 4_200);
+  assert.equal(result.validate_upload_inter_request_ms, 2_000);
+  assert.equal(result.upload_http_duration_ms, 19_680);
+  assert.equal(result.upload_server_duration_ms, 19_500);
+  assert.equal(result.upload_stage_duration_ms.receipt_write_ms, 120);
+  assert.equal(result.total_browser_observed_duration_ms, 11_000);
+  assert.equal(stored.get("qa:qa:lastUploadPerformance"), JSON.stringify(result));
+  const upload = functionBlock(employee, "commitSessionAndExport", true);
+  const performanceIndex = upload.indexOf("employeeQaStoreUploadPerformance(aggregatePreflight,resumed,uploadT0)");
+  assert.ok(performanceIndex >= 0 && performanceIndex < upload.indexOf("state.drafts=[]", performanceIndex));
+});
