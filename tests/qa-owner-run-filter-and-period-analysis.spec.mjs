@@ -252,7 +252,7 @@ test("Production cannot activate QA Run owner filtering", async () => {
 
 test("QA Owner Run HTML uses versioned no-store asset fetch without changing normal Owner caching", () => {
   const block = functionBlock(workerSource, "fetchStaticAsset");
-  assert.match(block, /String\(env\.APP_ENV \|\| ""\).*=== "qa"/s);
+  assert.match(block, /qaAcceptanceEnabled\(env\)/);
   assert.match(block, /requestUrl\.searchParams\.get\("qa_run_id"\)/);
   assert.match(block, /env\.CF_VERSION_METADATA\?\.id/);
   assert.match(block, /qa_asset_version=/);
