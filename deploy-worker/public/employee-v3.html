@@ -9413,7 +9413,12 @@ function employeeQaAcceptanceDeliveryContract(data={},runId=''){
     &&String(compatibility.current_artifact_sha256||'')===currentArtifact;
   if(!/^[a-f0-9]{64}$/i.test(artifact)||!/^[a-f0-9]{64}$/i.test(currentArtifact)||(!directArtifact&&!compatiblePredecessor))throw new Error('QA_ARTIFACT_MISMATCH');
   if(!workerVersion||!matrixVersion||!/^[a-f0-9]{64}$/i.test(payloadHash))throw new Error('QA_VALIDATION_CONTEXT_MISSING');
-  if(expected!==16||rawEntries.length!==expected||Number(data.scenario_count||0)!==16)throw new Error('QA_EMPLOYEE_COUNT_MISMATCH');
+  const runMode=String(data.mode||'').toLowerCase();
+  const scenarioCount=Number(data.scenario_count||0);
+  const countValid=runMode==='quick'
+    ?expected===16&&scenarioCount===16
+    :runMode==='full'&&expected>=35&&scenarioCount>=expected;
+  if(!countValid||rawEntries.length!==expected)throw new Error('QA_EMPLOYEE_COUNT_MISMATCH');
   if(ids.some(id=>!id.startsWith(`${runId}-E`))||new Set(ids).size!==ids.length)throw new Error('QA_ENTRY_ID_CONTRACT_INVALID');
   if(mappedSessionIds.some(id=>!id.startsWith(`${runId}-S`))||new Set(mappedSessionIds).size!==mappedSessionIds.length)throw new Error('QA_SESSION_ID_CONTRACT_INVALID');
   if(scenarioContractPresent&&(mappedScenarioIds.some(id=>!id)||new Set(mappedScenarioIds).size!==mappedScenarioIds.length))throw new Error('QA_SCENARIO_ID_CONTRACT_INVALID');

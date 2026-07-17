@@ -84,12 +84,18 @@ test("server delivery response is accepted only with active matching artifact ID
   const sessions = Object.fromEntries(entries.map((entry, index) => [entry.id, `${runId}-S${String(index + 1).padStart(2, "0")}`]));
   const oracle = Object.fromEntries(["cash_received","bank_received","total_received","total_expenses","net_funds","cash_net","bank_net","outstanding","arrears_opened","arrears_repaid","deposit_included","bed_transfer_fee","rent_income"].map(key => [key, 0]));
   const artifact = "a".repeat(64);
-  const valid = { qa_run_id: runId, status: "DRAFT_READY", cleanup_status: "NOT_RUN", delivery_contract: "SERVER_PERSISTED_QA_RUN_V1", artifact_sha256: artifact, current_artifact_sha256: artifact, artifact_compatibility: { ok: true, mode: "CURRENT_ARTIFACT", run_artifact_sha256: artifact, current_artifact_sha256: artifact }, qa_worker_version: "qa-worker-v2", matrix_version: "employee-qa-matrix-v2", payload_hash: "b".repeat(64), scenario_count: 16, employee_record_count: 16, server_record_count: 16, employee_review_status: "PENDING", upload_allowed: false, readonly: false, entries, session_ids_by_entry: sessions, expected_finance: oracle };
+  const valid = { qa_run_id: runId, mode: "quick", status: "DRAFT_READY", cleanup_status: "NOT_RUN", delivery_contract: "SERVER_PERSISTED_QA_RUN_V1", artifact_sha256: artifact, current_artifact_sha256: artifact, artifact_compatibility: { ok: true, mode: "CURRENT_ARTIFACT", run_artifact_sha256: artifact, current_artifact_sha256: artifact }, qa_worker_version: "qa-worker-v2", matrix_version: "employee-qa-matrix-v2", payload_hash: "b".repeat(64), scenario_count: 16, employee_record_count: 16, server_record_count: 16, employee_review_status: "PENDING", upload_allowed: false, readonly: false, entries, session_ids_by_entry: sessions, expected_finance: oracle };
   assert.equal(vm.runInContext("employeeQaAcceptanceDeliveryContract", context)(valid, runId).expected, 16);
   assert.throws(() => vm.runInContext("employeeQaAcceptanceDeliveryContract", context)({ ...valid, current_artifact_sha256: "b".repeat(64) }, runId), /QA_ARTIFACT_MISMATCH/);
   assert.throws(() => vm.runInContext("employeeQaAcceptanceDeliveryContract", context)({ ...valid, entries: [...entries.slice(0, 15), entries[0]] }, runId), /QA_ENTRY_ID_CONTRACT_INVALID/);
   assert.throws(() => vm.runInContext("employeeQaAcceptanceDeliveryContract", context)({ ...valid, expected_finance: {} }, runId), /QA_FINANCIAL_ORACLE_MISSING/);
   assert.throws(() => vm.runInContext("employeeQaAcceptanceDeliveryContract", context)({ ...valid, cleanup_status: "COMPLETED" }, runId), /QA_RUN_ALREADY_CLEANED/);
+
+  const fullEntries = Array.from({ length: 41 }, (_, index) => ({ id: `${runId}-E${String(index + 1).padStart(2, "0")}` }));
+  const fullSessions = Object.fromEntries(fullEntries.map((entry, index) => [entry.id, `${runId}-S${String(index + 1).padStart(2, "0")}`]));
+  const full = { ...valid, mode: "full", scenario_count: 46, employee_record_count: 41, server_record_count: 41, entries: fullEntries, session_ids_by_entry: fullSessions };
+  assert.equal(vm.runInContext("employeeQaAcceptanceDeliveryContract", context)(full, runId).expected, 41);
+  assert.throws(() => vm.runInContext("employeeQaAcceptanceDeliveryContract", context)({ ...full, scenario_count: 40 }, runId), /QA_EMPLOYEE_COUNT_MISMATCH/);
 });
 
 test("cross-browser loader always fetches server state and never falls back to personal draft or auto upload", async () => {
