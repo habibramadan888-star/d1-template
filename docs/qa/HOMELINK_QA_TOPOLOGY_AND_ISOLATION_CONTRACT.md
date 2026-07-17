@@ -26,7 +26,7 @@ The production version at contract creation is `84ee2023-f550-47e0-9e4f-3caa161a
 | Hostname | Dedicated `homelink-finance-qa` hostname reported after creation |
 | D1 binding | `DB` -> new `homelink-finance-qa` database; ID must differ from every Production and staging D1 ID |
 | KV binding | `RATE_LIMIT` -> new `HOMELINK_FINANCE_QA` namespace; ID must differ from every Production and staging KV ID |
-| APP_ENV | exactly `qa` |
+| APP_ENV | exactly `internal_beta`, matching the Production internal-beta runtime contract |
 | Company scope | exactly `HL-QA` |
 | Authentication scope | QA-only STAFF and OWNER/MANAGER identities; no copied Production auth rows or credentials |
 | TTLock scope | versioned, sanitized, frozen snapshot in QA KV; no TTLock/OAuth secrets and no live upstream access |
@@ -38,7 +38,7 @@ Remote IDs are intentionally not guessed in this pre-resource contract. They mus
 
 Every QA acceptance page, API, mutation, cleanup operation, and evidence read must independently verify all three boundaries:
 
-1. Environment: `APP_ENV === "qa"` and `QA_ACCEPTANCE_ENABLED === "true"`.
+1. Environment: `APP_ENV === "internal_beta"`, `QA_ACCEPTANCE_ENABLED === "true"`, and configured `CORPID === "HL-QA"`; Production has no QA acceptance flag and uses a different company scope.
 2. Hostname: the request hostname equals the configured dedicated QA hostname; localhost is allowed only for automated local tests.
 3. Bindings/company: authenticated `corpid === "HL-QA"`, configured `CORPID === "HL-QA"`, and runtime QA binding fingerprints match the committed QA binding contract.
 

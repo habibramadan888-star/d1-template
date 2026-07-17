@@ -52,9 +52,11 @@ test('authentication transport and local render failures retain the authenticate
   assert.match(action,/const errorCode=String\(r\.error_code\|\|''\)/);
   assert.doesNotMatch(action,/\(r\.error_code\|\|''\)\.includes/);
   assert.match(auth,/employee session check temporarily unavailable/);
+  assert.match(auth,/employeeFetchCurrentAuthUserWithRetry/);
+  assert.match(auth,/EMPLOYEE_AUTH_STATES\.TRANSIENT_ERROR/);
   assert.match(auth,/employee local workspace render failed; authentication retained/);
-  assert.match(auth,/if\(!me\)\{redirectToUnifiedLogin\('employee_session_required'\)/);
-  const fetchCatch=auth.slice(auth.indexOf('me=await fetchCurrentAuthUser'),auth.indexOf('if(!me)'));
+  assert.match(auth,/if\(!me\)\{[\s\S]*redirectToUnifiedLogin\('employee_session_required'\)/);
+  const fetchCatch=auth.slice(auth.indexOf('me=await employeeFetchCurrentAuthUserWithRetry'),auth.indexOf('if(!me)'));
   assert.doesNotMatch(fetchCatch,/redirectToUnifiedLogin/);
 });
 

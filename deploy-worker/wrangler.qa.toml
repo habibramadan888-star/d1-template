@@ -22,7 +22,7 @@ id = "4fba90660a0f4c02ad6e4114f179e929"
 [vars]
 APP_NAME = "Homelink Finance QA"
 APP_VERSION = "2.0.0"
-APP_ENV = "qa"
+APP_ENV = "internal_beta"
 CORPID = "HL-QA"
 QA_ACCEPTANCE_ENABLED = "true"
 QA_HOSTNAME = "homelink-finance-qa.habibramadan888.workers.dev"

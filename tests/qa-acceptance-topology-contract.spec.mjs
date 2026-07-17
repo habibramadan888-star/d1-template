@@ -13,7 +13,7 @@ test("QA topology contract pins distinct resource classes and triple gates", asy
   assert.match(contract, /homelink-finance-qa/);
   assert.match(contract, /homelink-finance-qa` database/);
   assert.match(contract, /HOMELINK_FINANCE_QA/);
-  assert.match(contract, /APP_ENV === "qa"/);
+  assert.match(contract, /APP_ENV === "internal_beta"/);
   assert.match(contract, /QA_ACCEPTANCE_ENABLED === "true"/);
   assert.match(contract, /corpid === "HL-QA"/);
   assert.match(contract, /request hostname equals the configured dedicated QA hostname/);

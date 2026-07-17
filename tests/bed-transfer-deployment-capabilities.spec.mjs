@@ -18,6 +18,7 @@ function functionBlock(source, name) {
 
 function capability(env = {}) {
   const code = [
+    functionBlock(worker, 'qaAcceptanceEnabled'),
     functionBlock(worker, 'ownerTodayTodoAcknowledgmentWriteEnabled'),
     functionBlock(worker, 'ownerBedTransferVoidWriteEnabled'),
     functionBlock(worker, 'bedTransferWriteApproved'),

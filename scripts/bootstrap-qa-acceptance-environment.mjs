@@ -75,7 +75,7 @@ export async function bootstrapQaAcceptanceEnvironment({ artifactDirectory } = {
     await kvPut("qa:environment-identity", { app_env: "qa", corpid: "HL-QA", d1_database_id: QA_D1_ID, kv_namespace_id: QA_KV_ID, binding_contract_sha256: BINDING_SHA }, temp);
     for (const mode of ["quick", "full", "recovery"]) await kvPut(`qa:matrix:${mode}:${QA_MATRIX_VERSION}`, qaAcceptanceMatrix(mode), temp);
     const now = Date.now();
-    await kvPut(`ttlock:snapshot:v2:qa:${accessSnapshotRuntimeHash("HL-QA")}`, { ...QA_TTLOCK_SNAPSHOT_V1, observed_at: new Date(now).toISOString(), loadedAt: new Date(now).toISOString(), expires_at: new Date(now + 365 * 86400000).toISOString() }, temp);
+    await kvPut(`ttlock:snapshot:v2:internal_beta:${accessSnapshotRuntimeHash("HL-QA")}`, { ...QA_TTLOCK_SNAPSHOT_V1, observed_at: new Date(now).toISOString(), loadedAt: new Date(now).toISOString(), expires_at: new Date(now + 365 * 86400000).toISOString() }, temp);
     if (artifactDirectory) {
       const manifest = JSON.parse(await readFile(path.join(artifactDirectory, "artifact-manifest.json"), "utf8"));
       await kvPut("qa:artifact-manifest", manifest, temp);

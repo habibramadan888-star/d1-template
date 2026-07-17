@@ -10,7 +10,7 @@ test("QA deployment config binds only the dedicated D1 and KV with exact gates",
   assert.match(qa, /name = "homelink-finance-qa"/);
   assert.match(qa, /database_id = "33c63b22-728d-45fe-a0cb-60b533f6055c"/);
   assert.match(qa, /id = "4fba90660a0f4c02ad6e4114f179e929"/);
-  assert.match(qa, /APP_ENV = "qa"/);
+  assert.match(qa, /APP_ENV = "internal_beta"/);
   assert.match(qa, /CORPID = "HL-QA"/);
   assert.match(qa, /QA_ACCEPTANCE_ENABLED = "true"/);
   assert.doesNotMatch(production, /33c63b22-728d-45fe-a0cb-60b533f6055c|4fba90660a0f4c02ad6e4114f179e929|QA_ACCEPTANCE_ENABLED/);

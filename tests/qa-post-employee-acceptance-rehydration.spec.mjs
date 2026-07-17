@@ -196,7 +196,7 @@ test("current identity redirects only on a real 401 and preserves role 403 as an
   ]);
   let selected = 200;
   const context = vm.createContext({ apiFetch: async () => responses.get(selected), unwrapStandardResponse: value => value, Error });
-  vm.runInContext(functionBlock(employee, "fetchCurrentAuthUser"), context);
+  vm.runInContext([functionBlock(employee, "employeeAuthError"), functionBlock(employee, "fetchCurrentAuthUser")].join("\n"), context);
   const current = vm.runInContext("fetchCurrentAuthUser", context);
   selected = 401;
   assert.equal(await current(), null);

@@ -9011,7 +9011,7 @@ function bedTransferDeploymentCapabilities(env={}){
     bed_transfer_owner_void_enabled:ownerBedTransferVoidWriteEnabled(env),
     controlled_beta_preview:String(env.APP_ENV||"").trim().toLowerCase()==="beta_preview",
     internal_beta:String(env.APP_ENV||"").trim().toLowerCase()==="internal_beta",
-    qa_acceptance:String(env.APP_ENV||"").trim().toLowerCase()==="qa"&&qaAcceptanceEnabled(env),
+    qa_acceptance:qaAcceptanceEnabled(env),
     canonical_write_path:"/api/employee/entry",
     production_cutover:"PRODUCTION_NO_GO",
     app_version:cleanText(env.APP_VERSION||"",40)
@@ -11892,7 +11892,7 @@ async function fetchStaticAsset(request, env, pathname) {
   if (!env.ASSETS) return null;
   const assetUrl = new URL(request.url);
   const requestUrl = new URL(request.url);
-  const qaOwnerRunAsset = String(env.APP_ENV || "").trim().toLowerCase() === "qa"
+  const qaOwnerRunAsset = qaAcceptanceEnabled(env)
     && (pathname === "/index-51" || pathname === "/index-51.html")
     && !!requestUrl.searchParams.get("qa_run_id");
   assetUrl.pathname = pathname;
@@ -11930,7 +11930,7 @@ function ownerBedTransferVoidControlResponse(request,env,claim){
 }
 __name(ownerBedTransferVoidControlResponse,"ownerBedTransferVoidControlResponse");
 function qaAcceptanceEnabled(env={}){
-  return String(env.APP_ENV||"").trim().toLowerCase()==="qa"
+  return ["qa","internal_beta"].includes(String(env.APP_ENV||"").trim().toLowerCase())
     && String(env.QA_ACCEPTANCE_ENABLED||"").trim().toLowerCase()==="true"
     && String(env.CORPID||"").trim()==="HL-QA";
 }
@@ -12144,7 +12144,7 @@ async function qaAcceptanceVerifyEntryScopes(run={},contract={},requests=[],user
 __name(qaAcceptanceVerifyEntryScopes,"qaAcceptanceVerifyEntryScopes");
 const QA_SESSION_RESUME_INTERNAL=Symbol("qa_session_resume_internal");
 async function qaAcceptanceEmployeeFormalWriteGate(env,user,body={},options={}){
-  if(!qaAcceptanceEnabled(env)||String(env.APP_ENV||"").trim().toLowerCase()!=="qa")return null;
+  if(!qaAcceptanceEnabled(env))return null;
   if(options.internal_token===QA_SESSION_RESUME_INTERNAL)return null;
   if(String(user?.corpid||"")!=="HL-QA"||!isStaffRoleValue(user?.role))return json({success:false,error_code:"QA_STAFF_REQUIRED",no_write:true,write_attempted:false},403);
   const runId=qaAcceptanceRunIdFromEmployeeWriteBody(body);

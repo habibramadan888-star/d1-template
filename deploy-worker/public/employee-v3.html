@@ -2912,6 +2912,11 @@ label .label-en{
     grid-template-columns:1fr 1fr;
   }
 }
+.employee-auth-state{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:8px auto;padding:10px 14px;max-width:1180px;border:1px solid #cbd5e1;border-radius:12px;background:#f8fafc;color:#334155;font-weight:800}
+.employee-auth-state[hidden]{display:none}
+.employee-auth-state[data-auth-state="AUTH_TRANSIENT_ERROR"]{border-color:#f59e0b;background:#fffbeb;color:#92400e}
+.employee-auth-state .btn{min-height:36px;white-space:nowrap}
+.employee-auth-restoring{opacity:.72}
 </style>
 </head>
 <body class="hl-page employee-ui">
@@ -2935,14 +2940,14 @@ label .label-en{
       <div class="operator" hidden><input id="operatorId" placeholder="未登录" readonly aria-label="员工姓名"></div>
       <div class="employee-user" id="employeeUser">
         <div class="employee-identity-card" id="employeeIdentityCard" data-employee-identity-display="true">
-          <span id="employeeIdentityName">Not signed in</span><span class="label-en">STAFF / 员工</span>
+          <span id="employeeIdentityName">Restoring session</span><span class="label-en">正在恢复登录</span>
         </div>
         <button class="employee-logout" id="btnEmployeeLogoutTop" type="button">Logout<span class="label-en">退出</span></button>
         <button class="employee-user-button" id="employeeUserButton" type="button" aria-haspopup="menu" aria-expanded="false">
-          <span id="employeeUserName">未登录</span><span class="label-en">ACCOUNT</span>
+          <span id="employeeUserName">Restoring session</span><span class="label-en">正在恢复登录</span>
         </button>
         <div class="employee-user-menu" id="employeeUserMenu" hidden>
-          <div class="employee-user-meta" id="employeeUserMeta">未登录</div>
+          <div class="employee-user-meta" id="employeeUserMeta">Restoring session / 正在恢复登录</div>
           <button class="employee-logout" id="btnEmployeeLogout" type="button"><span class="employee-btn-main">Logout</span><span class="label-en">退出登录</span></button>
         </div>
       </div>
@@ -2954,7 +2959,8 @@ label .label-en{
     <button class="tab" data-view="system"><span class="en">System</span><span class="tab-cn">系统</span></button>
   </div>
 </div>
-<div class="employee-workspace-switch" role="tablist" aria-label="Employee workspace"><button type="button" class="active" data-employee-workspace="entry">录入事项 <small>Add Entry</small></button><button type="button" data-employee-workspace="session">本票记录 <small id="workspaceSessionCount">Current Session (0)</small></button><button type="button" class="employee-session-status-bar" id="employeeSessionStatusBar" aria-label="Records 0, Cash Net AED 0.00, Bank Received AED 0.00"><span class="employee-session-status-item"><span class="employee-session-status-label">Records</span><strong>0</strong></span><span class="employee-session-status-item"><span class="employee-session-status-label">Cash Net</span><strong>AED 0.00</strong></span><span class="employee-session-status-item"><span class="employee-session-status-label">Bank Received</span><strong>AED 0.00</strong></span></button></div>
+<div class="employee-auth-state" id="employeeAuthState" data-auth-state="AUTH_REHYDRATING" role="status" aria-live="polite"><span id="employeeAuthStateMessage">Restoring session / 正在恢复登录</span><button class="btn" id="btnRetryEmployeeSession" type="button" hidden>Retry Session / 重试登录恢复</button></div>
+<div class="employee-workspace-switch employee-auth-restoring" role="tablist" aria-label="Employee workspace"><button type="button" class="active" data-employee-workspace="entry">录入事项 <small>Add Entry</small></button><button type="button" data-employee-workspace="session">本票记录 <small id="workspaceSessionCount">Restoring session</small></button><button type="button" class="employee-session-status-bar" id="employeeSessionStatusBar" aria-label="Restoring session"><span class="employee-session-status-item" style="grid-column:1/-1"><span class="employee-session-status-label">Current Session</span><strong>Restoring session</strong></span></button></div>
 <main class="wrap">
   <section id="view-entry">
     <div class="card employee-session-card" id="employeeSessionSummaryCard">
@@ -3139,7 +3145,7 @@ label .label-en{
     </div>
     <div class="card employee-session-card" id="employeeSessionRecordsCard">
       <div class="head">
-        <div><div class="title">本次会话</div><div class="small" id="sessionMeta">0 条记录</div></div>
+        <div><div class="title">本次会话</div><div class="small" id="sessionMeta">Restoring session / 正在恢复登录</div></div>
         <div class="employee-session-actions" style="flex:0 0 auto"><div class="employee-session-actions-primary"><button class="btn" id="btnPreviewSession"><span class="employee-btn-main">Preview &amp; Copy</span><span class="label-en">预览并复制</span></button><button class="btn" id="btnValidateSession"><span class="employee-btn-main">Validate Session</span><span class="label-en">仅预校验</span></button><button class="btn primary" id="btnExportSession"><span class="employee-btn-main">Upload Session</span><span class="label-en">确认本票并上传云端</span></button></div><button class="btn employee-new-session-action" id="btnNewSessionTop"><span class="employee-btn-main">New Session</span><span class="label-en">新会话</span></button></div>
       </div>
       <div class="body"><div class="preview-list" id="sessionPreview"></div></div>
@@ -3240,7 +3246,7 @@ function readSessionId(userid){
   try{return localStorage.getItem(employeeStorageKey('empv3:sessionId',userid))||''}
   catch{return ''}
 }
-const state={lockCards:[],current:null,depositBalance:null,depositContext:null,rentConfig:{},rentConfigLoaded:false,drafts:[],tasks:[],closedTasks:[],arrearsTasksLoaded:false,arrearTasksError:null,arrearsGatewaySource:'',arrearsGatewayProof:null,employeeDirectives:[],followupItems:[],systemReminderItems:[],systemReminderStatus:'idle',systemReminderSummary:null,systemReminderSources:null,systemReminderLimit:100,sessionId:'',user:null,aggregateValidationSessionError:null,aggregateValidationOnly:false,ttlockStatus:'idle',ttlockLoadedAt:0,ttlockError:'',ttlockDataSource:'',qaAcceptance:{runId:'',status:'',mode:'',artifactSha:'',workerVersion:'',matrixVersion:'',payloadHash:'',sessionIdsByEntry:{},scenarioIdsByEntry:{},validationAttestation:null,validationAttemptId:'',staleReason:'',loadStatus:'',personalDraftCount:0,alreadyPersistedCount:0,remainingCount:0,conflictingEntryCount:0,duplicateEntryIdCount:0,resumeRequired:false},bedTransferCapabilities:{status:'idle',bed_transfer_validate_enabled:false,bed_transfer_write_enabled:false,owner_waiver_ack_enabled:false,controlled_beta_preview:false,canonical_write_path:'/api/employee/entry',production_cutover:'PRODUCTION_NO_GO'},bedTransferContext:{status:'idle',source:null,target:null,requestKey:'',serverValidation:null,validatedRecord:null,recordedResult:null}};
+const state={lockCards:[],current:null,depositBalance:null,depositContext:null,rentConfig:{},rentConfigLoaded:false,drafts:[],tasks:[],closedTasks:[],arrearsTasksLoaded:false,arrearTasksError:null,arrearsGatewaySource:'',arrearsGatewayProof:null,employeeDirectives:[],followupItems:[],systemReminderItems:[],systemReminderStatus:'idle',systemReminderSummary:null,systemReminderSources:null,systemReminderLimit:100,sessionId:'',user:null,authState:{status:'AUTH_REHYDRATING',attempt:0,lastError:'',confirmedUserId:''},aggregateValidationSessionError:null,aggregateValidationOnly:false,ttlockStatus:'idle',ttlockLoadedAt:0,ttlockError:'',ttlockDataSource:'',qaAcceptance:{runId:'',status:'',mode:'',artifactSha:'',workerVersion:'',matrixVersion:'',payloadHash:'',sessionIdsByEntry:{},scenarioIdsByEntry:{},validationAttestation:null,validationAttemptId:'',staleReason:'',loadStatus:'',personalDraftCount:0,alreadyPersistedCount:0,remainingCount:0,conflictingEntryCount:0,duplicateEntryIdCount:0,resumeRequired:false},bedTransferCapabilities:{status:'idle',bed_transfer_validate_enabled:false,bed_transfer_write_enabled:false,owner_waiver_ack_enabled:false,controlled_beta_preview:false,canonical_write_path:'/api/employee/entry',production_cutover:'PRODUCTION_NO_GO'},bedTransferContext:{status:'idle',source:null,target:null,requestKey:'',serverValidation:null,validatedRecord:null,recordedResult:null}};
 const BED_TRANSFER_WRITE_ENABLED=false;
 const BED_TRANSFER_EVENT_LEDGER_MESSAGE='Bed transfer records save event anchors only. This does not directly change bed occupancy, deposit, arrears, or Access Card. 换床记录只保存信息锚点，不会直接改变床位、押金、欠款或门禁卡。';
 const BED_TRANSFER_SUBMITTED_MESSAGE='Bed transfer recorded / 换床记录已保存';
@@ -3283,12 +3289,96 @@ function isEmployeeAuthRole(r){return ['staff','employee'].includes(normalizeAut
 function isOwnerAuthRole(r){return ['manager','owner','admin'].includes(normalizeAuthRole(r))}
 const UNIFIED_LOGIN_DESTINATION='/';
 function unwrapStandardResponse(body){return body&&body.code===0&&body.data?body.data:body}
-async function fetchCurrentAuthUser(){
-  const r=await apiFetch('/api/me',{method:'GET'});
-  if(r.status===401)return null;
-  if(r.status===403)throw new Error('me_role_forbidden_403');
-  if(!r.ok)throw new Error('me_failed_'+r.status);
-  return unwrapStandardResponse(await r.json());
+const EMPLOYEE_AUTH_STATES=Object.freeze({REHYDRATING:'AUTH_REHYDRATING',AUTHENTICATED:'AUTHENTICATED',REQUIRED:'AUTH_REQUIRED',TRANSIENT_ERROR:'AUTH_TRANSIENT_ERROR'});
+const EMPLOYEE_AUTH_RETRY_DELAYS_MS=Object.freeze([0,250,750]);
+let employeeAuthCheckPromise=null;
+function employeeAuthError(code,status=0,cause=null){
+  const error=new Error(String(code||'employee_auth_error'));
+  error.code=String(code||'employee_auth_error');
+  error.status=Number(status||0);
+  if(cause)error.cause=cause;
+  return error;
+}
+async function fetchCurrentAuthUser({timeoutMs=6000}={}){
+  const controller=typeof AbortController==='function'?new AbortController():null;
+  const timer=controller&&Number(timeoutMs)>0?setTimeout(()=>controller.abort(),Number(timeoutMs)):null;
+  try{
+    const r=await apiFetch('/api/me',{method:'GET',...(controller?{signal:controller.signal}:{})});
+    if(r.status===401)return null;
+    if(r.status===403)throw employeeAuthError('me_role_forbidden_403',403);
+    if(!r.ok)throw employeeAuthError('me_failed_'+r.status,r.status);
+    let body=null;
+    try{body=await r.json()}catch(error){throw employeeAuthError('me_non_json_response',r.status,error)}
+    if(!body||typeof body!=='object')throw employeeAuthError('me_invalid_response',r.status);
+    return unwrapStandardResponse(body);
+  }catch(error){
+    if(error?.name==='AbortError'||controller?.signal?.aborted)throw employeeAuthError('me_timeout',0,error);
+    throw error;
+  }finally{if(timer)clearTimeout(timer)}
+}
+function employeeAuthErrorIsTransient(error){
+  const status=Number(error?.status||0);
+  return status===0||status===408||status===429||status>=500;
+}
+function employeeAuthDelay(ms){return Number(ms)>0?new Promise(resolve=>setTimeout(resolve,Number(ms))):Promise.resolve()}
+async function employeeFetchCurrentAuthUserWithRetry({attempts=3,delays=EMPLOYEE_AUTH_RETRY_DELAYS_MS,fetcher=fetchCurrentAuthUser,waiter=employeeAuthDelay}={}){
+  const maxAttempts=Math.max(1,Math.min(3,Number(attempts)||3));
+  let lastError=null;
+  for(let index=0;index<maxAttempts;index+=1){
+    if(index>0)await waiter(Number(delays?.[index]??delays?.at?.(-1)??0));
+    state.authState={...state.authState,attempt:index+1};
+    try{return await fetcher()}
+    catch(error){
+      lastError=error;
+      if(!employeeAuthErrorIsTransient(error)||index===maxAttempts-1)throw error;
+    }
+  }
+  throw lastError||employeeAuthError('me_unavailable');
+}
+function employeeSetAuthInteractionLocked(locked){
+  document.querySelectorAll('#view-entry button,#view-entry input,#view-entry select,#view-entry textarea').forEach(control=>{
+    if(locked){
+      if(!Object.prototype.hasOwnProperty.call(control.dataset,'authLockPrevious'))control.dataset.authLockPrevious=control.disabled?'1':'0';
+      control.disabled=true;
+      control.setAttribute('aria-disabled','true');
+      return;
+    }
+    if(!Object.prototype.hasOwnProperty.call(control.dataset,'authLockPrevious'))return;
+    control.disabled=control.dataset.authLockPrevious==='1';
+    if(control.disabled)control.setAttribute('aria-disabled','true');else control.removeAttribute('aria-disabled');
+    delete control.dataset.authLockPrevious;
+  });
+}
+function employeeRenderAuthWorkspacePlaceholder(status=EMPLOYEE_AUTH_STATES.REHYDRATING){
+  if(state.user?.userid)return;
+  const failed=status===EMPLOYEE_AUTH_STATES.TRANSIENT_ERROR;
+  const label=failed?'Session restore unavailable':'Restoring session';
+  if($('employeeIdentityName'))$('employeeIdentityName').textContent=label;
+  if($('employeeUserName'))$('employeeUserName').textContent=label;
+  if($('employeeUserMeta'))$('employeeUserMeta').textContent=failed?'Retry session restoration / 请重试登录恢复':'Restoring session / 正在恢复登录';
+  if($('workspaceSessionCount'))$('workspaceSessionCount').textContent=label;
+  if($('employeeSessionStatusBar')){
+    $('employeeSessionStatusBar').setAttribute('aria-label',label);
+    $('employeeSessionStatusBar').innerHTML=`<span class="employee-session-status-item" style="grid-column:1/-1"><span class="employee-session-status-label">Current Session</span><strong>${esc(label)}</strong></span>`;
+  }
+  if($('sessionClock'))$('sessionClock').textContent=label.toUpperCase();
+  if($('sessionMeta'))$('sessionMeta').textContent=failed?'Session restore unavailable / 登录恢复暂不可用':'Restoring session / 正在恢复登录';
+  if($('sessionKpis'))$('sessionKpis').innerHTML=`<div class="context-note" style="grid-column:1/-1;margin:0">${esc(failed?'Session data is preserved. Retry session restoration.':'Waiting for verified employee identity before loading local records.')}</div>`;
+  if($('sessionPreview'))$('sessionPreview').innerHTML=`<div class="preview-empty"><div><b>${esc(label)}</b><br><span>${esc(failed?'Local records were not cleared.':'Local records will load only after identity is verified.')}</span></div></div>`;
+}
+function setEmployeeAuthState(status,{message='',attempt=0,errorCode=''}={}){
+  const allowed=new Set(Object.values(EMPLOYEE_AUTH_STATES));
+  const next=allowed.has(status)?status:EMPLOYEE_AUTH_STATES.TRANSIENT_ERROR;
+  state.authState={status:next,attempt:Number(attempt||state.authState?.attempt||0),lastError:String(errorCode||''),confirmedUserId:next===EMPLOYEE_AUTH_STATES.AUTHENTICATED?String(state.user?.userid||''):String(state.authState?.confirmedUserId||'')};
+  document.body?.setAttribute('data-employee-auth-state',next);
+  const banner=$('employeeAuthState'),retry=$('btnRetryEmployeeSession'),text=$('employeeAuthStateMessage');
+  if(banner){banner.dataset.authState=next;banner.hidden=next===EMPLOYEE_AUTH_STATES.AUTHENTICATED;}
+  if(retry)retry.hidden=next!==EMPLOYEE_AUTH_STATES.TRANSIENT_ERROR;
+  if(text)text.textContent=message||(next===EMPLOYEE_AUTH_STATES.REHYDRATING?'Restoring session / 正在恢复登录':next===EMPLOYEE_AUTH_STATES.TRANSIENT_ERROR?'Session restore temporarily unavailable / 登录恢复暂不可用':next===EMPLOYEE_AUTH_STATES.REQUIRED?'Sign in required / 需要登录':'Session restored / 登录已恢复');
+  document.querySelector('.employee-workspace-switch')?.classList.toggle('employee-auth-restoring',next!==EMPLOYEE_AUTH_STATES.AUTHENTICATED);
+  employeeSetAuthInteractionLocked(next!==EMPLOYEE_AUTH_STATES.AUTHENTICATED);
+  if(next!==EMPLOYEE_AUTH_STATES.AUTHENTICATED)employeeRenderAuthWorkspacePlaceholder(next);
+  return state.authState;
 }
 function employeeBedTransferWriteEnabled(){
   return state.bedTransferCapabilities?.status==='success'&&state.bedTransferCapabilities?.bed_transfer_write_enabled===true;
@@ -5429,6 +5519,11 @@ updateEntrySessionActionState=function(){
   }
 };
 function refreshSessionViews(){
+  if(!state.user?.userid&&state.authState?.status!==EMPLOYEE_AUTH_STATES.AUTHENTICATED){
+    employeeRenderAuthWorkspacePlaceholder(state.authState?.status||EMPLOYEE_AUTH_STATES.REHYDRATING);
+    employeeSetAuthInteractionLocked(true);
+    return;
+  }
   renderSessionKpis();
   renderSessionPreview();
   updateEntrySessionActionState();
@@ -9252,45 +9347,67 @@ function renderContext(){
   box.className='ctx clean-context';
   box.innerHTML=employeeEvidenceShell('Verify System Context','系统核对信息',body);
 }
-async function checkEmployeeSession(){
-  try{
-    const cached=JSON.parse(localStorage.getItem('empv3:user')||'null');
-    const last=localStorage.getItem('empv3:lastEmployeeId')||cached?.userid||localStorage.getItem('empv3:operator')||'';
-    if(last)$('loginEmployeeId').value=last;
-    localStorage.removeItem('empv3:user');
-  }catch{}
-  $('loginOverlay').classList.add('hidden');
-  $('loginOverlay').setAttribute('aria-hidden','true');
-  let me=null;
-  try{
-    me=await fetchCurrentAuthUser();
-  }catch(e){
-    console.warn('[UnifiedLogin] employee session check temporarily unavailable:',e);
-    showStatus('Session check temporarily unavailable. Your login and local records were kept.','warn');
-    return;
-  }
-  if(!me){redirectToUnifiedLogin('employee_session_required');return}
-  if(isEmployeeAuthRole(me.role)){
+async function checkEmployeeSession(options){
+  options=options||{};
+  const force=options?.force===true;
+  if(employeeAuthCheckPromise)return employeeAuthCheckPromise;
+  const run=async()=>{
+    setEmployeeAuthState(EMPLOYEE_AUTH_STATES.REHYDRATING,{message:force?'Retrying session restoration / 正在重试登录恢复':'Restoring session / 正在恢复登录'});
     try{
-      applyEmployeeUser({
-        userid:me.userid,
-        employee_name:me.employee_name||me.name||me.username||me.userid,
-        display_name:me.display_name||me.displayName||me.name||me.username||me.employee_name||me.employee_id||me.userid,
-        username:me.username,
-        employee_id:me.employee_id||me.userid,
-        login_id:me.login_id,
-        role:me.role
-      });
-      await employeeLoadQaAcceptanceRun();
-      $('loginPin').value='';
+      const cached=JSON.parse(localStorage.getItem('empv3:user')||'null');
+      const last=localStorage.getItem('empv3:lastEmployeeId')||cached?.userid||localStorage.getItem('empv3:operator')||'';
+      if(last)$('loginEmployeeId').value=last;
+      localStorage.removeItem('empv3:user');
+    }catch{}
+    $('loginOverlay').classList.add('hidden');
+    $('loginOverlay').setAttribute('aria-hidden','true');
+    let me=null;
+    try{
+      me=await employeeFetchCurrentAuthUserWithRetry();
     }catch(e){
-      console.error('[UnifiedLogin] employee local workspace render failed; authentication retained:',e);
-      showStatus('Local workspace could not render. Login and saved records were retained.','bad');
+      console.warn('[UnifiedLogin] employee session check temporarily unavailable:',e);
+      setEmployeeAuthState(EMPLOYEE_AUTH_STATES.TRANSIENT_ERROR,{message:'Session restore temporarily unavailable. Local records were kept. / 登录恢复暂不可用，本地记录已保留。',attempt:state.authState?.attempt||3,errorCode:e?.code||e?.message||'me_unavailable'});
+      showStatus('Session check temporarily unavailable. Your login and local records were kept.','warn');
+      return {status:EMPLOYEE_AUTH_STATES.TRANSIENT_ERROR,error_code:String(e?.code||e?.message||'me_unavailable')};
     }
-    return;
-  }
-  if(isOwnerAuthRole(me.role)){location.replace('/owner');return}
-  redirectToUnifiedLogin('employee_role_denied');
+    if(!me){
+      setEmployeeAuthState(EMPLOYEE_AUTH_STATES.REQUIRED,{message:'Sign in required / 需要登录'});
+      redirectToUnifiedLogin('employee_session_required');
+      return {status:EMPLOYEE_AUTH_STATES.REQUIRED};
+    }
+    if(isEmployeeAuthRole(me.role)){
+      try{
+        applyEmployeeUser({
+          userid:me.userid,
+          employee_name:me.employee_name||me.name||me.username||me.userid,
+          display_name:me.display_name||me.displayName||me.name||me.username||me.employee_name||me.employee_id||me.userid,
+          username:me.username,
+          employee_id:me.employee_id||me.userid,
+          login_id:me.login_id,
+          corpid:me.corpid||me.company_id||'',
+          company:me.company||me.company_name||'',
+          role:me.role
+        });
+        await employeeLoadQaAcceptanceRun();
+        setEmployeeAuthState(EMPLOYEE_AUTH_STATES.AUTHENTICATED,{attempt:state.authState?.attempt||1});
+        refreshSessionViews();
+        $('loginPin').value='';
+      }catch(e){
+        console.error('[UnifiedLogin] employee local workspace render failed; authentication retained:',e);
+        setEmployeeAuthState(EMPLOYEE_AUTH_STATES.TRANSIENT_ERROR,{message:'Local workspace could not render. Login and saved records were retained. / 本地工作区暂不可用，登录和记录已保留。',errorCode:e?.code||e?.message||'workspace_render_failed'});
+        showStatus('Local workspace could not render. Login and saved records were retained.','bad');
+        return {status:EMPLOYEE_AUTH_STATES.TRANSIENT_ERROR,error_code:String(e?.code||e?.message||'workspace_render_failed')};
+      }
+      return {status:EMPLOYEE_AUTH_STATES.AUTHENTICATED,userid:String(me.userid||'')};
+    }
+    if(isOwnerAuthRole(me.role)){location.replace('/owner');return {status:'ROLE_REDIRECT'}}
+    setEmployeeAuthState(EMPLOYEE_AUTH_STATES.REQUIRED,{message:'Employee role required / 需要员工身份'});
+    redirectToUnifiedLogin('employee_role_denied');
+    return {status:EMPLOYEE_AUTH_STATES.REQUIRED,error_code:'employee_role_denied'};
+  };
+  const pending=run().finally(()=>{if(employeeAuthCheckPromise===pending)employeeAuthCheckPromise=null});
+  employeeAuthCheckPromise=pending;
+  return pending;
 }
 function employeeQaAcceptanceRequestedRunId(){
   const value=new URLSearchParams(location.search).get('qa_run_id')||'';
@@ -10533,6 +10650,10 @@ function employeeSetWorkspace(mode='entry'){
   document.querySelectorAll('[data-employee-workspace]').forEach(btn=>btn.classList.toggle('active',btn.dataset.employeeWorkspace===(session?'session':'entry')));
 }
 function employeeRefreshWorkspaceStatus(){
+  if(!state.user?.userid&&state.authState?.status!==EMPLOYEE_AUTH_STATES.AUTHENTICATED){
+    employeeRenderAuthWorkspacePlaceholder(state.authState?.status||EMPLOYEE_AUTH_STATES.REHYDRATING);
+    return;
+  }
   const summary=calculateEmployeeSessionSummary(state.drafts);
   const count=summary.rows.length;
   const statusBar=$('employeeSessionStatusBar');
@@ -10674,6 +10795,7 @@ const employeeWorkspaceRefreshLegacy=refreshSessionViews;
 refreshSessionViews=function(){employeeWorkspaceRefreshLegacy();employeeRefreshWorkspaceStatus();};
 document.querySelectorAll('[data-employee-workspace]').forEach(btn=>btn.onclick=()=>employeeSetWorkspace(btn.dataset.employeeWorkspace));
 $('employeeSessionStatusBar').onclick=()=>employeeSetWorkspace('session');
+$('btnRetryEmployeeSession').onclick=()=>checkEmployeeSession({force:true});
 $('validationBox').dataset.pristine='true';
 $('btnSaveEntry').addEventListener('click',()=>{$('validationBox').dataset.pristine='false';},{capture:true});
 $('btnValidateSession').onclick=()=>{state.aggregateValidationOnly=true;commitSessionAndExport()};
@@ -10683,7 +10805,7 @@ employeeAssociateEntryFieldLabels();
 employeeUpdateCollapsedStepSummaries();
 renderEntryTtlockStatus();
 updateEntrySessionActionState();
-renderContext();syncForm();refreshSessionViews();
+renderContext();syncForm();setEmployeeAuthState(EMPLOYEE_AUTH_STATES.REHYDRATING,{message:'Restoring session / 正在恢复登录'});
 checkEmployeeSession();
 loadRentConfig();
 </script>
