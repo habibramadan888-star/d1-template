@@ -23,6 +23,7 @@ function functionBlock(source, name, last = false) {
 function transportSandbox(apiFetch) {
   const sandbox = {
     Blob,
+    performance,
     apiFetch,
     employeeDiagnosticAssetMeta: () => ({ asset: "fixture" }),
     unwrapStandardResponse: body => body?.code === 0 && body?.data ? body.data : body
