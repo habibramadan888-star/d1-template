@@ -8756,7 +8756,19 @@ async function commitSessionAndExport(){
   refreshSessionViews();
   buildExport();
   uploadTiming.payload_build_ms=Math.round(performance.now()-payloadStart);
-  if(employeeQaAcceptanceFinalizeOnlyReady(uploadList.length)){
+  if(state.qaAcceptance?.runId&&state.qaAcceptance?.uploadAttemptId&&!validateOnly){
+    try{
+      setUploadPhase(`Continuing durable upload`,'Uploading');
+      const completed=await employeeQaDurableUpload(uploadList,null);
+      oldLabels.forEach(([b])=>{b.dataset.busy='0';b.disabled=false;b.classList.remove('disabled')});
+      state.drafts=[];state.sessionId='';state.uploadValidationFailedIndex=null;state.uploadValidationFailedEntryId='';state.uploadValidationFailedMessage='';employeeRemoveActiveDraftStorage({drafts:true,session:true});state.lastSavedBedTransferDraftId=null;
+      buildExport();refreshSessionViews();renderContext();if($('validationBox'))$('validationBox').innerHTML='';showStatus(`Upload completed. ${Number(completed.saved_count||uploadList.length)}/${uploadList.length} safely saved with one receipt.`,'ok');toast('Upload completed. Continue with Owner review.',6000);updateEntrySessionActionState();return;
+    }catch(error){
+      const result=error?.attemptResult&&typeof error.attemptResult==='object'?error.attemptResult:{};employeeQaAttemptAdoptProgress(result);state.drafts=allOriginalDrafts;state.sessionId=originalSessionId;saveDrafts();buildExport();refreshSessionViews();oldLabels.forEach(([b,html])=>{b.dataset.busy='0';b.disabled=false;b.classList.remove('disabled');b.innerHTML=html});
+      const saved=Number(state.qaAcceptance?.alreadyPersistedCount||0),summary=`Upload paused. ${saved}/${uploadList.length} safely saved.`;showStatus(summary,'warn');if($('validationBox'))$('validationBox').innerHTML=`<div class="upload-validation-panel" role="alert"><div class="uv-title">${esc(summary)}</div><div class="uv-sub">Continue the same durable attempt. Validation will not be repeated.</div></div>`;updateEntrySessionActionState();return;
+    }
+  }
+  if(employeeQaAcceptanceFinalizeOnlyReady(uploadList.length)&&!state.qaAcceptance?.runId){
     try{
       setUploadPhase(`All ${uploadList.length} records are saved. Completing the upload.`,'Complete Upload');
       const finalized=await employeeQaAcceptanceSessionResume({},uploadList,{finalizationOnly:true});
@@ -8934,8 +8946,8 @@ async function commitSessionAndExport(){
   }
   if(state.qaAcceptance?.runId){
     try{
-      setUploadPhase(`Resuming ${state.qaAcceptance.remainingCount} remaining records`,'Resume Upload');
-      const resumed=await employeeQaAcceptanceSessionResume(aggregatePreflight,uploadList);
+      setUploadPhase(`Starting one-click durable upload`,'Uploading');
+      const resumed=await employeeQaDurableUpload(uploadList,aggregatePreflight);
       employeeQaStoreUploadPerformance(aggregatePreflight,resumed,uploadT0);
       oldLabels.forEach(([b])=>{b.dataset.busy='0';b.disabled=false;b.classList.remove('disabled')});
       state.drafts=[];
@@ -8947,25 +8959,22 @@ async function commitSessionAndExport(){
       state.lastSavedBedTransferDraftId=null;
       buildExport();refreshSessionViews();renderContext();
       if($('validationBox'))$('validationBox').innerHTML='';
-      showStatus(`QA Upload completed. ${Number(resumed.already_persisted_count||0)} records were already saved and ${Number(resumed.new_write_count||0)} were resumed.`,'ok');
+      showStatus(`QA Upload completed. ${Number(resumed.saved_count||uploadList.length)}/${uploadList.length} safely saved with one receipt.`,'ok');
       toast('QA Upload completed. Continue with Owner review.',6000);
       updateEntrySessionActionState();
       return;
     }catch(error){
-      const result=error?.resumeResult&&typeof error.resumeResult==='object'?error.resumeResult:{};
-      const code=String(error?.message||'QA_SESSION_RESUME_FAILED').slice(0,120);
-      if(Number.isFinite(Number(result.already_persisted_count)))state.qaAcceptance.alreadyPersistedCount=Math.max(0,Number(result.already_persisted_count));
-      if(Number.isFinite(Number(result.remaining_count)))state.qaAcceptance.remainingCount=Math.max(0,Number(result.remaining_count));
-      if(Number.isFinite(Number(result.conflicting_entry_count)))state.qaAcceptance.conflictingEntryCount=Math.max(0,Number(result.conflicting_entry_count));
-      if(Number.isFinite(Number(result.duplicate_entry_id_count)))state.qaAcceptance.duplicateEntryIdCount=Math.max(0,Number(result.duplicate_entry_id_count));
+      const result=error?.attemptResult&&typeof error.attemptResult==='object'?error.attemptResult:{};
+      const code=String(error?.message||'UPLOAD_ATTEMPT_PAUSED_TRANSIENT').slice(0,120);
+      employeeQaAttemptAdoptProgress(result);
       state.qaAcceptance.resumeRequired=state.qaAcceptance.alreadyPersistedCount>0&&state.qaAcceptance.remainingCount>0&&state.qaAcceptance.conflictingEntryCount===0&&state.qaAcceptance.duplicateEntryIdCount===0;
       state.drafts=allOriginalDrafts;
       state.sessionId=originalSessionId;
       saveDrafts();buildExport();refreshSessionViews();
       oldLabels.forEach(([b,html])=>{b.dataset.busy='0';b.disabled=false;b.classList.remove('disabled');b.innerHTML=html});
-      const summary=`${state.qaAcceptance.alreadyPersistedCount} saved · ${state.qaAcceptance.remainingCount} remaining`;
-      showStatus(`${code}: Resume Upload stopped. ${summary}. Your records were preserved.`,'bad');
-      if($('validationBox'))$('validationBox').innerHTML=`<div class="upload-validation-panel" role="alert"><div class="uv-title">Resume Upload stopped</div><div class="uv-list"><span class="uv-label">Error</span><span class="uv-value">${esc(code)}</span></div><div class="uv-sub">${esc(summary)}. No duplicate request was sent by this page.</div></div>`;
+      const summary=`Upload paused. ${state.qaAcceptance.alreadyPersistedCount}/${uploadList.length} safely saved.`;
+      showStatus(`${code}: ${summary} Your records were preserved.`,'warn');
+      if($('validationBox'))$('validationBox').innerHTML=`<div class="upload-validation-panel" role="alert"><div class="uv-title">${esc(summary)}</div><div class="uv-list"><span class="uv-label">Status</span><span class="uv-value">${esc(code)}</span></div><div class="uv-sub">Continue the same durable attempt. Aggregate validation will not be repeated.</div></div>`;
       updateEntrySessionActionState();
       return;
     }
@@ -9745,7 +9754,10 @@ function employeeQaAcceptanceDeliveryContract(data={},runId=''){
   if(persistenceContractPresent&&(persistenceIds.length!==expected||new Set(persistenceIds).size!==expected||ids.some(id=>!persistedSet.has(id)&&!missingSet.has(id))))throw new Error('QA_PERSISTENCE_IDENTITY_MISMATCH');
   const resumeRequired=policy.accepted&&alreadyPersistedCount>0&&remainingCount>0&&conflictingEntryCount===0&&duplicateEntryIdCount===0;
   if(persistenceContractPresent&&data.resume_upload_required!==resumeRequired)throw new Error('QA_RESUME_STATE_MISMATCH');
-  return {rawEntries,sessionIds,scenarioIds,expected,oracle,workerVersion,matrixVersion,payloadHash,validationAttestation,staleReason:freshness.stale_reason,policy,serverRecordCount:expected,persistedEntryIds,missingEntryIds,alreadyPersistedCount,remainingCount,conflictingEntryCount,duplicateEntryIdCount,resumeRequired};
+  const activeUploadAttempt=data.active_upload_attempt&&typeof data.active_upload_attempt==='object'?data.active_upload_attempt:null;
+  if(activeUploadAttempt&&String(activeUploadAttempt.qa_run_id||'')!==runId)throw new Error('QA_UPLOAD_ATTEMPT_RUN_MISMATCH');
+  if(activeUploadAttempt&&String(activeUploadAttempt.payload_hash||'')!==payloadHash)throw new Error('QA_UPLOAD_ATTEMPT_PAYLOAD_MISMATCH');
+  return {rawEntries,sessionIds,scenarioIds,expected,oracle,workerVersion,matrixVersion,payloadHash,validationAttestation,staleReason:freshness.stale_reason,policy,serverRecordCount:expected,persistedEntryIds,missingEntryIds,alreadyPersistedCount,remainingCount,conflictingEntryCount,duplicateEntryIdCount,resumeRequired,activeUploadAttempt};
 }
 function employeeQaAcceptanceBanner({runId,status,mode,count,personalDraftCount,storageCount=0,serverRecordCount=null,error=''}){
   let banner=document.getElementById('qaAcceptanceEmployeeBanner');
@@ -9803,7 +9815,7 @@ async function employeeLoadQaAcceptanceRun(){
     const data=raw?.data&&typeof raw.data==='object'?raw.data:raw;
     serverMeta={status:String(data?.status||''),mode:String(data?.mode||''),serverRecordCount:Number.isFinite(Number(data?.server_record_count))?Number(data.server_record_count):null,httpStatus:response.status,errorCode:String(data?.error_code||'')};
     if(!response.ok||data?.success===false){const failure=new Error(data?.error_code||`HTTP_${response.status}`);failure.httpStatus=response.status;failure.serverMeta=serverMeta;throw failure}
-    const {rawEntries,sessionIds,scenarioIds,workerVersion,matrixVersion,payloadHash,validationAttestation,staleReason,policy,serverRecordCount,persistedEntryIds,alreadyPersistedCount,remainingCount,conflictingEntryCount,duplicateEntryIdCount,resumeRequired}=employeeQaAcceptanceDeliveryContract(data,runId);
+    const {rawEntries,sessionIds,scenarioIds,workerVersion,matrixVersion,payloadHash,validationAttestation,staleReason,policy,serverRecordCount,persistedEntryIds,alreadyPersistedCount,remainingCount,conflictingEntryCount,duplicateEntryIdCount,resumeRequired,activeUploadAttempt}=employeeQaAcceptanceDeliveryContract(data,runId);
     const attestedById=new Map((validationAttestation?.validation_results||[]).map(result=>[String(result?.entry_identity||''),result]));
     const persistedSet=new Set(persistedEntryIds||[]);
     const entries=rawEntries.map(entry=>{
@@ -9817,7 +9829,7 @@ async function employeeLoadQaAcceptanceRun(){
       const validationError=reusableFailure?{source:'aggregate_dry_run',stage:'qa_browser_validation',event_index:rawEntries.indexOf(entry),event_type:attested.event_type||entry.event_type||'',entry_identity:id,error_code:attested.error_code||'QA_VALIDATION_FAILED',message:'QA real-browser validation failed.',missing_fields:attested.missing_fields||[],invalid_fields:[],no_write:true,write_attempted:false}:null;
       return {...entry,amount:transferAmount,session_id:sessionIds[id]||entry.session_id||'',qa_scenario_id:scenarioIds[id]||'',pay_type:payment==='bank'||payment==='b'?'B':payment==='cash'||payment==='c'?'C':entry.pay_type,upload_status:uploadStatus,upload_resume_state:persistedSet.has(id)?'ALREADY_PERSISTED':'VALIDATED',upload_validation_error:validationError,upload_validation_error_code:validationError?.error_code||''};
     });
-    state.qaAcceptance={runId,status:data.status||'',mode:data.mode||'',artifactSha:data.artifact_sha256||'',currentArtifactSha:data.current_artifact_sha256||'',workerVersion,currentWorkerVersion:data.current_qa_worker_version||'',matrixVersion,payloadHash,sessionIdsByEntry:sessionIds,scenarioIdsByEntry:scenarioIds,validationAttestation,validationAttemptId:validationAttestation?.validation_attempt_id||'',staleReason:staleReason||'',loadStatus:'READY',personalDraftCount,cleanupStatus:data.cleanup_status||'NOT_RUN',employeeReviewStatus:data.employee_review_status||'',serverRecordCount,uploadAllowed:policy.upload_allowed,readOnly:policy.readonly,artifactCompatibility:data.artifact_compatibility||null,alreadyPersistedCount,remainingCount,conflictingEntryCount,duplicateEntryIdCount,resumeRequired};
+    state.qaAcceptance={runId,status:data.status||'',mode:data.mode||'',artifactSha:data.artifact_sha256||'',currentArtifactSha:data.current_artifact_sha256||'',workerVersion,currentWorkerVersion:data.current_qa_worker_version||'',matrixVersion,payloadHash,sessionIdsByEntry:sessionIds,scenarioIdsByEntry:scenarioIds,validationAttestation,validationAttemptId:validationAttestation?.validation_attempt_id||'',staleReason:staleReason||'',loadStatus:'READY',personalDraftCount,cleanupStatus:data.cleanup_status||'NOT_RUN',employeeReviewStatus:data.employee_review_status||'',serverRecordCount,uploadAllowed:policy.upload_allowed,readOnly:policy.readonly,artifactCompatibility:data.artifact_compatibility||null,alreadyPersistedCount:Number(activeUploadAttempt?.saved_count??alreadyPersistedCount),remainingCount:Number(activeUploadAttempt?.remaining_count??remainingCount),conflictingEntryCount:Number(activeUploadAttempt?.conflict_count??conflictingEntryCount),duplicateEntryIdCount:Number(activeUploadAttempt?.duplicate_count??duplicateEntryIdCount),resumeRequired:activeUploadAttempt?Number(activeUploadAttempt.remaining_count||0)>0:resumeRequired,uploadAttemptId:String(activeUploadAttempt?.attempt_id||''),uploadAttemptStatus:String(activeUploadAttempt?.status||''),uploadAttemptReceipt:activeUploadAttempt?.upload_receipt||null};
     state.drafts=entries;
     state.sessionId=data.logical_session_id;
     saveDrafts();buildExport();refreshSessionViews();
@@ -9842,6 +9854,8 @@ async function employeeQaAcceptanceReportValidation(aggregate={},uploadList=[]){
     ok:result?.ok===true,
     error_code:typeof result?.error_code==='string'?result.error_code:'UNREGISTERED_VALIDATION_ERROR',
     missing_fields:Array.isArray(result?.missing_fields)?result.missing_fields.map(String):[],
+    write_attestation:result?.write_attestation&&typeof result.write_attestation==='object'?result.write_attestation:{},
+    write_attestation_signature:String(result?.write_attestation_signature||''),
     diagnostic_envelope:{...(result?.diagnostic_envelope||{}),client_received_at:receivedAt}
   }));
   const body={
@@ -9917,6 +9931,77 @@ async function employeeQaAcceptanceSessionResume(aggregate={},uploadList=[],opti
   qa.readOnly=true;
   qa.uploadAllowed=false;
   return data;
+}
+function employeeQaAttemptAdoptProgress(data={}){
+  const qa=state.qaAcceptance||{};
+  if(Number.isFinite(Number(data.saved_count)))qa.alreadyPersistedCount=Math.max(0,Number(data.saved_count));
+  if(Number.isFinite(Number(data.remaining_count)))qa.remainingCount=Math.max(0,Number(data.remaining_count));
+  if(Number.isFinite(Number(data.conflict_count)))qa.conflictingEntryCount=Math.max(0,Number(data.conflict_count));
+  if(Number.isFinite(Number(data.duplicate_count)))qa.duplicateEntryIdCount=Math.max(0,Number(data.duplicate_count));
+  if(data.attempt_id)qa.uploadAttemptId=String(data.attempt_id);
+  if(data.status)qa.uploadAttemptStatus=String(data.status);
+  if(data.upload_receipt)qa.uploadAttemptReceipt=data.upload_receipt;
+  qa.resumeRequired=qa.remainingCount>0&&!qa.conflictingEntryCount&&!qa.duplicateEntryIdCount;
+  return qa;
+}
+async function employeeQaAttemptRequest(path,options={}){
+  let response;
+  try{response=await apiFetch(path,options)}catch(error){const failure=new Error('UPLOAD_ATTEMPT_STATUS_UNAVAILABLE');failure.transportFailure=true;failure.cause=error;throw failure}
+  const raw=await response.text();let parsed=null;try{parsed=raw?JSON.parse(raw):null}catch{}
+  const data=parsed?.data&&typeof parsed.data==='object'?parsed.data:parsed;
+  if(!response.ok||!data||data.success===false){
+    const code=typeof data?.error_code==='string'?data.error_code:response.status===503?'UPLOAD_ATTEMPT_PAUSED_TRANSIENT':`UPLOAD_ATTEMPT_HTTP_${response.status}`;
+    const failure=new Error(code);failure.httpStatus=response.status;failure.attemptResult=data||{};failure.retryable=data?.retryable===true||response.status===503||response.status===409&&code==='UPLOAD_ATTEMPT_LEASE_CONFLICT';throw failure;
+  }
+  return data;
+}
+async function employeeQaDurableUpload(uploadList=[],aggregate=null){
+  const qa=state.qaAcceptance||{},runId=String(qa.runId||''),expected=uploadList.length;
+  if(!runId)throw new Error('QA_RUN_ID_MISSING');
+  const base=`/api/qa/acceptance/runs/${encodeURIComponent(runId)}/upload-attempts`,body={artifact_sha256:String(qa.artifactSha||''),payload_hash:String(qa.payloadHash||''),validation_attempt_id:String(qa.validationAttemptId||''),session_id:String(state.sessionId||`${runId}-CURRENT`)};
+  let progress=null,statusRecoveries=0,transientFailures=0,automaticNextCalls=0;
+  if(qa.uploadAttemptId){
+    try{progress=await employeeQaAttemptRequest(`${base}/${encodeURIComponent(qa.uploadAttemptId)}`)}catch(error){if(!error.retryable&&!error.transportFailure)throw error}
+  }
+  if(!progress){
+    const startBody={...body,user_click_count:1,aggregate_validation_attempt_id:String(aggregate?.validation_attempt_id||qa.validationAttemptId||''),aggregate_validation_result_count:Number(aggregate?.validation_result_count||expected)};
+    for(let attempt=0;attempt<3&&!progress;attempt++){
+      try{progress=await employeeQaAttemptRequest(base,{method:'POST',body:JSON.stringify(startBody)})}
+      catch(error){if(!error.transportFailure&&!error.retryable)throw error;transientFailures+=1;if(String(error?.message||'')==='UPLOAD_ATTEMPT_LEASE_CONFLICT')await new Promise(resolve=>setTimeout(resolve,500));if(attempt===2)throw error}
+    }
+  }
+  employeeQaAttemptAdoptProgress(progress||{});
+  const showProgress=message=>{const saved=Number(state.qaAcceptance?.alreadyPersistedCount||0);showStatus(`${message} · 已安全保存 ${saved}/${expected}`,'ok');};
+  showProgress('Upload attempt created');
+  for(let safety=0;safety<Math.max(20,expected+12);safety++){
+    if(String(progress?.status||'')==='COMPLETED')break;
+    if(Number(progress?.conflict_count||0)>0)throw Object.assign(new Error('UPLOAD_ENTRY_CONFLICT'),{attemptResult:progress});
+    if(Number(progress?.duplicate_count||0)>0)throw Object.assign(new Error('UPLOAD_ENTRY_DUPLICATE'),{attemptResult:progress});
+    if(Number(progress?.remaining_count||0)===0){
+      try{progress=await employeeQaAttemptRequest(`${base}/${encodeURIComponent(state.qaAcceptance.uploadAttemptId)}/finalize`,{method:'POST',body:JSON.stringify(body)})}
+      catch(error){
+        transientFailures+=1;
+        if(!error.retryable&&!error.transportFailure)throw error;
+        if(String(error?.message||'')==='UPLOAD_ATTEMPT_LEASE_CONFLICT')await new Promise(resolve=>setTimeout(resolve,500));
+        try{progress=await employeeQaAttemptRequest(`${base}/${encodeURIComponent(state.qaAcceptance.uploadAttemptId)}`);statusRecoveries+=1}catch(statusError){if(transientFailures>=20)throw error;await new Promise(resolve=>setTimeout(resolve,500));continue}
+      }
+      employeeQaAttemptAdoptProgress(progress||{});showProgress(String(progress?.status||'')==='COMPLETED'?'Upload finalized':'Finalization status recovered');continue;
+    }
+    try{
+      progress=await employeeQaAttemptRequest(`${base}/${encodeURIComponent(state.qaAcceptance.uploadAttemptId)}/next`,{method:'POST',body:JSON.stringify(body)});automaticNextCalls+=1;
+    }catch(error){
+      transientFailures+=1;
+      if(!error.retryable&&!error.transportFailure)throw error;
+      if(String(error?.message||'')==='UPLOAD_ATTEMPT_LEASE_CONFLICT')await new Promise(resolve=>setTimeout(resolve,500));
+      try{progress=await employeeQaAttemptRequest(`${base}/${encodeURIComponent(state.qaAcceptance.uploadAttemptId)}`);statusRecoveries+=1}catch(statusError){if(transientFailures>=20)throw error;await new Promise(resolve=>setTimeout(resolve,500));continue}
+    }
+    employeeQaAttemptAdoptProgress(progress||{});showProgress(Number(progress?.remaining_count||0)>0?'Continuing automatically':'All entries safely saved');
+  }
+  const receipt=progress?.upload_receipt||state.qaAcceptance?.uploadAttemptReceipt||null,saved=Number(progress?.saved_count||0),remaining=Number(progress?.remaining_count||0),conflicts=Number(progress?.conflict_count||0),duplicates=Number(progress?.duplicate_count||0),formalWrites=Number(receipt?.formal_write_count||progress?.formal_write_count||0);
+  const complete=String(progress?.status||'')==='COMPLETED'&&saved===expected&&remaining===0&&conflicts===0&&duplicates===0&&receipt&&formalWrites===expected;
+  window.__qaLastDurableUpload={attempt_id:String(progress?.attempt_id||''),user_click_count:1,manual_resume_count:0,automatic_next_count:automaticNextCalls,status_recovery_count:statusRecoveries,transient_failure_count:transientFailures,expected_count:expected,saved_count:saved,remaining_count:remaining,formal_write_count:formalWrites,status:String(progress?.status||''),recorded_at:new Date().toISOString()};
+  if(!complete){const error=new Error('UPLOAD_ATTEMPT_PAUSED_TRANSIENT');error.attemptResult=progress||{};error.retryable=true;throw error}
+  qa.status='UPLOAD_PASS';qa.readOnly=true;qa.uploadAllowed=false;qa.resumeRequired=false;return progress;
 }
 function employeeUiPair(en,cn){
   return `${esc(en)}<span class="label-en">${esc(cn)}</span>`;
