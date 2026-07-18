@@ -13473,7 +13473,12 @@ async function handleRequest(request, env, ctx) {
         isReadonlyAdmin: isReadonlyAdminRoleValue(user.role),
         canWrite: canWriteOwnerData(user)
       };
-      return json(ok(data));
+      return json(ok(data),200,{
+        "Cache-Control":"no-store",
+        "x-homelink-worker-version":String(env.CF_VERSION_METADATA?.id||""),
+        "x-homelink-asset-version":HOMELINK_DIAGNOSTIC_ASSET_VERSION,
+        "x-homelink-auth-response-class":"AUTHENTICATED"
+      });
     }
     const phase0ReadOnlyResponse = await handlePhase0ReadOnlyApi(request, env, user);
     if (phase0ReadOnlyResponse) return phase0ReadOnlyResponse;

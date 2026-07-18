@@ -2940,11 +2940,11 @@ label .label-en{
       <div class="operator" hidden><input id="operatorId" placeholder="未登录" readonly aria-label="员工姓名"></div>
       <div class="employee-user" id="employeeUser">
         <div class="employee-identity-card" id="employeeIdentityCard" data-employee-identity-display="true">
-          <span id="employeeIdentityName">Restoring session</span><span class="label-en">正在恢复登录</span>
+          <span id="employeeIdentityName">Restoring session</span><span class="label-en" id="employeeIdentityRole">正在恢复登录</span>
         </div>
         <button class="employee-logout" id="btnEmployeeLogoutTop" type="button">Logout<span class="label-en">退出</span></button>
         <button class="employee-user-button" id="employeeUserButton" type="button" aria-haspopup="menu" aria-expanded="false">
-          <span id="employeeUserName">Restoring session</span><span class="label-en">正在恢复登录</span>
+          <span id="employeeUserName">Restoring session</span><span class="label-en" id="employeeUserRole">正在恢复登录</span>
         </button>
         <div class="employee-user-menu" id="employeeUserMenu" hidden>
           <div class="employee-user-meta" id="employeeUserMeta">Restoring session / 正在恢复登录</div>
@@ -3292,6 +3292,35 @@ function unwrapStandardResponse(body){return body&&body.code===0&&body.data?body
 const EMPLOYEE_AUTH_STATES=Object.freeze({REHYDRATING:'AUTH_REHYDRATING',AUTHENTICATED:'AUTHENTICATED',REQUIRED:'AUTH_REQUIRED',TRANSIENT_ERROR:'AUTH_TRANSIENT_ERROR'});
 const EMPLOYEE_AUTH_RETRY_DELAYS_MS=Object.freeze([0,250,750]);
 let employeeAuthCheckPromise=null;
+const EMPLOYEE_AUTH_DIAGNOSTIC={contract_version:'employee-auth-attempt-v1',attempt_sequence:0,attempts:[],transitions:[],concurrent_join_count:0,active_attempt_id:'',latest_response_class:'',latest_worker_version:'',latest_asset_version:''};
+window.__EMPLOYEE_AUTH_DIAGNOSTIC=EMPLOYEE_AUTH_DIAGNOSTIC;
+function employeeAuthDiagnosticTimestamp(){return new Date().toISOString()}
+function employeeAuthDiagnosticTrim(){
+  EMPLOYEE_AUTH_DIAGNOSTIC.attempts=EMPLOYEE_AUTH_DIAGNOSTIC.attempts.slice(-12);
+  EMPLOYEE_AUTH_DIAGNOSTIC.transitions=EMPLOYEE_AUTH_DIAGNOSTIC.transitions.slice(-24);
+}
+function employeeAuthDiagnosticBeginAttempt(index,timeoutMs){
+  const sequence=++EMPLOYEE_AUTH_DIAGNOSTIC.attempt_sequence;
+  const attempt={attempt_id:`employee-auth-${Date.now().toString(36)}-${sequence}`,attempt:Number(index||sequence),started_at:employeeAuthDiagnosticTimestamp(),ended_at:'',duration_ms:0,http_status:0,content_type:'',response_class:'PENDING',worker_version:'',asset_version:'',credentials_include:true,cookie_value_read:false,abort_reason:'',retry_reason:''};
+  attempt.timeout_ms=Math.max(0,Number(timeoutMs)||0);
+  EMPLOYEE_AUTH_DIAGNOSTIC.active_attempt_id=attempt.attempt_id;
+  EMPLOYEE_AUTH_DIAGNOSTIC.attempts.push(attempt);
+  employeeAuthDiagnosticTrim();
+  return attempt;
+}
+function employeeAuthDiagnosticFinishAttempt(attempt,patch={}){
+  if(!attempt)return;
+  Object.assign(attempt,patch,{ended_at:employeeAuthDiagnosticTimestamp()});
+  attempt.duration_ms=Math.max(0,Date.now()-Date.parse(attempt.started_at));
+  EMPLOYEE_AUTH_DIAGNOSTIC.latest_response_class=String(attempt.response_class||'');
+  EMPLOYEE_AUTH_DIAGNOSTIC.latest_worker_version=String(attempt.worker_version||'');
+  EMPLOYEE_AUTH_DIAGNOSTIC.latest_asset_version=String(attempt.asset_version||'');
+  employeeAuthDiagnosticTrim();
+}
+function employeeAuthDiagnosticTransition(status,details={}){
+  EMPLOYEE_AUTH_DIAGNOSTIC.transitions.push({status:String(status||''),at:employeeAuthDiagnosticTimestamp(),attempt_id:String(details.attempt_id||EMPLOYEE_AUTH_DIAGNOSTIC.active_attempt_id||''),reason:String(details.reason||'')});
+  employeeAuthDiagnosticTrim();
+}
 function employeeAuthError(code,status=0,cause=null){
   const error=new Error(String(code||'employee_auth_error'));
   error.code=String(code||'employee_auth_error');
@@ -3299,25 +3328,38 @@ function employeeAuthError(code,status=0,cause=null){
   if(cause)error.cause=cause;
   return error;
 }
-async function fetchCurrentAuthUser({timeoutMs=6000}={}){
+async function fetchCurrentAuthUser({timeoutMs=6000,diagnosticAttempt=null}={}){
   const controller=typeof AbortController==='function'?new AbortController():null;
   const timer=controller&&Number(timeoutMs)>0?setTimeout(()=>controller.abort(),Number(timeoutMs)):null;
+  const diagnostic=diagnosticAttempt||employeeAuthDiagnosticBeginAttempt(1,timeoutMs);
   try{
     const r=await apiFetch('/api/me',{method:'GET',...(controller?{signal:controller.signal}:{})});
-    if(r.status===401)return null;
-    if(r.status===403)throw employeeAuthError('me_role_forbidden_403',403);
-    if(!r.ok)throw employeeAuthError('me_failed_'+r.status,r.status);
+    const contentType=String(r.headers?.get?.('content-type')||'');
+    const workerVersion=String(r.headers?.get?.('x-homelink-worker-version')||'');
+    const responseAssetVersion=String(r.headers?.get?.('x-homelink-asset-version')||'');
+    Object.assign(diagnostic,{http_status:Number(r.status||0),content_type:contentType,worker_version:workerVersion,asset_version:responseAssetVersion});
+    if(r.status===401){employeeAuthDiagnosticFinishAttempt(diagnostic,{response_class:'AUTH_REQUIRED'});return null}
+    if(r.status===403){employeeAuthDiagnosticFinishAttempt(diagnostic,{response_class:'ROLE_FORBIDDEN'});throw employeeAuthError('me_role_forbidden_403',403)}
+    if(!r.ok){employeeAuthDiagnosticFinishAttempt(diagnostic,{response_class:'HTTP_ERROR',retry_reason:'http_'+r.status});throw employeeAuthError('me_failed_'+r.status,r.status)}
     let body=null;
-    try{body=await r.json()}catch(error){throw employeeAuthError('me_non_json_response',r.status,error)}
-    if(!body||typeof body!=='object')throw employeeAuthError('me_invalid_response',r.status);
+    try{body=await r.json()}catch(error){employeeAuthDiagnosticFinishAttempt(diagnostic,{response_class:'NON_JSON'});throw employeeAuthError('me_non_json_response',r.status,error)}
+    if(!body||typeof body!=='object'){employeeAuthDiagnosticFinishAttempt(diagnostic,{response_class:'INVALID_SCHEMA'});throw employeeAuthError('me_invalid_response',r.status)}
+    if(responseAssetVersion&&responseAssetVersion!==String(EMPLOYEE_ASSET_DIAGNOSTIC.frontend_asset_version||EMPLOYEE_ASSET_DIAGNOSTIC.employee_asset_version||'')){
+      employeeAuthDiagnosticFinishAttempt(diagnostic,{response_class:'ASSET_WORKER_VERSION_MISMATCH'});
+      throw employeeAuthError('me_asset_worker_version_mismatch',409);
+    }
+    employeeAuthDiagnosticFinishAttempt(diagnostic,{response_class:'AUTHENTICATED'});
     return unwrapStandardResponse(body);
   }catch(error){
-    if(error?.name==='AbortError'||controller?.signal?.aborted)throw employeeAuthError('me_timeout',0,error);
+    if(error?.name==='AbortError'||controller?.signal?.aborted){employeeAuthDiagnosticFinishAttempt(diagnostic,{response_class:'TIMEOUT',abort_reason:'timeout',retry_reason:'timeout'});throw employeeAuthError('me_timeout',0,error)}
+    if(diagnostic.response_class==='PENDING')employeeAuthDiagnosticFinishAttempt(diagnostic,{response_class:'NETWORK_ERROR',retry_reason:String(error?.code||error?.name||'network_error')});
     throw error;
   }finally{if(timer)clearTimeout(timer)}
 }
 function employeeAuthErrorIsTransient(error){
   const status=Number(error?.status||0);
+  const code=String(error?.code||'');
+  if(code==='me_non_json_response'||code==='me_invalid_response')return true;
   return status===0||status===408||status===429||status>=500;
 }
 function employeeAuthDelay(ms){return Number(ms)>0?new Promise(resolve=>setTimeout(resolve,Number(ms))):Promise.resolve()}
@@ -3327,9 +3369,15 @@ async function employeeFetchCurrentAuthUserWithRetry({attempts=3,delays=EMPLOYEE
   for(let index=0;index<maxAttempts;index+=1){
     if(index>0)await waiter(Number(delays?.[index]??delays?.at?.(-1)??0));
     state.authState={...state.authState,attempt:index+1};
-    try{return await fetcher()}
+    const diagnosticAttempt=employeeAuthDiagnosticBeginAttempt(index+1,6000);
+    try{
+      const value=await fetcher({timeoutMs:6000,diagnosticAttempt});
+      if(diagnosticAttempt.response_class==='PENDING')employeeAuthDiagnosticFinishAttempt(diagnosticAttempt,{response_class:value?'AUTHENTICATED':'AUTH_REQUIRED'});
+      return value;
+    }
     catch(error){
       lastError=error;
+      if(diagnosticAttempt.response_class==='PENDING')employeeAuthDiagnosticFinishAttempt(diagnosticAttempt,{response_class:employeeAuthErrorIsTransient(error)?'TRANSIENT_ERROR':'TERMINAL_ERROR',retry_reason:String(error?.code||error?.message||'auth_error')});
       if(!employeeAuthErrorIsTransient(error)||index===maxAttempts-1)throw error;
     }
   }
@@ -3366,6 +3414,14 @@ function employeeRenderAuthWorkspacePlaceholder(status=EMPLOYEE_AUTH_STATES.REHY
   if($('sessionKpis'))$('sessionKpis').innerHTML=`<div class="context-note" style="grid-column:1/-1;margin:0">${esc(failed?'Session data is preserved. Retry session restoration.':'Waiting for verified employee identity before loading local records.')}</div>`;
   if($('sessionPreview'))$('sessionPreview').innerHTML=`<div class="preview-empty"><div><b>${esc(label)}</b><br><span>${esc(failed?'Local records were not cleared.':'Local records will load only after identity is verified.')}</span></div></div>`;
 }
+function employeeRenderAuthIdentityLabels(status=state.authState?.status){
+  const required=status===EMPLOYEE_AUTH_STATES.REQUIRED;
+  const authenticated=!required&&isEmployeeAuthRole(state.user?.role)&&(status===EMPLOYEE_AUTH_STATES.AUTHENTICATED||status===EMPLOYEE_AUTH_STATES.REHYDRATING||status===EMPLOYEE_AUTH_STATES.TRANSIENT_ERROR);
+  const identityLabel=authenticated?'STAFF / 员工':required?'NOT SIGNED IN / 未登录':status===EMPLOYEE_AUTH_STATES.TRANSIENT_ERROR?'RESTORE ERROR / 恢复失败':'正在恢复登录';
+  const accountLabel=authenticated?'ACCOUNT / 账户':identityLabel;
+  if($('employeeIdentityRole'))$('employeeIdentityRole').textContent=identityLabel;
+  if($('employeeUserRole'))$('employeeUserRole').textContent=accountLabel;
+}
 function setEmployeeAuthState(status,{message='',attempt=0,errorCode=''}={}){
   const allowed=new Set(Object.values(EMPLOYEE_AUTH_STATES));
   const next=allowed.has(status)?status:EMPLOYEE_AUTH_STATES.TRANSIENT_ERROR;
@@ -3377,6 +3433,8 @@ function setEmployeeAuthState(status,{message='',attempt=0,errorCode=''}={}){
   if(text)text.textContent=message||(next===EMPLOYEE_AUTH_STATES.REHYDRATING?'Restoring session / 正在恢复登录':next===EMPLOYEE_AUTH_STATES.TRANSIENT_ERROR?'Session restore temporarily unavailable / 登录恢复暂不可用':next===EMPLOYEE_AUTH_STATES.REQUIRED?'Sign in required / 需要登录':'Session restored / 登录已恢复');
   document.querySelector('.employee-workspace-switch')?.classList.toggle('employee-auth-restoring',next!==EMPLOYEE_AUTH_STATES.AUTHENTICATED);
   employeeSetAuthInteractionLocked(next!==EMPLOYEE_AUTH_STATES.AUTHENTICATED);
+  employeeRenderAuthIdentityLabels(next);
+  employeeAuthDiagnosticTransition(next,{reason:String(errorCode||'')});
   if(next!==EMPLOYEE_AUTH_STATES.AUTHENTICATED)employeeRenderAuthWorkspacePlaceholder(next);
   return state.authState;
 }
@@ -3663,6 +3721,7 @@ function applyEmployeeUser(user){
     $('operatorId').readOnly=true;
     if($('employeeUserName'))$('employeeUserName').textContent=display;
     if($('employeeIdentityName'))$('employeeIdentityName').textContent=display;
+    employeeRenderAuthIdentityLabels(EMPLOYEE_AUTH_STATES.AUTHENTICATED);
     if($('employeeUserMeta'))$('employeeUserMeta').textContent=user.userid?`employee_id: ${user.userid}`:'signed in';
     if($('employeeUserButton'))$('employeeUserButton').disabled=false;
     setEmployeeMenuOpen(false);
@@ -3686,6 +3745,7 @@ function applyEmployeeUser(user){
     $('operatorId').readOnly=false;
     if($('employeeIdentityName'))$('employeeIdentityName').textContent='Not signed in';
     if($('employeeUserName'))$('employeeUserName').textContent='未登录';
+    employeeRenderAuthIdentityLabels(EMPLOYEE_AUTH_STATES.REQUIRED);
     if($('employeeUserMeta'))$('employeeUserMeta').textContent='未登录';
     setEmployeeMenuOpen(false);
     try{localStorage.removeItem('empv3:user')}catch{}
@@ -9350,7 +9410,7 @@ function renderContext(){
 async function checkEmployeeSession(options){
   options=options||{};
   const force=options?.force===true;
-  if(employeeAuthCheckPromise)return employeeAuthCheckPromise;
+  if(employeeAuthCheckPromise){EMPLOYEE_AUTH_DIAGNOSTIC.concurrent_join_count+=1;return employeeAuthCheckPromise;}
   const run=async()=>{
     setEmployeeAuthState(EMPLOYEE_AUTH_STATES.REHYDRATING,{message:force?'Retrying session restoration / 正在重试登录恢复':'Restoring session / 正在恢复登录'});
     try{
