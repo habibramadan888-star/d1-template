@@ -3209,6 +3209,21 @@ async function resolveDerivedArrearsPaymentForEntry(env,user,entry={},opts={}){
   const ref=cleanId(entry.arrears_ref||entry.cloud_arrears_ref||entry.linked_task_id||entry.original_arrears_id||"");
   const parsed=parseBedTransferDerivedArrearsRef(ref);
   if(!parsed)return {ok:true,derived:false,server_fields:{}};
+  const qaFixture=opts.request_context?.qa_arrears_fixture_by_ref instanceof Map
+    ?opts.request_context.qa_arrears_fixture_by_ref.get(ref)
+    :null;
+  if(qaFixture)return prepareDerivedArrearsPayment({
+    corpid:user.corpid,
+    arrears_ref:ref,
+    arrears_item:qaFixture,
+    source_effective:true,
+    payment_amount:entry.payment_amount||entry.paid_amount||entry.amount,
+    payment_method:entry.payment_method||entry.pay_type,
+    payment_date:entry.payment_date||entry.created_at,
+    accepted_at:empNow(),
+    operator_reference:user.userid,
+    event_id:entry.event_id||entry.anchor_id||entry.id
+  });
   const gateway=await canonicalArrearsGateway(env,user,{arrears_ref:ref,limit:2000,archive_snapshot:opts.archive_snapshot,request_context:opts.request_context});
   const item=[...(gateway.open_items||[]),...(gateway.closed_items||[]),...(gateway.all_items||[])].find(row=>cleanText(row.arrears_ref||row.task_id||row.id,160)===ref);
   if(!item){
@@ -3234,6 +3249,10 @@ __name(resolveDerivedArrearsPaymentForEntry,"resolveDerivedArrearsPaymentForEntr
 async function empFindOpenArrearTaskForPaymentReadOnly(env,user,taskId,bed="",opts={}){
   const cleanTaskId=cleanId(taskId);
   if(!cleanTaskId)return null;
+  const qaFixture=opts.request_context?.qa_arrears_fixture_by_ref instanceof Map
+    ?opts.request_context.qa_arrears_fixture_by_ref.get(cleanTaskId)
+    :null;
+  if(qaFixture)return {...qaFixture,task_id:cleanTaskId,source:"qa_server_attested_matrix"};
   const projected=await empFindProjectionArrearsForPayment(env,user,cleanTaskId,bed,opts);
   if(projected&&["open","partial"].includes(String(projected.status||"").toLowerCase())&&cleanMoney(projected.remaining_arrears||0)>0){
     return {
@@ -3806,7 +3825,9 @@ async function handleEmployeeEntryValidate(request,env,user){
   const aggregateRequests=employeeEntryAggregateValidationRequests(body);
   if(qaValidationContext?.ok===true&&aggregateRequested){
     request_context.archive_session_prefix=`${qaValidationContext.run.qa_run_id}-%`;
+    request_context.strict_archive_session_prefix=true;
     request_context.transaction_session_prefix=request_context.archive_session_prefix;
+    qaAcceptanceAttachServerValidationFixtures(request_context,qaValidationContext.contract);
   }
   const aggregateTypes=aggregateRequests.map(row=>employeeEntryUploadType(employeeEntryValidationEntryFromBody(row,row.event_index)));
   const singleType=employeeEntryUploadType(employeeEntryValidationEntryFromBody(body||{},body?.event_index??0));
@@ -11978,6 +11999,22 @@ function redirectToRootEntry(request, portal = "") {
   return Response.redirect(target, 302);
 }
 __name(redirectToRootEntry, "redirectToRootEntry");
+function ownerLoginReturnToFromRequest(request, env) {
+  const url = new URL(request.url);
+  if (url.pathname !== "/owner") return "/owner";
+  const keys = [...url.searchParams.keys()];
+  if (keys.some((key) => key !== "qa_run_id")) return "/owner";
+  const runId = qaAcceptanceEnabled(env) ? qaAcceptanceRunId(url.searchParams.get("qa_run_id")) : "";
+  return `/owner${runId ? `?qa_run_id=${encodeURIComponent(runId)}` : ""}`;
+}
+__name(ownerLoginReturnToFromRequest, "ownerLoginReturnToFromRequest");
+function redirectToOwnerLogin(request, env) {
+  const target = new URL("/", request.url);
+  target.searchParams.set("portal", "owner");
+  target.searchParams.set("return_to", ownerLoginReturnToFromRequest(request, env));
+  return Response.redirect(target, 302);
+}
+__name(redirectToOwnerLogin, "redirectToOwnerLogin");
 function redirectToPath(request, pathname) {
   const target = new URL(request.url);
   target.pathname = pathname;
@@ -12563,6 +12600,34 @@ async function qaAcceptanceResolveValidationContext(env,user,body={}){
   };
 }
 __name(qaAcceptanceResolveValidationContext,"qaAcceptanceResolveValidationContext");
+function qaAcceptanceAttachServerValidationFixtures(requestContext={},contract={}){
+  const fixtures=new Map();
+  for(const scenario of contract.scenarios||[]){
+    const entry=scenario?.input||{};
+    if(employeeEntryUploadType(entry)!=="AP")continue;
+    const ref=cleanId(entry.arrears_ref||entry.cloud_arrears_ref||entry.linked_task_id||entry.original_arrears_id||"");
+    const original=entryAnchorMoney(entry.original_arrears_amount||0);
+    const already=entryAnchorMoney(entry.already_paid_amount||0);
+    const remaining=entryAnchorMoney(entry.remaining_arrears_before_payment||Math.max(0,original-already));
+    if(!ref||original<=0||remaining<=0)continue;
+    fixtures.set(ref,{
+      arrears_ref:ref,
+      task_id:ref,
+      bed:cleanText(entry.bed||entry.room||"",80),
+      original_bed:cleanText(entry.bed||entry.room||"",80),
+      original_amount:original,
+      original_arrears_amount:original,
+      arrear_amount:original,
+      actual_received:already,
+      remaining_arrears:remaining,
+      status:"partial",
+      source:"qa_server_attested_matrix"
+    });
+  }
+  requestContext.qa_arrears_fixture_by_ref=fixtures;
+  return requestContext;
+}
+__name(qaAcceptanceAttachServerValidationFixtures,"qaAcceptanceAttachServerValidationFixtures");
 function qaValidationDiagnosticEnvelope(result={},qaContext={},requestContext={}){
   const rawCode=result?.ok===true?"":result?.error_code;
   const errorCode=normalizeEmployeeValidationErrorCode(rawCode);
@@ -13141,6 +13206,7 @@ async function qaAcceptanceSessionResume(request,env,user,run){
   requestContext.archive_session_prefix=`${run.qa_run_id}-%`;
   requestContext.strict_archive_session_prefix=true;
   requestContext.transaction_session_prefix=requestContext.archive_session_prefix;
+  qaAcceptanceAttachServerValidationFixtures(requestContext,contract);
   if(String(body.resume_intent||"")==="EMPLOYEE_FINALIZE_PERSISTED_RUN"){
     const finalizationPreflightStart=Date.now(),finalizationPreflight=await qaAcceptanceSessionPreflight(env,user,run,contract,requests,requestContext);mark("finalization_preflight_ms",finalizationPreflightStart);
     if(!finalizationPreflight.ok){
@@ -13501,7 +13567,7 @@ async function handleAppEntryRoute(request, env, path, method) {
   if (path !== "/employee" && path !== "/owner" && path !== "/admin") return null;
 
   const claim = await readRouteClaim(request, env);
-  if (!claim) return path === "/employee" ? redirectToEmployeeLogin(request, env) : redirectToRootEntry(request);
+  if (!claim) return path === "/employee" ? redirectToEmployeeLogin(request, env) : path === "/owner" ? redirectToOwnerLogin(request, env) : redirectToRootEntry(request);
   if (isStaffRoleValue(claim.role)) {
     return path === "/employee" ? fetchStaticAsset(request, env, "/employee-v3") : redirectToPath(request, "/employee");
   }

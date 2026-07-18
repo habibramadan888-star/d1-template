@@ -6,7 +6,8 @@ const ui=await readFile(new URL('../deploy-worker/public/index-51-main.js',impor
 const block=name=>{const start=ui.indexOf(`function ${name}`);assert.ok(start>=0,name);const next=ui.indexOf('\nfunction ',start+10);return ui.slice(start,next<0?ui.length:next);};
 
 test('Finance UI reads the canonical projection directly',()=>{
-  assert.match(block('loadOwnerFinanceProjection'),/ownerGatewayJson\('\/api\/owner\/finance\/projection'/);
+  const loader=block('loadOwnerFinanceProjection');
+  assert.match(loader,/ownerGatewayJson\(ownerRunScopedApi\('\/api\/owner\/finance\/projection'\)/);
 });
 
 test('transfer fee and bed difference stay separate from Rent',()=>{

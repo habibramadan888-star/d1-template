@@ -75,6 +75,15 @@ function ownerQaRunId(){
   const runId=String(new URLSearchParams(location.search).get('qa_run_id')||'').trim().toUpperCase();
   return /^QA-\d{8}-[A-Z0-9]{4,12}$/.test(runId)?runId:'';
 }
+function ownerLoginReturnTo(){
+  let current;
+  try{current=new URL(location.href);}catch{return'/owner';}
+  if(current.origin!==location.origin||current.pathname!=='/owner')return'/owner';
+  const allowedHashes=new Set(['','#overview','#history','#analysis','#clients','#wifi','#finance','#arrears','#todo']);
+  const hash=allowedHashes.has(current.hash)?current.hash:'';
+  const runId=ownerQaRunId();
+  return `/owner${runId?`?qa_run_id=${encodeURIComponent(runId)}`:''}${hash}`;
+}
 function ownerRunScopedApi(url){
   const runId=ownerQaRunId();
   if(!runId)return url;
@@ -161,8 +170,10 @@ function clearLegacyAuthStorage(){
   });
 }
 function redirectToUnifiedLogin(reason=''){
-  const target=UNIFIED_LOGIN_DESTINATION+(reason?`?reason=${encodeURIComponent(reason)}`:'');
-  location.replace(target);
+  const params=new URLSearchParams();
+  if(reason)params.set('reason',reason);
+  params.set('return_to',ownerLoginReturnTo());
+  location.replace(`${UNIFIED_LOGIN_DESTINATION}?${params.toString()}`);
 }
 function unwrapStandardResponse(body){
   if(!(body&&body.code===0&&Object.prototype.hasOwnProperty.call(body,'data')))return body;
@@ -928,6 +939,14 @@ function normalizeLedgerSession(session){
 
 function normalizeLedgerSessions(sessions){
   return Array.isArray(sessions)?sessions.map(normalizeLedgerSession):[];
+}
+
+function ownerHistorySessionEntryCount(session){
+  session=session||{};
+  const entries=Array.isArray(session.entries)?session.entries:[];
+  if(entries.length)return entries.length;
+  const trusted=Number(session.entriesCount??session.entries_count??0);
+  return Number.isFinite(trusted)&&trusted>0?Math.trunc(trusted):0;
 }
 
 /* ── STATE ── */
@@ -3099,7 +3118,7 @@ async function renderHistory(){
       refundOut:0,
       total:Number(s.gross_received||0)
     };
-    const cnt=hasEntries?s.entries.length:(s.entriesCount||0);
+    const cnt=ownerHistorySessionEntryCount(s);
     const uploader=s.source==='employee_entry'||s.source==='EMP'||s.createdBy==='staff'||(s.createdBy&&s.createdBy!=='manager')?`员工上传 ${esc(s.operatorName||s.createdBy||s.operatorId||'')}`:(s.createdBy==='manager'?'老板上传':'');
     const mismatch=Number(s.entriesCount||0)&&hasEntries&&Number(s.entriesCount||0)!==s.entries.length;
     const deleted=s._voided;
@@ -3129,7 +3148,7 @@ async function renderHistory(){
   };
   wrap.innerHTML=ownerHistoryBedControlsHtml()+ownerHistoryTransferLineageHtml(state.ownerHistoryTransferLineage)+`<div class="hist-toolbar"><span>${state.showDeletedHistory?'已删除/已作废记录 · 只读追踪':'按月份归类，优先显示最近记录'}</span><button class="btn btn-ghost" id="btnHistoryDeletedToggle" type="button">${state.showDeletedHistory?'返回正常历史':'已删除/已作废记录'}</button><span class="hist-order">${state.showDeletedHistory?'VOIDED · READ ONLY':'RECENT · FIRST'}</span></div>`+
     groups.map(([key,items],idx)=>{
-      const totalEntries=items.reduce((sum,s)=>sum+(s.entries?s.entries.length:(s.entriesCount||0)),0);
+      const totalEntries=items.reduce((sum,s)=>sum+ownerHistorySessionEntryCount(s),0);
       const from=(items[0]?.date||'').slice(0,10)||'--';
       const to=(items[items.length-1]?.date||'').slice(0,10)||from;
       const mid=`hist-month-${idx}`;

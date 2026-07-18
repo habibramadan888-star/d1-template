@@ -177,16 +177,35 @@ function safeReturnToForRole(raw,role){
   let target;
   try{target=new URL(text,location.origin)}catch{return null}
   if(target.origin!==location.origin||target.pathname!==roleTarget)return null;
-  if(roleTarget!=="/employee")return target.pathname;
   const keys=[...target.searchParams.keys()];
   if(keys.some(key=>key!=="qa_run_id"))return null;
   const runId=String(target.searchParams.get("qa_run_id")||"").toUpperCase();
   if(runId&&!/^QA-\d{8}-[A-Z0-9]{4,12}$/.test(runId))return null;
-  if(target.hash&&target.hash!=="#entry")return null;
-  return `/employee${runId?`?qa_run_id=${encodeURIComponent(runId)}`:""}#entry`;
+  if(roleTarget==="/employee"){
+    if(target.hash&&target.hash!=="#entry")return null;
+    return `/employee${runId?`?qa_run_id=${encodeURIComponent(runId)}`:""}#entry`;
+  }
+  if(roleTarget==="/owner"){
+    const allowedHashes=new Set(["","#overview","#history","#analysis","#clients","#wifi","#finance","#arrears","#todo"]);
+    if(!allowedHashes.has(target.hash))return null;
+    return `/owner${runId?`?qa_run_id=${encodeURIComponent(runId)}`:""}${target.hash}`;
+  }
+  if(runId||target.hash)return null;
+  return target.pathname;
+}
+function loginHashForOwnerReturn(role){
+  if(destinationForRole(role)!=="/owner")return "";
+  const allowedHashes=new Set(["#overview","#history","#analysis","#clients","#wifi","#finance","#arrears","#todo"]);
+  return allowedHashes.has(location.hash)?location.hash:"";
+}
+function returnToForCurrentLogin(raw,role){
+  const target=safeReturnToForRole(raw,role);
+  if(!target||destinationForRole(role)!=="/owner")return target;
+  const parsed=new URL(target,location.origin);
+  return parsed.hash?target:`${target}${loginHashForOwnerReturn(role)}`;
 }
 function destinationForMe(me){
-  return safeReturnToForRole(new URLSearchParams(location.search).get("return_to"),me?.role)||destinationForRole(me?.role);
+  return returnToForCurrentLogin(new URLSearchParams(location.search).get("return_to"),me?.role)||destinationForRole(me?.role);
 }
 async function requestJson(path,options={}){
   const headers={"Content-Type":"application/json",...(options.headers||{})};
@@ -213,7 +232,9 @@ function routeFromMe(me){
 function ownerPostLoginPath(me,authBody){
   const roleTarget=destinationForRole(me?.role);
   const serverTarget=String(authBody?.next_path||"").trim();
-  return roleTarget==="/owner"&&serverTarget==="/owner"?"/owner":null;
+  if(roleTarget!=="/owner"||serverTarget!=="/owner")return null;
+  const requested=returnToForCurrentLogin(new URLSearchParams(location.search).get("return_to"),me?.role);
+  return requested||"/owner";
 }
 async function checkExistingSession(){
   setStatus("Checking session...");

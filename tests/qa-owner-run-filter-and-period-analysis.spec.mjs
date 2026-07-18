@@ -82,6 +82,8 @@ test("Run analysis cache rejects stale parsed rows and retains canonical Entry-l
 test("Quick Period Analysis cash and bank nets match the shared Finance oracle", () => {
   const context = { Math, Number };
   vm.createContext(context);
+  vm.runInContext(functionBlock(ownerSource, "ownerRentPaymentLegs"), context);
+  vm.runInContext(functionBlock(ownerSource, "ownerEntryChannelAmounts"), context);
   vm.runInContext(functionBlock(ownerSource, "totals"), context);
   const entries = [
     {cat:"cash",amount:700},{cat:"bank",amount:700},{cat:"cash",amount:730},

@@ -29,9 +29,12 @@ test('successful Owner login response exposes only the fixed relative owner path
 
 test('Owner success handler accepts only server and role agreement on relative /owner',()=>{
   const destination=extractFunction(portal,'destinationForRole');
+  const safeReturn=extractFunction(portal,'safeReturnToForRole');
+  const loginHash=extractFunction(portal,'loginHashForOwnerReturn');
+  const currentReturn=extractFunction(portal,'returnToForCurrentLogin');
   const ownerPath=extractFunction(portal,'ownerPostLoginPath');
-  const factory=new Function(`const EMPLOYEE_ROLES=new Set(['staff','employee']);const OWNER_ROLES=new Set(['manager','owner']);const ADMIN_ROLES=new Set(['admin','admin_readonly','readonly_admin']);${destination};${ownerPath};return ownerPostLoginPath;`);
-  const resolve=factory();
+  const factory=new Function('location',`const EMPLOYEE_ROLES=new Set(['staff','employee']);const OWNER_ROLES=new Set(['manager','owner']);const ADMIN_ROLES=new Set(['admin','admin_readonly','readonly_admin']);${destination};${safeReturn};${loginHash};${currentReturn};${ownerPath};return ownerPostLoginPath;`);
+  const resolve=factory({origin:'https://qa.example',search:'',hash:''});
   assert.equal(resolve({role:'manager'},{next_path:'/owner'}),'/owner');
   assert.equal(resolve({role:'owner'},{next_path:'/owner'}),'/owner');
   for(const injected of ['https://evil.example/owner','//evil.example/owner','/owner?next=https://evil.example','/employee',''])assert.equal(resolve({role:'manager'},{next_path:injected}),null,injected);
@@ -58,7 +61,8 @@ test('relative /owner preserves Preview staging and production origins by URL re
 test('query body and headers cannot supply an Owner redirect origin',()=>{
   const handle=worker.slice(worker.indexOf('async function handleLogin'),worker.indexOf('__name(handleLogin'));
   assert.doesNotMatch(handle,/body\.(redirect|next|return_url|callback)|headers\.get\(["'](?:Location|X-Redirect)/i);
-  assert.doesNotMatch(portal,/URLSearchParams[\s\S]{0,200}(redirect|next|return_url|callback)/i);
+  assert.match(portal,/returnToForCurrentLogin\(new URLSearchParams\(location\.search\)\.get\("return_to"\),me\?\.role\)/);
+  assert.match(portal,/target\.origin!==location\.origin\|\|target\.pathname!==roleTarget/);
 });
 
 test('Owner logout remains relative and same-origin',()=>{

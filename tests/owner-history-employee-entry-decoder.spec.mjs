@@ -59,7 +59,8 @@ test("owner history card uses stored entries_count when employee summary has no 
 
   assert.match(main, /function isEmployeeLedgerSession\(s\)/);
   assert.match(main, /raw\.trim\(\)&&!isEmployeeLedgerSession\(original\)/);
-  assert.match(main, /const cnt=hasEntries\?s\.entries\.length:\(s\.entriesCount\|\|0\)/);
+  assert.match(main, /function ownerHistorySessionEntryCount\(session\)/);
+  assert.match(main, /const cnt=ownerHistorySessionEntryCount\(s\)/);
 });
 
 test("owner session detail has employee export decoder fallback for R AP and TF rows", async () => {

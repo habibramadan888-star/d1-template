@@ -37,7 +37,7 @@ test("legacy login and html paths are intercepted before static assets", async (
   assert.match(worker, /redirectToPath\(request, "\/owner"\)/);
 });
 
-test("unauthenticated business routes return to the root portal while Employee preserves its safe deep link", async () => {
+test("unauthenticated business routes preserve safe Employee and Owner deep links", async () => {
   const worker = await readFile("deploy-worker/src/index.js", "utf8");
 
   assert.match(
@@ -45,8 +45,9 @@ test("unauthenticated business routes return to the root portal while Employee p
     /if \(path !== "\/employee" && path !== "\/owner" && path !== "\/admin"\) return null/
   );
   assert.match(worker, /const claim = await readRouteClaim\(request, env\)/);
-  assert.match(worker, /if \(!claim\) return path === "\/employee" \? redirectToEmployeeLogin\(request, env\) : redirectToRootEntry\(request\)/);
+  assert.match(worker, /if \(!claim\) return path === "\/employee" \? redirectToEmployeeLogin\(request, env\) : path === "\/owner" \? redirectToOwnerLogin\(request, env\) : redirectToRootEntry\(request\)/);
   assert.match(worker, /target\.searchParams\.set\("return_to", employeeLoginReturnTo\(request, env\)\)/);
+  assert.match(worker, /target\.searchParams\.set\("return_to", ownerLoginReturnToFromRequest\(request, env\)\)/);
 });
 
 test("old employee and owner login panels cannot become visible normal flow", async () => {
