@@ -13,7 +13,10 @@ test('employee /api/me uses the standard response wrapper and preserves formal s
   const end=worker.indexOf('const phase0ReadOnlyResponse',start);
   const block=worker.slice(start,end);
   assert.match(block,/role: user\.role/);
-  assert.match(block,/return json\(ok\(data\)\)/);
+  assert.match(block,/return json\(ok\(data\),200,\{/);
+  assert.match(block,/"x-homelink-worker-version":String\(env\.CF_VERSION_METADATA\?\.id\|\|""\)/);
+  assert.match(block,/"x-homelink-asset-version":HOMELINK_DIAGNOSTIC_ASSET_VERSION/);
+  assert.match(block,/"x-homelink-auth-response-class":"AUTHENTICATED"/);
   assert.match(worker,/function isStaffRoleValue\(role\)[\s\S]*\["staff", "employee"\]\.includes\(normalizeRoleValue\(role\)\)/);
 });
 

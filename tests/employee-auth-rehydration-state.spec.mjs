@@ -45,7 +45,7 @@ function element(text = "") {
 
 function harness() {
   const elements = Object.fromEntries([
-    "employeeAuthState", "employeeAuthStateMessage", "btnRetryEmployeeSession", "employeeIdentityName", "employeeUserName", "employeeUserMeta", "workspaceSessionCount", "employeeSessionStatusBar", "sessionClock", "sessionMeta", "sessionKpis", "sessionPreview", "loginEmployeeId", "loginOverlay", "loginPin",
+    "employeeAuthState", "employeeAuthStateMessage", "btnRetryEmployeeSession", "employeeIdentityName", "employeeIdentityRole", "employeeUserName", "employeeUserRole", "employeeUserMeta", "workspaceSessionCount", "employeeSessionStatusBar", "sessionClock", "sessionMeta", "sessionKpis", "sessionPreview", "loginEmployeeId", "loginOverlay", "loginPin",
   ].map(id => [id, element()]));
   const controls = [element(), element()];
   const workspaceSwitch = element();
@@ -55,6 +55,7 @@ function harness() {
   ]);
   const localValues = new Map([["empv3:lastEmployeeId", "staff-a"]]);
   const state = { user: null, drafts: [], authState: { status: "AUTH_REHYDRATING", attempt: 0, lastError: "", confirmedUserId: "" } };
+  const EMPLOYEE_AUTH_DIAGNOSTIC = { contract_version: "employee-auth-attempt-v1", attempt_sequence: 0, attempts: [], transitions: [], concurrent_join_count: 0, active_attempt_id: "", latest_response_class: "", latest_worker_version: "", latest_asset_version: "" };
   let redirects = 0;
   let statusMessage = "";
   let fetchSequence = [];
@@ -64,6 +65,7 @@ function harness() {
     state,
     EMPLOYEE_AUTH_STATES: Object.freeze({ REHYDRATING: "AUTH_REHYDRATING", AUTHENTICATED: "AUTHENTICATED", REQUIRED: "AUTH_REQUIRED", TRANSIENT_ERROR: "AUTH_TRANSIENT_ERROR" }),
     EMPLOYEE_AUTH_RETRY_DELAYS_MS: Object.freeze([0, 0, 0]),
+    EMPLOYEE_AUTH_DIAGNOSTIC,
     employeeAuthCheckPromise: null,
     document: {
       body: element(),
@@ -100,11 +102,17 @@ function harness() {
   });
   const source = [
     functionBlock(employee, "employeeAuthError"),
+    functionBlock(employee, "employeeAuthDiagnosticTimestamp"),
+    functionBlock(employee, "employeeAuthDiagnosticTrim"),
+    functionBlock(employee, "employeeAuthDiagnosticBeginAttempt"),
+    functionBlock(employee, "employeeAuthDiagnosticFinishAttempt"),
+    functionBlock(employee, "employeeAuthDiagnosticTransition"),
     functionBlock(employee, "employeeAuthErrorIsTransient"),
     functionBlock(employee, "employeeAuthDelay"),
     functionBlock(employee, "employeeFetchCurrentAuthUserWithRetry"),
     functionBlock(employee, "employeeSetAuthInteractionLocked"),
     functionBlock(employee, "employeeRenderAuthWorkspacePlaceholder"),
+    functionBlock(employee, "employeeRenderAuthIdentityLabels"),
     functionBlock(employee, "setEmployeeAuthState"),
     functionBlock(employee, "checkEmployeeSession"),
   ].join("\n");
@@ -116,7 +124,7 @@ function harness() {
     return next;
   };
   return {
-    context, state, elements, controls, scopedDrafts,
+    context, state, elements, controls, scopedDrafts, EMPLOYEE_AUTH_DIAGNOSTIC,
     setSequence: values => { fetchSequence = [...values]; fetchCalls = 0; },
     check: options => vm.runInContext("checkEmployeeSession", context)(options),
     authError: (code, status) => vm.runInContext("employeeAuthError", context)(code, status),
@@ -137,6 +145,8 @@ test("initial 200 restores the verified employee draft without exposing last-use
   assert.equal(h.state.drafts[0].id, "ENTRY-A");
   assert.equal(h.elements.workspaceSessionCount.textContent, "Current Session (1)");
   assert.equal(h.elements.employeeAuthState.hidden, true);
+  assert.equal(h.elements.employeeIdentityRole.textContent, "STAFF / 员工");
+  assert.equal(h.elements.employeeUserRole.textContent, "ACCOUNT / 账户");
   assert.equal(h.syncFormCalls, 1);
   assert.equal(h.redirects, 0);
 });
@@ -188,6 +198,7 @@ test("an authenticated workspace survives 503 timeout network and non-json failu
     assert.equal(h.state.drafts.length, 1);
     assert.equal(h.state.drafts[0].id, "ENTRY-A");
     assert.equal(h.elements.workspaceSessionCount.textContent, "Current Session (1)");
+    assert.equal(h.elements.employeeIdentityRole.textContent, "STAFF / 员工");
     assert.equal(h.redirects, 0);
   }
 });
@@ -221,6 +232,49 @@ test("verified identities remain isolated across repeated refreshes and independ
   await second.check();
   assert.deepEqual(second.state.drafts.map(row => row.id), ["ENTRY-A"]);
   assert.deepEqual(first.state.drafts.map(row => row.id), ["ENTRY-B"]);
+});
+
+test("concurrent auth checks join one request and cannot overwrite the accepted result", async () => {
+  const h = harness();
+  let release;
+  const pending = new Promise(resolve => { release = resolve; });
+  h.setSequence([pending]);
+  h.context.fetchCurrentAuthUser = async () => {
+    const next = await pending;
+    return next;
+  };
+  const first = h.check();
+  const second = h.check({ force: true });
+  assert.equal(h.EMPLOYEE_AUTH_DIAGNOSTIC.concurrent_join_count, 1);
+  release({ userid: "staff-a", role: "staff" });
+  const [left, right] = await Promise.all([first, second]);
+  assert.equal(left.status, "AUTHENTICATED");
+  assert.equal(right.status, "AUTHENTICATED");
+  assert.equal(h.state.drafts[0].id, "ENTRY-A");
+  assert.equal(h.elements.employeeIdentityRole.textContent, "STAFF / 员工");
+});
+
+test("bounded attempts expose sanitized diagnostic timing without cookie values", async () => {
+  const h = harness();
+  h.setSequence([h.authError("me_timeout", 0), h.authError("me_network_error", 0), { userid: "staff-a", role: "staff" }]);
+  const result = await h.check();
+  assert.equal(result.status, "AUTHENTICATED");
+  assert.equal(h.EMPLOYEE_AUTH_DIAGNOSTIC.attempts.length, 3);
+  assert.deepEqual(h.EMPLOYEE_AUTH_DIAGNOSTIC.attempts.map(row => row.response_class), ["TRANSIENT_ERROR", "TRANSIENT_ERROR", "AUTHENTICATED"]);
+  assert.equal(h.EMPLOYEE_AUTH_DIAGNOSTIC.attempts.every(row => row.credentials_include === true), true);
+  assert.equal(h.EMPLOYEE_AUTH_DIAGNOSTIC.attempts.every(row => row.cookie_value_read === false), true);
+  assert.equal(h.EMPLOYEE_AUTH_DIAGNOSTIC.transitions.at(-1).status, "AUTHENTICATED");
+});
+
+test("the authenticated label is never left at the restoring copy after successful rehydration", async () => {
+  const h = harness();
+  h.elements.employeeIdentityRole.textContent = "正在恢复登录";
+  h.elements.employeeUserRole.textContent = "正在恢复登录";
+  h.setSequence([{ userid: "staff-a", role: "staff" }]);
+  await h.check();
+  assert.equal(h.elements.employeeIdentityRole.textContent, "STAFF / 员工");
+  assert.equal(h.elements.employeeUserRole.textContent, "ACCOUNT / 账户");
+  assert.doesNotMatch(h.elements.employeeIdentityRole.textContent + h.elements.employeeUserRole.textContent, /正在恢复登录/);
 });
 
 test("the auth recovery path never saves clears uploads or changes seven-event dispatch", () => {

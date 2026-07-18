@@ -328,7 +328,7 @@ test('Scenario G: provider, server fields, timestamps, mixed sessions, gate fals
 });
 
 test('Source-of-truth acceptance: canonical archive is the only transfer fact and all projections remain rebuildable', () => {
-  assert.match(functionBlock(worker, 'persistEmployeeBedTransferCanonicalArchive'), /INSERT INTO sessions .*source,entries_json\)/s);
+  assert.match(functionBlock(worker, 'persistEmployeeBedTransferCanonicalArchive'), /INSERT INTO sessions .*source,entries_json(?:,summary_json)?\)/s);
   assert.doesNotMatch(functionBlock(worker, 'persistEmployeeBedTransferCanonicalArchive'), /bed_transfer_events|transactions|entry_events|DB\.batch/);
   assert.match(worker, /source_deposit.*access_snapshot_remark_D|deposit_current_balance_source:"TTLock \/ Access Snapshot D amount"/);
   assert.match(worker, /physical_bed_status_source/);

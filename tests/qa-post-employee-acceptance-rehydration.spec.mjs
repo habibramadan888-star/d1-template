@@ -190,13 +190,24 @@ test("transient and role failures preserve all loaded records while only real 40
 test("current identity redirects only on a real 401 and preserves role 403 as an error", async () => {
   const employee = await read("deploy-worker/public/employee-v3.html");
   const responses = new Map([
-    [401, { status: 401, ok: false, json: async () => ({}) }],
-    [403, { status: 403, ok: false, json: async () => ({}) }],
-    [200, { status: 200, ok: true, json: async () => ({ role: "staff", userid: "qa-staff" }) }],
+    [401, { status: 401, ok: false, headers: { get: () => "" }, json: async () => ({}) }],
+    [403, { status: 403, ok: false, headers: { get: () => "" }, json: async () => ({}) }],
+    [200, { status: 200, ok: true, headers: { get: name => name === "content-type" ? "application/json" : "" }, json: async () => ({ role: "staff", userid: "qa-staff" }) }],
   ]);
   let selected = 200;
-  const context = vm.createContext({ apiFetch: async () => responses.get(selected), unwrapStandardResponse: value => value, Error });
-  vm.runInContext([functionBlock(employee, "employeeAuthError"), functionBlock(employee, "fetchCurrentAuthUser")].join("\n"), context);
+  const context = vm.createContext({
+    apiFetch: async () => responses.get(selected), unwrapStandardResponse: value => value, Error,
+    EMPLOYEE_ASSET_DIAGNOSTIC: { frontend_asset_version: "qa-idempotent-finalization-v1", employee_asset_version: "qa-idempotent-finalization-v1" },
+    EMPLOYEE_AUTH_DIAGNOSTIC: { contract_version: "employee-auth-attempt-v1", attempt_sequence: 0, attempts: [], transitions: [], concurrent_join_count: 0, active_attempt_id: "", latest_response_class: "", latest_worker_version: "", latest_asset_version: "" },
+  });
+  vm.runInContext([
+    functionBlock(employee, "employeeAuthDiagnosticTimestamp"),
+    functionBlock(employee, "employeeAuthDiagnosticTrim"),
+    functionBlock(employee, "employeeAuthDiagnosticBeginAttempt"),
+    functionBlock(employee, "employeeAuthDiagnosticFinishAttempt"),
+    functionBlock(employee, "employeeAuthError"),
+    functionBlock(employee, "fetchCurrentAuthUser"),
+  ].join("\n"), context);
   const current = vm.runInContext("fetchCurrentAuthUser", context);
   selected = 401;
   assert.equal(await current(), null);
