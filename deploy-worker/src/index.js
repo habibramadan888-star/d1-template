@@ -11883,6 +11883,19 @@ function redirectToPath(request, pathname) {
   return Response.redirect(target, 302);
 }
 __name(redirectToPath, "redirectToPath");
+function employeeLoginReturnTo(request, env) {
+  const url = new URL(request.url);
+  const runId = qaAcceptanceEnabled(env) ? qaAcceptanceRunId(url.searchParams.get("qa_run_id")) : "";
+  return `/employee${runId ? `?qa_run_id=${encodeURIComponent(runId)}` : ""}#entry`;
+}
+__name(employeeLoginReturnTo, "employeeLoginReturnTo");
+function redirectToEmployeeLogin(request, env) {
+  const target = new URL("/", request.url);
+  target.searchParams.set("portal", "employee");
+  target.searchParams.set("return_to", employeeLoginReturnTo(request, env));
+  return Response.redirect(target, 302);
+}
+__name(redirectToEmployeeLogin, "redirectToEmployeeLogin");
 async function readRouteClaim(request, env) {
   const auth = await requireAuth(request, env);
   return auth.error ? null : auth.payload;
@@ -12487,7 +12500,7 @@ async function qaAcceptanceCreateRun(request,env,user){
   let body={};try{body=await request.json()}catch{return badRequest("invalid_json")}
   const mode=String(body.mode||"quick").trim().toLowerCase();
   if(!["quick","full","recovery"].includes(mode))return json({success:false,error_code:"QA_RUN_MODE_INVALID"},422);
-  const active=await env.DB.prepare("SELECT qa_run_id,status FROM qa_acceptance_runs WHERE corpid=? AND cleanup_status<>'COMPLETED' AND status NOT IN ('FINAL_ACCEPTED','UPLOAD_PASS','MANUAL_OWNER_ACCEPTED') ORDER BY created_at DESC LIMIT 1").bind(user.corpid).first();
+  const active=await env.DB.prepare("SELECT qa_run_id,status FROM qa_acceptance_runs WHERE corpid=? AND cleanup_status<>'COMPLETED' AND status NOT IN ('FINAL_ACCEPTED','UPLOAD_PASS','MANUAL_OWNER_ACCEPTED','REJECTED_CROSS_AUTH_REDIRECT') ORDER BY created_at DESC LIMIT 1").bind(user.corpid).first();
   if(active)return json({success:false,error_code:"QA_ACTIVE_RUN_EXISTS",qa_run_id:active.qa_run_id,status:active.status},409);
   const matrix=await env.RATE_LIMIT.get(`qa:matrix:${mode}:${env.QA_MATRIX_VERSION}`,"json").catch(()=>null);
   if(!matrix||String(matrix.matrix_version||"")!==String(env.QA_MATRIX_VERSION||""))return json({success:false,error_code:"QA_MATRIX_UNAVAILABLE",no_write:true},503);
@@ -13377,7 +13390,7 @@ async function handleAppEntryRoute(request, env, path, method) {
   if (path !== "/employee" && path !== "/owner" && path !== "/admin") return null;
 
   const claim = await readRouteClaim(request, env);
-  if (!claim) return redirectToRootEntry(request);
+  if (!claim) return path === "/employee" ? redirectToEmployeeLogin(request, env) : redirectToRootEntry(request);
   if (isStaffRoleValue(claim.role)) {
     return path === "/employee" ? fetchStaticAsset(request, env, "/employee-v3") : redirectToPath(request, "/employee");
   }

@@ -1,7 +1,7 @@
 {
   "qa_run_id": "QA-20260718-D8FEE436",
   "mode": "full",
-  "status": "AUTOMATION_PASS",
+  "status": "REJECTED_CROSS_AUTH_REDIRECT",
   "artifact_sha256": "fa3d7acaa41a1515f3a2135cf3aa1c48a552c6f5f7829bee467e982aac97e54c",
   "artifact_commit": "d260e18763485aed3b7982d1a004bb6e13bba32f",
   "qa_worker_version": "36b5d77f-ad25-4ac4-917f-7dcddc7d9d97",

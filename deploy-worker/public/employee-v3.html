@@ -3487,9 +3487,21 @@ function clearEmployeeLegacyAuthState(){
     try{sessionStorage.removeItem(k)}catch{}
   });
 }
+function employeeLoginReturnTo(){
+  let current;
+  try{current=new URL(location.href)}catch{return'/employee#entry'}
+  if(current.origin!==location.origin||current.pathname!=='/employee')return'/employee#entry';
+  const runId=String(current.searchParams.get('qa_run_id')||'').toUpperCase();
+  const validRunId=/^QA-\d{8}-[A-Z0-9]{4,12}$/.test(runId)?runId:'';
+  return `/employee${validRunId?`?qa_run_id=${encodeURIComponent(validRunId)}`:''}#entry`;
+}
 function redirectToUnifiedLogin(reason=''){
   clearEmployeeLegacyAuthState();
-  const target=UNIFIED_LOGIN_DESTINATION+(reason?`?reason=${encodeURIComponent(reason)}`:'');
+  const params=new URLSearchParams();
+  params.set('portal','employee');
+  params.set('return_to',employeeLoginReturnTo());
+  if(reason)params.set('reason',String(reason));
+  const target=`${UNIFIED_LOGIN_DESTINATION}?${params.toString()}`;
   location.replace(target);
 }
 function setEmployeeMenuOpen(open){

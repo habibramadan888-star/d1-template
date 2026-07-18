@@ -170,6 +170,24 @@ function destinationForRole(role){
   if(OWNER_ROLES.has(r))return"/owner";
   return null;
 }
+function safeReturnToForRole(raw,role){
+  const roleTarget=destinationForRole(role);
+  const text=String(raw||"").trim();
+  if(!roleTarget||!text.startsWith("/")||text.startsWith("//")||text.includes("\\")||/[\u0000-\u001f\u007f]/.test(text))return null;
+  let target;
+  try{target=new URL(text,location.origin)}catch{return null}
+  if(target.origin!==location.origin||target.pathname!==roleTarget)return null;
+  if(roleTarget!=="/employee")return target.pathname;
+  const keys=[...target.searchParams.keys()];
+  if(keys.some(key=>key!=="qa_run_id"))return null;
+  const runId=String(target.searchParams.get("qa_run_id")||"").toUpperCase();
+  if(runId&&!/^QA-\d{8}-[A-Z0-9]{4,12}$/.test(runId))return null;
+  if(target.hash&&target.hash!=="#entry")return null;
+  return `/employee${runId?`?qa_run_id=${encodeURIComponent(runId)}`:""}#entry`;
+}
+function destinationForMe(me){
+  return safeReturnToForRole(new URLSearchParams(location.search).get("return_to"),me?.role)||destinationForRole(me?.role);
+}
 async function requestJson(path,options={}){
   const headers={"Content-Type":"application/json",...(options.headers||{})};
   const token=localStorage.getItem("homelink:cloud_token");
@@ -188,7 +206,7 @@ async function fetchMe(){
   return unwrapStandardResponse(body);
 }
 function routeFromMe(me){
-  const target=destinationForRole(me?.role);
+  const target=destinationForMe(me);
   if(!target){setStatus("此账号暂不能进入系统","error");return}
   location.replace(target);
 }

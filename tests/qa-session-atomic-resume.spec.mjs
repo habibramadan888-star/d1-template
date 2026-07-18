@@ -128,7 +128,7 @@ test("41-entry Full upload uses bounded dependency-safe write batches and preser
 
 test("an uploaded Run awaiting Owner review remains immutable while a replacement performance Run may be created", () => {
   const createRun = functionBlock(worker, "qaAcceptanceCreateRun");
-  assert.match(createRun, /status NOT IN \('FINAL_ACCEPTED','UPLOAD_PASS','MANUAL_OWNER_ACCEPTED'\)/);
+  assert.match(createRun, /status NOT IN \('FINAL_ACCEPTED','UPLOAD_PASS','MANUAL_OWNER_ACCEPTED','REJECTED_CROSS_AUTH_REDIRECT'\)/);
   assert.match(createRun, /cleanup_status<>'COMPLETED'/);
   assert.doesNotMatch(createRun, /UPDATE qa_acceptance_runs/);
 });
