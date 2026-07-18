@@ -20,6 +20,31 @@ function normalizeEntry(e){
   }
   return out;
 }
+function ownerRentPaymentLegs(entry){
+  const eventType=String(entry?.event_type||entry?.type||entry?.reason_code||'').trim().toLowerCase();
+  const isRent=eventType==='rent'||eventType==='r';
+  const legs=Array.isArray(entry?.payment_legs)?entry.payment_legs:[];
+  if(!isRent||legs.length!==2)return null;
+  const normalized=legs.map(leg=>({
+    method:String(leg?.method||leg?.payment_method||'').trim().toLowerCase(),
+    amount:Number(leg?.amount_aed??leg?.amount)
+  }));
+  if(normalized.some(leg=>!['cash','bank'].includes(leg.method)||!Number.isFinite(leg.amount)||leg.amount<=0))return null;
+  if(new Set(normalized.map(leg=>leg.method)).size!==2)return null;
+  const paid=Number(entry?.paid??entry?.paid_amount??entry?.payment_amount??entry?.amount??0);
+  const legTotal=Math.round(normalized.reduce((sum,leg)=>sum+leg.amount,0)*100)/100;
+  if(!Number.isFinite(paid)||Math.abs(legTotal-paid)>0.01)return null;
+  return normalized;
+}
+function ownerEntryChannelAmounts(entry){
+  const legs=ownerRentPaymentLegs(entry);
+  if(legs){
+    return legs.reduce((out,leg)=>({...out,[leg.method]:Math.round((out[leg.method]+leg.amount)*100)/100}),{cash:0,bank:0});
+  }
+  const amount=Number(entry?.amount??entry?.paid??entry?.paid_amount??entry?.payment_amount??0)||0;
+  const method=String(entry?.cat||entry?.payment_method||entry?.pay_type||'').trim().toLowerCase();
+  return{cash:method==='cash'||method==='c'?amount:0,bank:method==='bank'||method==='b'?amount:0};
+}
 const CAT_DISP={cash:'C',bank:'B',refund:'R',expense:'E'}; // 类别缩写
 const PRICES_KEY='apt:preset_prices';
 const ARREARS_KEY='apt:arrears';
@@ -744,9 +769,14 @@ function parseTXT(text){
 function totals(entries){
   // entry.amount = 本次实收总额（租金+押金合计），不需要额外加 depPaid
   const r2=n=>Math.round(n*100)/100;
-  const sum=c=>r2(entries.filter(e=>e.cat===c)
-    .reduce((s,e)=>s+Number(e.amount||0),0));
-  const ci=sum('cash'),bi=sum('bank'),ro=sum('refund'),eo=sum('expense');
+  const channelTotals=entries.reduce((sum,e)=>{
+    const channels=ownerEntryChannelAmounts(e);
+    sum.cash+=channels.cash;
+    sum.bank+=channels.bank;
+    return sum;
+  },{cash:0,bank:0});
+  const sum=c=>r2(entries.filter(e=>e.cat===c).reduce((s,e)=>s+Number(e.amount||0),0));
+  const ci=r2(channelTotals.cash),bi=r2(channelTotals.bank),ro=sum('refund'),eo=sum('expense');
   const outflows=entries.filter(e=>e.cat==='refund'||e.cat==='expense');
   const bankOut=r2(outflows.filter(e=>['bank','b'].includes(String(e.payType||e.payment_method||'').trim().toLowerCase())).reduce((s,e)=>s+Number(e.amount||0),0));
   const cashOut=r2(ro+eo-bankOut);
@@ -3204,7 +3234,7 @@ function computeAna(sessions){
   if(!sessions.length)return null;
   const all=sessions.flatMap(s=>(s.entries||[]).map(e=>({...normalizeEntry(e),sd:s.date})));
   const t=totals(all);
-  const byD={};sessions.forEach(s=>{const d=(s.date||'').slice(0,10);if(!byD[d])byD[d]={date:d,cash:0,bank:0,expense:0,refund:0,n:0};byD[d].n+=1;s.entries.forEach(e=>{if(byD[d][e.cat]!==undefined)byD[d][e.cat]+=Number(e.amount||0);});});
+  const byD={};sessions.forEach(s=>{const d=(s.date||'').slice(0,10);if(!byD[d])byD[d]={date:d,cash:0,bank:0,expense:0,refund:0,n:0};byD[d].n+=1;s.entries.forEach(e=>{const channels=ownerEntryChannelAmounts(e);byD[d].cash+=channels.cash;byD[d].bank+=channels.bank;if(e.cat==='expense'||e.cat==='refund')byD[d][e.cat]+=Number(e.amount||0);});});
   const trend=Object.values(byD).sort((a,b)=>a.date.localeCompare(b.date));
   // Structured discounts (payType===discount) + legacy keyword
   const discounts=all.filter(e=>e.payType==='discount'||(e.payType!=='installment'&&/discount|折扣|优惠/i.test(e.note||e.discountReason||'')));
@@ -5050,7 +5080,8 @@ function rc_cardPaymentCandidates(card,monthly,defaultPrice){
       if(rc_normBedKey(e.room)!==bed)return;
       const rentPaid=rc_entryRentPaid(e);
       if(rentPaid<=0)return;
-      raw.push({paidTs,rentPaid,e,s,cash:e.cat==='cash'?rentPaid:0,bank:e.cat==='bank'?rentPaid:0});
+      const channels=ownerEntryChannelAmounts(e);
+      raw.push({paidTs,rentPaid,e,s,cash:channels.cash,bank:channels.bank});
     });
   });
   if(!raw.length)return[];
@@ -7082,8 +7113,9 @@ function renderBillingWidget(targetId){
   let cash=0,bank=0;
   // Fix2: s.entries 防空守卫
   inPeriod.forEach(s=>(s.entries||[]).forEach(e=>{
-    if(e.cat==='cash')cash+=Number(e.amount||0);
-    if(e.cat==='bank')bank+=Number(e.amount||0);
+    const channels=ownerEntryChannelAmounts(e);
+    cash+=channels.cash;
+    bank+=channels.bank;
   }));
   const collected=r2(cash+bank);
   const [cashD,bankD]=[r2(cash),r2(bank)];  // 用于显示的已截断值
