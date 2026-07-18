@@ -3858,9 +3858,19 @@ async function handleEmployeeEntryValidate(request,env,user){
   if(Array.isArray(result.validation_results))result.validation_results=result.validation_results.map(row=>({...row,...assetInfo}));
   if(qaValidationContext?.ok===true&&Array.isArray(result.validation_results)){
     const responseQaContext=qaAcceptedResumePreflight?{...qaValidationContext,validation_attempt_id:result.accepted_validation_attempt_id||qaValidationContext.validation_attempt_id,expires_at:result.accepted_validation_expires_at||qaValidationContext.expires_at}:qaValidationContext;
-    result.validation_results=result.validation_results.map(row=>row.locked_accepted_attestation===true
-      ?{...row,result_origin:"SERVER_ATTESTATION",diagnostic_envelope:{...(row.diagnostic_envelope||{}),result_origin:"SERVER_ATTESTATION",cache_status:"SERVER_PERSISTED"}}
-      :qaValidationResultWithDiagnosticEnvelope(row,responseQaContext,request_context));
+    result.validation_results=await Promise.all(result.validation_results.map(async row=>{
+      if(row.locked_accepted_attestation===true)return {...row,result_origin:"SERVER_ATTESTATION",diagnostic_envelope:{...(row.diagnostic_envelope||{}),result_origin:"SERVER_ATTESTATION",cache_status:"SERVER_PERSISTED"}};
+      const enriched=qaValidationResultWithDiagnosticEnvelope(row,responseQaContext,request_context),writeAttestation=qaAcceptanceValidationWriteAttestation(enriched);
+      const writeAttestationSignature=await qaAcceptanceSignWriteAttestation(env,{
+        qa_run_id:qaValidationContext.run.qa_run_id,
+        artifact_sha256:qaValidationContext.run.artifact_sha256,
+        qa_worker_version:qaValidationContext.run.qa_worker_version,
+        matrix_version:qaValidationContext.run.matrix_version,
+        payload_hash:qaValidationContext.contract.payloadHash,
+        validation_attempt_id:responseQaContext.validation_attempt_id
+      },enriched.entry_identity,writeAttestation);
+      return {...enriched,write_attestation:writeAttestation,write_attestation_signature:writeAttestationSignature};
+    }));
     result.trace_id=qaValidationContext.trace_id;
     result.validation_attempt_id=responseQaContext.validation_attempt_id;
     result.qa_run_id=qaValidationContext.run.qa_run_id;
@@ -12672,20 +12682,76 @@ function qaAcceptanceStoredValidation(run={}){
   try{return JSON.parse(run.automation_json||"null")}catch{return null}
 }
 __name(qaAcceptanceStoredValidation,"qaAcceptanceStoredValidation");
+function qaAcceptanceValidationWriteAttestation(result={}){
+  const bedTransfer=result?.bed_transfer_phase1_preview&&typeof result.bed_transfer_phase1_preview==="object"
+    ?sanitizeBedTransferIdentityFields(result.bed_transfer_phase1_preview)
+    :null;
+  const arrears=result?.derived_arrears_payment?.derived===true
+    ?{derived:true,server_fields:{...(result.derived_arrears_payment.server_fields||{})}}
+    :null;
+  const exitEvent=result?.exit_event_reference?.server_fields
+    ?{server_fields:{...(result.exit_event_reference.server_fields||{})}}
+    :null;
+  return hscStableValue({
+    bed_transfer_phase1_preview:bedTransfer,
+    derived_arrears_payment:arrears,
+    exit_event_reference:exitEvent,
+    idempotent:result?.idempotent===true,
+    existing_session_id:cleanText(result?.existing_session_id||"",160),
+    existing_anchor:cleanText(result?.existing_anchor||"",180),
+    duplicate_guard:result?.duplicate_guard&&typeof result.duplicate_guard==="object"?{
+      ok:result.duplicate_guard.ok===true,
+      idempotent:result.duplicate_guard.idempotent===true,
+      existing_session_id:cleanText(result.duplicate_guard.existing_session_id||"",160),
+      existing_anchor:cleanText(result.duplicate_guard.existing_anchor||"",180),
+      canonical_fingerprint_persistence:cleanText(result.duplicate_guard.canonical_fingerprint_persistence||"",80)
+    }:null
+  });
+}
+__name(qaAcceptanceValidationWriteAttestation,"qaAcceptanceValidationWriteAttestation");
+function qaAcceptanceWriteAttestationBasis(context={},entryIdentity="",writeAttestation={}){
+  return hscStableValue({
+    contract:"QA_VALIDATION_WRITE_ATTESTATION_V1",
+    qa_run_id:cleanText(context.qa_run_id||"",120),
+    artifact_sha256:cleanText(context.artifact_sha256||"",80),
+    qa_worker_version:cleanText(context.qa_worker_version||context.worker_version||"",120),
+    matrix_version:cleanText(context.matrix_version||"",120),
+    payload_hash:cleanText(context.payload_hash||"",80),
+    validation_attempt_id:cleanText(context.validation_attempt_id||"",120),
+    entry_identity:cleanText(entryIdentity||"",160),
+    write_attestation:hscStableValue(writeAttestation||{})
+  });
+}
+__name(qaAcceptanceWriteAttestationBasis,"qaAcceptanceWriteAttestationBasis");
+async function qaAcceptanceSignWriteAttestation(env,context={},entryIdentity="",writeAttestation={}){
+  const secret=String(env.JWT_SECRET||"");
+  if(!secret)throw new Error("qa_write_attestation_secret_missing");
+  const key=await importKey(secret,"sign"),payload=JSON.stringify(qaAcceptanceWriteAttestationBasis(context,entryIdentity,writeAttestation));
+  const signature=await crypto.subtle.sign(ALGO,key,new TextEncoder().encode(payload));
+  return bytesToB64url(new Uint8Array(signature));
+}
+__name(qaAcceptanceSignWriteAttestation,"qaAcceptanceSignWriteAttestation");
+async function qaAcceptanceVerifyWriteAttestation(env,context={},entryIdentity="",writeAttestation={},signature=""){
+  const received=cleanText(signature||"",160);
+  if(!received)return false;
+  try{return constantTimeEqual(received,await qaAcceptanceSignWriteAttestation(env,context,entryIdentity,writeAttestation))}catch{return false}
+}
+__name(qaAcceptanceVerifyWriteAttestation,"qaAcceptanceVerifyWriteAttestation");
 async function qaAcceptanceCreateRun(request,env,user){
   let body={};try{body=await request.json()}catch{return badRequest("invalid_json")}
   const mode=String(body.mode||"quick").trim().toLowerCase();
   if(!["quick","full","recovery"].includes(mode))return json({success:false,error_code:"QA_RUN_MODE_INVALID"},422);
-  const active=await env.DB.prepare("SELECT qa_run_id,status FROM qa_acceptance_runs WHERE corpid=? AND cleanup_status<>'COMPLETED' AND status NOT IN ('FINAL_ACCEPTED','UPLOAD_PASS','MANUAL_OWNER_ACCEPTED','REJECTED_CROSS_AUTH_REDIRECT') ORDER BY created_at DESC LIMIT 1").bind(user.corpid).first();
-  if(active)return json({success:false,error_code:"QA_ACTIVE_RUN_EXISTS",qa_run_id:active.qa_run_id,status:active.status},409);
   const matrix=await env.RATE_LIMIT.get(`qa:matrix:${mode}:${env.QA_MATRIX_VERSION}`,"json").catch(()=>null);
   if(!matrix||String(matrix.matrix_version||"")!==String(env.QA_MATRIX_VERSION||""))return json({success:false,error_code:"QA_MATRIX_UNAVAILABLE",no_write:true},503);
+  const artifactManifest=await env.RATE_LIMIT.get("qa:artifact-manifest","json").catch(()=>null);
+  const artifact=String(artifactManifest?.candidate_sha256||""),artifactCommit=String(env.QA_ARTIFACT_COMMIT||artifactManifest?.git_commit||"").trim(),workerVersion=String(env.CF_VERSION_METADATA?.id||env.QA_WORKER_VERSION||artifactManifest?.worker_version||artifact.slice(0,12)).trim();
+  if(!/^[a-f0-9]{64}$/i.test(artifact)||!artifactCommit||!workerVersion||(String(env.QA_ARTIFACT_COMMIT||"").trim()&&String(artifactManifest?.git_commit||"")!==String(env.QA_ARTIFACT_COMMIT||"")))return json({success:false,error_code:"QA_ARTIFACT_SHA_UNAVAILABLE",no_write:true},503);
+  const active=await env.DB.prepare("SELECT qa_run_id,status FROM qa_acceptance_runs WHERE corpid=? AND artifact_sha256=? AND cleanup_status<>'COMPLETED' AND status NOT IN ('FINAL_ACCEPTED','UPLOAD_PASS','MANUAL_OWNER_ACCEPTED','REJECTED_CROSS_AUTH_REDIRECT') ORDER BY created_at DESC LIMIT 1").bind(user.corpid,artifact).first();
+  if(active)return json({success:false,error_code:"QA_ACTIVE_RUN_EXISTS",qa_run_id:active.qa_run_id,status:active.status},409);
   const runId=`QA-${empTodayDubai().replaceAll("-","")}-${crypto.randomUUID().replaceAll("-","").slice(0,8).toUpperCase()}`;
   const materialized=qaAcceptanceMaterializeMatrix(runId,matrix),scenarios=materialized.scenarios||[];
   materialized.validation_payload_hash=await qaAcceptanceValidationPayloadHash(materialized);
-  const artifactManifest=await env.RATE_LIMIT.get("qa:artifact-manifest","json").catch(()=>null);
-  const now=empNow(),status="DRAFT_READY",artifact=String(artifactManifest?.candidate_sha256||""),artifactCommit=String(env.QA_ARTIFACT_COMMIT||artifactManifest?.git_commit||"").trim(),workerVersion=String(env.CF_VERSION_METADATA?.id||env.QA_WORKER_VERSION||artifactManifest?.worker_version||artifact.slice(0,12)).trim();
-  if(!/^[a-f0-9]{64}$/i.test(artifact)||!artifactCommit||!workerVersion||(String(env.QA_ARTIFACT_COMMIT||"").trim()&&String(artifactManifest?.git_commit||"")!==String(env.QA_ARTIFACT_COMMIT||"")))return json({success:false,error_code:"QA_ARTIFACT_SHA_UNAVAILABLE",no_write:true},503);
+  const now=empNow(),status="DRAFT_READY";
   await env.DB.prepare(`INSERT INTO qa_acceptance_runs (qa_run_id,corpid,mode,matrix_version,scenario_count,employee_record_count,status,artifact_sha256,artifact_commit,qa_worker_version,matrix_json,expected_json,created_by,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(runId,user.corpid,mode,String(matrix.matrix_version),Number(scenarios.length)+Number((materialized.automation_only||materialized.recovery_scenarios||[]).length),scenarios.filter(row=>row.upload_enabled!==false).length,status,artifact,artifactCommit,workerVersion,JSON.stringify(materialized),JSON.stringify(materialized.expected_finance||{}),user.userid,now,now).run();
   return success(qaAcceptancePublicRun(request,await qaAcceptanceReadRun(env,user,runId)));
 }
@@ -13024,6 +13090,7 @@ async function qaAcceptanceEmployeeDraft(request,env,user,run){
   if(!contract.ok)return qaAcceptanceEmployeeDraftUnavailable(contract.error_code,409,run);
   const {scenarios,expected,manifest,payloadHash,artifactCompatibility}=contract;
   const persistence=await qaAcceptanceRunPersistenceSnapshot(env,user,run,contract,null,{fresh:true});
+  const durableAttempt=await employeeUploadAttemptReadForRun(env,user,run.qa_run_id).catch(()=>({attempt:null,entries:[]}));
   const stored=qaAcceptanceStoredValidation(run);
   const freshness=qaAcceptanceValidationAttestationCurrent(run,contract,stored);
   const validationAttestation=freshness.current?{
@@ -13065,6 +13132,7 @@ async function qaAcceptanceEmployeeDraft(request,env,user,run){
     duplicate_entry_id_count:persistence.duplicate_count,
     persisted_entry_ids:persistence.persisted_entry_ids,
     missing_entry_ids:persistence.missing_entry_ids,
+    active_upload_attempt:durableAttempt.attempt?employeeUploadAttemptPublic(durableAttempt.attempt,durableAttempt.entries):null,
     readonly:String(run.status||"")==="UPLOAD_PASS",
     delivery_contract:"SERVER_PERSISTED_QA_RUN_V1",
     preview_expected:true,
@@ -13100,10 +13168,12 @@ async function qaAcceptanceRecordAutomation(request,env,user,run){
       &&String(envelope.payload_hash||"")===payloadHash
       &&String(envelope.result_origin||"")==="LIVE_SERVER";
   });
-  if(!contextValid||!identityValid||!envelopeValid||Number(body.formal_write_count||0)!==0)return json({success:false,error_code:"QA_AUTOMATION_RESULT_INVALID",expected_count:expected.length,result_count:results.length,no_write:true},422);
+  const attestationContext={qa_run_id:run.qa_run_id,artifact_sha256:run.artifact_sha256,qa_worker_version:run.qa_worker_version,matrix_version:run.matrix_version,payload_hash:payloadHash,validation_attempt_id:validationAttemptId};
+  const writeAttestationValid=(await Promise.all(results.map(row=>qaAcceptanceVerifyWriteAttestation(env,attestationContext,row.entry_identity,hscStableValue(row.write_attestation||{}),row.write_attestation_signature)))).every(Boolean);
+  if(!contextValid||!identityValid||!envelopeValid||!writeAttestationValid||Number(body.formal_write_count||0)!==0)return json({success:false,error_code:"QA_AUTOMATION_RESULT_INVALID",expected_count:expected.length,result_count:results.length,no_write:true},422);
   const passed=results.filter(row=>row.ok===true).length,failed=results.length-passed;
-  const validationResults=results.map(row=>({entry_identity:String(row.entry_identity||""),event_type:cleanText(row.event_type||"",80),ok:row.ok===true,error_code:normalizeEmployeeValidationErrorCode(row.error_code),missing_fields:Array.isArray(row.missing_fields)?row.missing_fields.map(value=>cleanText(value,80)).filter(Boolean):[],diagnostic_envelope:{...(row.diagnostic_envelope||{}),client_received_at:cleanText(row?.diagnostic_envelope?.client_received_at||body.client_received_at||"",80)}}));
-  const resultDigest=await hscSha256(JSON.stringify(validationResults.map(row=>({entry_identity:row.entry_identity,event_type:row.event_type,ok:row.ok,error_code:row.error_code,missing_fields:row.missing_fields})).sort((a,b)=>a.entry_identity.localeCompare(b.entry_identity))));
+  const validationResults=results.map(row=>({entry_identity:String(row.entry_identity||""),event_type:cleanText(row.event_type||"",80),ok:row.ok===true,error_code:normalizeEmployeeValidationErrorCode(row.error_code),missing_fields:Array.isArray(row.missing_fields)?row.missing_fields.map(value=>cleanText(value,80)).filter(Boolean):[],write_attestation:hscStableValue(row.write_attestation||{}),write_attestation_signature:cleanText(row.write_attestation_signature||"",160),diagnostic_envelope:{...(row.diagnostic_envelope||{}),client_received_at:cleanText(row?.diagnostic_envelope?.client_received_at||body.client_received_at||"",80)}}));
+  const resultDigest=await hscSha256(JSON.stringify(validationResults.map(row=>({entry_identity:row.entry_identity,event_type:row.event_type,ok:row.ok,error_code:row.error_code,missing_fields:row.missing_fields,write_attestation:row.write_attestation,write_attestation_signature:row.write_attestation_signature})).sort((a,b)=>a.entry_identity.localeCompare(b.entry_identity))));
   const previous=qaAcceptanceStoredValidation(run)||{};
   const previousFreshness=qaAcceptanceValidationAttestationCurrent(run,{payloadHash},previous);
   const exactAttempt=String(previous.validation_attempt_id||"")===validationAttemptId&&String(previous.result_digest||"")===resultDigest;
@@ -13119,10 +13189,14 @@ async function qaAcceptanceRecordAutomation(request,env,user,run){
   const automation={qa_run_id:run.qa_run_id,artifact_sha256:run.artifact_sha256,qa_worker_version:run.qa_worker_version||"",matrix_version:run.matrix_version,payload_hash:payloadHash,validation_attempt_id:validationAttemptId,result_digest:resultDigest,trace_id:attemptSummary.trace_id,server_validated_at:cleanText(firstEnvelope.server_validated_at||recordedAt,80),expires_at:cleanText(firstEnvelope.expires_at||"",80),result_origin:"LIVE_SERVER",aggregate_http_status:Number(body.aggregate_http_status||0),validation_result_count:results.length,passed_count:passed,failed_count:failed,entry_ids:ids,validation_results:validationResults,attempt_history:attemptHistory,formal_write_count:0,ttlock_external_calls:Number(body.ttlock_external_calls||0),recorded_at:recordedAt};
   if(automation.ttlock_external_calls!==0)return json({success:false,error_code:"QA_TTLOCK_EXTERNAL_CALL_DETECTED",no_write:true},422);
   const nextStatus=failed===0&&automation.aggregate_http_status===200?"AUTOMATION_PASS":"AUTOMATION_FAILED";
-  const update=await env.DB.prepare("UPDATE qa_acceptance_runs SET status=?,automation_json=?,updated_at=? WHERE qa_run_id=? AND corpid=? AND status IN ('DRAFT_READY','AUTOMATION_FAILED','AUTOMATION_PASS')").bind(nextStatus,JSON.stringify(automation),empNow(),run.qa_run_id,user.corpid).run();
+  const recoveryAutoAccepted=String(run.mode||"")==="recovery"&&nextStatus==="AUTOMATION_PASS";
+  const persistedStatus=recoveryAutoAccepted?"MANUAL_EMPLOYEE_ACCEPTED":nextStatus,updatedAt=empNow();
+  const update=recoveryAutoAccepted
+    ?await env.DB.prepare("UPDATE qa_acceptance_runs SET status=?,automation_json=?,employee_accepted_by='qa-recovery-automation',employee_accepted_at=?,updated_at=? WHERE qa_run_id=? AND corpid=? AND status IN ('DRAFT_READY','AUTOMATION_FAILED','AUTOMATION_PASS')").bind(persistedStatus,JSON.stringify(automation),updatedAt,updatedAt,run.qa_run_id,user.corpid).run()
+    :await env.DB.prepare("UPDATE qa_acceptance_runs SET status=?,automation_json=?,updated_at=? WHERE qa_run_id=? AND corpid=? AND status IN ('DRAFT_READY','AUTOMATION_FAILED','AUTOMATION_PASS')").bind(persistedStatus,JSON.stringify(automation),updatedAt,run.qa_run_id,user.corpid).run();
   if(Number(update?.meta?.changes??update?.changes??0)!==1)return json({success:false,error_code:"QA_RUN_STATE_CONFLICT",status:(await qaAcceptanceReadRun(env,user,run.qa_run_id))?.status||"UNKNOWN",retryable:false},409);
   const refreshed=await qaAcceptanceReadRun(env,user,run.qa_run_id);
-  return success({...qaAcceptancePublicRun(request,refreshed),automation_attestation_status:runStatus==="AUTOMATION_PASS"?"REFRESHED":"RECORDED",idempotent:false,validation_attestation:automation});
+  return success({...qaAcceptancePublicRun(request,refreshed),automation_attestation_status:runStatus==="AUTOMATION_PASS"?"REFRESHED":"RECORDED",recovery_auto_accepted:recoveryAutoAccepted,idempotent:false,validation_attestation:automation});
 }
 __name(qaAcceptanceRecordAutomation,"qaAcceptanceRecordAutomation");
 async function qaAcceptanceAcceptReview(request,env,user,run,kind){
@@ -13158,6 +13232,180 @@ async function qaAcceptanceRecordUpload(request,env,user,run){
   return success(qaAcceptancePublicRun(request,await qaAcceptanceReadRun(env,user,run.qa_run_id)));
 }
 __name(qaAcceptanceRecordUpload,"qaAcceptanceRecordUpload");
+const EMPLOYEE_UPLOAD_ATTEMPT_CONTRACT="employee_upload_attempt_v2";
+const EMPLOYEE_UPLOAD_ATTEMPT_CHUNK_SIZE=6;
+const EMPLOYEE_UPLOAD_ATTEMPT_LEASE_MS=8e3;
+const EMPLOYEE_UPLOAD_ATTEMPT_ACTIVE_STATUSES=new Set(["CREATED","VALIDATED","WRITING","PAUSED_TRANSIENT","VERIFYING","FINALIZING"]);
+function employeeUploadAttemptCounts(entries=[]){
+  const saved=entries.filter(row=>String(row.status||"")==="SAVED").length;
+  const conflicts=entries.filter(row=>String(row.status||"")==="CONFLICT").length;
+  const duplicates=entries.filter(row=>String(row.status||"")==="DUPLICATE").length;
+  return {saved_count:saved,remaining_count:Math.max(0,entries.length-saved-conflicts-duplicates),conflict_count:conflicts,duplicate_count:duplicates};
+}
+__name(employeeUploadAttemptCounts,"employeeUploadAttemptCounts");
+function employeeUploadAttemptParse(value,fallback=null){try{return JSON.parse(value||"")||fallback}catch{return fallback}}
+__name(employeeUploadAttemptParse,"employeeUploadAttemptParse");
+function employeeUploadAttemptPublic(attempt={},entries=[],extra={}){
+  const counts=employeeUploadAttemptCounts(entries),metrics=employeeUploadAttemptParse(attempt.metrics_json,{})||{},receipt=employeeUploadAttemptParse(attempt.receipt_json,null);
+  return {
+    contract_version:String(attempt.contract_version||EMPLOYEE_UPLOAD_ATTEMPT_CONTRACT),attempt_id:String(attempt.attempt_id||""),qa_run_id:String(attempt.qa_run_id||""),session_id:String(attempt.session_id||""),artifact_sha:String(attempt.artifact_sha||""),payload_hash:String(attempt.payload_hash||""),status:String(attempt.status||"UNKNOWN"),expected_count:Number(attempt.expected_count||entries.length),saved_count:counts.saved_count,remaining_count:counts.remaining_count,conflict_count:counts.conflict_count,duplicate_count:counts.duplicate_count,next_cursor:entries.find(row=>!["SAVED","CONFLICT","DUPLICATE"].includes(String(row.status||"")))?.ordinal??null,has_more:counts.remaining_count>0&&!counts.conflict_count&&!counts.duplicate_count,retryable:["VALIDATED","WRITING","PAUSED_TRANSIENT","VERIFYING","FINALIZING"].includes(String(attempt.status||"")),last_error_code:String(attempt.last_error_code||""),validation_attempt_id:String(attempt.validation_attempt_id||""),validation_result_digest:String(attempt.validation_result_digest||""),receipt_digest:String(attempt.receipt_digest||""),upload_receipt:receipt,metrics,server_time:empNow(),entry_progress:entries.map(row=>({entry_id:String(row.entry_id||""),ordinal:Number(row.ordinal||0),event_type:String(row.event_type||""),status:String(row.status||""),canonical_anchor_id:String(row.canonical_anchor_id||""),last_error_code:String(row.last_error_code||"")})),...extra
+  };
+}
+__name(employeeUploadAttemptPublic,"employeeUploadAttemptPublic");
+function employeeUploadAttemptError(errorCode,status,attempt={},entries=[],extra={}){
+  const progress=employeeUploadAttemptPublic(attempt,entries,extra);
+  return json({success:false,error_code:errorCode,attempt_id:progress.attempt_id,payload_hash:progress.payload_hash,stage:String(extra.stage||progress.status||"UNKNOWN"),saved_count:progress.saved_count,remaining_count:progress.remaining_count,conflict_count:progress.conflict_count,duplicate_count:progress.duplicate_count,entry_progress:progress.entry_progress,metrics:progress.metrics,no_write:extra.no_write!==false,write_attempted:extra.write_attempted===true,retryable:extra.retryable===true,server_time:progress.server_time,...extra},status);
+}
+__name(employeeUploadAttemptError,"employeeUploadAttemptError");
+async function employeeUploadAttemptSchemaReady(env,context=null){
+  const [attempts,entries]=await Promise.all([empTableColumns(env,"employee_upload_attempts",context).catch(()=>new Set()),empTableColumns(env,"employee_upload_attempt_entries",context).catch(()=>new Set())]);
+  return attempts instanceof Set&&entries instanceof Set&&attempts.has("attempt_id")&&attempts.has("receipt_json")&&entries.has("entry_id");
+}
+__name(employeeUploadAttemptSchemaReady,"employeeUploadAttemptSchemaReady");
+async function employeeUploadAttemptRead(env,user,attemptId){
+  const attempt=await env.DB.prepare("SELECT * FROM employee_upload_attempts WHERE attempt_id=? AND company_scope=? LIMIT 1").bind(attemptId,user.corpid).first();
+  if(!attempt)return {attempt:null,entries:[]};
+  const entries=(await env.DB.prepare("SELECT * FROM employee_upload_attempt_entries WHERE attempt_id=? ORDER BY ordinal,entry_id").bind(attemptId).all()).results||[];
+  return {attempt,entries};
+}
+__name(employeeUploadAttemptRead,"employeeUploadAttemptRead");
+async function employeeUploadAttemptReadForRun(env,user,runId){
+  const attempt=await env.DB.prepare("SELECT * FROM employee_upload_attempts WHERE company_scope=? AND qa_run_id=? ORDER BY created_at DESC LIMIT 1").bind(user.corpid,runId).first().catch(()=>null);
+  return attempt?employeeUploadAttemptRead(env,user,attempt.attempt_id):{attempt:null,entries:[]};
+}
+__name(employeeUploadAttemptReadForRun,"employeeUploadAttemptReadForRun");
+async function employeeUploadAttemptAcquireLease(env,user,attemptId){
+  const token=crypto.randomUUID(),tokenHash=await hscSha256(token),now=empNow(),expiresAt=new Date(Date.now()+EMPLOYEE_UPLOAD_ATTEMPT_LEASE_MS).toISOString();
+  const result=await env.DB.prepare("UPDATE employee_upload_attempts SET lease_token_hash=?,lease_expires_at=?,status=CASE WHEN status IN ('CREATED','VALIDATED','PAUSED_TRANSIENT') THEN 'WRITING' ELSE status END,updated_at=? WHERE attempt_id=? AND company_scope=? AND status IN ('CREATED','VALIDATED','WRITING','PAUSED_TRANSIENT','VERIFYING','FINALIZING') AND (COALESCE(lease_token_hash,'')='' OR COALESCE(lease_expires_at,'')<?)").bind(tokenHash,expiresAt,now,attemptId,user.corpid,now).run();
+  return Number(result?.meta?.changes??result?.changes??0)===1?{ok:true,token_hash:tokenHash,expires_at:expiresAt}:{ok:false,token_hash:"",expires_at:""};
+}
+__name(employeeUploadAttemptAcquireLease,"employeeUploadAttemptAcquireLease");
+async function employeeUploadAttemptReleaseLease(env,user,attemptId,tokenHash,status,lastError=""){
+  const result=await env.DB.prepare("UPDATE employee_upload_attempts SET lease_token_hash=NULL,lease_expires_at=NULL,status=?,last_error_code=?,updated_at=? WHERE attempt_id=? AND company_scope=? AND lease_token_hash=?").bind(status,lastError||null,empNow(),attemptId,user.corpid,tokenHash).run();
+  return Number(result?.meta?.changes??result?.changes??0)===1;
+}
+__name(employeeUploadAttemptReleaseLease,"employeeUploadAttemptReleaseLease");
+function employeeUploadAttemptMetrics(attempt={}){return employeeUploadAttemptParse(attempt.metrics_json,{validation_count:0,chunks:[],status_recovery_count:0,lease_conflict_count:0,total_wall_ms:0})||{validation_count:0,chunks:[],status_recovery_count:0,lease_conflict_count:0,total_wall_ms:0}}
+__name(employeeUploadAttemptMetrics,"employeeUploadAttemptMetrics");
+async function employeeUploadAttemptSaveMetrics(env,user,attemptId,metrics={}){
+  await env.DB.prepare("UPDATE employee_upload_attempts SET metrics_json=?,updated_at=? WHERE attempt_id=? AND company_scope=?").bind(JSON.stringify(metrics),empNow(),attemptId,user.corpid).run();
+}
+__name(employeeUploadAttemptSaveMetrics,"employeeUploadAttemptSaveMetrics");
+async function employeeUploadAttemptReconcile(env,user,run,contract,attempt,requestContext,metrics=null){
+  const persistence=await qaAcceptanceRunPersistenceSnapshot(env,user,run,contract,requestContext,{fresh:true}),persisted=new Set(persistence.persisted_entry_ids||[]),conflicted=new Map((persistence.conflicting_entries||[]).map(row=>[String(row.entry_identity||""),row])),duplicates=new Set(persistence.duplicate_entry_ids||[]),locations=requestContext?.qa_persisted_entry_locations;
+  const now=empNow(),statements=[];
+  for(const [ordinal,scenario] of (contract.scenarios||[]).entries()){
+    const entryId=String(scenario.entry_id||""),location=locations instanceof Map?locations.get(entryId):null,anchorId=cleanText(location?.session?.anchor_id||location?.entry?.transfer_anchor_id||location?.entry?.anchor_id||entryId,160);
+    const status=persisted.has(entryId)?"SAVED":duplicates.has(entryId)?"DUPLICATE":conflicted.has(entryId)?"CONFLICT":"PENDING";
+    statements.push(env.DB.prepare("UPDATE employee_upload_attempt_entries SET status=?,canonical_anchor_id=?,last_error_code=?,write_completed_at=CASE WHEN ?='SAVED' THEN COALESCE(write_completed_at,?) ELSE write_completed_at END,updated_at=? WHERE attempt_id=? AND entry_id=?").bind(status,status==="SAVED"?anchorId:null,status==="CONFLICT"?"UPLOAD_ENTRY_CONFLICT":status==="DUPLICATE"?"UPLOAD_ENTRY_DUPLICATE":null,status,now,now,attempt.attempt_id,entryId));
+  }
+  if(statements.length)await env.DB.batch(statements);
+  const refreshed=await employeeUploadAttemptRead(env,user,attempt.attempt_id),counts=employeeUploadAttemptCounts(refreshed.entries);
+  const nextStatus=counts.duplicate_count?"FAILED_PERMANENT":counts.conflict_count?"CONFLICTED":counts.remaining_count===0?"VERIFYING":EMPLOYEE_UPLOAD_ATTEMPT_ACTIVE_STATUSES.has(String(attempt.status||""))?String(attempt.status||"WRITING"):"WRITING";
+  const errorCode=counts.duplicate_count?"UPLOAD_ENTRY_DUPLICATE":counts.conflict_count?"UPLOAD_ENTRY_CONFLICT":"";
+  await env.DB.prepare("UPDATE employee_upload_attempts SET saved_count=?,conflict_count=?,duplicate_count=?,status=?,last_error_code=?,updated_at=? WHERE attempt_id=? AND company_scope=? AND status<>'COMPLETED'").bind(counts.saved_count,counts.conflict_count,counts.duplicate_count,nextStatus,errorCode||null,now,attempt.attempt_id,user.corpid).run();
+  if(metrics){metrics.reconciliation_count=Number(metrics.reconciliation_count||0)+1;metrics.last_reconciliation={saved_count:counts.saved_count,remaining_count:counts.remaining_count,conflict_count:counts.conflict_count,duplicate_count:counts.duplicate_count,first_conflicting_entry:persistence.conflicting_entries?.[0]||null,duplicate_entry_ids:persistence.duplicate_entry_ids||[],at:now};}
+  return {...await employeeUploadAttemptRead(env,user,attempt.attempt_id),persistence};
+}
+__name(employeeUploadAttemptReconcile,"employeeUploadAttemptReconcile");
+async function employeeUploadAttemptStart(request,env,user,run){
+  const startedAt=Date.now(),context=ttlockRequestContext(request,env,user,"employee_upload_attempt_start",TTLOCK_STRICT_CACHE_MAX_AGE_MS);context.allow_live_fetch=false;
+  if(!await employeeUploadAttemptSchemaReady(env,context))return employeeUploadAttemptError("UPLOAD_ATTEMPT_SCHEMA_UNAVAILABLE",503,{},[],{stage:"CREATED",no_write:true,retryable:false});
+  if(!["MANUAL_EMPLOYEE_ACCEPTED","UPLOAD_PASS"].includes(String(run.status||"")))return employeeUploadAttemptError("QA_MANUAL_EMPLOYEE_ACCEPTANCE_REQUIRED",409,{},[],{stage:"CREATED",no_write:true,retryable:false});
+  let body={};try{body=await request.json()}catch{return badRequest("invalid_json")}
+  const contract=await qaAcceptanceEmployeeDraftContract(env,run);if(!contract.ok)return employeeUploadAttemptError(contract.error_code,409,{},[],{stage:"CREATED",no_write:true,retryable:false});
+  const stored=qaAcceptanceStoredValidation(run),freshness=qaAcceptanceValidationAttestationCurrent(run,contract,stored);
+  if(!freshness.current||freshness.acceptance_locked!==true)return employeeUploadAttemptError("QA_ACCEPTED_ATTESTATION_REQUIRED",409,{},[],{stage:"VALIDATION_FAILED",no_write:true,retryable:false});
+  const sessionId=cleanText(body.session_id||`${run.qa_run_id}-CURRENT`,160),artifact=String(body.artifact_sha256||""),payloadHash=String(body.payload_hash||""),validationAttempt=String(body.validation_attempt_id||"");
+  if(artifact!==String(run.artifact_sha256||"")||payloadHash!==String(contract.payloadHash||"")||validationAttempt!==String(stored.validation_attempt_id||""))return employeeUploadAttemptError(artifact!==String(run.artifact_sha256||"")?"UPLOAD_ATTEMPT_ARTIFACT_MISMATCH":"UPLOAD_ATTEMPT_PAYLOAD_MISMATCH",409,{},[],{stage:"CREATED",no_write:true,retryable:false});
+  const existing=await env.DB.prepare("SELECT * FROM employee_upload_attempts WHERE company_scope=? AND session_id=? AND payload_hash=? ORDER BY created_at DESC LIMIT 1").bind(user.corpid,sessionId,payloadHash).first();
+  if(existing){
+    const current=await employeeUploadAttemptRead(env,user,existing.attempt_id);
+    return success({...employeeUploadAttemptPublic(current.attempt,current.entries,{idempotent:true,write_attempted:false,no_write:true}),total_wall_ms:Math.max(0,Date.now()-startedAt)});
+  }
+  const otherActive=await env.DB.prepare("SELECT * FROM employee_upload_attempts WHERE company_scope=? AND session_id=? AND status IN ('CREATED','VALIDATED','WRITING','PAUSED_TRANSIENT','VERIFYING','FINALIZING') ORDER BY created_at DESC LIMIT 1").bind(user.corpid,sessionId).first();
+  if(otherActive){const current=await employeeUploadAttemptRead(env,user,otherActive.attempt_id);return employeeUploadAttemptError("UPLOAD_ATTEMPT_PAYLOAD_MISMATCH",409,current.attempt,current.entries,{stage:current.attempt?.status||"CREATED",no_write:true,retryable:false})}
+  context.archive_session_prefix=`${run.qa_run_id}-%`;context.strict_archive_session_prefix=true;context.transaction_session_prefix=context.archive_session_prefix;
+  const attemptId=`UPA-${crypto.randomUUID()}`,scenarios=contract.scenarios||[],expectedIds=scenarios.map(row=>String(row.entry_id||"")),now=empNow(),validationDigest=String(stored.result_digest||await hscSha256(JSON.stringify(stored.validation_results||[]))),metrics={validation_count:1,validation_attestation_reused:true,validation_duration_ms:0,user_click_count:Math.max(1,Number(body.user_click_count||1)),manual_resume_count:0,chunks:[],status_recovery_count:0,lease_conflict_count:0,total_wall_ms:0,created_at:now};
+  const attemptInsert=env.DB.prepare("INSERT INTO employee_upload_attempts (attempt_id,contract_version,company_scope,employee_id,session_id,qa_run_id,artifact_sha,payload_hash,validation_attempt_id,validation_result_digest,expected_entry_ids_json,expected_count,saved_count,conflict_count,duplicate_count,status,metrics_json,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,0,0,0,'VALIDATED',?,?,?)").bind(attemptId,EMPLOYEE_UPLOAD_ATTEMPT_CONTRACT,user.corpid,user.userid,sessionId,run.qa_run_id,artifact,payloadHash,validationAttempt,validationDigest,JSON.stringify(expectedIds),expectedIds.length,JSON.stringify(metrics),now,now);
+  try{await attemptInsert.run()}catch{
+    const raced=await env.DB.prepare("SELECT * FROM employee_upload_attempts WHERE company_scope=? AND session_id=? AND payload_hash=? LIMIT 1").bind(user.corpid,sessionId,payloadHash).first();
+    if(raced){const current=await employeeUploadAttemptRead(env,user,raced.attempt_id);return success({...employeeUploadAttemptPublic(current.attempt,current.entries,{idempotent:true,no_write:true,write_attempted:false}),total_wall_ms:Math.max(0,Date.now()-startedAt)})}
+    return employeeUploadAttemptError("UPLOAD_ATTEMPT_CREATE_FAILED",503,{},[],{stage:"CREATED",no_write:true,retryable:true});
+  }
+  const entryStatements=scenarios.map((scenario,ordinal)=>env.DB.prepare("INSERT INTO employee_upload_attempt_entries (attempt_id,entry_id,ordinal,event_type,status,updated_at) VALUES (?,?,?,?,?,?)").bind(attemptId,String(scenario.entry_id||""),ordinal,entryAnchorEventType(employeeEntryUploadType(scenario.input||{})),"PENDING",now));
+  if(entryStatements.length)await env.DB.batch(entryStatements);
+  const created=await employeeUploadAttemptRead(env,user,attemptId),reconciled=await employeeUploadAttemptReconcile(env,user,run,contract,created.attempt,context,metrics);metrics.total_wall_ms=Math.max(0,Date.now()-startedAt);await employeeUploadAttemptSaveMetrics(env,user,attemptId,metrics);
+  return success({...employeeUploadAttemptPublic(reconciled.attempt,reconciled.entries,{idempotent:false,no_write:true,write_attempted:false}),total_wall_ms:metrics.total_wall_ms});
+}
+__name(employeeUploadAttemptStart,"employeeUploadAttemptStart");
+async function employeeUploadAttemptStatus(request,env,user,run,attemptId){
+  const context=ttlockRequestContext(request,env,user,"employee_upload_attempt_status",TTLOCK_STRICT_CACHE_MAX_AGE_MS);context.allow_live_fetch=false;
+  if(!await employeeUploadAttemptSchemaReady(env,context))return employeeUploadAttemptError("UPLOAD_ATTEMPT_SCHEMA_UNAVAILABLE",503,{},[],{stage:"STATUS",no_write:true,retryable:false});
+  let current=await employeeUploadAttemptRead(env,user,attemptId);if(!current.attempt||String(current.attempt.qa_run_id||"")!==String(run.qa_run_id||""))return employeeUploadAttemptError("UPLOAD_ATTEMPT_STATUS_UNAVAILABLE",404,{},[],{stage:"STATUS",no_write:true,retryable:true});
+  const leaseActive=String(current.attempt.lease_token_hash||"")&&Date.parse(String(current.attempt.lease_expires_at||""))>Date.now();
+  if(!leaseActive&&String(current.attempt.status||"")!=="COMPLETED"){
+    const contract=await qaAcceptanceEmployeeDraftContract(env,run);if(contract.ok){const metrics=employeeUploadAttemptMetrics(current.attempt);metrics.status_recovery_count=Number(metrics.status_recovery_count||0)+1;current=await employeeUploadAttemptReconcile(env,user,run,contract,current.attempt,context,metrics);await employeeUploadAttemptSaveMetrics(env,user,attemptId,metrics);current=await employeeUploadAttemptRead(env,user,attemptId);}
+  }
+  return success({...employeeUploadAttemptPublic(current.attempt,current.entries,{idempotent:true,no_write:true,write_attempted:false,lease_active:!!leaseActive})});
+}
+__name(employeeUploadAttemptStatus,"employeeUploadAttemptStatus");
+async function employeeUploadAttemptNext(request,env,user,run,attemptId){
+  const startedAt=Date.now(),context=ttlockRequestContext(request,env,user,"employee_upload_attempt_next",TTLOCK_STRICT_CACHE_MAX_AGE_MS);context.allow_live_fetch=false;
+  if(!await employeeUploadAttemptSchemaReady(env,context))return employeeUploadAttemptError("UPLOAD_ATTEMPT_SCHEMA_UNAVAILABLE",503,{},[],{stage:"WRITING",no_write:true,retryable:false});
+  let body={};try{body=await request.json()}catch{return badRequest("invalid_json")}
+  let current=await employeeUploadAttemptRead(env,user,attemptId);if(!current.attempt||String(current.attempt.qa_run_id||"")!==String(run.qa_run_id||""))return employeeUploadAttemptError("UPLOAD_ATTEMPT_STATUS_UNAVAILABLE",404,{},[],{stage:"WRITING",no_write:true,retryable:true});
+  if(String(current.attempt.artifact_sha||"")!==String(body.artifact_sha256||""))return employeeUploadAttemptError("UPLOAD_ATTEMPT_ARTIFACT_MISMATCH",409,current.attempt,current.entries,{stage:"WRITING",no_write:true,retryable:false});
+  if(String(current.attempt.payload_hash||"")!==String(body.payload_hash||""))return employeeUploadAttemptError("UPLOAD_ATTEMPT_PAYLOAD_MISMATCH",409,current.attempt,current.entries,{stage:"WRITING",no_write:true,retryable:false});
+  if(String(current.attempt.status||"")==="COMPLETED")return success({...employeeUploadAttemptPublic(current.attempt,current.entries,{idempotent:true,no_write:true,write_attempted:false})});
+  const lease=await employeeUploadAttemptAcquireLease(env,user,attemptId);
+  if(!lease.ok){const metrics=employeeUploadAttemptMetrics(current.attempt);metrics.lease_conflict_count=Number(metrics.lease_conflict_count||0)+1;await employeeUploadAttemptSaveMetrics(env,user,attemptId,metrics);current=await employeeUploadAttemptRead(env,user,attemptId);return employeeUploadAttemptError("UPLOAD_ATTEMPT_LEASE_CONFLICT",409,current.attempt,current.entries,{stage:"WRITING",no_write:true,retryable:true,lease_expires_at:String(current.attempt?.lease_expires_at||"")});}
+  const contract=await qaAcceptanceEmployeeDraftContract(env,run),stored=qaAcceptanceStoredValidation(run);if(!contract.ok){await employeeUploadAttemptReleaseLease(env,user,attemptId,lease.token_hash,"FAILED_PERMANENT",contract.error_code);return employeeUploadAttemptError(contract.error_code,409,current.attempt,current.entries,{stage:"WRITING",no_write:true,retryable:false})}
+  context.archive_session_prefix=`${run.qa_run_id}-%`;context.strict_archive_session_prefix=true;context.transaction_session_prefix=context.archive_session_prefix;qaAcceptanceAttachServerValidationFixtures(context,contract);
+  const metrics=employeeUploadAttemptMetrics(current.attempt),reconciled=await employeeUploadAttemptReconcile(env,user,run,contract,current.attempt,context,metrics);current={attempt:reconciled.attempt,entries:reconciled.entries};
+  const counts=employeeUploadAttemptCounts(current.entries);
+  if(counts.conflict_count||counts.duplicate_count){const code=counts.duplicate_count?"UPLOAD_ENTRY_DUPLICATE":"UPLOAD_ENTRY_CONFLICT";await employeeUploadAttemptSaveMetrics(env,user,attemptId,metrics);await employeeUploadAttemptReleaseLease(env,user,attemptId,lease.token_hash,counts.duplicate_count?"FAILED_PERMANENT":"CONFLICTED",code);current=await employeeUploadAttemptRead(env,user,attemptId);return employeeUploadAttemptError(code,409,current.attempt,current.entries,{stage:"WRITING",no_write:true,retryable:false});}
+  if(counts.remaining_count===0){await employeeUploadAttemptReleaseLease(env,user,attemptId,lease.token_hash,"VERIFYING","");await employeeUploadAttemptSaveMetrics(env,user,attemptId,metrics);current=await employeeUploadAttemptRead(env,user,attemptId);return success({...employeeUploadAttemptPublic(current.attempt,current.entries,{idempotent:true,no_write:true,write_attempted:false})});}
+  const scenarios=contract.scenarios||[],scenarioById=new Map(scenarios.map((row,index)=>[String(row.entry_id||""),{row,index}])),allPendingIds=current.entries.filter(row=>String(row.status||"")==="PENDING").map(row=>String(row.entry_id||"")),recoveryPlan=String(run.mode||"")==="recovery"?contract.matrix?.recovery_plan:null,recoveryFaultConsumed=metrics.recovery_fault_consumed===true,recoveryInitialCount=Number(recoveryPlan?.initial_persisted_count||0),recoveryHeldIds=new Set((Array.isArray(recoveryPlan?.initial_missing_ordinals)?recoveryPlan.initial_missing_ordinals:[]).map(ordinal=>String(scenarios[Number(ordinal)-1]?.entry_id||"")).filter(Boolean)),pendingIds=recoveryPlan&&!recoveryFaultConsumed&&counts.saved_count<recoveryInitialCount?allPendingIds.filter(id=>!recoveryHeldIds.has(id)):allPendingIds,batch=qaAcceptanceBuildWriteBatches(pendingIds,scenarioById,EMPLOYEE_UPLOAD_ATTEMPT_CHUNK_SIZE)[0]||[],acceptedById=new Map((stored?.validation_results||[]).map(row=>[String(row.entry_identity||""),row]));
+  const now=empNow();if(batch.length)await env.DB.batch(batch.map(entryId=>env.DB.prepare("UPDATE employee_upload_attempt_entries SET status='WRITING',write_started_at=COALESCE(write_started_at,?),updated_at=? WHERE attempt_id=? AND entry_id=? AND status='PENDING'").bind(now,now,attemptId,entryId)));
+  const preloadStart=Date.now();await Promise.all([empTableColumns(env,"sessions",context),empTableColumns(env,"transactions",context),empTableColumns(env,"entry_events",context),empTableColumns(env,"arrear_tasks",context),ensureAuditLogSchema(env,context),batch.some(id=>employeeEntryUploadType(scenarioById.get(id)?.row?.input||{})==="R")?empRentConfig(env,user.corpid,context):Promise.resolve({})]);
+  const chunkStart=Date.now(),results=await Promise.all(batch.map(async entryId=>{
+    const found=scenarioById.get(entryId),validated=acceptedById.get(entryId);if(!found||!validated?.ok)return {entryId,response:null,data:{error_code:"QA_ACCEPTED_ATTESTATION_ENTRY_MISSING"},duration_ms:0};
+    const writeAttestation={...validated,...(validated.write_attestation||{})},requestBody=qaAcceptanceScenarioRequestBody(run,found.row,found.index,scenarios.length),writeStart=Date.now(),response=await handleEmployeeEntry(request,env,user,{body:requestBody,request_context:context,prevalidated_result:writeAttestation,schema_prechecked:true,internal_token:QA_SESSION_RESUME_INTERNAL}),payload=await response.json().catch(()=>({})),data=payload?.data&&typeof payload.data==="object"?payload.data:payload;
+    return {entryId,response,data,duration_ms:Math.max(0,Date.now()-writeStart)};
+  }));
+  const chunkDuration=Math.max(0,Date.now()-chunkStart),failed=results.find(row=>!row.response||!row.response.ok||row.data?.success===false);
+  metrics.chunks=[...(Array.isArray(metrics.chunks)?metrics.chunks:[]),{ordinal:(metrics.chunks||[]).length+1,entry_count:batch.length,entry_ids:batch,saved_before:counts.saved_count,duration_ms:chunkDuration,preload_ms:Math.max(0,chunkStart-preloadStart),d1_read_count:Number(context.d1_read_count||0),d1_write_count:Number(context.d1_write_count||0),d1_batch_count:Number(context.d1_batch_count||0),error_code:cleanText(failed?.data?.error_code||"",120),recorded_at:empNow()}].slice(-100);
+  const after=await employeeUploadAttemptReconcile(env,user,run,contract,(await employeeUploadAttemptRead(env,user,attemptId)).attempt,context,metrics),afterCounts=employeeUploadAttemptCounts(after.entries);metrics.chunks[metrics.chunks.length-1].saved_after=afterCounts.saved_count;metrics.total_wall_ms=Number(metrics.total_wall_ms||0)+Math.max(0,Date.now()-startedAt);await employeeUploadAttemptSaveMetrics(env,user,attemptId,metrics);
+  const injectRecoveryResponseLoss=!failed&&recoveryPlan&&!recoveryFaultConsumed&&recoveryInitialCount>0&&afterCounts.saved_count===recoveryInitialCount;
+  if(injectRecoveryResponseLoss){metrics.recovery_fault_consumed=true;metrics.recovery_initial_persisted_count=afterCounts.saved_count;metrics.recovery_initial_missing_entry_ids=[...recoveryHeldIds];metrics.error_stage="WRITING_RESPONSE_LOST";await employeeUploadAttemptSaveMetrics(env,user,attemptId,metrics);await employeeUploadAttemptReleaseLease(env,user,attemptId,lease.token_hash,"PAUSED_TRANSIENT","SERVER_PROCESSING_TIMEOUT");current=await employeeUploadAttemptRead(env,user,attemptId);return employeeUploadAttemptError("UPLOAD_ATTEMPT_PAUSED_TRANSIENT",503,current.attempt,current.entries,{stage:"WRITING_RESPONSE_LOST",no_write:false,write_attempted:true,retryable:true,upstream_error_code:"SERVER_PROCESSING_TIMEOUT",response_lost:true});}
+  if(failed){const code=cleanText(failed.data?.error_code||"UPLOAD_ATTEMPT_PAUSED_TRANSIENT",120),transient=!failed.response||Number(failed.response.status||500)>=500||/TIMEOUT|UNAVAILABLE|TRANSIENT|503/.test(code),nextStatus=transient?"PAUSED_TRANSIENT":"FAILED_PERMANENT";await employeeUploadAttemptReleaseLease(env,user,attemptId,lease.token_hash,nextStatus,code);current=await employeeUploadAttemptRead(env,user,attemptId);return employeeUploadAttemptError(transient?"UPLOAD_ATTEMPT_PAUSED_TRANSIENT":code,transient?503:409,current.attempt,current.entries,{stage:"WRITING",no_write:false,write_attempted:true,retryable:transient,failed_entry_identity:failed.entryId,upstream_error_code:code});}
+  await employeeUploadAttemptReleaseLease(env,user,attemptId,lease.token_hash,afterCounts.remaining_count?"WRITING":"VERIFYING","");current=await employeeUploadAttemptRead(env,user,attemptId);
+  return success({...employeeUploadAttemptPublic(current.attempt,current.entries,{idempotent:results.every(row=>row.data?.idempotent===true||row.data?.already_accepted===true),no_write:false,write_attempted:results.some(row=>row.data?.idempotent!==true&&row.data?.already_accepted!==true),chunk_entry_count:batch.length,chunk_duration_ms:chunkDuration})});
+}
+__name(employeeUploadAttemptNext,"employeeUploadAttemptNext");
+async function employeeUploadAttemptFinalize(request,env,user,run,attemptId){
+  const startedAt=Date.now(),stageMs={},context=ttlockRequestContext(request,env,user,"employee_upload_attempt_finalize",TTLOCK_STRICT_CACHE_MAX_AGE_MS);context.allow_live_fetch=false;
+  let body={};try{body=await request.json()}catch{return badRequest("invalid_json")}
+  let current=await employeeUploadAttemptRead(env,user,attemptId);if(!current.attempt||String(current.attempt.qa_run_id||"")!==String(run.qa_run_id||""))return employeeUploadAttemptError("UPLOAD_ATTEMPT_STATUS_UNAVAILABLE",404,{},[],{stage:"FINALIZING",no_write:true,retryable:true});
+  if(String(current.attempt.artifact_sha||"")!==String(body.artifact_sha256||""))return employeeUploadAttemptError("UPLOAD_ATTEMPT_ARTIFACT_MISMATCH",409,current.attempt,current.entries,{stage:"FINALIZING",no_write:true,retryable:false});
+  if(String(current.attempt.payload_hash||"")!==String(body.payload_hash||""))return employeeUploadAttemptError("UPLOAD_ATTEMPT_PAYLOAD_MISMATCH",409,current.attempt,current.entries,{stage:"FINALIZING",no_write:true,retryable:false});
+  if(String(current.attempt.status||"")==="COMPLETED")return success({...employeeUploadAttemptPublic(current.attempt,current.entries,{idempotent:true,no_write:true,write_attempted:false})});
+  const lease=await employeeUploadAttemptAcquireLease(env,user,attemptId);if(!lease.ok)return employeeUploadAttemptError("UPLOAD_ATTEMPT_LEASE_CONFLICT",409,current.attempt,current.entries,{stage:"FINALIZING",no_write:true,retryable:true});
+  const contract=await qaAcceptanceEmployeeDraftContract(env,run),stored=qaAcceptanceStoredValidation(run);if(!contract.ok){await employeeUploadAttemptReleaseLease(env,user,attemptId,lease.token_hash,"FAILED_PERMANENT",contract.error_code);return employeeUploadAttemptError(contract.error_code,409,current.attempt,current.entries,{stage:"FINALIZING",no_write:true,retryable:false})}
+  context.archive_session_prefix=`${run.qa_run_id}-%`;context.strict_archive_session_prefix=true;context.transaction_session_prefix=context.archive_session_prefix;
+  const requests=(contract.scenarios||[]).map((scenario,index)=>qaAcceptanceScenarioRequestBody(run,scenario,index,contract.scenarios.length)),preflight=await qaAcceptanceSessionPreflight(env,user,run,contract,requests,context),counts={saved_count:preflight.persisted_count,remaining_count:preflight.missing_count,conflict_count:preflight.conflicting_count,duplicate_count:preflight.duplicate_entry_id_count};
+  if(!preflight.ok||counts.saved_count!==Number(current.attempt.expected_count||0)||counts.remaining_count||counts.conflict_count||counts.duplicate_count){await employeeUploadAttemptReleaseLease(env,user,attemptId,lease.token_hash,counts.conflict_count?"CONFLICTED":"PAUSED_TRANSIENT","UPLOAD_FINALIZATION_NOT_READY");current=await employeeUploadAttemptRead(env,user,attemptId);return employeeUploadAttemptError("UPLOAD_FINALIZATION_NOT_READY",409,current.attempt,current.entries,{stage:"FINALIZING",no_write:true,retryable:!counts.conflict_count,...counts});}
+  await env.DB.prepare("UPDATE employee_upload_attempts SET status='FINALIZING',updated_at=? WHERE attempt_id=? AND company_scope=? AND lease_token_hash=?").bind(empNow(),attemptId,user.corpid,lease.token_hash).run();
+  const response=await qaAcceptanceFinalizePersistedRun(env,user,run,contract,stored,preflight,context,startedAt,stageMs),payload=await response.clone().json().catch(()=>({})),data=payload?.data&&typeof payload.data==="object"?payload.data:payload;
+  if(!response.ok||data?.success===false||String(data?.status||"")!=="UPLOAD_PASS"){
+    const code=cleanText(data?.error_code||"UPLOAD_FINALIZATION_FAILED",120);await employeeUploadAttemptReleaseLease(env,user,attemptId,lease.token_hash,Number(response.status||500)>=500?"PAUSED_TRANSIENT":"FAILED_PERMANENT",code);current=await employeeUploadAttemptRead(env,user,attemptId);return employeeUploadAttemptError(code,response.status||503,current.attempt,current.entries,{stage:"FINALIZING",no_write:true,write_attempted:false,retryable:Number(response.status||500)>=500});
+  }
+  const receipt=data.upload_receipt||{},receiptJson=JSON.stringify(receipt),receiptDigest=await hscSha256(receiptJson),completedAt=empNow(),metrics=employeeUploadAttemptMetrics(current.attempt);metrics.finalization_duration_ms=Math.max(0,Date.now()-startedAt);metrics.receipt_duration_ms=Number(data?.stage_duration_ms?.receipt_write_ms||0);metrics.total_wall_ms=Number(metrics.total_wall_ms||0)+metrics.finalization_duration_ms;
+  await env.DB.prepare("UPDATE employee_upload_attempts SET status='COMPLETED',saved_count=expected_count,conflict_count=0,duplicate_count=0,lease_token_hash=NULL,lease_expires_at=NULL,last_error_code=NULL,receipt_json=?,receipt_digest=?,metrics_json=?,completed_at=?,updated_at=? WHERE attempt_id=? AND company_scope=? AND lease_token_hash=?").bind(receiptJson,receiptDigest,JSON.stringify(metrics),completedAt,completedAt,attemptId,user.corpid,lease.token_hash).run();
+  current=await employeeUploadAttemptRead(env,user,attemptId);return success({...employeeUploadAttemptPublic(current.attempt,current.entries,{idempotent:data.idempotent===true,no_write:true,write_attempted:false,formal_write_count:Number(data.formal_write_count||receipt.formal_write_count||0),completed_session_count:Number(data.completed_session_count||0)})});
+}
+__name(employeeUploadAttemptFinalize,"employeeUploadAttemptFinalize");
 const QA_ACCEPTANCE_WRITE_BATCH_SIZE=6;
 function qaAcceptanceScenarioWriteDependencyKeys(scenario={}){
   const input=scenario?.input||{},keys=new Set();
@@ -13497,7 +13745,8 @@ async function handleQaAcceptanceApi(request,env,user){
   const staffAutomation=/^\/api\/qa\/acceptance\/runs\/([^/]+)\/automation$/.exec(path);
   const staffUploadComplete=/^\/api\/qa\/acceptance\/runs\/([^/]+)\/upload-complete$/.exec(path);
   const staffSessionResume=/^\/api\/qa\/acceptance\/runs\/([^/]+)\/session-resume$/.exec(path);
-  const staffRoute=staffDraft||staffAutomation||staffUploadComplete||staffSessionResume;
+  const staffUploadAttempt=/^\/api\/qa\/acceptance\/runs\/([^/]+)\/upload-attempts(?:\/([^/]+)(?:\/(next|finalize))?)?$/.exec(path);
+  const staffRoute=staffDraft||staffAutomation||staffUploadComplete||staffSessionResume||staffUploadAttempt;
   const gate=await qaAcceptanceGate(request,env,user,{manager:!staffRoute,staff:!!staffRoute});
   if(gate)return gate;
   if(path==="/api/qa/acceptance/runs"&&method==="GET"){
@@ -13505,6 +13754,16 @@ async function handleQaAcceptanceApi(request,env,user){
     return success({runs:rows.map(row=>qaAcceptancePublicRun(request,row)),binding_identity:"VERIFIED",production_access:false});
   }
   if(path==="/api/qa/acceptance/runs"&&method==="POST")return qaAcceptanceCreateRun(request,env,user);
+  if(staffUploadAttempt){
+    const runId=qaAcceptanceRunId(decodeURIComponent(staffUploadAttempt[1]||""));if(!runId)return badRequest("QA_RUN_ID_INVALID");
+    const run=await qaAcceptanceReadRun(env,user,runId);if(!run)return qaAcceptanceNotFound(true);
+    const attemptId=cleanText(decodeURIComponent(staffUploadAttempt[2]||""),160),action=String(staffUploadAttempt[3]||"");
+    if(!attemptId&&method==="POST")return employeeUploadAttemptStart(request,env,user,run);
+    if(attemptId&&!action&&method==="GET")return employeeUploadAttemptStatus(request,env,user,run,attemptId);
+    if(attemptId&&action==="next"&&method==="POST")return employeeUploadAttemptNext(request,env,user,run,attemptId);
+    if(attemptId&&action==="finalize"&&method==="POST")return employeeUploadAttemptFinalize(request,env,user,run,attemptId);
+    return qaAcceptanceNotFound(true);
+  }
   const match=/^\/api\/qa\/acceptance\/runs\/([^/]+)(?:\/(automation|employee-draft|accept-employee|upload-complete|session-resume|accept-owner|reconcile|cleanup|evidence|diagnostics|period-analysis-diagnostic))?$/.exec(path);
   if(!match)return qaAcceptanceNotFound(true);
   const runId=qaAcceptanceRunId(decodeURIComponent(match[1]||""));if(!runId)return badRequest("QA_RUN_ID_INVALID");
