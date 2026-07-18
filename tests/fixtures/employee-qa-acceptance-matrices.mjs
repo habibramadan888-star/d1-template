@@ -217,6 +217,18 @@ export function qaAcceptanceMatrix(mode = "quick") {
   const normalized = String(mode).toLowerCase();
   if (normalized === "quick") return { mode: "quick", matrix_version: QA_MATRIX_VERSION, scenarios: clone(QA_QUICK_SCENARIOS), automation_only: [], expected_finance: clone(GOLDEN_FINANCE_EXPECTED) };
   if (normalized === "full") return { mode: "full", matrix_version: QA_MATRIX_VERSION, scenarios: clone(QA_FULL_SCENARIOS), automation_only: clone(QA_FULL_AUTOMATION_ONLY), expected_finance: clone(QA_FULL_FINANCE_EXPECTED) };
-  if (normalized === "recovery") return { mode: "recovery", matrix_version: QA_MATRIX_VERSION, scenarios: [], recovery_scenarios: clone(QA_RECOVERY_SCENARIOS), expected_finance: null };
+  if (normalized === "recovery") return {
+    mode: "recovery",
+    matrix_version: QA_MATRIX_VERSION,
+    scenarios: clone(QA_FULL_SCENARIOS),
+    recovery_scenarios: clone(QA_RECOVERY_SCENARIOS),
+    recovery_plan: {
+      contract: "employee_upload_attempt_v2",
+      initial_persisted_count: 40,
+      initial_missing_ordinals: [25, 27, 43, 44],
+      fault: "response_lost_after_initial_persisted",
+    },
+    expected_finance: clone(QA_FULL_FINANCE_EXPECTED),
+  };
   throw new Error(`unsupported QA mode: ${mode}`);
 }

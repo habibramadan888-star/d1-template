@@ -355,6 +355,7 @@ function acceptedAggregateHarness() {
       validation_results: storedResults,
     }),
     qaAcceptanceValidationAttestationCurrent: () => ({ current: true, acceptance_locked: true }),
+    qaAcceptanceAttachServerValidationFixtures: context => context,
     cloudArrearsFetchActiveSessionRows: async (_env, _user, options) => {
       archiveLoads += 1;
       options.request_context.archive_read_count += 1;
@@ -798,6 +799,7 @@ function resumeHarness({ initiallyPersisted = 13, failIndex = -1, intent = "EMPL
     employeeEntryUploadType: row => String(row?.type || ""),
     qaAcceptanceRunId: value => String(value || "").toUpperCase() === RUN_ID ? RUN_ID : "",
     qaAcceptanceEmployeeDraftContract: async () => contract,
+    qaAcceptanceAttachServerValidationFixtures: context => context,
     qaAcceptanceStoredValidation: () => ({
       validation_attempt_id: validationAttemptId,
       validation_result_count: 16,
@@ -1153,7 +1155,7 @@ for (const oneBasedPosition of [1, 8, 14, 16]) {
   });
 }
 
-test("QA atomic resume route is Staff-only, server-sourced, bounded, and the only accepted QA write path", () => {
+test("QA durable attempt route supersedes manual resume while preserving the bounded legacy fallback", () => {
   const resume = functionBlock(worker, "qaAcceptanceSessionResume");
   const directGate = functionBlock(worker, "qaAcceptanceEmployeeFormalWriteGate");
   const preload = functionBlock(worker, "employeeEntryPreloadExistingTransactions");
@@ -1184,7 +1186,11 @@ test("QA atomic resume route is Staff-only, server-sourced, bounded, and the onl
   assert.match(preload, /existing_transactions_by_event_id=rows/);
   assert.equal((preload.match(/FROM transactions/g) || []).length, 1);
   assert.match(artifactBuilder, /employee_post_acceptance_session_resume_v1/);
-  assert.match(upload, /employeeQaAcceptanceSessionResume\(aggregatePreflight,uploadList\)/);
+  assert.match(worker, /employeeUploadAttemptStart/);
+  assert.match(worker, /employeeUploadAttemptNext/);
+  assert.match(worker, /employeeUploadAttemptFinalize/);
+  assert.match(worker, /upload-attempts/);
+  assert.match(upload, /employeeQaDurableUpload\(uploadList,aggregatePreflight\)/);
   assert.match(clientResume, /\/session-resume/);
-  assert.ok(upload.indexOf("validateEmployeeUploadAggregateDryRun(validationRequests)") < upload.indexOf("employeeQaAcceptanceSessionResume(aggregatePreflight,uploadList)"));
+  assert.ok(upload.indexOf("validateEmployeeUploadAggregateDryRun(validationRequests)") < upload.indexOf("employeeQaDurableUpload(uploadList,aggregatePreflight)"));
 });
