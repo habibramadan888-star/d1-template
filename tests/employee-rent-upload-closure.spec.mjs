@@ -32,6 +32,13 @@ async function loadEmployeeRentHarness() {
     function operatorName(){ return 'Abdul'; }
     function operatorId(){ return 'abdul'; }
     function nowIso(){ return '2026-07-07T10:00:00.000Z'; }
+    function employeeEntryStableIdentity(entry={}){
+      return String(entry.id||entry.event_id||entry.anchor_id||entry.original_local_entry_id||'').trim();
+    }
+    function employeeQaAcceptanceSessionId(entry={},fallback=''){
+      const id=employeeEntryStableIdentity(entry);
+      return String(state.qaAcceptance?.sessionIdsByEntry?.[id]||fallback||'');
+    }
     const localStorage = { setItem(){}, getItem(){ return ''; } };
     ${html.slice(start, end)}
     ${html.slice(uploadStart, uploadEnd)}
@@ -57,6 +64,7 @@ async function loadWorkerRentHarness() {
     function __name(fn){ return fn; }
     function cleanText(value,max=10000){ return String(value ?? '').slice(0,max); }
     function cleanDate(value){ return String(value || '').slice(0, 10); }
+    const employeeEntryAnchorParseCache = new WeakMap();
     ${worker.slice(start, end)}
     globalThis.extractEmployeeEntryAnchorsFromSession = extractEmployeeEntryAnchorsFromSession;
     `,
@@ -68,6 +76,7 @@ async function loadWorkerRentHarness() {
 test("normal rent add-to-session payload is valid for dry-run upload", async () => {
   const harness = await loadEmployeeRentHarness();
   const rent = harness.normalizeEntryAnchor({
+    id: "E-rent-143",
     type: "R",
     room: "143",
     amount: 700,
@@ -90,7 +99,7 @@ test("normal rent add-to-session payload is valid for dry-run upload", async () 
   const uploadRows = harness.prepareRepeatableUploadRows([rent], "S-rent-143", "upload-rent-143");
   assert.equal(harness.validateUploadAnchorBatch(uploadRows).ok, true);
   assert.equal(uploadRows[0].session_id, "S-rent-143");
-  assert.match(uploadRows[0].idempotency_key, /^upload-rent-143-ent-test-01$/);
+  assert.equal(uploadRows[0].idempotency_key, "employee-entry-S-rent-143-E-rent-143");
 });
 
 test("short paid rent preserves arrears anchor while remaining upload-valid", async () => {
@@ -138,7 +147,10 @@ test("owner history detail can decode uploaded rent session anchors", async () =
     period_end: "2026-09-06",
     created_at: "2026-07-07T10:00:00.000Z"
   });
-  const entriesJson = JSON.stringify({ anchor_contract_version: "employee_entry_anchor_v1", entries: [rent] });
+  const entriesJson = JSON.stringify({
+    anchor_contract_version: "employee_entry_anchor_v1",
+    entries: [rent]
+  });
   const rows = worker.extractEmployeeEntryAnchorsFromSession({
     id: "S-rent-143",
     corpid: "homelink",
@@ -155,7 +167,7 @@ test("owner history detail can decode uploaded rent session anchors", async () =
   assert.equal(rows[0].paid_amount, 700);
 });
 
-test("rent whatsapp export remains available after synced upload state", async () => {
+test("rent ledger export remains available after synced upload state", async () => {
   const text = await buildWhatsappTextWithDrafts([
     {
       type: "R",
@@ -173,7 +185,7 @@ test("rent whatsapp export remains available after synced upload state", async (
     }
   ]);
 
-  assert.match(text, /^Statement/m);
+  assert.match(text, /^HOMELINK LEDGER/m);
   assert.match(text, /\[143\] paid 700 cash/);
   assert.doesNotMatch(text, /short_paid/);
   assert.doesNotMatch(text, /Upload validation failed/);
