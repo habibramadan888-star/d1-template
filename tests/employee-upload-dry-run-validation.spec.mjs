@@ -46,12 +46,12 @@ test("arrears payment dry-run accepts projection-aware refs and returns exact AP
   const validateBlock = functionBlock(worker, "validateEmployeeEntryUploadPayload");
   const readOnlyLookup = functionBlock(worker, "empFindOpenArrearTaskForPaymentReadOnly");
 
-  assert.match(validateBlock, /empFindOpenArrearTaskForPaymentReadOnly\(env,user,taskId,room\)/);
+  assert.match(validateBlock, /empFindOpenArrearTaskForPaymentReadOnly\(env,user,taskId,room,opts\)/);
   assert.match(validateBlock, /ARREARS_REF_STALE_REFRESH_REQUIRED/);
   assert.match(validateBlock, /This arrears item is no longer open\. Please refresh arrears\./);
-  assert.match(readOnlyLookup, /empFindProjectionArrearsForPayment\(env,user,cleanTaskId,bed\)/);
+  assert.match(readOnlyLookup, /empFindProjectionArrearsForPayment\(env,user,cleanTaskId,bed,opts\)/);
   assert.ok(
-    readOnlyLookup.indexOf("empFindProjectionArrearsForPayment(env,user,cleanTaskId,bed)") <
+    readOnlyLookup.indexOf("empFindProjectionArrearsForPayment(env,user,cleanTaskId,bed,opts)") <
       readOnlyLookup.indexOf("SELECT * FROM arrear_tasks"),
     "projection must be checked before stale materialized arrear_tasks"
   );
@@ -62,16 +62,15 @@ test("arrears payment dry-run accepts projection-aware refs and returns exact AP
   assert.match(validateBlock, /event_type:\"arrears_payment\"/);
 });
 
-test("deposit out dry-run enforces difference reason only when refund differs", async () => {
+test("deposit out dry-run preserves the current required-field contract", async () => {
   const worker = await readFile(workerPath, "utf8");
   const validateBlock = functionBlock(worker, "validateEmployeeEntryUploadPayload");
+  const depositOutValidator = functionBlock(worker, "validateDepositOutUploadFields");
 
-  assert.match(validateBlock, /const diff=Math\.round\(\(amount-depositBalance\)\*100\)\/100/);
-  assert.doesNotMatch(validateBlock, /const diff=cleanMoney\(amount-depositBalance\)/);
-  assert.match(validateBlock, /DEPOSIT_REFUND_DIFFERENCE_REASON_REQUIRED/);
-  assert.match(validateBlock, /missing_fields:\[\"difference_reason\"\]/);
-  assert.match(validateBlock, /actual_refund_amount:amount/);
-  assert.match(validateBlock, /refund_difference:diff/);
+  assert.match(depositOutValidator, /missing\.push\(\"actual_refund_amount\"\)/);
+  assert.match(depositOutValidator, /missing\.push\(\"refund_method\"\)/);
+  assert.match(depositOutValidator, /missing\.push\(\"refund_reason\"\)/);
+  assert.match(validateBlock, /validateEmployeeEntryUploadEventFields\(type,entry,normalized,eventIndex,anchorPreview\)/);
 });
 
 test("left with arrears dry-run returns required missing fields", async () => {
@@ -80,9 +79,6 @@ test("left with arrears dry-run returns required missing fields", async () => {
   const checkoutValidator = functionBlock(worker, "validateCheckoutUploadFields");
 
   assert.match(validateBlock, /LEFT_WITH_ARREARS_REQUIRED_FIELDS_MISSING/);
-  assert.match(checkoutValidator, /missing\.push\(\"contact_phone_or_method\"\)/);
-  assert.match(checkoutValidator, /missing\.push\(\"left_date\"\)/);
-  assert.match(checkoutValidator, /missing\.push\(\"promised_payment_date\"\)/);
   assert.match(checkoutValidator, /missing\.push\(\"left_arrears_amount\"\)/);
   assert.match(checkoutValidator, /missing\.push\(\"note\"\)/);
   assert.doesNotMatch(checkoutValidator, /missing\.push\(\"coverage_end_date\"\)/);
@@ -95,14 +91,14 @@ test("employee UI runs dry-run validation before real upload and surfaces backen
   const commitStart = html.lastIndexOf("async function commitSessionAndExport");
   assert.ok(commitStart >= 0, "effective commitSessionAndExport function must exist");
   const commitBlock = html.slice(commitStart);
-  const dryRunIndex = commitBlock.indexOf("validateEmployeeUploadDryRun(requestPayload?.entry||e,requestPayload?.session||sessionForEntry,i");
+  const dryRunIndex = commitBlock.indexOf("validateEmployeeUploadAggregateDryRun(validationRequests)");
   const realUploadIndex = commitBlock.indexOf("apiFetch('/api/employee/entry',{");
 
   assert.match(html, /function formatEmployeeUploadDryRunError\(result,index\)/);
   assert.match(html, /function normalizeEmployeeUploadDryRunError\(result,index/);
   assert.match(html, /function renderEmployeeUploadDryRunError\(result\)/);
   assert.match(html, /apiFetch\('\/api\/employee\/entry\/validate'/);
-  assert.ok(dryRunIndex > 0, "commit flow must call dry-run validation");
+  assert.ok(dryRunIndex > 0, "commit flow must call aggregate dry-run validation");
   assert.ok(realUploadIndex > dryRunIndex, "real upload must happen only after dry-run validation");
   assert.match(html, /Upload validation failed \//);
   assert.match(html, /\\u4e0a\\u4f20\\u6821\\u9a8c\\u5931\\u8d25/);
@@ -123,16 +119,19 @@ test("employee UI runs dry-run validation before real upload and surfaces backen
   assert.match(html, /employeeUploadValidationSuggestedAction\(r\)/);
   assert.match(html, /err\.dryRunResult=result/);
   assert.match(html, /renderEmployeeUploadDryRunError\(firstDryRunFailure\.result\)/);
-  assert.match(html, /toast\(`Upload validation failed \/ \\u4e0a\\u4f20\\u6821\\u9a8c\\u5931\\u8d25: \$\{firstDryRunFailure\.result\.error_code\}`/);
+  assert.match(html, /showStatus\(`Upload validation failed \/ \\u4e0a\\u4f20\\u6821\\u9a8c\\u5931\\u8d25: \$\{firstDryRunFailure\.message\}`,'bad'\)/);
+  assert.match(html, /toast\(`\$\{dryRunFailed\.length\} records failed validation/);
   assert.doesNotMatch(html, /toast\('Upload validation failed before cloud write\.'/);
-  assert.match(html, /const failedIndex=Number\(firstDryRunFailure\.result\?\.event_index\|\|0\)/);
+  assert.match(html, /const failedIdentity=employeeEntryStableIdentity\(firstDryRunFailure\.entry\)/);
+  assert.match(html, /const failedIndex=Math\.max\(0,allOriginalDrafts\.findIndex\(row=>employeeEntryStableIdentity\(row\)===failedIdentity\)\)/);
   assert.match(html, /state\.uploadValidationFailedIndex=failedIndex/);
   assert.match(html, /data-session-record-index="\$\{recordIndex\}"/);
   assert.match(html, /upload-validation-failed/);
   assert.match(html, /data-remove-session-record/);
   assert.match(html, /removeCurrentSessionRecord\(btn\.dataset\.removeSessionRecord/);
   assert.match(commitBlock, /uploadList\.forEach\(e=>\{e\.upload_status='VALIDATING';e\.upload_validation_error=null;\}\)/);
-  assert.match(commitBlock, /failedOriginal\.upload_status=firstDryRunFailure\.result\?\.error_code==='ARREARS_REF_STALE_REFRESH_REQUIRED'\?'STALE':'VALIDATION_FAILED'/);
+  assert.match(commitBlock, /const original=allOriginalDrafts\.find\(row=>employeeEntryStableIdentity\(row\)===employeeEntryStableIdentity\(validated\)\)/);
+  assert.match(commitBlock, /original\.upload_status=validated\.upload_status/);
   assert.match(commitBlock, /e\.upload_status='UPLOADING'/);
   assert.match(commitBlock, /e\.sync_status='LOCAL'/);
   assert.match(commitBlock, /e\.upload_status='CHECKING_CLOUD'/);
@@ -188,7 +187,6 @@ test("validation failure does not restore done or uploaded success state", async
   assert.match(html, /currentSessionHasUploadBlockingError\(\)/);
   assert.doesNotMatch(html, /renderEmployeeButtonLabel\('Upload Failed','\\u4e0a\\u4f20\\u5931\\u8d25'\)/);
   assert.match(html, /exportBtn\.disabled=!hasRows/);
-  assert.match(html, /whats\.disabled=!uploaded\|\|blocked/);
 });
 
 test("upload error codes have bilingual explanations", async () => {

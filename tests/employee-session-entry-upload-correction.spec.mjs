@@ -103,10 +103,10 @@ test("mixed upload validates every unsynced row before formal writes and clears 
   const formalWrite = upload.indexOf("apiFetch('/api/employee/entry'", aggregateCall);
   const failedGate = upload.indexOf("if(dryRunFailed.length)", aggregateCall);
   assert.ok(aggregateCall >= 0 && failedGate > aggregateCall && formalWrite > failedGate);
-  assert.match(upload, /allOriginalDrafts\.filter\(entry=>!employeeEntryCloudConfirmed\(entry\)\)/);
+  assert.match(upload, /const originalDrafts=allOriginalDrafts/);
   assert.match(upload, /ordinaryCanonicalEntries=canonicalEntries\.filter/);
   assert.match(upload, /ordinarySummary=calculateEmployeeSessionSummary\(ordinaryCanonicalEntries\)/);
-  assert.match(upload, /requestEntries=isBedTransfer\?\[e\]:ordinaryCanonicalEntries/);
+  assert.match(upload, /requestEntries=\(isBedTransfer\|\|qaAcceptanceActive\)\?\[e\]:ordinaryCanonicalEntries/);
   assert.match(upload, /employeeBedTransferValidatePayload/);
   assert.match(upload, /employeeBedTransferRecordPayload/);
   assert.match(upload, /aggregatePreflight\?\.validation_results/);
@@ -123,15 +123,16 @@ test("each Bed Transfer uses one stable dedicated canonical session in a mixed t
   const idBlock = block(employee, "function employeeBedTransferCanonicalSessionId", "function employeeBedTransferValidatePayload");
   const validateBlock = block(employee, "function employeeBedTransferValidatePayload", "function employeeBedTransferRecordPayload");
   assert.match(idBlock, /bed-transfer-\$\{String\(entry\.id/);
+  assert.match(idBlock, /-\$\{String\(session\.id/);
   assert.match(idBlock, /replace\(\/\[\^A-Za-z0-9_-\]\/g,'-'\)\.slice\(0,80\)/);
-  assert.match(validateBlock, /id:employeeBedTransferCanonicalSessionId\(entry,session\)/);
+  assert.match(validateBlock, /id:String\(session\.id\|\|session\.session_id\|\|employeeBedTransferCanonicalSessionId\(entry,session\)\)/);
   assert.match(validateBlock, /entries:\[clean\]/);
 });
 
 test("all seven event templates remain wired and stable upload identities prevent duplicate anchors", () => {
   for (const type of ["R", "AP", "D", "DR", "CO", "E", "TF"]) assert.match(employee, new RegExp(`code:'${type}'`));
   const clone = block(employee, "function cloneEntryForUpload", "function prepareRepeatableUploadRows");
-  assert.match(clone, /copy\.idempotency_key=isBedTransfer\?`bed-transfer-\$\{sessionId\}-\$\{entryId\}`:`employee-entry-\$\{sessionId\}-\$\{entryId\}`/);
+  assert.match(clone, /copy\.idempotency_key=isBedTransfer\?`bed-transfer-\$\{scopedSessionId\}-\$\{entryId\}`:`employee-entry-\$\{scopedSessionId\}-\$\{entryId\}`/);
   assert.doesNotMatch(clone, /uid\('ent'\)/);
 });
 

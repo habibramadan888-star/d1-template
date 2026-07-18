@@ -18,7 +18,12 @@ async function summaryCalculator() {
     num: (value) => Number(String(value ?? "").replace(/,/g, "")) || 0
   };
   vm.createContext(sandbox);
-  vm.runInContext(`${source.slice(start, end)}\nresult = calculateEmployeeSessionSummary;`, sandbox);
+  const rentStart = source.indexOf("function employeeRentLegId");
+  const rentEnd = source.indexOf("function employeePaymentMethodDisplay", rentStart);
+  const payStart = source.indexOf("function paymentMethodLabel");
+  const payEnd = source.indexOf("function buildEntryRawDisplayLine", payStart);
+  assert.ok(rentStart >= 0 && rentEnd > rentStart && payStart >= 0 && payEnd > payStart);
+  vm.runInContext(`${source.slice(rentStart, rentEnd)}\n${source.slice(payStart, payEnd)}\n${source.slice(start, end)}\nresult = calculateEmployeeSessionSummary;`, sandbox);
   return sandbox.result;
 }
 

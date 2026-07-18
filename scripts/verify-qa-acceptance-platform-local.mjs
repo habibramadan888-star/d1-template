@@ -36,7 +36,7 @@ export async function verifyQaAcceptancePlatformLocal() {
   const tempRoot = await mkdtemp(path.join(os.tmpdir(), "homelink-qa-platform-")), persistTo = path.join(tempRoot, "runtime"); let worker = null;
   try {
     await migrateQaD1(persistTo);
-    runQaD1(["--command", "INSERT OR REPLACE INTO app_settings (corpid,key,value,updated_by,updated_at) VALUES ('HL-QA','rent_ref_room','{\"201\":700,\"202\":770,\"203\":700}','qa-local','2026-07-16T00:00:00.000Z')"], persistTo);
+    runQaD1(["--command", "INSERT OR REPLACE INTO app_settings (corpid,key,value,updated_by,updated_at) VALUES ('HL-QA','rent_ref_room','{\"201\":700,\"202\":770,\"203\":700,\"7210\":730,\"7211\":770,\"7212\":700}','qa-local','2026-07-16T00:00:00.000Z')"], persistTo);
     runQaD1(["--command", "INSERT OR REPLACE INTO arrear_tasks (task_id,corpid,userid,entry_id,bed,tenant_name,arrear_amount,arrear_reason,created_at,followup_status,promise_date,promise_amount,actual_received,close_status) VALUES ('GOLDEN-CLOUD-ARREARS-1','HL-QA','qa-staff','QA-SEED-ARREARS','204','QA Fixture',100,'QA arrears','2026-07-15T08:00:00.000Z','pending','2026-07-20',100,60,'OPEN')"], persistTo);
     await kvPut("qa:environment-identity", { app_env: "qa", corpid: "HL-QA", d1_database_id: D1_ID, kv_namespace_id: KV_ID, binding_contract_sha256: BINDING_SHA }, persistTo, tempRoot);
     await kvPut(`qa:matrix:quick:${QA_MATRIX_VERSION}`, qaAcceptanceMatrix("quick"), persistTo, tempRoot);

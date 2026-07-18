@@ -187,7 +187,7 @@ test("owner detail decoder reads structured anchors for every employee event typ
   const owner = await readFile(ownerPath, "utf8");
 
   assert.match(worker, /const anchorRows=extractEmployeeEntryAnchorsFromSession\(sessionRow\)/);
-  assert.match(worker, /const detailChoice=chooseOwnerEmployeeSessionDetailRows\(sessionRow,results,anchorRows,exportRows\)/);
+  assert.match(worker, /const detailChoice=chooseOwnerEmployeeSessionDetailRows\(sessionRow,transactionRows,anchorRows,exportRows\)/);
   assert.match(worker, /if\(detailChoice\.rows\.length\)/);
   assert.match(worker, /parseEmployeeEntryAnchorJson/);
 

@@ -26,6 +26,12 @@ export async function buildWhatsappTextWithDrafts(drafts) {
     throw new Error("Unable to extract shared employee session summary");
   }
   const summaryBlock = source.slice(summaryStart, summaryEnd);
+  const rentLegBlock = [
+    extractFunctionBlock(source, "employeeRentLegId", "employeeRentSplitFormLegs"),
+    extractFunctionBlock(source, "employeeRentPaymentLegs", "employeeRentPaymentBreakdown"),
+    extractFunctionBlock(source, "employeeRentPaymentBreakdown", "employeePaymentMethodDisplay"),
+    extractFunctionBlock(source, "paymentMethodLabel", "buildEntryRawDisplayLine"),
+  ].join("\n");
   const sandbox = {
     state: { drafts },
     num: (value) => Number(String(value || "").replace(/,/g, "")),
@@ -58,6 +64,6 @@ export async function buildWhatsappTextWithDrafts(drafts) {
     };
   };
   vm.createContext(sandbox);
-  vm.runInContext(`${summaryBlock}\n${block}\nresult = buildEntrySessionLedgerText();`, sandbox);
+  vm.runInContext(`${rentLegBlock}\n${summaryBlock}\n${block}\nresult = buildEntrySessionLedgerText();`, sandbox);
   return sandbox.result;
 }

@@ -33,11 +33,11 @@ test("Full publishes one shared financial oracle derived from every legal upload
   const matrix = qaAcceptanceMatrix("full");
   assert.deepEqual(matrix.expected_finance, QA_FULL_FINANCE_EXPECTED);
   assert.deepEqual(QA_FULL_FINANCE_EXPECTED, {
-    cash_received: 3800,
-    bank_received: 2620,
-    rent_income: 5360,
-    arrears_opened: 300,
-    outstanding: 300,
+    cash_received: 5870,
+    bank_received: 2710,
+    rent_income: 7520,
+    arrears_opened: 370,
+    outstanding: 370,
     arrears_repaid: 160,
     deposit_included: 700,
     cash_out: 999,
@@ -45,11 +45,11 @@ test("Full publishes one shared financial oracle derived from every legal upload
     deposit_refund: 500,
     expense: 1298,
     bed_transfer_fee: 200,
-    total_received: 6420,
+    total_received: 8580,
     total_expenses: 1798,
-    net_funds: 4622,
-    cash_net: 2801,
-    bank_net: 1821,
+    net_funds: 6782,
+    cash_net: 4871,
+    bank_net: 1911,
   });
 });
 
@@ -58,6 +58,7 @@ test("Full uses distinct legal business identities instead of weakening global i
   const byCase = new Map(matrix.scenarios.map(row => [row.case_id, row.input]));
   for (const row of matrix.scenarios) assert.equal(row.input.created_at, "2026-07-17T08:00:00.000Z");
   assert.equal(byCase.get("rent-cash-full").rent_period_start, "2026-07-17");
+  assert.deepEqual(byCase.get("rent-cash-full-mixed-full").payment_legs, [{ method: "cash", amount_aed: 700 }, { method: "bank", amount_aed: 30 }]);
   assert.equal(byCase.get("rent-cash-full-custom-period").rent_period_start, "2026-07-18");
   assert.equal(byCase.get("rent-cash-full-mismatch-period-reviewed").rent_period_start, "2026-08-17");
   assert.equal(byCase.get("deposit-in-cash").bed, "512");

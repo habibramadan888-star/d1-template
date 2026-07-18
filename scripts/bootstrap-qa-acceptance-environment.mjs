@@ -66,7 +66,7 @@ export async function bootstrapQaAcceptanceEnvironment({ artifactDirectory } = {
   run(["d1", "execute", QA_D1, "--remote", "--command", "CREATE INDEX IF NOT EXISTS idx_arrear_tasks_directive ON arrear_tasks(corpid, directive_status, boss_requested_due_date, promise_date)"]);
   run(["d1", "execute", QA_D1, "--remote", "--file", path.join(rootDir, "migrations/qa/001_qa_acceptance_platform.sql")]);
   run(["d1", "execute", QA_D1, "--remote", "--file", path.join(rootDir, "migrations/qa/002_qa_owner_handoff.sql")]);
-  run(["d1", "execute", QA_D1, "--remote", "--command", "INSERT OR REPLACE INTO app_settings (corpid,key,value,updated_by,updated_at) VALUES ('HL-QA','rent_ref_room','{\"201\":700,\"202\":770,\"203\":700}','qa-bootstrap','2026-07-16T00:00:00.000Z')"]);
+  run(["d1", "execute", QA_D1, "--remote", "--command", "INSERT OR REPLACE INTO app_settings (corpid,key,value,updated_by,updated_at) VALUES ('HL-QA','rent_ref_room','{\"201\":700,\"202\":770,\"203\":700,\"7210\":730,\"7211\":770,\"7212\":700}','qa-bootstrap','2026-07-16T00:00:00.000Z')"]);
   for (const [taskId, actualReceived] of [["GOLDEN-CLOUD-ARREARS-1", 60], ["FULL-CLOUD-ARREARS-1", 60], ["FULL-CLOUD-ARREARS-2", 40], ["FULL-CLOUD-ARREARS-3", 60]]) {
     run(["d1", "execute", QA_D1, "--remote", "--command", `INSERT OR REPLACE INTO arrear_tasks (task_id,corpid,userid,entry_id,bed,tenant_name,arrear_amount,arrear_reason,created_at,followup_status,promise_date,promise_amount,actual_received,close_status) VALUES ('${taskId}','HL-QA','qa-staff','QA-SEED-${taskId}','204','QA Fixture',100,'QA formal cloud arrears','2026-07-15T08:00:00.000Z','pending','2026-07-20',100,${actualReceived},'OPEN')`]);
   }

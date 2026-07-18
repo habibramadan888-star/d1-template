@@ -4,7 +4,7 @@ import {
 } from "./employee-seven-event-golden-session.mjs";
 import { GOLDEN_FINANCE_EXPECTED } from "../helpers/employee-golden-session-oracle.mjs";
 
-export const QA_MATRIX_VERSION = "employee-qa-matrix-v2";
+export const QA_MATRIX_VERSION = "employee-qa-matrix-v3";
 
 const clone = value => structuredClone(value);
 
@@ -39,6 +39,24 @@ const variant = (base, suffix, input, expected = {}) => templateScenario(baseByC
 });
 
 const FULL_EXTENSIONS = [
+  variant("rent-cash-full", "mixed-full", {
+    room: "7210", bed: "7210", amount: 730, due: 730, paid: 730, expected_rent: 730, paid_amount: 730,
+    payment_method: "mixed", pay_type: "M", cat: "mixed", contract_version: "rent_entry_v2", anchor_contract_version: "rent_entry_v2",
+    payment_legs: [{ method: "cash", amount_aed: 700 }, { method: "bank", amount_aed: 30 }],
+    note: "qa mixed rent full",
+  }, { expected_finance_delta: { cash_received: 700, bank_received: 30, rent_income: 730 } }),
+  variant("rent-bank-short", "mixed-short", {
+    room: "7211", bed: "7211", amount: 700, due: 770, paid: 700, expected_rent: 770, paid_amount: 700,
+    payment_method: "mixed", pay_type: "M", cat: "mixed", contract_version: "rent_entry_v2", anchor_contract_version: "rent_entry_v2",
+    payment_legs: [{ method: "cash", amount_aed: 670 }, { method: "bank", amount_aed: 30 }],
+    note: "qa mixed rent short",
+  }, { expected_finance_delta: { cash_received: 670, bank_received: 30, outstanding: 70, arrears_opened: 70, rent_income: 700 }, expected_arrears_delta: { opened: 70, repaid: 0 } }),
+  variant("rent-cash-excess", "mixed-excess", {
+    room: "7212", bed: "7212", amount: 730, due: 700, paid: 730, expected_rent: 700, paid_amount: 730,
+    payment_method: "mixed", pay_type: "M", cat: "mixed", contract_version: "rent_entry_v2", anchor_contract_version: "rent_entry_v2",
+    payment_legs: [{ method: "cash", amount_aed: 700 }, { method: "bank", amount_aed: 30 }],
+    note: "qa mixed rent excess",
+  }, { expected_finance_delta: { cash_received: 700, bank_received: 30, rent_income: 730 } }),
   variant("rent-cash-full", "bank-full", { payment_method: "bank", pay_type: "bank" }, { expected_finance_delta: { bank_received: 700, rent_income: 700 } }),
   variant("rent-bank-short", "cash-short", { payment_method: "cash", pay_type: "cash" }, { expected_finance_delta: { cash_received: 700, outstanding: 70, arrears_opened: 70, rent_income: 700 } }),
   variant("rent-cash-excess", "bank-excess", { payment_method: "bank", pay_type: "bank" }, { expected_finance_delta: { bank_received: 730, rent_income: 730 } }),
@@ -131,6 +149,19 @@ export const QA_FULL_AUTOMATION_ONLY = Object.freeze([
   { case_id: "bed-transfer-existing-fingerprint-idempotent", event_type: "bed_transfer", expected_validation: "idempotent" },
   { case_id: "bed-transfer-missing-legacy-entry-id-idempotent", event_type: "bed_transfer", expected_validation: "idempotent" },
   { case_id: "bed-transfer-same-bed-finance-isolated", event_type: "bed_transfer", expected_validation: "fail", expected_error_code: "BED_TRANSFER_SAME_BED" },
+  { case_id: "rent-split-gate-closed", event_type: "rent", expected_validation: "fail", expected_error_code: "RENT_SPLIT_PAYMENT_V2_DISABLED" },
+  { case_id: "rent-split-leg-sum-mismatch", event_type: "rent", expected_validation: "fail", expected_error_code: "RENT_SPLIT_LEG_SUM_MISMATCH" },
+  { case_id: "rent-split-negative-cash", event_type: "rent", expected_validation: "fail", expected_error_code: "RENT_SPLIT_LEG_AMOUNT_INVALID" },
+  { case_id: "rent-split-negative-bank", event_type: "rent", expected_validation: "fail", expected_error_code: "RENT_SPLIT_LEG_AMOUNT_INVALID" },
+  { case_id: "rent-split-missing-leg", event_type: "rent", expected_validation: "fail", expected_error_code: "RENT_SPLIT_LEG_COUNT_INVALID" },
+  { case_id: "rent-split-zero-legs", event_type: "rent", expected_validation: "fail", expected_error_code: "RENT_SPLIT_LEG_AMOUNT_INVALID" },
+  { case_id: "rent-split-duplicate-method", event_type: "rent", expected_validation: "fail", expected_error_code: "RENT_SPLIT_DUPLICATE_METHOD" },
+  { case_id: "rent-split-duplicate-leg-id", event_type: "rent", expected_validation: "fail", expected_error_code: "RENT_SPLIT_LEG_ID_INVALID" },
+  { case_id: "rent-split-illegal-decimal", event_type: "rent", expected_validation: "fail", expected_error_code: "RENT_SPLIT_LEG_AMOUNT_INVALID" },
+  { case_id: "rent-split-stale-attestation", event_type: "rent", expected_validation: "fail", expected_error_code: "QA_VALIDATION_ATTESTATION_PAYLOAD_MISMATCH" },
+  { case_id: "rent-split-idempotency-conflict", event_type: "rent", expected_validation: "fail", expected_error_code: "IDEMPOTENCY_CONFLICT" },
+  { case_id: "rent-split-cross-entry-result-mismatch", event_type: "rent", expected_validation: "fail", expected_error_code: "QA_VALIDATION_RESULT_IDENTITY_MISMATCH" },
+  { case_id: "rent-split-non-rent-field-injection", event_type: "deposit_in", expected_validation: "fail", expected_error_code: "ENTRY_FIELD_NOT_ALLOWED" },
 ]);
 
 export const QA_RECOVERY_SCENARIOS = Object.freeze([
@@ -146,6 +177,12 @@ export const QA_RECOVERY_SCENARIOS = Object.freeze([
   "local_storage_memory_dom_divergence",
   "explicit_401",
   "transient_error_does_not_logout",
+  "rent_split_validation_interrupted",
+  "rent_split_response_lost_after_parent_write",
+  "rent_split_finalization_interrupted",
+  "rent_split_payload_edit_invalidates_attestation",
+  "rent_split_relogin_preserves_legs",
+  "rent_split_retry_does_not_duplicate_legs",
 ].map((case_id, index) => ({ case_id, sequence: index + 1, formal_write_expected: case_id === "eight_written_then_interrupted" ? 8 : 0 })));
 
 export const QA_TTLOCK_SNAPSHOT_V1 = Object.freeze({

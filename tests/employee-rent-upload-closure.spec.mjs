@@ -63,7 +63,9 @@ async function loadWorkerRentHarness() {
     `
     function __name(fn){ return fn; }
     function cleanText(value,max=10000){ return String(value ?? '').slice(0,max); }
+    function cleanId(value){ return String(value ?? '').trim(); }
     function cleanDate(value){ return String(value || '').slice(0, 10); }
+    function qaAcceptanceEnabled(){ return false; }
     const employeeEntryAnchorParseCache = new WeakMap();
     ${worker.slice(start, end)}
     globalThis.extractEmployeeEntryAnchorsFromSession = extractEmployeeEntryAnchorsFromSession;

@@ -87,6 +87,7 @@ test("employee export detail decoder returns the four expected owner detail rows
   vm.runInContext(
     `
     function __name(fn){ return fn; }
+    function cleanId(value){ return String(value ?? '').trim(); }
     function cleanText(value,max=10000){ return String(value ?? '').slice(0,max); }
     function employeeEntryBedTransferFee(entry){
       const fee=Number(String(entry?.fee_amount||entry?.transfer_fee||entry?.amount||0).replace(/,/g,''))||0;
@@ -140,6 +141,7 @@ test("owner parser reads WhatsApp-friendly employee statement without changing d
   vm.runInContext(
     `
     function __name(fn){ return fn; }
+    function cleanId(value){ return String(value ?? '').trim(); }
     function cleanText(value,max=10000){ return String(value ?? '').slice(0,max); }
     function employeeEntryBedTransferFee(entry){
       const fee=Number(String(entry?.fee_amount||entry?.transfer_fee||entry?.amount||0).replace(/,/g,''))||0;
@@ -228,6 +230,7 @@ test("owner session detail chooses complete transaction rows over partial export
   vm.runInContext(
     `
     function __name(fn){ return fn; }
+    function cleanId(value){ return String(value ?? '').trim(); }
     function cleanText(value,max=10000){ return String(value ?? '').slice(0,max); }
     function cleanDate(value){ return String(value || '').slice(0,10); }
     ${worker.slice(start, end)}

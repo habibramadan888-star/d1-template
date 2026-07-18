@@ -41,7 +41,7 @@ function functionBlock(source, name) {
 
 test("Quick fixture carries immutable legacy identity and complete left-with-arrears note", () => {
   const matrix = qaAcceptanceMatrix("quick");
-  assert.equal(QA_MATRIX_VERSION, "employee-qa-matrix-v2");
+  assert.equal(QA_MATRIX_VERSION, "employee-qa-matrix-v3");
   assert.equal(matrix.scenarios.length, 16);
 
   const legacy = matrix.scenarios[4].input;

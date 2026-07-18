@@ -90,7 +90,7 @@ export async function buildQaAcceptanceArtifact({ rehydrationCompatibleArtifacts
     assets,
     binding_contract_sha256: "7a3b133331e698544c819aa314f33a7d28aa98c53256c86ff8e3277544f47ebd",
     schema_version_qa: "qa-acceptance-schema-v1",
-    test_matrix_version: "employee-qa-matrix-v2",
+    test_matrix_version: "employee-qa-matrix-v3",
     reproducible_build: true,
     production_promoted: false,
     rehydration_compatible_artifacts: rehydrationCompatibleArtifacts,

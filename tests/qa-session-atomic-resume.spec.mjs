@@ -80,7 +80,7 @@ function validationRequests(scenarios = materializedScenarios()) {
   }));
 }
 
-test("41-entry Full upload uses bounded dependency-safe write batches and preserves Bed Transfer serialization", () => {
+test("Full upload uses bounded dependency-safe write batches and preserves Bed Transfer serialization", () => {
   const runId = "QA-20260717-PERFORMANCE";
   const scenarios = QA_FULL_SCENARIOS.map((template, index) => {
     const number = String(index + 1).padStart(2, "0");
@@ -103,9 +103,9 @@ test("41-entry Full upload uses bounded dependency-safe write batches and preser
   ].join("\n"), sandbox);
   const byId = new Map(scenarios.map((row, index) => [row.entry_id, { row, index }]));
   const batches = sandbox.batches(scenarios.map(row => row.entry_id), byId, 6);
-  assert.equal(batches.flat().length, 41);
-  assert.equal(new Set(batches.flat()).size, 41);
-  assert.ok(batches.length < 41, "ordinary writes must no longer be serialized one-by-one");
+  assert.equal(batches.flat().length, QA_FULL_SCENARIOS.length);
+  assert.equal(new Set(batches.flat()).size, QA_FULL_SCENARIOS.length);
+  assert.ok(batches.length < QA_FULL_SCENARIOS.length, "ordinary writes must no longer be serialized one-by-one");
   for (const batch of batches) {
     assert.ok(batch.length <= 6);
     const used = new Set();
@@ -789,6 +789,7 @@ function resumeHarness({ initiallyPersisted = 13, failIndex = -1, intent = "EMPL
     Set,
     String,
     Symbol,
+    rentEntryAnchorEnvelopeVersion: entries => (entries || []).some(row => String(row?.contract_version || row?.anchor_contract_version || "").toLowerCase() === "rent_entry_v2") ? "rent_entry_v2" : "employee_entry_anchor_v1",
     QA_SESSION_RESUME_COMPATIBILITY_SCOPE: RESUME_SCOPE,
     QA_SESSION_RESUME_INTERNAL: Symbol("qa_session_resume_internal"),
     QA_ACCEPTANCE_WRITE_BATCH_SIZE: 6,
@@ -1061,12 +1062,19 @@ test("finalization-only intent fails closed on financial oracle mismatch", async
 
 test("finalization finance check derives the complete Quick oracle from the 16 persisted anchors", () => {
   const scenarios = materializedScenarios();
-  const sandbox = { Map, Number, Object, String, entryAnchorContract: { R: [], AP: [], D: [], DR: [], CO: [], E: [], TF: [], TFF: [] } };
+  const sandbox = { Map, Number, Object, Set, String, cleanId: value => String(value || "").trim(), entryAnchorContract: { R: [], AP: [], D: [], DR: [], CO: [], E: [], TF: [], TFF: [] } };
   vm.createContext(sandbox);
   vm.runInContext([
+    'const RENT_ENTRY_V2_CONTRACT="rent_entry_v2";const RENT_ENTRY_V2_LEG_METHOD_ORDER={bank:0,cash:1};',
     functionBlock(worker, "ownerOverviewMoney"),
     functionBlock(worker, "entryAnchorType"),
     functionBlock(worker, "entryAnchorEventType"),
+    functionBlock(worker, "entryAnchorPaymentMethod"),
+    functionBlock(worker, "entryAnchorMoney"),
+    functionBlock(worker, "rentEntryV2Requested"),
+    functionBlock(worker, "rentEntryParentIdentity"),
+    functionBlock(worker, "rentEntryLegIdentity"),
+    functionBlock(worker, "normalizeRentEntryPaymentLegs"),
     functionBlock(worker, "canonicalFinanceProjectionZeroTotals"),
     functionBlock(worker, "canonicalFinanceProjectionRoundTotals"),
     functionBlock(worker, "canonicalFinanceProjectionPaymentMethod"),

@@ -29,12 +29,21 @@ async function summaryRuntime() {
     Object,
     String,
     cleanText: (value, max = 1000) => String(value ?? "").trim().slice(0, max),
+    cleanId: value => String(value ?? "").trim(),
+    qaAcceptanceEnabled: env => String(env?.QA_ACCEPTANCE_ENABLED || "").toLowerCase() === "true",
     ownerOverviewMoney: value => Math.round((Number(value) || 0) * 100) / 100,
     entryAnchorType: row => String(row?.type || ""),
     entryAnchorEventType: type => ({ R: "rent", AP: "arrears_payment", D: "deposit_in", DR: "deposit_out", CO: "checkout", E: "expense", TF: "bed_transfer" })[String(type || "").toUpperCase()] || "",
   };
   vm.createContext(sandbox);
+  vm.runInContext('const RENT_ENTRY_V2_CONTRACT="rent_entry_v2"; const RENT_ENTRY_V2_LEG_METHOD_ORDER={bank:0,cash:1};', sandbox);
   for (const name of [
+    "entryAnchorPaymentMethod",
+    "entryAnchorMoney",
+    "rentEntryV2Requested",
+    "rentEntryParentIdentity",
+    "rentEntryLegIdentity",
+    "normalizeRentEntryPaymentLegs",
     "canonicalFinanceProjectionZeroTotals",
     "canonicalFinanceProjectionRoundTotals",
     "canonicalFinanceProjectionPaymentMethod",
@@ -61,17 +70,30 @@ async function summaryRuntime() {
   return { worker, sandbox };
 }
 
-function fullEntries() {
-  return QA_FULL_SCENARIOS.map((row, index) => ({ ...structuredClone(row.input), entry_identity: `QAF-E-${index + 1}`, session_id: `QAF-S-${index + 1}` }));
+function fullEntry(row, index) {
+  const entryId = `QAF-E-${index + 1}`;
+  const entry = { ...structuredClone(row.input), id: entryId, event_id: entryId, entry_identity: entryId, session_id: `QAF-S-${index + 1}` };
+  if (entry.contract_version === "rent_entry_v2") {
+    entry.payment_legs = entry.payment_legs.map(leg => ({
+      ...leg,
+      leg_id: `${entryId}-${leg.method.toUpperCase()}`,
+      parent_entry_id: entryId,
+    }));
+  }
+  return entry;
 }
 
-test("server canonical summary covers the Full 41-entry oracle without client summary", async () => {
+function fullEntries() {
+  return QA_FULL_SCENARIOS.map(fullEntry);
+}
+
+test("server canonical summary covers the complete Full oracle without client summary", async () => {
   const { sandbox } = await summaryRuntime();
   const summary = sandbox.calculateCanonicalSessionSummary(fullEntries(), fullEntries(), []);
   for (const [field, expected] of Object.entries(QA_FULL_FINANCE_EXPECTED)) {
     assert.equal(summary[field], expected, `${field} must come from canonical entries`);
   }
-  assert.equal(summary.entry_count, 41);
+  assert.equal(summary.entry_count, QA_FULL_SCENARIOS.length);
   assert.equal(summary.server_authoritative, true);
   assert.equal(summary.summary_contract_version, "canonical-session-summary-v1");
 });
@@ -127,12 +149,13 @@ test("seven-event semantics keep deposits, expenses, arrears, checkout, and tran
   assert.equal(summary.bank_out, 100);
 });
 
-test("Full finalization persists all 41 summaries in one batch with deterministic retry parity", async () => {
+test("Full finalization persists every summary in one batch with deterministic retry parity", async () => {
   const { sandbox } = await summaryRuntime();
   const scenarios = QA_FULL_SCENARIOS.map((row, index) => ({ ...row, entry_id: `QAF-E-${index + 1}`, session_id: `QAF-S-${index + 1}` }));
   const locations = new Map(), sessions = new Map(), transactions = new Map();
-  for (const scenario of scenarios) {
-    const entry = { ...structuredClone(scenario.input), entry_identity: scenario.entry_id, session_id: scenario.session_id };
+  for (const [index, scenario] of scenarios.entries()) {
+    const entry = { ...fullEntry(scenario, index), id: scenario.entry_id, event_id: scenario.entry_id, entry_identity: scenario.entry_id, session_id: scenario.session_id };
+    if (entry.contract_version === "rent_entry_v2") entry.payment_legs = entry.payment_legs.map(leg => ({ ...leg, leg_id: `${scenario.entry_id}-${leg.method.toUpperCase()}`, parent_entry_id: scenario.entry_id }));
     const session = { id: scenario.session_id, cash_handover: 9999, bank_transfer_total: 9999, bank_transfer_count: 99, gross_received: 9999, summary_json: "" };
     locations.set(scenario.entry_id, { session, entry });
     sessions.set(scenario.session_id, session);
@@ -143,13 +166,13 @@ test("Full finalization persists all 41 summaries in one batch with deterministi
   const env = {
     DB: {
       prepare: query => ({ bind: (...args) => ({ query, args }) }),
-      batch: async statements => { batchCount += 1; assert.equal(statements.length, 41); },
+      batch: async statements => { batchCount += 1; assert.equal(statements.length, QA_FULL_SCENARIOS.length); },
     },
   };
   const contract = { scenarios };
   const first = await sandbox.qaAcceptancePersistCanonicalSessionSummaries(env, { corpid: "HL-QA" }, contract, context, { complete: true });
   assert.equal(first.ok, true);
-  assert.equal(first.parity_count, 41);
+  assert.equal(first.parity_count, QA_FULL_SCENARIOS.length);
   assert.equal(first.mismatch_count, 0);
   assert.equal(batchCount, 1);
   assert.equal([...sessions.values()].every(row => row.handover_status === "COMPLETED"), true);
@@ -157,7 +180,7 @@ test("Full finalization persists all 41 summaries in one batch with deterministi
   const stable = [...sessions.values()].map(row => row.summary_json);
   const retry = await sandbox.qaAcceptancePersistCanonicalSessionSummaries(env, { corpid: "HL-QA" }, contract, context, { complete: true });
   assert.equal(retry.ok, true);
-  assert.equal(retry.parity_count, 41);
+  assert.equal(retry.parity_count, QA_FULL_SCENARIOS.length);
   assert.deepEqual([...sessions.values()].map(row => row.summary_json), stable);
   assert.equal(batchCount, 2);
 });

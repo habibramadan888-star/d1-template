@@ -14,6 +14,8 @@ function fnBlock(source, name, next) {
 
 test("S20260713-jkqj7 metrics compare like-for-like and do not render a mismatch", async () => {
   const source = await readFile(ownerPath, "utf8");
+  const rentLegsBlock = fnBlock(source, "ownerRentPaymentLegs", "ownerEntryChannelAmounts");
+  const channelAmountsBlock = fnBlock(source, "ownerEntryChannelAmounts", "apiUrl");
   const totalsBlock = fnBlock(source, "totals", "balanceTotalFromTotals");
   const mismatchBlock = fnBlock(source, "historyDetailMismatchHtml", "ownerArchiveTotalsValue");
   const sandbox = {
@@ -24,7 +26,7 @@ test("S20260713-jkqj7 metrics compare like-for-like and do not render a mismatch
     esc: (value) => String(value)
   };
   vm.createContext(sandbox);
-  vm.runInContext(`${totalsBlock}\n${mismatchBlock}\nresult = historyDetailMismatchHtml;`, sandbox);
+  vm.runInContext(`${rentLegsBlock}\n${channelAmountsBlock}\n${totalsBlock}\n${mismatchBlock}\nresult = historyDetailMismatchHtml;`, sandbox);
   const entries = [
     { cat: "cash", amount: 970 },
     { cat: "bank", amount: 700 },
