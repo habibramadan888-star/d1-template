@@ -1,0 +1,62 @@
+{
+  "schema_version": "homelink-production-capability-manifest-v1",
+  "worker_name": "homelink-finance",
+  "artifact_sha256": "f2e688b706239fcf8803d80dcea0cea66b8cc4e32952916df563caaffe06165d",
+  "required_plain_text": {
+    "APP_ENV": "internal_beta",
+    "APP_NAME": "Homelink Finance",
+    "APP_VERSION": "2.0.0",
+    "BED_TRANSFER_LEGACY_GENESIS_MODE": "server_verified",
+    "BED_TRANSFER_WRITE_APPROVED": "true",
+    "CORPID": "homelink",
+    "FF_AUDIT_TRAIL": "false",
+    "FF_BACKEND_TOTALS": "false",
+    "FF_RECEIVABLES_STATE": "false",
+    "FF_TENANT_ISOLATION": "false"
+  },
+  "forbidden_plain_text": {
+    "QA_ACCEPTANCE_ENABLED": "true"
+  },
+  "required_bindings": {
+    "ASSETS": {
+      "type": "assets"
+    },
+    "DB": {
+      "type": "d1",
+      "id": "562aa079-1cca-4176-ba3b-7276a65f98fb"
+    },
+    "RATE_LIMIT": {
+      "type": "kv_namespace",
+      "id": "c7c64d522d964baba2e72454e7262da9"
+    }
+  },
+  "required_secret_names": [
+    "JWT_SECRET",
+    "MANAGER_PW_HASH",
+    "PW_SALT",
+    "STAFF_PW_HASH",
+    "TTLOCK_CLIENT_ID",
+    "TTLOCK_CLIENT_SECRET",
+    "TTLOCK_PASSWORD",
+    "TTLOCK_PROXY_ORIGIN",
+    "TTLOCK_USERNAME",
+    "USER_ACCOUNTS"
+  ],
+  "runtime_contract": {
+    "compatibility_date": "2024-09-23",
+    "usage_model": "standard",
+    "assets_run_worker_first": true
+  },
+  "capability_contract": {
+    "bed_transfer_validate_enabled": true,
+    "bed_transfer_write_enabled": true,
+    "legacy_genesis_mode": "server_verified",
+    "server_verified_permission": true,
+    "production_cutover": "PRODUCTION_NO_GO"
+  },
+  "browser_acceptance_contract": {
+    "ready_when": "bed_transfer_capabilities.status=success AND bed_transfer_validate_enabled=true AND bed_transfer_write_enabled=true",
+    "not_ready_when": "authenticated identity is visible but capability request is still loading",
+    "fail_closed_timeout_ms": 10000
+  }
+}

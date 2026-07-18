@@ -20,7 +20,7 @@ test('TF controls and context loading use validate capability, not write capabil
   assert.match(block('applyEmployeeBedTransferUiGate'),/control\.disabled=!gate\.fields_enabled/);
   assert.match(block('employeeLoadBedTransferContexts'),/if\(!employeeBedTransferValidateEnabled\(\)\)throw/);
   const render=block('renderEntryTtlockStatus');
-  assert.match(render,/isTransfer\?!employeeBedTransferValidateEnabled\(\):!ttlockCacheReady\(\)/);
+  assert.match(render,/isTransfer\?!employeeBedTransferValidateEnabled\(\):\(exitEvent\?false:!ttlockCacheReady\(\)\)/);
 });
 
 test('capability failure is fail closed for validation and upload',()=>{

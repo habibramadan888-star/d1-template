@@ -26,6 +26,7 @@ function asyncFn(source, name) {
 
 function gate(env, user) {
   const source = [
+    fn(worker, "qaAcceptanceEnabled"),
     fn(worker, "bedTransferWriteApproved"),
     fn(worker, "ownerTodayTodoAcknowledgmentWriteEnabled"),
     fn(worker, "ownerBedTransferVoidWriteEnabled"),
@@ -87,7 +88,7 @@ test("source and target reuse one request-scoped canonical snapshot path", () =>
   const canonical = asyncFn(worker, "validateEmployeeBedTransferCanonicalLink");
   assert.match(canonical, /const archiveSnapshot=await cloudArrearsFetchActiveSessionRows/);
   assert.equal((canonical.match(/archive_snapshot:archiveSnapshot/g) || []).length, 3);
-  assert.equal((canonical.match(/request_context:requestContext/g) || []).length, 3);
+  assert.equal((canonical.match(/request_context:requestContext/g) || []).length, 4);
   assert.match(canonical, /Promise\.all\(\[/);
 });
 
