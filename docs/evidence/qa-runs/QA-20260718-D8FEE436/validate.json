@@ -1,0 +1,14 @@
+{
+  "status": "AUTOMATION_PASS",
+  "validation_result_count": 41,
+  "passed_result_count": 41,
+  "failed_result_count": 0,
+  "formal_write_count": 0,
+  "ttlock_external_calls": 0,
+  "header_count": 41,
+  "sticky_count": 41,
+  "dom_card_count": 41,
+  "unique_entry_id_count": 41,
+  "settled_refresh_pass_count": 10,
+  "upload_clicked": false
+}
