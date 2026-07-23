@@ -103,6 +103,8 @@ test('mixed seven-entry sessions bypass the transfer-only shortcut and retain st
   assert.match(history,/s\.bed_transfer_history&&Number\(s\.entriesCount\|\|s\.entries_count\|\|0\)<=1/);
   assert.match(history,/transfer&&Number\(s\.entriesCount\|\|s\.entries_count\|\|0\)<=1/);
   assert.match(history,/tx\.transfer_reason/);
+  assert.match(history,/tx\.fee_amount_aed/);
+  assert.match(history,/eventType==='deposit_out'\?'refund'/);
   assert.match(detailText,/ownerHistoryMixedTransferSession\(session\)/);
   assert.match(detailText,/source:'structured_detail'/);
 });
@@ -112,6 +114,8 @@ test('detail count mismatch remains fail-closed for mixed sessions', () => {
   assert.match(mismatch,/expectedCount&&expectedCount!==renderedCount/);
   assert.match(mismatch,/data-owner-detail-render-mismatch="true"/);
   assert.match(mismatch,/bed_transfer_history&&Number\(session\?\.entriesCount\|\|session\?\.entries_count\|\|0\)<=1/);
+  assert.match(mismatch,/structuredMixed\?rendered\.cashOut/);
+  assert.match(mismatch,/structuredMixed\?\(summaryNetCash\+summaryCashOut\)/);
 });
 
 test('server projection keeps mixed sessions intact and specializes only transfer-only sessions', async () => {

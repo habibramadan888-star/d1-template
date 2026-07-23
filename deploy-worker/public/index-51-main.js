@@ -765,8 +765,9 @@ function historyDetailMismatchHtml(session,renderedCount){
   const rendered=totals(entries);
   const expectedCount=Number(session?.entriesCount||session?.entries_count||0)||0;
   const summaryNetCash=Math.round(Number(session?.net_cash??session?.cash_handover??0)*100)/100;
-  const summaryCashOut=Math.round(Number(session?.cash_out??session?.cash_expenses??rendered.cashOut)*100)/100;
-  const summaryCashReceived=Math.round(Number(session?.cash_received??session?.cash_in??(summaryNetCash+summaryCashOut))*100)/100;
+  const structuredMixed=ownerHistoryMixedTransferSession(session);
+  const summaryCashOut=Math.round(Number(structuredMixed?rendered.cashOut:(session?.cash_out??session?.cash_expenses??rendered.cashOut))*100)/100;
+  const summaryCashReceived=Math.round(Number(structuredMixed?(summaryNetCash+summaryCashOut):(session?.cash_received??session?.cash_in??(summaryNetCash+summaryCashOut)))*100)/100;
   const summaryBank=Math.round(Number(session?.bank_received??session?.bank_transfer_total??0)*100)/100;
   const summaryGross=Math.round(Number(session?.gross_received??0)*100)/100;
   const summaryNetFunds=Math.round(Number(session?.net_funds??session?.balance_total??(summaryNetCash+summaryBank))*100)/100;
@@ -2923,12 +2924,12 @@ async function renderHistory(){
           const canonicalType=tx.type||tx.reason_code||({
             rent:'R',arrears_payment:'AP',deposit_in:'D',deposit_out:'DR',checkout:'CO',expense:'E',bed_transfer:'TF'
           }[eventType]||eventType);
-          const amount=Number(tx.amount??tx.paid_amount??tx.payment_amount??tx.deposit_amount??tx.refund_amount??tx.expense_amount??tx.fee_amount??0);
+          const amount=Number(tx.amount??tx.paid_amount??tx.payment_amount??tx.deposit_amount??tx.refund_amount??tx.expense_amount??tx.fee_paid_amount??tx.fee_amount_aed??tx.fee_amount??0);
           const expected=Number(tx.expected_rent??tx.expected_amount??tx.period_due??tx.due??0);
           return {
             ...tx,
             id:tx.id||tx.event_id||tx.anchor_id,
-            cat:tx.cat||((tx.payment_method==='bank'||tx.pay_type==='B')?'bank':(eventType==='expense'?'expense':(eventType==='deposit_out'?'refund':'cash'))),
+            cat:eventType==='expense'?'expense':(eventType==='deposit_out'?'refund':(tx.cat||((tx.payment_method==='bank'||tx.pay_type==='B')?'bank':'cash'))),
             room:tx.room||tx.bed||tx.from_bed||tx.target_bed||tx.expense_category||'',
             room_to:tx.room_to||tx.to_bed||tx.roomTo||'',
             roomTo:tx.room_to||tx.to_bed||tx.roomTo||undefined,
