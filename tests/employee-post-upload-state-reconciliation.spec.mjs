@@ -36,6 +36,59 @@ test("synced records cannot render stale validation errors", async () => {
   assert.ok(failedIndexFallback > syncedGuard, "synced guard must run before stale session-level fallback");
 });
 
+test("null failed index does not mask a validated first record as pending", async () => {
+  const html = await readFile(employeePath, "utf8");
+  const block = functionBlock(
+    html,
+    "function employeeRecordValidationError(entry,index)",
+    "function employeeEntryArrearsRef(entry)"
+  );
+  const load = new Function(
+    "state",
+    "normalizeEmployeeUploadDryRunError",
+    "employeeEntryStableIdentity",
+    "entryEventType",
+    `${block}; return employeeRecordValidationError;`
+  );
+  const makeRecordState = (uploadValidationFailedIndex) => load(
+    {
+      uploadValidationFailedEntryId: "",
+      uploadValidationFailedIndex,
+      uploadValidationFailedMessage: ""
+    },
+    (value) => value,
+    (entry) => String(entry?.id || ""),
+    () => "bed_transfer"
+  );
+  const validatedEntry = {
+    id: "BT-112-936",
+    type: "TF",
+    event_type: "bed_transfer",
+    upload_status: "VALIDATION_PASSED"
+  };
+
+  assert.equal(
+    makeRecordState(null)(validatedEntry, 0),
+    null,
+    "null failed index must not coerce to record index 0"
+  );
+  assert.equal(
+    makeRecordState(undefined)(validatedEntry, 0),
+    null,
+    "undefined failed index must not coerce to record index 0"
+  );
+  assert.equal(
+    makeRecordState("")(validatedEntry, 0),
+    null,
+    "empty failed index must not coerce to record index 0"
+  );
+  assert.equal(
+    makeRecordState(0)(validatedEntry, 0)?.error_code,
+    "SERVER_DRY_RUN_REQUIRED",
+    "a real failed index 0 must retain the fallback"
+  );
+});
+
 test("full upload success clears stale validation state and waits for cloud confirmation", async () => {
   const html = await readFile(employeePath, "utf8");
   const uploadBlock = finalFunctionBlock(
