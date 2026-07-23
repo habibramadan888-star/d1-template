@@ -760,7 +760,7 @@ function balanceTotalFromTotals(t){
 }
 
 function historyDetailMismatchHtml(session,renderedCount){
-  if(session?.bed_transfer_history)return '';
+  if(session?.bed_transfer_history&&Number(session?.entriesCount||session?.entries_count||0)<=1)return '';
   const entries=Array.isArray(session?.entries)?session.entries:[];
   const rendered=totals(entries);
   const expectedCount=Number(session?.entriesCount||session?.entries_count||0)||0;
@@ -841,7 +841,13 @@ function employeeExportDisplayText(s){
     .trim();
 }
 
+function ownerHistoryMixedTransferSession(session){
+  const entries=Array.isArray(session?.entries)?session.entries:[];
+  return entries.length>1&&entries.some(entry=>String(entry?.event_type||entry?.type||'').toLowerCase()==='bed_transfer');
+}
+
 function ownerHistoryDetailMainText(session){
+  if(ownerHistoryMixedTransferSession(session))return {txt:genTXT(session),source:'structured_detail'};
   const raw=employeeExportDisplayText(session);
   if(raw)return {txt:raw,source:'export_text'};
   return genTXT(session);
@@ -1432,7 +1438,7 @@ function ownerBedTransferHistoryDetailHtml(item={}){
   const effective=Number(item.effective_fee_amount_aed??raw);
   const paid=Number(item.fee_paid_amount??0);
   const payment=String(item.payment_method||'-').toUpperCase();
-  return `<div class="card"><div class="card-head"><div><div class="card-title">${esc(item.from_bed||'-')} → ${esc(item.to_bed||'-')} · Bed Transfer</div><div class="card-sub">${status==='VOIDED'?'Voided / 已撤销':'Recorded / 已记录'}</div></div></div><div class="card-body"><div class="hist-grid"><div class="hist-card"><div class="hist-stat"><span>Due</span><b>AED ${fmtMoney(item.fee_due_amount??raw)}</b></div><div class="hist-stat"><span>Paid</span><b>AED ${fmtMoney(paid)}</b></div><div class="hist-stat"><span>Payment</span><b>${esc(payment)}</b></div></div><div class="hist-card"><div class="hist-stat"><span>Raw transfer fee</span><b>AED ${fmtMoney(raw)}</b></div><div class="hist-stat"><span>Effective transfer fee</span><b>AED ${fmtMoney(effective)}</b></div><div class="hist-stat"><span>Status</span><b>${esc(status)}</b></div></div></div><div class="hist-title" style="margin-top:12px">Audit Trail</div><div class="detail-list">${trail.map(row=>`<div class="detail-row"><b>${esc(row.kind==='owner_void'?'Owner void':'Original transfer')}</b><span class="hist-anchor">${esc(row.anchor_id||'-')}</span><span>${esc(row.at||'-')}</span></div>`).join('')||'<div class="empty-text">No canonical audit anchors</div>'}</div></div></div>`;
+  return `<div class="card"><div class="card-head"><div><div class="card-title">${esc(item.from_bed||'-')} → ${esc(item.to_bed||'-')} · Bed Transfer</div><div class="card-sub">${status==='VOIDED'?'Voided / 已撤销':'Recorded / 已记录'}</div></div></div><div class="card-body"><div class="hist-grid"><div class="hist-card"><div class="hist-stat"><span>Reason</span><b>${esc(item.transfer_reason||'-')}</b></div><div class="hist-stat"><span>Due</span><b>AED ${fmtMoney(item.fee_due_amount??raw)}</b></div><div class="hist-stat"><span>Paid</span><b>AED ${fmtMoney(paid)}</b></div><div class="hist-stat"><span>Payment</span><b>${esc(payment)}</b></div></div><div class="hist-card"><div class="hist-stat"><span>Raw transfer fee</span><b>AED ${fmtMoney(raw)}</b></div><div class="hist-stat"><span>Effective transfer fee</span><b>AED ${fmtMoney(effective)}</b></div><div class="hist-stat"><span>Status</span><b>${esc(status)}</b></div></div></div><div class="hist-title" style="margin-top:12px">Audit Trail</div><div class="detail-list">${trail.map(row=>`<div class="detail-row"><b>${esc(row.kind==='owner_void'?'Owner void':'Original transfer')}</b><span class="hist-anchor">${esc(row.anchor_id||'-')}</span><span>${esc(row.at||'-')}</span></div>`).join('')||'<div class="empty-text">No canonical audit anchors</div>'}</div></div></div>`;
 }
 async function loadHistoricalArrearsForOwner(opts={}){
   return (await loadExistingArrearsForOwner(opts)).rows;
@@ -2888,7 +2894,7 @@ async function renderHistory(){
   if(state.historyViewing){
     let s=normalizeLedgerSession(state.historyViewing);
     state.historyViewing=s;
-    if(s.bed_transfer_history){
+    if(s.bed_transfer_history&&Number(s.entriesCount||s.entries_count||0)<=1){
       wrap.innerHTML=`<button class="btn btn-ghost" id="btnHistBack" style="margin-bottom:14px"><svg class="ico"><use href="#i-back"/></svg>返回历史</button>${ownerBedTransferHistoryDetailHtml(s.bed_transfer_history)}`;
       document.getElementById('btnHistBack').onclick=()=>{state.historyViewing=null;renderHistory();};
       return;
@@ -2931,7 +2937,7 @@ async function renderHistory(){
             paid:tx.paid??tx.paid_amount??tx.payment_amount??amount,
             deficit:tx.deficit??tx.arrears_amount??Math.max(0,expected-amount),
             tag:normTag(tx.tag||(eventType==='bed_transfer'?'Transfer':'Old')),
-            note:tx.note||tx.arrears_note||tx.final_note||tx.refund_reason||tx.reason||tx.expense_desc||tx.raw_display_line||'',
+            note:tx.note||tx.arrears_note||tx.final_note||tx.refund_reason||tx.transfer_reason||tx.reason||tx.expense_desc||tx.raw_display_line||'',
             type:canonicalType,
             event_type:eventType,
             source:tx.source||'employee_entry',
@@ -3056,7 +3062,7 @@ async function renderHistory(){
 
   const cardHtml=s=>{
     const transfer=s.bed_transfer_history;
-    if(transfer){
+    if(transfer&&Number(s.entriesCount||s.entries_count||0)<=1){
       const status=String(transfer.status||'ACTIVE').toUpperCase();
       return `<div class="hist-card" data-id="${s.id}" data-bed-transfer-history="true"><div class="hist-date">${esc((s.date||'').slice(0,10))}</div><div class="hist-anchor">${esc(transfer.transfer_anchor_id||s.anchorId||'-')}</div><div class="hist-stat"><span>Bed Transfer / 换床</span><b>${esc(transfer.from_bed||'-')} → ${esc(transfer.to_bed||'-')}</b></div><div class="hist-stat"><span>Due</span><b>AED ${fmtMoney(transfer.fee_due_amount??transfer.fee_amount_aed)}</b></div><div class="hist-stat"><span>Paid</span><b>AED ${fmtMoney(transfer.fee_paid_amount??0)}</b></div><div class="hist-stat"><span>Payment</span><b>${esc(String(transfer.payment_method||'-').toUpperCase())}</b></div><div class="hist-stat"><span>Status</span><b>${status==='VOIDED'?'Voided / 已撤销':esc(status)}</b></div><div class="hist-actions"><button class="btn btn-ghost" data-act="view"><svg class="ico"><use href="#i-eye"/></svg>查看</button></div></div>`;
     }

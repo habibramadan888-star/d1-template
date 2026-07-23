@@ -9432,10 +9432,11 @@ async function canonicalOwnerHistorySessionRowsForList(env,user,rows=[]){
   for(const row of rows||[]){
     const sessionId=String(row?.id||"");
     projectedBySessionId.set(sessionId,canonicalOwnerHistorySessionRow({...row,...canonicalOwnerHistoryIdentityFields(row)}));
-    for(const anchor of extractEmployeeEntryAnchorsFromSession(row)){
+    const sessionAnchors=extractEmployeeEntryAnchorsFromSession(row);
+    for(const anchor of sessionAnchors){
       const eventType=String(anchor?.event_type||anchor?.type||"").trim().toLowerCase();
       const anchorId=cleanText(anchor?.transfer_anchor_id||anchor?.anchor_id||anchor?.event_id||"",180);
-      if(eventType==="bed_transfer"&&anchorId){
+      if(eventType==="bed_transfer"&&anchorId&&sessionAnchors.length===1){
         transferBySessionId.set(sessionId,{row,anchor,anchor_id:anchorId});
       }else if(["void_transfer","transfer_void"].includes(eventType)){
         const target=cleanText(anchor?.target_transfer_anchor_id||anchor?.voids_transfer_anchor_id||"",180);
@@ -9465,6 +9466,7 @@ async function canonicalOwnerHistorySessionRowsForList(env,user,rows=[]){
         transfer_anchor_id:transfer.anchor_id,
         from_bed:cleanText(transfer.anchor?.from_bed||"",80),
         to_bed:cleanText(transfer.anchor?.to_bed||"",80),
+        transfer_reason:cleanText(transfer.anchor?.transfer_reason||transfer.anchor?.reason||"",160),
         fee_mode:feeMode,
         fee_amount_aed:feeAmount,
         fee_due_amount:cleanMoney(transfer.anchor?.fee_due_amount??feeAmount),
