@@ -139,6 +139,29 @@ test('void paid fee keeps raw amount, makes effective income zero, and warns wit
   assert.equal(result.derived_arrears.length, 0);
 });
 
+test('retain-earned-income void removes transfer operation but preserves paid AED 50 classification', () => {
+  const anchor = transfer();
+  const result = project([anchor, {
+    corpid,
+    event_type: 'void_transfer',
+    target_transfer_anchor_id: anchor.transfer_anchor_id,
+    financial_disposition: 'retain_earned_income',
+    paid_transfer_fee_amount_aed: 50,
+    payment_method: 'cash',
+    refund_required: false,
+    automatic_refund_created: false
+  }]);
+  assert.equal(result.ok, true);
+  assert.equal(result.effective_transfer_events.length, 0);
+  assert.equal(result.finance.bed_transfer_fee_income, 50);
+  assert.equal(result.finance.cash_received, 50);
+  assert.equal(result.finance.bank_received, 0);
+  assert.equal(result.finance.gross_received, 50);
+  assert.equal(result.finance.rent_income, 0);
+  assert.equal(result.finance.bed_price_difference_income, 0);
+  assert.deepEqual(result.reconciliation_warnings, []);
+});
+
 test('correction replacement is counted once while original remains raw', () => {
   const original = transfer();
   const replacement = transfer({

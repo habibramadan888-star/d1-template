@@ -64,6 +64,20 @@ test('void financial todo requires actual collected amount and never invents ref
   }
 });
 
+test('retain-earned-income void resolves operational todo without creating financial reconciliation', () => {
+  const retainedVoid={
+    event_type:'void_transfer',
+    target_transfer_anchor_id:'tf-1',
+    financial_disposition:'retain_earned_income',
+    paid_transfer_fee_amount_aed:50,
+    payment_method:'cash',
+    refund_required:false,
+    automatic_refund_created:false,
+    corpid:'corp'
+  };
+  assert.deepEqual(project([transfer(),retainedVoid]).todos,[]);
+});
+
 test('cross-corpid fails closed and bed 334 never produces todo', () => {
   assert.equal(projectBedTransferOwnerTodos({corpid:'corp',archive_entries:[transfer({corpid:'other'})],access_snapshots:{}}).error_code,'BED_TRANSFER_TODO_CORPID_MISMATCH');
   assert.equal(project([transfer({from_bed:'334'})]).todos.length,0);

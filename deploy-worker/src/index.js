@@ -4914,6 +4914,13 @@ async function employeeEntryCloudSyncCorrectionExists(env,user,session){
     ORDER BY created_at DESC LIMIT 1`).bind(user.corpid,targetId,likeId,targetAnchor,likeAnchor).first().catch(()=>null);
 }
 __name(employeeEntryCloudSyncCorrectionExists,"employeeEntryCloudSyncCorrectionExists");
+function employeeEntryCloudSyncVoidedTransferAnchorIds(entries=[]){
+  return new Set((entries||[])
+    .filter(row=>["void_transfer","transfer_void"].includes(String(row?.event_type||row?.type||"").trim().toLowerCase()))
+    .map(row=>cleanText(row?.target_transfer_anchor_id||row?.voids_transfer_anchor_id||"",180))
+    .filter(Boolean));
+}
+__name(employeeEntryCloudSyncVoidedTransferAnchorIds,"employeeEntryCloudSyncVoidedTransferAnchorIds");
 async function handleEmployeeEntrySyncState(request,env,user){
   let body;
   try{body=await request.json();}catch{return badRequest("invalid_json");}
@@ -4947,6 +4954,11 @@ async function handleEmployeeEntrySyncState(request,env,user){
   }
   const cloudEntries=extractEmployeeEntryAnchorsFromSession(session);
   const cloudKeySets=cloudEntries.map(row=>employeeEntryCloudSyncKeySet(row,user));
+  let voidedTransferAnchorIds=new Set();
+  if(cloudEntries.some(row=>String(row?.event_type||row?.type||"").trim().toLowerCase()==="bed_transfer")){
+    const archiveSessions=await cloudArrearsFetchActiveSessionRows(env,user,{limit:1000,include_archive:true}).catch(()=>[]);
+    voidedTransferAnchorIds=employeeEntryCloudSyncVoidedTransferAnchorIds(ownerHistoryTransferLineageArchiveEntries(archiveSessions,user.corpid));
+  }
   const localEntryIds=[...new Set((entries||[]).map(entry=>cleanId(entry?.event_id||entry?.anchor_id||entry?.id||entry?.cloud_entry_id||'')).filter(Boolean))].slice(0,100);
   const persistedTransactionIds=new Set();
   if(localEntryIds.length&&await empTableExists(env,'transactions').catch(()=>false)){
@@ -4970,6 +4982,11 @@ async function handleEmployeeEntrySyncState(request,env,user){
     }
     if(matchedIndex>=0){
       const matched=cloudEntries[matchedIndex]||{};
+      const matchedType=String(matched?.event_type||matched?.type||"").trim().toLowerCase();
+      const matchedTransferAnchor=cleanText(matched?.transfer_anchor_id||matched?.anchor_id||matched?.event_id||matched?.id||"",180);
+      if(matchedType==="bed_transfer"&&matchedTransferAnchor&&voidedTransferAnchorIds.has(matchedTransferAnchor)){
+        return {index,local_event_id:cleanText(entry?.event_id||entry?.anchor_id||entry?.id||entry?.cloud_entry_id||"",120),status:"cloud_voided",sync_status:"CLOUD_VOIDED",archive_state:"voided",cloud_match:true,matched:true,matched_by:"target_transfer_anchor_id",cloud_record_id:cleanText(session.id||"",160),matched_event_id:cleanText(matched.event_id||matched.anchor_id||matched.id||"",120),source_proof:{source:"canonical_event_archive",session_id:session.id||"",anchor_id:session.anchor_id||"",target_transfer_anchor_id:matchedTransferAnchor},allowed_next_action:"owner_review_required",reason:"matched_transfer_void_anchor"};
+      }
       const parsed=parseBedTransferDerivedArrearsRef(matched.arrears_ref||matched.original_arrears_id||"");
       if(parsed&&effectiveTransferAnchorIds&&!effectiveTransferAnchorIds.has(cleanText(matched.source_anchor_ref||parsed.source_anchor_ref,180))){
         return {index,local_event_id:cleanText(entry?.event_id||entry?.anchor_id||entry?.id||entry?.cloud_entry_id||"",120),status:"cloud_source_reconciliation",sync_status:"OWNER_REVIEW_REQUIRED",archive_state:"source_transfer_voided",cloud_match:true,matched:true,matched_by:"canonical_fingerprint_or_event_id",cloud_record_id:cleanText(session.id||"",160),matched_event_id:cleanText(matched.event_id||matched.anchor_id||matched.id||"",120),source_proof:{source:"canonical_event_archive",session_id:session.id||"",anchor_id:session.anchor_id||"",source_anchor_ref:matched.source_anchor_ref||parsed.source_anchor_ref},allowed_next_action:"owner_review_required",reason:"source_transfer_voided_reconciliation_required"};
@@ -6425,29 +6442,40 @@ function ownerTodayTodoAcknowledgmentWriteEnabled(env={}){
   return ["1","true","yes","on"].includes(String(env.OWNER_TODAY_TODO_ACK_ENABLED||"").trim().toLowerCase())&&["development","dev","local","test","beta_preview","internal_beta","qa"].includes(appEnv)&&(appEnv!=="qa"||qaAcceptanceEnabled(env));
 }
 __name(ownerTodayTodoAcknowledgmentWriteEnabled,"ownerTodayTodoAcknowledgmentWriteEnabled");
-function ownerBedTransferVoidWriteEnabled(env={}){
+function ownerBedTransferVoidWriteEnabled(env={},targetAnchorId=""){
   const appEnv=String(env.APP_ENV||"").trim().toLowerCase();
-  const gate=["internal_beta","qa"].includes(appEnv)?env.BED_TRANSFER_OWNER_VOID_ENABLED:env.BED_TRANSFER_VOID_APPROVED;
-  return ["beta_preview","internal_beta","qa"].includes(appEnv)&&String(gate||"").trim().toLowerCase()==="true"&&bedTransferWriteApproved(env)&&(appEnv!=="qa"||qaAcceptanceEnabled(env));
+  const gate=env.BED_TRANSFER_OWNER_VOID_ENABLED;
+  const exactTarget=cleanText(env.BED_TRANSFER_OWNER_VOID_TARGET_ANCHOR_ID||"",180);
+  const requestedTarget=cleanText(targetAnchorId||"",180);
+  return ["internal_beta","qa"].includes(appEnv)
+    &&String(gate||"").trim().toLowerCase()==="true"
+    &&!!exactTarget
+    &&(!requestedTarget||requestedTarget===exactTarget)
+    &&(appEnv!=="qa"||qaAcceptanceEnabled(env));
 }
 __name(ownerBedTransferVoidWriteEnabled,"ownerBedTransferVoidWriteEnabled");
 async function handleOwnerBedTransferVoid(request,env,user){
   if(!requireManager(user))return forbidden();
   if(request.method!=="POST")return errorResponse("method_not_allowed",405,"METHOD_NOT_ALLOWED");
-  if(!ownerBedTransferVoidWriteEnabled(env))return json({ok:false,error_code:"BED_TRANSFER_VOID_DISABLED",no_write:true,production_cutover:"PRODUCTION_NO_GO"},409);
   let body;
   try{
     const contentType=String(request.headers.get("content-type")||"").toLowerCase();
     if(contentType.includes("application/x-www-form-urlencoded")||contentType.includes("multipart/form-data"))body=Object.fromEntries(await request.formData());
     else body=await request.json();
   }catch{return json({ok:false,error_code:"INVALID_JSON",no_write:true},400);}
+  const target=cleanText(body?.transfer_anchor_id||"",180);
+  if(!ownerBedTransferVoidWriteEnabled(env,target))return json({ok:false,error_code:"BED_TRANSFER_VOID_DISABLED",no_write:true,production_cutover:"PRODUCTION_NO_GO"},409);
   if(!await empTableExists(env,"sessions"))return json({ok:false,error_code:"SESSIONS_TABLE_NOT_READY",no_write:true},503);
   if(!(await empTableColumns(env,"sessions")).has("entries_json"))return json({ok:false,error_code:"BED_TRANSFER_CANONICAL_ARCHIVE_SCHEMA_NOT_READY",no_write:true,write_attempted:false,production_cutover:"PRODUCTION_NO_GO"},503);
-  const target=cleanText(body?.transfer_anchor_id||"",180);
   const sessions=await cloudArrearsFetchActiveSessionRows(env,user,{limit:1000,include_archive:true});
   const entries=ownerHistoryTransferLineageArchiveEntries(sessions,user.corpid);
   const existingVoid=entries.find(row=>["void_transfer","transfer_void"].includes(String(row?.event_type||row?.type||"").toLowerCase())&&cleanText(row?.target_transfer_anchor_id||"",180)===target);
-  if(existingVoid)return success({ok:true,idempotent:true,void_anchor_id:cleanText(existingVoid.void_anchor_id||existingVoid.anchor_id||existingVoid.event_id||"",180),target_transfer_anchor_id:target,effective:false,original_transfer_mutated:false,hard_delete:false});
+  if(existingVoid){
+    const requestedDisposition=cleanText(body?.financial_disposition||"",80);
+    const existingDisposition=cleanText(existingVoid?.financial_disposition||"",80);
+    if(requestedDisposition!==existingDisposition)return json({ok:false,error_code:"BED_TRANSFER_VOID_FINANCIAL_DISPOSITION_CONFLICT",no_write:true,write_attempted:false},409);
+    return success({ok:true,idempotent:true,void_anchor_id:cleanText(existingVoid.void_anchor_id||existingVoid.anchor_id||existingVoid.event_id||"",180),target_transfer_anchor_id:target,effective:false,financial_disposition:existingDisposition,original_transfer_mutated:false,hard_delete:false});
+  }
   const projectedEffective=findEffectiveBedTransferAnchor(entries,target);
   const exactActiveMatches=entries.filter(row=>{
     const type=String(row?.event_type||row?.type||"").trim().toLowerCase();
@@ -6464,7 +6492,7 @@ async function handleOwnerBedTransferVoid(request,env,user){
     }
   }
   const effective=projectedEffective||(exactActiveMatches.length===1?exactActiveMatches[0]:null)||persistedExact;
-  const now=empNow(),deterministic=accessSnapshotRuntimeHash([user.corpid,target,"CONTROLLED_BETA_TEST_CLEANUP"].join("|"));
+  const now=empNow(),deterministic=accessSnapshotRuntimeHash([user.corpid,target,"CONTROLLED_BETA_TEST_CLEANUP",cleanText(body?.financial_disposition||"",80)].join("|"));
   const prepared=prepareOwnerBedTransferVoid({request:body,effective_transfer:effective,corpid:user.corpid,accepted_at:now,owner_reference:user.userid},{idFactory:kind=>`${kind==="void_session_id"?"owner-tf-void-session":"owner-tf-void-anchor"}-${deterministic}`});
   if(!prepared.ok)return json({...prepared,production_cutover:"PRODUCTION_NO_GO"},422);
   try{
@@ -6472,9 +6500,9 @@ async function handleOwnerBedTransferVoid(request,env,user){
   }catch(error){
     const raced=await env.DB.prepare("SELECT id FROM sessions WHERE id=? AND corpid=? LIMIT 1").bind(prepared.void_session_id,user.corpid).first().catch(()=>null);
     if(!raced)throw error;
-    return success({ok:true,idempotent:true,void_anchor_id:prepared.void_anchor_id,target_transfer_anchor_id:target,effective:false,original_transfer_mutated:false,hard_delete:false});
+    return success({ok:true,idempotent:true,void_anchor_id:prepared.void_anchor_id,target_transfer_anchor_id:target,effective:false,financial_disposition:cleanText(prepared.entry?.financial_disposition||"",80),original_transfer_mutated:false,hard_delete:false});
   }
-  return json({ok:true,idempotent:false,void_session_id:prepared.void_session_id,void_anchor_id:prepared.void_anchor_id,target_transfer_anchor_id:target,effective:false,original_transfer_mutated:false,hard_delete:false,transaction_write_attempted:false,finance_mutated:false,deposit_mutated:false,arrears_mutated:false,ttlock_mutated:false,production_cutover:"PRODUCTION_NO_GO"},201);
+  return json({ok:true,idempotent:false,void_session_id:prepared.void_session_id,void_anchor_id:prepared.void_anchor_id,target_transfer_anchor_id:target,effective:false,financial_disposition:cleanText(prepared.entry?.financial_disposition||"",80),retained_transfer_fee_amount_aed:Number(prepared.entry?.paid_transfer_fee_amount_aed||0),refund_required:prepared.entry?.refund_required===true,automatic_refund_created:prepared.entry?.automatic_refund_created===true,original_transfer_mutated:false,hard_delete:false,transaction_write_attempted:false,finance_mutated:false,deposit_mutated:false,arrears_mutated:false,ttlock_mutated:false,production_cutover:"PRODUCTION_NO_GO"},201);
 }
 __name(handleOwnerBedTransferVoid,"handleOwnerBedTransferVoid");
 async function handleOwnerTodayTodoAcknowledgment(request,env,user){
@@ -9429,6 +9457,7 @@ async function canonicalOwnerHistorySessionRowsForList(env,user,rows=[]){
   const transferBySessionId=new Map();
   const voidsByTargetAnchor=new Map();
   const transferVoidSessionIds=new Set();
+  const transferVoidBySessionId=new Map();
   for(const row of rows||[]){
     const sessionId=String(row?.id||"");
     projectedBySessionId.set(sessionId,canonicalOwnerHistorySessionRow({...row,...canonicalOwnerHistoryIdentityFields(row)}));
@@ -9446,6 +9475,7 @@ async function canonicalOwnerHistorySessionRowsForList(env,user,rows=[]){
           list.push({row,anchor,anchor_id:voidAnchorId});
           voidsByTargetAnchor.set(target,list);
           transferVoidSessionIds.add(sessionId);
+          transferVoidBySessionId.set(sessionId,{row,anchor,anchor_id:voidAnchorId,target_anchor_id:target});
         }
       }
     }
@@ -9455,6 +9485,7 @@ async function canonicalOwnerHistorySessionRowsForList(env,user,rows=[]){
     const transfer=transferBySessionId.get(String(canonicalRow?.id||""));
     if(transfer){
       const voids=voidsByTargetAnchor.get(transfer.anchor_id)||[];
+      const retainedVoid=voids.find(item=>cleanText(item.anchor?.financial_disposition||"",80)==="retain_earned_income");
       const feeAmount=cleanMoney(transfer.anchor?.fee_amount_aed??transfer.anchor?.fee_paid_amount??0);
       const feeMode=cleanText(transfer.anchor?.fee_mode||"",40).toLowerCase();
       const paymentMethod=cleanText(transfer.anchor?.payment_method||"",40).toLowerCase();
@@ -9473,14 +9504,33 @@ async function canonicalOwnerHistorySessionRowsForList(env,user,rows=[]){
         fee_paid_amount:cleanMoney(transfer.anchor?.fee_paid_amount??(feeMode==="paid"?feeAmount:0)),
         payment_method:paymentMethod,
         status:voids.length?"VOIDED":"ACTIVE",
+        financial_disposition:cleanText(retainedVoid?.anchor?.financial_disposition||"",80),
+        refund_required:retainedVoid?.anchor?.refund_required===true,
         raw_fee_amount_aed:feeAmount,
-        effective_fee_amount_aed:voids.length?0:feeAmount,
+        effective_fee_amount_aed:voids.length&&!retainedVoid?0:feeAmount,
         audit_trail:auditTrail
       }}];
     }
     const isTransferVoid=transferVoidSessionIds.has(String(canonicalRow?.id||""));
     const isGenericVoided=Boolean(canonicalRow?.voided_at)||String(canonicalRow?.handover_status||"").trim().toUpperCase()==="VOID";
-    return isTransferVoid||isGenericVoided?[]:[canonicalRow];
+    if(isTransferVoid){
+      const item=transferVoidBySessionId.get(String(canonicalRow?.id||""));
+      const anchor=item?.anchor||{};
+      return [{...canonicalRow,bed_transfer_void_history:{
+        void_anchor_id:item?.anchor_id||"",
+        target_transfer_anchor_id:item?.target_anchor_id||"",
+        from_bed:cleanText(anchor?.from_bed||"",80),
+        to_bed:cleanText(anchor?.to_bed||"",80),
+        void_reason:cleanText(anchor?.void_reason||"",160),
+        financial_disposition:cleanText(anchor?.financial_disposition||"",80),
+        paid_transfer_fee_amount_aed:cleanMoney(anchor?.paid_transfer_fee_amount_aed??0),
+        payment_method:cleanText(anchor?.payment_method||"",40),
+        refund_required:anchor?.refund_required===true,
+        automatic_refund_created:anchor?.automatic_refund_created===true,
+        status:"VOIDED"
+      }}];
+    }
+    return isGenericVoided?[]:[canonicalRow];
   });
 }
 __name(canonicalOwnerHistorySessionRowsForList,"canonicalOwnerHistorySessionRowsForList");
@@ -11933,9 +11983,10 @@ async function fetchStaticAsset(request, env, pathname) {
 }
 __name(fetchStaticAsset, "fetchStaticAsset");
 function ownerBedTransferVoidControlResponse(request,env,claim){
-  if(!requireManager(claim)||!ownerBedTransferVoidWriteEnabled(env))return new Response("Not Found",{status:404,headers:{"Cache-Control":"no-store"}});
   const target=cleanText(new URL(request.url).searchParams.get("transfer_anchor_id")||"",180);
-  const html=`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Controlled Beta Transfer Void</title></head><body><main><h1>Controlled Beta Transfer Void</h1><p>Beta Preview only. Adds canonical void evidence; no hard delete and no TTLock mutation.</p><form method="post" action="/api/owner/bed-transfer/void"><label>Transfer anchor <input name="transfer_anchor_id" value="${esc(target)}" required readonly></label><input type="hidden" name="reason" value="CONTROLLED_BETA_TEST_CLEANUP"><button type="submit">Void Controlled Beta Transfer</button></form></main></body></html>`;
+  if(!requireManager(claim)||!ownerBedTransferVoidWriteEnabled(env,target))return new Response("Not Found",{status:404,headers:{"Cache-Control":"no-store"}});
+  const idempotencyKey=`retain-earned-income-${accessSnapshotRuntimeHash(target)}`;
+  const html=`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Controlled Beta Transfer Void</title></head><body><main><h1>Controlled Beta Transfer Void</h1><p>Operational transfer reversal only. Retains the canonical paid transfer fee; no refund, hard delete, correction, transaction, or TTLock mutation.</p><form method="post" action="/api/owner/bed-transfer/void"><label>Transfer anchor <input name="transfer_anchor_id" value="${esc(target)}" required readonly></label><input type="hidden" name="reason" value="CONTROLLED_BETA_TEST_CLEANUP"><input type="hidden" name="financial_disposition" value="retain_earned_income"><input type="hidden" name="idempotency_key" value="${esc(idempotencyKey)}"><button type="submit">Void Transfer and Retain Earned Fee</button></form></main></body></html>`;
   return new Response(html,{status:200,headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store","Content-Security-Policy":"default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'"}});
 }
 __name(ownerBedTransferVoidControlResponse,"ownerBedTransferVoidControlResponse");

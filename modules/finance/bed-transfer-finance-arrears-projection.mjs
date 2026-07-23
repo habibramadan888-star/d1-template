@@ -120,15 +120,19 @@ function effectiveTransferState(entries) {
   const replacements = new Map();
   for (const row of byId.values()) if (replacementRef(row)) replacements.set(replacementRef(row), anchorRef(row));
   const inactiveIds = new Set([...replacements.keys()]);
+  const voidsByTarget = new Map();
   for (const row of entries) {
     if (['void', 'void_transfer', 'transfer_void', 'reversal', 'transfer_reversal'].includes(typeOf(row))) {
       const target = targetRef(row);
       if (!target) return { error_code: 'BED_TRANSFER_FINANCE_REVERSAL_REF_REQUIRED' };
       inactiveIds.add(target);
+      const list = voidsByTarget.get(target) || [];
+      list.push(row);
+      voidsByTarget.set(target, list);
     }
   }
   for (const row of byId.values()) if (inactive(row)) inactiveIds.add(anchorRef(row));
-  return { raw: [...byId.values()], effective: [...byId.values()].filter(row => !inactiveIds.has(anchorRef(row))), inactiveIds, replacements };
+  return { raw: [...byId.values()], effective: [...byId.values()].filter(row => !inactiveIds.has(anchorRef(row))), inactiveIds, replacements, voidsByTarget };
 }
 
 function lineageTerminals(effective, replacements) {
@@ -236,6 +240,17 @@ export function projectBedTransferFinanceAndArrears(input = {}) {
     if (!state.inactiveIds.has(anchorRef(raw))) continue;
     const fee = validateFee(raw);
     const difference = validateDifference(raw);
+    const voidRows = state.voidsByTarget.get(anchorRef(raw)) || [];
+    const retained = voidRows.find(row => clean(row?.financial_disposition) === 'retain_earned_income');
+    if (retained) {
+      if (!fee.ok || !difference.ok || fee.mode !== 'paid' || fee.amount !== money(retained?.paid_transfer_fee_amount_aed) || difference.mode !== 'none' || retained?.refund_required !== false || retained?.automatic_refund_created !== false) {
+        return failure('BED_TRANSFER_VOID_FINANCIAL_DISPOSITION_CONFLICT', { raw_transfer_events: state.raw.map(row => transferAuditView(row, state.effective.includes(row))) });
+      }
+      finance.bed_transfer_fee_income += fee.amount;
+      finance.gross_received += fee.amount;
+      finance[fee.method === 'bank' ? 'bank_received' : 'cash_received'] += fee.amount;
+      continue;
+    }
     if ((fee.ok && fee.mode === 'paid' && fee.amount > 0) || (difference.ok && difference.mode === 'paid' && difference.amount > 0)) {
       warnings.push({ code: 'TRANSFER_VOID_FINANCIAL_RECONCILIATION_REQUIRED', transfer_anchor_id: anchorRef(raw), message: 'Raw paid transfer amount remains visible; effective income is zero and no automatic refund is created.' });
     }

@@ -26,6 +26,7 @@ function effectiveState(entries) {
     byId.set(id, row);
   }
   const inactiveIds = new Set();
+  const voidsByTarget = new Map();
   for (const row of byId.values()) {
     if (inactive(row)) inactiveIds.add(transferRef(row));
     if (replacementRef(row)) inactiveIds.add(replacementRef(row));
@@ -33,10 +34,15 @@ function effectiveState(entries) {
   for (const row of entries) {
     if (['void','void_transfer','transfer_void','reversal','transfer_reversal'].includes(typeOf(row))) {
       const target = targetRef(row);
-      if (target) inactiveIds.add(target);
+      if (target) {
+        inactiveIds.add(target);
+        const list = voidsByTarget.get(target) || [];
+        list.push(row);
+        voidsByTarget.set(target, list);
+      }
     }
   }
-  return { raw: [...byId.values()], effective: [...byId.values()].filter(row => !inactiveIds.has(transferRef(row))), inactiveIds, warnings };
+  return { raw: [...byId.values()], effective: [...byId.values()].filter(row => !inactiveIds.has(transferRef(row))), inactiveIds, voidsByTarget, warnings };
 }
 
 export function findEffectiveBedTransferAnchor(entries, transferAnchorId) {
@@ -148,6 +154,7 @@ export function projectBedTransferOwnerTodos(input = {}) {
   }
   for (const anchor of state.raw.filter(row => state.inactiveIds.has(transferRef(row)))) {
     if (bed(anchor.from_bed) === '334' || bed(anchor.to_bed) === '334') continue;
+    if ((state.voidsByTarget.get(transferRef(anchor)) || []).some(row => clean(row?.financial_disposition) === 'retain_earned_income')) continue;
     const paidFee = clean(anchor.fee_mode) === 'paid' && Number(anchor.fee_amount_aed || 0) > 0;
     const paidDifference = clean(anchor.bed_price_difference_mode) === 'paid' && Number(anchor.bed_price_difference_amount_aed || 0) > 0;
     if (!paidFee && !paidDifference) continue;

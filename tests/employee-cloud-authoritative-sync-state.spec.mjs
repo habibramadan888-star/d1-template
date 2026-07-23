@@ -52,6 +52,9 @@ test("employee sync-state endpoint is read-only and cloud-authoritative", async 
   assert.match(handler, /session_status:"cloud_missing"/);
   assert.match(handler, /cloud_deleted/);
   assert.match(handler, /cloud_voided/);
+  assert.match(handler, /employeeEntryCloudSyncVoidedTransferAnchorIds/);
+  assert.match(handler, /matched_by:"target_transfer_anchor_id"/);
+  assert.match(handler, /matched_transfer_void_anchor/);
   assert.match(handler, /cloud_corrected/);
   assert.match(handler, /allowed_next_action:"owner_review_required"/);
   assert.match(missingHelper, /allowed_next_action:"server_validation_required"/);

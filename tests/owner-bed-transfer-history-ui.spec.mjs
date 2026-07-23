@@ -50,7 +50,7 @@ test('History requests only the current bed and never expands into bed-number me
   assert.doesNotMatch(history, /historical_beds.*fetch|room IN|Promise\.all.*history|\[A,B,C\]/);
 });
 
-test('canonical paid transfer cards retain their own void audit trail and never render a standalone void business card', () => {
+test('canonical paid transfer cards retain their audit trail and additive void renders as a distinct audit card', () => {
   const renderer=block('ownerBedTransferHistoryDetailHtml');
   assert.match(renderer, /transfer_reason/);
   assert.match(renderer, /Raw transfer fee/);
@@ -61,6 +61,10 @@ test('canonical paid transfer cards retain their own void audit trail and never 
   const history=block('renderHistory', true);
   assert.match(history, /bed_transfer_history:s\.bed_transfer_history\|\|null/);
   assert.match(history, /data-bed-transfer-history="true"/);
+  assert.match(history, /bed_transfer_void_history:s\.bed_transfer_void_history\|\|null/);
+  assert.match(history, /ownerBedTransferVoidHistoryDetailHtml/);
+  assert.match(history, /data-bed-transfer-void-history="true"/);
+  assert.match(ui, /50 AED.*income retained|50 AED.*收入保留/);
   assert.match(history, /status==='VOIDED'\?'Voided/);
   assert.doesNotMatch(renderer, /historyDetailMismatchHtml/);
 });
@@ -136,14 +140,21 @@ test('server projection keeps mixed sessions intact and specializes only transfe
   const ordinaryTypes=['rent','arrears_payment','deposit_in','deposit_out','checkout','expense'];
   const transfer={event_type:'bed_transfer',entry_id:'TF-1',transfer_anchor_id:'A-TF-1',from_bed:'112',to_bed:'936',transfer_reason:'room_issue'};
   const mixed={id:'S-MIXED',entries_count:7,anchors:[...ordinaryTypes.map((event_type,index)=>({event_type,entry_id:`E-${index+1}`})),transfer]};
+  const voidAnchor={event_type:'void_transfer',anchor_id:'A-VOID-1',entry_id:'VOID-1',target_transfer_anchor_id:'A-TF-1',from_bed:'112',to_bed:'936',reason:'CONTROLLED_BETA_TEST_CLEANUP',financial_disposition:'retain_earned_income',paid_transfer_fee_amount_aed:50,payment_method:'cash',refund_required:false,automatic_refund_created:false};
   const single={id:'S-TRANSFER',entries_count:1,anchors:[transfer]};
-  const rows=await sandbox.project({}, {}, [mixed,single]);
+  const voidSession={id:'S-VOID',entries_count:1,anchors:[voidAnchor]};
+  const rows=await sandbox.project({}, {}, [mixed,single,voidSession]);
 
-  assert.equal(rows.length,2);
+  assert.equal(rows.length,3);
   assert.equal(rows[0].id,'S-MIXED');
   assert.equal(rows[0].bed_transfer_history,undefined);
   assert.equal(rows[1].id,'S-TRANSFER');
   assert.equal(rows[1].bed_transfer_history.transfer_reason,'room_issue');
   assert.equal(rows[1].bed_transfer_history.from_bed,'112');
   assert.equal(rows[1].bed_transfer_history.to_bed,'936');
+  assert.equal(rows[2].id,'S-VOID');
+  assert.equal(rows[2].bed_transfer_void_history.target_transfer_anchor_id,'A-TF-1');
+  assert.equal(rows[2].bed_transfer_void_history.financial_disposition,'retain_earned_income');
+  assert.equal(rows[2].bed_transfer_void_history.paid_transfer_fee_amount_aed,50);
+  assert.equal(rows[2].bed_transfer_void_history.refund_required,false);
 });

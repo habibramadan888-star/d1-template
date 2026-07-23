@@ -50,9 +50,9 @@ test('server capability response reflects exact real gates without exposing env 
   assert.match(worker, /path==="\/api\/capabilities"&&method==="GET"/);
 });
 
-test('internal beta capabilities expose write, owner acknowledgment, and exact owner void gate', () => {
-  const row = capability({ BED_TRANSFER_WRITE_APPROVED: 'true', OWNER_TODAY_TODO_ACK_ENABLED: 'true', BED_TRANSFER_OWNER_VOID_ENABLED: 'true', APP_ENV: 'internal_beta' });
-  assert.equal(row.bed_transfer_write_enabled, true);
+test('internal beta exposes an exact independent Owner void gate without opening employee writes', () => {
+  const row = capability({ BED_TRANSFER_WRITE_APPROVED: 'false', OWNER_TODAY_TODO_ACK_ENABLED: 'true', BED_TRANSFER_OWNER_VOID_ENABLED: 'true', BED_TRANSFER_OWNER_VOID_TARGET_ANCHOR_ID: 'target-anchor', APP_ENV: 'internal_beta' });
+  assert.equal(row.bed_transfer_write_enabled, false);
   assert.equal(row.owner_waiver_ack_enabled, true);
   assert.equal(row.bed_transfer_owner_void_enabled, true);
   assert.equal(row.internal_beta, true);
