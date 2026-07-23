@@ -11986,7 +11986,7 @@ function ownerBedTransferVoidControlResponse(request,env,claim){
   const target=cleanText(new URL(request.url).searchParams.get("transfer_anchor_id")||"",180);
   if(!requireManager(claim)||!ownerBedTransferVoidWriteEnabled(env,target))return new Response("Not Found",{status:404,headers:{"Cache-Control":"no-store"}});
   const idempotencyKey=`retain-earned-income-${accessSnapshotRuntimeHash(target)}`;
-  const html=`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Controlled Beta Transfer Void</title></head><body><main><h1>Controlled Beta Transfer Void</h1><p>Operational transfer reversal only. Retains the canonical paid transfer fee; no refund, hard delete, correction, transaction, or TTLock mutation.</p><form method="post" action="/api/owner/bed-transfer/void"><label>Transfer anchor <input name="transfer_anchor_id" value="${esc(target)}" required readonly></label><input type="hidden" name="reason" value="CONTROLLED_BETA_TEST_CLEANUP"><input type="hidden" name="financial_disposition" value="retain_earned_income"><input type="hidden" name="idempotency_key" value="${esc(idempotencyKey)}"><button type="submit">Void Transfer and Retain Earned Fee</button></form></main></body></html>`;
+  const html=`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Controlled Beta Transfer Void</title></head><body><main><h1>Controlled Beta Transfer Void</h1><p>Operational transfer reversal only. Retains the canonical paid transfer fee; no refund, hard delete, correction, transaction, or TTLock mutation.</p><form method="post" action="/api/owner/bed-transfer/retain-earned-income-reversal"><label>Transfer anchor <input name="transfer_anchor_id" value="${esc(target)}" required readonly></label><input type="hidden" name="reason" value="CONTROLLED_BETA_TEST_CLEANUP"><input type="hidden" name="financial_disposition" value="retain_earned_income"><input type="hidden" name="idempotency_key" value="${esc(idempotencyKey)}"><button type="submit">Void Transfer and Retain Earned Fee</button></form></main></body></html>`;
   return new Response(html,{status:200,headers:{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store","Content-Security-Policy":"default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'"}});
 }
 __name(ownerBedTransferVoidControlResponse,"ownerBedTransferVoidControlResponse");
@@ -13430,7 +13430,7 @@ async function handleAppEntryRoute(request, env, path, method) {
   if (path === "/admin-login") return redirectToRootEntry(request, "admin");
   if (path === "/employee-v3.html" || path === "/employee-v2.html") return redirectToPath(request, "/employee");
   if (path === "/index.html" || path === "/index-51.html" || path === "/owner.html") return redirectToPath(request, "/owner");
-  if (path === "/owner/beta-transfer-void") {
+  if (path === "/owner/beta-transfer-void" || path === "/owner/beta-transfer-retain-earned-income") {
     const claim=await readRouteClaim(request,env);
     if(!claim)return redirectToRootEntry(request,"owner");
     return ownerBedTransferVoidControlResponse(request,env,claim);
@@ -13515,7 +13515,7 @@ async function handleRequest(request, env, ctx) {
     if (path === "/api/owner/corrections/apply" && method === "POST") {
       return handleOwnerCorrectionApply(request, env, user);
     }
-    if (path === "/api/owner/bed-transfer/void" && method === "POST") {
+    if ((path === "/api/owner/bed-transfer/void" || path === "/api/owner/bed-transfer/retain-earned-income-reversal") && method === "POST") {
       return handleOwnerBedTransferVoid(request, env, user);
     }
     const employeeApiResponse = await handleEmployeeApi(request, env, user);
