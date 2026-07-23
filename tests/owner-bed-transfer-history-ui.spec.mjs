@@ -106,6 +106,8 @@ test('mixed seven-entry sessions bypass the transfer-only shortcut and retain st
   assert.match(history,/tx\.fee_amount_aed/);
   assert.match(history,/eventType==='deposit_out'\?'refund'/);
   assert.match(detailText,/ownerHistoryMixedTransferSession\(session\)/);
+  assert.match(detailText,/const generated=genTXT\(session\)/);
+  assert.match(detailText,/txt:generated\.txt/);
   assert.match(detailText,/source:'structured_detail'/);
 });
 

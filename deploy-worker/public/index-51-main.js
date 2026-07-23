@@ -848,7 +848,10 @@ function ownerHistoryMixedTransferSession(session){
 }
 
 function ownerHistoryDetailMainText(session){
-  if(ownerHistoryMixedTransferSession(session))return {txt:genTXT(session),source:'structured_detail'};
+  if(ownerHistoryMixedTransferSession(session)){
+    const generated=genTXT(session);
+    return {txt:generated.txt,source:'structured_detail'};
+  }
   const raw=employeeExportDisplayText(session);
   if(raw)return {txt:raw,source:'export_text'};
   return genTXT(session);
