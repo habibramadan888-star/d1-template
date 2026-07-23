@@ -163,13 +163,13 @@ async function fetchCurrentAuthUser(){
 }
 function ownerWaiverAckCapabilityEnabled(){return state.ownerCapabilities?.status==='success'&&state.ownerCapabilities?.owner_waiver_ack_enabled===true;}
 async function loadOwnerCapabilities(){
-  state.ownerCapabilities={...state.ownerCapabilities,status:'loading',owner_waiver_ack_enabled:false};
+  state.ownerCapabilities={...state.ownerCapabilities,status:'loading',owner_waiver_ack_enabled:false,bed_transfer_owner_void_enabled:false};
   try{
     const data=await ownerGatewayJson('/api/capabilities',{method:'GET'},8000);
     if(!data||typeof data.owner_waiver_ack_enabled!=='boolean')throw new Error('CAPABILITY_RESPONSE_INVALID');
-    state.ownerCapabilities={status:'success',owner_waiver_ack_enabled:data.owner_waiver_ack_enabled===true,bed_transfer_write_enabled:data.bed_transfer_write_enabled===true,production_cutover:String(data.production_cutover||'PRODUCTION_NO_GO')};
+    state.ownerCapabilities={status:'success',owner_waiver_ack_enabled:data.owner_waiver_ack_enabled===true,bed_transfer_write_enabled:data.bed_transfer_write_enabled===true,bed_transfer_owner_void_enabled:data.bed_transfer_owner_void_enabled===true,production_cutover:String(data.production_cutover||'PRODUCTION_NO_GO')};
   }catch{
-    state.ownerCapabilities={status:'error',owner_waiver_ack_enabled:false,bed_transfer_write_enabled:false,production_cutover:'PRODUCTION_NO_GO'};
+    state.ownerCapabilities={status:'error',owner_waiver_ack_enabled:false,bed_transfer_write_enabled:false,bed_transfer_owner_void_enabled:false,production_cutover:'PRODUCTION_NO_GO'};
   }
   return state.ownerCapabilities;
 }
@@ -3096,6 +3096,7 @@ async function renderHistory(){
     const mismatch=Number(s.entriesCount||0)&&hasEntries&&Number(s.entriesCount||0)!==s.entries.length;
     const deleted=s._voided;
     const exactBetaTransferVoidCandidate=isOwnerWriteRole()&&!deleted&&s.source==='employee_entry'&&cnt===1&&Number(s.gross_received||0)===0;
+    const retainedMixedTransferVoidCandidate=isOwnerWriteRole()&&!deleted&&s.source==='employee_entry'&&cnt>1&&state.ownerCapabilities?.bed_transfer_owner_void_enabled===true;
     const grossLabel=deleted?'原始流水金额，不计入有效收入':'总收入';
     const deletedTotals=ownerArchiveVoidedTotalsHtml(s,t);
     return `<div class="hist-card" data-id="${s.id}">
@@ -3115,6 +3116,7 @@ async function renderHistory(){
       <div class="hist-actions">
         <button class="btn btn-ghost" data-act="view"><svg class="ico"><use href="#i-eye"/></svg>查看</button>
         ${exactBetaTransferVoidCandidate?`<button class="btn btn-danger" data-act="void-transfer">Void Transfer</button>`:''}
+        ${retainedMixedTransferVoidCandidate?`<button class="btn btn-danger" data-act="void-transfer-retain">Void Transfer, Retain Fee</button>`:''}
         ${isOwnerWriteRole()&&!deleted?`<button class="btn btn-danger" data-act="del"><svg class="ico"><use href="#i-trash"/></svg></button>`:''}
       </div>
     </div>`;
@@ -3161,24 +3163,28 @@ async function renderHistory(){
       const a=e.target.closest('[data-act]');if(!a)return;
       const id=card.dataset.id;
       const s=all.find(x=>x.id===id);if(!s)return;
-      if(a.dataset.act==='void-transfer'){
+      if(a.dataset.act==='void-transfer'||a.dataset.act==='void-transfer-retain'){
         if(denyReadonlyAdminWrite())return;
+        const retainEarnedIncome=a.dataset.act==='void-transfer-retain';
         try{
           a.disabled=true;
           a.textContent='Voiding...';
           const detail=await ownerGatewayJson(ownerRunScopedApi(`/api/session_detail?id=${encodeURIComponent(id)}`),{},HISTORY_FETCH_TIMEOUT_MS);
           const rows=Array.isArray(detail)?detail:(Array.isArray(detail?.data)?detail.data:[]);
           const transfers=rows.filter(row=>String(row?.event_type||row?.type||'').toLowerCase()==='bed_transfer');
-          if(rows.length!==1||transfers.length!==1)throw new Error('BED_TRANSFER_VOID_EXACT_SESSION_REQUIRED');
+          if((retainEarnedIncome?rows.length<2:rows.length!==1)||transfers.length!==1)throw new Error('BED_TRANSFER_VOID_EXACT_SESSION_REQUIRED');
           const transferAnchor=String(transfers[0]?.transfer_anchor_id||transfers[0]?.anchor_id||transfers[0]?.event_id||s.anchorId||'').trim();
           if(!transferAnchor)throw new Error('BED_TRANSFER_VOID_TARGET_REQUIRED');
-          const voidResult=await ownerGatewayJson('/api/owner/bed-transfer/void',{method:'POST',body:JSON.stringify({transfer_anchor_id:transferAnchor,reason:'CONTROLLED_BETA_TEST_CLEANUP'})},HISTORY_FETCH_TIMEOUT_MS);
+          const endpoint=retainEarnedIncome?'/api/owner/bed-transfer/retain-earned-income-reversal':'/api/owner/bed-transfer/void';
+          const payload={transfer_anchor_id:transferAnchor,reason:'CONTROLLED_BETA_TEST_CLEANUP'};
+          if(retainEarnedIncome)payload.financial_disposition='retain_earned_income';
+          const voidResult=await ownerGatewayJson(endpoint,{method:'POST',body:JSON.stringify(payload)},HISTORY_FETCH_TIMEOUT_MS);
           toast('Bed Transfer voided');
           a.dataset.result=JSON.stringify({ok:voidResult?.ok===true,idempotent:voidResult?.idempotent===true,void_anchor_id:voidResult?.void_anchor_id||''});
           a.title=a.dataset.result;
           a.textContent='Voided';
           state.historyViewing=null;
-        }catch(error){const message=String(error?.message||error);a.disabled=false;a.textContent='Void Transfer';a.dataset.error=message;a.title=message;toast(`Bed Transfer void failed: ${message}`,'err');}
+        }catch(error){const message=String(error?.message||error);a.disabled=false;a.textContent=retainEarnedIncome?'Void Transfer, Retain Fee':'Void Transfer';a.dataset.error=message;a.title=message;toast(`Bed Transfer void failed: ${message}`,'err');}
       }else if(a.dataset.act==='del'){
         if(denyReadonlyAdminWrite())return;
         const ok=await confirmManagerPassword('删除流水记录将同时从云端移除');

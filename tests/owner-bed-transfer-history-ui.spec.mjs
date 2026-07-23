@@ -65,6 +65,10 @@ test('canonical paid transfer cards retain their audit trail and additive void r
   assert.match(history, /ownerBedTransferVoidHistoryDetailHtml/);
   assert.match(history, /data-bed-transfer-void-history="true"/);
   assert.match(ui, /50 AED.*income retained|50 AED.*收入保留/);
+  assert.match(ui, /bed_transfer_owner_void_enabled/);
+  assert.match(ui, /data-act="void-transfer-retain"/);
+  assert.match(ui, /financial_disposition='retain_earned_income'/);
+  assert.match(ui, /retain-earned-income-reversal/);
   assert.match(history, /status==='VOIDED'\?'Voided/);
   assert.doesNotMatch(renderer, /historyDetailMismatchHtml/);
 });
