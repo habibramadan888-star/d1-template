@@ -3193,6 +3193,7 @@ label .label-en{
   </div>
 </div>
 <script>
+const EMPLOYEE_UI_BUILD_ID='bt-readonly-preflight-006f-v1';
 const EMPLOYEE_ASSET_DIAGNOSTIC={
   employee_asset_version:'qa-idempotent-finalization-v1',
   frontend_asset_version:'qa-idempotent-finalization-v1',
@@ -3385,6 +3386,7 @@ async function employeeFetchCurrentAuthUserWithRetry({attempts=3,delays=EMPLOYEE
 }
 function employeeSetAuthInteractionLocked(locked){
   document.querySelectorAll('#view-entry button,#view-entry input,#view-entry select,#view-entry textarea').forEach(control=>{
+    const capabilityOwned=control.matches?.('.event-chip[data-type="TF"]')||!!control.closest?.('#transferFields');
     if(locked){
       if(!Object.prototype.hasOwnProperty.call(control.dataset,'authLockPrevious'))control.dataset.authLockPrevious=control.disabled?'1':'0';
       control.disabled=true;
@@ -3392,6 +3394,10 @@ function employeeSetAuthInteractionLocked(locked){
       return;
     }
     if(!Object.prototype.hasOwnProperty.call(control.dataset,'authLockPrevious'))return;
+    if(capabilityOwned){
+      delete control.dataset.authLockPrevious;
+      return;
+    }
     control.disabled=control.dataset.authLockPrevious==='1';
     if(control.disabled)control.setAttribute('aria-disabled','true');else control.removeAttribute('aria-disabled');
     delete control.dataset.authLockPrevious;
@@ -3451,12 +3457,45 @@ function employeeBedTransferUiGateState(capabilities=state.bedTransferCapabiliti
   const write=ready&&capabilities?.bed_transfer_write_enabled===true;
   return {fields_enabled:validate,context_loading_enabled:validate,validate_enabled:validate,final_upload_enabled:validate&&write,error_code:validate?'':(capabilities?.status==='error'?'BED_TRANSFER_CAPABILITY_UNAVAILABLE':'BED_TRANSFER_VALIDATE_NOT_ENABLED')};
 }
+function employeeReadonlyPreflightRequested(){
+  try{return typeof URLSearchParams==='function'&&typeof location!=='undefined'&&new URLSearchParams(location.search||'').has('readonly_preflight')}catch{return false}
+}
+function employeeRenderReadonlyPreflightDiagnostic(gate=employeeBedTransferUiGateState()){
+  let box=$('employeeReadonlyPreflightDiagnostic');
+  if(!employeeReadonlyPreflightRequested()){if(box)box.remove();return null}
+  if(!box){
+    box=document.createElement('pre');
+    box.id='employeeReadonlyPreflightDiagnostic';
+    box.setAttribute('aria-label','Readonly Preflight Diagnostic');
+    box.style.cssText='white-space:pre-wrap;margin:8px 0;padding:10px;border:1px solid #b8c4cc;border-radius:10px;background:#f8fafc;color:#334155;font:12px/1.45 Consolas,monospace';
+    document.body.appendChild(box);
+  }
+  const chip=document.querySelector('.event-chip[data-type="TF"]');
+  const source=$('transferFromBed');
+  const target=$('bedTo');
+  const authLockState=control=>Object.prototype.hasOwnProperty.call(control?.dataset||{},'authLockPrevious')?'present':'absent';
+  box.textContent=[
+    `ui_build_id=${EMPLOYEE_UI_BUILD_ID}`,
+    `auth_state=${String(state.authState?.status||'unknown')}`,
+    `capability_status=${String(state.bedTransferCapabilities?.status||'unknown')}`,
+    `validate_enabled=${String(gate.validate_enabled===true)}`,
+    `write_enabled=${String(gate.final_upload_enabled===true)}`,
+    `tf_chip_disabled=${String(chip?.disabled!==false)}`,
+    `source_disabled=${String(source?.disabled!==false)}`,
+    `target_disabled=${String(target?.disabled!==false)}`,
+    `source_auth_lock_previous=${authLockState(source)}`,
+    `target_auth_lock_previous=${authLockState(target)}`,
+    `production_cutover=${String(state.bedTransferCapabilities?.production_cutover||'PRODUCTION_NO_GO')}`
+  ].join('\n');
+  return box;
+}
 function applyEmployeeBedTransferUiGate(){
   const gate=employeeBedTransferUiGateState();
   const authenticated=state.authState?.status===EMPLOYEE_AUTH_STATES.AUTHENTICATED;
   document.querySelectorAll('#transferFields input,#transferFields select,#transferFields textarea').forEach(control=>{
     control.disabled=!gate.fields_enabled;
     if(!authenticated)control.disabled=true;
+    if(authenticated)delete control.dataset.authLockPrevious;
     if(control.disabled)control.setAttribute('aria-disabled','true');else control.removeAttribute('aria-disabled');
   });
   const chip=document.querySelector('.event-chip[data-type="TF"]');
@@ -3466,6 +3505,7 @@ function applyEmployeeBedTransferUiGate(){
     chip.title=validateEnabled?'':gate.error_code;
     if(gate.validate_enabled)chip.removeAttribute('aria-disabled');else chip.setAttribute('aria-disabled','true');
     if(!authenticated){chip.disabled=true;chip.setAttribute('aria-disabled','true');}
+    if(authenticated)delete chip.dataset.authLockPrevious;
   }
   const saveButton=$('btnSaveEntry');
   if(saveButton&&$('entryType')?.value==='TF'){
@@ -3477,6 +3517,7 @@ function applyEmployeeBedTransferUiGate(){
   }
   const notice=$('bedTransferWriteDisabledNotice');
   if(notice){notice.textContent=gate.final_upload_enabled?'Save Transfer adds one local Current Session record; Upload Session performs the canonical write.':'Formal Bed Transfer upload is not enabled; local Save Transfer remains read-only.';}
+  employeeRenderReadonlyPreflightDiagnostic(gate);
   return gate;
 }
 async function employeeLoadBedTransferCapabilities(){
@@ -5164,6 +5205,7 @@ function employeeMountEntryTemplate(type=$('entryType')?.value){
   if(mount.dataset.eventTemplate===key&&existingBody){
     mount.dataset.eventType=template.event_type;
     renderEmployeeBedInfoStrips();
+    applyEmployeeBedTransferUiGate();
     return template;
   }
   const uniqueNodes=new Set();
@@ -5196,6 +5238,7 @@ function employeeMountEntryTemplate(type=$('entryType')?.value){
     if(node&&node.parentElement===parking)node.removeAttribute('data-active-event-template');
   });
   renderEmployeeBedInfoStrips();
+  applyEmployeeBedTransferUiGate();
   return template;
 }
 function eventLabel(type){

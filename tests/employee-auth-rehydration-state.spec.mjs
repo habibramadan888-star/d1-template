@@ -26,12 +26,15 @@ function functionBlock(source, name) {
 function element(text = "") {
   const classes = new Set();
   return {
+    id: "",
     textContent: text,
     innerHTML: "",
     hidden: false,
     disabled: false,
     dataset: {},
     value: "",
+    transferField: false,
+    transferChip: false,
     classList: {
       add: (...names) => names.forEach(name => classes.add(name)),
       remove: (...names) => names.forEach(name => classes.delete(name)),
@@ -40,6 +43,8 @@ function element(text = "") {
     },
     setAttribute(name, value) { this[name] = String(value); },
     removeAttribute(name) { delete this[name]; },
+    matches(selector) { return this.transferChip && selector === '.event-chip[data-type="TF"]'; },
+    closest(selector) { return this.transferField && selector === "#transferFields" ? { id: "transferFields" } : null; },
   };
 }
 
@@ -48,10 +53,24 @@ function harness() {
     "employeeAuthState", "employeeAuthStateMessage", "btnRetryEmployeeSession", "employeeIdentityName", "employeeIdentityRole", "employeeUserName", "employeeUserRole", "employeeUserMeta", "workspaceSessionCount", "employeeSessionStatusBar", "sessionClock", "sessionMeta", "sessionKpis", "sessionPreview", "loginEmployeeId", "loginOverlay", "loginPin", "entryType", "btnSaveEntry", "bedTransferWriteDisabledNotice",
   ].map(id => [id, element()]));
   elements.entryType.value = "TF";
-  const transferControls = [element(), element()];
+  const transferFromBed = element();
+  transferFromBed.id = "transferFromBed";
+  transferFromBed.transferField = true;
+  const bedTo = element();
+  bedTo.id = "bedTo";
+  bedTo.transferField = true;
+  const transferReason = element();
+  transferReason.id = "transferReason";
+  transferReason.transferField = true;
+  elements.transferFromBed = transferFromBed;
+  elements.bedTo = bedTo;
+  elements.transferReason = transferReason;
+  const transferControls = [transferFromBed, bedTo, transferReason];
   transferControls.forEach(control => { control.disabled = true; control.setAttribute("aria-disabled", "true"); });
-  const controls = [...transferControls, element()];
   const transferChip = element();
+  transferChip.transferChip = true;
+  const ordinaryControl = element();
+  const controls = [...transferControls, transferChip, elements.btnSaveEntry, ordinaryControl];
   const workspaceSwitch = element();
   const scopedDrafts = new Map([
     ["staff-a", [{ id: "ENTRY-A", amount: 700 }]],
@@ -89,7 +108,11 @@ function harness() {
     employeeAuthCheckPromise: null,
     document: {
       body: element(),
-      querySelectorAll: selector => selector.startsWith("#transferFields") ? transferControls : controls,
+      querySelectorAll: selector => {
+        if (selector === "#transferFields input,#transferFields select,#transferFields textarea") return transferControls;
+        if (selector === "#view-entry button,#view-entry input,#view-entry select,#view-entry textarea") return controls;
+        return [];
+      },
       querySelector: selector => selector === ".employee-workspace-switch" ? workspaceSwitch : selector === '.event-chip[data-type="TF"]' ? transferChip : null,
     },
     $: id => elements[id] || null,
@@ -145,6 +168,8 @@ function harness() {
     functionBlock(employee, "employeeRenderAuthWorkspacePlaceholder"),
     functionBlock(employee, "employeeRenderAuthIdentityLabels"),
     functionBlock(employee, "employeeBedTransferUiGateState"),
+    functionBlock(employee, "employeeReadonlyPreflightRequested"),
+    functionBlock(employee, "employeeRenderReadonlyPreflightDiagnostic"),
     functionBlock(employee, "applyEmployeeBedTransferUiGate"),
     functionBlock(employee, "employeeLoadBedTransferCapabilities"),
     functionBlock(employee, "setEmployeeAuthState"),
@@ -158,7 +183,7 @@ function harness() {
     return next;
   };
   return {
-    context, state, elements, controls, transferControls, transferChip, scopedDrafts, EMPLOYEE_AUTH_DIAGNOSTIC,
+    context, state, elements, controls, transferControls, transferFromBed, bedTo, transferReason, transferChip, scopedDrafts, EMPLOYEE_AUTH_DIAGNOSTIC,
     setSequence: values => { fetchSequence = [...values]; fetchCalls = 0; },
     deferCapabilities() {
       capabilityResponse = new Promise(resolve => { capabilityResolve = resolve; });
