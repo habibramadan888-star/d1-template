@@ -200,9 +200,51 @@ test('authenticated final capability authority removes stale auth snapshots from
 });
 
 test('readonly asset identity diagnostic is opt-in and exposes only the approved state fields',()=>{
-  assert.match(html,/const EMPLOYEE_UI_BUILD_ID='bt-readonly-preflight-006f-v1'/);
+  assert.match(html,/const EMPLOYEE_UI_BUILD_ID='bt-readonly-preflight-006g-v1'/);
   const diagnostic=block('employeeRenderReadonlyPreflightDiagnostic');
-  for(const field of ['ui_build_id','auth_state','capability_status','validate_enabled','write_enabled','tf_chip_disabled','source_disabled','target_disabled','source_auth_lock_previous','target_auth_lock_previous','production_cutover'])assert.match(diagnostic,new RegExp(field));
-  for(const forbidden of ['cookie','token','tenant','provider','draft'])assert.doesNotMatch(diagnostic,new RegExp(forbidden,'i'));
+  for(const field of ['ui_build_id','auth_state','capability_status','validate_enabled','write_enabled','tf_chip_disabled','source_disabled','target_disabled','source_auth_lock_previous','target_auth_lock_previous','production_cutover','physical_bed_status','physical_bed_status_source','parsed_vacancy_marker','candidate_count','ambiguous','conflict','stale','snapshot_status','parse_status','deposit_status','deposit_amount_aed','mmdd','expiry','open_arrears_count','warnings'])assert.match(diagnostic,new RegExp(field));
+  for(const forbidden of ['cookie','token','tenant','provider','card_id','phone','draft'])assert.doesNotMatch(diagnostic,new RegExp(forbidden,'i'));
   assert.match(block('employeeReadonlyPreflightRequested'),/readonly_preflight/);
+});
+
+test('Bed Context access candidate count is exact and fail closed for zero missing or multiple candidates',()=>{
+  const source=block('employeeBedTransferSafeContext');
+  const context=vm.createContext({num:value=>Number(value||0),Number,String,Array});
+  vm.runInContext(`${source};globalThis.safe=employeeBedTransferSafeContext`,context);
+  const make=(candidate_count,flags={})=>context.safe('source','144',{
+    ok:true,success:true,gateway:'canonical_bed_context_gateway',
+    occupancy_gateway:{physical_bed_status:'not_marked_vacant',deposit_recorded_amount:200},
+    access_snapshot_context:{candidate_count,parsed_vacancy_marker:false,parsed_checkin_mmdd:'0101',normalized_expiry_value:'2026-08-01T08:00:00.000Z',status:'ready',parse_status:'parsed',...flags},
+    open_arrears:[],
+  });
+  assert.equal(make(1).ambiguous,false);
+  assert.equal(make(0).ambiguous,true);
+  assert.equal(make(undefined).ambiguous,true);
+  assert.equal(make(2).ambiguous,true);
+  for(const flag of ['ambiguous','conflict','stale'])assert.equal(make(1,{[flag]:true}).ambiguous,true,flag);
+});
+
+test('Bed Context preserves E marker semantics without rejecting not_marked_vacant source vocabulary',()=>{
+  const source=block('employeeBedTransferSafeContext');
+  const context=vm.createContext({num:value=>Number(value||0),Number,String,Array});
+  vm.runInContext(`${source};globalThis.safe=employeeBedTransferSafeContext`,context);
+  const sourceBed=context.safe('source','144',{ok:true,success:true,gateway:'canonical_bed_context_gateway',occupancy_gateway:{physical_bed_status:'not_marked_vacant'},access_snapshot_context:{candidate_count:1,parsed_vacancy_marker:false,status:'ready',parse_status:'parsed'}});
+  const targetBed=context.safe('target','122',{ok:true,success:true,gateway:'canonical_bed_context_gateway',occupancy_gateway:{physical_bed_status:'vacant'},access_snapshot_context:{candidate_count:1,parsed_vacancy_marker:true,status:'ready',parse_status:'parsed'}});
+  assert.equal(sourceBed.physical_status,'not_marked_vacant');
+  assert.equal(sourceBed.vacancy_marker,false);
+  assert.equal(sourceBed.physical_status_source,'access_snapshot_no_E');
+  assert.equal(sourceBed.ambiguous,false);
+  assert.equal(targetBed.physical_status,'vacant');
+  assert.equal(targetBed.vacancy_marker,true);
+  assert.equal(targetBed.physical_status_source,'access_snapshot_E_marker');
+  assert.equal(targetBed.ambiguous,false);
+});
+
+test('formal upload remains disabled while exact readonly Bed Context evidence is enabled',()=>{
+  const h=domLifecycleHarness();
+  h.mount();
+  h.setCapability({validate:true,write:false});
+  h.authenticate();
+  assert.equal(h.finalUploadDisabled(),true);
+  assert.match(block('employeeRenderReadonlyPreflightDiagnostic'),/employeeReadonlyPreflightRequested\(\)/);
 });
