@@ -25,6 +25,7 @@ const expectedFiles = [
   "tests/architecture/architecture-boundary.spec.mjs",
   "tests/architecture/scaffold-smoke.spec.mjs",
   "tests/core/event-contract.spec.mjs",
+  "tests/core/event-registry.spec.mjs",
 ];
 
 async function listFiles(directory) {
