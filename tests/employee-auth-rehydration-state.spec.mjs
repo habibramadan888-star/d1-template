@@ -45,22 +45,42 @@ function element(text = "") {
 
 function harness() {
   const elements = Object.fromEntries([
-    "employeeAuthState", "employeeAuthStateMessage", "btnRetryEmployeeSession", "employeeIdentityName", "employeeIdentityRole", "employeeUserName", "employeeUserRole", "employeeUserMeta", "workspaceSessionCount", "employeeSessionStatusBar", "sessionClock", "sessionMeta", "sessionKpis", "sessionPreview", "loginEmployeeId", "loginOverlay", "loginPin",
+    "employeeAuthState", "employeeAuthStateMessage", "btnRetryEmployeeSession", "employeeIdentityName", "employeeIdentityRole", "employeeUserName", "employeeUserRole", "employeeUserMeta", "workspaceSessionCount", "employeeSessionStatusBar", "sessionClock", "sessionMeta", "sessionKpis", "sessionPreview", "loginEmployeeId", "loginOverlay", "loginPin", "entryType", "btnSaveEntry", "bedTransferWriteDisabledNotice",
   ].map(id => [id, element()]));
-  const controls = [element(), element()];
+  elements.entryType.value = "TF";
+  const transferControls = [element(), element()];
+  transferControls.forEach(control => { control.disabled = true; control.setAttribute("aria-disabled", "true"); });
+  const controls = [...transferControls, element()];
+  const transferChip = element();
   const workspaceSwitch = element();
   const scopedDrafts = new Map([
     ["staff-a", [{ id: "ENTRY-A", amount: 700 }]],
     ["staff-b", [{ id: "ENTRY-B", amount: 900 }]],
   ]);
   const localValues = new Map([["empv3:lastEmployeeId", "staff-a"]]);
-  const state = { user: null, drafts: [], authState: { status: "AUTH_REHYDRATING", attempt: 0, lastError: "", confirmedUserId: "" } };
+  const state = {
+    user: null,
+    drafts: [],
+    authState: { status: "AUTH_REHYDRATING", attempt: 0, lastError: "", confirmedUserId: "" },
+    bedTransferCapabilities: { status: "idle", bed_transfer_validate_enabled: false, bed_transfer_write_enabled: false },
+    bedTransferContext: { status: "idle" },
+  };
   const EMPLOYEE_AUTH_DIAGNOSTIC = { contract_version: "employee-auth-attempt-v1", attempt_sequence: 0, attempts: [], transitions: [], concurrent_join_count: 0, active_attempt_id: "", latest_response_class: "", latest_worker_version: "", latest_asset_version: "" };
   let redirects = 0;
   let statusMessage = "";
   let fetchSequence = [];
   let fetchCalls = 0;
   let syncFormCalls = 0;
+  let capabilityResponse = Promise.resolve({
+    ok: true,
+    async json() {
+      return { code: 0, data: { bed_transfer_validate_enabled: true, bed_transfer_write_enabled: false, production_cutover: "PRODUCTION_NO_GO" } };
+    },
+  });
+  let capabilityResolve = null;
+  let capabilityLoadPromise = Promise.resolve();
+  let qaAcceptancePromise = Promise.resolve();
+  let qaAcceptanceResolve = null;
   const context = vm.createContext({
     state,
     EMPLOYEE_AUTH_STATES: Object.freeze({ REHYDRATING: "AUTH_REHYDRATING", AUTHENTICATED: "AUTHENTICATED", REQUIRED: "AUTH_REQUIRED", TRANSIENT_ERROR: "AUTH_TRANSIENT_ERROR" }),
@@ -69,8 +89,8 @@ function harness() {
     employeeAuthCheckPromise: null,
     document: {
       body: element(),
-      querySelectorAll: () => controls,
-      querySelector: selector => selector === ".employee-workspace-switch" ? workspaceSwitch : null,
+      querySelectorAll: selector => selector.startsWith("#transferFields") ? transferControls : controls,
+      querySelector: selector => selector === ".employee-workspace-switch" ? workspaceSwitch : selector === '.event-chip[data-type="TF"]' ? transferChip : null,
     },
     $: id => elements[id] || null,
     esc: value => String(value ?? ""),
@@ -80,10 +100,21 @@ function harness() {
     },
     console: { warn() {}, error() {} },
     location: { replace() {} },
+    apiFetch: async path => {
+      assert.equal(path, "/api/capabilities");
+      return capabilityResponse;
+    },
+    unwrapStandardResponse: value => value?.code === 0 && value?.data ? value.data : value,
+    updateEntrySessionActionState() {},
+    validate() {},
     isEmployeeAuthRole: role => ["staff", "employee"].includes(String(role || "").toLowerCase()),
     isOwnerAuthRole: role => ["owner", "manager", "admin"].includes(String(role || "").toLowerCase()),
-    applyEmployeeUser(user) { state.user = user; state.drafts = structuredClone(scopedDrafts.get(user.userid) || []); },
-    async employeeLoadQaAcceptanceRun() {},
+    applyEmployeeUser(user) {
+      state.user = user;
+      state.drafts = structuredClone(scopedDrafts.get(user.userid) || []);
+      capabilityLoadPromise = context.employeeLoadBedTransferCapabilities();
+    },
+    async employeeLoadQaAcceptanceRun() { await qaAcceptancePromise; },
     syncForm() { syncFormCalls += 1; },
     refreshSessionViews() {
       elements.workspaceSessionCount.textContent = `Current Session (${state.drafts.length})`;
@@ -113,6 +144,9 @@ function harness() {
     functionBlock(employee, "employeeSetAuthInteractionLocked"),
     functionBlock(employee, "employeeRenderAuthWorkspacePlaceholder"),
     functionBlock(employee, "employeeRenderAuthIdentityLabels"),
+    functionBlock(employee, "employeeBedTransferUiGateState"),
+    functionBlock(employee, "applyEmployeeBedTransferUiGate"),
+    functionBlock(employee, "employeeLoadBedTransferCapabilities"),
     functionBlock(employee, "setEmployeeAuthState"),
     functionBlock(employee, "checkEmployeeSession"),
   ].join("\n");
@@ -124,8 +158,30 @@ function harness() {
     return next;
   };
   return {
-    context, state, elements, controls, scopedDrafts, EMPLOYEE_AUTH_DIAGNOSTIC,
+    context, state, elements, controls, transferControls, transferChip, scopedDrafts, EMPLOYEE_AUTH_DIAGNOSTIC,
     setSequence: values => { fetchSequence = [...values]; fetchCalls = 0; },
+    deferCapabilities() {
+      capabilityResponse = new Promise(resolve => { capabilityResolve = resolve; });
+    },
+    resolveCapabilities({ validate = true, write = false } = {}) {
+      capabilityResolve?.({
+        ok: true,
+        async json() {
+          return { code: 0, data: { bed_transfer_validate_enabled: validate, bed_transfer_write_enabled: write, production_cutover: "PRODUCTION_NO_GO" } };
+        },
+      });
+    },
+    rejectCapabilities() {
+      capabilityResolve?.(Promise.reject(new Error("capability unavailable")));
+    },
+    holdQaAcceptance() {
+      qaAcceptancePromise = new Promise(resolve => { qaAcceptanceResolve = resolve; });
+    },
+    releaseQaAcceptance() {
+      qaAcceptanceResolve?.();
+    },
+    waitForCapabilities: () => capabilityLoadPromise,
+    gate: () => vm.runInContext("employeeBedTransferUiGateState()", context),
     check: options => vm.runInContext("checkEmployeeSession", context)(options),
     authError: (code, status) => vm.runInContext("employeeAuthError", context)(code, status),
     get fetchCalls() { return fetchCalls; },
@@ -275,6 +331,59 @@ test("the authenticated label is never left at the restoring copy after successf
   assert.equal(h.elements.employeeIdentityRole.textContent, "STAFF / 员工");
   assert.equal(h.elements.employeeUserRole.textContent, "ACCOUNT / 账户");
   assert.doesNotMatch(h.elements.employeeIdentityRole.textContent + h.elements.employeeUserRole.textContent, /正在恢复登录/);
+});
+
+test("capabilities resolving before authentication cannot bypass the auth lock and are reapplied after unlock", async () => {
+  const h = harness();
+  h.deferCapabilities();
+  h.holdQaAcceptance();
+  h.setSequence([{ userid: "staff-a", role: "staff" }]);
+  const pending = h.check();
+  await new Promise(resolve => setTimeout(resolve, 0));
+  h.resolveCapabilities();
+  await h.waitForCapabilities();
+  assert.equal(h.state.authState.status, "AUTH_REHYDRATING");
+  assert.equal(h.transferControls.every(control => control.disabled), true);
+  assert.equal(h.transferChip.disabled, true);
+  h.releaseQaAcceptance();
+  const result = await pending;
+  assert.equal(result.status, "AUTHENTICATED");
+  assert.equal(h.transferControls.every(control => !control.disabled), true);
+  assert.equal(h.transferControls.every(control => control["aria-disabled"] === undefined), true);
+  assert.equal(h.transferChip.disabled, false);
+  assert.equal(h.gate().final_upload_enabled, false);
+  assert.deepEqual(h.state.drafts.map(row => row.id), ["ENTRY-A"]);
+});
+
+test("capabilities resolving after authentication enable validate-only fields without enabling final upload", async () => {
+  const h = harness();
+  h.deferCapabilities();
+  h.setSequence([{ userid: "staff-a", role: "staff" }]);
+  const result = await h.check();
+  assert.equal(result.status, "AUTHENTICATED");
+  assert.equal(h.transferControls.every(control => control.disabled), true);
+  h.resolveCapabilities();
+  await h.waitForCapabilities();
+  assert.equal(h.transferControls.every(control => !control.disabled), true);
+  assert.equal(h.transferChip.disabled, false);
+  assert.equal(h.gate().validate_enabled, true);
+  assert.equal(h.gate().final_upload_enabled, false);
+  assert.deepEqual(h.state.drafts.map(row => row.id), ["ENTRY-A"]);
+});
+
+test("capability failure remains fail closed after authenticated draft restoration", async () => {
+  const h = harness();
+  h.deferCapabilities();
+  h.setSequence([{ userid: "staff-a", role: "staff" }]);
+  const result = await h.check();
+  assert.equal(result.status, "AUTHENTICATED");
+  h.rejectCapabilities();
+  await h.waitForCapabilities();
+  assert.equal(h.transferControls.every(control => control.disabled), true);
+  assert.equal(h.transferChip.disabled, true);
+  assert.equal(h.gate().validate_enabled, false);
+  assert.equal(h.gate().final_upload_enabled, false);
+  assert.deepEqual(h.state.drafts.map(row => row.id), ["ENTRY-A"]);
 });
 
 test("the auth recovery path never saves clears uploads or changes seven-event dispatch", () => {

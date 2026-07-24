@@ -3433,6 +3433,7 @@ function setEmployeeAuthState(status,{message='',attempt=0,errorCode=''}={}){
   if(text)text.textContent=message||(next===EMPLOYEE_AUTH_STATES.REHYDRATING?'Restoring session / 正在恢复登录':next===EMPLOYEE_AUTH_STATES.TRANSIENT_ERROR?'Session restore temporarily unavailable / 登录恢复暂不可用':next===EMPLOYEE_AUTH_STATES.REQUIRED?'Sign in required / 需要登录':'Session restored / 登录已恢复');
   document.querySelector('.employee-workspace-switch')?.classList.toggle('employee-auth-restoring',next!==EMPLOYEE_AUTH_STATES.AUTHENTICATED);
   employeeSetAuthInteractionLocked(next!==EMPLOYEE_AUTH_STATES.AUTHENTICATED);
+  if(next===EMPLOYEE_AUTH_STATES.AUTHENTICATED)applyEmployeeBedTransferUiGate();
   employeeRenderAuthIdentityLabels(next);
   employeeAuthDiagnosticTransition(next,{reason:String(errorCode||'')});
   if(next!==EMPLOYEE_AUTH_STATES.AUTHENTICATED)employeeRenderAuthWorkspacePlaceholder(next);
@@ -3452,13 +3453,25 @@ function employeeBedTransferUiGateState(capabilities=state.bedTransferCapabiliti
 }
 function applyEmployeeBedTransferUiGate(){
   const gate=employeeBedTransferUiGateState();
-  document.querySelectorAll('#transferFields input,#transferFields select,#transferFields textarea').forEach(control=>{control.disabled=!gate.fields_enabled});
+  const authenticated=state.authState?.status===EMPLOYEE_AUTH_STATES.AUTHENTICATED;
+  document.querySelectorAll('#transferFields input,#transferFields select,#transferFields textarea').forEach(control=>{
+    control.disabled=!gate.fields_enabled;
+    if(!authenticated)control.disabled=true;
+    if(control.disabled)control.setAttribute('aria-disabled','true');else control.removeAttribute('aria-disabled');
+  });
   const chip=document.querySelector('.event-chip[data-type="TF"]');
-  if(chip){chip.disabled=!gate.validate_enabled;chip.title=gate.validate_enabled?'':gate.error_code;if(gate.validate_enabled)chip.removeAttribute('aria-disabled');else chip.setAttribute('aria-disabled','true');}
+  const validateEnabled=authenticated&&gate.validate_enabled;
+  if(chip){
+    chip.disabled=!validateEnabled;
+    chip.title=validateEnabled?'':gate.error_code;
+    if(gate.validate_enabled)chip.removeAttribute('aria-disabled');else chip.setAttribute('aria-disabled','true');
+    if(!authenticated){chip.disabled=true;chip.setAttribute('aria-disabled','true');}
+  }
   const saveButton=$('btnSaveEntry');
   if(saveButton&&$('entryType')?.value==='TF'){
     const contextReady=state.bedTransferContext?.status==='ready';
     saveButton.disabled=!gate.fields_enabled||!contextReady;
+    if(!authenticated)saveButton.disabled=true;
     saveButton.setAttribute('aria-disabled',String(saveButton.disabled));
     saveButton.title=saveButton.disabled?(gate.error_code||'BED_TRANSFER_BED_CONTEXT_REQUIRED'):'';
   }
@@ -4001,7 +4014,8 @@ function renderEntryTtlockStatus(){
   const save=$('btnSaveEntry');
   if(save){
     const isTransfer=$('entryType')?.value==='TF';
-    const blocked=isTransfer?!employeeBedTransferValidateEnabled():(exitEvent?false:!ttlockCacheReady());
+    let blocked=isTransfer?!employeeBedTransferValidateEnabled():!ttlockCacheReady();
+    if(!isTransfer&&exitEvent)blocked=false;
     save.disabled=blocked;
     save.classList.toggle('disabled',blocked);
     save.title=blocked?(isTransfer?employeeBedTransferUiGateState().error_code:'Load Cards before formal entry / 请先加载卡片'):'';
