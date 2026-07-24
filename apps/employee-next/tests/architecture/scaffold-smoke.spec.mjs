@@ -22,6 +22,7 @@ const expectedFiles = [
   "src/events/checkout/index.ts",
   "src/events/expense/index.ts",
   "src/events/bed-transfer/index.ts",
+  "tests/architecture/architecture-boundary.spec.mjs",
   "tests/architecture/scaffold-smoke.spec.mjs",
 ];
 
