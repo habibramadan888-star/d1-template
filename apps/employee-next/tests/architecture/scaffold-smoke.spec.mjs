@@ -13,6 +13,7 @@ const employeeNextRoot = resolve(
 const expectedFiles = [
   "index.html",
   "src/main.ts",
+  "src/core/api-client.ts",
   "src/core/auth.ts",
   "src/core/draft-store.ts",
   "src/core/event-contract.ts",
@@ -26,6 +27,7 @@ const expectedFiles = [
   "src/events/bed-transfer/index.ts",
   "tests/architecture/architecture-boundary.spec.mjs",
   "tests/architecture/scaffold-smoke.spec.mjs",
+  "tests/core/api-client.spec.mjs",
   "tests/core/auth.spec.mjs",
   "tests/core/draft-store.spec.mjs",
   "tests/core/event-contract.spec.mjs",
