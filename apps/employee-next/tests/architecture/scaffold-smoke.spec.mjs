@@ -18,6 +18,7 @@ const expectedFiles = [
   "src/core/draft-store.ts",
   "src/core/event-contract.ts",
   "src/core/event-registry.ts",
+  "src/core/submit-entry.ts",
   "src/events/rent/index.ts",
   "src/events/arrears-payment/index.ts",
   "src/events/deposit-in/index.ts",
@@ -32,6 +33,7 @@ const expectedFiles = [
   "tests/core/draft-store.spec.mjs",
   "tests/core/event-contract.spec.mjs",
   "tests/core/event-registry.spec.mjs",
+  "tests/core/submit-entry.spec.mjs",
 ];
 
 async function listFiles(directory) {
