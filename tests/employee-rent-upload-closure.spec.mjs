@@ -4,6 +4,13 @@ import test from "node:test";
 import vm from "node:vm";
 import { buildWhatsappTextWithDrafts } from "./helpers/employee-entry-whatsapp-helper.mjs";
 
+function functionBlock(source, name) {
+  const start = source.indexOf(`function ${name}(`);
+  assert.ok(start >= 0, `${name} must exist`);
+  const next = source.slice(start + 10).match(/\n(?:async\s+)?function\s+/);
+  return source.slice(start, next ? start + 10 + next.index : source.length);
+}
+
 async function loadEmployeeRentHarness() {
   const html = await readFile("deploy-worker/public/employee-v3.html", "utf8");
   const uploadStart = html.indexOf("function cloneEntryForUpload");
@@ -34,6 +41,8 @@ async function loadEmployeeRentHarness() {
     function nowIso(){ return '2026-07-07T10:00:00.000Z'; }
     const localStorage = { setItem(){}, getItem(){ return ''; } };
     ${html.slice(start, end)}
+    ${functionBlock(html, "employeeEntryStableIdentity")}
+    ${functionBlock(html, "employeeQaAcceptanceSessionId")}
     ${html.slice(uploadStart, uploadEnd)}
     globalThis.normalizeEntryAnchor = normalizeEntryAnchor;
     globalThis.validateUploadAnchorBatch = validateUploadAnchorBatch;
@@ -57,6 +66,7 @@ async function loadWorkerRentHarness() {
     function __name(fn){ return fn; }
     function cleanText(value,max=10000){ return String(value ?? '').slice(0,max); }
     function cleanDate(value){ return String(value || '').slice(0, 10); }
+    const employeeEntryAnchorParseCache=new WeakMap();
     ${worker.slice(start, end)}
     globalThis.extractEmployeeEntryAnchorsFromSession = extractEmployeeEntryAnchorsFromSession;
     `,

@@ -16,6 +16,7 @@ async function loadWorkerAnchorHarness() {
     function __name(fn){ return fn; }
     function cleanText(value,max=10000){ return String(value ?? '').slice(0,max); }
     function cleanDate(value){ return String(value || '').slice(0, 10); }
+    const employeeEntryAnchorParseCache=new WeakMap();
     ${worker.slice(start, end)}
     globalThis.extractEmployeeEntryAnchorsFromSession = extractEmployeeEntryAnchorsFromSession;
     globalThis.employeeEntryExportTextWithAnchors = employeeEntryExportTextWithAnchors;

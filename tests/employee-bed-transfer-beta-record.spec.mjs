@@ -45,7 +45,7 @@ test('paid, waived and unpaid Current Session models never fall back to generic 
 
 test('beta serializer uses legal business fields and no provider or server-managed fields',()=>{
   const serializer=block(html,'employeeBedTransferValidatePayload');
-  const context={Object,String,state:{bedTransferCapabilities:{controlled_beta_preview:true}}};vm.createContext(context);vm.runInContext(`${serializer};globalThis.serialize=employeeBedTransferValidatePayload`,context);
+  const context={Object,String,state:{bedTransferCapabilities:{controlled_beta_preview:true}}};vm.createContext(context);vm.runInContext(`${block(html,'employeeEntryStableIdentity')};${serializer};globalThis.serialize=employeeBedTransferValidatePayload`,context);
   const payload=context.serialize({event_type:'bed_transfer',type:'TF',source:'employee_entry',from_bed:'146',to_bed:'111',transfer_reason:'customer_request',fee_mode:'paid',fee_amount_aed:50,payment_method:'cash'},{id:'beta-session'});
   assert.match(payload.entry.transfer_reason,/^CONTROLLED_BETA_TEST\|/);
   assert.equal('beta_test' in payload.entry,false);

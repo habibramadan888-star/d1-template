@@ -14,6 +14,13 @@ function block(name, asyncFunction = false) {
   return html.slice(start, next ? start + marker.length + next.index : html.length);
 }
 
+function constStatement(name) {
+  const start = html.indexOf(`const ${name}=`);
+  const end = html.indexOf(";", start);
+  assert.ok(start >= 0 && end > start, `${name} must exist`);
+  return html.slice(start, end + 1);
+}
+
 test("Save Transfer appends exactly one local draft and performs zero API writes", async () => {
   const source = block("saveCanonicalBedTransferDraft", true);
   let apiWrites = 0;
@@ -53,17 +60,20 @@ test("Bed Transfer keeps the shared Save and Reset action row visible while gate
   const save = {
     hidden: false, disabled: true, readOnly: false, title: "",
     parentElement: actionRow,
-    setAttribute(name, value) { this[name] = value; }
+    dataset: {},
+    setAttribute(name, value) { this[name] = value; },
+    removeAttribute(name) { delete this[name]; }
   };
+  const chip = { disabled: false, title: "", dataset: {}, setAttribute(name, value) { this[name] = value; }, removeAttribute(name) { delete this[name]; } };
   const entryType = { value: "TF" };
   const context = {
-    state: { bedTransferContext: { status: "ready" } },
+    state: { authState: { status: "AUTHENTICATED" }, bedTransferContext: { status: "ready" } },
     employeeBedTransferUiGateState: () => ({ fields_enabled: true, validate_enabled: true, final_upload_enabled: true, error_code: "" }),
-    document: { querySelectorAll: () => [], querySelector: () => ({ disabled: false, title: "" }) },
+    document: { querySelectorAll: () => [], querySelector: () => chip },
     $: id => ({ btnSaveEntry: save, entryType, bedTransferWriteDisabledNotice: { textContent: "" }, employeeTemplateFieldParking: parking }[id] || null)
   };
   vm.createContext(context);
-  vm.runInContext(`${source};globalThis.applyGate=applyEmployeeBedTransferUiGate`, context);
+  vm.runInContext(`${constStatement("EMPLOYEE_AUTH_STATES")};${block("employeeReadonlyPreflightRequested")};${block("employeeRenderReadonlyPreflightDiagnostic")};${source};globalThis.applyGate=applyEmployeeBedTransferUiGate`, context);
   context.applyGate();
   assert.equal(save.hidden, false);
   assert.equal(save.disabled, false);
@@ -148,10 +158,11 @@ test("Bed Transfer upload preserves its local Entry ID across validate and write
   const context = {
     String,
     uid: () => "unexpected-new-id",
-    normalizeEntryAnchor: value => value
+    normalizeEntryAnchor: value => value,
+    state: { qaAcceptance: null }
   };
   vm.createContext(context);
-  vm.runInContext(`${source};globalThis.cloneForUpload=cloneEntryForUpload`, context);
+  vm.runInContext(`${block("employeeEntryStableIdentity")};${block("employeeQaAcceptanceSessionId")};${source};globalThis.cloneForUpload=cloneEntryForUpload`, context);
   const local = { id: "E20260713-aichb", type: "TF", event_type: "bed_transfer", from_bed: "144", to_bed: "111" };
   const first = context.cloneForUpload(local, "S-new-ticket", "upload-one", 0);
   const retry = context.cloneForUpload(local, "S-new-ticket", "upload-two", 0);

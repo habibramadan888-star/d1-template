@@ -20,6 +20,7 @@ function buildHarness(source) {
     "arrearsWhatsappCustomerCode",
     "arrearsWhatsappDateCode",
     "arrearsWhatsappDueHeader",
+    "arrearsWhatsappTimestamp",
     "arrearsWhatsappOverdueStatus",
     "arrearsWhatsappPackageLabel",
     "dedupeArrearsExportRows",

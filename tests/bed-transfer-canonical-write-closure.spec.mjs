@@ -6,7 +6,7 @@ import vm from "node:vm";
 const workerPath = new URL("../deploy-worker/src/index.js", import.meta.url);
 
 function functionBlock(source, name) {
-  const start = source.indexOf(`function ${name}`);
+  const start = source.indexOf(`function ${name}(`);
   assert.ok(start >= 0, `${name} must exist`);
   const end = source.indexOf(`__name(${name},`, start);
   assert.ok(end > start, `${name} block must end with __name marker`);
@@ -123,9 +123,14 @@ test("canonical employee entry Bed Transfer write gate remains fail closed", asy
   const handler = functionBlock(source, "handleEmployeeEntry");
   assert.match(handler, /const writeGateType=employeeEntryUploadType\(entryForWriteGate\);/);
   assert.match(handler, /\["TF","TFF"\]\.includes\(writeGateType\)&&!bedTransferWriteApproved\(env\)/);
+  assert.doesNotMatch(handler, /validation_only:true/);
   assert.ok(
     handler.indexOf("bedTransferWriteDisabledResponse()") < handler.indexOf('empTableExists(env,"sessions")'),
     "canonical employee entry gate must remain before D1 schema inspection"
+  );
+  assert.ok(
+    handler.indexOf("bedTransferWriteDisabledResponse()") < handler.indexOf("validateEmployeeEntryUploadPayload"),
+    "formal write must reject before validation can reach any canonical persistence path"
   );
 });
 
@@ -136,12 +141,15 @@ test("canonical validate and employee entry routes remain the only Phase 1 path"
   assert.match(source, /path==="\/api\/employee\/bed-transfers"&&request\.method==="POST"\)return handleEmployeeBedTransferCreate\(request,env,user\)/);
 
   const validateHandler = functionBlock(source, "handleEmployeeEntryValidate");
+  const aggregatePreflight = functionBlock(source, "validateEmployeeEntryAggregatePreflight");
   const validatePayload = functionBlock(source, "validateEmployeeEntryUploadPayload");
   const entryHandler = functionBlock(source, "handleEmployeeEntry");
   const classifier = functionBlock(source, "employeeEntryUploadType");
   const dispatch = functionBlock(source, "validateEmployeeEntryUploadEventFields");
 
   assert.doesNotMatch(validateHandler, /\.run\(|\.batch\(|empInsertDynamic/);
+  assert.match(validateHandler, /validation_only:true/);
+  assert.match(aggregatePreflight, /validation_only:opts\.validation_only===true/);
   assert.match(classifier, /bed_transfer:"TF"/);
   assert.match(dispatch, /TF:validateBedTransferUploadFields/);
   assert.match(validatePayload, /validateEmployeeBedTransferCanonicalLink\(env,user,entry,normalized,opts\)/);
@@ -150,6 +158,7 @@ test("canonical validate and employee entry routes remain the only Phase 1 path"
   assert.match(validatePayload, /employeeEntryExportTextWithAnchors/);
   assert.match(entryHandler, /entries_json:cleanText\(sessionEntriesJson,50000\)/);
   assert.match(entryHandler, /\["TF","TFF"\]\.includes\(writeGateType\)&&!bedTransferWriteApproved\(env\)/);
+  assert.doesNotMatch(entryHandler, /validation_only:true/);
 });
 
 test("historical Bed Transfer table remains read-only and is not deleted", async () => {

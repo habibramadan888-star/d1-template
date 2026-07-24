@@ -13,11 +13,19 @@ function escaped(value) {
 }
 
 function scriptBlock(text) {
-  const start = text.indexOf("```js\n");
-  const end = text.indexOf("```", start + 5);
-  assert.ok(start >= 0, "manual js block should exist");
-  assert.ok(end > start, "manual js block should terminate");
-  return text.slice(start, end);
+  const label = "11. One-Time Apply Browser Console Script";
+  const heading = new RegExp(`^#{1,6}\\s+${escaped(label)}\\s*$`, "m").exec(text);
+  assert.ok(heading, "manual script heading should exist");
+  const sectionStart = heading.index + heading[0].length;
+  const remainder = text.slice(sectionStart);
+  const nextHeading = /\r?\n#{1,6}\s+/.exec(remainder);
+  const section = remainder.slice(0, nextHeading ? nextHeading.index : remainder.length);
+  const openingFence = /```(?:js|javascript)[^\S\r\n]*\r?\n/i.exec(section);
+  assert.ok(openingFence, "manual js block should exist");
+  const bodyStart = openingFence.index + openingFence[0].length;
+  const closingFence = /\r?\n```[^\S\r\n]*(?:\r?\n|$)/.exec(section.slice(bodyStart));
+  assert.ok(closingFence, "manual js block should terminate");
+  return section.slice(bodyStart, bodyStart + closingFence.index);
 }
 
 test("H3B3 one-time x6wio runbook exists and is documentation only", async () => {

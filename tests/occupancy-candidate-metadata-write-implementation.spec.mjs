@@ -82,6 +82,7 @@ async function loadFingerprintHarness() {
     function __name(fn){ return fn; }
     function cleanText(value,max=10000){ return Array.from(String(value ?? '')).join('').trim().slice(0,max); }
     function cleanDate(value){ return cleanText(value,32).slice(0,10); }
+    const employeeEntryAnchorParseCache=new WeakMap();
     ${worker.slice(start, end)}
     globalThis.buildCanonicalEventFingerprint = buildCanonicalEventFingerprint;
     globalThis.extractEmployeeEntryAnchorsFromSession = extractEmployeeEntryAnchorsFromSession;

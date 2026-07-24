@@ -6,6 +6,13 @@ import vm from "node:vm";
 const employee = await readFile("deploy-worker/public/employee-v3.html", "utf8");
 const worker = await readFile("deploy-worker/src/index.js", "utf8");
 
+function constStatement(source, name) {
+  const start = source.indexOf(`const ${name}=`);
+  const end = source.indexOf(";", start);
+  assert.ok(start >= 0 && end > start, `${name} not found`);
+  return source.slice(start, end + 1);
+}
+
 function block(source, startText, endText) {
   const start = source.indexOf(startText);
   assert.ok(start >= 0, `${startText} not found`);
@@ -133,14 +140,14 @@ test("summary fixture renders Records 10, Cash Net AED 770.00, Bank Received AED
     workspaceSessionCount: { textContent: "" }
   };
   const context = {
-    state: { drafts: Array.from({ length: 10 }) },
+    state: { user: { userid: "staff" }, authState: { status: "AUTHENTICATED" }, drafts: Array.from({ length: 10 }) },
     calculateEmployeeSessionSummary: () => ({ rows: Array.from({ length: 10 }), cashNet: 770, bankReceived: 700 }),
     fmtDisplayMoney: value => Number(value).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
     $: id => nodes[id],
     Number
   };
   vm.createContext(context);
-  vm.runInContext(`${fn}\nemployeeRefreshWorkspaceStatus();`, context);
+  vm.runInContext(`${constStatement(employee, "EMPLOYEE_AUTH_STATES")}\n${fn}\nemployeeRefreshWorkspaceStatus();`, context);
   assert.match(nodes.employeeSessionStatusBar.innerHTML, />Records</);
   assert.match(nodes.employeeSessionStatusBar.innerHTML, />10</);
   assert.match(nodes.employeeSessionStatusBar.innerHTML, /Cash Net<\/span><strong>AED 770\.00/);
@@ -160,14 +167,14 @@ test("summary keeps stable formatting for 0, 1, 20 records and large AED values"
       workspaceSessionCount: { textContent: "" }
     };
     const context = {
-      state: { drafts: Array.from({ length: fixture.count }) },
+      state: { user: { userid: "staff" }, authState: { status: "AUTHENTICATED" }, drafts: Array.from({ length: fixture.count }) },
       calculateEmployeeSessionSummary: () => ({ rows: Array.from({ length: fixture.count }), cashNet: fixture.cashNet, bankReceived: fixture.bankReceived }),
       fmtDisplayMoney: value => Number(value).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
       $: id => nodes[id],
       Number
     };
     vm.createContext(context);
-    vm.runInContext(`${fn}\nemployeeRefreshWorkspaceStatus();`, context);
+    vm.runInContext(`${constStatement(employee, "EMPLOYEE_AUTH_STATES")}\n${fn}\nemployeeRefreshWorkspaceStatus();`, context);
     assert.match(nodes.employeeSessionStatusBar.innerHTML, new RegExp(`>Records<\\/span><strong>${fixture.count}<`));
     assert.ok(nodes.employeeSessionStatusBar.innerHTML.includes(fixture.cash));
     assert.ok(nodes.employeeSessionStatusBar.innerHTML.includes(fixture.bank));

@@ -26,6 +26,7 @@ function asyncFn(source, name) {
 
 function gate(env, user) {
   const source = [
+    fn(worker, "qaAcceptanceEnabled"),
     fn(worker, "bedTransferWriteApproved"),
     fn(worker, "ownerTodayTodoAcknowledgmentWriteEnabled"),
     fn(worker, "ownerBedTransferVoidWriteEnabled"),
@@ -33,7 +34,7 @@ function gate(env, user) {
     fn(worker, "employeeBedTransferLegacyGenesisGate"),
     "result=employeeBedTransferLegacyGenesisGate(env,user);"
   ].join("\n");
-  const sandbox = { env, user, result: null, cleanText: (value, max) => String(value ?? "").trim().slice(0, max) };
+  const sandbox = { env, user, result: null, cleanText: (value, max) => String(value ?? "").trim().slice(0, max), qaAcceptanceEnabled: () => false };
   vm.runInNewContext(source, sandbox);
   return structuredClone(sandbox.result);
 }
@@ -61,33 +62,58 @@ test("production config restores only the existing internal-beta legacy genesis 
 
 test("single validate, mixed dry-run and canonical write converge on one server gate", () => {
   const validate = asyncFn(worker, "handleEmployeeEntryValidate");
+  const aggregate = asyncFn(worker, "validateEmployeeEntryAggregatePreflight");
   const write = asyncFn(worker, "handleEmployeeEntry");
   const payload = asyncFn(worker, "validateEmployeeEntryUploadPayload");
   const canonical = asyncFn(worker, "validateEmployeeBedTransferCanonicalLink");
   assert.match(validate, /canonical_transfer_link_anchor:true/);
+  assert.match(validate, /validation_only:true/);
+  assert.match(aggregate, /validation_only:opts\.validation_only===true/);
   assert.match(write, /canonical_transfer_link_anchor:\["TF","TFF"\]\.includes\(writeGateType\)/);
+  assert.doesNotMatch(write, /validation_only:true/);
   assert.match(payload, /validateEmployeeBedTransferCanonicalLink\(env,user,entry,normalized,opts\)/);
   assert.equal((canonical.match(/employeeBedTransferLegacyGenesisGate\(env,user\)/g) || []).length, 1);
-  assert.match(canonical, /resolveEmployeeOwnerConfirmedLegacyGenesis\([^;]+legacyGenesisGate\)/);
+  assert.match(canonical, /resolveEmployeeOwnerConfirmedLegacyGenesis\([^;]+legacyGenesisGate,\{validation_only:opts\.validation_only===true\}\)/);
   assert.doesNotMatch(payload, /body\.(legacy_genesis|server_verified)|entry\.(legacy_genesis|server_verified)/);
+  assert.doesNotMatch(canonical, /entry\.(dry_run|validate_only|no_write)|normalized\.(dry_run|validate_only|no_write)/);
 });
 
-test("shared gate requires exact server config and authenticated Employee role", () => {
+test("shared gate separates server-verified validation from formal write permission", () => {
   const env = { APP_ENV: "internal_beta", BED_TRANSFER_WRITE_APPROVED: "true", BED_TRANSFER_LEGACY_GENESIS_MODE: "server_verified" };
   const enabled = gate(env, { role: "STAFF", corpid: "homelink" });
   assert.equal(enabled.bed_transfer_validate_enabled, true);
   assert.equal(enabled.bed_transfer_write_enabled, true);
+  assert.equal(enabled.server_verified_validation_permission, true);
   assert.equal(enabled.server_verified_permission, true);
-  for (const user of [{ role: "owner", corpid: "homelink" }, { role: "staff", corpid: "" }]) assert.equal(gate(env, user).server_verified_permission, false);
-  assert.equal(gate({ ...env, BED_TRANSFER_WRITE_APPROVED: "false" }, { role: "staff", corpid: "homelink" }).server_verified_permission, false);
-  assert.equal(gate({ ...env, BED_TRANSFER_LEGACY_GENESIS_MODE: "" }, { role: "staff", corpid: "homelink" }).server_verified_permission, false);
+  const validationOnly = gate({ ...env, BED_TRANSFER_WRITE_APPROVED: "false" }, { role: "staff", corpid: "homelink" });
+  assert.equal(validationOnly.bed_transfer_validate_enabled, true);
+  assert.equal(validationOnly.bed_transfer_write_enabled, false);
+  assert.equal(validationOnly.server_verified_validation_permission, true);
+  assert.equal(validationOnly.server_verified_permission, false);
+  for (const user of [{ role: "owner", corpid: "homelink" }, { role: "staff", corpid: "" }]) {
+    const rejected = gate(env, user);
+    assert.equal(rejected.server_verified_validation_permission, false);
+    assert.equal(rejected.server_verified_permission, false);
+  }
+  const missingMode = gate({ ...env, BED_TRANSFER_LEGACY_GENESIS_MODE: "" }, { role: "staff", corpid: "homelink" });
+  assert.equal(missingMode.server_verified_validation_permission, false);
+  assert.equal(missingMode.server_verified_permission, false);
+  assert.equal(gate({ ...env, APP_ENV: "production" }, { role: "staff", corpid: "homelink" }).server_verified_permission, false);
+  assert.equal(gate({ ...env, APP_ENV: "qa" }, { role: "staff", corpid: "homelink" }).server_verified_permission, false);
+  assert.equal(gate({ ...env, APP_ENV: "qa", QA_ACCEPTANCE_ENABLED: "true", CORPID: "HL-QA" }, { role: "staff", corpid: "homelink" }).server_verified_permission, true);
 });
 
 test("source and target reuse one request-scoped canonical snapshot path", () => {
   const canonical = asyncFn(worker, "validateEmployeeBedTransferCanonicalLink");
-  assert.match(canonical, /const archiveSnapshot=await cloudArrearsFetchActiveSessionRows/);
+  assert.equal((canonical.match(/cloudArrearsFetchActiveSessionRows\(/g) || []).length, 1);
+  assert.equal((canonical.match(/const archiveSnapshot=/g) || []).length, 1);
+  assert.match(canonical, /const archiveSnapshot=await cloudArrearsFetchActiveSessionRows\(env,user,\{limit:1000,request_context:requestContext\}\)/);
+  assert.match(canonical, /employeeEntryPrepareArchiveSnapshotContext\(archiveSnapshot,requestContext\|\|\{\}\)/);
+  assert.match(canonical, /canonicalBedContextGateway\(env,user,\{bed:fromBed,[^}]+archive_snapshot:archiveSnapshot,request_context:requestContext/);
+  assert.match(canonical, /canonicalBedContextGateway\(env,user,\{bed:toBed,[^}]+archive_snapshot:archiveSnapshot,request_context:requestContext/);
+  assert.match(canonical, /resolveEmployeeBedTransferSourceContext\(env,user,fromBed,sourceGateway,\{archive_snapshot:archiveSnapshot,request_context:requestContext\}\)/);
   assert.equal((canonical.match(/archive_snapshot:archiveSnapshot/g) || []).length, 3);
-  assert.equal((canonical.match(/request_context:requestContext/g) || []).length, 3);
+  assert.equal((canonical.match(/request_context:requestContext/g) || []).length, 4);
   assert.match(canonical, /Promise\.all\(\[/);
 });
 
@@ -96,9 +122,20 @@ test("zero canonical candidates pass only for safe occupied-to-vacant internal-b
   assert.equal(passed.resolution_status, "resolved");
   assert.equal(passed.resolution_method, "server_verified_legacy_genesis");
   assert.equal(passed.lineage_genesis, true);
+  assert.equal(passed.candidate_group_count, 1);
+  assert.deepEqual(passed.ambiguity_reasons, []);
+  const warningOnly = resolveOwnerConfirmedLegacyGenesis(safeLegacy({
+    source_context: { ...safeLegacy().source_context, warnings: ["CHECKOUT_EVENT_WITHOUT_TTLOCK_E", "TRANSFER_WITHOUT_TTLOCK_E_ON_FROM_BED"] },
+    target_context: { ...safeLegacy().target_context, warnings: ["TTLOCK_VACANT_WITHOUT_CHECKOUT_EVENT"] }
+  }));
+  assert.equal(warningOnly.resolution_status, "resolved");
   assert.equal(resolveOwnerConfirmedLegacyGenesis(safeLegacy({ target_context: { ...safeLegacy().target_context, physical_bed_status: "occupied", parsed_vacancy_marker: false } })).error_code, "BED_TRANSFER_TARGET_NOT_VACANT");
   assert.equal(resolveOwnerConfirmedLegacyGenesis(safeLegacy({ source_context: { ...safeLegacy().source_context, physical_bed_status: "vacant", parsed_vacancy_marker: true } })).error_code, "BED_TRANSFER_LEGACY_GENESIS_SOURCE_NOT_OCCUPIED");
   assert.equal(resolveOwnerConfirmedLegacyGenesis(safeLegacy({ base_resolution: { resolution_status: "discontinuous", error_code: "BED_TRANSFER_LINEAGE_DISCONTINUITY", candidate_group_count: 2, ambiguity_reasons: ["active_transfer_lineage_broken"] } })).error_code, "BED_TRANSFER_LINEAGE_DISCONTINUITY");
+  for (const flag of ["ambiguous", "conflict", "stale"]) {
+    assert.equal(resolveOwnerConfirmedLegacyGenesis(safeLegacy({ source_context: { ...safeLegacy().source_context, [flag]: true } })).error_code, "BED_TRANSFER_ACCESS_SNAPSHOT_AMBIGUOUS");
+  }
+  assert.equal(resolveOwnerConfirmedLegacyGenesis(safeLegacy({ target_context: { ...safeLegacy().target_context, candidate_count: 2 } })).error_code, "BED_TRANSFER_ACCESS_SNAPSHOT_AMBIGUOUS");
   assert.equal(resolveOwnerConfirmedLegacyGenesis(safeLegacy({ to_bed: "111" })).error_code, "BED_TRANSFER_LEGACY_GENESIS_SCOPE_MISMATCH");
   assert.equal(resolveOwnerConfirmedLegacyGenesis(safeLegacy({ from_bed: "334" })).error_code, "BED_TRANSFER_LEGACY_GENESIS_SCOPE_MISMATCH");
 });

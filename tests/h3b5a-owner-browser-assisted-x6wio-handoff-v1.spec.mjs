@@ -13,13 +13,18 @@ function escaped(value) {
 }
 
 function scriptBlock(text, label) {
-  const heading = text.indexOf(label);
-  assert.ok(heading >= 0, `${label} should exist`);
-  const start = text.indexOf("```js\n", heading);
-  const end = text.indexOf("```", start + 5);
-  assert.ok(start >= 0, `${label} script block should exist`);
-  assert.ok(end > start, `${label} script block should terminate`);
-  return text.slice(start, end);
+  const heading = new RegExp(`^#{1,6}\\s+(?:\\d+\\.\\s+)?${escaped(label)}\\s*$`, "m").exec(text);
+  assert.ok(heading, `${label} should exist`);
+  const sectionStart = heading.index + heading[0].length;
+  const remainder = text.slice(sectionStart);
+  const nextHeading = /\r?\n#{1,6}\s+/.exec(remainder);
+  const section = remainder.slice(0, nextHeading ? nextHeading.index : remainder.length);
+  const openingFence = /```(?:js|javascript)[^\S\r\n]*\r?\n/i.exec(section);
+  assert.ok(openingFence, `${label} script block should exist`);
+  const bodyStart = openingFence.index + openingFence[0].length;
+  const closingFence = /\r?\n```[^\S\r\n]*(?:\r?\n|$)/.exec(section.slice(bodyStart));
+  assert.ok(closingFence, `${label} script block should terminate`);
+  return section.slice(bodyStart, bodyStart + closingFence.index);
 }
 
 test("H3B5A handoff document exists and is no-write only", async () => {

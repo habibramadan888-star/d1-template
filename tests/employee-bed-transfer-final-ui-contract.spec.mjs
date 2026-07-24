@@ -31,7 +31,7 @@ test('Bed Transfer uses Save Transfer plus the one existing Upload Session actio
 
 test('validate serializer is an exact business-input allowlist with no dates context or provider fields',()=>{
   const serializer=block(html,'employeeBedTransferValidatePayload');
-  const context={Object,String,state:{bedTransferCapabilities:{controlled_beta_preview:false}}};vm.createContext(context);vm.runInContext(`${serializer};globalThis.serialize=employeeBedTransferValidatePayload`,context);
+  const context={Object,String,state:{bedTransferCapabilities:{controlled_beta_preview:false}}};vm.createContext(context);vm.runInContext(`${block(html,'employeeEntryStableIdentity')};${serializer};globalThis.serialize=employeeBedTransferValidatePayload`,context);
   const payload=context.serialize({event_type:'bed_transfer',type:'TF',source:'employee_entry',from_bed:'146',to_bed:'111',transfer_reason:'move',fee_mode:'paid',fee_amount_aed:50,payment_method:'cash',transfer_date:'x',transfer_at:'x',canonical_accepted_at:'x',source_context:{raw:true},snapshot_fingerprint:'x',corpid:'x',card_id:'x'},{id:'safe-session',date:'x',entries_json:'x'});
   assert.equal(payload.dry_run,true);assert.equal(payload.validate_only,true);assert.equal(payload.no_write,true);
   for(const field of ['transfer_date','transfer_at','canonical_accepted_at','source_context','snapshot_fingerprint','corpid','card_id','entries_json','date'])assert.equal(JSON.stringify(payload).includes(`"${field}"`),false,field);

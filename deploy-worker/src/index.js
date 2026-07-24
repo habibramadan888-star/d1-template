@@ -2925,16 +2925,18 @@ function employeeBedTransferLegacyGenesisGate(env={},user={}){
   const legacyGenesisMode=cleanText(env.BED_TRANSFER_LEGACY_GENESIS_MODE||"",40).toLowerCase();
   const validateEnabled=capabilities.bed_transfer_validate_enabled===true;
   const writeEnabled=capabilities.bed_transfer_write_enabled===true;
-  const serverVerifiedPermission=["internal_beta","qa"].includes(appEnv)&&employeeAuthorized&&validateEnabled&&writeEnabled&&legacyGenesisMode==="server_verified"&&(appEnv!=="qa"||qaAcceptanceEnabled(env));
-  return {app_env:appEnv,bed_transfer_validate_enabled:validateEnabled,bed_transfer_write_enabled:writeEnabled,legacy_genesis_mode:legacyGenesisMode,employee_authorized:employeeAuthorized,server_verified_permission:serverVerifiedPermission};
+  const serverVerifiedValidationPermission=["internal_beta","qa"].includes(appEnv)&&employeeAuthorized&&validateEnabled&&legacyGenesisMode==="server_verified"&&(appEnv!=="qa"||qaAcceptanceEnabled(env));
+  const serverVerifiedPermission=serverVerifiedValidationPermission&&writeEnabled;
+  return {app_env:appEnv,bed_transfer_validate_enabled:validateEnabled,bed_transfer_write_enabled:writeEnabled,legacy_genesis_mode:legacyGenesisMode,employee_authorized:employeeAuthorized,server_verified_validation_permission:serverVerifiedValidationPermission,server_verified_permission:serverVerifiedPermission};
 }
 __name(employeeBedTransferLegacyGenesisGate,"employeeBedTransferLegacyGenesisGate");
-function resolveEmployeeOwnerConfirmedLegacyGenesis(env,user,fromBed,toBed,sourceGateway,targetGateway,baseResolution,gate=employeeBedTransferLegacyGenesisGate(env,user)){
+function resolveEmployeeOwnerConfirmedLegacyGenesis(env,user,fromBed,toBed,sourceGateway,targetGateway,baseResolution,gate=employeeBedTransferLegacyGenesisGate(env,user),options={}){
   const context=(gateway={})=>{
     const occupancy=gateway.occupancy_gateway||{},access=gateway.access_snapshot_context||{};
     return {corpid:cleanText(user?.corpid||"",120),physical_bed_status:cleanText(occupancy.physical_bed_status||"",40),parsed_vacancy_marker:access.parsed_vacancy_marker===true,candidate_count:access.candidate_count??0,ambiguous:access.ambiguous===true,conflict:access.conflict===true,stale:access.stale===true,parsed_deposit_amount:occupancy.deposit_recorded_amount??access.parsed_deposit_amount??null,parsed_checkin_mmdd:cleanText(access.parsed_checkin_mmdd||"",20),parsed_valid_until_mmdd:cleanText(access.parsed_valid_until_mmdd||"",20),normalized_expiry_value:cleanText(access.normalized_expiry_value||"",80),snapshot_fingerprint:bedTransferSafeSnapshotFingerprint(user,gateway)};
   };
-  const writeApproved=["internal_beta","qa"].includes(gate.app_env)?gate.server_verified_permission:gate.bed_transfer_write_enabled;
+  const serverVerifiedPermission=options.validation_only===true?gate.server_verified_validation_permission:gate.server_verified_permission;
+  const writeApproved=["internal_beta","qa"].includes(gate.app_env)?serverVerifiedPermission:gate.bed_transfer_write_enabled;
   return resolveOwnerConfirmedLegacyGenesis({base_resolution:baseResolution,corpid:user?.corpid||"",from_bed:fromBed,to_bed:toBed,app_env:gate.app_env,write_approved:writeApproved,legacy_genesis_mode:gate.legacy_genesis_mode,allowed_source_beds:bedTransferLegacyGenesisAllowlist(env),source_context:context(sourceGateway),target_context:context(targetGateway),open_arrears:sourceGateway?.open_arrears||[]});
 }
 __name(resolveEmployeeOwnerConfirmedLegacyGenesis,"resolveEmployeeOwnerConfirmedLegacyGenesis");
@@ -2955,7 +2957,7 @@ async function validateEmployeeBedTransferCanonicalLink(env,user,entry={},normal
   const fee=employeeEntryBedTransferFee(entry,normalized);
   const legacyGenesisGate=opts.legacy_genesis_gate||employeeBedTransferLegacyGenesisGate(env,user);
   let resolved=await resolveEmployeeBedTransferSourceContext(env,user,fromBed,sourceGateway,{archive_snapshot:archiveSnapshot,request_context:requestContext});
-  if(resolved.resolution_status!=="resolved")resolved=resolveEmployeeOwnerConfirmedLegacyGenesis(env,user,fromBed,toBed,sourceGateway,targetGateway,resolved,legacyGenesisGate);
+  if(resolved.resolution_status!=="resolved")resolved=resolveEmployeeOwnerConfirmedLegacyGenesis(env,user,fromBed,toBed,sourceGateway,targetGateway,resolved,legacyGenesisGate,{validation_only:opts.validation_only===true});
   if(resolved.resolution_status!=="resolved")return {ok:false,error_code:resolved.error_code||"BED_TRANSFER_SOURCE_CONTEXT_AMBIGUOUS",message:"Canonical source context could not be resolved.",invalid_fields:["source_context"],source_context_resolution:resolved};
   const sourceAccess=sourceGateway?.access_snapshot_context||{},targetAccess=targetGateway?.access_snapshot_context||{};
   const source={...resolved,corpid:user?.corpid||"",physical_bed_status:sourceGateway?.occupancy_gateway?.physical_bed_status||"unknown",parsed_vacancy_marker:sourceAccess.parsed_vacancy_marker===true,snapshot_fingerprint:resolved.snapshot_fingerprint||bedTransferSafeSnapshotFingerprint(user,sourceGateway),candidate_count:sourceAccess.candidate_count??1,ambiguous:sourceAccess.ambiguous===true,conflict:sourceAccess.conflict===true,stale:sourceAccess.stale===true,parse_status:sourceAccess.parse_status||"parsed",parsed_deposit_amount:sourceAccess.parsed_deposit_amount,parsed_checkin_mmdd:sourceAccess.parsed_checkin_mmdd,parsed_valid_until_mmdd:sourceAccess.parsed_valid_until_mmdd,normalized_expiry_value:sourceAccess.normalized_expiry_value,active_lineage:resolved.active_transfer_lineage_id?{current_bed:fromBed,transfer_lineage_id:resolved.active_transfer_lineage_id,last_active_transfer_anchor_id:resolved.previous_transfer_anchor_id}:null};
@@ -3710,7 +3712,7 @@ async function validateEmployeeEntryAggregatePreflight(env,user,body,opts={}){
     const entryIdentity=employeeEntryAggregateResultIdentity(requestBody,index);
     let result;
     try{
-      result=await validateEmployeeEntryUploadPayload(env,user,requestBody,{event_index:index,canonical_transfer_link_anchor:true,request_context:context,legacy_genesis_gate:context.legacy_genesis_gate});
+      result=await validateEmployeeEntryUploadPayload(env,user,requestBody,{event_index:index,canonical_transfer_link_anchor:true,request_context:context,legacy_genesis_gate:context.legacy_genesis_gate,validation_only:opts.validation_only===true});
     }catch(error){
       result=employeeEntryValidationFailure("validate_exception","VALIDATION_EXCEPTION","Upload validation threw an exception before cloud write.",{event_index:index,event_type:eventType,record_id:entryIdentity,invalid_fields:[],anchor_preview:{id:entryIdentity,exception_name:error?.name||"Error"}});
     }
@@ -3808,8 +3810,8 @@ async function handleEmployeeEntryValidate(request,env,user){
     const acceptedResult=aggregateRequested?await qaAcceptanceValidateAcceptedAggregatePreflight(env,user,body,qaValidationContext,request_context,aggregateRequests):null;
     qaAcceptedResumePreflight=acceptedResult?.qa_accepted_resume_preflight===true;
     result=acceptedResult||(aggregateRequested
-      ?await validateEmployeeEntryAggregatePreflight(env,user,body,{request_context})
-      :await validateEmployeeEntryUploadPayload(env,user,body,{event_index:body?.event_index,canonical_transfer_link_anchor:true,request_context,legacy_genesis_gate:request_context.legacy_genesis_gate}));
+      ?await validateEmployeeEntryAggregatePreflight(env,user,body,{request_context,validation_only:true})
+      :await validateEmployeeEntryUploadPayload(env,user,body,{event_index:body?.event_index,canonical_transfer_link_anchor:true,request_context,legacy_genesis_gate:request_context.legacy_genesis_gate,validation_only:true}));
   }catch(err){
     const eventIndex=Number(body?.event_index||0)||0;
     const eventType=entryAnchorEventType(cleanText(body?.entry?.type||body?.entry?.reason_code||"R",12).toUpperCase());
@@ -5047,7 +5049,7 @@ async function employeeEntryPreloadExistingTransactions(env,user,requests=[],con
     const selector=sessionPrefix?"session_id LIKE ?":`id IN (${placeholders})`;
     const selectorParams=sessionPrefix?[sessionPrefix]:uncheckedIds;
     const statement=env.DB.prepare(`SELECT id, session_id, created_at, type FROM transactions
-      WHERE corpid=? AND ${selector} AND COALESCE(voided_at,'')='' AND COALESCE(status,'ACTIVE')<>'VOID' LIMIT 100`).bind(user.corpid,...selectorParams);
+      WHERE corpid=? AND ${selector} AND COALESCE(voided_at,'')='' AND UPPER(COALESCE(status,'ACTIVE')) NOT IN ('VOID','VOIDED') LIMIT 100`).bind(user.corpid,...selectorParams);
     const transactionReadStartedAt=Date.now(),result=await statement.all().catch(()=>{readOk=false;return {results:[]}});
     context.transaction_read_count=Number(context.transaction_read_count||0)+1;
     context.d1_read_count=Number(context.d1_read_count||0)+1;
@@ -5078,31 +5080,75 @@ async function employeeEntryExistingTransactionsByEventId(env,user,keys,opts={})
   for(const key of keys){
     if(!key.event_id||rows.has(key.event_id))continue;
     const row=await env.DB.prepare(`SELECT id, session_id, created_at, type FROM transactions
-      WHERE id=? AND corpid=? AND COALESCE(voided_at,'')='' AND COALESCE(status,'ACTIVE')<>'VOID' LIMIT 1`)
+      WHERE id=? AND corpid=? AND COALESCE(voided_at,'')='' AND UPPER(COALESCE(status,'ACTIVE')) NOT IN ('VOID','VOIDED') LIMIT 1`)
       .bind(key.event_id,user.corpid).first().catch(()=>null);
     if(row)rows.set(key.event_id,row);
   }
   return rows;
 }
 __name(employeeEntryExistingTransactionsByEventId,"employeeEntryExistingTransactionsByEventId");
+function employeeEntryDuplicateSessionIsActive(session){
+  const status=String(session?.handover_status||session?.status||"").trim().toUpperCase();
+  return !String(session?.voided_at||"").trim()&&!["VOID","VOIDED"].includes(status);
+}
+__name(employeeEntryDuplicateSessionIsActive,"employeeEntryDuplicateSessionIsActive");
+function employeeEntryDuplicateVoidedEventIds(sessions=[]){
+  const ids=new Set();
+  for(const session of sessions||[]){
+    if(!employeeEntryDuplicateSessionIsActive(session))continue;
+    const parsed=parseOwnerCorrectionAnchorText(session?.export_text||"");
+    if(parsed?.found!==true||parsed?.ok!==true||!parsed?.correction)continue;
+    for(const event of parsed.correction.correction_events||[]){
+      const type=String(event?.correction_event_type||"").trim().toLowerCase();
+      const status=String(event?.status||"applied").trim().toLowerCase();
+      if(type!=="void_duplicate_event"||status!=="applied")continue;
+      for(const id of [event?.original_event_id,event?.original_entry_id]){
+        const normalized=cleanText(id||"",180);
+        if(normalized)ids.add(normalized);
+      }
+    }
+  }
+  return ids;
+}
+__name(employeeEntryDuplicateVoidedEventIds,"employeeEntryDuplicateVoidedEventIds");
+function employeeEntryDuplicateEffectiveArchiveItems(items=[],sessions=[]){
+  const voidedEventIds=employeeEntryDuplicateVoidedEventIds(sessions);
+  return (items||[]).filter(item=>{
+    if(!employeeEntryDuplicateSessionIsActive(item?.session))return false;
+    const anchor=item?.anchor||{};
+    const ids=[
+      anchor.event_id,
+      anchor.entry_id,
+      anchor.id,
+      anchor.anchor_id,
+      anchor.original_event_id,
+      anchor.original_entry_id
+    ].map(value=>cleanText(value||"",180)).filter(Boolean);
+    return !ids.some(id=>voidedEventIds.has(id));
+  });
+}
+__name(employeeEntryDuplicateEffectiveArchiveItems,"employeeEntryDuplicateEffectiveArchiveItems");
 async function employeeEntryExistingSessionAnchors(env,user,incomingSessionId,opts={}){
   const snapshot=opts.request_context
     ?await cloudArrearsFetchActiveSessionRows(env,user,{limit:1000,request_context:opts.request_context}).catch(()=>[])
     :null;
   const rows=Array.isArray(snapshot)
-    ?snapshot.filter(session=>!String(session?.voided_at||'').trim()&&String(session?.handover_status||'').toUpperCase()!=='VOID')
+    ?snapshot.filter(employeeEntryDuplicateSessionIsActive)
     :(await env.DB.prepare(`SELECT id, anchor_id, created_at, entries_json, export_text FROM sessions
-      WHERE corpid=? AND COALESCE(voided_at,'')='' AND COALESCE(handover_status,'')<>'VOID'
+      WHERE corpid=? AND COALESCE(voided_at,'')='' AND UPPER(COALESCE(handover_status,'')) NOT IN ('VOID','VOIDED')
       ORDER BY created_at DESC LIMIT 1000`).bind(user.corpid).all().catch(()=>({results:[]}))).results||[];
   const cached=opts.request_context?.archive_anchor_items;
   const anchors=Array.isArray(cached)
-    ?cached.map(item=>({...item,same_session:!!incomingSessionId&&String(item?.session?.id||'')===String(incomingSessionId)}))
+    ?employeeEntryDuplicateEffectiveArchiveItems(cached,Array.isArray(snapshot)?snapshot:rows)
+      .map(item=>({...item,same_session:!!incomingSessionId&&String(item?.session?.id||'')===String(incomingSessionId)}))
     :[];
   if(!Array.isArray(cached)){
+    const extractedItems=[];
     for(const session of rows){
       const extracted=extractEmployeeEntryAnchorsFromSession(session);
-      extracted.forEach((anchor,index)=>anchors.push({session,index,anchor,same_session:!!incomingSessionId&&String(session.id||'')===String(incomingSessionId)}));
+      extracted.forEach((anchor,index)=>extractedItems.push({session,index,anchor,same_session:!!incomingSessionId&&String(session.id||'')===String(incomingSessionId)}));
     }
+    anchors.push(...employeeEntryDuplicateEffectiveArchiveItems(extractedItems,rows));
   }
   return anchors;
 }

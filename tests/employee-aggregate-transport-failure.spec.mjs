@@ -59,7 +59,7 @@ test("aggregate validation uses the authenticated same-origin Worker route witho
   assert.doesNotMatch(client, /https?:\/\/|workers\.dev/);
   assert.match(employee, /credentials:'include'/);
   assert.match(worker, /path==="\/api\/employee\/entry\/validate"&&request\.method==="POST"/);
-  assert.match(handler, /validateEmployeeEntryAggregatePreflight\(env,user,body,\{request_context\}\)/);
+  assert.match(handler, /validateEmployeeEntryAggregatePreflight\(env,user,body,\{request_context,validation_only:true\}\)/);
 });
 
 test("network, 404, 503, timeout and non-JSON failures stay session-scoped", async () => {

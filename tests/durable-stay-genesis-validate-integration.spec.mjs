@@ -20,6 +20,8 @@ async function loadHarness() {
   const source = await readFile(workerPath, "utf8");
   const context = {
     evaluateStayGenesisTrigger,
+    Date,
+    URL,
     employeeEntryValidationFailure: (stage, error_code, message, extra = {}) => ({
       ok: false,
       stage,
@@ -31,6 +33,13 @@ async function loadHarness() {
   };
   vm.createContext(context);
   vm.runInContext([
+    "const TTLOCK_READ_CACHE_MAX_AGE_MS=5*60*1000;",
+    "const TTLOCK_STRICT_CACHE_MAX_AGE_MS=60*1000;",
+    functionBlock(source, "cleanText"),
+    functionBlock(source, "ttlockRequestContext"),
+    functionBlock(source, "qaAcceptanceEnabled"),
+    functionBlock(source, "qaAcceptanceEmployeeFormalWriteGate"),
+    functionBlock(source, "employeeEntryUploadType"),
     functionBlock(source, "employeeEntryValidationEntryFromBody"),
     functionBlock(source, "employeeEntryStayGenesisRows"),
     functionBlock(source, "employeeEntryStayGenesisEnvelopeFailure"),

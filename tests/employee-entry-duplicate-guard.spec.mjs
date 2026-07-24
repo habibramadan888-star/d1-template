@@ -15,6 +15,16 @@ async function loadDuplicateGuardHarness() {
     function __name(fn){ return fn; }
     function cleanText(value,max=10000){ return Array.from(String(value ?? '')).join('').trim().slice(0,max); }
     function cleanDate(value){ return cleanText(value,32).slice(0,10); }
+    function parseOwnerCorrectionAnchorText(text){
+      const match=String(text||'').match(/====\\s*CORRECTION ANCHORS JSON\\s*====\\s*([\\s\\S]*?)\\s*====\\s*END CORRECTION ANCHORS JSON\\s*====/i);
+      if(!match)return {ok:true,found:false,correction:null};
+      try{return {ok:true,found:true,correction:JSON.parse(match[1])}}catch{return {ok:false,found:true,correction:null}}
+    }
+    async function cloudArrearsFetchActiveSessionRows(env,user,opts={}){
+      return opts.request_context?.archiveSnapshotPromise
+        ?await opts.request_context.archiveSnapshotPromise
+        :[];
+    }
     const employeeEntryAnchorParseCache=new WeakMap();
     ${worker.slice(start, end)}
     globalThis.buildCanonicalEventFingerprint = buildCanonicalEventFingerprint;
@@ -196,6 +206,112 @@ test("duplicate canonical_fingerprint is rejected against stored session anchors
   assert.equal(result.ok, false);
   assert.equal(result.error_code, "DUPLICATE_CANONICAL_FINGERPRINT");
   assert.equal(result.duplicates[0].duplicate_type, "canonical_fingerprint");
+});
+
+test("voided session canonical fingerprint remains auditable but is excluded from duplicate enforcement", async () => {
+  const h = await loadDuplicateGuardHarness();
+  const stored = rent({ event_id: "ent20260707-krbbb-01", id: "ent20260707-krbbb-01", room: "145" });
+  const incoming = rent({ event_id: "new-rent-145", id: "new-rent-145", room: "145" });
+  const archived = {
+    id: "S20260707-krbbb",
+    anchor_id: "EMPV3-20260707-krbbb",
+    created_at: "2026-07-07T10:00:00Z",
+    handover_status: "VOID",
+    voided_at: "2026-07-09T09:39:58.238Z",
+    entries_json: JSON.stringify({ entries: [stored] }),
+    export_text: ""
+  };
+  const requestContext = {
+    archiveSnapshotPromise: Promise.resolve([archived]),
+    archive_anchor_items: [{ session: archived, index: 0, anchor: stored, same_session: false }]
+  };
+
+  const result = await h.checkEmployeeEntryDuplicates(
+    fakeEnv(),
+    { corpid: "homelink" },
+    bodyFor([incoming]),
+    { request_context: requestContext }
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(requestContext.archive_anchor_items.length, 1, "raw archive cache must remain intact for audit");
+
+  const uncachedResult = await h.checkEmployeeEntryDuplicates(
+    fakeEnv({ sessions: [{ ...archived, handover_status: "VOIDED", voided_at: "" }] }),
+    { corpid: "homelink" },
+    bodyFor([incoming])
+  );
+  assert.equal(uncachedResult.ok, true, "uncached VOIDED archives must use the same active-only rule");
+});
+
+test("active void_duplicate_event excludes only its target from duplicate enforcement", async () => {
+  const h = await loadDuplicateGuardHarness();
+  const removed = rent({ event_id: "old-rent-145", id: "old-rent-145", room: "145" });
+  const stillActive = rent({ event_id: "old-rent-146", id: "old-rent-146", room: "146" });
+  const original = {
+    id: "S-old",
+    anchor_id: "EMPV3-old",
+    created_at: "2026-07-07T10:00:00Z",
+    handover_status: "COMPLETED",
+    entries_json: JSON.stringify({ entries: [removed, stillActive] }),
+    export_text: ""
+  };
+  const correction = {
+    id: "CORR-S-old",
+    anchor_id: "CORR-EMPV3-old",
+    created_at: "2026-07-08T10:00:00Z",
+    handover_status: "CORRECTION_APPLIED",
+    entries_json: "",
+    export_text: [
+      "==== CORRECTION ANCHORS JSON ====",
+      JSON.stringify({
+        anchor_contract_version: "owner_correction_anchor_v1",
+        correction_session_id: "CORR-S-old",
+        correction_type: "duplicate_upload_correction",
+        target_session_anchor: "EMPV3-old",
+        correction_events: [{
+          correction_event_type: "void_duplicate_event",
+          original_event_id: "old-rent-145",
+          status: "applied",
+          correction_reason: "duplicate",
+          financial_effect: {}
+        }]
+      }),
+      "==== END CORRECTION ANCHORS JSON ===="
+    ].join("\n")
+  };
+  const requestContext = {
+    archiveSnapshotPromise: Promise.resolve([original, correction]),
+    archive_anchor_items: [
+      { session: original, index: 0, anchor: removed, same_session: false },
+      { session: original, index: 1, anchor: stillActive, same_session: false }
+    ]
+  };
+
+  const removedResult = await h.checkEmployeeEntryDuplicates(
+    fakeEnv(),
+    { corpid: "homelink" },
+    bodyFor([rent({ event_id: "new-145", id: "new-145", room: "145" })]),
+    { request_context: requestContext }
+  );
+  const activeResult = await h.checkEmployeeEntryDuplicates(
+    fakeEnv(),
+    { corpid: "homelink" },
+    bodyFor([rent({ event_id: "new-146", id: "new-146", room: "146" })]),
+    { request_context: requestContext }
+  );
+
+  assert.equal(removedResult.ok, true);
+  assert.equal(activeResult.ok, false);
+  assert.equal(activeResult.error_code, "DUPLICATE_CANONICAL_FINGERPRINT");
+  assert.equal(requestContext.archive_anchor_items.length, 2, "raw archive cache must remain intact for audit");
+
+  const uncachedRemovedResult = await h.checkEmployeeEntryDuplicates(
+    fakeEnv({ sessions: [original, correction] }),
+    { corpid: "homelink" },
+    bodyFor([rent({ event_id: "uncached-new-145", id: "uncached-new-145", room: "145" })])
+  );
+  assert.equal(uncachedRemovedResult.ok, true, "uncached correction archives must use the same effective-event rule");
 });
 
 test("duplicate records inside same payload are rejected before DB scan", async () => {
@@ -382,6 +498,7 @@ test("validate and real upload routes both run duplicate guard before writes", a
   assert.match(worker, /function buildEmployeeEntryDuplicateKeys/);
   assert.match(worker, /function buildCanonicalEventFingerprint/);
   assert.match(worker, /async function checkEmployeeEntryDuplicates/);
+  assert.match(worker, /UPPER\(COALESCE\(status,'ACTIVE'\)\) NOT IN \('VOID','VOIDED'\)/);
   assert.match(worker, /let duplicateGuard=await checkEmployeeEntryDuplicates\(env,user,body,\{event_index:eventIndex,request_context:opts\.request_context\}\)/);
   assert.match(worker, /if\(validationResult\.idempotent\)/);
   assert.match(worker, /no_write:true/);

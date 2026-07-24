@@ -6,9 +6,29 @@ test('write boundary requires exactly one TF entry and canonical resolver valida
 test('session primary key and race recovery provide at-most-one canonical fact',async()=>{const s=await readFile(path,'utf8'),schema=s.slice(s.indexOf('CREATE TABLE IF NOT EXISTS sessions'),s.indexOf('CREATE TABLE IF NOT EXISTS sessions')+180),persist=block(s,'persistEmployeeBedTransferCanonicalArchive');assert.match(schema,/id TEXT PRIMARY KEY/);assert.match(persist,/catch\(error\)/);assert.match(persist,/classifyExistingCanonicalTransfer/);assert.match(persist,/classified\.error_code/);});
 async function harness({corruptAfterInsert=false}={}){
   const s=await readFile(path,'utf8'),store=new Map();let ids=0,writes=0;
-  const context={prepareCanonicalTransferArchiveWrite,classifyExistingCanonicalTransfer,findEffectiveCanonicalTransferByFingerprint:async()=>({status:'missing',matches:[]}),cleanId:v=>String(v||''),cleanText:v=>String(v||''),empNow:()=> '2026-07-12T12:00:00+04:00',cleanDate:v=>String(v||'').slice(0,10),crypto:{randomUUID:()=>`00000000-0000-4000-8000-${String(++ids).padStart(12,'0')}`},json:(body,status)=>({body,status}),success:body=>body};
-  vm.createContext(context);vm.runInContext(`${block(s,'persistEmployeeBedTransferCanonicalArchive')};this.persist=persistEmployeeBedTransferCanonicalArchive`,context);
-  const env={DB:{prepare:(sql)=>({bind:(...args)=>({
+  const context={
+    Map,Set,JSON,Math,Number,Object,String,
+    prepareCanonicalTransferArchiveWrite,classifyExistingCanonicalTransfer,
+    findEffectiveCanonicalTransferByFingerprint:async()=>({status:'missing',matches:[]}),
+    cleanId:v=>String(v||''),cleanText:v=>String(v||''),empNow:()=> '2026-07-12T12:00:00+04:00',
+    cleanDate:v=>String(v||'').slice(0,10),
+    ownerOverviewMoney:value=>Math.round((Number(value)||0)*100)/100,
+    entryAnchorType:row=>String(row?.type||''),
+    entryAnchorEventType:type=>({R:'rent',AP:'arrears_payment',D:'deposit_in',DR:'deposit_out',CO:'checkout',E:'expense',TF:'bed_transfer'})[String(type||'').toUpperCase()]||'',
+    crypto:{randomUUID:()=>`00000000-0000-4000-8000-${String(++ids).padStart(12,'0')}`},
+    json:(body,status)=>({body,status}),success:body=>body
+  };
+  const summaryBlocks=[
+    'canonicalFinanceProjectionZeroTotals','canonicalFinanceProjectionRoundTotals','canonicalFinanceProjectionPaymentMethod',
+    'canonicalFinanceProjectionAmount','canonicalFinanceProjectionEventType','canonicalFinanceProjectionAddInflow',
+    'canonicalFinanceProjectionAddOutflow','canonicalFinanceProjectionApplyAnchor','qaAcceptanceFinanceComparable',
+    'canonicalSessionSummaryEntryIdentity','canonicalSessionSummaryNormalizeAnchor','calculateCanonicalSessionSummary',
+    'canonicalSessionSummaryClientDiagnostic','canonicalSessionSummaryWithClientDiagnostic','canonicalSessionSummaryPersistenceFields'
+  ].map(name=>block(s,name)).join('\n');
+  vm.createContext(context);vm.runInContext(`${summaryBlocks};${block(s,'empTableColumns')};${block(s,'persistEmployeeBedTransferCanonicalArchive')};this.persist=persistEmployeeBedTransferCanonicalArchive`,context);
+  const env={DB:{prepare:(sql)=>({
+    all:async()=>/^PRAGMA table_info\(sessions\)/.test(sql)?{results:[{name:'entries_json'},{name:'summary_json'}]}:{results:[]},
+    bind:(...args)=>({
     first:async()=>store.get(args[0])||null,
     run:async()=>{
       if(/^INSERT INTO sessions/.test(sql)){
