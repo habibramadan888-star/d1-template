@@ -26,6 +26,7 @@ const expectedFiles = [
   "src/events/checkout/index.ts",
   "src/events/expense/index.ts",
   "src/events/bed-transfer/index.ts",
+  "src/ui/shell.ts",
   "tests/architecture/architecture-boundary.spec.mjs",
   "tests/architecture/scaffold-smoke.spec.mjs",
   "tests/core/api-client.spec.mjs",
@@ -34,6 +35,7 @@ const expectedFiles = [
   "tests/core/event-contract.spec.mjs",
   "tests/core/event-registry.spec.mjs",
   "tests/core/submit-entry.spec.mjs",
+  "tests/ui/shell.spec.mjs",
 ];
 
 async function listFiles(directory) {
@@ -71,12 +73,18 @@ test("scaffold does not implement runtime integration or legacy behavior", async
   const files = await listFiles(employeeNextRoot);
   const forbidden = /\b(?:fetch|localStorage|sessionStorage|XMLHttpRequest)\b|\/api\/|employee-v3|canonical|finance|ttlock|void|correction|reversal/i;
   const authForbidden = /\b(?:fetch|localStorage|sessionStorage|XMLHttpRequest)\b|\/api\/|employee-v3|canonical|finance|ttlock|correction|reversal/i;
+  const uiShellForbidden = /\b(?:fetch|localStorage|sessionStorage|XMLHttpRequest)\b|\/api\/|employee-v3|canonical|finance|ttlock|correction|reversal/i;
 
   for (const path of files.filter((file) => /\.(?:html|ts)$/.test(file))) {
     const source = await readFile(resolve(employeeNextRoot, path), "utf8");
+    const forbiddenForPath = path === "src/core/auth.ts"
+      ? authForbidden
+      : path === "src/ui/shell.ts"
+        ? uiShellForbidden
+        : forbidden;
     assert.doesNotMatch(
       source,
-      path === "src/core/auth.ts" ? authForbidden : forbidden,
+      forbiddenForPath,
       path,
     );
   }
