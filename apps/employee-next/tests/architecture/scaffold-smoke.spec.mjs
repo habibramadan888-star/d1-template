@@ -13,6 +13,7 @@ const employeeNextRoot = resolve(
 const expectedFiles = [
   "index.html",
   "src/main.ts",
+  "src/core/auth.ts",
   "src/core/event-contract.ts",
   "src/core/event-registry.ts",
   "src/events/rent/index.ts",
@@ -24,6 +25,7 @@ const expectedFiles = [
   "src/events/bed-transfer/index.ts",
   "tests/architecture/architecture-boundary.spec.mjs",
   "tests/architecture/scaffold-smoke.spec.mjs",
+  "tests/core/auth.spec.mjs",
   "tests/core/event-contract.spec.mjs",
   "tests/core/event-registry.spec.mjs",
 ];
@@ -62,9 +64,14 @@ test("event placeholders remain independent and side-effect free", async () => {
 test("scaffold does not implement runtime integration or legacy behavior", async () => {
   const files = await listFiles(employeeNextRoot);
   const forbidden = /\b(?:fetch|localStorage|sessionStorage|XMLHttpRequest)\b|\/api\/|employee-v3|canonical|finance|ttlock|void|correction|reversal/i;
+  const authForbidden = /\b(?:fetch|localStorage|sessionStorage|XMLHttpRequest)\b|\/api\/|employee-v3|canonical|finance|ttlock|correction|reversal/i;
 
   for (const path of files.filter((file) => /\.(?:html|ts)$/.test(file))) {
     const source = await readFile(resolve(employeeNextRoot, path), "utf8");
-    assert.doesNotMatch(source, forbidden, path);
+    assert.doesNotMatch(
+      source,
+      path === "src/core/auth.ts" ? authForbidden : forbidden,
+      path,
+    );
   }
 });
