@@ -26,6 +26,7 @@ const expectedFiles = [
   "src/events/checkout/index.ts",
   "src/events/expense/index.ts",
   "src/events/bed-transfer/index.ts",
+  "src/events/index.ts",
   "src/ui/shell.ts",
   "tests/architecture/architecture-boundary.spec.mjs",
   "tests/architecture/scaffold-smoke.spec.mjs",
@@ -41,6 +42,7 @@ const expectedFiles = [
   "tests/events/deposit-in.spec.mjs",
   "tests/events/deposit-out.spec.mjs",
   "tests/events/expense.spec.mjs",
+  "tests/events/register-seven-events.spec.mjs",
   "tests/events/rent.spec.mjs",
   "tests/ui/shell.spec.mjs",
 ];
@@ -80,6 +82,7 @@ test("event placeholders remain independent and side-effect free", async () => {
     checkoutPath,
     "src/events/expense/index.ts",
     "src/events/bed-transfer/index.ts",
+    "src/events/index.ts",
   ];
   const placeholderFiles = eventFiles.filter(
     (path) => !implementedFiles.includes(path),
