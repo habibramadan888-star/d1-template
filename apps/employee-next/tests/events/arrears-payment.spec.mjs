@@ -500,8 +500,13 @@ test("arrears-payment source boundary excludes integrations and identity fields"
   );
   assert.match(rentSource, /EMPLOYEE_RENT_EVENT_ID/u);
 
+  const depositInSource = await readFile(
+    resolve(employeeNextRoot, "src", "events", "deposit-in", "index.ts"),
+    "utf8",
+  );
+  assert.match(depositInSource, /EMPLOYEE_DEPOSIT_IN_EVENT_ID/u);
+
   const placeholders = new Map([
-    ["deposit-in", 'export const depositInScaffold = "deposit-in-scaffold";\n'],
     ["deposit-out", 'export const depositOutScaffold = "deposit-out-scaffold";\n'],
     ["checkout", 'export const checkoutScaffold = "checkout-scaffold";\n'],
     ["expense", 'export const expenseScaffold = "expense-scaffold";\n'],

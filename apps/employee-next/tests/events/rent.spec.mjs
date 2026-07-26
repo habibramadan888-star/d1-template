@@ -481,8 +481,17 @@ test("rent source boundary excludes integrations and other event rules", async (
   );
   assert.doesNotMatch(arrearsPaymentSource, /arrearsPaymentScaffold/u);
 
+  const depositInSource = await readFile(
+    resolve(employeeNextRoot, "src", "events", "deposit-in", "index.ts"),
+    "utf8",
+  );
+  assert.match(
+    depositInSource,
+    /export const EMPLOYEE_DEPOSIT_IN_EVENT_ID = "deposit-in"/u,
+  );
+  assert.doesNotMatch(depositInSource, /depositInScaffold/u);
+
   const placeholders = new Map([
-    ["deposit-in", 'export const depositInScaffold = "deposit-in-scaffold";\n'],
     ["deposit-out", 'export const depositOutScaffold = "deposit-out-scaffold";\n'],
     ["checkout", 'export const checkoutScaffold = "checkout-scaffold";\n'],
     ["expense", 'export const expenseScaffold = "expense-scaffold";\n'],
