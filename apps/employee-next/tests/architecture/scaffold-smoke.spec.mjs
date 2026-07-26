@@ -27,6 +27,7 @@ const expectedFiles = [
   "src/events/expense/index.ts",
   "src/events/bed-transfer/index.ts",
   "src/events/index.ts",
+  "src/submit-flow.ts",
   "src/ui/shell.ts",
   "tests/architecture/architecture-boundary.spec.mjs",
   "tests/architecture/scaffold-smoke.spec.mjs",
@@ -44,6 +45,7 @@ const expectedFiles = [
   "tests/events/expense.spec.mjs",
   "tests/events/register-seven-events.spec.mjs",
   "tests/events/rent.spec.mjs",
+  "tests/integration/submit-flow.spec.mjs",
   "tests/ui/shell.spec.mjs",
 ];
 
