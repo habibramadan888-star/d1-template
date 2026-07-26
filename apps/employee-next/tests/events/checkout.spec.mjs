@@ -552,20 +552,12 @@ test("checkout source boundary excludes integrations and other event rules", asy
     ["deposit-in", "EMPLOYEE_DEPOSIT_IN_EVENT_ID"],
     ["deposit-out", "EMPLOYEE_DEPOSIT_OUT_EVENT_ID"],
     ["expense", "EMPLOYEE_EXPENSE_EVENT_ID"],
+    ["bed-transfer", "EMPLOYEE_BED_TRANSFER_EVENT_ID"],
   ]) {
     const source = await readFile(
       resolve(employeeNextRoot, "src", "events", directory, "index.ts"),
       "utf8",
     );
     assert.match(source, new RegExp(marker, "u"));
-  }
-  for (const [directory, expected] of [
-    ["bed-transfer", 'export const bedTransferScaffold = "bed-transfer-scaffold";\n'],
-  ]) {
-    const source = await readFile(
-      resolve(employeeNextRoot, "src", "events", directory, "index.ts"),
-      "utf8",
-    );
-    assert.equal(source.replaceAll("\r\n", "\n"), expected);
   }
 });

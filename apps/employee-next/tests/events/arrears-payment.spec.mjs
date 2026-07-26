@@ -520,15 +520,9 @@ test("arrears-payment source boundary excludes integrations and identity fields"
     "utf8",
   );
   assert.match(expenseSource, /EMPLOYEE_EXPENSE_EVENT_ID/u);
-
-  const placeholders = new Map([
-    ["bed-transfer", 'export const bedTransferScaffold = "bed-transfer-scaffold";\n'],
-  ]);
-  for (const [directory, expected] of placeholders) {
-    const source = await readFile(
-      resolve(employeeNextRoot, "src", "events", directory, "index.ts"),
-      "utf8",
-    );
-    assert.equal(source.replaceAll("\r\n", "\n"), expected);
-  }
+  const bedTransferSource = await readFile(
+    resolve(employeeNextRoot, "src", "events", "bed-transfer", "index.ts"),
+    "utf8",
+  );
+  assert.match(bedTransferSource, /EMPLOYEE_BED_TRANSFER_EVENT_ID/u);
 });

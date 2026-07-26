@@ -474,8 +474,5 @@ test("expense source boundary excludes integrations and other event rules", asyn
     resolve(employeeNextRoot, "src", "events", "bed-transfer", "index.ts"),
     "utf8",
   );
-  assert.equal(
-    bedTransferSource.replaceAll("\r\n", "\n"),
-    'export const bedTransferScaffold = "bed-transfer-scaffold";\n',
-  );
+  assert.match(bedTransferSource, /EMPLOYEE_BED_TRANSFER_EVENT_ID/u);
 });
