@@ -471,8 +471,17 @@ test("rent source boundary excludes integrations and other event rules", async (
     /createEmployeeEventRegistry|register|singleton|canonical anchor|owner history|finance ledger|sync state/iu,
   );
 
+  const arrearsPaymentSource = await readFile(
+    resolve(employeeNextRoot, "src", "events", "arrears-payment", "index.ts"),
+    "utf8",
+  );
+  assert.match(
+    arrearsPaymentSource,
+    /export const EMPLOYEE_ARREARS_PAYMENT_EVENT_ID = "arrears-payment"/u,
+  );
+  assert.doesNotMatch(arrearsPaymentSource, /arrearsPaymentScaffold/u);
+
   const placeholders = new Map([
-    ["arrears-payment", 'export const arrearsPaymentScaffold = "arrears-payment-scaffold";\n'],
     ["deposit-in", 'export const depositInScaffold = "deposit-in-scaffold";\n'],
     ["deposit-out", 'export const depositOutScaffold = "deposit-out-scaffold";\n'],
     ["checkout", 'export const checkoutScaffold = "checkout-scaffold";\n'],

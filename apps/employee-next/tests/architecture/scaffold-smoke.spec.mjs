@@ -35,6 +35,7 @@ const expectedFiles = [
   "tests/core/event-contract.spec.mjs",
   "tests/core/event-registry.spec.mjs",
   "tests/core/submit-entry.spec.mjs",
+  "tests/events/arrears-payment.spec.mjs",
   "tests/events/rent.spec.mjs",
   "tests/ui/shell.spec.mjs",
 ];
@@ -62,7 +63,11 @@ test("isolated employee-next scaffold contains only the task whitelist", async (
 test("event placeholders remain independent and side-effect free", async () => {
   const eventFiles = expectedFiles.filter((path) => path.startsWith("src/events/"));
   const rentPath = "src/events/rent/index.ts";
-  const placeholderFiles = eventFiles.filter((path) => path !== rentPath);
+  const arrearsPaymentPath = "src/events/arrears-payment/index.ts";
+  const implementedFiles = [rentPath, arrearsPaymentPath];
+  const placeholderFiles = eventFiles.filter(
+    (path) => !implementedFiles.includes(path),
+  );
   const forbidden = /\b(?:fetch|localStorage|sessionStorage|XMLHttpRequest)\b|\/api\/|employee-v3|deploy-worker|src\/events\/\.\./;
 
   for (const path of eventFiles) {
@@ -74,6 +79,16 @@ test("event placeholders remain independent and side-effect free", async () => {
   const rentSource = await readFile(resolve(employeeNextRoot, rentPath), "utf8");
   assert.match(rentSource, /from "\.\.\/\.\.\/core\/event-contract"/);
   assert.doesNotMatch(rentSource, /rentScaffold/);
+
+  const arrearsPaymentSource = await readFile(
+    resolve(employeeNextRoot, arrearsPaymentPath),
+    "utf8",
+  );
+  assert.match(
+    arrearsPaymentSource,
+    /from "\.\.\/\.\.\/core\/event-contract"/,
+  );
+  assert.doesNotMatch(arrearsPaymentSource, /arrearsPaymentScaffold/);
 
   for (const path of placeholderFiles) {
     const source = await readFile(resolve(employeeNextRoot, path), "utf8");
