@@ -39,6 +39,7 @@ const expectedFiles = [
   "tests/events/checkout.spec.mjs",
   "tests/events/deposit-in.spec.mjs",
   "tests/events/deposit-out.spec.mjs",
+  "tests/events/expense.spec.mjs",
   "tests/events/rent.spec.mjs",
   "tests/ui/shell.spec.mjs",
 ];
@@ -76,6 +77,7 @@ test("event placeholders remain independent and side-effect free", async () => {
     depositInPath,
     depositOutPath,
     checkoutPath,
+    "src/events/expense/index.ts",
   ];
   const placeholderFiles = eventFiles.filter(
     (path) => !implementedFiles.includes(path),
@@ -113,6 +115,7 @@ test("scaffold does not implement runtime integration or legacy behavior", async
   const forbidden = /\b(?:fetch|localStorage|sessionStorage|XMLHttpRequest)\b|\/api\/|employee-v3|canonical|finance|ttlock|void|correction|reversal/i;
   const authForbidden = /\b(?:fetch|localStorage|sessionStorage|XMLHttpRequest)\b|\/api\/|employee-v3|canonical|finance|ttlock|correction|reversal/i;
   const uiShellForbidden = /\b(?:fetch|localStorage|sessionStorage|XMLHttpRequest)\b|\/api\/|employee-v3|canonical|finance|ttlock|correction|reversal/i;
+  const expenseForbidden = /\b(?:fetch|localStorage|sessionStorage|XMLHttpRequest)\b|\/api\/|employee-v3|canonical|finance[_ ]ledger|ttlock|void|correction|reversal/i;
 
   for (const path of files.filter((file) => /\.(?:html|ts)$/.test(file))) {
     const source = await readFile(resolve(employeeNextRoot, path), "utf8");
@@ -120,7 +123,9 @@ test("scaffold does not implement runtime integration or legacy behavior", async
       ? authForbidden
       : path === "src/ui/shell.ts"
         ? uiShellForbidden
-        : forbidden;
+        : path === "src/events/expense/index.ts"
+          ? expenseForbidden
+          : forbidden;
     assert.doesNotMatch(
       source,
       forbiddenForPath,

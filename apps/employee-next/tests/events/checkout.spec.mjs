@@ -551,6 +551,7 @@ test("checkout source boundary excludes integrations and other event rules", asy
     ["arrears-payment", "EMPLOYEE_ARREARS_PAYMENT_EVENT_ID"],
     ["deposit-in", "EMPLOYEE_DEPOSIT_IN_EVENT_ID"],
     ["deposit-out", "EMPLOYEE_DEPOSIT_OUT_EVENT_ID"],
+    ["expense", "EMPLOYEE_EXPENSE_EVENT_ID"],
   ]) {
     const source = await readFile(
       resolve(employeeNextRoot, "src", "events", directory, "index.ts"),
@@ -559,7 +560,6 @@ test("checkout source boundary excludes integrations and other event rules", asy
     assert.match(source, new RegExp(marker, "u"));
   }
   for (const [directory, expected] of [
-    ["expense", 'export const expenseScaffold = "expense-scaffold";\n'],
     ["bed-transfer", 'export const bedTransferScaffold = "bed-transfer-scaffold";\n'],
   ]) {
     const source = await readFile(

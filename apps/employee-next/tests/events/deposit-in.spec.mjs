@@ -540,9 +540,13 @@ test("deposit-in source boundary excludes integrations and identity fields", asy
     "utf8",
   );
   assert.match(checkoutSource, /EMPLOYEE_CHECKOUT_EVENT_ID/u);
+  const expenseSource = await readFile(
+    resolve(employeeNextRoot, "src", "events", "expense", "index.ts"),
+    "utf8",
+  );
+  assert.match(expenseSource, /EMPLOYEE_EXPENSE_EVENT_ID/u);
 
   const placeholders = new Map([
-    ["expense", 'export const expenseScaffold = "expense-scaffold";\n'],
     ["bed-transfer", 'export const bedTransferScaffold = "bed-transfer-scaffold";\n'],
   ]);
   for (const [directory, expected] of placeholders) {
