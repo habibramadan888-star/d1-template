@@ -25,7 +25,7 @@ test("business pages keep api me as routing authority", async () => {
   const employee = await readFile("deploy-worker/public/employee-v3.html", "utf8");
   const owner = await readFile("deploy-worker/public/index-51-main.js", "utf8");
 
-  assert.match(employee, /const r=await apiFetch\('\/api\/me',\{method:'GET'\}\)/);
+  assert.match(employee, /const r=await apiFetch\('\/api\/me',\{method:'GET',\.\.\.\(controller\?\{signal:controller\.signal\}:\{\}\)\}\)/);
   assert.match(owner, /const r=await apiFetch\('\/api\/me',\{method:'GET'\}\)/);
   assert.match(employee, /isEmployeeAuthRole\(me\.role\)/);
   assert.match(owner, /isOwnerAppRole\(me\.role\)/);

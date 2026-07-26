@@ -54,6 +54,7 @@ export interface EmployeeNextRouteOptions {
   readonly transport: EmployeeNextRouteTransport;
   readonly render: EmployeeNextRouteRenderPort;
   readonly buildApiRequest: EmployeeSubmitFlowRequestBuilder;
+  readonly allowedSubmitPath?: string;
 }
 
 export type EmployeeNextRouteState =
@@ -141,10 +142,22 @@ export function isEmployeeNextRouteOptions(
   }
   const options = value as Readonly<Record<string, unknown>>;
   return (
-    hasOnlyKeys(options, ["transport", "render", "buildApiRequest"])
+    hasOnlyKeys(
+      options,
+      ["transport", "render", "buildApiRequest", "allowedSubmitPath"],
+    )
     && isTransport(options.transport)
     && isRenderPort(options.render)
     && typeof options.buildApiRequest === "function"
+    && (
+      options.allowedSubmitPath === undefined
+      || (
+        typeof options.allowedSubmitPath === "string"
+        && options.allowedSubmitPath.startsWith("/")
+        && !options.allowedSubmitPath.startsWith("//")
+        && !options.allowedSubmitPath.includes("..")
+      )
+    )
   );
 }
 
@@ -314,7 +327,12 @@ function optionsError(value: unknown): EmployeeNextRouteErrorCode | undefined {
     return "INVALID_OPTIONS";
   }
   const options = value as Readonly<Record<string, unknown>>;
-  if (!hasOnlyKeys(options, ["transport", "render", "buildApiRequest"])) {
+  if (
+    !hasOnlyKeys(
+      options,
+      ["transport", "render", "buildApiRequest", "allowedSubmitPath"],
+    )
+  ) {
     return "INVALID_OPTIONS";
   }
   if (!isRenderPort(options.render)) {
@@ -326,14 +344,32 @@ function optionsError(value: unknown): EmployeeNextRouteErrorCode | undefined {
   if (typeof options.buildApiRequest !== "function") {
     return "INVALID_OPTIONS";
   }
+  if (
+    options.allowedSubmitPath !== undefined
+    && (
+      typeof options.allowedSubmitPath !== "string"
+      || !options.allowedSubmitPath.startsWith("/")
+      || options.allowedSubmitPath.startsWith("//")
+      || options.allowedSubmitPath.includes("..")
+    )
+  ) {
+    return "INVALID_OPTIONS";
+  }
   return undefined;
 }
 
-function isSafeLocalPostRequest(value: unknown): value is EmployeeApiRequest {
+function isSafeLocalPostRequest(
+  value: unknown,
+  allowedSubmitPath: string | undefined,
+): value is EmployeeApiRequest {
   return (
     isEmployeeApiRequest(value)
     && value.method === "POST"
-    && value.path.startsWith("/unit-test-")
+    && (
+      allowedSubmitPath === undefined
+        ? value.path.startsWith("/unit-test-")
+        : value.path === allowedSubmitPath
+    )
   );
 }
 
@@ -367,6 +403,7 @@ export function createEmployeeNextRouteController(
   });
   const eventIds = Object.freeze([...registry.eventIds]);
   const renderPort = options.render;
+  const allowedSubmitPath = options.allowedSubmitPath;
   let selectedEventId: EmployeeEventId | undefined;
   let session: EmployeeAuthSession | undefined;
   let draft: Readonly<Record<string, EmployeeApiJsonValue>> | undefined;
@@ -510,7 +547,7 @@ export function createEmployeeNextRouteController(
         draft,
         buildApiRequest(context): EmployeeApiRequest {
           const request = options.buildApiRequest(context);
-          if (!isSafeLocalPostRequest(request)) {
+          if (!isSafeLocalPostRequest(request, allowedSubmitPath)) {
             throw new Error("INVALID_API_REQUEST");
           }
           return request;

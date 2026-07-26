@@ -13443,7 +13443,35 @@ async function handleQaAcceptanceApi(request,env,user){
 }
 __name(handleQaAcceptanceApi,"handleQaAcceptanceApi");
 
+function employeeNextAssetPath(path){
+  if(path==="/employee-next"||path==="/employee-next/"||path==="/employee-next/index.html")return "/employee-next/index.html";
+  if(path==="/employee-next/employee-next.js")return "/employee-next/employee-next.js";
+  return "";
+}
+__name(employeeNextAssetPath,"employeeNextAssetPath");
+async function handleEmployeeNextSidecarRoute(request,env,path,method){
+  const inScope=path==="/employee-next"||path.startsWith("/employee-next/");
+  if(!inScope)return null;
+  if(method!=="GET"&&method!=="HEAD")return new Response("Method Not Allowed",{status:405,headers:{"Allow":"GET, HEAD","Cache-Control":"no-store"}});
+  const assetPath=employeeNextAssetPath(path);
+  if(!assetPath)return new Response("Not Found",{status:404,headers:{"Cache-Control":"no-store"}});
+  const claim=await readRouteClaim(request,env);
+  if(!claim)return redirectToRootEntry(request,"employee");
+  if(!isStaffRoleValue(claim.role))return new Response("Not Found",{status:404,headers:{"Cache-Control":"no-store"}});
+  const asset=await fetchStaticAsset(request,env,assetPath);
+  if(!asset)return new Response("Not Found",{status:404,headers:{"Cache-Control":"no-store"}});
+  const headers=new Headers(asset.headers);
+  headers.set("Cache-Control","no-store, no-cache, max-age=0, must-revalidate");
+  headers.set("Pragma","no-cache");
+  headers.set("X-Content-Type-Options","nosniff");
+  headers.set("Referrer-Policy","same-origin");
+  if(assetPath.endsWith(".html"))headers.set("Content-Security-Policy","default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");
+  return new Response(method==="HEAD"?null:asset.body,{status:asset.status,statusText:asset.statusText,headers});
+}
+__name(handleEmployeeNextSidecarRoute,"handleEmployeeNextSidecarRoute");
 async function handleAppEntryRoute(request, env, path, method) {
+  const employeeNextResponse=await handleEmployeeNextSidecarRoute(request,env,path,method);
+  if(employeeNextResponse)return employeeNextResponse;
   if (method !== "GET") return null;
   if(path==="/qa-owner-acceptance-login"||path==="/qa-owner-acceptance-login.html"){
     const boundary=await qaAcceptanceBoundary(request,env,false);

@@ -11,6 +11,7 @@
     "qa:acceptance:owner-handoff": "node scripts/issue-qa-owner-handoff.mjs",
     "qa:acceptance:run": "node scripts/run-qa-acceptance-automation.mjs",
     "verify:qa-acceptance-platform": "node scripts/verify-qa-acceptance-platform-local.mjs",
+    "build:employee-next-sidecar": "node scripts/build-employee-next-sidecar.mjs",
     "build": "npm run build:lib && npm run build:worker:assets && npm run build:worker:embedded",
     "build:worker:assets": "cd deploy-worker && wrangler deploy --config wrangler.toml --dry-run --outdir ../.wrangler-dryrun/assets",
     "build:worker:embedded": "cd deploy-worker && wrangler deploy --config wrangler.embedded.toml --dry-run --outdir ../.wrangler-dryrun/embedded",

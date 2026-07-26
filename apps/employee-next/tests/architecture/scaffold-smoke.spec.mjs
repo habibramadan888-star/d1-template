@@ -47,6 +47,7 @@ const expectedFiles = [
   "tests/events/register-seven-events.spec.mjs",
   "tests/events/rent.spec.mjs",
   "tests/integration/local-isolation-gates.spec.mjs",
+  "tests/integration/production-sidecar-adapters.spec.mjs",
   "tests/integration/submit-flow.spec.mjs",
   "tests/integration/route-build.spec.mjs",
   "tests/ui/shell.spec.mjs",
