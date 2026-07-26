@@ -65,7 +65,12 @@ const validationCodes = [
   "DEPOSIT_IN_PAYMENT_LEGS_INVALID",
   "DEPOSIT_IN_PAYMENT_TOTAL_MISMATCH",
   "DEPOSIT_IN_RECEIVED_DATE_REQUIRED",
+  "DEPOSIT_IN_REQUIRED_TOTAL_REQUIRED",
+  "DEPOSIT_IN_REQUIRED_TOTAL_INVALID",
+  "DEPOSIT_IN_CURRENT_DEPOSIT_SNAPSHOT_REQUIRED",
   "DEPOSIT_IN_CURRENT_DEPOSIT_SNAPSHOT_INVALID",
+  "DEPOSIT_IN_DEPOSIT_TOTAL_RELATION_INVALID",
+  "DEPOSIT_IN_OVERPAYMENT_UNSUPPORTED",
   "DEPOSIT_IN_EXISTING_DEPOSIT_NOTE_REQUIRED",
   "DEPOSIT_IN_PROVIDER_IDENTITY_FORBIDDEN",
 ];
@@ -78,7 +83,8 @@ function cashDraft(overrides = {}) {
     cashReceivedAed: 500,
     bankReceivedAed: 0,
     depositReceivedDate: "2026-07-26",
-    currentDepositSnapshotAed: null,
+    depositRequiredTotalAed: 1_000,
+    currentDepositSnapshotAed: 0,
     note: "",
     ...overrides,
   };
@@ -149,6 +155,7 @@ test("deposit-in runtime success contract", () => {
     cashReceivedAed: null,
     bankReceivedAed: null,
     depositReceivedDate: "",
+    depositRequiredTotalAed: null,
     currentDepositSnapshotAed: null,
     note: "",
   }));
@@ -184,7 +191,12 @@ test("deposit-in runtime success contract", () => {
       legs: [{ method: "cash", amountAed: 500 }],
     },
     depositReceivedDate: "2026-07-26",
-    currentDepositSnapshotAed: null,
+    depositRequiredTotalAed: 1_000,
+    currentDepositSnapshotAed: 0,
+    previousDepositRecordedAmountAed: 0,
+    depositPaidAmountAed: 500,
+    expectedDepositAfterPaymentAed: 500,
+    depositRemainingAfterPaymentAed: 500,
     accountingPreview: {
       depositReceivedAed: 500,
       rentIncomeAed: 0,
@@ -197,7 +209,7 @@ test("deposit-in runtime success contract", () => {
     note: "collected in office",
   }));
   check(() => assert.equal(cashSubmission.depositReceivedDate, "2026-07-26"));
-  check(() => assert.equal(cashSubmission.currentDepositSnapshotAed, null));
+  check(() => assert.equal(cashSubmission.currentDepositSnapshotAed, 0));
   check(() => assert.equal(
     cashSubmission.accountingPreview.depositReceivedAed,
     500,
@@ -247,6 +259,7 @@ test("deposit-in runtime success contract", () => {
     cashReceivedAed: 40.05,
     bankReceivedAed: 60.05,
     currentDepositSnapshotAed: 75.1,
+    depositRequiredTotalAed: 1_000,
     note: " existing deposit confirmed ",
   }));
   check(() => assert.deepEqual(normalizedSubmission.payment.legs, [
@@ -256,6 +269,14 @@ test("deposit-in runtime success contract", () => {
   check(() => assert.equal(
     normalizedSubmission.currentDepositSnapshotAed,
     75.1,
+  ));
+  check(() => assert.equal(
+    normalizedSubmission.expectedDepositAfterPaymentAed,
+    175.2,
+  ));
+  check(() => assert.equal(
+    normalizedSubmission.depositRemainingAfterPaymentAed,
+    824.8,
   ));
   check(() => assert.equal(
     normalizedSubmission.note,
@@ -304,11 +325,25 @@ test("deposit-in runtime fail-closed contract", () => {
     [mixedDraft({ cashReceivedAed: 190, bankReceivedAed: 300 }), "DEPOSIT_IN_PAYMENT_TOTAL_MISMATCH"],
     [cashDraft({ depositReceivedDate: "" }), "DEPOSIT_IN_RECEIVED_DATE_REQUIRED"],
     [cashDraft({ depositReceivedDate: "26/07/2026" }), "DEPOSIT_IN_RECEIVED_DATE_REQUIRED"],
+    [cashDraft({ depositRequiredTotalAed: null }), "DEPOSIT_IN_REQUIRED_TOTAL_REQUIRED"],
+    [cashDraft({ depositRequiredTotalAed: 0 }), "DEPOSIT_IN_REQUIRED_TOTAL_INVALID"],
+    [cashDraft({ depositRequiredTotalAed: 1.001 }), "DEPOSIT_IN_REQUIRED_TOTAL_INVALID"],
+    [cashDraft({ currentDepositSnapshotAed: null }), "DEPOSIT_IN_CURRENT_DEPOSIT_SNAPSHOT_REQUIRED"],
     [cashDraft({ currentDepositSnapshotAed: Number.NaN }), "DEPOSIT_IN_CURRENT_DEPOSIT_SNAPSHOT_INVALID"],
     [cashDraft({ currentDepositSnapshotAed: -1 }), "DEPOSIT_IN_CURRENT_DEPOSIT_SNAPSHOT_INVALID"],
     [cashDraft({ currentDepositSnapshotAed: 1.001 }), "DEPOSIT_IN_CURRENT_DEPOSIT_SNAPSHOT_INVALID"],
     [cashDraft({ currentDepositSnapshotAed: 50, note: "" }), "DEPOSIT_IN_EXISTING_DEPOSIT_NOTE_REQUIRED"],
     [cashDraft({ currentDepositSnapshotAed: 50, note: "   " }), "DEPOSIT_IN_EXISTING_DEPOSIT_NOTE_REQUIRED"],
+    [cashDraft({
+      depositRequiredTotalAed: 400,
+      currentDepositSnapshotAed: 500,
+      note: "existing deposit confirmed",
+    }), "DEPOSIT_IN_DEPOSIT_TOTAL_RELATION_INVALID"],
+    [cashDraft({
+      depositRequiredTotalAed: 600,
+      currentDepositSnapshotAed: 200,
+      note: "existing deposit confirmed",
+    }), "DEPOSIT_IN_OVERPAYMENT_UNSUPPORTED"],
     [{ ...cashDraft(), providerPhone: "hidden" }, "DEPOSIT_IN_PROVIDER_IDENTITY_FORBIDDEN"],
     [{ ...cashDraft(), phone: "hidden" }, "DEPOSIT_IN_PROVIDER_IDENTITY_FORBIDDEN"],
     [{ ...cashDraft(), cardId: "hidden" }, "DEPOSIT_IN_PROVIDER_IDENTITY_FORBIDDEN"],
@@ -449,7 +484,8 @@ test("deposit-in TypeScript semantic fixtures", () => {
     cashReceivedAed: 500,
     bankReceivedAed: 0,
     depositReceivedDate: "2026-07-26",
-    currentDepositSnapshotAed: null,
+    depositRequiredTotalAed: 1000,
+    currentDepositSnapshotAed: 0,
     note: ""
   }`;
   const positives = [

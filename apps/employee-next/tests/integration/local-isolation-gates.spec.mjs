@@ -10,6 +10,9 @@ const employeeNextRoot = resolve(testDirectory, "..", "..");
 const worktreeRoot = resolve(employeeNextRoot, "..", "..");
 const sourceRoot = resolve(employeeNextRoot, "src");
 const routePath = resolve(sourceRoot, "route.ts");
+const rentPath = resolve(sourceRoot, "events", "rent", "index.ts");
+const depositInPath = resolve(sourceRoot, "events", "deposit-in", "index.ts");
+const expensePath = resolve(sourceRoot, "events", "expense", "index.ts");
 const mainPath = resolve(sourceRoot, "main.ts");
 const indexPath = resolve(employeeNextRoot, "index.html");
 const gitDirectory = (
@@ -52,6 +55,9 @@ async function listFiles(directory) {
 }
 
 const routeRuntime = await loadRuntime(routePath);
+const rentRuntime = await loadRuntime(rentPath);
+const depositInRuntime = await loadRuntime(depositInPath);
+const expenseRuntime = await loadRuntime(expensePath);
 const expectedEventIds = Object.freeze([
   "rent",
   "arrears-payment",
@@ -73,6 +79,8 @@ function validDrafts() {
   return {
     rent: {
       bedLabel: "A-101",
+      rentPeriodStart: "2026-07-01",
+      rentPeriodEnd: "2026-08-01",
       amountDueAed: 1_000,
       amountReceivedAed: 1_000,
       paymentMethod: "cash",
@@ -100,8 +108,9 @@ function validDrafts() {
       cashReceivedAed: 500,
       bankReceivedAed: 0,
       depositReceivedDate: "2026-07-26",
-      currentDepositSnapshotAed: null,
-      note: "",
+      depositRequiredTotalAed: 1_000,
+      currentDepositSnapshotAed: 100,
+      note: "Existing synthetic deposit snapshot confirmed",
     },
     "deposit-out": {
       bedLabel: "B-401",
@@ -140,8 +149,8 @@ function validDrafts() {
       paymentMethod: "cash",
       cashPaidAed: 125,
       bankPaidAed: 0,
-      expenseScope: "general",
-      apartmentLabel: "",
+      expenseScope: "apartment",
+      apartmentLabel: "LOCAL-APARTMENT-021",
       bedLabel: "",
       vendorName: "Local vendor",
       paidBy: "",
@@ -351,6 +360,69 @@ test("local-isolation failures stay closed, isolated and safely summarized", asy
     options({ render: { render() { return "private-value"; } } }),
   );
   assertSafeFailure(await echoController.render(), "UNSAFE_ERROR_ECHO");
+
+  const validationCases = [
+    {
+      eventId: "rent",
+      contract: rentRuntime.createEmployeeRentEventContract(),
+      draft: { ...validDrafts().rent, rentPeriodStart: "" },
+      expectedValidationCode: "RENT_PERIOD_START_REQUIRED",
+    },
+    {
+      eventId: "deposit-in",
+      contract: depositInRuntime.createEmployeeDepositInEventContract(),
+      draft: { ...validDrafts()["deposit-in"], depositRequiredTotalAed: null },
+      expectedValidationCode: "DEPOSIT_IN_REQUIRED_TOTAL_REQUIRED",
+    },
+    {
+      eventId: "deposit-in",
+      contract: depositInRuntime.createEmployeeDepositInEventContract(),
+      draft: {
+        ...validDrafts()["deposit-in"],
+        depositRequiredTotalAed: 550,
+      },
+      expectedValidationCode: "DEPOSIT_IN_OVERPAYMENT_UNSUPPORTED",
+    },
+    {
+      eventId: "expense",
+      contract: expenseRuntime.createEmployeeExpenseEventContract(),
+      draft: { ...validDrafts().expense, expenseScope: "general" },
+      expectedValidationCode: "EXPENSE_SCOPE_INVALID",
+    },
+    {
+      eventId: "expense",
+      contract: expenseRuntime.createEmployeeExpenseEventContract(),
+      draft: {
+        ...validDrafts().expense,
+        paymentMethod: "mixed",
+        cashPaidAed: 50,
+        bankPaidAed: 75,
+      },
+      expectedValidationCode: "EXPENSE_MIXED_PAYMENT_UNSUPPORTED_BY_WORKER",
+    },
+  ];
+  for (const validationCase of validationCases) {
+    const requests = [];
+    const controller = routeRuntime.createEmployeeNextRouteController(options({
+      transport: {
+        async request(request) {
+          requests.push(request);
+          return { status: 200, body: { accepted: true } };
+        },
+      },
+    }));
+    assert.ok(
+      validationCase.contract
+        .validateDraft(validationCase.draft)
+        .some(({ code }) => code === validationCase.expectedValidationCode),
+      validationCase.expectedValidationCode,
+    );
+    assert.equal(controller.selectEvent(validationCase.eventId).ok, true);
+    assert.equal(controller.setSession(session).ok, true);
+    assert.equal(controller.setDraft(validationCase.draft).ok, true);
+    assertSafeFailure(await controller.submit(), "SUBMIT_FLOW_FAILED");
+    assert.equal(requests.length, 0, validationCase.expectedValidationCode);
+  }
 
   const failedSubmit = routeRuntime.createEmployeeNextRouteController(options({
     transport: { request() { throw new Error("private-value"); } },

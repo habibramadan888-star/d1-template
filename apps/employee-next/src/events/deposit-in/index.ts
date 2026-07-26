@@ -24,7 +24,12 @@ export const EMPLOYEE_DEPOSIT_IN_VALIDATION_CODES = Object.freeze([
   "DEPOSIT_IN_PAYMENT_LEGS_INVALID",
   "DEPOSIT_IN_PAYMENT_TOTAL_MISMATCH",
   "DEPOSIT_IN_RECEIVED_DATE_REQUIRED",
+  "DEPOSIT_IN_REQUIRED_TOTAL_REQUIRED",
+  "DEPOSIT_IN_REQUIRED_TOTAL_INVALID",
+  "DEPOSIT_IN_CURRENT_DEPOSIT_SNAPSHOT_REQUIRED",
   "DEPOSIT_IN_CURRENT_DEPOSIT_SNAPSHOT_INVALID",
+  "DEPOSIT_IN_DEPOSIT_TOTAL_RELATION_INVALID",
+  "DEPOSIT_IN_OVERPAYMENT_UNSUPPORTED",
   "DEPOSIT_IN_EXISTING_DEPOSIT_NOTE_REQUIRED",
   "DEPOSIT_IN_PROVIDER_IDENTITY_FORBIDDEN",
 ] as const);
@@ -44,6 +49,7 @@ export interface EmployeeDepositInDraft {
   readonly cashReceivedAed: number | null;
   readonly bankReceivedAed: number | null;
   readonly depositReceivedDate: string;
+  readonly depositRequiredTotalAed: number | null;
   readonly currentDepositSnapshotAed: number | null;
   readonly note: string;
 }
@@ -59,7 +65,12 @@ export interface EmployeeDepositInSubmission {
     legs: readonly EmployeeDepositInPaymentLeg[];
   }>;
   readonly depositReceivedDate: string;
-  readonly currentDepositSnapshotAed: number | null;
+  readonly depositRequiredTotalAed: number;
+  readonly currentDepositSnapshotAed: number;
+  readonly previousDepositRecordedAmountAed: number;
+  readonly depositPaidAmountAed: number;
+  readonly expectedDepositAfterPaymentAed: number;
+  readonly depositRemainingAfterPaymentAed: number;
   readonly accountingPreview: Readonly<{
     depositReceivedAed: number;
     rentIncomeAed: 0;
@@ -84,6 +95,7 @@ const DEPOSIT_IN_DRAFT_KEYS = Object.freeze([
   "cashReceivedAed",
   "bankReceivedAed",
   "depositReceivedDate",
+  "depositRequiredTotalAed",
   "currentDepositSnapshotAed",
   "note",
 ] as const);
@@ -125,6 +137,14 @@ function moneyEqual(left: number, right: number): boolean {
   return Math.abs(normalizeMoney(left) - normalizeMoney(right)) < 1e-9;
 }
 
+function moneyToFils(value: number): number {
+  return Math.round(value * 100);
+}
+
+function moneyFromFils(value: number): number {
+  return value / 100;
+}
+
 function issue(
   code: EmployeeDepositInValidationCode,
   message: string,
@@ -152,6 +172,7 @@ function createInitialDraft(): EmployeeDepositInDraft {
     cashReceivedAed: null,
     bankReceivedAed: null,
     depositReceivedDate: "",
+    depositRequiredTotalAed: null,
     currentDepositSnapshotAed: null,
     note: "",
   });
@@ -180,6 +201,7 @@ export function isEmployeeDepositInDraft(
       && isNullableFiniteNumber(value.cashReceivedAed)
       && isNullableFiniteNumber(value.bankReceivedAed)
       && typeof value.depositReceivedDate === "string"
+      && isNullableFiniteNumber(value.depositRequiredTotalAed)
       && isNullableFiniteNumber(value.currentDepositSnapshotAed)
       && typeof value.note === "string"
     );
@@ -228,6 +250,7 @@ function validateDraft(
   const cashReceived = draft.cashReceivedAed;
   const bankReceived = draft.bankReceivedAed;
   const receivedDate = draft.depositReceivedDate;
+  const depositRequiredTotal = draft.depositRequiredTotalAed;
   const currentDepositSnapshot = draft.currentDepositSnapshotAed;
   const note = draft.note;
 
@@ -381,16 +404,39 @@ function validateDraft(
     );
   }
 
-  const snapshotIsValid = (
-    currentDepositSnapshot === null
-    || (
-      typeof currentDepositSnapshot === "number"
-      && Number.isFinite(currentDepositSnapshot)
-      && currentDepositSnapshot >= 0
-      && hasAtMostTwoDecimalPlaces(currentDepositSnapshot)
-    )
+  const requiredTotalIsValid = (
+    typeof depositRequiredTotal === "number"
+    && Number.isFinite(depositRequiredTotal)
+    && depositRequiredTotal > 0
+    && hasAtMostTwoDecimalPlaces(depositRequiredTotal)
   );
-  if (!snapshotIsValid) {
+  if (depositRequiredTotal === null || depositRequiredTotal === undefined) {
+    issues.push(issue(
+      "DEPOSIT_IN_REQUIRED_TOTAL_REQUIRED",
+      "Required deposit total is required.",
+      "depositRequiredTotalAed",
+    ));
+  } else if (!requiredTotalIsValid) {
+    issues.push(issue(
+      "DEPOSIT_IN_REQUIRED_TOTAL_INVALID",
+      "Required deposit total must be positive with at most two decimals.",
+      "depositRequiredTotalAed",
+    ));
+  }
+
+  const snapshotIsValid = (
+    typeof currentDepositSnapshot === "number"
+    && Number.isFinite(currentDepositSnapshot)
+    && currentDepositSnapshot >= 0
+    && hasAtMostTwoDecimalPlaces(currentDepositSnapshot)
+  );
+  if (currentDepositSnapshot === null || currentDepositSnapshot === undefined) {
+    issues.push(issue(
+      "DEPOSIT_IN_CURRENT_DEPOSIT_SNAPSHOT_REQUIRED",
+      "Current deposit snapshot is required.",
+      "currentDepositSnapshotAed",
+    ));
+  } else if (!snapshotIsValid) {
     issues.push(
       issue(
         "DEPOSIT_IN_CURRENT_DEPOSIT_SNAPSHOT_INVALID",
@@ -399,8 +445,7 @@ function validateDraft(
       ),
     );
   } else if (
-    typeof currentDepositSnapshot === "number"
-    && currentDepositSnapshot > 0
+    currentDepositSnapshot > 0
     && (typeof note !== "string" || note.trim().length === 0)
   ) {
     issues.push(
@@ -410,6 +455,27 @@ function validateDraft(
         "note",
       ),
     );
+  }
+
+  if (requiredTotalIsValid && snapshotIsValid) {
+    const requiredTotalFils = moneyToFils(depositRequiredTotal);
+    const snapshotFils = moneyToFils(currentDepositSnapshot);
+    if (snapshotFils > requiredTotalFils) {
+      issues.push(issue(
+        "DEPOSIT_IN_DEPOSIT_TOTAL_RELATION_INVALID",
+        "Current deposit snapshot cannot exceed the required deposit total.",
+        "currentDepositSnapshotAed",
+      ));
+    } else if (
+      amountIsValid
+      && snapshotFils + moneyToFils(depositAmount) > requiredTotalFils
+    ) {
+      issues.push(issue(
+        "DEPOSIT_IN_OVERPAYMENT_UNSUPPORTED",
+        "Deposit payment cannot exceed the remaining required deposit.",
+        "depositAmountAed",
+      ));
+    }
   }
 
   if (typeof note !== "string") {
@@ -434,9 +500,18 @@ function buildSubmission(
   }
 
   const depositAmountAed = normalizeMoney(draft.depositAmountAed as number);
-  const currentDepositSnapshotAed = draft.currentDepositSnapshotAed === null
-    ? null
-    : normalizeMoney(draft.currentDepositSnapshotAed);
+  const requiredTotalFils = moneyToFils(draft.depositRequiredTotalAed as number);
+  const snapshotFils = moneyToFils(draft.currentDepositSnapshotAed as number);
+  const paidFils = moneyToFils(draft.depositAmountAed as number);
+  const expectedAfterPaymentFils = snapshotFils + paidFils;
+  const depositRequiredTotalAed = moneyFromFils(requiredTotalFils);
+  const currentDepositSnapshotAed = moneyFromFils(snapshotFils);
+  const previousDepositRecordedAmountAed = currentDepositSnapshotAed;
+  const depositPaidAmountAed = moneyFromFils(paidFils);
+  const expectedDepositAfterPaymentAed = moneyFromFils(expectedAfterPaymentFils);
+  const depositRemainingAfterPaymentAed = moneyFromFils(
+    requiredTotalFils - expectedAfterPaymentFils,
+  );
   const legs: EmployeeDepositInPaymentLeg[] = draft.paymentMethod === "mixed"
     ? [
         Object.freeze({
@@ -477,7 +552,12 @@ function buildSubmission(
     depositAmountAed,
     payment,
     depositReceivedDate: draft.depositReceivedDate,
+    depositRequiredTotalAed,
     currentDepositSnapshotAed,
+    previousDepositRecordedAmountAed,
+    depositPaidAmountAed,
+    expectedDepositAfterPaymentAed,
+    depositRemainingAfterPaymentAed,
     accountingPreview,
     reconciliationPreview,
     ...(note.length === 0 ? {} : { note }),

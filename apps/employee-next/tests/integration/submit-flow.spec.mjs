@@ -78,6 +78,8 @@ function validDrafts() {
   return {
     rent: {
       bedLabel: "A-101",
+      rentPeriodStart: "2026-07-01",
+      rentPeriodEnd: "2026-08-01",
       amountDueAed: 1_000,
       amountReceivedAed: 1_000,
       paymentMethod: "cash",
@@ -105,8 +107,9 @@ function validDrafts() {
       cashReceivedAed: 500,
       bankReceivedAed: 0,
       depositReceivedDate: "2026-07-26",
-      currentDepositSnapshotAed: null,
-      note: "",
+      depositRequiredTotalAed: 1_000,
+      currentDepositSnapshotAed: 100,
+      note: "Existing synthetic deposit snapshot confirmed",
     },
     "deposit-out": {
       bedLabel: "B-401",
@@ -145,8 +148,8 @@ function validDrafts() {
       paymentMethod: "cash",
       cashPaidAed: 125,
       bankPaidAed: 0,
-      expenseScope: "general",
-      apartmentLabel: "",
+      expenseScope: "apartment",
+      apartmentLabel: "LOCAL-APARTMENT-019",
       bedLabel: "",
       vendorName: "Local vendor",
       paidBy: "",

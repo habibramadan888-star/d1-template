@@ -57,8 +57,8 @@ const categories = [
   "government_fee",
   "other",
 ];
-const methods = ["cash", "bank", "mixed"];
-const scopes = ["general", "apartment", "bed"];
+const methods = ["cash", "bank"];
+const scopes = ["apartment", "bed"];
 const validationCodes = [
   "EXPENSE_DRAFT_NOT_OBJECT",
   "EXPENSE_DATE_REQUIRED",
@@ -67,6 +67,7 @@ const validationCodes = [
   "EXPENSE_AMOUNT_REQUIRED",
   "EXPENSE_AMOUNT_INVALID",
   "EXPENSE_PAYMENT_METHOD_INVALID",
+  "EXPENSE_MIXED_PAYMENT_UNSUPPORTED_BY_WORKER",
   "EXPENSE_CASH_AMOUNT_INVALID",
   "EXPENSE_BANK_AMOUNT_INVALID",
   "EXPENSE_PAYMENT_SPLIT_MISMATCH",
@@ -88,8 +89,8 @@ function cashDraft(overrides = {}) {
     paymentMethod: "cash",
     cashPaidAed: 125,
     bankPaidAed: 0,
-    expenseScope: "general",
-    apartmentLabel: "",
+    expenseScope: "apartment",
+    apartmentLabel: "A-4",
     bedLabel: "",
     vendorName: "Local vendor",
     paidBy: "",
@@ -136,7 +137,7 @@ test("expense runtime success contract", () => {
     paymentMethod: "cash",
     cashPaidAed: null,
     bankPaidAed: null,
-    expenseScope: "general",
+    expenseScope: "apartment",
     apartmentLabel: "",
     bedLabel: "",
     vendorName: "",
@@ -149,7 +150,7 @@ test("expense runtime success contract", () => {
   assert.equal(Object.isFrozen(contract.createInitialDraft()), true);
   assert.equal(expenseModule.isEmployeeExpenseCategory("maintenance"), true);
   assert.equal(expenseModule.isEmployeeExpenseCategory("Maintenance"), false);
-  assert.equal(expenseModule.isEmployeeExpensePaymentMethod("mixed"), true);
+  assert.equal(expenseModule.isEmployeeExpensePaymentMethod("mixed"), false);
   assert.equal(expenseModule.isEmployeeExpensePaymentMethod("bank_transfer"), false);
   assert.equal(expenseModule.isEmployeeExpenseScope("bed"), true);
   assert.equal(expenseModule.isEmployeeExpenseScope("property"), false);
@@ -168,10 +169,12 @@ test("expense runtime success contract", () => {
     legs: [{ method: "cash", amountAed: 125 }],
   });
   assert.deepEqual(cash.allocation, {
-    expenseScope: "general",
-    apartmentLabel: null,
+    expenseScope: "apartment",
+    targetBedOrRoomLabel: "A-4",
+    apartmentLabel: "A-4",
     bedLabel: null,
   });
+  assert.equal(cash.expenseDescription, "Repair supplies");
   assert.deepEqual(cash.vendor, { vendorName: "Local vendor", paidBy: null });
   assert.deepEqual(cash.receiptPreview, {
     receiptAvailable: false,
@@ -208,39 +211,40 @@ test("expense runtime success contract", () => {
   assert.deepEqual(bank.payment.legs, [{ method: "bank", amountAed: 80 }]);
   assert.deepEqual(bank.allocation, {
     expenseScope: "apartment",
+    targetBedOrRoomLabel: "A-4",
     apartmentLabel: "A-4",
     bedLabel: null,
   });
   assert.equal(bank.vendor.paidBy, "Staff 4");
 
-  const mixed = contract.buildSubmission(cashDraft({
+  const bed = contract.buildSubmission(cashDraft({
     expenseCategory: "supplies",
     expenseAmountAed: 100.1,
-    paymentMethod: "mixed",
-    cashPaidAed: 40.04,
-    bankPaidAed: 60.06,
+    paymentMethod: "cash",
+    cashPaidAed: 100.1,
+    bankPaidAed: 0,
     expenseScope: "bed",
     bedLabel: " B-12 ",
     receiptAvailable: true,
     receiptNote: " paper copy retained ",
   }));
-  assert.equal(mixed.expenseAmountAed, 100.1);
-  assert.deepEqual(mixed.payment.legs, [
-    { method: "cash", amountAed: 40.04 },
-    { method: "bank", amountAed: 60.06 },
+  assert.equal(bed.expenseAmountAed, 100.1);
+  assert.deepEqual(bed.payment.legs, [
+    { method: "cash", amountAed: 100.1 },
   ]);
-  assert.deepEqual(mixed.allocation, {
+  assert.deepEqual(bed.allocation, {
     expenseScope: "bed",
+    targetBedOrRoomLabel: "B-12",
     apartmentLabel: null,
     bedLabel: "B-12",
   });
-  assert.deepEqual(mixed.receiptPreview, {
+  assert.deepEqual(bed.receiptPreview, {
     receiptAvailable: true,
     receiptNote: "paper copy retained",
     receiptUploadIncluded: false,
     receiptUploadRequiredLater: true,
   });
-  assert.equal(mixed.reconciliationPreview.receiptReconciliationRequired, true);
+  assert.equal(bed.reconciliationPreview.receiptReconciliationRequired, true);
   for (const snapshot of [
     cash,
     cash.payment,
@@ -271,10 +275,10 @@ test("expense runtime fail-closed contract", () => {
     [cashDraft({ cashPaidAed: 124 }), "EXPENSE_PAYMENT_SPLIT_MISMATCH"],
     [cashDraft({ bankPaidAed: 1 }), "EXPENSE_PAYMENT_SPLIT_MISMATCH"],
     [cashDraft({ paymentMethod: "bank", cashPaidAed: 0, bankPaidAed: 124 }), "EXPENSE_PAYMENT_SPLIT_MISMATCH"],
-    [cashDraft({ paymentMethod: "mixed", cashPaidAed: 0, bankPaidAed: 125 }), "EXPENSE_PAYMENT_SPLIT_MISMATCH"],
-    [cashDraft({ paymentMethod: "mixed", cashPaidAed: 50, bankPaidAed: 50 }), "EXPENSE_PAYMENT_SPLIT_MISMATCH"],
+    [cashDraft({ paymentMethod: "mixed", cashPaidAed: 50, bankPaidAed: 75 }), "EXPENSE_MIXED_PAYMENT_UNSUPPORTED_BY_WORKER"],
+    [cashDraft({ expenseScope: "general" }), "EXPENSE_SCOPE_INVALID"],
     [cashDraft({ expenseScope: "Apartment" }), "EXPENSE_SCOPE_INVALID"],
-    [cashDraft({ expenseScope: "apartment" }), "EXPENSE_SCOPE_TARGET_REQUIRED"],
+    [cashDraft({ expenseScope: "apartment", apartmentLabel: "" }), "EXPENSE_SCOPE_TARGET_REQUIRED"],
     [cashDraft({ expenseScope: "bed" }), "EXPENSE_SCOPE_TARGET_REQUIRED"],
     [cashDraft({ vendorName: " " }), "EXPENSE_VENDOR_REQUIRED"],
     [cashDraft({ expenseDescription: "" }), "EXPENSE_DESCRIPTION_REQUIRED"],
@@ -374,8 +378,8 @@ test("expense TypeScript semantic fixtures", () => {
     paymentMethod: "cash",
     cashPaidAed: 125,
     bankPaidAed: 0,
-    expenseScope: "general",
-    apartmentLabel: "",
+    expenseScope: "apartment",
+    apartmentLabel: "A-4",
     bedLabel: "",
     vendorName: "vendor",
     paidBy: "",
@@ -386,8 +390,8 @@ test("expense TypeScript semantic fixtures", () => {
   }`;
   const positives = [
     `${imports} const value: EmployeeExpenseCategory = "maintenance"; void value;`,
-    `${imports} const value: EmployeeExpensePaymentMethod = "mixed"; void value;`,
-    `${imports} const value: EmployeeExpenseScope = "general"; void value;`,
+    `${imports} const value: EmployeeExpensePaymentMethod = "cash"; void value;`,
+    `${imports} const value: EmployeeExpenseScope = "apartment"; void value;`,
     `${imports} const value: EmployeeExpenseDraft = ${validDraft}; void value;`,
     `${imports} declare const value: EmployeeExpenseSubmission; const id: "expense" = value.eventId; void id;`,
     `${imports} const value: EmployeeExpensePaymentLeg = { method: "cash", amountAed: 1 }; void value;`,
@@ -407,7 +411,9 @@ test("expense TypeScript semantic fixtures", () => {
   const negatives = [
     [`${imports} const value: EmployeeExpenseCategory = "unknown";`, /unknown/u],
     [`${imports} const value: EmployeeExpensePaymentMethod = "card";`, /card/u],
+    [`${imports} const value: EmployeeExpensePaymentMethod = "mixed";`, /mixed/u],
     [`${imports} const value: EmployeeExpenseScope = "property";`, /property/u],
+    [`${imports} const value: EmployeeExpenseScope = "general";`, /general/u],
     [`${imports} const value: EmployeeExpenseDraft = { ...${validDraft}, expenseDate: undefined };`, /undefined/u],
     [`${imports} const { expenseAmountAed, ...rest } = ${validDraft}; const value: EmployeeExpenseDraft = rest;`, /expenseAmountAed/u],
     [`${imports} const value: EmployeeExpenseDraft = { ...${validDraft}, expenseAmountAed: "125" };`, /string/u],

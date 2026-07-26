@@ -35,6 +35,11 @@ export type EmployeeRentPaymentStatus =
 export const EMPLOYEE_RENT_VALIDATION_CODES = Object.freeze([
   "RENT_DRAFT_NOT_OBJECT",
   "RENT_BED_REQUIRED",
+  "RENT_PERIOD_START_REQUIRED",
+  "RENT_PERIOD_START_INVALID",
+  "RENT_PERIOD_END_REQUIRED",
+  "RENT_PERIOD_END_INVALID",
+  "RENT_PERIOD_RANGE_INVALID",
   "RENT_AMOUNT_DUE_REQUIRED",
   "RENT_AMOUNT_RECEIVED_REQUIRED",
   "RENT_AMOUNT_INVALID",
@@ -57,6 +62,8 @@ export interface EmployeeRentPaymentLeg {
 
 export interface EmployeeRentDraft {
   readonly bedLabel: string;
+  readonly rentPeriodStart: string;
+  readonly rentPeriodEnd: string;
   readonly amountDueAed: number | null;
   readonly amountReceivedAed: number | null;
   readonly paymentMethod: EmployeeRentPaymentMethod;
@@ -72,6 +79,8 @@ export interface EmployeeRentSubmission {
   readonly schemaVersion: 1;
   readonly displayName: "Rent";
   readonly bedLabel: string;
+  readonly rentPeriodStart: string;
+  readonly rentPeriodEnd: string;
   readonly amountDueAed: number;
   readonly amountReceivedAed: number;
   readonly balanceAed: number;
@@ -96,6 +105,8 @@ export interface EmployeeRentEventContract extends EmployeeEventContract<
 
 const RENT_DRAFT_KEYS = Object.freeze([
   "bedLabel",
+  "rentPeriodStart",
+  "rentPeriodEnd",
   "amountDueAed",
   "amountReceivedAed",
   "paymentMethod",
@@ -150,6 +161,19 @@ function moneyEqual(left: number, right: number): boolean {
   return Math.abs(normalizeMoney(left) - normalizeMoney(right)) < 1e-9;
 }
 
+function isValidIsoCalendarDate(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/u.test(value)) {
+    return false;
+  }
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return (
+    date.getUTCFullYear() === year
+    && date.getUTCMonth() === month - 1
+    && date.getUTCDate() === day
+  );
+}
+
 function issue(
   code: EmployeeRentValidationCode,
   message: string,
@@ -172,6 +196,8 @@ function freezeIssues(
 function createInitialDraft(): EmployeeRentDraft {
   return Object.freeze({
     bedLabel: "",
+    rentPeriodStart: "",
+    rentPeriodEnd: "",
     amountDueAed: null,
     amountReceivedAed: null,
     paymentMethod: "cash",
@@ -204,6 +230,8 @@ export function isEmployeeRentDraft(
   try {
     return (
       typeof value.bedLabel === "string"
+      && typeof value.rentPeriodStart === "string"
+      && typeof value.rentPeriodEnd === "string"
       && isNullableFiniteNumber(value.amountDueAed)
       && isNullableFiniteNumber(value.amountReceivedAed)
       && isEmployeeRentPaymentMethod(value.paymentMethod)
@@ -240,6 +268,8 @@ function validateDraft(value: Readonly<EmployeeRentDraft>): readonly EventValida
 
   const issues: EventValidationIssue[] = [];
   const bedLabel = draft.bedLabel;
+  const rentPeriodStart = draft.rentPeriodStart;
+  const rentPeriodEnd = draft.rentPeriodEnd;
   const amountDue = draft.amountDueAed;
   const amountReceived = draft.amountReceivedAed;
   const paymentMethod = draft.paymentMethod;
@@ -251,6 +281,58 @@ function validateDraft(value: Readonly<EmployeeRentDraft>): readonly EventValida
 
   if (typeof bedLabel !== "string" || bedLabel.trim().length === 0) {
     issues.push(issue("RENT_BED_REQUIRED", "Bed label is required.", "bedLabel"));
+  }
+
+  const normalizedRentPeriodStart = typeof rentPeriodStart === "string"
+    ? rentPeriodStart.trim()
+    : "";
+  const normalizedRentPeriodEnd = typeof rentPeriodEnd === "string"
+    ? rentPeriodEnd.trim()
+    : "";
+  const rentPeriodStartValid = (
+    normalizedRentPeriodStart.length > 0
+    && isValidIsoCalendarDate(normalizedRentPeriodStart)
+  );
+  const rentPeriodEndValid = (
+    normalizedRentPeriodEnd.length > 0
+    && isValidIsoCalendarDate(normalizedRentPeriodEnd)
+  );
+  if (normalizedRentPeriodStart.length === 0) {
+    issues.push(issue(
+      "RENT_PERIOD_START_REQUIRED",
+      "Rent period start is required.",
+      "rentPeriodStart",
+    ));
+  } else if (!rentPeriodStartValid) {
+    issues.push(issue(
+      "RENT_PERIOD_START_INVALID",
+      "Rent period start must be a valid YYYY-MM-DD date.",
+      "rentPeriodStart",
+    ));
+  }
+  if (normalizedRentPeriodEnd.length === 0) {
+    issues.push(issue(
+      "RENT_PERIOD_END_REQUIRED",
+      "Rent period end is required.",
+      "rentPeriodEnd",
+    ));
+  } else if (!rentPeriodEndValid) {
+    issues.push(issue(
+      "RENT_PERIOD_END_INVALID",
+      "Rent period end must be a valid YYYY-MM-DD date.",
+      "rentPeriodEnd",
+    ));
+  }
+  if (
+    rentPeriodStartValid
+    && rentPeriodEndValid
+    && normalizedRentPeriodEnd <= normalizedRentPeriodStart
+  ) {
+    issues.push(issue(
+      "RENT_PERIOD_RANGE_INVALID",
+      "Rent period end must be later than rent period start.",
+      "rentPeriodEnd",
+    ));
   }
 
   if (amountDue === null || amountDue === undefined) {
@@ -558,6 +640,8 @@ function buildSubmission(
     schemaVersion: 1 as const,
     displayName: "Rent" as const,
     bedLabel: draft.bedLabel.trim(),
+    rentPeriodStart: draft.rentPeriodStart.trim(),
+    rentPeriodEnd: draft.rentPeriodEnd.trim(),
     amountDueAed,
     amountReceivedAed,
     balanceAed,

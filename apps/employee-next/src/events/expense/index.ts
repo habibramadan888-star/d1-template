@@ -24,14 +24,12 @@ export type EmployeeExpenseCategory =
 export const EMPLOYEE_EXPENSE_PAYMENT_METHODS = Object.freeze([
   "cash",
   "bank",
-  "mixed",
 ] as const);
 
 export type EmployeeExpensePaymentMethod =
   (typeof EMPLOYEE_EXPENSE_PAYMENT_METHODS)[number];
 
 export const EMPLOYEE_EXPENSE_SCOPES = Object.freeze([
-  "general",
   "apartment",
   "bed",
 ] as const);
@@ -46,6 +44,7 @@ export const EMPLOYEE_EXPENSE_VALIDATION_CODES = Object.freeze([
   "EXPENSE_AMOUNT_REQUIRED",
   "EXPENSE_AMOUNT_INVALID",
   "EXPENSE_PAYMENT_METHOD_INVALID",
+  "EXPENSE_MIXED_PAYMENT_UNSUPPORTED_BY_WORKER",
   "EXPENSE_CASH_AMOUNT_INVALID",
   "EXPENSE_BANK_AMOUNT_INVALID",
   "EXPENSE_PAYMENT_SPLIT_MISMATCH",
@@ -100,9 +99,11 @@ export interface EmployeeExpenseSubmission {
   }>;
   readonly allocation: Readonly<{
     expenseScope: EmployeeExpenseScope;
+    targetBedOrRoomLabel: string;
     apartmentLabel: string | null;
     bedLabel: string | null;
   }>;
+  readonly expenseDescription: string;
   readonly vendor: Readonly<{
     vendorName: string;
     paidBy: string | null;
@@ -226,7 +227,7 @@ function createInitialDraft(): EmployeeExpenseDraft {
     paymentMethod: "cash",
     cashPaidAed: null,
     bankPaidAed: null,
-    expenseScope: "general",
+    expenseScope: "apartment",
     apartmentLabel: "",
     bedLabel: "",
     vendorName: "",
@@ -366,7 +367,13 @@ function validateDraft(
   ) {
     issues.push(issue("EXPENSE_AMOUNT_INVALID", "Expense amount is invalid.", "expenseAmountAed"));
   }
-  if (!isEmployeeExpensePaymentMethod(paymentMethod)) {
+  if (paymentMethod === "mixed") {
+    issues.push(issue(
+      "EXPENSE_MIXED_PAYMENT_UNSUPPORTED_BY_WORKER",
+      "Mixed expense payment is not supported by the Worker contract.",
+      "paymentMethod",
+    ));
+  } else if (!isEmployeeExpensePaymentMethod(paymentMethod)) {
     issues.push(issue("EXPENSE_PAYMENT_METHOD_INVALID", "Payment method is invalid.", "paymentMethod"));
   }
   if (!isValidNonNegativeMoney(cashPaidAed)) {
@@ -392,11 +399,7 @@ function validateDraft(
   ) {
     const splitValid = paymentMethod === "cash"
       ? moneyEqual(cashPaidAed, expenseAmountAed) && bankPaidAed === 0
-      : paymentMethod === "bank"
-        ? moneyEqual(bankPaidAed, expenseAmountAed) && cashPaidAed === 0
-        : cashPaidAed > 0
-          && bankPaidAed > 0
-          && moneyEqual(cashPaidAed + bankPaidAed, expenseAmountAed);
+      : moneyEqual(bankPaidAed, expenseAmountAed) && cashPaidAed === 0;
     if (!splitValid) {
       issues.push(issue(
         "EXPENSE_PAYMENT_SPLIT_MISMATCH",
@@ -483,6 +486,9 @@ function buildSubmission(
   });
   const allocation = Object.freeze({
     expenseScope: draft.expenseScope,
+    targetBedOrRoomLabel: draft.expenseScope === "apartment"
+      ? draft.apartmentLabel.trim()
+      : draft.bedLabel.trim(),
     apartmentLabel: draft.expenseScope === "apartment"
       ? draft.apartmentLabel.trim()
       : null,
@@ -521,6 +527,7 @@ function buildSubmission(
     expenseDate: draft.expenseDate,
     expenseCategory: draft.expenseCategory,
     expenseAmountAed,
+    expenseDescription: draft.expenseDescription.trim(),
     payment,
     allocation,
     vendor,

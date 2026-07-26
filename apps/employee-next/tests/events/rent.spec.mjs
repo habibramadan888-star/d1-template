@@ -59,6 +59,11 @@ const paymentStatuses = ["full-paid", "short-paid"];
 const validationCodes = [
   "RENT_DRAFT_NOT_OBJECT",
   "RENT_BED_REQUIRED",
+  "RENT_PERIOD_START_REQUIRED",
+  "RENT_PERIOD_START_INVALID",
+  "RENT_PERIOD_END_REQUIRED",
+  "RENT_PERIOD_END_INVALID",
+  "RENT_PERIOD_RANGE_INVALID",
   "RENT_AMOUNT_DUE_REQUIRED",
   "RENT_AMOUNT_RECEIVED_REQUIRED",
   "RENT_AMOUNT_INVALID",
@@ -74,6 +79,8 @@ const validationCodes = [
 function fullCash(overrides = {}) {
   return {
     bedLabel: "A-101",
+    rentPeriodStart: "2026-07-01",
+    rentPeriodEnd: "2026-08-01",
     amountDueAed: 1_000,
     amountReceivedAed: 1_000,
     paymentMethod: "cash",
@@ -146,6 +153,8 @@ test("rent runtime success contract", () => {
   const initialDraft = firstContract.createInitialDraft();
   check(() => assert.deepEqual(initialDraft, {
     bedLabel: "",
+    rentPeriodStart: "",
+    rentPeriodEnd: "",
     amountDueAed: null,
     amountReceivedAed: null,
     paymentMethod: "cash",
@@ -171,6 +180,8 @@ test("rent runtime success contract", () => {
     schemaVersion: 1,
     displayName: "Rent",
     bedLabel: "A-101",
+    rentPeriodStart: "2026-07-01",
+    rentPeriodEnd: "2026-08-01",
     amountDueAed: 1_000,
     amountReceivedAed: 1_000,
     balanceAed: 0,
@@ -246,6 +257,13 @@ test("rent runtime fail-closed contract", () => {
     [{ ...fullCash(), secret: "hidden" }, "RENT_DRAFT_NOT_OBJECT"],
     [fullCash({ bedLabel: "" }), "RENT_BED_REQUIRED"],
     [fullCash({ bedLabel: "   " }), "RENT_BED_REQUIRED"],
+    [fullCash({ rentPeriodStart: "" }), "RENT_PERIOD_START_REQUIRED"],
+    [fullCash({ rentPeriodStart: "2026-02-30" }), "RENT_PERIOD_START_INVALID"],
+    [fullCash({ rentPeriodStart: "01/07/2026" }), "RENT_PERIOD_START_INVALID"],
+    [fullCash({ rentPeriodEnd: "" }), "RENT_PERIOD_END_REQUIRED"],
+    [fullCash({ rentPeriodEnd: "2026-13-01" }), "RENT_PERIOD_END_INVALID"],
+    [fullCash({ rentPeriodEnd: "2026-07-01" }), "RENT_PERIOD_RANGE_INVALID"],
+    [fullCash({ rentPeriodEnd: "2026-06-30" }), "RENT_PERIOD_RANGE_INVALID"],
     [fullCash({ amountDueAed: null }), "RENT_AMOUNT_DUE_REQUIRED"],
     [fullCash({ amountDueAed: Number.NaN }), "RENT_AMOUNT_INVALID"],
     [fullCash({ amountDueAed: 0 }), "RENT_AMOUNT_INVALID"],
@@ -402,6 +420,8 @@ test("rent TypeScript semantic fixtures", () => {
   `;
   const validDraft = `{
     bedLabel: "A-101",
+    rentPeriodStart: "2026-07-01",
+    rentPeriodEnd: "2026-08-01",
     amountDueAed: 1000,
     amountReceivedAed: 1000,
     paymentMethod: "cash",

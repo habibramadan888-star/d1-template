@@ -76,6 +76,8 @@ const session = Object.freeze({
 function validRentDraft(overrides = {}) {
   return {
     bedLabel: "A-101",
+    rentPeriodStart: "2026-07-01",
+    rentPeriodEnd: "2026-08-01",
     amountDueAed: 1_000,
     amountReceivedAed: 1_000,
     paymentMethod: "cash",
