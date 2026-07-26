@@ -497,6 +497,7 @@ test("deposit-out source boundary excludes integrations and other event rules", 
     ["rent", "EMPLOYEE_RENT_EVENT_ID"],
     ["arrears-payment", "EMPLOYEE_ARREARS_PAYMENT_EVENT_ID"],
     ["deposit-in", "EMPLOYEE_DEPOSIT_IN_EVENT_ID"],
+    ["checkout", "EMPLOYEE_CHECKOUT_EVENT_ID"],
   ]) {
     const source = await readFile(
       resolve(employeeNextRoot, "src", "events", directory, "index.ts"),
@@ -505,7 +506,6 @@ test("deposit-out source boundary excludes integrations and other event rules", 
     assert.match(source, new RegExp(marker, "u"));
   }
   for (const [directory, expected] of [
-    ["checkout", 'export const checkoutScaffold = "checkout-scaffold";\n'],
     ["expense", 'export const expenseScaffold = "expense-scaffold";\n'],
     ["bed-transfer", 'export const bedTransferScaffold = "bed-transfer-scaffold";\n'],
   ]) {

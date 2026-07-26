@@ -36,6 +36,7 @@ const expectedFiles = [
   "tests/core/event-registry.spec.mjs",
   "tests/core/submit-entry.spec.mjs",
   "tests/events/arrears-payment.spec.mjs",
+  "tests/events/checkout.spec.mjs",
   "tests/events/deposit-in.spec.mjs",
   "tests/events/deposit-out.spec.mjs",
   "tests/events/rent.spec.mjs",
@@ -68,11 +69,13 @@ test("event placeholders remain independent and side-effect free", async () => {
   const arrearsPaymentPath = "src/events/arrears-payment/index.ts";
   const depositInPath = "src/events/deposit-in/index.ts";
   const depositOutPath = "src/events/deposit-out/index.ts";
+  const checkoutPath = "src/events/checkout/index.ts";
   const implementedFiles = [
     rentPath,
     arrearsPaymentPath,
     depositInPath,
     depositOutPath,
+    checkoutPath,
   ];
   const placeholderFiles = eventFiles.filter(
     (path) => !implementedFiles.includes(path),
