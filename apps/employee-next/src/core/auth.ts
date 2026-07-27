@@ -19,6 +19,8 @@ export interface EmployeeAuthUser {
   readonly employeeId: string;
   readonly displayName: string;
   readonly role: EmployeeAuthRole;
+  readonly userid?: string;
+  readonly corpid?: string;
 }
 
 export interface EmployeeAuthSession {
@@ -98,6 +100,20 @@ export function isEmployeeAuthSession(
     && user.employeeId.length > 0
     && typeof user.displayName === "string"
     && isEmployeeAuthRole(user.role)
+    && (
+      user.userid === undefined
+      || (
+        typeof user.userid === "string"
+        && user.userid.trim().length > 0
+      )
+    )
+    && (
+      user.corpid === undefined
+      || (
+        typeof user.corpid === "string"
+        && user.corpid.trim().length > 0
+      )
+    )
   );
 }
 
@@ -137,6 +153,12 @@ function authenticatedState(
     employeeId: session.user.employeeId,
     displayName: session.user.displayName,
     role: session.user.role,
+    ...(session.user.userid === undefined
+      ? {}
+      : { userid: session.user.userid }),
+    ...(session.user.corpid === undefined
+      ? {}
+      : { corpid: session.user.corpid }),
   });
   const sessionSnapshot = Object.freeze({ user });
   return Object.freeze({

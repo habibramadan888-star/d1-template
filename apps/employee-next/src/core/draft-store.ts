@@ -1,7 +1,10 @@
 import { isEmployeeEventId } from "./event-contract";
 import type { EmployeeEventId } from "./event-contract";
 
-export type EmployeeDraftScopeId = string;
+export interface EmployeeDraftScopeId {
+  readonly corpid: string;
+  readonly userid: string;
+}
 export type EmployeeDraftId = string;
 
 export type EmployeeDraftPayload =
@@ -97,7 +100,43 @@ type PayloadValidation = "VALID" | "INVALID" | "SECRET";
 export function isEmployeeDraftScopeId(
   value: unknown,
 ): value is EmployeeDraftScopeId {
-  return typeof value === "string" && value.length > 0;
+  if (typeof value !== "object" || value === null || !isPlainObject(value)) {
+    return false;
+  }
+  const keys = Object.keys(value).sort();
+  if (
+    Object.getOwnPropertySymbols(value).length > 0
+    || keys.length !== 2
+    || keys[0] !== "corpid"
+    || keys[1] !== "userid"
+  ) {
+    return false;
+  }
+  return (
+    typeof value.corpid === "string"
+    && value.corpid.trim().length > 0
+    && typeof value.userid === "string"
+    && value.userid.trim().length > 0
+  );
+}
+
+function encodeScopeField(value: string): string {
+  let encoded = "";
+  for (let index = 0; index < value.length; index += 1) {
+    encoded += value.charCodeAt(index).toString(16).padStart(4, "0");
+  }
+  return encoded;
+}
+
+export function employeeNextDraftStorageKey(
+  scopeId: EmployeeDraftScopeId,
+): string {
+  if (!isEmployeeDraftScopeId(scopeId)) {
+    throw new Error("EMPLOYEE_DRAFT_STORE_INVALID_SCOPE_ID");
+  }
+  return `homelink:employee-next:draft:v1:${
+    encodeScopeField(scopeId.corpid.trim())
+  }:${encodeScopeField(scopeId.userid.trim())}`;
 }
 
 export function isEmployeeDraftId(value: unknown): value is EmployeeDraftId {
@@ -346,14 +385,19 @@ export function createEmployeeDraftStore(
     throw new Error("EMPLOYEE_DRAFT_STORE_INVALID_STORAGE_PORT");
   }
 
+  const scopeSnapshot = Object.freeze({
+    corpid: scopeId.corpid.trim(),
+    userid: scopeId.userid.trim(),
+  });
+
   const store: EmployeeDraftStore = {
-    scopeId,
+    scopeId: scopeSnapshot,
 
     async list(): Promise<
       EmployeeDraftStoreResult<readonly EmployeeDraftRecord[]>
     > {
       try {
-        return validatedList(await storage.list(scopeId));
+        return validatedList(await storage.list(scopeSnapshot));
       } catch {
         return failure("EMPLOYEE_DRAFT_STORE_STORAGE_LIST_FAILED");
       }
@@ -366,7 +410,7 @@ export function createEmployeeDraftStore(
         return failure("EMPLOYEE_DRAFT_STORE_INVALID_DRAFT_ID");
       }
       try {
-        const value = await storage.read(scopeId, draftId);
+        const value = await storage.read(scopeSnapshot, draftId);
         if (value === undefined) {
           return success(undefined);
         }
@@ -398,7 +442,7 @@ export function createEmployeeDraftStore(
       const storageRecord = cloneRecord(record);
       const resultSnapshot = snapshotRecord(record);
       try {
-        await storage.write(scopeId, storageRecord);
+        await storage.write(scopeSnapshot, storageRecord);
         return success(resultSnapshot);
       } catch {
         return failure("EMPLOYEE_DRAFT_STORE_STORAGE_WRITE_FAILED");
@@ -421,7 +465,7 @@ export function createEmployeeDraftStore(
       }
 
       try {
-        await storage.remove(scopeId, draftId);
+        await storage.remove(scopeSnapshot, draftId);
         return success(undefined);
       } catch {
         return failure("EMPLOYEE_DRAFT_STORE_STORAGE_REMOVE_FAILED");

@@ -69,12 +69,17 @@ function record(
   };
 }
 
+function scopeId(userid = "employee-1", corpid = "homelink") {
+  return { corpid, userid };
+}
+
 function memoryPort() {
   const byScope = new Map();
   const calls = [];
   const scope = (scopeId) => {
-    if (!byScope.has(scopeId)) byScope.set(scopeId, new Map());
-    return byScope.get(scopeId);
+    const key = draftStoreModule.employeeNextDraftStorageKey(scopeId);
+    if (!byScope.has(key)) byScope.set(key, new Map());
+    return byScope.get(key);
   };
   return {
     calls,
@@ -102,6 +107,7 @@ test("draft-store runtime success contract", async () => {
   assert.deepEqual(Object.keys(draftStoreModule).sort(), [
     "EMPLOYEE_DRAFT_STORE_ERROR_CODES",
     "createEmployeeDraftStore",
+    "employeeNextDraftStorageKey",
     "isEmployeeDraftId",
     "isEmployeeDraftPayload",
     "isEmployeeDraftRecord",
@@ -111,8 +117,21 @@ test("draft-store runtime success contract", async () => {
     Object.isFrozen(draftStoreModule.EMPLOYEE_DRAFT_STORE_ERROR_CODES),
     true,
   );
-  assert.equal(draftStoreModule.isEmployeeDraftScopeId("scope-1"), true);
+  assert.equal(draftStoreModule.isEmployeeDraftScopeId(scopeId()), true);
+  assert.equal(draftStoreModule.isEmployeeDraftScopeId("scope-1"), false);
   assert.equal(draftStoreModule.isEmployeeDraftScopeId(""), false);
+  assert.equal(
+    draftStoreModule.employeeNextDraftStorageKey(scopeId("a:b", "c")),
+    draftStoreModule.employeeNextDraftStorageKey(scopeId("a:b", "c")),
+  );
+  assert.notEqual(
+    draftStoreModule.employeeNextDraftStorageKey(scopeId("a:b", "c")),
+    draftStoreModule.employeeNextDraftStorageKey(scopeId("b:c", "a")),
+  );
+  assert.notEqual(
+    draftStoreModule.employeeNextDraftStorageKey(scopeId("same", "one")),
+    draftStoreModule.employeeNextDraftStorageKey(scopeId("same", "two")),
+  );
   assert.equal(draftStoreModule.isEmployeeDraftId("draft-1"), true);
   assert.equal(draftStoreModule.isEmployeeDraftId(""), false);
   for (
@@ -136,8 +155,9 @@ test("draft-store runtime success contract", async () => {
   }
 
   const port = memoryPort();
-  const store = draftStoreModule.createEmployeeDraftStore("scope-1", port);
-  assert.equal(store.scopeId, "scope-1");
+  const primaryScope = scopeId("scope-1");
+  const store = draftStoreModule.createEmployeeDraftStore(primaryScope, port);
+  assert.deepEqual(store.scopeId, primaryScope);
   assert.equal(Object.isFrozen(store), true);
   assert.deepEqual(await store.list(), { ok: true, value: [] });
 
@@ -168,7 +188,9 @@ test("draft-store runtime success contract", async () => {
   assert.equal(read.ok, true);
   assert.equal(read.value.draft_id, "draft-save");
   assert.equal(Object.isFrozen(read.value), true);
-  port.byScope.get("scope-1").get("draft-save").payload.nested.value =
+  port.byScope.get(
+    draftStoreModule.employeeNextDraftStorageKey(primaryScope),
+  ).get("draft-save").payload.nested.value =
     "storage-change";
   assert.equal(read.value.payload.nested.value, "unchanged");
 
@@ -183,11 +205,11 @@ test("draft-store runtime success contract", async () => {
 
   const sharedPort = memoryPort();
   const firstScope = draftStoreModule.createEmployeeDraftStore(
-    "scope-first",
+    scopeId("scope-first"),
     sharedPort,
   );
   const secondScope = draftStoreModule.createEmployeeDraftStore(
-    "scope-second",
+    scopeId("scope-second"),
     sharedPort,
   );
   await firstScope.save(record("same-id", "rent"));
@@ -196,7 +218,7 @@ test("draft-store runtime success contract", async () => {
 
   const separatePort = memoryPort();
   const isolated = draftStoreModule.createEmployeeDraftStore(
-    "scope-first",
+    scopeId("scope-first"),
     separatePort,
   );
   assert.equal((await isolated.list()).value.length, 0);
@@ -208,7 +230,7 @@ test("draft-store runtime success contract", async () => {
 test("draft-store runtime fail-closed contract", async () => {
   for (const invalid of [null, 1, {}, { list() {}, read() {}, write() {} }]) {
     assert.throws(
-      () => draftStoreModule.createEmployeeDraftStore("scope", invalid),
+      () => draftStoreModule.createEmployeeDraftStore(scopeId(), invalid),
       { message: "EMPLOYEE_DRAFT_STORE_INVALID_STORAGE_PORT" },
     );
   }
@@ -221,7 +243,8 @@ test("draft-store runtime fail-closed contract", async () => {
   assert.equal(untouchedPort.calls.length, 0);
 
   const port = memoryPort();
-  const store = draftStoreModule.createEmployeeDraftStore("scope", port);
+  const storeScope = scopeId("scope");
+  const store = draftStoreModule.createEmployeeDraftStore(storeScope, port);
   assert.deepEqual(await store.read(""), {
     ok: false,
     errorCode: "EMPLOYEE_DRAFT_STORE_INVALID_DRAFT_ID",
@@ -254,11 +277,11 @@ test("draft-store runtime fail-closed contract", async () => {
 
   const duplicatePort = memoryPort();
   duplicatePort.byScope.set(
-    "scope",
+    draftStoreModule.employeeNextDraftStorageKey(storeScope),
     new Map([["existing", record("existing")]]),
   );
   const duplicateStore = draftStoreModule.createEmployeeDraftStore(
-    "scope",
+    storeScope,
     duplicatePort,
   );
   assert.deepEqual(await duplicateStore.save(record("existing")), {
@@ -274,7 +297,7 @@ test("draft-store runtime fail-closed contract", async () => {
   duplicateListPort.list = async () => [record("same"), record("same")];
   assert.deepEqual(
     await draftStoreModule.createEmployeeDraftStore(
-      "scope",
+      storeScope,
       duplicateListPort,
     ).list(),
     {
@@ -286,7 +309,7 @@ test("draft-store runtime fail-closed contract", async () => {
   const invalidDataPort = memoryPort();
   invalidDataPort.list = async () => ({ invalid: true });
   const invalidDataStore = draftStoreModule.createEmployeeDraftStore(
-    "scope",
+    storeScope,
     invalidDataPort,
   );
   assert.deepEqual(await invalidDataStore.list(), {
@@ -310,7 +333,7 @@ test("draft-store runtime fail-closed contract", async () => {
       throw new Error("private storage detail");
     };
     const throwingStore = draftStoreModule.createEmployeeDraftStore(
-      "scope",
+      storeScope,
       throwingPort,
     );
     const result = method === "list"
@@ -327,7 +350,7 @@ test("draft-store runtime fail-closed contract", async () => {
   };
   assert.deepEqual(
     await draftStoreModule.createEmployeeDraftStore(
-      "scope",
+      storeScope,
       writePort,
     ).save(record("new")),
     {
@@ -337,12 +360,15 @@ test("draft-store runtime fail-closed contract", async () => {
   );
 
   const removePort = memoryPort();
-  removePort.byScope.set("scope", new Map([["draft", record("draft")]]));
+  removePort.byScope.set(
+    draftStoreModule.employeeNextDraftStorageKey(storeScope),
+    new Map([["draft", record("draft")]]),
+  );
   removePort.remove = async () => {
     throw new Error("private storage detail");
   };
   const removeStore = draftStoreModule.createEmployeeDraftStore(
-    "scope",
+    storeScope,
     removePort,
   );
   assert.deepEqual(await removeStore.remove("draft"), {
@@ -448,6 +474,7 @@ test("draft-store TypeScript semantic fixtures", () => {
       createEmployeeDraftStore,
       type EmployeeDraftPayload,
       type EmployeeDraftRecord,
+      type EmployeeDraftScopeId,
       type EmployeeDraftStoragePort,
       type EmployeeDraftStore,
       type EmployeeDraftStoreResult,
@@ -457,7 +484,7 @@ test("draft-store TypeScript semantic fixtures", () => {
     `${imports} const value: EmployeeDraftPayload = { nested: [1, "two", null] }; void value;`,
     `${imports} const value: EmployeeDraftRecord = { draft_id: "d", event_id: "rent", payload: {}, updated_at_iso: "r" }; void value;`,
     `${imports} const port: EmployeeDraftStoragePort = { async list() { return []; }, async read() { return undefined; }, async write() {}, async remove() {} }; void port;`,
-    `${imports} declare const port: EmployeeDraftStoragePort; const store: EmployeeDraftStore = createEmployeeDraftStore("scope", port); void store;`,
+    `${imports} declare const port: EmployeeDraftStoragePort; const scope: EmployeeDraftScopeId = { corpid: "homelink", userid: "employee" }; const store: EmployeeDraftStore = createEmployeeDraftStore(scope, port); void store;`,
     `${imports} declare const store: EmployeeDraftStore; const result: Promise<EmployeeDraftStoreResult<readonly EmployeeDraftRecord[]>> = store.list(); void result;`,
     `${imports} const value: EmployeeDraftRecord = { draft_id: "d", event_id: "bed-transfer", payload: null, updated_at_iso: "r" }; void value;`,
   ];
@@ -475,8 +502,8 @@ test("draft-store TypeScript semantic fixtures", () => {
     [`${imports} const port: EmployeeDraftStoragePort = { list() { return []; }, async read() { return undefined; }, async write() {}, async remove() {} };`, /Promise/u],
     [`${imports} declare const result: EmployeeDraftStoreResult<string>; const value: string = result.value;`, /value/u],
     [`${imports} const value: EmployeeDraftRecord = { draft_id: "d", event_id: "rent", payload: {}, updated_at_iso: "r", secret: "x" };`, /secret/u],
-    [`${imports} declare const port: EmployeeDraftStoragePort; createEmployeeDraftStore({ value: "scope" }, port);`, /not assignable/u],
-    [`${imports} declare const port: EmployeeDraftStoragePort; async function run() { const raw = await port.read("s", "d"); const value: EmployeeDraftRecord = raw; }`, /unknown/u],
+    [`${imports} declare const port: EmployeeDraftStoragePort; createEmployeeDraftStore({ value: "scope" }, port);`, /does not exist|not assignable/u],
+    [`${imports} declare const port: EmployeeDraftStoragePort; async function run() { const raw = await port.read({ corpid: "c", userid: "u" }, "d"); const value: EmployeeDraftRecord = raw; }`, /unknown/u],
   ];
   for (const [source, expected] of negativeFixtures) {
     const diagnostics = semanticDiagnosticsFor(source);

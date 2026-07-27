@@ -682,7 +682,13 @@ test("route-build source boundary stays isolated", () => {
   assert.match(mainSource, /from "\.\/route"/u);
   assert.doesNotMatch(
     mainSource,
-    /\b(?:fetch|localStorage|sessionStorage|indexedDB|XMLHttpRequest|WebSocket|EventSource|sendBeacon)\b/u,
+    /\b(?:fetch|sessionStorage|indexedDB|XMLHttpRequest|WebSocket|EventSource|sendBeacon)\b/u,
+  );
+  assert.match(mainSource, /globalThis\.localStorage\.getItem\(key\)/u);
+  assert.match(mainSource, /globalThis\.localStorage\.setItem\(key, value\)/u);
+  assert.doesNotMatch(
+    mainSource,
+    /globalThis\.localStorage\.(?:removeItem|clear)\s*\(/u,
   );
   assert.doesNotMatch(
     mainSource,

@@ -15,6 +15,13 @@ import type {
 import type {
   EmployeeSubmitEntryContext,
 } from "./core/submit-entry";
+import {
+  createEmployeeNextSessionDraftController,
+  type EmployeeNextSessionDraftController,
+  type EmployeeNextSessionDraftEntry,
+  type EmployeeNextSessionDraftStoragePort,
+  type EmployeeNextSessionDraftView,
+} from "./session-draft";
 
 export const employeeNextRouteId = "employee-next-route-candidate";
 
@@ -142,7 +149,15 @@ export function mapEmployeeNextServerSession(
       ? "STAFF"
       : undefined;
   const employeeId = normalizedServerId(data);
-  if (role === undefined || employeeId === undefined) {
+  const corpid = typeof data.corpid === "string"
+    && data.corpid.trim().length > 0
+    ? data.corpid.trim()
+    : undefined;
+  if (
+    role === undefined
+    || employeeId === undefined
+    || corpid === undefined
+  ) {
     return undefined;
   }
   const displayNameValue = [data.display_name, data.employee_name]
@@ -153,7 +168,13 @@ export function mapEmployeeNextServerSession(
     ? displayNameValue.trim()
     : employeeId;
   return Object.freeze({
-    user: Object.freeze({ employeeId, displayName, role }),
+    user: Object.freeze({
+      employeeId,
+      displayName,
+      role,
+      userid: employeeId,
+      corpid,
+    }),
   });
 }
 
@@ -792,6 +813,7 @@ function appendText(
 function createLocalRenderPort(
   root: HTMLElement,
   controllerRef: () => EmployeeNextRouteController | undefined,
+  draftViewRef?: () => EmployeeNextSessionDraftView,
 ) {
   return Object.freeze({
     render(view: EmployeeNextRouteView): void {
@@ -803,6 +825,35 @@ function createLocalRenderPort(
       appendText(root, "p", `Route status: ${view.state.status}`);
       appendText(root, "p", `Authentication: ${view.shell.auth.status}`);
       appendText(root, "p", `Submit status: ${view.shell.submit.status}`);
+      const draftView = draftViewRef?.();
+      if (draftView !== undefined) {
+        if (draftView.status === "AUTH_RESTORING") {
+          appendText(root, "p", "Restoring session");
+        } else if (draftView.status === "DRAFT_RESTORING") {
+          appendText(root, "p", "Restoring draft");
+        } else if (draftView.status === "DRAFT_UNAVAILABLE") {
+          appendText(root, "p", `Draft unavailable: ${draftView.errorCode}`);
+        } else {
+          appendText(
+            root,
+            "p",
+            `Current Session (${draftView.entryCount})`,
+          );
+          appendText(
+            root,
+            "p",
+            `Cash total: AED ${draftView.cashTotalAed.toFixed(2)}`,
+          );
+          appendText(
+            root,
+            "p",
+            `Bank total: AED ${draftView.bankTotalAed.toFixed(2)}`,
+          );
+          if (draftView.errorCode !== undefined) {
+            appendText(root, "p", draftView.errorCode);
+          }
+        }
+      }
 
       const eventSection = appendText(root, "section", "");
       eventSection.setAttribute("aria-label", "Seven event choices");
@@ -823,6 +874,22 @@ function createLocalRenderPort(
       }
     },
   });
+}
+
+function createBrowserDraftStoragePort(): EmployeeNextSessionDraftStoragePort {
+  return Object.freeze({
+    getItem(key: string): string | null {
+      return globalThis.localStorage.getItem(key);
+    },
+    setItem(key: string, value: string): void {
+      globalThis.localStorage.setItem(key, value);
+    },
+  });
+}
+
+export interface EmployeeNextSidecarRuntimeOptions {
+  readonly draftStorage?: EmployeeNextSessionDraftStoragePort;
+  readonly now?: () => string;
 }
 
 function createDisabledLocalTransport() {
@@ -856,8 +923,14 @@ export function startEmployeeNextRoute(
 export function startEmployeeNextSidecarRoute(
   root: HTMLElement,
   adapters: EmployeeNextSidecarAdapters,
+  options: EmployeeNextSidecarRuntimeOptions = {},
 ): Readonly<{
   controller: EmployeeNextRouteController;
+  drafts: EmployeeNextSessionDraftController;
+  addToSession: (input: Readonly<{
+    sessionId: string;
+    entry: EmployeeNextSessionDraftEntry;
+  }>) => Promise<boolean>;
   sessionRestore: Promise<boolean>;
 }> {
   if (
@@ -869,10 +942,18 @@ export function startEmployeeNextSidecarRoute(
   ) {
     throw new Error("SIDECAR_ADAPTER_INVALID_OPTIONS");
   }
+  const drafts = createEmployeeNextSessionDraftController(
+    options.draftStorage ?? createBrowserDraftStoragePort(),
+    options.now,
+  );
   let controller: EmployeeNextRouteController | undefined;
   controller = createEmployeeNextRouteController({
     transport: adapters.transport,
-    render: createLocalRenderPort(root, () => controller),
+    render: createLocalRenderPort(
+      root,
+      () => controller,
+      () => drafts.getView(),
+    ),
     buildApiRequest: adapters.buildApiRequest,
     allowedSubmitPath: adapters.submitPath,
   });
@@ -880,15 +961,28 @@ export function startEmployeeNextSidecarRoute(
   const sessionRestore = adapters.restoreSession()
     .then(async (session) => {
       const result = controller?.setSession(session);
+      const draftRestore = drafts.restore(session);
       await controller?.render();
-      return result?.ok === true;
+      const restored = await draftRestore;
+      await controller?.render();
+      return result?.ok === true && restored.ok;
     })
     .catch(async () => {
+      await drafts.restore(undefined);
       await controller?.render();
       return false;
     });
   void controller.render();
-  return Object.freeze({ controller, sessionRestore });
+  return Object.freeze({
+    controller,
+    drafts,
+    sessionRestore,
+    async addToSession(input): Promise<boolean> {
+      const result = await drafts.addToSession(input);
+      await controller?.render();
+      return result.ok;
+    },
+  });
 }
 
 if (typeof document !== "undefined") {

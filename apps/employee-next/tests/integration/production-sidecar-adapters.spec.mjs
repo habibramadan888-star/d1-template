@@ -250,6 +250,7 @@ test("production session restore maps only explicit employee and staff roles", a
             userid: "employee-023",
             employee_id: "employee-023",
             display_name: "Employee 023",
+            corpid: "homelink",
             role: serverRole,
           },
         });
@@ -258,6 +259,8 @@ test("production session restore maps only explicit employee and staff roles", a
     const restored = await adapters.restoreSession();
     assert.equal(restored.user.role, localRole);
     assert.equal(restored.user.employeeId, "employee-023");
+    assert.equal(restored.user.userid, "employee-023");
+    assert.equal(restored.user.corpid, "homelink");
     assert.equal(calls.length, 1);
     assert.equal(calls[0].path, sessionPath);
     assert.equal(calls[0].init.method, "GET");
@@ -335,6 +338,7 @@ test("production session restore fails closed for every non-employee role", asyn
           userid: "employee-023",
           employee_id: "employee-023",
           display_name: "Employee 023",
+          corpid: "homelink",
           role,
         },
       })),
@@ -349,6 +353,7 @@ test("production session restore fails closed for every non-employee role", asyn
     data: {
       userid: "one",
       employee_id: "two",
+      corpid: "homelink",
       role: "staff",
     },
   }), undefined);

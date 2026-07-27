@@ -213,6 +213,12 @@ function snapshotSession(session: EmployeeAuthSession): EmployeeAuthSession {
       employeeId: session.user.employeeId,
       displayName: session.user.displayName,
       role: session.user.role,
+      ...(session.user.userid === undefined
+        ? {}
+        : { userid: session.user.userid }),
+      ...(session.user.corpid === undefined
+        ? {}
+        : { corpid: session.user.corpid }),
     }),
   });
 }
