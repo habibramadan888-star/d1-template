@@ -289,6 +289,84 @@ test("production session restore rejects nonzero error code with valid-looking e
   );
 });
 
+test("explicit top-level auth failures take precedence over stale nested identities", async () => {
+  const staleStaff = authEnvelope("staff").data;
+  const cases = [
+    {
+      name: "success=false with stale staff data",
+      status: 200,
+      body: { code: 0, success: false, data: staleStaff },
+    },
+    {
+      name: "success=false with stale nested user role",
+      status: 200,
+      body: {
+        code: 0,
+        success: false,
+        data: { user: staleStaff },
+      },
+    },
+    {
+      name: "top-level error string with stale staff data",
+      status: 200,
+      body: {
+        code: 0,
+        error: "unauthenticated",
+        data: staleStaff,
+      },
+    },
+    {
+      name: "top-level error object with stale nested user",
+      status: 200,
+      body: {
+        code: 0,
+        error: { code: 40_101 },
+        data: { user: staleStaff },
+      },
+    },
+    {
+      name: "success=true cannot override top-level error",
+      status: 200,
+      body: {
+        code: 0,
+        success: true,
+        error: "session expired",
+        data: staleStaff,
+      },
+    },
+  ];
+
+  for (const fixture of cases) {
+    const adapters = runtime.createEmployeeNextSidecarAdapters(
+      adapterOptions(async () => response(fixture.status, fixture.body)),
+    );
+    await assert.rejects(
+      adapters.restoreSession(),
+      /SIDECAR_SESSION_RESTORE_FAILED/u,
+      fixture.name,
+    );
+    assert.equal(
+      runtime.mapEmployeeNextServerSession(fixture.body),
+      undefined,
+      fixture.name,
+    );
+  }
+});
+
+test("empty top-level error signals preserve existing valid session compatibility", async () => {
+  for (const envelope of [
+    { ...authEnvelope("employee"), error: null },
+    { ...authEnvelope("staff"), error: "" },
+    { ...authEnvelope("staff"), error: "   " },
+  ]) {
+    const adapters = runtime.createEmployeeNextSidecarAdapters(
+      adapterOptions(async () => response(200, envelope)),
+    );
+    const restored = await adapters.restoreSession();
+    assert.match(restored.user.role, /^(?:EMPLOYEE|STAFF)$/u);
+  }
+});
+
 test("production session restore requires the exact numeric zero success code", async () => {
   for (const envelope of [
     { data: authEnvelope("staff").data },

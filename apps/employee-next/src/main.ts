@@ -120,7 +120,19 @@ function safeHeaders(
 }
 
 function apiData(value: unknown): Readonly<Record<string, unknown>> | undefined {
-  if (!isPlainRecord(value) || value.code !== 0) {
+  if (
+    !isPlainRecord(value)
+    || value.code !== 0
+    || value.success === false
+  ) {
+    return undefined;
+  }
+  const error = value.error;
+  if (
+    error !== undefined
+    && error !== null
+    && !(typeof error === "string" && error.trim().length === 0)
+  ) {
     return undefined;
   }
   const data = value.data;

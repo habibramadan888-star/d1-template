@@ -25,7 +25,10 @@ const bundle = await esbuild.build({
     contents: `
       export * from "./apps/employee-next/src/session-draft.ts";
       export { employeeNextDraftStorageKey } from "./apps/employee-next/src/core/draft-store.ts";
-      export { startEmployeeNextSidecarRoute } from "./apps/employee-next/src/main.ts";
+      export {
+        createEmployeeNextSidecarAdapters,
+        startEmployeeNextSidecarRoute,
+      } from "./apps/employee-next/src/main.ts";
     `,
     loader: "ts",
     resolveDir: worktreeRoot,
@@ -536,9 +539,18 @@ test("sidecar auth failure does not read drafts or render a false zero", async (
   try {
     const storage = storagePort();
     const root = new FakeElement("main");
+    root.append(Object.assign(new FakeElement("p"), {
+      textContent: "Authentication: AUTHENTICATED Current Session (1) Upload Session",
+    }));
+    let businessRequests = 0;
     const sidecar = runtime.startEmployeeNextSidecarRoute(root, {
       submitPath: "/unit-test-submit",
-      transport: { async request() { throw new Error("not used"); } },
+      transport: {
+        async request() {
+          businessRequests += 1;
+          throw new Error("not used");
+        },
+      },
       buildApiRequest() { throw new Error("not used"); },
       async restoreSession() {
         throw new Error("private auth detail");
@@ -548,6 +560,68 @@ test("sidecar auth failure does not read drafts or render a false zero", async (
     assert.equal(storage.calls.length, 0);
     assert.match(visibleText(root), /Draft unavailable/u);
     assert.doesNotMatch(visibleText(root), /Current Session \(0\)/u);
+    assert.doesNotMatch(visibleText(root), /Authentication: AUTHENTICATED/u);
+    assert.doesNotMatch(visibleText(root), /Current Session \(1\)/u);
+    assert.doesNotMatch(visibleText(root), /Upload Session/u);
+    assert.doesNotMatch(visibleText(root), /Expense date/u);
+    assert.equal(businessRequests, 0);
+  } finally {
+    globalThis.document = previousDocument;
+  }
+});
+
+test("contradictory auth envelopes render no authenticated session or event form", async () => {
+  const previousDocument = globalThis.document;
+  globalThis.document = {
+    createElement(tagName) {
+      return new FakeElement(tagName);
+    },
+  };
+  try {
+    const staleStaff = {
+      userid: "employee-stale",
+      employee_id: "employee-stale",
+      display_name: "Stale Staff",
+      corpid: "homelink",
+      role: "staff",
+    };
+    for (const body of [
+      { code: 0, success: false, data: staleStaff },
+      { code: 0, error: "session expired", data: { user: staleStaff } },
+      { code: 40_101, data: staleStaff },
+    ]) {
+      const storage = storagePort();
+      let businessRequests = 0;
+      const adapters = runtime.createEmployeeNextSidecarAdapters({
+        requestPort: {
+          async request(path) {
+            if (path === "/api/me") {
+              return { status: 200, async json() { return body; } };
+            }
+            businessRequests += 1;
+            return { status: 500, async json() { return null; } };
+          },
+        },
+        sessionPath: "/api/me",
+        submitPath: "/api/employee/entry",
+      });
+      const root = new FakeElement("main");
+      root.append(Object.assign(new FakeElement("p"), {
+        textContent: "Authentication: AUTHENTICATED Current Session (1)",
+      }));
+      const sidecar = runtime.startEmployeeNextSidecarRoute(
+        root,
+        adapters,
+        { draftStorage: storage },
+      );
+      assert.equal(await sidecar.sessionRestore, false);
+      assert.equal(storage.calls.length, 0);
+      assert.doesNotMatch(visibleText(root), /Authentication: AUTHENTICATED/u);
+      assert.doesNotMatch(visibleText(root), /Current Session/u);
+      assert.doesNotMatch(visibleText(root), /Expense date/u);
+      assert.doesNotMatch(visibleText(root), /Upload Session/u);
+      assert.equal(businessRequests, 0);
+    }
   } finally {
     globalThis.document = previousDocument;
   }
