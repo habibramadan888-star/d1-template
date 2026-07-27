@@ -110,7 +110,7 @@ async function saveSeven(controller, sessionId = "session-seven") {
   }
 }
 
-test("scope is strict, staff-derived and collision-safe", async () => {
+test("scope is strict, employee/staff-derived and collision-safe", async () => {
   assert.equal(runtime.createEmployeeDraftScope("scope"), undefined);
   assert.equal(runtime.createEmployeeDraftScope({}), undefined);
   assert.equal(
@@ -125,12 +125,22 @@ test("scope is strict, staff-derived and collision-safe", async () => {
     }),
     undefined,
   );
-  assert.equal(
+  assert.deepEqual(
     runtime.createEmployeeDraftScope({
       user: {
         role: "EMPLOYEE",
         corpid: "homelink",
         userid: "employee",
+      },
+    }),
+    { corpid: "homelink", userid: "employee" },
+  );
+  assert.equal(
+    runtime.createEmployeeDraftScope({
+      user: {
+        role: "OWNER",
+        corpid: "homelink",
+        userid: "owner",
       },
     }),
     undefined,
@@ -172,7 +182,6 @@ test("scope is strict, staff-derived and collision-safe", async () => {
     undefined,
     { user: { role: "STAFF", corpid: "homelink" } },
     { user: { role: "STAFF", userid: "employee" } },
-    { user: { role: "EMPLOYEE", corpid: "homelink", userid: "employee" } },
   ]) {
     const controller = runtime.createEmployeeNextSessionDraftController(storage);
     const result = await controller.restore(invalid);

@@ -879,6 +879,12 @@ function requireManager(user) {
 __name(requireManager, "requireManager");
 async function ensureAuditLogSchema(env,requestContext=null){
   if(requestContext?.audit_schema_ready===true)return;
+  if(requestContext?.atomic_write_plan===true){
+    const exists=await empTableExists(env,"audit_logs").catch(()=>false);
+    if(!exists)throw new Error("AGGREGATE_AUDIT_SCHEMA_UNAVAILABLE");
+    requestContext.audit_schema_ready=true;
+    return;
+  }
   if(requestContext?.audit_schema_promise)return requestContext.audit_schema_promise;
   const startedAt=Date.now(),pending=env.DB.prepare(
     `CREATE TABLE IF NOT EXISTS audit_logs (
@@ -917,6 +923,7 @@ async function audit(env, user, action, target = "", detail = {}, requestContext
     ).run();
     if(requestContext){requestContext.d1_write_count=Number(requestContext.d1_write_count||0)+1;requestContext.d1_write_duration_ms=Number(requestContext.d1_write_duration_ms||0)+Math.max(0,Date.now()-writeStartedAt);}
   } catch (e) {
+    if(requestContext?.atomic_write_plan===true)throw e;
     logger.warn({ action, err: e }, "Audit log failed");
   }
 }
@@ -1875,14 +1882,16 @@ async function canonicalDepositGateway(env,user,opts={}){
   };
 }
 __name(canonicalDepositGateway,"canonicalDepositGateway");
-async function empDepositMove(env,user,move){
+async function empDepositMove(env,user,move,requestContext=null){
   if(move.entry_id){
     const existing=await env.DB.prepare(`SELECT ledger_id,balance_after,delta FROM deposit_ledger
       WHERE corpid=? AND tenant_card_id=? AND entry_id=? AND type=? AND COALESCE(voided_at,'')='' LIMIT 1`)
       .bind(user.corpid,move.tenant_card_id,move.entry_id,move.type||"").first();
     if(existing)return {ledger_id:existing.ledger_id,balance_after:Number(existing.balance_after||0),delta:Number(existing.delta||0),duplicate:true};
   }
-  const before=await empDepositBalance(env,user.corpid,move.tenant_card_id);
+  const plannedBalances=requestContext?.atomic_planned_deposit_deltas;
+  const plannedDelta=plannedBalances instanceof Map?Number(plannedBalances.get(move.tenant_card_id)||0):0;
+  const before=(await empDepositBalance(env,user.corpid,move.tenant_card_id))+plannedDelta;
   const delta=Number(move.delta||0);
   const balanceAfter=Math.max(0,Math.round((before+delta)*100)/100);
   const ledgerId=empId("dep");
@@ -1890,7 +1899,8 @@ async function empDepositMove(env,user,move){
     ledger_id:ledgerId,corpid:user.corpid,userid:user.userid,tenant_card_id:move.tenant_card_id,tenant_name:move.tenant_name||"",
     bed:move.bed||"",entry_id:move.entry_id||"",type:move.type||"",amount:Number(move.amount||Math.abs(delta)||0),
     delta,balance_after:balanceAfter,note:move.note||"",operator_id:move.operator_id||user.userid,ts:move.ts||empNow()
-  },EMP_DEPOSIT_COLUMNS);
+  },EMP_DEPOSIT_COLUMNS,requestContext);
+  if(plannedBalances instanceof Map)plannedBalances.set(move.tenant_card_id,plannedDelta+delta);
   return {ledger_id:ledgerId,balance_before:before,balance_after:balanceAfter,delta};
 }
 __name(empDepositMove,"empDepositMove");
@@ -1902,7 +1912,7 @@ async function empFindProjectionArrearsForPayment(env,user,taskId,bed="",opts={}
   return rows.find(row=>[row.task_id,row.arrears_ref,row.id,row.source_ref].some(v=>cleanText(v,160)===cleanTaskId))||null;
 }
 __name(empFindProjectionArrearsForPayment,"empFindProjectionArrearsForPayment");
-async function empReconcileArrearTask(env,user,taskId,operatorId,now,bed=""){
+async function empReconcileArrearTask(env,user,taskId,operatorId,now,bed="",requestContext=null){
   const cleanTaskId=cleanId(taskId);
   if(!cleanTaskId)return null;
   const task=await env.DB.prepare(`SELECT * FROM arrear_tasks
@@ -1924,7 +1934,9 @@ async function empReconcileArrearTask(env,user,taskId,operatorId,now,bed=""){
   const paidRow=await env.DB.prepare(`SELECT COALESCE(SUM(amount),0) AS total_paid FROM transactions
     WHERE corpid=? AND linked_task_id=? AND COALESCE(status,'ACTIVE')='ACTIVE' AND COALESCE(type,'')='AP'`)
     .bind(user.corpid,cleanTaskId).first();
-  const actual=Math.round(Number(paidRow?.total_paid||0)*100)/100;
+  const plannedPayments=requestContext?.atomic_planned_arrears_payments;
+  const plannedAmount=plannedPayments instanceof Map?Number(plannedPayments.get(cleanTaskId)||0):0;
+  const actual=Math.round((Number(paidRow?.total_paid||0)+plannedAmount)*100)/100;
   const target=Number(task.arrear_amount||0);
   const closed=actual>=target-0.01;
   await env.DB.prepare(`UPDATE arrear_tasks
@@ -2028,9 +2040,11 @@ async function empApplyLeftWithArrearsMetadata(env,user,entry,entryId,operatorId
   return {ok:true,task_id:taskId,metadata:meta};
 }
 __name(empApplyLeftWithArrearsMetadata,"empApplyLeftWithArrearsMetadata");
-async function empEnsureOpenArrearTaskForPayment(env,user,taskId,operatorId,now,bed=""){
+async function empEnsureOpenArrearTaskForPayment(env,user,taskId,operatorId,now,bed="",requestContext=null){
   const cleanTaskId=cleanId(taskId);
   if(!cleanTaskId)return null;
+  const plannedTasks=requestContext?.atomic_planned_arrear_tasks;
+  if(plannedTasks instanceof Map&&plannedTasks.has(cleanTaskId))return plannedTasks.get(cleanTaskId);
   const existing=await env.DB.prepare(`SELECT * FROM arrear_tasks
     WHERE task_id=? AND corpid=? LIMIT 1`).bind(cleanTaskId,user.corpid).first();
   if(existing){
@@ -2063,8 +2077,9 @@ async function empEnsureOpenArrearTaskForPayment(env,user,taskId,operatorId,now,
     updated_by:operatorId||user.userid,
     updated_at:now||empNow()
   };
-  await empInsertDynamic(env,"arrear_tasks",created,EMP_TASK_COLUMNS);
-  await empEvent(env,user,{ref_id:cleanTaskId,ref_type:"arrear_task",event_type:"create",field_name:"*",new_value:JSON.stringify(created),operator_id:operatorId||user.userid,ts:now||empNow()});
+  await empInsertDynamic(env,"arrear_tasks",created,EMP_TASK_COLUMNS,requestContext);
+  await empEvent(env,user,{ref_id:cleanTaskId,ref_type:"arrear_task",event_type:"create",field_name:"*",new_value:JSON.stringify(created),operator_id:operatorId||user.userid,ts:now||empNow()},requestContext);
+  if(plannedTasks instanceof Map)plannedTasks.set(cleanTaskId,created);
   return created;
 }
 __name(empEnsureOpenArrearTaskForPayment,"empEnsureOpenArrearTaskForPayment");
@@ -3925,12 +3940,323 @@ async function persistEmployeeBedTransferCanonicalArchive(env,user,body,validati
   return success({success:true,ok:true,idempotent:false,canonical_write_status:'accepted',canonical_persistence_verified:true,session_id:sessionId,canonical_entry:stored});
 }
 __name(persistEmployeeBedTransferCanonicalArchive,"persistEmployeeBedTransferCanonicalArchive");
+const EMPLOYEE_ENTRY_AGGREGATE_ORDINARY_TYPES=new Set(["R","AP","D","DR","CO","E"]);
+function employeeEntryAggregateWriteFailure(errorCode,message,httpStatus=422,detail={}){
+  return json({success:false,ok:false,aggregate_write:true,committed:false,no_write:true,write_attempted:false,error_code:errorCode,message,...detail},httpStatus);
+}
+__name(employeeEntryAggregateWriteFailure,"employeeEntryAggregateWriteFailure");
+function employeeEntryAtomicSqlMutates(sql=""){
+  return /^(?:\s|--[^\n]*\n)*(?:INSERT|UPDATE|DELETE|REPLACE|CREATE|DROP|ALTER)\b/i.test(String(sql||""));
+}
+__name(employeeEntryAtomicSqlMutates,"employeeEntryAtomicSqlMutates");
+function employeeEntryAtomicSchemaObject(sql=""){
+  const source=String(sql||"");
+  const table=source.match(/^\s*CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+["`[]?([A-Za-z0-9_]+)/i);
+  if(table)return {type:"table",name:table[1]};
+  const index=source.match(/^\s*CREATE\s+(?:UNIQUE\s+)?INDEX\s+IF\s+NOT\s+EXISTS\s+["`[]?([A-Za-z0-9_]+)/i);
+  if(index)return {type:"index",name:index[1]};
+  return null;
+}
+__name(employeeEntryAtomicSchemaObject,"employeeEntryAtomicSchemaObject");
+async function employeeEntryAtomicSchemaAlreadyExists(database,sql=""){
+  const object=employeeEntryAtomicSchemaObject(sql);
+  if(!object)return false;
+  const row=await database.prepare("SELECT name FROM sqlite_master WHERE type=? AND name=? LIMIT 1")
+    .bind(object.type,object.name).first().catch(()=>null);
+  return cleanText(row?.name||"",160)===object.name;
+}
+__name(employeeEntryAtomicSchemaAlreadyExists,"employeeEntryAtomicSchemaAlreadyExists");
+function createEmployeeEntryAtomicWritePlanner(database){
+  const statements=[];
+  let sessionInsertCaptured=false;
+  const prepare=sql=>{
+    const source=String(sql||"");
+    const original=database.prepare(source);
+    let bound=original;
+    const wrapper={
+      bind(...values){bound=original.bind(...values);return wrapper},
+      async first(...args){return bound.first(...args)},
+      async all(...args){return bound.all(...args)},
+      async raw(...args){return bound.raw(...args)},
+      async run(){
+        if(!employeeEntryAtomicSqlMutates(source))return bound.run();
+        if(/^\s*(?:CREATE|ALTER|DROP)\b/i.test(source)){
+          if(await employeeEntryAtomicSchemaAlreadyExists(database,source)){
+            return {success:true,meta:{changes:0},changes:0,atomic_schema_verified:true};
+          }
+          const error=new Error("AGGREGATE_SCHEMA_MUTATION_FORBIDDEN");
+          error.code="AGGREGATE_SCHEMA_MUTATION_FORBIDDEN";
+          throw error;
+        }
+        if(/\bINTO\s+sessions\b/i.test(source)){
+          if(sessionInsertCaptured)return {success:true,meta:{changes:0},changes:0,atomic_planned:true};
+          sessionInsertCaptured=true;
+        }
+        statements.push(bound);
+        return {success:true,meta:{changes:1},changes:1,atomic_planned:true};
+      },
+      __employee_entry_atomic_statement:()=>bound
+    };
+    return wrapper;
+  };
+  return {
+    database:{
+      prepare,
+      async batch(rows=[]){
+        for(const row of rows){
+          const statement=typeof row?.__employee_entry_atomic_statement==="function"?row.__employee_entry_atomic_statement():row;
+          statements.push(statement);
+        }
+        return rows.map(()=>({success:true,meta:{changes:1},changes:1,atomic_planned:true}));
+      }
+    },
+    statements
+  };
+}
+__name(createEmployeeEntryAtomicWritePlanner,"createEmployeeEntryAtomicWritePlanner");
+async function commitEmployeeEntryAtomicWritePlan(database,statements){
+  if(!database||typeof database.batch!=="function"||!Array.isArray(statements)||!statements.length){
+    const error=new Error("AGGREGATE_ATOMIC_WRITE_PLAN_INVALID");
+    error.code="AGGREGATE_ATOMIC_WRITE_PLAN_INVALID";
+    throw error;
+  }
+  try{
+    const results=await database.batch(statements);
+    if(!Array.isArray(results)||results.length!==statements.length||results.some(result=>result?.success===false)){
+      const error=new Error("D1_BATCH_RESULT_MISMATCH");
+      error.code="AGGREGATE_ATOMIC_COMMIT_FAILED";
+      throw error;
+    }
+    return results;
+  }catch(error){
+    if(error?.code==="AGGREGATE_ATOMIC_COMMIT_FAILED")throw error;
+    const failure=new Error("AGGREGATE_ATOMIC_COMMIT_FAILED");
+    failure.code="AGGREGATE_ATOMIC_COMMIT_FAILED";
+    failure.cause=error;
+    throw failure;
+  }
+}
+__name(commitEmployeeEntryAtomicWritePlan,"commitEmployeeEntryAtomicWritePlan");
+function employeeEntryAggregateCanonicalSet(rows=[],user={}){
+  return rows.map((row,index)=>buildEmployeeEntryDuplicateKeys(row,user,index));
+}
+__name(employeeEntryAggregateCanonicalSet,"employeeEntryAggregateCanonicalSet");
+function employeeEntryAggregateEnvelope(body={},user={}){
+  if(body?.aggregate_write!==true)return {ok:false,error_code:"AGGREGATE_WRITE_REQUIRED"};
+  if(body?.entry!==void 0||body?.entries!==void 0||body?.validation_requests!==void 0)return {ok:false,error_code:"AGGREGATE_TOP_LEVEL_ENTRY_SOURCE_FORBIDDEN"};
+  const session=body?.session;
+  if(!session||typeof session!=="object"||Array.isArray(session))return {ok:false,error_code:"AGGREGATE_SESSION_REQUIRED"};
+  const sessionId=cleanId(session.id||session.session_id);
+  const rows=Array.isArray(session.entries)?session.entries:[];
+  if(!sessionId)return {ok:false,error_code:"AGGREGATE_SESSION_ID_REQUIRED"};
+  if(!rows.length)return {ok:false,error_code:"AGGREGATE_SESSION_EMPTY"};
+  if(!Number.isInteger(Number(session.entries_count))||Number(session.entries_count)!==rows.length)return {ok:false,error_code:"AGGREGATE_ENTRIES_COUNT_MISMATCH"};
+  const identities=[],types=[];
+  for(let index=0;index<rows.length;index++){
+    const row=rows[index]&&typeof rows[index]==="object"?rows[index]:{};
+    const identity=cleanId(row.id||row.entry_id||row.event_id||row.anchor_id||row.original_local_entry_id);
+    const type=employeeEntryUploadType(row);
+    if(!identity)return {ok:false,error_code:"AGGREGATE_ENTRY_IDENTITY_REQUIRED",event_index:index};
+    if(!EMPLOYEE_ENTRY_AGGREGATE_ORDINARY_TYPES.has(type)){
+      return {ok:false,error_code:["TF","TFF"].includes(type)?"BED_TRANSFER_SESSION_MUST_BE_SINGLE_ENTRY":"AGGREGATE_EVENT_TYPE_REJECTED",event_index:index};
+    }
+    const rowSessionId=cleanId(row.session_id||row.sessionId||"");
+    if(rowSessionId&&rowSessionId!==sessionId)return {ok:false,error_code:"AGGREGATE_SESSION_IDENTITY_MISMATCH",event_index:index};
+    identities.push(identity);
+    types.push(type);
+  }
+  if(new Set(identities).size!==identities.length)return {ok:false,error_code:"AGGREGATE_DUPLICATE_ENTRY_IDENTITY"};
+  const keys=employeeEntryAggregateCanonicalSet(rows,user);
+  const canonical=keys.map(row=>row.canonical_fingerprint).filter(Boolean);
+  if(new Set(canonical).size!==canonical.length)return {ok:false,error_code:"AGGREGATE_DUPLICATE_BUSINESS_IDENTITY"};
+  const arrearsRefs=rows.filter((_,index)=>types[index]==="AP").map(row=>cleanId(row.linked_task_id||row.arrears_ref)).filter(Boolean);
+  if(new Set(arrearsRefs).size!==arrearsRefs.length)return {ok:false,error_code:"AGGREGATE_DUPLICATE_ARREARS_REFERENCE"};
+  const rentPeriods=rows.filter((_,index)=>types[index]==="R").map(row=>[cleanText(row.room||row.bed||"",40),cleanDate(row.period_start||row.rent_period_start||""),cleanDate(row.period_end||row.rent_period_end||"")]).filter(parts=>parts.every(Boolean)).map(parts=>parts.join("|"));
+  if(new Set(rentPeriods).size!==rentPeriods.length)return {ok:false,error_code:"AGGREGATE_DUPLICATE_RENT_PERIOD"};
+  return {ok:true,session,session_id:sessionId,rows,identities,types,keys};
+}
+__name(employeeEntryAggregateEnvelope,"employeeEntryAggregateEnvelope");
+function employeeEntryAggregateValidationBody(envelope,index){
+  const entry=envelope.rows[index];
+  return {
+    entry_identity:envelope.identities[index],
+    entry,
+    event_index:index,
+    session:{...envelope.session,id:envelope.session_id,session_id:envelope.session_id,entries:envelope.rows,entries_count:envelope.rows.length}
+  };
+}
+__name(employeeEntryAggregateValidationBody,"employeeEntryAggregateValidationBody");
+function employeeEntryAggregateApplyDerived(envelope,validationResults=[]){
+  for(let index=0;index<envelope.rows.length;index++){
+    const result=validationResults[index]||{};
+    if(result.derived_arrears_payment?.server_fields)Object.assign(envelope.rows[index],result.derived_arrears_payment.server_fields);
+    if(result.exit_event_reference?.server_fields)Object.assign(envelope.rows[index],result.exit_event_reference.server_fields);
+    const row=envelope.rows[index];
+    if(employeeEntryUploadType(row)==="CO"&&row.left_with_arrears&&!cleanId(row.cloud_arrears_ref||row.arrears_ref||"")){
+      const generated=cleanId(`left-with-arrears-${envelope.session_id}-${envelope.identities[index]}`);
+      Object.assign(row,{cloud_arrears_ref:generated,arrears_ref:generated});
+    }
+  }
+}
+__name(employeeEntryAggregateApplyDerived,"employeeEntryAggregateApplyDerived");
+async function employeeEntryAggregateVerifyDerivedPersistence(env,user,envelope){
+  const errors=[];
+  const placeholders=envelope.identities.map(()=>"?").join(",");
+  const eventRows=await env.DB.prepare(`SELECT ref_id FROM entry_events WHERE corpid=? AND ref_id IN (${placeholders}) AND event_type='create'`)
+    .bind(user.corpid,...envelope.identities).all().catch(()=>({results:[]}));
+  const eventIds=new Set((eventRows?.results||[]).map(row=>cleanId(row.ref_id)));
+  if(envelope.identities.some(id=>!eventIds.has(id)))errors.push("ENTRY_EVENT_SET_INCOMPLETE");
+  const auditRows=await env.DB.prepare(`SELECT target FROM audit_logs WHERE corpid=? AND target IN (${placeholders}) AND action='employee.entry.create'`)
+    .bind(user.corpid,...envelope.identities).all().catch(()=>({results:[]}));
+  const auditIds=new Set((auditRows?.results||[]).map(row=>cleanId(row.target)));
+  if(envelope.identities.some(id=>!auditIds.has(id)))errors.push("AUDIT_SET_INCOMPLETE");
+
+  const depositExpected=envelope.rows.flatMap((row,index)=>{
+    const type=envelope.types[index];
+    if(type==="D"||type==="DR")return [{entry_id:envelope.identities[index],type}];
+    if(type==="CO"&&Number(row.deposit_deduction||0)>0)return [{entry_id:envelope.identities[index],type}];
+    return [];
+  });
+  if(depositExpected.length){
+    const depositIds=[...new Set(depositExpected.map(row=>row.entry_id))];
+    const depositPlaceholders=depositIds.map(()=>"?").join(",");
+    const depositRows=await env.DB.prepare(`SELECT entry_id,type FROM deposit_ledger WHERE corpid=? AND entry_id IN (${depositPlaceholders})`)
+      .bind(user.corpid,...depositIds).all().catch(()=>({results:[]}));
+    const depositSet=new Set((depositRows?.results||[]).map(row=>`${cleanId(row.entry_id)}|${cleanText(row.type,12).toUpperCase()}`));
+    if(depositExpected.some(row=>!depositSet.has(`${row.entry_id}|${row.type}`)))errors.push("DEPOSIT_LEDGER_SET_INCOMPLETE");
+  }
+
+  const shortRentIds=envelope.rows.flatMap((row,index)=>{
+    if(envelope.types[index]!=="R")return [];
+    const due=Number(row.period_due||row.due||row.expected_rent||0);
+    const paid=Number(row.paid||row.paid_amount||row.amount||0);
+    return due>paid+0.009?[envelope.identities[index]]:[];
+  });
+  if(shortRentIds.length){
+    const rentPlaceholders=shortRentIds.map(()=>"?").join(",");
+    const taskRows=await env.DB.prepare(`SELECT entry_id,original_entry_id FROM arrear_tasks WHERE corpid=? AND (entry_id IN (${rentPlaceholders}) OR original_entry_id IN (${rentPlaceholders}))`)
+      .bind(user.corpid,...shortRentIds,...shortRentIds).all().catch(()=>({results:[]}));
+    const taskIds=new Set((taskRows?.results||[]).flatMap(row=>[cleanId(row.entry_id),cleanId(row.original_entry_id)]).filter(Boolean));
+    if(shortRentIds.some(id=>!taskIds.has(id)))errors.push("RENT_ARREAR_TASK_SET_INCOMPLETE");
+  }
+
+  const arrearsRefs=envelope.rows.flatMap((row,index)=>{
+    if(envelope.types[index]==="AP")return [cleanId(row.linked_task_id||row.arrears_ref)];
+    if(envelope.types[index]==="CO"&&row.left_with_arrears)return [cleanId(row.cloud_arrears_ref||row.arrears_ref)];
+    return [];
+  }).filter(Boolean);
+  for(const arrearsRef of new Set(arrearsRefs)){
+    const gateway=await canonicalArrearsGateway(env,user,{arrears_ref:arrearsRef,limit:2000}).catch(()=>null);
+    const rows=[...(gateway?.open_items||[]),...(gateway?.closed_items||[]),...(gateway?.all_items||[])];
+    if(!rows.some(row=>[row.task_id,row.arrears_ref,row.id,row.source_ref].some(value=>cleanId(value)===arrearsRef))){
+      errors.push("CANONICAL_ARREARS_REFERENCE_MISSING");
+      break;
+    }
+  }
+
+  const stayExpected=envelope.rows.flatMap((_,index)=>
+    employeeEntryStayGenesisStartRequested(employeeEntryAggregateValidationBody(envelope,index),index)
+      ?[envelope.identities[index]]
+      :[]
+  );
+  if(stayExpected.length){
+    const stayPlaceholders=stayExpected.map(()=>"?").join(",");
+    const stayRows=await env.DB.prepare(`SELECT entry_id FROM stay_event_links WHERE corpid=? AND session_id=? AND entry_id IN (${stayPlaceholders})`)
+      .bind(user.corpid,envelope.session_id,...stayExpected).all().catch(()=>({results:[]}));
+    const stayIds=new Set((stayRows?.results||[]).map(row=>cleanId(row.entry_id)));
+    if(stayExpected.some(id=>!stayIds.has(id)))errors.push("STAY_GENESIS_SET_INCOMPLETE");
+  }
+  return {ok:errors.length===0,errors,event_count:eventIds.size,audit_count:auditIds.size};
+}
+__name(employeeEntryAggregateVerifyDerivedPersistence,"employeeEntryAggregateVerifyDerivedPersistence");
+async function handleEmployeeEntryAggregateWrite(request,env,user,body,requestContext){
+  const role=String(user?.role||"").trim().toLowerCase();
+  if(!["employee","staff"].includes(role)||!cleanText(user?.corpid||"",120))return employeeEntryAggregateWriteFailure("FORBIDDEN","Only an authenticated employee or staff member may upload an aggregate session.",403);
+  const envelope=employeeEntryAggregateEnvelope(body,user);
+  if(!envelope.ok)return employeeEntryAggregateWriteFailure(envelope.error_code,"Aggregate session contract rejected before write.",422,{event_index:envelope.event_index});
+  const existingSession=await env.DB.prepare("SELECT id, entries_count, entries_json, handover_status, voided_at FROM sessions WHERE id=? AND corpid=? LIMIT 1").bind(envelope.session_id,user.corpid).first().catch(()=>null);
+  if(existingSession){
+    const existingRows=extractEmployeeEntryAnchorsFromSession(existingSession);
+    const expectedSet=employeeEntryDuplicateSetFingerprint(envelope.keys);
+    const existingSet=employeeEntryDuplicateSetFingerprint(employeeEntryAggregateCanonicalSet(existingRows,user));
+    const placeholders=envelope.identities.map(()=>"?").join(",");
+    const existingTransactions=await env.DB.prepare(`SELECT id, session_id, type FROM transactions WHERE corpid=? AND id IN (${placeholders})`).bind(user.corpid,...envelope.identities).all().catch(()=>({results:[]}));
+    const transactionRows=Array.isArray(existingTransactions?.results)?existingTransactions.results:[];
+    const txById=new Map(transactionRows.map(row=>[cleanId(row.id),row]));
+    const exact=!String(existingSession.voided_at||"").trim()&&Number(existingSession.entries_count||0)===envelope.rows.length&&existingRows.length===envelope.rows.length&&existingSet===expectedSet&&transactionRows.length===envelope.rows.length&&envelope.identities.every((id,index)=>cleanId(txById.get(id)?.session_id)===envelope.session_id&&cleanText(txById.get(id)?.type,12).toUpperCase()===envelope.types[index]);
+    if(!exact)return employeeEntryAggregateWriteFailure("SESSION_IDEMPOTENCY_CONFLICT","Session ID already exists with different content.",409,{session_id:envelope.session_id});
+    return success({success:true,ok:true,aggregate_write:true,session_id:envelope.session_id,requested_entry_count:envelope.rows.length,persisted_entry_count:envelope.rows.length,canonical_anchor_count:existingRows.length,transaction_count:transactionRows.length,entry_results:envelope.identities.map((entry_id,event_index)=>({event_index,entry_id,success:true,ok:true,idempotent:true})),committed:true,idempotent:true,no_write:true,write_attempted:false});
+  }
+  const validationRequests=envelope.rows.map((row,index)=>employeeEntryAggregateValidationBody(envelope,index));
+  const preflight=await validateEmployeeEntryAggregatePreflight(env,user,{aggregate_preflight:true,validation_requests:validationRequests},{request_context:requestContext});
+  if(!preflight.ok||preflight.validation_result_count!==envelope.rows.length||preflight.failed_result_count!==0){
+    return employeeEntryAggregateWriteFailure(preflight.error_code||"AGGREGATE_PREFLIGHT_FAILED","All aggregate entries must validate before the first write.",422,{validation_results:preflight.validation_results||[],requested_entry_count:envelope.rows.length});
+  }
+  const idempotentCount=(preflight.validation_results||[]).filter(row=>row.idempotent===true).length;
+  if(idempotentCount)return employeeEntryAggregateWriteFailure("AGGREGATE_PARTIAL_IDEMPOTENCY_CONFLICT","Aggregate session cannot mix persisted and new entry identities.",409,{idempotent_entry_count:idempotentCount});
+  employeeEntryAggregateApplyDerived(envelope,preflight.validation_results);
+  const planner=createEmployeeEntryAtomicWritePlanner(env.DB);
+  const planningContext={
+    ...requestContext,
+    atomic_write_plan:true,
+    atomic_planned_deposit_deltas:new Map(),
+    atomic_planned_arrears_payments:new Map(),
+    atomic_planned_arrear_tasks:new Map()
+  };
+  const planningEnv={...env,DB:planner.database};
+  const entryResults=[];
+  for(let index=0;index<envelope.rows.length;index++){
+    const row=envelope.rows[index];
+    const type=envelope.types[index];
+    if(type==="AP"){
+      const taskId=cleanId(row.linked_task_id||row.arrears_ref);
+      const current=Number(planningContext.atomic_planned_arrears_payments.get(taskId)||0);
+      planningContext.atomic_planned_arrears_payments.set(taskId,current+Number(row.amount||row.payment_amount||0));
+    }
+    const eventBody=employeeEntryAggregateValidationBody(envelope,index);
+    let response;
+    try{
+      response=await handleEmployeeEntry(request,planningEnv,user,{body:eventBody,request_context:planningContext,prevalidated_result:preflight.validation_results[index],schema_prechecked:true,internal_atomic_plan:true});
+    }catch(error){
+      return employeeEntryAggregateWriteFailure(error?.message==="AGGREGATE_AUDIT_SCHEMA_UNAVAILABLE"?"AGGREGATE_AUDIT_SCHEMA_UNAVAILABLE":"AGGREGATE_WRITE_PLAN_EXCEPTION","Aggregate write planning failed before commit.",503,{event_index:index,failure_name:error?.name||"Error"});
+    }
+    let payload={};
+    try{payload=await response.clone().json()}catch{}
+    if(response.status<200||response.status>299||payload?.success!==true||payload?.ok===false){
+      return employeeEntryAggregateWriteFailure(payload?.error_code||payload?.error||"AGGREGATE_WRITE_PLAN_REJECTED","Aggregate write planning failed before commit.",Number(response.status||422),{event_index:index});
+    }
+    entryResults.push({event_index:index,entry_id:envelope.identities[index],event_type:entryAnchorEventType(type),success:true,ok:true,idempotent:false});
+  }
+  if(!planner.statements.length)return employeeEntryAggregateWriteFailure("AGGREGATE_WRITE_PLAN_EMPTY","Aggregate write plan contained no durable statements.",500);
+  const batchStarted=Date.now();
+  try{
+    await commitEmployeeEntryAtomicWritePlan(env.DB,planner.statements);
+    planningContext.d1_batch_count=Number(planningContext.d1_batch_count||0)+1;
+    planningContext.d1_batch_duration_ms=Number(planningContext.d1_batch_duration_ms||0)+Math.max(0,Date.now()-batchStarted);
+  }catch(error){
+    return employeeEntryAggregateWriteFailure("AGGREGATE_ATOMIC_COMMIT_FAILED","D1 rejected the atomic aggregate batch; the transaction was rolled back.",500,{failure_name:error?.name||"Error"});
+  }
+  const persistedSession=await env.DB.prepare("SELECT id, entries_count, entries_json, handover_status, voided_at FROM sessions WHERE id=? AND corpid=? LIMIT 1").bind(envelope.session_id,user.corpid).first().catch(()=>null);
+  const placeholders=envelope.identities.map(()=>"?").join(",");
+  const persistedTransactions=await env.DB.prepare(`SELECT id, session_id, type FROM transactions WHERE corpid=? AND id IN (${placeholders})`).bind(user.corpid,...envelope.identities).all().catch(()=>({results:[]}));
+  const persistedRows=extractEmployeeEntryAnchorsFromSession(persistedSession||{});
+  const txRows=Array.isArray(persistedTransactions?.results)?persistedTransactions.results:[];
+  const txById=new Map(txRows.map(row=>[cleanId(row.id),row]));
+  const persistedSet=employeeEntryDuplicateSetFingerprint(employeeEntryAggregateCanonicalSet(persistedRows,user));
+  const expectedSet=employeeEntryDuplicateSetFingerprint(envelope.keys);
+  const derivedVerification=await employeeEntryAggregateVerifyDerivedPersistence(env,user,envelope);
+  const persistenceOk=persistedSession&&!String(persistedSession.voided_at||"").trim()&&Number(persistedSession.entries_count||0)===envelope.rows.length&&persistedRows.length===envelope.rows.length&&persistedSet===expectedSet&&txRows.length===envelope.rows.length&&envelope.identities.every((id,index)=>cleanId(txById.get(id)?.session_id)===envelope.session_id&&cleanText(txById.get(id)?.type,12).toUpperCase()===envelope.types[index])&&derivedVerification.ok;
+  if(!persistenceOk)return json({success:false,ok:false,aggregate_write:true,committed:true,no_write:false,write_attempted:true,error_code:"AGGREGATE_PERSISTENCE_VERIFICATION_FAILED",session_id:envelope.session_id,requested_entry_count:envelope.rows.length,persisted_entry_count:persistedRows.length,transaction_count:txRows.length,verification_errors:derivedVerification.errors,production_cutover:"PRODUCTION_NO_GO"},500);
+  return success({success:true,ok:true,aggregate_write:true,session_id:envelope.session_id,requested_entry_count:envelope.rows.length,persisted_entry_count:persistedRows.length,canonical_anchor_count:persistedRows.length,transaction_count:txRows.length,entry_results:entryResults,committed:true,idempotent:false,no_write:false,write_attempted:true});
+}
+__name(handleEmployeeEntryAggregateWrite,"handleEmployeeEntryAggregateWrite");
 async function handleEmployeeEntry(request,env,user,options={}){
   const timingEnabled=request.headers.get("X-Employee-Entry-Timing")==="1";
   const request_context=options.request_context||ttlockRequestContext(request,env,user,"employee_entry_upload",TTLOCK_STRICT_CACHE_MAX_AGE_MS);
   const timing={started_at:Date.now(),d1_write_ms:0,total_ms:0};
   let body=options.body;
   if(!body)try{body=await request.json();}catch{return badRequest("invalid_json");}
+  if(body?.aggregate_write===true&&options.internal_atomic_plan!==true)return handleEmployeeEntryAggregateWrite(request,env,user,body,request_context);
   const qaWriteGate=await qaAcceptanceEmployeeFormalWriteGate(env,user,body||{},options);
   if(qaWriteGate)return qaWriteGate;
   if(["DR","CO"].includes(employeeEntryUploadType(employeeEntryValidationEntryFromBody(body||{},body?.event_index??0))))request_context.allow_live_fetch=false;
@@ -4043,7 +4369,7 @@ async function handleEmployeeEntry(request,env,user,options={}){
   if(existingTx){
     let arrearTask=null;
     if(existingTx.type==="AP"&&existingTx.linked_task_id&&!String(existingTx.linked_task_id).startsWith("legacy-manual-")){
-      arrearTask=await empReconcileArrearTask(env,user,existingTx.linked_task_id,authOperatorId,now);
+      arrearTask=await empReconcileArrearTask(env,user,existingTx.linked_task_id,authOperatorId,now,"",request_context);
     }
     return success({
       success:true,
@@ -4135,7 +4461,7 @@ async function handleEmployeeEntry(request,env,user,options={}){
       due=amount;
       periodDue=amount;
     }else{
-      apTaskForPayment=await empEnsureOpenArrearTaskForPayment(env,user,taskId,authOperatorId,now,room);
+      apTaskForPayment=await empEnsureOpenArrearTaskForPayment(env,user,taskId,authOperatorId,now,room,request_context);
       if(!apTaskForPayment)return badRequest("linked_task_not_open");
       const remain=Math.max(0,Number(apTaskForPayment.arrear_amount||0)-Number(apTaskForPayment.actual_received||0));
       if(amount<=0||amount>remain+0.01)return badRequest("arrear_payment_amount_invalid");
@@ -4227,13 +4553,13 @@ async function handleEmployeeEntry(request,env,user,options={}){
   if(request_context.existing_transaction_ids_checked instanceof Set)request_context.existing_transaction_ids_checked.add(entryId);
   let depositLedger=null;
   if(tenantCardId&&type==="D"){
-    depositLedger=await empDepositMove(env,user,{tenant_card_id:tenantCardId,tenant_name:tenantName,bed:room,entry_id:entryId,type,amount,delta:amount,note:cleanText(entry.note,240),operator_id:authOperatorId,ts:now});
+    depositLedger=await empDepositMove(env,user,{tenant_card_id:tenantCardId,tenant_name:tenantName,bed:room,entry_id:entryId,type,amount,delta:amount,note:cleanText(entry.note,240),operator_id:authOperatorId,ts:now},request_context);
   }else if(tenantCardId&&type==="DR"){
-    if(seedLegacyDeposit)await empDepositMove(env,user,{tenant_card_id:tenantCardId,tenant_name:tenantName,bed:room,entry_id:entryId,type:"LEGACY_SEED",amount:depositBalance,delta:depositBalance,note:"legacy deposit seed from lock card",operator_id:authOperatorId,ts:now});
-    depositLedger=await empDepositMove(env,user,{tenant_card_id:tenantCardId,tenant_name:tenantName,bed:room,entry_id:entryId,type,amount,delta:-amount,note:cleanText(entry.note,240),operator_id:authOperatorId,ts:now});
+    if(seedLegacyDeposit)await empDepositMove(env,user,{tenant_card_id:tenantCardId,tenant_name:tenantName,bed:room,entry_id:entryId,type:"LEGACY_SEED",amount:depositBalance,delta:depositBalance,note:"legacy deposit seed from lock card",operator_id:authOperatorId,ts:now},request_context);
+    depositLedger=await empDepositMove(env,user,{tenant_card_id:tenantCardId,tenant_name:tenantName,bed:room,entry_id:entryId,type,amount,delta:-amount,note:cleanText(entry.note,240),operator_id:authOperatorId,ts:now},request_context);
   }else if(tenantCardId&&type==="CO"&&depositBalance>0&&depositDeduction>0){
-    if(seedLegacyDeposit)await empDepositMove(env,user,{tenant_card_id:tenantCardId,tenant_name:tenantName,bed:room,entry_id:entryId,type:"LEGACY_SEED",amount:depositBalance,delta:depositBalance,note:"legacy deposit seed from lock card",operator_id:authOperatorId,ts:now});
-    depositLedger=await empDepositMove(env,user,{tenant_card_id:tenantCardId,tenant_name:tenantName,bed:room,entry_id:entryId,type,amount:depositDeduction,delta:-depositDeduction,note:`checkout deduction ${depositDeduction}`,operator_id:authOperatorId,ts:now});
+    if(seedLegacyDeposit)await empDepositMove(env,user,{tenant_card_id:tenantCardId,tenant_name:tenantName,bed:room,entry_id:entryId,type:"LEGACY_SEED",amount:depositBalance,delta:depositBalance,note:"legacy deposit seed from lock card",operator_id:authOperatorId,ts:now},request_context);
+    depositLedger=await empDepositMove(env,user,{tenant_card_id:tenantCardId,tenant_name:tenantName,bed:room,entry_id:entryId,type,amount:depositDeduction,delta:-depositDeduction,note:`checkout deduction ${depositDeduction}`,operator_id:authOperatorId,ts:now},request_context);
   }
   let arrearTask=null;
   if(type==="R"&&periodStart&&periodEnd&&periodDue>0){
@@ -4274,7 +4600,7 @@ async function handleEmployeeEntry(request,env,user,options={}){
   }
   if(type==="AP"){
     const taskId=cleanId(entry.linked_task_id);
-    if(taskId&&apTaskForPayment&&!String(taskId).startsWith("legacy-manual-"))arrearTask=await empReconcileArrearTask(env,user,taskId,authOperatorId,now,room);
+    if(taskId&&apTaskForPayment&&!String(taskId).startsWith("legacy-manual-"))arrearTask=await empReconcileArrearTask(env,user,taskId,authOperatorId,now,room,request_context);
   }
   let leftWithArrearsTask=null;
   if(type==="CO"&&entry.left_with_arrears){
@@ -4298,7 +4624,8 @@ async function handleEmployeeEntry(request,env,user,options={}){
     arrear_handling:arrearHandling,arrear_promise_date:arrearPromiseDate,arrear_reason_detail:arrearReasonDetail,operator_name:operatorName
   };
   await empEvent(env,user,{ref_id:entryId,ref_type:"transaction",event_type:"create",field_name:"*",new_value:JSON.stringify(finalEntryForAudit),operator_id:authOperatorId,ts:now},request_context);
-  await audit(env,user,"employee.entry.create",entryId,{room,amount},request_context).catch(()=>{});
+  if(request_context.atomic_write_plan===true)await audit(env,user,"employee.entry.create",entryId,{room,amount},request_context);
+  else await audit(env,user,"employee.entry.create",entryId,{room,amount},request_context).catch(()=>{});
   let stayRegistryResult=null;
   if(preparedStayGenesis){
     try{

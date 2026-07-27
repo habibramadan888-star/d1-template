@@ -43,7 +43,7 @@ test("only arrears payment reconciliation can settle a cloud arrears task", asyn
   assert.notEqual(apStart, -1, "arrears payment reconciliation block should exist");
   const apBlock = source.slice(apStart, source.indexOf("let leftWithArrearsTask", apStart));
 
-  assert.match(apBlock, /empReconcileArrearTask\(env,user,taskId,authOperatorId,now(?:,room)?\)/);
+  assert.match(apBlock, /empReconcileArrearTask\(env,user,taskId,authOperatorId,now(?:,room)?(?:,request_context)?\)/);
   assert.match(source, /WHERE corpid=\? AND linked_task_id=\?[^`]+COALESCE\(type,''\)='AP'/s);
   assert.match(source, /closed\?"PAID":""/);
 });

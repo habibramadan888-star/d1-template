@@ -272,7 +272,7 @@ export function createEmployeeDraftScope(
   if (
     !isPlainObject(session)
     || !isPlainObject(session.user)
-    || session.user.role !== "STAFF"
+    || !["EMPLOYEE", "STAFF"].includes(String(session.user.role))
     || !isNonEmptyString(session.user.corpid)
     || !isNonEmptyString(session.user.userid)
   ) {
