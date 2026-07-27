@@ -154,6 +154,7 @@ test("Deposit firewall passes canonical payload while documenting legacy identit
   const depositOut = allowed.match(/DR:\[[^\]]+\]/s)?.[0] || "";
   const gateway = functionBlock(worker, "canonicalDepositGateway");
   const handler = functionBlock(worker, "handleEmployeeDeposit");
+  const requestHandler = functionBlock(worker, "handleRequest");
 
   for (const block of [depositIn, depositOut]) {
     assert.doesNotMatch(block, /tenant_card_id|card_id|old_ttlock_ref/);
@@ -167,7 +168,22 @@ test("Deposit firewall passes canonical payload while documenting legacy identit
   }
   assert.match(gateway, /deposit_source:"access_snapshot_remark_D"/);
   assert.match(gateway, /cloud_deposit_events_role:"audit_supporting_only"/);
-  assert.match(handler, /canonicalDepositGateway\(env,user,\{bed,limit:1000\}\)/);
+  assert.match(
+    handler,
+    /const requestContext=ttlockRequestContext\(request,env,user,"employee_deposit",TTLOCK_READ_CACHE_MAX_AGE_MS\)/,
+  );
+  assert.match(
+    handler,
+    /canonicalDepositGateway\(env,user,\{bed,limit:1000,request_context:requestContext\}\)/,
+  );
+  assert.ok(
+    requestHandler.indexOf("const auth = await requireAuth(request, env)") <
+      requestHandler.indexOf("handleEmployeeApi(request, env, user)"),
+  );
+  assert.doesNotMatch(
+    handler,
+    /request_context\s*:\s*(?:body|url|request\.headers|localStorage|referer|origin|whatsApp|provider)/i,
+  );
   assert.match(handler, /tenant_card_id_identity_allowed:false/);
   assert.doesNotMatch(handler, /url\.searchParams\.get\("cid"\)|empDepositBalance/);
 });

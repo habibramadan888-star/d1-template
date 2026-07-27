@@ -78,6 +78,7 @@ async function loadWorkerRentHarness() {
 test("normal rent add-to-session payload is valid for dry-run upload", async () => {
   const harness = await loadEmployeeRentHarness();
   const rent = harness.normalizeEntryAnchor({
+    id: "rent-143-entry",
     type: "R",
     room: "143",
     amount: 700,
@@ -100,7 +101,10 @@ test("normal rent add-to-session payload is valid for dry-run upload", async () 
   const uploadRows = harness.prepareRepeatableUploadRows([rent], "S-rent-143", "upload-rent-143");
   assert.equal(harness.validateUploadAnchorBatch(uploadRows).ok, true);
   assert.equal(uploadRows[0].session_id, "S-rent-143");
-  assert.match(uploadRows[0].idempotency_key, /^upload-rent-143-ent-test-01$/);
+  assert.equal(
+    uploadRows[0].idempotency_key,
+    "employee-entry-S-rent-143-rent-143-entry",
+  );
 });
 
 test("short paid rent preserves arrears anchor while remaining upload-valid", async () => {
@@ -183,7 +187,8 @@ test("rent whatsapp export remains available after synced upload state", async (
     }
   ]);
 
-  assert.match(text, /^Statement/m);
+  assert.match(text, /^HOMELINK LEDGER/m);
+  assert.match(text, /^Cash Details$/m);
   assert.match(text, /\[143\] paid 700 cash/);
   assert.doesNotMatch(text, /short_paid/);
   assert.doesNotMatch(text, /Upload validation failed/);

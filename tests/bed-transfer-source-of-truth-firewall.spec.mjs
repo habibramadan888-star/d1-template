@@ -128,7 +128,22 @@ test("Worker rejects before D1 and preserves existing Bed Transfer validation an
   assert.match(validator, /validateEmployeeBedTransferPhase1\(env,user,entry,normalized,opts\)/);
   assert.ok(writer.indexOf("bedTransferForbiddenIdentityFailure") < writer.indexOf('empTableExists(env,"sessions")'));
   assert.match(writer, /\["TF","TFF"\]\.includes\(writeGateType\)&&!bedTransferWriteApproved\(env\)/);
-  assert.match(validateRoute, /if\(!result\.ok\)return json\(\{success:false,\.\.\.result\},422\)/);
+  assert.match(
+    validateRoute,
+    /if\(!result\.ok\)return json\(\{success:false,\.\.\.result\},Number\(result\.http_status\|\|422\)\)/,
+  );
+  assert.ok(
+    validateRoute.indexOf("if(!result.ok)return json") >
+      validateRoute.indexOf("validateEmployeeEntryUploadPayload"),
+  );
+  assert.ok(
+    validateRoute.indexOf("if(!result.ok)return json") <
+      validateRoute.indexOf("return success(result)"),
+  );
+  assert.doesNotMatch(
+    validateRoute,
+    /Number\((?:body|request|request\.headers|url|localStorage|state)\??\.?[^)]*http_status/i,
+  );
   assert.match(normalizer, /\["TF","TFF"\]\.includes\(type\)\?sanitizeBedTransferIdentityFields\(entry\):entry/);
 });
 
