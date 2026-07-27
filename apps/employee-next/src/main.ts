@@ -9,8 +9,9 @@ import type {
   EmployeeApiResponse,
   EmployeeApiTransport,
 } from "./core/api-client";
-import type {
-  EmployeeAuthSession,
+import {
+  isEmployeeAuthSession,
+  type EmployeeAuthSession,
 } from "./core/auth";
 import type {
   EmployeeSubmitEntryContext,
@@ -66,6 +67,19 @@ export interface EmployeeNextSidecarAdapters {
     context: EmployeeSubmitEntryContext<object>,
   ) => EmployeeApiRequest;
 }
+
+export type EmployeeExpenseUploadCanaryState =
+  | Readonly<{ status: "IDLE" }>
+  | Readonly<{ status: "SUBMITTING" }>
+  | Readonly<{
+    status: "SYNCED";
+    entryId: string;
+    sessionId: string;
+  }>
+  | Readonly<{
+    status: "ERROR";
+    errorCode: "EXPENSE_UPLOAD_FAILED";
+  }>;
 
 type JsonRecord = Readonly<Record<string, EmployeeApiJsonValue>>;
 
@@ -819,6 +833,47 @@ export function createEmployeeNextSidecarAdapters(
   });
 }
 
+function expectedExpenseUploadReceipt(
+  request: EmployeeApiRequest,
+): Readonly<{ entryId: string; sessionId: string }> | undefined {
+  if (
+    request.method !== "POST"
+    || !isPlainRecord(request.body)
+    || typeof request.body.entry_identity !== "string"
+    || !isPlainRecord(request.body.session)
+  ) {
+    return undefined;
+  }
+  const entryId = request.body.entry_identity.trim();
+  const sessionIdValue = request.body.session.session_id;
+  const sessionId = typeof sessionIdValue === "string"
+    ? sessionIdValue.trim()
+    : "";
+  return entryId.length > 0 && sessionId.length > 0
+    ? Object.freeze({ entryId, sessionId })
+    : undefined;
+}
+
+function explicitExpenseUploadReceipt(
+  response: EmployeeApiResponse,
+  expected: Readonly<{ entryId: string; sessionId: string }>,
+): Readonly<{ entryId: string; sessionId: string }> | undefined {
+  if (
+    response.status < 200
+    || response.status > 299
+    || !isPlainRecord(response.body)
+    || response.body.success !== true
+    || response.body.ok === false
+    || response.body.error !== undefined
+    || response.body.error_code !== undefined
+    || response.body.entry_id !== expected.entryId
+    || response.body.session_id !== expected.sessionId
+  ) {
+    return undefined;
+  }
+  return expected;
+}
+
 function appendText(
   parent: HTMLElement,
   tagName: "h1" | "p" | "section",
@@ -857,6 +912,11 @@ function createLocalRenderPort(
   draftViewRef?: () => EmployeeNextSessionDraftView,
   entryUiRef?: () => EmployeeEntryUiController | undefined,
   removeLocalDraft?: (entry: EmployeeNextSessionDraftEntry) => Promise<void>,
+  expenseUploadRef?: () => Readonly<{
+    enabled: boolean;
+    state: EmployeeExpenseUploadCanaryState;
+    upload: () => Promise<boolean>;
+  }>,
 ) {
   return Object.freeze({
     render(view: EmployeeNextRouteView): void {
@@ -947,6 +1007,25 @@ function createLocalRenderPort(
           }
         }
       }
+      const expenseUpload = expenseUploadRef?.();
+      if (expenseUpload !== undefined) {
+        appendText(
+          root,
+          "p",
+          `Employee Sync State: ${expenseUpload.state.status}`,
+        );
+        if (expenseUpload.enabled) {
+          const upload = document.createElement("button");
+          upload.type = "button";
+          upload.textContent = "Upload Session";
+          upload.dataset.action = "upload-expense-session";
+          upload.disabled = expenseUpload.state.status === "SUBMITTING";
+          upload.addEventListener("click", () => {
+            void expenseUpload.upload();
+          });
+          root.append(upload);
+        }
+      }
 
       const eventSection = appendText(root, "section", "");
       eventSection.setAttribute("aria-label", "Seven event choices");
@@ -997,6 +1076,9 @@ export interface EmployeeNextSidecarRuntimeOptions {
   readonly entryContexts?: EmployeeEntryContextPort;
   readonly createId?: () => string;
   readonly confirmLocalDraftRemoval?: (
+    entry: EmployeeNextSessionDraftEntry,
+  ) => boolean | Promise<boolean>;
+  readonly confirmExpenseUpload?: (
     entry: EmployeeNextSessionDraftEntry,
   ) => boolean | Promise<boolean>;
 }
@@ -1052,6 +1134,8 @@ export function startEmployeeNextSidecarRoute(
     entry: EmployeeNextSessionDraftEntry;
   }>) => Promise<boolean>;
   sessionRestore: Promise<boolean>;
+  getExpenseUploadState: () => EmployeeExpenseUploadCanaryState;
+  uploadExpense: () => Promise<boolean>;
 }> {
   if (
     typeof adapters !== "object"
@@ -1068,11 +1152,95 @@ export function startEmployeeNextSidecarRoute(
   );
   let controller: EmployeeNextRouteController | undefined;
   let entryUi: EmployeeEntryUiController | undefined;
+  let authenticatedSession: EmployeeAuthSession | undefined;
+  let expenseUploadState: EmployeeExpenseUploadCanaryState =
+    Object.freeze({ status: "IDLE" });
+  let expenseUploadInFlight = false;
   const removingEntryIds = new Set<string>();
   const confirmLocalDraftRemoval = options.confirmLocalDraftRemoval
     ?? (() => globalThis.confirm(
       "Remove this unsent local draft? This cannot affect cloud records.",
     ));
+  const confirmExpenseUpload = options.confirmExpenseUpload
+    ?? (() => globalThis.confirm(
+      "Upload this one real Expense to Homelink now? This creates a real business record.",
+    ));
+  function expenseUploadEntry(): EmployeeNextSessionDraftEntry | undefined {
+    const session = drafts.getSession();
+    return (
+      isEmployeeAuthSession(authenticatedSession)
+      && authenticatedSession.user.role === "STAFF"
+      && authenticatedSession.user.corpid === "homelink"
+      && drafts.getView().status === "CURRENT_SESSION_READY"
+      && session?.entries.length === 1
+      && session.entries[0]?.event_type === "expense"
+      && expenseUploadState.status !== "SYNCED"
+    )
+      ? session.entries[0]
+      : undefined;
+  }
+  async function uploadExpense(): Promise<boolean> {
+    if (expenseUploadInFlight) {
+      return false;
+    }
+    const initialEntry = expenseUploadEntry();
+    if (initialEntry === undefined) {
+      return false;
+    }
+    let confirmed = false;
+    try {
+      confirmed = await confirmExpenseUpload(initialEntry);
+    } catch {
+      confirmed = false;
+    }
+    const entry = expenseUploadEntry();
+    if (
+      !confirmed
+      || entry === undefined
+      || entry.entry_id !== initialEntry.entry_id
+      || !isEmployeeAuthSession(authenticatedSession)
+    ) {
+      return false;
+    }
+    expenseUploadInFlight = true;
+    expenseUploadState = Object.freeze({ status: "SUBMITTING" });
+    await controller?.render();
+    try {
+      const request = adapters.buildApiRequest(Object.freeze({
+        session: authenticatedSession,
+        eventId: "expense",
+        submission: entry.payload as object,
+      }));
+      const expected = expectedExpenseUploadReceipt(request);
+      if (
+        expected === undefined
+        || request.method !== "POST"
+        || request.path !== adapters.submitPath
+      ) {
+        throw new Error("EXPENSE_UPLOAD_REQUEST_REJECTED");
+      }
+      const response = await adapters.transport.request(request);
+      const receipt = explicitExpenseUploadReceipt(response, expected);
+      if (receipt === undefined) {
+        throw new Error("EXPENSE_UPLOAD_RESPONSE_REJECTED");
+      }
+      expenseUploadState = Object.freeze({
+        status: "SYNCED",
+        entryId: receipt.entryId,
+        sessionId: receipt.sessionId,
+      });
+      return true;
+    } catch {
+      expenseUploadState = Object.freeze({
+        status: "ERROR",
+        errorCode: "EXPENSE_UPLOAD_FAILED",
+      });
+      return false;
+    } finally {
+      expenseUploadInFlight = false;
+      await controller?.render();
+    }
+  }
   controller = createEmployeeNextRouteController({
     transport: adapters.transport,
     render: createLocalRenderPort(
@@ -1094,6 +1262,11 @@ export function startEmployeeNextSidecarRoute(
           await controller?.render();
         }
       },
+      () => Object.freeze({
+        enabled: expenseUploadEntry() !== undefined,
+        state: expenseUploadState,
+        upload: uploadExpense,
+      }),
     ),
     buildApiRequest: adapters.buildApiRequest,
     allowedSubmitPath: adapters.submitPath,
@@ -1119,10 +1292,14 @@ export function startEmployeeNextSidecarRoute(
       const draftRestore = drafts.restore(session);
       await controller?.render();
       const restored = await draftRestore;
+      authenticatedSession = result?.ok === true && restored.ok
+        ? session
+        : undefined;
       await controller?.render();
       return result?.ok === true && restored.ok;
     })
     .catch(async () => {
+      authenticatedSession = undefined;
       await drafts.restore(undefined);
       await controller?.render();
       return false;
@@ -1132,6 +1309,10 @@ export function startEmployeeNextSidecarRoute(
     controller,
     drafts,
     sessionRestore,
+    getExpenseUploadState(): EmployeeExpenseUploadCanaryState {
+      return expenseUploadState;
+    },
+    uploadExpense,
     async addToSession(input): Promise<boolean> {
       const result = await drafts.addToSession(input);
       await controller?.render();
