@@ -42,6 +42,7 @@ const runtime = await loadRuntime(`
   export {
     buildEmployeeNextSidecarRequest,
     createEmployeeNextSidecarAdapters,
+    mapEmployeeNextBedTransferCapability,
     mapEmployeeNextServerSession,
   } from "./apps/employee-next/src/main.ts";
   export {
@@ -58,6 +59,7 @@ const session = Object.freeze({
 });
 const sessionPath = `/${["api", "me"].join("/")}`;
 const submitPath = `/${["api", "employee", "entry"].join("/")}`;
+const capabilitiesPath = `/${["api", "capabilities"].join("/")}`;
 
 function validDrafts() {
   return {
@@ -232,8 +234,85 @@ function adapterOptions(request) {
     requestPort: { request },
     sessionPath,
     submitPath,
+    capabilitiesPath,
   };
 }
+
+test("production capability decoder accepts only the exact server-controlled write contract", () => {
+  const enabled = runtime.mapEmployeeNextBedTransferCapability({
+    code: 0,
+    success: true,
+    data: {
+      bed_transfer_validate_enabled: true,
+      bed_transfer_write_enabled: true,
+      canonical_write_path: submitPath,
+      production_cutover: "PRODUCTION_NO_GO",
+    },
+  });
+  assert.deepEqual(enabled, {
+    validateEnabled: true,
+    writeEnabled: true,
+    canonicalWritePath: submitPath,
+  });
+  for (const body of [
+    { code: 0, success: true, data: {} },
+    { code: 0, success: true, data: {
+      bed_transfer_validate_enabled: true,
+      bed_transfer_write_enabled: "true",
+      canonical_write_path: submitPath,
+    } },
+    { code: 1001, success: false, data: {
+      bed_transfer_validate_enabled: true,
+      bed_transfer_write_enabled: true,
+      canonical_write_path: submitPath,
+    } },
+    { code: 40101, success: false, data: {
+      bed_transfer_validate_enabled: true,
+      bed_transfer_write_enabled: true,
+      canonical_write_path: submitPath,
+    } },
+  ]) {
+    assert.equal(runtime.mapEmployeeNextBedTransferCapability(body), undefined);
+  }
+});
+
+test("capability adapter refetches after a pre-auth 401 and never persists an override", async () => {
+  const calls = [];
+  const responses = [
+    response(401, { code: 1001, success: false }),
+    response(200, {
+      code: 0,
+      success: true,
+      data: {
+        bed_transfer_validate_enabled: true,
+        bed_transfer_write_enabled: true,
+        canonical_write_path: submitPath,
+        production_cutover: "PRODUCTION_NO_GO",
+      },
+    }),
+  ];
+  const adapters = runtime.createEmployeeNextSidecarAdapters(
+    adapterOptions(async (path, init) => {
+      calls.push({ path, init });
+      return responses.shift();
+    }),
+  );
+  assert.deepEqual(await adapters.restoreBedTransferCapability(), {
+    validateEnabled: false,
+    writeEnabled: false,
+    canonicalWritePath: "",
+  });
+  assert.deepEqual(await adapters.restoreBedTransferCapability(), {
+    validateEnabled: true,
+    writeEnabled: true,
+    canonicalWritePath: submitPath,
+  });
+  assert.deepEqual(calls.map((call) => call.path), [
+    capabilitiesPath,
+    capabilitiesPath,
+  ]);
+  assert.ok(calls.every((call) => call.init.method === "GET"));
+});
 
 test("production session restore maps only explicit employee and staff roles", async () => {
   for (const [serverRole, localRole] of [

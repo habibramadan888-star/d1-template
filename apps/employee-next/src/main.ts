@@ -58,12 +58,20 @@ export interface EmployeeNextSidecarAdapterOptions {
   readonly requestPort: EmployeeNextBrowserRequestPort;
   readonly sessionPath: string;
   readonly submitPath: string;
+  readonly capabilitiesPath?: string;
+}
+
+export interface EmployeeBedTransferCapability {
+  readonly validateEnabled: boolean;
+  readonly writeEnabled: boolean;
+  readonly canonicalWritePath: string;
 }
 
 export interface EmployeeNextSidecarAdapters {
   readonly transport: EmployeeApiTransport;
   readonly submitPath: string;
   readonly restoreSession: () => Promise<EmployeeAuthSession>;
+  readonly restoreBedTransferCapability: () => Promise<EmployeeBedTransferCapability>;
   readonly buildApiRequest: (
     context: EmployeeSubmitEntryContext<object>,
   ) => EmployeeApiRequest;
@@ -153,6 +161,36 @@ function apiData(value: unknown): Readonly<Record<string, unknown>> | undefined 
   }
   const data = value.data;
   return isPlainRecord(data) ? data : undefined;
+}
+
+const disabledBedTransferCapability: EmployeeBedTransferCapability =
+  Object.freeze({
+    validateEnabled: false,
+    writeEnabled: false,
+    canonicalWritePath: "",
+  });
+
+export function mapEmployeeNextBedTransferCapability(
+  value: unknown,
+): EmployeeBedTransferCapability | undefined {
+  const data = apiData(value);
+  if (
+    data === undefined
+    || typeof data.bed_transfer_validate_enabled !== "boolean"
+    || typeof data.bed_transfer_write_enabled !== "boolean"
+    || typeof data.canonical_write_path !== "string"
+  ) {
+    return undefined;
+  }
+  const canonicalWritePath = data.canonical_write_path.trim();
+  if (!safePath(canonicalWritePath)) {
+    return undefined;
+  }
+  return Object.freeze({
+    validateEnabled: data.bed_transfer_validate_enabled,
+    writeEnabled: data.bed_transfer_write_enabled,
+    canonicalWritePath,
+  });
 }
 
 function normalizedServerId(
@@ -740,12 +778,25 @@ export function createEmployeeNextSidecarAdapters(
     || !safePath(options.sessionPath)
     || !safePath(options.submitPath)
     || options.sessionPath === options.submitPath
+    || (
+      options.capabilitiesPath !== undefined
+      && !safePath(options.capabilitiesPath)
+    )
   ) {
     throw new Error("SIDECAR_ADAPTER_INVALID_OPTIONS");
   }
   const requestPort = options.requestPort;
   const sessionPath = options.sessionPath;
   const submitPath = options.submitPath;
+  const capabilitiesPath = options.capabilitiesPath
+    ?? sessionPath.replace(/\/me$/u, "/capabilities");
+  if (
+    !safePath(capabilitiesPath)
+    || capabilitiesPath === sessionPath
+    || capabilitiesPath === submitPath
+  ) {
+    throw new Error("SIDECAR_ADAPTER_INVALID_OPTIONS");
+  }
   const transport = Object.freeze({
     async request(request: EmployeeApiRequest): Promise<EmployeeApiResponse> {
       if (
@@ -826,6 +877,25 @@ export function createEmployeeNextSidecarAdapters(
         throw new Error("SIDECAR_SESSION_RESTORE_FAILED");
       }
       return session;
+    },
+    async restoreBedTransferCapability(): Promise<EmployeeBedTransferCapability> {
+      try {
+        const response = await requestPort.request(
+          capabilitiesPath,
+          Object.freeze({
+            method: "GET",
+            credentials: "same-origin",
+            headers: Object.freeze({ Accept: "application/json" }),
+          }),
+        );
+        if (!responsePort(response) || response.status !== 200) {
+          return disabledBedTransferCapability;
+        }
+        return mapEmployeeNextBedTransferCapability(await response.json())
+          ?? disabledBedTransferCapability;
+      } catch {
+        return disabledBedTransferCapability;
+      }
     },
     buildApiRequest(
       context: EmployeeSubmitEntryContext<object>,
@@ -1002,6 +1072,7 @@ function createLocalRenderPort(
     state: EmployeeExpenseUploadCanaryState;
     upload: () => Promise<boolean>;
   }>,
+  bedTransferWriteEnabledRef?: () => boolean,
 ) {
   return Object.freeze({
     render(view: EmployeeNextRouteView): void {
@@ -1134,8 +1205,10 @@ function createLocalRenderPort(
       entryUiRef?.()?.mount(entrySection, {
         authenticatedStaff: (
           view.shell.auth.status === "AUTHENTICATED"
-          && view.shell.auth.role === "STAFF"
+          && ["EMPLOYEE", "STAFF"].includes(view.shell.auth.role ?? "")
         ),
+        bedTransferFormalWriteEnabled:
+          bedTransferWriteEnabledRef?.() === true,
       });
     },
   });
@@ -1243,6 +1316,7 @@ export function startEmployeeNextSidecarRoute(
   let controller: EmployeeNextRouteController | undefined;
   let entryUi: EmployeeEntryUiController | undefined;
   let authenticatedSession: EmployeeAuthSession | undefined;
+  let bedTransferCapability = disabledBedTransferCapability;
   let sessionUploadState: EmployeeSessionUploadState =
     Object.freeze({ status: "IDLE" });
   let sessionUploadInFlight = false;
@@ -1267,7 +1341,16 @@ export function startEmployeeNextSidecarRoute(
       && drafts.getView().status === "CURRENT_SESSION_READY"
       && session !== undefined
       && session.entries.length > 0
-      && !session.entries.some((entry) => entry.event_type === "bed-transfer")
+      && (
+        !session.entries.some((entry) => entry.event_type === "bed-transfer")
+        || (
+          session.entries.length === 1
+          && session.entries[0]?.event_type === "bed-transfer"
+          && bedTransferCapability.validateEnabled
+          && bedTransferCapability.writeEnabled
+          && bedTransferCapability.canonicalWritePath === adapters.submitPath
+        )
+      )
       && sessionUploadState.status !== "SYNCED"
     )
       ? session
@@ -1304,15 +1387,30 @@ export function startEmployeeNextSidecarRoute(
     sessionUploadState = Object.freeze({ status: "SUBMITTING" });
     await controller?.render();
     try {
-      const request = aggregateSessionRequest(
-        session,
-        authenticatedSession,
-        adapters.buildApiRequest,
-        adapters.submitPath,
+      const bedTransferOnly = (
+        session.entries.length === 1
+        && session.entries[0]?.event_type === "bed-transfer"
       );
+      const request = bedTransferOnly
+        ? adapters.buildApiRequest(Object.freeze({
+          session: authenticatedSession,
+          eventId: "bed-transfer",
+          submission: session.entries[0].payload as object,
+        }))
+        : aggregateSessionRequest(
+          session,
+          authenticatedSession,
+          adapters.buildApiRequest,
+          adapters.submitPath,
+        );
       const expected = request === undefined
         ? undefined
-        : expectedAggregateUploadReceipt(request);
+        : bedTransferOnly
+          ? Object.freeze({
+            entryIds: Object.freeze([session.entries[0].entry_id]),
+            sessionId: session.session_id,
+          })
+          : expectedAggregateUploadReceipt(request);
       if (
         request === undefined
         || expected === undefined
@@ -1322,7 +1420,23 @@ export function startEmployeeNextSidecarRoute(
         throw new Error("SESSION_UPLOAD_REQUEST_REJECTED");
       }
       const response = await adapters.transport.request(request);
-      const receipt = explicitAggregateUploadReceipt(response, expected);
+      const receipt = bedTransferOnly
+        ? (
+          response.status >= 200
+          && response.status <= 299
+          && isPlainRecord(response.body)
+          && response.body.success === true
+          && response.body.ok === true
+          && response.body.error === undefined
+          && response.body.error_code === undefined
+          && (
+            response.body.session_id === expected.sessionId
+            || response.body.requested_session_id === expected.sessionId
+          )
+          ? expected
+          : undefined
+        )
+        : explicitAggregateUploadReceipt(response, expected);
       if (receipt === undefined) {
         throw new Error("SESSION_UPLOAD_RESPONSE_REJECTED");
       }
@@ -1369,6 +1483,7 @@ export function startEmployeeNextSidecarRoute(
         state: sessionUploadState,
         upload: uploadSession,
       }),
+      () => bedTransferCapability.writeEnabled,
     ),
     buildApiRequest: adapters.buildApiRequest,
     allowedSubmitPath: adapters.submitPath,
@@ -1397,11 +1512,17 @@ export function startEmployeeNextSidecarRoute(
       authenticatedSession = result?.ok === true && restored.ok
         ? session
         : undefined;
+      bedTransferCapability = authenticatedSession === undefined
+        ? disabledBedTransferCapability
+        : typeof adapters.restoreBedTransferCapability === "function"
+          ? await adapters.restoreBedTransferCapability()
+          : disabledBedTransferCapability;
       await controller?.render();
       return result?.ok === true && restored.ok;
     })
     .catch(async () => {
       authenticatedSession = undefined;
+      bedTransferCapability = disabledBedTransferCapability;
       await drafts.restore(undefined);
       await controller?.render();
       return false;

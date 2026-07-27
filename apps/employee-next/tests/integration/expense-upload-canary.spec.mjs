@@ -151,6 +151,13 @@ function adapters(options = {}) {
       }
       return options.session ?? staff();
     },
+    async restoreBedTransferCapability() {
+      return options.capability ?? {
+        validateEnabled: false,
+        writeEnabled: false,
+        canonicalWritePath: "",
+      };
+    },
     buildApiRequest(context) {
       return {
         method: "POST",
@@ -433,6 +440,40 @@ test("Bed Transfer stays isolated from ordinary aggregate transport", async () =
     } finally {
       fixture.restoreDocument();
     }
+  }
+});
+
+test("exact enabled capability permits one isolated Bed Transfer POST only", async () => {
+  const fixture = await start({
+    capability: {
+      validateEnabled: true,
+      writeEnabled: true,
+      canonicalWritePath: "/api/employee/entry",
+    },
+    request: async (request) => ({
+      status: 201,
+      body: {
+        success: true,
+        ok: true,
+        requested_session_id: "bed-transfer-session",
+        canonical_entry: { event_type: "bed_transfer" },
+      },
+    }),
+  });
+  try {
+    await fixture.sidecar.addToSession({
+      sessionId: "bed-transfer-session",
+      entry: entry("bed-transfer", "transfer-one"),
+    });
+    assert.match(visibleText(fixture.root), /Upload Session/u);
+    assert.equal(await fixture.sidecar.uploadSession(), true);
+    assert.equal(fixture.adapter.calls.length, 1);
+    assert.equal(fixture.adapter.calls[0].method, "POST");
+    assert.equal(fixture.adapter.calls[0].path, "/api/employee/entry");
+    assert.equal(fixture.adapter.calls[0].body.aggregate_write, undefined);
+    assert.equal(fixture.adapter.calls[0].body.entry.event_type, "bed-transfer");
+  } finally {
+    fixture.restoreDocument();
   }
 });
 

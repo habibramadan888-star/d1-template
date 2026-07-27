@@ -104,6 +104,7 @@ export interface EmployeeEntryTemplateMountOptions {
   readonly canAdd: boolean;
   readonly busy: boolean;
   readonly errorCode?: string;
+  readonly bedTransferFormalWriteEnabled?: boolean;
   readonly onChange: (field: string, value: unknown) => void;
   readonly onAdd: () => void;
 }
@@ -131,7 +132,10 @@ export interface EmployeeEntryUiController {
   selectEvent(value: unknown): boolean;
   mount(
     parent: HTMLElement,
-    gate: Readonly<{ authenticatedStaff: boolean }>,
+    gate: Readonly<{
+      authenticatedStaff: boolean;
+      bedTransferFormalWriteEnabled?: boolean;
+    }>,
   ): void;
   getSelectedEvent(): EmployeeEventId | undefined;
   getDraft(): Readonly<DraftRecord> | undefined;
@@ -458,7 +462,10 @@ function createTemplate(
       if (definition.notice !== undefined) {
         const notice = document.createElement("p");
         notice.dataset.templateNotice = definition.eventType;
-        notice.textContent = definition.notice;
+        notice.textContent = definition.eventType === "bed-transfer"
+          && options.bedTransferFormalWriteEnabled === true
+          ? "Formal Bed Transfer write: enabled through the canonical employee entry."
+          : definition.notice;
         parent.append(notice);
       }
     },
@@ -874,6 +881,7 @@ export function createEmployeeEntryUiController(
         canAdd,
         busy,
         errorCode,
+        bedTransferFormalWriteEnabled: gate.bedTransferFormalWriteEnabled,
         onChange(field, value): void {
           if (!selected?.employeeEditableFields.includes(field) || draft === undefined) {
             return;
