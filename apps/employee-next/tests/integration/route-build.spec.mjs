@@ -686,9 +686,10 @@ test("route-build source boundary stays isolated", () => {
   );
   assert.match(mainSource, /globalThis\.localStorage\.getItem\(key\)/u);
   assert.match(mainSource, /globalThis\.localStorage\.setItem\(key, value\)/u);
+  assert.match(mainSource, /globalThis\.localStorage\.removeItem\(key\)/u);
   assert.doesNotMatch(
     mainSource,
-    /globalThis\.localStorage\.(?:removeItem|clear)\s*\(/u,
+    /globalThis\.localStorage\.clear\s*\(/u,
   );
   assert.doesNotMatch(
     mainSource,

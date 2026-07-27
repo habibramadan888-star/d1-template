@@ -818,11 +818,33 @@ function appendText(
   return element;
 }
 
+function localDraftDisplayText(entry: EmployeeNextSessionDraftEntry): string {
+  const base = `${entry.event_type} — unsent local draft`;
+  if (entry.event_type !== "expense" || !isPlainRecord(entry.payload)) {
+    return base;
+  }
+  const payment = entry.payload.payment;
+  const amount = entry.payload.expenseAmountAed;
+  const description = entry.payload.expenseDescription;
+  if (
+    typeof amount !== "number"
+    || !Number.isFinite(amount)
+    || !isPlainRecord(payment)
+    || (payment.method !== "cash" && payment.method !== "bank")
+    || typeof description !== "string"
+    || description.trim().length === 0
+  ) {
+    return base;
+  }
+  return `${base} — AED ${amount.toFixed(2)} — ${payment.method} — ${description.trim()}`;
+}
+
 function createLocalRenderPort(
   root: HTMLElement,
   controllerRef: () => EmployeeNextRouteController | undefined,
   draftViewRef?: () => EmployeeNextSessionDraftView,
   entryUiRef?: () => EmployeeEntryUiController | undefined,
+  removeLocalDraft?: (entry: EmployeeNextSessionDraftEntry) => Promise<void>,
 ) {
   return Object.freeze({
     render(view: EmployeeNextRouteView): void {
@@ -851,13 +873,63 @@ function createLocalRenderPort(
           appendText(
             root,
             "p",
-            `Cash total: AED ${draftView.cashTotalAed.toFixed(2)}`,
+            `Cash Received: AED ${draftView.summary.cashReceivedAed.toFixed(2)}`,
           );
           appendText(
             root,
             "p",
-            `Bank total: AED ${draftView.bankTotalAed.toFixed(2)}`,
+            `Bank Received: AED ${draftView.summary.bankReceivedAed.toFixed(2)}`,
           );
+          appendText(
+            root,
+            "p",
+            `Total Received: AED ${draftView.summary.totalReceivedAed.toFixed(2)}`,
+          );
+          appendText(
+            root,
+            "p",
+            `Expenses: AED ${draftView.summary.expensesAed.toFixed(2)}`,
+          );
+          appendText(
+            root,
+            "p",
+            `Cash Net: AED ${draftView.summary.cashNetAed.toFixed(2)}`,
+          );
+          appendText(
+            root,
+            "p",
+            `Bank Net: AED ${draftView.summary.bankNetAed.toFixed(2)}`,
+          );
+          appendText(
+            root,
+            "p",
+            `Net Funds: AED ${draftView.summary.netFundsAed.toFixed(2)}`,
+          );
+          if (
+            draftView.session !== undefined
+            && removeLocalDraft !== undefined
+          ) {
+            const localDrafts = appendText(root, "section", "");
+            localDrafts.setAttribute("aria-label", "Current local drafts");
+            localDrafts.dataset.sessionId = draftView.session.session_id;
+            for (const entry of draftView.session.entries) {
+              const row = appendText(
+                localDrafts,
+                "section",
+                localDraftDisplayText(entry),
+              );
+              row.dataset.entryId = entry.entry_id;
+              const remove = document.createElement("button");
+              remove.type = "button";
+              remove.textContent = "Remove Local Draft / 删除本地草稿";
+              remove.dataset.action = "remove-local-draft";
+              remove.dataset.entryId = entry.entry_id;
+              remove.addEventListener("click", () => {
+                void removeLocalDraft(entry);
+              });
+              row.append(remove);
+            }
+          }
           if (draftView.errorCode !== undefined) {
             appendText(root, "p", draftView.errorCode);
           }
@@ -901,6 +973,9 @@ function createBrowserDraftStoragePort(): EmployeeNextSessionDraftStoragePort {
     setItem(key: string, value: string): void {
       globalThis.localStorage.setItem(key, value);
     },
+    removeItem(key: string): void {
+      globalThis.localStorage.removeItem(key);
+    },
   });
 }
 
@@ -909,6 +984,9 @@ export interface EmployeeNextSidecarRuntimeOptions {
   readonly now?: () => string;
   readonly entryContexts?: EmployeeEntryContextPort;
   readonly createId?: () => string;
+  readonly confirmLocalDraftRemoval?: (
+    entry: EmployeeNextSessionDraftEntry,
+  ) => boolean | Promise<boolean>;
 }
 
 function createBrowserId(): string {
@@ -978,6 +1056,11 @@ export function startEmployeeNextSidecarRoute(
   );
   let controller: EmployeeNextRouteController | undefined;
   let entryUi: EmployeeEntryUiController | undefined;
+  const removingEntryIds = new Set<string>();
+  const confirmLocalDraftRemoval = options.confirmLocalDraftRemoval
+    ?? (() => globalThis.confirm(
+      "Remove this unsent local draft? This cannot affect cloud records.",
+    ));
   controller = createEmployeeNextRouteController({
     transport: adapters.transport,
     render: createLocalRenderPort(
@@ -985,6 +1068,20 @@ export function startEmployeeNextSidecarRoute(
       () => controller,
       () => drafts.getView(),
       () => entryUi,
+      async (entry): Promise<void> => {
+        if (removingEntryIds.has(entry.entry_id)) {
+          return;
+        }
+        removingEntryIds.add(entry.entry_id);
+        try {
+          if (await confirmLocalDraftRemoval(entry)) {
+            await drafts.removeLocalDraft(entry.entry_id);
+          }
+        } finally {
+          removingEntryIds.delete(entry.entry_id);
+          await controller?.render();
+        }
+      },
     ),
     buildApiRequest: adapters.buildApiRequest,
     allowedSubmitPath: adapters.submitPath,

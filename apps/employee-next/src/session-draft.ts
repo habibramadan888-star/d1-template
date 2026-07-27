@@ -35,6 +35,7 @@ export interface EmployeeNextSessionDraftEnvelope {
 export interface EmployeeNextSessionDraftStoragePort {
   getItem(key: string): string | null | Promise<string | null>;
   setItem(key: string, value: string): void | Promise<void>;
+  removeItem(key: string): void | Promise<void>;
 }
 
 export const EMPLOYEE_NEXT_DRAFT_ERROR_CODES = Object.freeze([
@@ -42,10 +43,23 @@ export const EMPLOYEE_NEXT_DRAFT_ERROR_CODES = Object.freeze([
   "DRAFT_STORAGE_UNAVAILABLE",
   "DRAFT_ENVELOPE_INVALID",
   "DRAFT_SAVE_FAILED",
+  "DRAFT_DELETE_FAILED",
 ] as const);
 
 export type EmployeeNextDraftErrorCode =
   (typeof EMPLOYEE_NEXT_DRAFT_ERROR_CODES)[number];
+
+export interface EmployeeNextSessionDraftSummary {
+  readonly cashReceivedAed: number;
+  readonly bankReceivedAed: number;
+  readonly totalReceivedAed: number;
+  readonly cashExpensesAed: number;
+  readonly bankExpensesAed: number;
+  readonly expensesAed: number;
+  readonly cashNetAed: number;
+  readonly bankNetAed: number;
+  readonly netFundsAed: number;
+}
 
 export type EmployeeNextSessionDraftView =
   | Readonly<{ status: "AUTH_RESTORING" }>
@@ -56,7 +70,8 @@ export type EmployeeNextSessionDraftView =
     entryCount: number;
     cashTotalAed: number;
     bankTotalAed: number;
-    errorCode?: "DRAFT_SAVE_FAILED";
+    summary: EmployeeNextSessionDraftSummary;
+    errorCode?: "DRAFT_SAVE_FAILED" | "DRAFT_DELETE_FAILED";
   }>
   | Readonly<{
     status: "DRAFT_UNAVAILABLE";
@@ -79,6 +94,7 @@ export interface EmployeeNextSessionDraftController {
     sessionId: string;
     entry: EmployeeNextSessionDraftEntry;
   }>): Promise<EmployeeNextSessionDraftResult>;
+  removeLocalDraft(entryId: string): Promise<EmployeeNextSessionDraftResult>;
 }
 
 const entryKeys = Object.freeze([
@@ -246,6 +262,7 @@ function isStoragePort(
     && value !== null
     && typeof (value as Readonly<Record<string, unknown>>).getItem === "function"
     && typeof (value as Readonly<Record<string, unknown>>).setItem === "function"
+    && typeof (value as Readonly<Record<string, unknown>>).removeItem === "function"
   );
 }
 
@@ -268,29 +285,105 @@ export function createEmployeeDraftScope(
   return isEmployeeDraftScopeId(scope) ? Object.freeze(scope) : undefined;
 }
 
+function money(value: number): number {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
+function paymentLegTotals(
+  value: EmployeeDraftPayload | undefined,
+): Readonly<{ cash: number; bank: number }> {
+  if (!isPlainObject(value) || !Array.isArray(value.legs)) {
+    return Object.freeze({ cash: 0, bank: 0 });
+  }
+  let cash = 0;
+  let bank = 0;
+  for (const leg of value.legs) {
+    if (!isPlainObject(leg) || !isMoney(leg.amountAed)) {
+      continue;
+    }
+    if (leg.method === "cash") cash += leg.amountAed;
+    if (leg.method === "bank") bank += leg.amountAed;
+  }
+  return Object.freeze({ cash: money(cash), bank: money(bank) });
+}
+
+function entryOutflows(
+  entry: EmployeeNextSessionDraftEntry,
+): Readonly<{ cash: number; bank: number }> {
+  if (!isPlainObject(entry.payload)) {
+    return Object.freeze({ cash: 0, bank: 0 });
+  }
+  if (entry.event_type === "expense") {
+    return paymentLegTotals(entry.payload.payment);
+  }
+  if (entry.event_type === "deposit-out") {
+    return paymentLegTotals(entry.payload.refund);
+  }
+  return Object.freeze({ cash: 0, bank: 0 });
+}
+
+export function calculateEmployeeNextSessionDraftSummary(
+  entries: readonly EmployeeNextSessionDraftEntry[],
+): EmployeeNextSessionDraftSummary {
+  let cashReceived = 0;
+  let bankReceived = 0;
+  let cashExpenses = 0;
+  let bankExpenses = 0;
+  for (const entry of entries) {
+    if (
+      entry.event_type === "rent"
+      || entry.event_type === "arrears-payment"
+      || entry.event_type === "deposit-in"
+      || entry.event_type === "bed-transfer"
+    ) {
+      cashReceived += entry.cash_amount_aed;
+      bankReceived += entry.bank_amount_aed;
+    }
+    const outflows = entryOutflows(entry);
+    cashExpenses += outflows.cash;
+    bankExpenses += outflows.bank;
+  }
+  const cashReceivedAed = money(cashReceived);
+  const bankReceivedAed = money(bankReceived);
+  const cashExpensesAed = money(cashExpenses);
+  const bankExpensesAed = money(bankExpenses);
+  const totalReceivedAed = money(cashReceivedAed + bankReceivedAed);
+  const expensesAed = money(cashExpensesAed + bankExpensesAed);
+  return Object.freeze({
+    cashReceivedAed,
+    bankReceivedAed,
+    totalReceivedAed,
+    cashExpensesAed,
+    bankExpensesAed,
+    expensesAed,
+    cashNetAed: money(cashReceivedAed - cashExpensesAed),
+    bankNetAed: money(bankReceivedAed - bankExpensesAed),
+    netFundsAed: money(totalReceivedAed - expensesAed),
+  });
+}
+
 function readyView(
   session: EmployeeNextSessionDraft | undefined,
-  errorCode?: "DRAFT_SAVE_FAILED",
+  errorCode?: "DRAFT_SAVE_FAILED" | "DRAFT_DELETE_FAILED",
 ): EmployeeNextSessionDraftView {
   const entries = session?.entries ?? [];
+  const summary = calculateEmployeeNextSessionDraftSummary(entries);
   return Object.freeze({
     status: "CURRENT_SESSION_READY",
     ...(session === undefined ? {} : { session }),
     entryCount: entries.length,
-    cashTotalAed: entries.reduce(
-      (total, entry) => total + entry.cash_amount_aed,
-      0,
-    ),
-    bankTotalAed: entries.reduce(
-      (total, entry) => total + entry.bank_amount_aed,
-      0,
-    ),
+    cashTotalAed: summary.cashReceivedAed,
+    bankTotalAed: summary.bankReceivedAed,
+    summary,
     ...(errorCode === undefined ? {} : { errorCode }),
   });
 }
 
 function unavailableView(
-  errorCode: Exclude<EmployeeNextDraftErrorCode, "DRAFT_SAVE_FAILED">,
+  errorCode: Exclude<
+    EmployeeNextDraftErrorCode,
+    "DRAFT_SAVE_FAILED" | "DRAFT_DELETE_FAILED"
+  >,
 ): EmployeeNextSessionDraftView {
   return Object.freeze({ status: "DRAFT_UNAVAILABLE", errorCode });
 }
@@ -432,6 +525,62 @@ export function createEmployeeNextSessionDraftController(
 
       session = nextSession;
       revision = envelope.revision;
+      view = readyView(session);
+      return success(view);
+    },
+
+    async removeLocalDraft(
+      entryId: string,
+    ): Promise<EmployeeNextSessionDraftResult> {
+      if (
+        scope === undefined
+        || view.status !== "CURRENT_SESSION_READY"
+        || session === undefined
+        || !isNonEmptyString(entryId)
+      ) {
+        return failure("DRAFT_ENVELOPE_INVALID", view);
+      }
+      const targetIndex = session.entries.findIndex(
+        (entry) => entry.entry_id === entryId,
+      );
+      if (targetIndex < 0) {
+        return failure("DRAFT_ENVELOPE_INVALID", view);
+      }
+
+      const nextSession = snapshotSession({
+        session_id: session.session_id,
+        entries: session.entries.filter((_, index) => index !== targetIndex),
+      });
+      const envelope: EmployeeNextSessionDraftEnvelope = Object.freeze({
+        schema_version: 1,
+        scope,
+        session: nextSession,
+        revision: revision + 1,
+        saved_at: now(),
+      });
+      if (!isEnvelope(envelope)) {
+        return failure("DRAFT_ENVELOPE_INVALID", view);
+      }
+
+      const key = employeeNextDraftStorageKey(scope);
+      try {
+        const serialized = JSON.stringify(envelope);
+        const verified: unknown = JSON.parse(serialized);
+        if (!isEnvelope(verified) || !sameScope(verified.scope, scope)) {
+          throw new Error("DRAFT_ENVELOPE_INVALID");
+        }
+        if (nextSession.entries.length === 0) {
+          await storage.removeItem(key);
+        } else {
+          await storage.setItem(key, serialized);
+        }
+      } catch {
+        view = readyView(session, "DRAFT_DELETE_FAILED");
+        return failure("DRAFT_DELETE_FAILED", view);
+      }
+
+      session = nextSession.entries.length === 0 ? undefined : nextSession;
+      revision = session === undefined ? 0 : envelope.revision;
       view = readyView(session);
       return success(view);
     },

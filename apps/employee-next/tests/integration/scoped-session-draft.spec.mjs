@@ -90,6 +90,10 @@ function storagePort(initial = new Map()) {
       calls.push(["setItem", key, value]);
       values.set(key, value);
     },
+    removeItem(key) {
+      calls.push(["removeItem", key]);
+      values.delete(key);
+    },
   };
 }
 
@@ -212,8 +216,8 @@ test("A and B scopes round-trip exact independent sessions without restore write
     writesBeforeRestore,
   );
   assert.equal(controller.getView().entryCount, 7);
-  assert.equal(controller.getView().cashTotalAed, 28);
-  assert.equal(controller.getView().bankTotalAed, 29.75);
+  assert.equal(controller.getView().cashTotalAed, 13);
+  assert.equal(controller.getView().bankTotalAed, 14);
   assert.deepEqual(
     controller.getSession().entries.map((item) => item.event_type),
     eventIds,
@@ -283,6 +287,146 @@ test("storage write failure preserves prior memory and storage", async () => {
   assert.deepEqual(controller.getSession(), beforeSession);
   assert.equal(storage.values.get(key), beforeRaw);
   assert.equal(controller.getView().errorCode, "DRAFT_SAVE_FAILED");
+});
+
+test("canonical local summary keeps cash Expense out of received totals", async () => {
+  const storage = storagePort();
+  const controller = runtime.createEmployeeNextSessionDraftController(storage);
+  await controller.restore(staff());
+  await controller.addToSession({
+    sessionId: "expense-session",
+    entry: entry("expense", 1, {
+      payload: {
+        eventId: "expense",
+        payment: {
+          method: "cash",
+          legs: [{ method: "cash", amountAed: 1 }],
+        },
+      },
+      cash_amount_aed: 0,
+      bank_amount_aed: 0,
+    }),
+  });
+  assert.deepEqual(controller.getView().summary, {
+    cashReceivedAed: 0,
+    bankReceivedAed: 0,
+    totalReceivedAed: 0,
+    cashExpensesAed: 1,
+    bankExpensesAed: 0,
+    expensesAed: 1,
+    cashNetAed: -1,
+    bankNetAed: 0,
+    netFundsAed: -1,
+  });
+});
+
+test("remove local draft persists exact scope atomically and preserves order", async () => {
+  const storage = storagePort(new Map([["unrelated", "preserve"]]));
+  const controller = runtime.createEmployeeNextSessionDraftController(
+    storage,
+    () => "2026-07-27T13:00:00.000Z",
+  );
+  await controller.restore(staff());
+  for (const index of [1, 2, 3]) {
+    await controller.addToSession({
+      sessionId: "remove-session",
+      entry: entry(index === 2 ? "expense" : "rent", index),
+    });
+  }
+  const key = runtime.employeeNextDraftStorageKey({
+    corpid: "homelink",
+    userid: "employee-a",
+  });
+  const result = await controller.removeLocalDraft("entry-2");
+  assert.equal(result.ok, true);
+  assert.equal(controller.getSession().session_id, "remove-session");
+  assert.deepEqual(
+    controller.getSession().entries.map((item) => item.entry_id),
+    ["entry-1", "entry-3"],
+  );
+  assert.equal(storage.values.get("unrelated"), "preserve");
+  assert.equal(storage.values.has(key), true);
+  assert.deepEqual(
+    JSON.parse(storage.values.get(key)).session.entries.map(
+      (item) => item.entry_id,
+    ),
+    ["entry-1", "entry-3"],
+  );
+  assert.equal(
+    storage.calls.filter(([method]) => method === "removeItem").length,
+    0,
+  );
+});
+
+test("last local draft removal deletes only the exact scoped key", async () => {
+  const storage = storagePort(new Map([["unrelated", "preserve"]]));
+  const controller = runtime.createEmployeeNextSessionDraftController(storage);
+  await controller.restore(staff());
+  await controller.addToSession({
+    sessionId: "single-session",
+    entry: entry("expense", 1),
+  });
+  const key = runtime.employeeNextDraftStorageKey({
+    corpid: "homelink",
+    userid: "employee-a",
+  });
+  const result = await controller.removeLocalDraft("entry-1");
+  assert.equal(result.ok, true);
+  assert.equal(controller.getSession(), undefined);
+  assert.equal(controller.getView().entryCount, 0);
+  assert.equal(storage.values.has(key), false);
+  assert.equal(storage.values.get("unrelated"), "preserve");
+  assert.deepEqual(
+    storage.calls.filter(([method]) => method === "removeItem"),
+    [["removeItem", key]],
+  );
+});
+
+test("local draft removal failure preserves storage memory and summary", async () => {
+  const storage = storagePort();
+  const controller = runtime.createEmployeeNextSessionDraftController(storage);
+  await controller.restore(staff());
+  await controller.addToSession({
+    sessionId: "failure-session",
+    entry: entry("expense", 1),
+  });
+  const beforeSession = structuredClone(controller.getSession());
+  const beforeView = structuredClone(controller.getView());
+  const key = runtime.employeeNextDraftStorageKey({
+    corpid: "homelink",
+    userid: "employee-a",
+  });
+  const beforeRaw = storage.values.get(key);
+  storage.removeItem = () => {
+    throw new Error("private delete failure");
+  };
+  const result = await controller.removeLocalDraft("entry-1");
+  assert.equal(result.ok, false);
+  assert.equal(result.errorCode, "DRAFT_DELETE_FAILED");
+  assert.deepEqual(controller.getSession(), beforeSession);
+  assert.deepEqual(controller.getView().summary, beforeView.summary);
+  assert.equal(controller.getView().entryCount, 1);
+  assert.equal(controller.getView().errorCode, "DRAFT_DELETE_FAILED");
+  assert.equal(storage.values.get(key), beforeRaw);
+});
+
+test("unknown or cloud-only entry identity cannot delete local drafts", async () => {
+  const storage = storagePort();
+  const controller = runtime.createEmployeeNextSessionDraftController(storage);
+  await controller.restore(staff());
+  await controller.addToSession({
+    sessionId: "guard-session",
+    entry: entry("rent", 1),
+  });
+  const before = structuredClone(controller.getSession());
+  const result = await controller.removeLocalDraft("cloud-entry");
+  assert.equal(result.ok, false);
+  assert.equal(result.errorCode, "DRAFT_ENVELOPE_INVALID");
+  assert.deepEqual(controller.getSession(), before);
+  assert.equal(
+    storage.calls.some(([method]) => method === "removeItem"),
+    false,
+  );
 });
 
 class FakeElement {
@@ -374,8 +518,8 @@ test("sidecar renders restoring then true summary and add never calls business t
       }),
     }), true);
     assert.match(visibleText(root), /Current Session \(1\)/u);
-    assert.match(visibleText(root), /Cash total: AED 1300\.00/u);
-    assert.match(visibleText(root), /Bank total: AED 0\.00/u);
+    assert.match(visibleText(root), /Cash Received: AED 1300\.00/u);
+    assert.match(visibleText(root), /Bank Received: AED 0\.00/u);
     assert.equal(businessRequests, 0);
   } finally {
     globalThis.document = previousDocument;

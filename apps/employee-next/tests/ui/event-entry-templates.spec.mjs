@@ -409,6 +409,10 @@ test("real Expense DOM Add to Session is scoped, atomic, and transport-free", as
         storageCalls.push(["setItem", key]);
         values.set(key, value);
       },
+      removeItem(key) {
+        storageCalls.push(["removeItem", key]);
+        values.delete(key);
+      },
     };
     let businessRequests = 0;
     let id = 0;
@@ -431,6 +435,7 @@ test("real Expense DOM Add to Session is scoped, atomic, and transport-free", as
       draftStorage: storage,
       now: () => "2026-07-27T12:00:00.000Z",
       createId: () => String(++id),
+      confirmLocalDraftRemoval: () => true,
     });
     assert.equal(await sidecar.sessionRestore, true);
 
@@ -475,6 +480,33 @@ test("real Expense DOM Add to Session is scoped, atomic, and transport-free", as
     );
     assert.equal(businessRequests, 0);
     assert.match(storageCalls[1][1], /^homelink:employee-next:draft:v1:/u);
+    assert.match(visibleText(root), /Cash Received: AED 0\.00/u);
+    assert.match(visibleText(root), /Bank Received: AED 0\.00/u);
+    assert.match(visibleText(root), /Total Received: AED 0\.00/u);
+    assert.match(visibleText(root), /Expenses: AED 1\.00/u);
+    assert.match(visibleText(root), /Cash Net: AED -1\.00/u);
+    assert.match(visibleText(root), /Bank Net: AED 0\.00/u);
+    assert.match(visibleText(root), /Net Funds: AED -1\.00/u);
+    assert.match(
+      visibleText(root),
+      /expense — unsent local draft — AED 1\.00 — cash — LOCAL_DRAFT_CANARY_TEST/u,
+    );
+
+    const remove = byDataset(root, "action", "remove-local-draft");
+    assert.ok(remove);
+    remove.listeners.get("click")();
+    remove.listeners.get("click")();
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    assert.match(visibleText(root), /Current Session \(0\)/u);
+    assert.equal(sidecar.drafts.getSession(), undefined);
+    assert.equal(
+      storageCalls.filter(([method]) => method === "removeItem").length,
+      1,
+    );
+    assert.equal(values.size, 0);
+    assert.equal(businessRequests, 0);
   } finally {
     globalThis.document = previousDocument;
   }
@@ -494,6 +526,9 @@ test("storage failure retains Expense form values and Current Session count", as
       },
       setItem() {
         throw new Error("private storage detail");
+      },
+      removeItem() {
+        throw new Error("not used");
       },
     };
     let id = 0;
@@ -535,6 +570,80 @@ test("storage failure retains Expense form values and Current Session count", as
       "LOCAL_DRAFT_CANARY_TEST",
     );
     assert.equal(sidecar.drafts.getSession(), undefined);
+  } finally {
+    globalThis.document = previousDocument;
+  }
+});
+
+test("Remove Local Draft storage failure keeps UI and memory unchanged", async () => {
+  const previousDocument = globalThis.document;
+  globalThis.document = {
+    createElement(tagName) {
+      return new FakeElement(tagName);
+    },
+  };
+  try {
+    const values = new Map();
+    const storage = {
+      getItem(key) {
+        return values.get(key) ?? null;
+      },
+      setItem(key, value) {
+        values.set(key, value);
+      },
+      removeItem() {
+        throw new Error("private delete detail");
+      },
+    };
+    let businessRequests = 0;
+    const root = new FakeElement("main");
+    const sidecar = mainRuntime.startEmployeeNextSidecarRoute(root, {
+      submitPath: "/unit-test-submit",
+      transport: {
+        async request() {
+          businessRequests += 1;
+          return { status: 500, body: null };
+        },
+      },
+      buildApiRequest() {
+        throw new Error("not used");
+      },
+      async restoreSession() {
+        return staff();
+      },
+    }, {
+      draftStorage: storage,
+      confirmLocalDraftRemoval: () => true,
+    });
+    await sidecar.sessionRestore;
+    assert.equal(await sidecar.addToSession({
+      sessionId: "delete-failure-session",
+      entry: {
+        entry_id: "delete-failure-entry",
+        event_type: "expense",
+        payload: {
+          eventId: "expense",
+          payment: {
+            method: "cash",
+            legs: [{ method: "cash", amountAed: 1 }],
+          },
+        },
+        cash_amount_aed: 0,
+        bank_amount_aed: 0,
+      },
+    }), true);
+
+    const before = structuredClone(sidecar.drafts.getSession());
+    const remove = byDataset(root, "action", "remove-local-draft");
+    remove.listeners.get("click")();
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    assert.deepEqual(sidecar.drafts.getSession(), before);
+    assert.match(visibleText(root), /Current Session \(1\)/u);
+    assert.match(visibleText(root), /DRAFT_DELETE_FAILED/u);
+    assert.equal(businessRequests, 0);
   } finally {
     globalThis.document = previousDocument;
   }
