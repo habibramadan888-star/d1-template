@@ -22,6 +22,14 @@ import {
   type EmployeeNextSessionDraftStoragePort,
   type EmployeeNextSessionDraftView,
 } from "./session-draft";
+import {
+  createEmployeeEntryUiController,
+  type EmployeeEntryContextPort,
+  type EmployeeEntryUiController,
+} from "./ui/event-entry-templates";
+import {
+  createEmployeeSevenEventRegistry,
+} from "./events";
 
 export const employeeNextRouteId = "employee-next-route-candidate";
 
@@ -814,6 +822,7 @@ function createLocalRenderPort(
   root: HTMLElement,
   controllerRef: () => EmployeeNextRouteController | undefined,
   draftViewRef?: () => EmployeeNextSessionDraftView,
+  entryUiRef?: () => EmployeeEntryUiController | undefined,
 ) {
   return Object.freeze({
     render(view: EmployeeNextRouteView): void {
@@ -867,11 +876,19 @@ function createLocalRenderPort(
           const controller = controllerRef();
           if (controller !== undefined) {
             controller.selectEvent(option.eventId);
-            void controller.render();
+            entryUiRef?.()?.selectEvent(option.eventId);
           }
         });
         eventSection.append(button);
       }
+      const entrySection = appendText(root, "section", "");
+      entrySection.setAttribute("aria-label", "Event entry form");
+      entryUiRef?.()?.mount(entrySection, {
+        authenticatedStaff: (
+          view.shell.auth.status === "AUTHENTICATED"
+          && view.shell.auth.role === "STAFF"
+        ),
+      });
     },
   });
 }
@@ -890,6 +907,19 @@ function createBrowserDraftStoragePort(): EmployeeNextSessionDraftStoragePort {
 export interface EmployeeNextSidecarRuntimeOptions {
   readonly draftStorage?: EmployeeNextSessionDraftStoragePort;
   readonly now?: () => string;
+  readonly entryContexts?: EmployeeEntryContextPort;
+  readonly createId?: () => string;
+}
+
+function createBrowserId(): string {
+  if (
+    typeof globalThis.crypto !== "object"
+    || globalThis.crypto === null
+    || typeof globalThis.crypto.randomUUID !== "function"
+  ) {
+    throw new Error("EMPLOYEE_NEXT_ID_GENERATOR_UNAVAILABLE");
+  }
+  return globalThis.crypto.randomUUID();
 }
 
 function createDisabledLocalTransport() {
@@ -947,15 +977,31 @@ export function startEmployeeNextSidecarRoute(
     options.now,
   );
   let controller: EmployeeNextRouteController | undefined;
+  let entryUi: EmployeeEntryUiController | undefined;
   controller = createEmployeeNextRouteController({
     transport: adapters.transport,
     render: createLocalRenderPort(
       root,
       () => controller,
       () => drafts.getView(),
+      () => entryUi,
     ),
     buildApiRequest: adapters.buildApiRequest,
     allowedSubmitPath: adapters.submitPath,
+  });
+  entryUi = createEmployeeEntryUiController({
+    registry: createEmployeeSevenEventRegistry(),
+    contexts: options.entryContexts,
+    createId: options.createId ?? createBrowserId,
+    session: () => drafts.getSession(),
+    draftView: () => drafts.getView(),
+    async requestRender(): Promise<void> {
+      await controller?.render();
+    },
+    async addToSession(input): Promise<boolean> {
+      const result = await drafts.addToSession(input);
+      return result.ok;
+    },
   });
   root.dataset.routeCandidate = employeeNextRouteId;
   const sessionRestore = adapters.restoreSession()

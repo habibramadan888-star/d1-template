@@ -31,6 +31,7 @@ const expectedFiles = [
   "src/submit-flow.ts",
   "src/route.ts",
   "src/ui/shell.ts",
+  "src/ui/event-entry-templates.ts",
   "tests/architecture/architecture-boundary.spec.mjs",
   "tests/architecture/scaffold-smoke.spec.mjs",
   "tests/core/api-client.spec.mjs",
@@ -52,6 +53,7 @@ const expectedFiles = [
   "tests/integration/submit-flow.spec.mjs",
   "tests/integration/route-build.spec.mjs",
   "tests/integration/scoped-session-draft.spec.mjs",
+  "tests/ui/event-entry-templates.spec.mjs",
   "tests/ui/shell.spec.mjs",
 ];
 
@@ -133,6 +135,7 @@ test("scaffold does not implement runtime integration or legacy behavior", async
   const routeBuildForbidden = /\b(?:fetch|localStorage|sessionStorage|XMLHttpRequest)\b|\/api\/|employee-v3|canonical|finance|ttlock|correction|reversal/i;
   const sidecarMainForbidden = /\b(?:fetch|sessionStorage|XMLHttpRequest)\b|\/api\/|employee-v3|canonical|finance|ttlock|correction|reversal/i;
   const sessionDraftForbidden = /\b(?:fetch|localStorage|sessionStorage|XMLHttpRequest)\b|\/api\/|employee-v3|canonical|finance|ttlock|correction|reversal/i;
+  const eventEntryUiForbidden = /\b(?:fetch|localStorage|sessionStorage|XMLHttpRequest|WebSocket|EventSource)\b|\/api\/|employee-v3|finance[_ ]ledger|ttlock[_ ]adapter|correction|reversal/i;
 
   for (const path of files.filter((file) => /\.(?:html|ts)$/.test(file))) {
     const source = await readFile(resolve(employeeNextRoot, path), "utf8");
@@ -140,6 +143,8 @@ test("scaffold does not implement runtime integration or legacy behavior", async
       ? authForbidden
       : path === "src/ui/shell.ts"
         ? uiShellForbidden
+        : path === "src/ui/event-entry-templates.ts"
+          ? eventEntryUiForbidden
         : path === "src/main.ts"
           ? sidecarMainForbidden
           : path === "src/session-draft.ts"
