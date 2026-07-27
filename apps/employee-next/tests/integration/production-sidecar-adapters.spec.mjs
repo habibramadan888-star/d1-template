@@ -212,6 +212,21 @@ function response(status, body) {
   });
 }
 
+function authEnvelope(role, code = 0) {
+  return {
+    code,
+    message: code === 0 ? "ok" : "request failed",
+    data: {
+      userid: "employee-023",
+      employee_id: "employee-023",
+      display_name: "Employee 023",
+      employee_name: "Employee 023",
+      corpid: "homelink",
+      role,
+    },
+  };
+}
+
 function adapterOptions(request) {
   return {
     requestPort: { request },
@@ -248,6 +263,66 @@ test("production session restore maps only explicit employee and staff roles", a
     assert.equal(calls[0].init.method, "GET");
     assert.equal(calls[0].init.credentials, "same-origin");
     assert.equal("body" in calls[0].init, false);
+  }
+});
+
+test("production session restore rejects nonzero error code with valid-looking staff data", async () => {
+  const adapters = runtime.createEmployeeNextSidecarAdapters(
+    adapterOptions(async () => response(200, authEnvelope("staff", 40_101))),
+  );
+  await assert.rejects(
+    adapters.restoreSession(),
+    /SIDECAR_SESSION_RESTORE_FAILED/u,
+  );
+});
+
+test("production session restore rejects nonzero error code with valid-looking employee data", async () => {
+  const adapters = runtime.createEmployeeNextSidecarAdapters(
+    adapterOptions(async () => response(200, authEnvelope("employee", 40_101))),
+  );
+  await assert.rejects(
+    adapters.restoreSession(),
+    /SIDECAR_SESSION_RESTORE_FAILED/u,
+  );
+});
+
+test("production session restore requires the exact numeric zero success code", async () => {
+  for (const envelope of [
+    { data: authEnvelope("staff").data },
+    authEnvelope("staff", "0"),
+    authEnvelope("staff", null),
+    authEnvelope("staff", false),
+  ]) {
+    const adapters = runtime.createEmployeeNextSidecarAdapters(
+      adapterOptions(async () => response(200, envelope)),
+    );
+    await assert.rejects(
+      adapters.restoreSession(),
+      /SIDECAR_SESSION_RESTORE_FAILED/u,
+    );
+  }
+});
+
+test("production session restore rejects malformed data and missing roles", async () => {
+  for (const envelope of [
+    null,
+    [],
+    { code: 0, data: null },
+    {
+      code: 0,
+      data: {
+        userid: "employee-023",
+        employee_id: "employee-023",
+      },
+    },
+  ]) {
+    const adapters = runtime.createEmployeeNextSidecarAdapters(
+      adapterOptions(async () => response(200, envelope)),
+    );
+    await assert.rejects(
+      adapters.restoreSession(),
+      /SIDECAR_SESSION_RESTORE_FAILED/u,
+    );
   }
 });
 
