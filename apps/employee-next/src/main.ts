@@ -40,6 +40,7 @@ import {
 } from "./events/expense";
 
 export const employeeNextRouteId = "employee-next-route-candidate";
+export const EMPLOYEE_NEXT_FORMAL_WRITE_ENABLED = false as const;
 
 export interface EmployeeNextBrowserRequestInit {
   readonly method: "GET" | "POST";
@@ -131,7 +132,7 @@ export type EmployeeSessionValidationState =
   | Readonly<{ status: "NOT_VALIDATED" }>
   | Readonly<{ status: "VALIDATING"; payloadFingerprint: string }>
   | Readonly<{
-    status: "VALIDATED";
+    status: "VALIDATED_VALIDATE_ONLY";
     payloadFingerprint: string;
     resultCount: number;
   }>
@@ -1369,6 +1370,9 @@ export function createEmployeeNextSidecarAdapters(
   }
   const transport = Object.freeze({
     async request(request: EmployeeApiRequest): Promise<EmployeeApiResponse> {
+      if (!EMPLOYEE_NEXT_FORMAL_WRITE_ENABLED) {
+        throw new Error("SIDECAR_FORMAL_UPLOAD_DISABLED");
+      }
       if (
         request.method !== "POST"
         || request.path !== submitPath
@@ -2035,20 +2039,6 @@ function createLocalRenderPort(
           "p",
           `Employee Sync State: ${expenseUpload.state.status}`,
         );
-        if (expenseUpload.enabled) {
-          const upload = document.createElement("button");
-          upload.type = "button";
-          upload.textContent = "Upload Session";
-          upload.dataset.action = "upload-session";
-          upload.disabled = (
-            expenseUpload.state.status === "SUBMITTING"
-            || expenseUpload.state.status === "SYNC_CHECKING"
-          );
-          upload.addEventListener("click", () => {
-            void expenseUpload.upload();
-          });
-          root.append(upload);
-        }
         if (expenseUpload.state.status === "SYNC_CHECK_UNAVAILABLE") {
           const retry = document.createElement("button");
           retry.type = "button";
@@ -2293,7 +2283,7 @@ export function startEmployeeNextSidecarRoute(
         throw new Error("SIDECAR_VALIDATION_REJECTED");
       }
       sessionValidationState = Object.freeze({
-        status: "VALIDATED",
+        status: "VALIDATED_VALIDATE_ONLY",
         payloadFingerprint,
         resultCount: session.entries.length,
       });
@@ -2367,6 +2357,9 @@ export function startEmployeeNextSidecarRoute(
     }
   }
   function uploadableSession(): EmployeeNextSessionDraft | undefined {
+    if (!EMPLOYEE_NEXT_FORMAL_WRITE_ENABLED) {
+      return undefined;
+    }
     const session = drafts.getSession();
     const payloadFingerprint = currentPayloadFingerprint();
     return (
@@ -2377,7 +2370,7 @@ export function startEmployeeNextSidecarRoute(
       && session !== undefined
       && session.entries.length > 0
       && uploadAttemptedSessionId !== session.session_id
-      && sessionValidationState.status === "VALIDATED"
+      && sessionValidationState.status === "VALIDATED_VALIDATE_ONLY"
       && payloadFingerprint !== undefined
       && sessionValidationState.payloadFingerprint === payloadFingerprint
       && (
@@ -2406,7 +2399,7 @@ export function startEmployeeNextSidecarRoute(
       : undefined;
   }
   async function uploadSession(): Promise<boolean> {
-    if (sessionUploadInFlight) {
+    if (!EMPLOYEE_NEXT_FORMAL_WRITE_ENABLED || sessionUploadInFlight) {
       return false;
     }
     const initialSession = uploadableSession();
@@ -2528,7 +2521,7 @@ export function startEmployeeNextSidecarRoute(
         }
       },
       () => Object.freeze({
-        enabled: uploadableSession() !== undefined,
+        enabled: false,
         state: sessionUploadState,
         validationState: sessionValidationState,
         payloadPreview: currentPendingRequest()?.body === undefined
@@ -2540,7 +2533,7 @@ export function startEmployeeNextSidecarRoute(
         upload: uploadSession,
         retrySyncCheck: refreshSyncState,
       }),
-      () => bedTransferCapability.writeEnabled,
+      () => false,
     ),
     buildApiRequest: adapters.buildApiRequest,
     allowedSubmitPath: adapters.submitPath,
@@ -2569,11 +2562,15 @@ export function startEmployeeNextSidecarRoute(
       await controller?.render();
       const restored = await draftRestore;
       authenticatedSession = result?.ok === true ? session : undefined;
-      bedTransferCapability = authenticatedSession === undefined
+      const restoredBedTransferCapability = authenticatedSession === undefined
         ? disabledBedTransferCapability
         : typeof adapters.restoreBedTransferCapability === "function"
           ? await adapters.restoreBedTransferCapability()
           : disabledBedTransferCapability;
+      bedTransferCapability = Object.freeze({
+        ...restoredBedTransferCapability,
+        writeEnabled: false,
+      });
       if (authenticatedSession !== undefined && drafts.getSession() !== undefined) {
         await refreshSyncState();
       }

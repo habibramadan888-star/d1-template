@@ -543,11 +543,11 @@ test("production request ports are explicit, same-origin and exact-path only", a
   );
   await assert.rejects(
     adapters.transport.request({ method: "GET", path: sessionPath }),
-    /SIDECAR_ADAPTER_REQUEST_REJECTED/u,
+    /SIDECAR_FORMAL_UPLOAD_DISABLED/u,
   );
   await assert.rejects(
     adapters.transport.request({ method: "POST", path: "/unknown" }),
-    /SIDECAR_ADAPTER_REQUEST_REJECTED/u,
+    /SIDECAR_FORMAL_UPLOAD_DISABLED/u,
   );
   await assert.rejects(
     adapters.transport.request({
@@ -555,7 +555,7 @@ test("production request ports are explicit, same-origin and exact-path only", a
       path: submitPath,
       headers: { Authorization: "forbidden" },
     }),
-    /SIDECAR_ADAPTER_REQUEST_REJECTED/u,
+    /SIDECAR_FORMAL_UPLOAD_DISABLED/u,
   );
   assert.equal(callCount, 0);
 });
@@ -791,7 +791,7 @@ test("provider identity fields fail closed without unsafe error echo", () => {
   );
 });
 
-test("business POST transport is invoked once and never retried", async () => {
+test("business POST transport is rejected before the request port", async () => {
   let callCount = 0;
   const adapters = runtime.createEmployeeNextSidecarAdapters(
     adapterOptions(async () => {
@@ -807,11 +807,11 @@ test("business POST transport is invoked once and never retried", async () => {
     }),
     (error) => (
       error instanceof Error
-      && error.message === "SIDECAR_ADAPTER_TRANSPORT_FAILED"
+      && error.message === "SIDECAR_FORMAL_UPLOAD_DISABLED"
       && !error.message.includes("network-detail-must-not-escape")
     ),
   );
-  assert.equal(callCount, 1);
+  assert.equal(callCount, 0);
 });
 
 test("production bootstrap contains no automatic submit or background channel", async () => {

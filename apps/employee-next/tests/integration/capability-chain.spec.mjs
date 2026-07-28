@@ -271,13 +271,13 @@ function enabledNotice(root) {
     .test(visibleText(root));
 }
 
-test("actual Worker envelope enables the actual Employee Next gate for staff and employee", async () => {
+test("actual Worker envelope cannot enable the closed Employee Next write gate", async () => {
   for (const role of ["staff", "employee"]) {
     const fixture = await startChain({ role });
     try {
       assert.equal(
         enabledNotice(fixture.root),
-        true,
+        false,
         `${role}: ${JSON.stringify(fixture.calls)}\n${
           visibleText(fixture.root)
         }`,
@@ -407,7 +407,7 @@ test("invalid and incomplete capability envelopes fail closed", async () => {
   }
 });
 
-test("QA flag absence does not disable internal-beta write capability", async () => {
+test("QA flag absence does not reopen the Employee Next write capability", async () => {
   const fixture = await startChain({
     env: {
       ...enabledEnv,
@@ -415,7 +415,7 @@ test("QA flag absence does not disable internal-beta write capability", async ()
     },
   });
   try {
-    assert.equal(enabledNotice(fixture.root), true);
+    assert.equal(enabledNotice(fixture.root), false);
     const capabilityCall = fixture.calls.find(
       (call) => call.path === capabilitiesPath,
     );
@@ -429,14 +429,14 @@ test("QA flag absence does not disable internal-beta write capability", async ()
   }
 });
 
-test("authenticated capability restoration is independent from local draft restoration", async () => {
+test("authenticated capability restoration stays write-closed after draft failure", async () => {
   const fixture = await startChain({ storageMode: "read-error" });
   try {
     assert.equal(
       fixture.calls.some((call) => call.path === capabilitiesPath),
       true,
     );
-    assert.equal(enabledNotice(fixture.root), true);
+    assert.equal(enabledNotice(fixture.root), false);
   } finally {
     fixture.restoreDocument();
   }

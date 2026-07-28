@@ -450,7 +450,11 @@ test("all seven events expose Add, Preview and Validate; upload needs current PA
         pendingEntry,
         `${eventType}: preview/validate payload`,
       );
-      assert.match(visibleText(root), /Upload Session/u);
+      assert.doesNotMatch(visibleText(root), /Upload Session/u);
+      assert.equal(
+        sidecar.getSessionValidationState().status,
+        "VALIDATED_VALIDATE_ONLY",
+      );
       const editable = find(
         root,
         (element) =>

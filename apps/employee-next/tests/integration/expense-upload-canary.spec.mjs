@@ -297,11 +297,11 @@ async function validateCurrent(fixture) {
   assert.equal(await fixture.sidecar.validateSession(), true);
   assert.equal(
     fixture.sidecar.getSessionValidationState().status,
-    "VALIDATED",
+    "VALIDATED_VALIDATE_ONLY",
   );
 }
 
-test("session upload stays hidden without exact employee/staff and accepts ordinary sessions", async () => {
+test("session upload stays hidden for every role and every validated session shape", async () => {
   for (const options of [
     { restoreError: true },
     { session: staff("OWNER") },
@@ -334,7 +334,9 @@ test("session upload stays hidden without exact employee/staff and accepts ordin
     });
     assert.doesNotMatch(visibleText(nonExpense.root), /Upload Session/u);
     await validateCurrent(nonExpense);
-    assert.match(visibleText(nonExpense.root), /Upload Session/u);
+    assert.doesNotMatch(visibleText(nonExpense.root), /Upload Session/u);
+    assert.equal(await nonExpense.sidecar.uploadSession(), false);
+    assert.equal(nonExpense.adapter.calls.length, 0);
   } finally {
     nonExpense.restoreDocument();
   }
@@ -350,7 +352,9 @@ test("session upload stays hidden without exact employee/staff and accepts ordin
       entry: entry("expense", "expense-two"),
     });
     await validateCurrent(multiple);
-    assert.match(visibleText(multiple.root), /Upload Session/u);
+    assert.doesNotMatch(visibleText(multiple.root), /Upload Session/u);
+    assert.equal(await multiple.sidecar.uploadSession(), false);
+    assert.equal(multiple.adapter.calls.length, 0);
   } finally {
     multiple.restoreDocument();
   }
@@ -362,13 +366,15 @@ test("session upload stays hidden without exact employee/staff and accepts ordin
       entry: entry(),
     });
     await validateCurrent(employee);
-    assert.match(visibleText(employee.root), /Upload Session/u);
+    assert.doesNotMatch(visibleText(employee.root), /Upload Session/u);
+    assert.equal(await employee.sidecar.uploadSession(), false);
+    assert.equal(employee.adapter.calls.length, 0);
   } finally {
     employee.restoreDocument();
   }
 });
 
-test("explicit confirmation is required and cancellation preserves the local draft", async () => {
+test("validated Expense remains local and the direct upload entry stays closed", async () => {
   const fixture = await start({ confirmExpenseUpload: () => false });
   try {
     await fixture.sidecar.addToSession({
@@ -377,7 +383,7 @@ test("explicit confirmation is required and cancellation preserves the local dra
     });
     await validateCurrent(fixture);
     const before = JSON.stringify([...fixture.storage.values]);
-    assert.match(visibleText(fixture.root), /Upload Session/u);
+    assert.doesNotMatch(visibleText(fixture.root), /Upload Session/u);
     assert.equal(await fixture.sidecar.uploadExpense(), false);
     assert.equal(fixture.adapter.calls.length, 0);
     assert.equal(JSON.stringify([...fixture.storage.values]), before);
@@ -387,7 +393,7 @@ test("explicit confirmation is required and cancellation preserves the local dra
   }
 });
 
-test("one confirmed Expense produces exactly one POST and only explicit success becomes SYNCED", async () => {
+test("direct Expense upload bypass is rejected before transport", async () => {
   const fixture = await start();
   try {
     await fixture.sidecar.addToSession({
@@ -396,39 +402,25 @@ test("one confirmed Expense produces exactly one POST and only explicit success 
     });
     await validateCurrent(fixture);
     const before = fixture.sidecar.drafts.getSession();
-    assert.equal(await fixture.sidecar.uploadExpense(), true);
-    assert.equal(fixture.adapter.calls.length, 1);
-    assert.equal(fixture.adapter.calls[0].method, "POST");
-    assert.equal(fixture.adapter.calls[0].path, "/api/employee/entry");
-    assert.equal(fixture.adapter.calls[0].body.aggregate_write, true);
-    assert.equal(fixture.adapter.calls[0].body.session.entries.length, 1);
-    assert.equal(fixture.adapter.calls[0].body.session.entries[0].event_type, "expense");
+    assert.equal(await fixture.sidecar.uploadExpense(), false);
+    assert.equal(fixture.adapter.calls.length, 0);
     assert.deepEqual(fixture.sidecar.getExpenseUploadState(), {
-      status: "SYNCED",
-      sessionId: "local-session",
-      anchorId: "cloud-session-anchor",
-      entries: [{
-        entryId: "local-expense-entry",
-        status: "SYNCED",
-      }],
+      status: "IDLE",
     });
-    assert.match(visibleText(fixture.root), /Employee Sync State: SYNCED/u);
+    assert.match(visibleText(fixture.root), /Employee Sync State: IDLE/u);
     assert.doesNotMatch(visibleText(fixture.root), /Upload Session/u);
     assert.deepEqual(
       fixture.sidecar.drafts.getSession().entries,
       before.entries,
     );
-    assert.equal(
-      fixture.sidecar.drafts.getSession().anchor_id,
-      "cloud-session-anchor",
-    );
+    assert.equal(fixture.sidecar.drafts.getSession().anchor_id, undefined);
     assert.equal(fixture.sidecar.drafts.getView().entryCount, 1);
   } finally {
     fixture.restoreDocument();
   }
 });
 
-test("rapid double invocation produces one POST", async () => {
+test("rapid direct upload invocations both fail before transport", async () => {
   let release;
   const pending = new Promise((resolve) => {
     release = resolve;
@@ -463,19 +455,20 @@ test("rapid double invocation produces one POST", async () => {
       entry: entry(),
     });
     await validateCurrent(fixture);
-    const first = fixture.sidecar.uploadExpense();
-    await Promise.resolve();
-    const second = fixture.sidecar.uploadExpense();
-    assert.equal(await second, false);
+    const [first, second] = await Promise.all([
+      fixture.sidecar.uploadExpense(),
+      fixture.sidecar.uploadExpense(),
+    ]);
+    assert.equal(first, false);
+    assert.equal(second, false);
     release();
-    assert.equal(await first, true);
-    assert.equal(fixture.adapter.calls.length, 1);
+    assert.equal(fixture.adapter.calls.length, 0);
   } finally {
     fixture.restoreDocument();
   }
 });
 
-test("ordinary mixed session sends one aggregate POST with every stable identity", async () => {
+test("ordinary mixed validated session preserves payload but cannot POST", async () => {
   const fixture = await start();
   try {
     await fixture.sidecar.addToSession({
@@ -487,23 +480,15 @@ test("ordinary mixed session sends one aggregate POST with every stable identity
       entry: entry("expense", "expense-one"),
     });
     await validateCurrent(fixture);
-    assert.equal(await fixture.sidecar.uploadSession(), true);
-    assert.equal(fixture.adapter.calls.length, 1);
-    const body = fixture.adapter.calls[0].body;
-    assert.equal(body.aggregate_write, true);
-    assert.equal(body.session.entries_count, 2);
-    assert.deepEqual(
-      body.session.entries.map((row) => [row.id, row.event_type]),
-      [["rent-one", "rent"], ["expense-one", "expense"]],
-    );
+    const preview = visibleText(fixture.root);
+    assert.equal(await fixture.sidecar.uploadSession(), false);
+    assert.equal(fixture.adapter.calls.length, 0);
+    assert.match(preview, /"aggregate_write":true/u);
+    assert.match(preview, /"entries_count":2/u);
+    assert.match(preview, /"event_type":"rent","id":"rent-one"/u);
+    assert.match(preview, /"event_type":"expense","id":"expense-one"/u);
     assert.deepEqual(fixture.sidecar.getSessionUploadState(), {
-      status: "SYNCED",
-      sessionId: "mixed-session",
-      anchorId: "cloud-session-anchor",
-      entries: [
-        { entryId: "rent-one", status: "SYNCED" },
-        { entryId: "expense-one", status: "SYNCED" },
-      ],
+      status: "IDLE",
     });
   } finally {
     fixture.restoreDocument();
@@ -604,13 +589,15 @@ test("ambiguous sync never becomes SYNCED and retry performs no business write",
     );
     assert.doesNotMatch(visibleText(fixture.root), /Upload Session/u);
     await validateCurrent(fixture);
-    assert.match(visibleText(fixture.root), /Upload Session/u);
+    assert.doesNotMatch(visibleText(fixture.root), /Upload Session/u);
+    assert.equal(await fixture.sidecar.uploadSession(), false);
+    assert.equal(fixture.adapter.calls.length, 0);
   } finally {
     fixture.restoreDocument();
   }
 });
 
-test("ambiguous upload survives refresh as sync-only and cannot be resubmitted", async () => {
+test("refresh of a validated local draft never attempts upload", async () => {
   const storage = storagePort();
   const first = await start({
     storage,
@@ -626,15 +613,9 @@ test("ambiguous upload survives refresh as sync-only and cannot be resubmitted",
     });
     await validateCurrent(first);
     assert.equal(await first.sidecar.uploadSession(), false);
-    assert.equal(first.adapter.calls.length, 1);
-    assert.equal(
-      first.sidecar.drafts.getSession().cloud_sync_required,
-      true,
-    );
-    assert.equal(
-      first.sidecar.getSessionUploadState().status,
-      "SYNC_CHECK_UNAVAILABLE",
-    );
+    assert.equal(first.adapter.calls.length, 0);
+    assert.notEqual(first.sidecar.drafts.getSession().cloud_sync_required, true);
+    assert.equal(first.sidecar.getSessionUploadState().status, "IDLE");
     assert.doesNotMatch(visibleText(first.root), /Upload Session/u);
   } finally {
     first.restoreDocument();
@@ -642,10 +623,6 @@ test("ambiguous upload survives refresh as sync-only and cannot be resubmitted",
 
   const restored = await start({ storage, syncStateError: true });
   try {
-    assert.equal(
-      restored.sidecar.drafts.getSession().cloud_sync_required,
-      true,
-    );
     assert.equal(
       restored.sidecar.getSessionUploadState().status,
       "SYNC_CHECK_UNAVAILABLE",
@@ -725,7 +702,7 @@ test("Bed Transfer stays isolated from ordinary aggregate transport", async () =
   }
 });
 
-test("exact enabled capability permits one isolated Bed Transfer POST only", async () => {
+test("server write capability cannot reopen isolated Bed Transfer POST", async () => {
   const fixture = await start({
     capability: {
       validateEnabled: true,
@@ -748,19 +725,15 @@ test("exact enabled capability permits one isolated Bed Transfer POST only", asy
       entry: entry("bed-transfer", "transfer-one"),
     });
     await validateCurrent(fixture);
-    assert.match(visibleText(fixture.root), /Upload Session/u);
-    assert.equal(await fixture.sidecar.uploadSession(), true);
-    assert.equal(fixture.adapter.calls.length, 1);
-    assert.equal(fixture.adapter.calls[0].method, "POST");
-    assert.equal(fixture.adapter.calls[0].path, "/api/employee/entry");
-    assert.equal(fixture.adapter.calls[0].body.aggregate_write, undefined);
-    assert.equal(fixture.adapter.calls[0].body.entry.event_type, "bed-transfer");
+    assert.doesNotMatch(visibleText(fixture.root), /Upload Session/u);
+    assert.equal(await fixture.sidecar.uploadSession(), false);
+    assert.equal(fixture.adapter.calls.length, 0);
   } finally {
     fixture.restoreDocument();
   }
 });
 
-test("transport and server failures retain the unsynced Expense without retry", async () => {
+test("formal transport outcomes are unreachable while the global gate is closed", async () => {
   const failures = [
     async () => {
       throw new Error("NETWORK_FAILURE");
@@ -825,19 +798,11 @@ test("transport and server failures retain the unsynced Expense without retry", 
       await validateCurrent(fixture);
       const before = structuredClone(fixture.sidecar.drafts.getSession());
       assert.equal(await fixture.sidecar.uploadExpense(), false);
-      assert.equal(fixture.adapter.calls.length, 1);
+      assert.equal(fixture.adapter.calls.length, 0);
       assert.deepEqual(fixture.sidecar.getExpenseUploadState(), {
-        status: "CLOUD_MISSING",
-        sessionId: "local-session",
-        entries: [{
-          entryId: "local-expense-entry",
-          status: "CLOUD_MISSING",
-        }],
+        status: "IDLE",
       });
-      assert.equal(
-        fixture.sidecar.drafts.getSession().cloud_sync_required,
-        true,
-      );
+      assert.notEqual(fixture.sidecar.drafts.getSession().cloud_sync_required, true);
       assert.deepEqual(
         fixture.sidecar.drafts.getSession().entries,
         before.entries,
