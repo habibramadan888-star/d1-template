@@ -78,8 +78,8 @@ function visibleText(element) {
   ].join("\n");
 }
 
-function storagePort() {
-  const values = new Map();
+function storagePort(initial = new Map()) {
+  const values = new Map(initial);
   return {
     values,
     getItem(key) {
@@ -142,8 +142,11 @@ function entry(eventType = "expense", id = "local-expense-entry") {
 
 function adapters(options = {}) {
   const calls = [];
+  const syncCalls = [];
+  let accepted = false;
   const value = {
     calls,
+    syncCalls,
     submitPath: "/api/employee/entry",
     async restoreSession() {
       if (options.restoreError) {
@@ -174,13 +177,53 @@ function adapters(options = {}) {
         },
       };
     },
+    async checkSyncState(session) {
+      syncCalls.push(structuredClone(session));
+      if (options.syncStateError) {
+        throw new Error("SYNC_STATE_FAILED");
+      }
+      if (options.syncState) {
+        return options.syncState(session);
+      }
+      const status = accepted ? "SYNCED" : "CLOUD_MISSING";
+      return {
+        status,
+        sessionId: session.session_id,
+        ...(accepted ? { anchorId: "cloud-session-anchor" } : {}),
+        entries: session.entries.map((draft) => ({
+          entryId: draft.entry_id,
+          status,
+        })),
+      };
+    },
     transport: {
       async request(request) {
         calls.push(request);
         if (options.request) {
-          return options.request(request);
+          const result = await options.request(request);
+          if (
+            result?.status >= 200
+            && result?.status <= 299
+            && result?.body?.success === true
+            && result?.body?.ok === true
+            && (
+              (
+                result.body.aggregate_write === true
+                && result.body.committed === true
+                && result.body.requested_entry_count
+                  === result.body.persisted_entry_count
+                && result.body.requested_entry_count
+                  === result.body.canonical_anchor_count
+              )
+              || result.body.canonical_entry?.event_type === "bed_transfer"
+            )
+          ) {
+            accepted = true;
+          }
+          return result;
         }
         const entries = request.body.session.entries;
+        accepted = true;
         return {
           status: 201,
           body: {
@@ -214,7 +257,7 @@ async function start(options = {}) {
     },
   };
   const root = new FakeElement("main");
-  const storage = storagePort();
+  const storage = options.storage ?? storagePort();
   const adapter = adapters(options);
   const sidecar = runtime.startEmployeeNextSidecarRoute(root, adapter, {
     draftStorage: storage,
@@ -320,7 +363,7 @@ test("one confirmed Expense produces exactly one POST and only explicit success 
       sessionId: "local-session",
       entry: entry(),
     });
-    const before = JSON.stringify([...fixture.storage.values]);
+    const before = fixture.sidecar.drafts.getSession();
     assert.equal(await fixture.sidecar.uploadExpense(), true);
     assert.equal(fixture.adapter.calls.length, 1);
     assert.equal(fixture.adapter.calls[0].method, "POST");
@@ -330,12 +373,23 @@ test("one confirmed Expense produces exactly one POST and only explicit success 
     assert.equal(fixture.adapter.calls[0].body.session.entries[0].event_type, "expense");
     assert.deepEqual(fixture.sidecar.getExpenseUploadState(), {
       status: "SYNCED",
-      entryIds: ["local-expense-entry"],
       sessionId: "local-session",
+      anchorId: "cloud-session-anchor",
+      entries: [{
+        entryId: "local-expense-entry",
+        status: "SYNCED",
+      }],
     });
     assert.match(visibleText(fixture.root), /Employee Sync State: SYNCED/u);
     assert.doesNotMatch(visibleText(fixture.root), /Upload Session/u);
-    assert.equal(JSON.stringify([...fixture.storage.values]), before);
+    assert.deepEqual(
+      fixture.sidecar.drafts.getSession().entries,
+      before.entries,
+    );
+    assert.equal(
+      fixture.sidecar.drafts.getSession().anchor_id,
+      "cloud-session-anchor",
+    );
     assert.equal(fixture.sidecar.drafts.getView().entryCount, 1);
   } finally {
     fixture.restoreDocument();
@@ -410,11 +464,202 @@ test("ordinary mixed session sends one aggregate POST with every stable identity
     );
     assert.deepEqual(fixture.sidecar.getSessionUploadState(), {
       status: "SYNCED",
-      entryIds: ["rent-one", "expense-one"],
       sessionId: "mixed-session",
+      anchorId: "cloud-session-anchor",
+      entries: [
+        { entryId: "rent-one", status: "SYNCED" },
+        { entryId: "expense-one", status: "SYNCED" },
+      ],
     });
   } finally {
     fixture.restoreDocument();
+  }
+});
+
+test("auth restoration rehydrates the saved session from canonical sync state", async () => {
+  const storage = storagePort();
+  const writer = await start({ storage });
+  try {
+    await writer.sidecar.addToSession({
+      sessionId: "restored-session",
+      entry: entry(),
+    });
+  } finally {
+    writer.restoreDocument();
+  }
+
+  const restored = await start({
+    storage,
+    syncState(session) {
+      return {
+        status: "SYNCED",
+        sessionId: session.session_id,
+        anchorId: "restored-cloud-anchor",
+        entries: session.entries.map((draft) => ({
+          entryId: draft.entry_id,
+          status: "SYNCED",
+        })),
+      };
+    },
+  });
+  try {
+    assert.equal(restored.adapter.syncCalls.length, 1);
+    assert.equal(restored.adapter.calls.length, 0);
+    assert.deepEqual(restored.sidecar.getSessionUploadState(), {
+      status: "SYNCED",
+      sessionId: "restored-session",
+      anchorId: "restored-cloud-anchor",
+      entries: [{
+        entryId: "local-expense-entry",
+        status: "SYNCED",
+      }],
+    });
+    assert.equal(
+      restored.sidecar.drafts.getSession().anchor_id,
+      "restored-cloud-anchor",
+    );
+    assert.match(visibleText(restored.root), /Cloud Sync: SYNCED/u);
+    assert.doesNotMatch(visibleText(restored.root), /Upload Session/u);
+  } finally {
+    restored.restoreDocument();
+  }
+});
+
+test("ambiguous sync never becomes SYNCED and retry performs no business write", async () => {
+  const storage = storagePort();
+  const writer = await start({ storage });
+  try {
+    await writer.sidecar.addToSession({
+      sessionId: "retry-session",
+      entry: entry(),
+    });
+  } finally {
+    writer.restoreDocument();
+  }
+  let unavailable = true;
+  const fixture = await start({
+    storage,
+    syncState(session) {
+      if (unavailable) throw new Error("ambiguous response");
+      return {
+        status: "CLOUD_MISSING",
+        sessionId: session.session_id,
+        entries: session.entries.map((draft) => ({
+          entryId: draft.entry_id,
+          status: "CLOUD_MISSING",
+        })),
+      };
+    },
+  });
+  try {
+    assert.deepEqual(fixture.sidecar.getSessionUploadState(), {
+      status: "SYNC_CHECK_UNAVAILABLE",
+      sessionId: "retry-session",
+    });
+    assert.match(visibleText(fixture.root), /Retry Sync Check/u);
+    assert.doesNotMatch(visibleText(fixture.root), /Employee Sync State: SYNCED/u);
+    assert.match(visibleText(fixture.root), /Upload Session/u);
+    assert.equal(fixture.adapter.calls.length, 0);
+    unavailable = false;
+    assert.equal(await fixture.sidecar.retrySyncCheck(), true);
+    assert.equal(fixture.adapter.syncCalls.length, 2);
+    assert.equal(fixture.adapter.calls.length, 0);
+    assert.equal(
+      fixture.sidecar.getSessionUploadState().status,
+      "CLOUD_MISSING",
+    );
+    assert.match(visibleText(fixture.root), /Upload Session/u);
+  } finally {
+    fixture.restoreDocument();
+  }
+});
+
+test("ambiguous upload survives refresh as sync-only and cannot be resubmitted", async () => {
+  const storage = storagePort();
+  const first = await start({
+    storage,
+    syncStateError: true,
+    request: async () => {
+      throw new Error("response lost");
+    },
+  });
+  try {
+    await first.sidecar.addToSession({
+      sessionId: "ambiguous-upload-session",
+      entry: entry(),
+    });
+    assert.equal(await first.sidecar.uploadSession(), false);
+    assert.equal(first.adapter.calls.length, 1);
+    assert.equal(
+      first.sidecar.drafts.getSession().cloud_sync_required,
+      true,
+    );
+    assert.equal(
+      first.sidecar.getSessionUploadState().status,
+      "SYNC_CHECK_UNAVAILABLE",
+    );
+    assert.doesNotMatch(visibleText(first.root), /Upload Session/u);
+  } finally {
+    first.restoreDocument();
+  }
+
+  const restored = await start({ storage, syncStateError: true });
+  try {
+    assert.equal(
+      restored.sidecar.drafts.getSession().cloud_sync_required,
+      true,
+    );
+    assert.equal(
+      restored.sidecar.getSessionUploadState().status,
+      "SYNC_CHECK_UNAVAILABLE",
+    );
+    assert.doesNotMatch(visibleText(restored.root), /Upload Session/u);
+    assert.equal(await restored.sidecar.uploadSession(), false);
+    assert.equal(restored.adapter.calls.length, 0);
+  } finally {
+    restored.restoreDocument();
+  }
+});
+
+test("canonical mismatch, void, correction and owner review states block reupload", async () => {
+  for (const status of [
+    "CLOUD_MISMATCH",
+    "CLOUD_VOIDED",
+    "CLOUD_CORRECTED",
+    "OWNER_REVIEW_REQUIRED",
+  ]) {
+    const storage = storagePort();
+    const writer = await start({ storage });
+    try {
+      await writer.sidecar.addToSession({
+        sessionId: `cloud-state-${status}`,
+        entry: entry(),
+      });
+    } finally {
+      writer.restoreDocument();
+    }
+    const fixture = await start({
+      storage,
+      syncState(session) {
+        return {
+          status,
+          sessionId: session.session_id,
+          entries: session.entries.map((draft) => ({
+            entryId: draft.entry_id,
+            status,
+          })),
+        };
+      },
+    });
+    try {
+      assert.equal(fixture.sidecar.getSessionUploadState().status, status);
+      assert.match(visibleText(fixture.root), new RegExp(status, "u"));
+      assert.doesNotMatch(visibleText(fixture.root), /Upload Session/u);
+      assert.equal(await fixture.sidecar.uploadSession(), false);
+      assert.equal(fixture.adapter.calls.length, 0);
+    } finally {
+      fixture.restoreDocument();
+    }
   }
 });
 
@@ -539,14 +784,25 @@ test("transport and server failures retain the unsynced Expense without retry", 
         sessionId: "local-session",
         entry: entry(),
       });
-      const before = JSON.stringify([...fixture.storage.values]);
+      const before = structuredClone(fixture.sidecar.drafts.getSession());
       assert.equal(await fixture.sidecar.uploadExpense(), false);
       assert.equal(fixture.adapter.calls.length, 1);
       assert.deepEqual(fixture.sidecar.getExpenseUploadState(), {
-        status: "ERROR",
-        errorCode: "SESSION_UPLOAD_FAILED",
+        status: "CLOUD_MISSING",
+        sessionId: "local-session",
+        entries: [{
+          entryId: "local-expense-entry",
+          status: "CLOUD_MISSING",
+        }],
       });
-      assert.equal(JSON.stringify([...fixture.storage.values]), before);
+      assert.equal(
+        fixture.sidecar.drafts.getSession().cloud_sync_required,
+        true,
+      );
+      assert.deepEqual(
+        fixture.sidecar.drafts.getSession().entries,
+        before.entries,
+      );
       assert.equal(fixture.sidecar.drafts.getView().entryCount, 1);
     } finally {
       fixture.restoreDocument();

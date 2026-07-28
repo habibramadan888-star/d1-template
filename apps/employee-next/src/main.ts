@@ -59,6 +59,7 @@ export interface EmployeeNextSidecarAdapterOptions {
   readonly sessionPath: string;
   readonly submitPath: string;
   readonly capabilitiesPath?: string;
+  readonly syncStatePath?: string;
 }
 
 export interface EmployeeBedTransferCapability {
@@ -72,22 +73,46 @@ export interface EmployeeNextSidecarAdapters {
   readonly submitPath: string;
   readonly restoreSession: () => Promise<EmployeeAuthSession>;
   readonly restoreBedTransferCapability: () => Promise<EmployeeBedTransferCapability>;
+  readonly checkSyncState?: (
+    session: EmployeeNextSessionDraft,
+  ) => Promise<EmployeeCloudSyncState>;
   readonly buildApiRequest: (
     context: EmployeeSubmitEntryContext<object>,
   ) => EmployeeApiRequest;
 }
 
+export const EMPLOYEE_CLOUD_SYNC_STATUSES = Object.freeze([
+  "SYNCED",
+  "CLOUD_MISSING",
+  "CLOUD_MISMATCH",
+  "CLOUD_VOIDED",
+  "CLOUD_CORRECTED",
+  "OWNER_REVIEW_REQUIRED",
+] as const);
+
+export type EmployeeCloudSyncStatus =
+  (typeof EMPLOYEE_CLOUD_SYNC_STATUSES)[number];
+
+export interface EmployeeCloudEntrySyncState {
+  readonly entryId: string;
+  readonly status: EmployeeCloudSyncStatus;
+}
+
+export interface EmployeeCloudSyncState {
+  readonly status: EmployeeCloudSyncStatus;
+  readonly sessionId: string;
+  readonly anchorId?: string;
+  readonly entries: readonly EmployeeCloudEntrySyncState[];
+}
+
 export type EmployeeSessionUploadState =
   | Readonly<{ status: "IDLE" }>
   | Readonly<{ status: "SUBMITTING" }>
+  | Readonly<{ status: "SYNC_CHECKING" }>
+  | EmployeeCloudSyncState
   | Readonly<{
-    status: "SYNCED";
-    entryIds: readonly string[];
-    sessionId: string;
-  }>
-  | Readonly<{
-    status: "ERROR";
-    errorCode: "SESSION_UPLOAD_FAILED";
+    status: "SYNC_CHECK_UNAVAILABLE";
+    sessionId?: string;
   }>;
 export type EmployeeExpenseUploadCanaryState = EmployeeSessionUploadState;
 
@@ -190,6 +215,112 @@ export function mapEmployeeNextBedTransferCapability(
     validateEnabled: data.bed_transfer_validate_enabled,
     writeEnabled: data.bed_transfer_write_enabled,
     canonicalWritePath,
+  });
+}
+
+function cloudSyncStatus(value: unknown): EmployeeCloudSyncStatus | undefined {
+  if (
+    typeof value === "string"
+    && (EMPLOYEE_CLOUD_SYNC_STATUSES as readonly string[]).includes(value)
+  ) {
+    return value as EmployeeCloudSyncStatus;
+  }
+  return value === "CLOUD_DELETED" ? "OWNER_REVIEW_REQUIRED" : undefined;
+}
+
+function cloudSyncAggregateStatus(
+  statuses: readonly EmployeeCloudSyncStatus[],
+): EmployeeCloudSyncStatus | undefined {
+  if (statuses.length === 0) return undefined;
+  if (statuses.every((status) => status === "SYNCED")) return "SYNCED";
+  for (const status of [
+    "CLOUD_MISMATCH",
+    "OWNER_REVIEW_REQUIRED",
+    "CLOUD_CORRECTED",
+    "CLOUD_VOIDED",
+    "CLOUD_MISSING",
+  ] as const) {
+    if (statuses.includes(status)) return status;
+  }
+  return undefined;
+}
+
+export function mapEmployeeNextCloudSyncState(
+  value: unknown,
+  expectedSession: EmployeeNextSessionDraft,
+): EmployeeCloudSyncState | undefined {
+  const data = apiData(value);
+  if (
+    data === undefined
+    || data.gateway !== "canonical_sync_state_gateway"
+    || data.cloud_authoritative !== true
+    || data.production_write !== false
+    || data.no_write !== true
+    || data.session_id !== expectedSession.session_id
+    || !Array.isArray(data.entries)
+    || data.entries.length !== expectedSession.entries.length
+  ) {
+    return undefined;
+  }
+  const expectedIds = expectedSession.entries.map((entry) => entry.entry_id);
+  const seen = new Set<string>();
+  const entries: EmployeeCloudEntrySyncState[] = [];
+  for (const item of data.entries) {
+    if (!isPlainRecord(item)) return undefined;
+    const entryId = typeof item.local_event_id === "string"
+      ? item.local_event_id.trim()
+      : "";
+    const status = cloudSyncStatus(item.sync_status);
+    if (
+      entryId.length === 0
+      || status === undefined
+      || !expectedIds.includes(entryId)
+      || seen.has(entryId)
+    ) {
+      return undefined;
+    }
+    if (
+      status === "SYNCED"
+      && !(item.matched === true && item.cloud_match === true)
+    ) {
+      return undefined;
+    }
+    seen.add(entryId);
+    entries.push(Object.freeze({ entryId, status }));
+  }
+  if (expectedIds.some((entryId) => !seen.has(entryId))) return undefined;
+  const status = cloudSyncAggregateStatus(entries.map((entry) => entry.status));
+  if (status === undefined) return undefined;
+  const cloudSession = isPlainRecord(data.cloud_session)
+    ? data.cloud_session
+    : undefined;
+  const cloudSessionId = typeof cloudSession?.id === "string"
+    ? cloudSession.id.trim()
+    : "";
+  const anchorId = typeof cloudSession?.anchor_id === "string"
+    ? cloudSession.anchor_id.trim()
+    : "";
+  if (
+    status === "SYNCED"
+    && (
+      cloudSessionId !== expectedSession.session_id
+      || anchorId.length === 0
+    )
+  ) {
+    return undefined;
+  }
+  if (
+    expectedSession.anchor_id !== undefined
+    && anchorId.length > 0
+    && anchorId !== expectedSession.anchor_id
+  ) {
+    return undefined;
+  }
+  return Object.freeze({
+    status,
+    sessionId: expectedSession.session_id,
+    ...(anchorId.length === 0 ? {} : { anchorId }),
+    entries: Object.freeze(entries),
   });
 }
 
@@ -782,6 +913,10 @@ export function createEmployeeNextSidecarAdapters(
       options.capabilitiesPath !== undefined
       && !safePath(options.capabilitiesPath)
     )
+    || (
+      options.syncStatePath !== undefined
+      && !safePath(options.syncStatePath)
+    )
   ) {
     throw new Error("SIDECAR_ADAPTER_INVALID_OPTIONS");
   }
@@ -790,10 +925,16 @@ export function createEmployeeNextSidecarAdapters(
   const submitPath = options.submitPath;
   const capabilitiesPath = options.capabilitiesPath
     ?? sessionPath.replace(/\/me$/u, "/capabilities");
+  const syncStatePath = options.syncStatePath
+    ?? `${submitPath}/sync-state`;
   if (
     !safePath(capabilitiesPath)
     || capabilitiesPath === sessionPath
     || capabilitiesPath === submitPath
+    || !safePath(syncStatePath)
+    || syncStatePath === sessionPath
+    || syncStatePath === submitPath
+    || syncStatePath === capabilitiesPath
   ) {
     throw new Error("SIDECAR_ADAPTER_INVALID_OPTIONS");
   }
@@ -896,6 +1037,59 @@ export function createEmployeeNextSidecarAdapters(
       } catch {
         return disabledBedTransferCapability;
       }
+    },
+    async checkSyncState(
+      session: EmployeeNextSessionDraft,
+    ): Promise<EmployeeCloudSyncState> {
+      if (
+        typeof session !== "object"
+        || session === null
+        || typeof session.session_id !== "string"
+        || session.session_id.trim().length === 0
+        || !Array.isArray(session.entries)
+        || session.entries.length === 0
+      ) {
+        throw new Error("SIDECAR_SYNC_STATE_REQUEST_REJECTED");
+      }
+      let response: EmployeeNextBrowserResponse;
+      try {
+        response = await requestPort.request(syncStatePath, Object.freeze({
+          method: "POST",
+          credentials: "same-origin",
+          headers: Object.freeze({
+            Accept: "application/json",
+            "Content-Type": "application/json",
+          }),
+          body: JSON.stringify({
+            session_id: session.session_id,
+            ...(session.anchor_id === undefined
+              ? {}
+              : { anchor_id: session.anchor_id }),
+            entries: session.entries.map((entry) => ({
+              id: entry.entry_id,
+              entry_id: entry.entry_id,
+              event_id: entry.entry_id,
+              event_type: entry.event_type,
+            })),
+          }),
+        }));
+      } catch {
+        throw new Error("SIDECAR_SYNC_STATE_UNAVAILABLE");
+      }
+      if (!responsePort(response) || response.status !== 200) {
+        throw new Error("SIDECAR_SYNC_STATE_UNAVAILABLE");
+      }
+      let body: unknown;
+      try {
+        body = await response.json();
+      } catch {
+        throw new Error("SIDECAR_SYNC_STATE_UNAVAILABLE");
+      }
+      const result = mapEmployeeNextCloudSyncState(body, session);
+      if (result === undefined) {
+        throw new Error("SIDECAR_SYNC_STATE_UNAVAILABLE");
+      }
+      return result;
     },
     buildApiRequest(
       context: EmployeeSubmitEntryContext<object>,
@@ -1071,6 +1265,7 @@ function createLocalRenderPort(
     enabled: boolean;
     state: EmployeeExpenseUploadCanaryState;
     upload: () => Promise<boolean>;
+    retrySyncCheck: () => Promise<boolean>;
   }>,
   bedTransferWriteEnabledRef?: () => boolean,
 ) {
@@ -1084,6 +1279,7 @@ function createLocalRenderPort(
       appendText(root, "p", `Route status: ${view.state.status}`);
       appendText(root, "p", `Authentication: ${view.shell.auth.status}`);
       appendText(root, "p", `Submit status: ${view.shell.submit.status}`);
+      const expenseUpload = expenseUploadRef?.();
       const draftView = draftViewRef?.();
       if (draftView !== undefined) {
         if (draftView.status === "AUTH_RESTORING") {
@@ -1147,6 +1343,17 @@ function createLocalRenderPort(
                 localDraftDisplayText(entry),
               );
               row.dataset.entryId = entry.entry_id;
+              const cloudEntry = (
+                expenseUpload !== undefined
+                && "entries" in expenseUpload.state
+              )
+                ? expenseUpload.state.entries.find(
+                  (item) => item.entryId === entry.entry_id,
+                )
+                : undefined;
+              if (cloudEntry !== undefined) {
+                appendText(row, "p", `Cloud Sync: ${cloudEntry.status}`);
+              }
               const remove = document.createElement("button");
               remove.type = "button";
               remove.textContent = "Remove Local Draft / 删除本地草稿";
@@ -1163,7 +1370,6 @@ function createLocalRenderPort(
           }
         }
       }
-      const expenseUpload = expenseUploadRef?.();
       if (expenseUpload !== undefined) {
         appendText(
           root,
@@ -1175,11 +1381,24 @@ function createLocalRenderPort(
           upload.type = "button";
           upload.textContent = "Upload Session";
           upload.dataset.action = "upload-session";
-          upload.disabled = expenseUpload.state.status === "SUBMITTING";
+          upload.disabled = (
+            expenseUpload.state.status === "SUBMITTING"
+            || expenseUpload.state.status === "SYNC_CHECKING"
+          );
           upload.addEventListener("click", () => {
             void expenseUpload.upload();
           });
           root.append(upload);
+        }
+        if (expenseUpload.state.status === "SYNC_CHECK_UNAVAILABLE") {
+          const retry = document.createElement("button");
+          retry.type = "button";
+          retry.textContent = "Retry Sync Check";
+          retry.dataset.action = "retry-sync-check";
+          retry.addEventListener("click", () => {
+            void expenseUpload.retrySyncCheck();
+          });
+          root.append(retry);
         }
       }
 
@@ -1299,6 +1518,7 @@ export function startEmployeeNextSidecarRoute(
   uploadExpense: () => Promise<boolean>;
   getSessionUploadState: () => EmployeeSessionUploadState;
   uploadSession: () => Promise<boolean>;
+  retrySyncCheck: () => Promise<boolean>;
 }> {
   if (
     typeof adapters !== "object"
@@ -1320,6 +1540,8 @@ export function startEmployeeNextSidecarRoute(
   let sessionUploadState: EmployeeSessionUploadState =
     Object.freeze({ status: "IDLE" });
   let sessionUploadInFlight = false;
+  let syncCheckInFlight = false;
+  let uploadAttemptedSessionId: string | undefined;
   const removingEntryIds = new Set<string>();
   const confirmLocalDraftRemoval = options.confirmLocalDraftRemoval
     ?? (() => globalThis.confirm(
@@ -1332,6 +1554,62 @@ export function startEmployeeNextSidecarRoute(
       ))
       : ((session: EmployeeNextSessionDraft) =>
         options.confirmExpenseUpload?.(session.entries[0])));
+  async function refreshSyncState(): Promise<boolean> {
+    if (syncCheckInFlight) return false;
+    const session = drafts.getSession();
+    if (
+      !isEmployeeAuthSession(authenticatedSession)
+      || session === undefined
+      || session.entries.length === 0
+    ) {
+      sessionUploadState = Object.freeze({ status: "IDLE" });
+      await controller?.render();
+      return true;
+    }
+    if (typeof adapters.checkSyncState !== "function") {
+      sessionUploadState = Object.freeze({
+        status: "SYNC_CHECK_UNAVAILABLE",
+        sessionId: session.session_id,
+      });
+      await controller?.render();
+      return false;
+    }
+    syncCheckInFlight = true;
+    sessionUploadState = Object.freeze({ status: "SYNC_CHECKING" });
+    await controller?.render();
+    try {
+      const state = await adapters.checkSyncState(session);
+      const current = drafts.getSession();
+      if (
+        current === undefined
+        || current.session_id !== session.session_id
+        || current.entries.length !== session.entries.length
+        || current.entries.some(
+          (entry, index) =>
+            entry.entry_id !== session.entries[index]?.entry_id,
+        )
+      ) {
+        throw new Error("SIDECAR_SYNC_STATE_SCOPE_CHANGED");
+      }
+      if (state.anchorId !== undefined) {
+        const anchorSaved = await drafts.setCloudAnchor(state.anchorId);
+        if (!anchorSaved.ok) {
+          throw new Error("SIDECAR_SYNC_ANCHOR_SAVE_FAILED");
+        }
+      }
+      sessionUploadState = state;
+      return true;
+    } catch {
+      sessionUploadState = Object.freeze({
+        status: "SYNC_CHECK_UNAVAILABLE",
+        sessionId: session.session_id,
+      });
+      return false;
+    } finally {
+      syncCheckInFlight = false;
+      await controller?.render();
+    }
+  }
   function uploadableSession(): EmployeeNextSessionDraft | undefined {
     const session = drafts.getSession();
     return (
@@ -1341,6 +1619,18 @@ export function startEmployeeNextSidecarRoute(
       && drafts.getView().status === "CURRENT_SESSION_READY"
       && session !== undefined
       && session.entries.length > 0
+      && uploadAttemptedSessionId !== session.session_id
+      && (
+        (
+          sessionUploadState.status === "IDLE"
+          && session.cloud_sync_required !== true
+        )
+        || sessionUploadState.status === "CLOUD_MISSING"
+        || (
+          sessionUploadState.status === "SYNC_CHECK_UNAVAILABLE"
+          && session.cloud_sync_required !== true
+        )
+      )
       && (
         !session.entries.some((entry) => entry.event_type === "bed-transfer")
         || (
@@ -1351,7 +1641,6 @@ export function startEmployeeNextSidecarRoute(
           && bedTransferCapability.canonicalWritePath === adapters.submitPath
         )
       )
-      && sessionUploadState.status !== "SYNCED"
     )
       ? session
       : undefined;
@@ -1383,10 +1672,15 @@ export function startEmployeeNextSidecarRoute(
     ) {
       return false;
     }
+    uploadAttemptedSessionId = session.session_id;
     sessionUploadInFlight = true;
     sessionUploadState = Object.freeze({ status: "SUBMITTING" });
     await controller?.render();
     try {
+      const syncRequired = await drafts.markCloudSyncRequired();
+      if (!syncRequired.ok) {
+        throw new Error("SESSION_SYNC_MARKER_SAVE_FAILED");
+      }
       const bedTransferOnly = (
         session.entries.length === 1
         && session.entries[0]?.event_type === "bed-transfer"
@@ -1440,17 +1734,10 @@ export function startEmployeeNextSidecarRoute(
       if (receipt === undefined) {
         throw new Error("SESSION_UPLOAD_RESPONSE_REJECTED");
       }
-      sessionUploadState = Object.freeze({
-        status: "SYNCED",
-        entryIds: receipt.entryIds,
-        sessionId: receipt.sessionId,
-      });
+      await refreshSyncState();
       return true;
     } catch {
-      sessionUploadState = Object.freeze({
-        status: "ERROR",
-        errorCode: "SESSION_UPLOAD_FAILED",
-      });
+      await refreshSyncState();
       return false;
     } finally {
       sessionUploadInFlight = false;
@@ -1482,6 +1769,7 @@ export function startEmployeeNextSidecarRoute(
         enabled: uploadableSession() !== undefined,
         state: sessionUploadState,
         upload: uploadSession,
+        retrySyncCheck: refreshSyncState,
       }),
       () => bedTransferCapability.writeEnabled,
     ),
@@ -1515,6 +1803,9 @@ export function startEmployeeNextSidecarRoute(
         : typeof adapters.restoreBedTransferCapability === "function"
           ? await adapters.restoreBedTransferCapability()
           : disabledBedTransferCapability;
+      if (authenticatedSession !== undefined && drafts.getSession() !== undefined) {
+        await refreshSyncState();
+      }
       await controller?.render();
       return result?.ok === true && restored.ok;
     })
@@ -1538,8 +1829,13 @@ export function startEmployeeNextSidecarRoute(
       return sessionUploadState;
     },
     uploadSession,
+    retrySyncCheck: refreshSyncState,
     async addToSession(input): Promise<boolean> {
       const result = await drafts.addToSession(input);
+      if (result.ok) {
+        sessionUploadState = Object.freeze({ status: "IDLE" });
+        uploadAttemptedSessionId = undefined;
+      }
       await controller?.render();
       return result.ok;
     },

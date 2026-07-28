@@ -43,6 +43,7 @@ const runtime = await loadRuntime(`
     buildEmployeeNextSidecarRequest,
     createEmployeeNextSidecarAdapters,
     mapEmployeeNextBedTransferCapability,
+    mapEmployeeNextCloudSyncState,
     mapEmployeeNextServerSession,
   } from "./apps/employee-next/src/main.ts";
   export {
@@ -566,6 +567,107 @@ test("production request ports are explicit, same-origin and exact-path only", a
     /SIDECAR_ADAPTER_REQUEST_REJECTED/u,
   );
   assert.equal(callCount, 0);
+});
+
+test("canonical sync-state adapter uses the exact read-only POST and fails closed", async () => {
+  const calls = [];
+  const localSession = {
+    session_id: "employee-next-local-session",
+    entries: [{
+      entry_id: "employee-next-local-entry",
+      event_type: "expense",
+      payload: { marker: "local-only" },
+      cash_amount_aed: 0,
+      bank_amount_aed: 0,
+    }],
+  };
+  const canonicalEnvelope = {
+    code: 0,
+    success: true,
+    data: {
+      gateway: "canonical_sync_state_gateway",
+      cloud_authoritative: true,
+      production_write: false,
+      no_write: true,
+      session_id: localSession.session_id,
+      cloud_session: {
+        id: localSession.session_id,
+        anchor_id: "EMP-SESSION-ANCHOR",
+      },
+      entries: [{
+        local_event_id: "employee-next-local-entry",
+        sync_status: "SYNCED",
+        matched: true,
+        cloud_match: true,
+      }],
+    },
+  };
+  const adapters = runtime.createEmployeeNextSidecarAdapters(
+    adapterOptions(async (path, init) => {
+      calls.push({ path, init });
+      return response(200, canonicalEnvelope);
+    }),
+  );
+  assert.deepEqual(await adapters.checkSyncState(localSession), {
+    status: "SYNCED",
+    sessionId: localSession.session_id,
+    anchorId: "EMP-SESSION-ANCHOR",
+    entries: [{
+      entryId: "employee-next-local-entry",
+      status: "SYNCED",
+    }],
+  });
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].path, `${submitPath}/sync-state`);
+  assert.equal(calls[0].init.method, "POST");
+  assert.equal(calls[0].init.credentials, "same-origin");
+  assert.equal(
+    Object.keys(calls[0].init.headers).some(
+      (key) => key.toLowerCase() === "authorization",
+    ),
+    false,
+  );
+  assert.deepEqual(JSON.parse(calls[0].init.body), {
+    session_id: localSession.session_id,
+    entries: [{
+      id: "employee-next-local-entry",
+      entry_id: "employee-next-local-entry",
+      event_id: "employee-next-local-entry",
+      event_type: "expense",
+    }],
+  });
+
+  for (const body of [
+    {
+      ...canonicalEnvelope,
+      data: {
+        ...canonicalEnvelope.data,
+        cloud_session: undefined,
+      },
+    },
+    {
+      ...canonicalEnvelope,
+      data: {
+        ...canonicalEnvelope.data,
+        entries: [{
+          ...canonicalEnvelope.data.entries[0],
+          matched: false,
+        }],
+      },
+    },
+    {
+      ...canonicalEnvelope,
+      data: {
+        ...canonicalEnvelope.data,
+        production_write: true,
+      },
+    },
+  ]) {
+    assert.equal(
+      runtime.mapEmployeeNextCloudSyncState(body, localSession),
+      undefined,
+    );
+  }
 });
 
 test("all seven real event contracts form exact single-path requests", () => {

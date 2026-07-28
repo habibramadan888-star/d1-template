@@ -243,6 +243,44 @@ test("A and B scopes round-trip exact independent sessions without restore write
   assert.deepEqual(controller.getSession(), sessionA);
 });
 
+test("canonical anchor and upload-attempt marker persist without claiming sync success", async () => {
+  const storage = storagePort();
+  const controller = runtime.createEmployeeNextSessionDraftController(storage);
+  assert.equal((await controller.restore(staff())).ok, true);
+  assert.equal((await controller.addToSession({
+    sessionId: "session-with-cloud-anchor",
+    entry: entry("expense", 50),
+  })).ok, true);
+  const entryBefore = structuredClone(controller.getSession().entries);
+  assert.equal((await controller.markCloudSyncRequired()).ok, true);
+  assert.equal(controller.getSession().cloud_sync_required, true);
+  assert.equal(
+    (await controller.setCloudAnchor("EMP-CANONICAL-ANCHOR")).ok,
+    true,
+  );
+  assert.equal(
+    controller.getSession().anchor_id,
+    "EMP-CANONICAL-ANCHOR",
+  );
+  assert.deepEqual(controller.getSession().entries, entryBefore);
+
+  const restored = runtime.createEmployeeNextSessionDraftController(storage);
+  assert.equal((await restored.restore(staff())).ok, true);
+  assert.deepEqual(restored.getSession(), controller.getSession());
+  assert.equal(
+    JSON.stringify([...storage.values]).includes("SYNCED"),
+    false,
+  );
+  assert.equal(
+    (await restored.setCloudAnchor("   ")).ok,
+    false,
+  );
+  assert.equal(
+    restored.getSession().anchor_id,
+    "EMP-CANONICAL-ANCHOR",
+  );
+});
+
 test("corrupt JSON, schema and scope mismatch fail closed without overwrite", async () => {
   const scope = { corpid: "homelink", userid: "employee-a" };
   const key = runtime.employeeNextDraftStorageKey(scope);

@@ -21,6 +21,8 @@ export interface EmployeeNextSessionDraftEntry {
 
 export interface EmployeeNextSessionDraft {
   readonly session_id: string;
+  readonly anchor_id?: string;
+  readonly cloud_sync_required?: true;
   readonly entries: readonly EmployeeNextSessionDraftEntry[];
 }
 
@@ -95,6 +97,8 @@ export interface EmployeeNextSessionDraftController {
     entry: EmployeeNextSessionDraftEntry;
   }>): Promise<EmployeeNextSessionDraftResult>;
   removeLocalDraft(entryId: string): Promise<EmployeeNextSessionDraftResult>;
+  setCloudAnchor(anchorId: string): Promise<EmployeeNextSessionDraftResult>;
+  markCloudSyncRequired(): Promise<EmployeeNextSessionDraftResult>;
 }
 
 const entryKeys = Object.freeze([
@@ -105,6 +109,22 @@ const entryKeys = Object.freeze([
   "payload",
 ] as const);
 const sessionKeys = Object.freeze(["entries", "session_id"] as const);
+const anchoredSessionKeys = Object.freeze([
+  "anchor_id",
+  "entries",
+  "session_id",
+] as const);
+const syncRequiredSessionKeys = Object.freeze([
+  "cloud_sync_required",
+  "entries",
+  "session_id",
+] as const);
+const anchoredSyncRequiredSessionKeys = Object.freeze([
+  "anchor_id",
+  "cloud_sync_required",
+  "entries",
+  "session_id",
+] as const);
 const envelopeKeys = Object.freeze([
   "revision",
   "saved_at",
@@ -199,6 +219,12 @@ function snapshotSession(
 ): EmployeeNextSessionDraft {
   return Object.freeze({
     session_id: session.session_id,
+    ...(session.anchor_id === undefined
+      ? {}
+      : { anchor_id: session.anchor_id }),
+    ...(session.cloud_sync_required === true
+      ? { cloud_sync_required: true as const }
+      : {}),
     entries: Object.freeze(session.entries.map((entry) => snapshotEntry(entry))),
   });
 }
@@ -217,10 +243,29 @@ function isEntry(value: unknown): value is EmployeeNextSessionDraftEntry {
 }
 
 function isSession(value: unknown): value is EmployeeNextSessionDraft {
-  if (!isPlainObject(value) || !hasExactKeys(value, sessionKeys)) {
+  if (
+    !isPlainObject(value)
+    || !(
+      hasExactKeys(value, sessionKeys)
+      || hasExactKeys(value, anchoredSessionKeys)
+      || hasExactKeys(value, syncRequiredSessionKeys)
+      || hasExactKeys(value, anchoredSyncRequiredSessionKeys)
+    )
+  ) {
     return false;
   }
-  if (!isNonEmptyString(value.session_id) || !Array.isArray(value.entries)) {
+  if (
+    !isNonEmptyString(value.session_id)
+    || (
+      value.anchor_id !== undefined
+      && !isNonEmptyString(value.anchor_id)
+    )
+    || (
+      value.cloud_sync_required !== undefined
+      && value.cloud_sync_required !== true
+    )
+    || !Array.isArray(value.entries)
+  ) {
     return false;
   }
   const ids = new Set<string>();
@@ -498,6 +543,12 @@ export function createEmployeeNextSessionDraftController(
 
       const nextSession = snapshotSession({
         session_id: input.sessionId,
+        ...(session?.anchor_id === undefined
+          ? {}
+          : { anchor_id: session.anchor_id }),
+        ...(session?.cloud_sync_required === true
+          ? { cloud_sync_required: true as const }
+          : {}),
         entries: [
           ...(session?.entries ?? []),
           snapshotEntry(input.entry),
@@ -549,6 +600,12 @@ export function createEmployeeNextSessionDraftController(
 
       const nextSession = snapshotSession({
         session_id: session.session_id,
+        ...(session.anchor_id === undefined
+          ? {}
+          : { anchor_id: session.anchor_id }),
+        ...(session.cloud_sync_required === true
+          ? { cloud_sync_required: true as const }
+          : {}),
         entries: session.entries.filter((_, index) => index !== targetIndex),
       });
       const envelope: EmployeeNextSessionDraftEnvelope = Object.freeze({
@@ -581,6 +638,101 @@ export function createEmployeeNextSessionDraftController(
 
       session = nextSession.entries.length === 0 ? undefined : nextSession;
       revision = session === undefined ? 0 : envelope.revision;
+      view = readyView(session);
+      return success(view);
+    },
+
+    async setCloudAnchor(
+      anchorId: string,
+    ): Promise<EmployeeNextSessionDraftResult> {
+      if (
+        scope === undefined
+        || view.status !== "CURRENT_SESSION_READY"
+        || session === undefined
+        || !isNonEmptyString(anchorId)
+      ) {
+        return failure("DRAFT_ENVELOPE_INVALID", view);
+      }
+      const normalizedAnchorId = anchorId.trim();
+      if (normalizedAnchorId.length === 0) {
+        return failure("DRAFT_ENVELOPE_INVALID", view);
+      }
+      if (session.anchor_id === normalizedAnchorId) {
+        return success(view);
+      }
+      const nextSession = snapshotSession({
+        session_id: session.session_id,
+        anchor_id: normalizedAnchorId,
+        ...(session.cloud_sync_required === true
+          ? { cloud_sync_required: true as const }
+          : {}),
+        entries: session.entries,
+      });
+      const envelope: EmployeeNextSessionDraftEnvelope = Object.freeze({
+        schema_version: 1,
+        scope,
+        session: nextSession,
+        revision: revision + 1,
+        saved_at: now(),
+      });
+      if (!isEnvelope(envelope)) {
+        return failure("DRAFT_ENVELOPE_INVALID", view);
+      }
+      try {
+        await storage.setItem(
+          employeeNextDraftStorageKey(scope),
+          JSON.stringify(envelope),
+        );
+      } catch {
+        view = readyView(session, "DRAFT_SAVE_FAILED");
+        return failure("DRAFT_SAVE_FAILED", view);
+      }
+      session = nextSession;
+      revision = envelope.revision;
+      view = readyView(session);
+      return success(view);
+    },
+
+    async markCloudSyncRequired(): Promise<EmployeeNextSessionDraftResult> {
+      if (
+        scope === undefined
+        || view.status !== "CURRENT_SESSION_READY"
+        || session === undefined
+      ) {
+        return failure("DRAFT_ENVELOPE_INVALID", view);
+      }
+      if (session.cloud_sync_required === true) {
+        return success(view);
+      }
+      const nextSession = snapshotSession({
+        session_id: session.session_id,
+        ...(session.anchor_id === undefined
+          ? {}
+          : { anchor_id: session.anchor_id }),
+        cloud_sync_required: true,
+        entries: session.entries,
+      });
+      const envelope: EmployeeNextSessionDraftEnvelope = Object.freeze({
+        schema_version: 1,
+        scope,
+        session: nextSession,
+        revision: revision + 1,
+        saved_at: now(),
+      });
+      if (!isEnvelope(envelope)) {
+        return failure("DRAFT_ENVELOPE_INVALID", view);
+      }
+      try {
+        await storage.setItem(
+          employeeNextDraftStorageKey(scope),
+          JSON.stringify(envelope),
+        );
+      } catch {
+        view = readyView(session, "DRAFT_SAVE_FAILED");
+        return failure("DRAFT_SAVE_FAILED", view);
+      }
+      session = nextSession;
+      revision = envelope.revision;
       view = readyView(session);
       return success(view);
     },
