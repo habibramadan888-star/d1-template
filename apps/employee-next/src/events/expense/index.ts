@@ -66,13 +66,15 @@ export interface EmployeeExpensePaymentLeg {
   readonly amountAed: number;
 }
 
+export type EmployeeExpenseAedInput = string | number | null;
+
 export interface EmployeeExpenseDraft {
   readonly expenseDate: string;
   readonly expenseCategory: EmployeeExpenseCategory;
-  readonly expenseAmountAed: number | null;
+  readonly expenseAmountAed: EmployeeExpenseAedInput;
   readonly paymentMethod: EmployeeExpensePaymentMethod;
-  readonly cashPaidAed: number | null;
-  readonly bankPaidAed: number | null;
+  readonly cashPaidAed: EmployeeExpenseAedInput;
+  readonly bankPaidAed: EmployeeExpenseAedInput;
   readonly expenseScope: EmployeeExpenseScope;
   readonly apartmentLabel: string;
   readonly bedLabel: string;
@@ -136,6 +138,24 @@ export interface EmployeeExpenseEventContract extends EmployeeEventContract<
   EmployeeExpenseSubmission
 > {}
 
+const EMPLOYEE_EXPENSE_AED_DECIMAL = /^(0|[1-9]\d*)(?:\.(\d{1,2}))?$/u;
+
+export function employeeExpenseAedToFils(value: unknown): bigint | undefined {
+  if (
+    (typeof value !== "number" && typeof value !== "string")
+    || (typeof value === "number" && !Number.isFinite(value))
+  ) {
+    return undefined;
+  }
+  const decimal = typeof value === "string" ? value : String(value);
+  const match = EMPLOYEE_EXPENSE_AED_DECIMAL.exec(decimal);
+  if (match === null) {
+    return undefined;
+  }
+  const fraction = (match[2] ?? "").padEnd(2, "0");
+  return (BigInt(match[1]) * 100n) + BigInt(fraction);
+}
+
 const EXPENSE_DRAFT_KEYS = Object.freeze([
   "expenseDate",
   "expenseCategory",
@@ -175,29 +195,37 @@ function hasExactDraftKeys(value: Readonly<Record<string, unknown>>): boolean {
   );
 }
 
-function isNullableFiniteNumber(value: unknown): value is number | null {
-  return value === null || (typeof value === "number" && Number.isFinite(value));
+function isNullableExpenseMoney(value: unknown): value is EmployeeExpenseAedInput {
+  return value === null
+    || typeof value === "string"
+    || (typeof value === "number" && Number.isFinite(value));
 }
 
-function hasAtMostTwoDecimalPlaces(value: number): boolean {
-  return Math.abs(value - Math.round(value * 100) / 100) < 1e-9;
+function isValidNonNegativeMoney(
+  value: unknown,
+): value is Exclude<EmployeeExpenseAedInput, null> {
+  return employeeExpenseAedToFils(value) !== undefined;
 }
 
-function isValidNonNegativeMoney(value: unknown): value is number {
-  return (
-    typeof value === "number"
-    && Number.isFinite(value)
-    && value >= 0
-    && hasAtMostTwoDecimalPlaces(value)
-  );
+function normalizeMoney(value: Exclude<EmployeeExpenseAedInput, null>): number {
+  const fils = employeeExpenseAedToFils(value);
+  if (fils === undefined) {
+    throw new Error("EMPLOYEE_EXPENSE_INVALID_MONEY");
+  }
+  const normalized = Number(value);
+  if (
+    !Number.isFinite(normalized)
+    || employeeExpenseAedToFils(normalized) !== fils
+  ) {
+    throw new Error("EMPLOYEE_EXPENSE_MONEY_NOT_REPRESENTABLE");
+  }
+  return normalized;
 }
 
-function normalizeMoney(value: number): number {
-  return Math.round((value + Number.EPSILON) * 100) / 100;
-}
-
-function moneyEqual(left: number, right: number): boolean {
-  return Math.abs(normalizeMoney(left) - normalizeMoney(right)) < 1e-9;
+function moneyEqual(left: unknown, right: unknown): boolean {
+  const leftFils = employeeExpenseAedToFils(left);
+  const rightFils = employeeExpenseAedToFils(right);
+  return leftFils !== undefined && leftFils === rightFils;
 }
 
 function issue(
@@ -276,10 +304,10 @@ export function isEmployeeExpenseDraft(
     return (
       typeof value.expenseDate === "string"
       && isEmployeeExpenseCategory(value.expenseCategory)
-      && isNullableFiniteNumber(value.expenseAmountAed)
+      && isNullableExpenseMoney(value.expenseAmountAed)
       && isEmployeeExpensePaymentMethod(value.paymentMethod)
-      && isNullableFiniteNumber(value.cashPaidAed)
-      && isNullableFiniteNumber(value.bankPaidAed)
+      && isNullableExpenseMoney(value.cashPaidAed)
+      && isNullableExpenseMoney(value.bankPaidAed)
       && isEmployeeExpenseScope(value.expenseScope)
       && typeof value.apartmentLabel === "string"
       && typeof value.bedLabel === "string"
@@ -359,12 +387,7 @@ function validateDraft(
   }
   if (expenseAmountAed === null || expenseAmountAed === undefined) {
     issues.push(issue("EXPENSE_AMOUNT_REQUIRED", "Expense amount is required.", "expenseAmountAed"));
-  } else if (
-    typeof expenseAmountAed !== "number"
-    || !Number.isFinite(expenseAmountAed)
-    || expenseAmountAed <= 0
-    || !hasAtMostTwoDecimalPlaces(expenseAmountAed)
-  ) {
+  } else if ((employeeExpenseAedToFils(expenseAmountAed) ?? 0n) <= 0n) {
     issues.push(issue("EXPENSE_AMOUNT_INVALID", "Expense amount is invalid.", "expenseAmountAed"));
   }
   if (paymentMethod === "mixed") {
@@ -383,12 +406,7 @@ function validateDraft(
     issues.push(issue("EXPENSE_BANK_AMOUNT_INVALID", "Bank amount is invalid.", "bankPaidAed"));
   }
 
-  const amountIsValid = (
-    typeof expenseAmountAed === "number"
-    && Number.isFinite(expenseAmountAed)
-    && expenseAmountAed > 0
-    && hasAtMostTwoDecimalPlaces(expenseAmountAed)
-  );
+  const amountIsValid = (employeeExpenseAedToFils(expenseAmountAed) ?? 0n) > 0n;
   const cashIsValid = isValidNonNegativeMoney(cashPaidAed);
   const bankIsValid = isValidNonNegativeMoney(bankPaidAed);
   if (
@@ -398,8 +416,10 @@ function validateDraft(
     && bankIsValid
   ) {
     const splitValid = paymentMethod === "cash"
-      ? moneyEqual(cashPaidAed, expenseAmountAed) && bankPaidAed === 0
-      : moneyEqual(bankPaidAed, expenseAmountAed) && cashPaidAed === 0;
+      ? moneyEqual(cashPaidAed, expenseAmountAed)
+        && employeeExpenseAedToFils(bankPaidAed) === 0n
+      : moneyEqual(bankPaidAed, expenseAmountAed)
+        && employeeExpenseAedToFils(cashPaidAed) === 0n;
     if (!splitValid) {
       issues.push(issue(
         "EXPENSE_PAYMENT_SPLIT_MISMATCH",
@@ -467,9 +487,9 @@ function buildSubmission(
     throw new Error("EMPLOYEE_EXPENSE_INVALID_DRAFT");
   }
 
-  const expenseAmountAed = normalizeMoney(draft.expenseAmountAed as number);
-  const cashPaidAed = normalizeMoney(draft.cashPaidAed as number);
-  const bankPaidAed = normalizeMoney(draft.bankPaidAed as number);
+  const expenseAmountAed = normalizeMoney(draft.expenseAmountAed as Exclude<EmployeeExpenseAedInput, null>);
+  const cashPaidAed = normalizeMoney(draft.cashPaidAed as Exclude<EmployeeExpenseAedInput, null>);
+  const bankPaidAed = normalizeMoney(draft.bankPaidAed as Exclude<EmployeeExpenseAedInput, null>);
   const legs = Object.freeze([
     ...(cashPaidAed > 0
       ? [Object.freeze({ method: "cash" as const, amountAed: cashPaidAed })]

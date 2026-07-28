@@ -143,10 +143,12 @@ function entry(eventType = "expense", id = "local-expense-entry") {
 function adapters(options = {}) {
   const calls = [];
   const syncCalls = [];
+  const validationCalls = [];
   let accepted = false;
   const value = {
     calls,
     syncCalls,
+    validationCalls,
     submitPath: "/api/employee/entry",
     async restoreSession() {
       if (options.restoreError) {
@@ -159,6 +161,31 @@ function adapters(options = {}) {
         validateEnabled: false,
         writeEnabled: false,
         canonicalWritePath: "",
+      };
+    },
+    async validateSessionRequest(request) {
+      validationCalls.push(structuredClone(request));
+      const count = request.body.validation_requests.length;
+      return {
+        status: 200,
+        body: {
+          code: 0,
+          success: true,
+          data: {
+            ok: true,
+            no_write: true,
+            write_attempted: false,
+            formal_write_count: 0,
+            validation_result_count: count,
+            passed_result_count: count,
+            failed_result_count: 0,
+            validation_results: request.body.validation_requests.map(() => ({
+              ok: true,
+              no_write: true,
+              write_attempted: false,
+            })),
+          },
+        },
       };
     },
     buildApiRequest(context) {
@@ -275,6 +302,14 @@ async function start(options = {}) {
   };
 }
 
+async function validateCurrent(fixture) {
+  assert.equal(await fixture.sidecar.validateSession(), true);
+  assert.equal(
+    fixture.sidecar.getSessionValidationState().status,
+    "VALIDATED",
+  );
+}
+
 test("session upload stays hidden without exact employee/staff and accepts ordinary sessions", async () => {
   for (const options of [
     { restoreError: true },
@@ -306,6 +341,8 @@ test("session upload stays hidden without exact employee/staff and accepts ordin
       sessionId: "local-session",
       entry: entry("rent"),
     });
+    assert.doesNotMatch(visibleText(nonExpense.root), /Upload Session/u);
+    await validateCurrent(nonExpense);
     assert.match(visibleText(nonExpense.root), /Upload Session/u);
   } finally {
     nonExpense.restoreDocument();
@@ -321,6 +358,7 @@ test("session upload stays hidden without exact employee/staff and accepts ordin
       sessionId: "local-session",
       entry: entry("expense", "expense-two"),
     });
+    await validateCurrent(multiple);
     assert.match(visibleText(multiple.root), /Upload Session/u);
   } finally {
     multiple.restoreDocument();
@@ -332,6 +370,7 @@ test("session upload stays hidden without exact employee/staff and accepts ordin
       sessionId: "local-session",
       entry: entry(),
     });
+    await validateCurrent(employee);
     assert.match(visibleText(employee.root), /Upload Session/u);
   } finally {
     employee.restoreDocument();
@@ -345,6 +384,7 @@ test("explicit confirmation is required and cancellation preserves the local dra
       sessionId: "local-session",
       entry: entry(),
     });
+    await validateCurrent(fixture);
     const before = JSON.stringify([...fixture.storage.values]);
     assert.match(visibleText(fixture.root), /Upload Session/u);
     assert.equal(await fixture.sidecar.uploadExpense(), false);
@@ -363,6 +403,7 @@ test("one confirmed Expense produces exactly one POST and only explicit success 
       sessionId: "local-session",
       entry: entry(),
     });
+    await validateCurrent(fixture);
     const before = fixture.sidecar.drafts.getSession();
     assert.equal(await fixture.sidecar.uploadExpense(), true);
     assert.equal(fixture.adapter.calls.length, 1);
@@ -430,6 +471,7 @@ test("rapid double invocation produces one POST", async () => {
       sessionId: "local-session",
       entry: entry(),
     });
+    await validateCurrent(fixture);
     const first = fixture.sidecar.uploadExpense();
     await Promise.resolve();
     const second = fixture.sidecar.uploadExpense();
@@ -453,6 +495,7 @@ test("ordinary mixed session sends one aggregate POST with every stable identity
       sessionId: "mixed-session",
       entry: entry("expense", "expense-one"),
     });
+    await validateCurrent(fixture);
     assert.equal(await fixture.sidecar.uploadSession(), true);
     assert.equal(fixture.adapter.calls.length, 1);
     const body = fixture.adapter.calls[0].body;
@@ -558,7 +601,7 @@ test("ambiguous sync never becomes SYNCED and retry performs no business write",
     });
     assert.match(visibleText(fixture.root), /Retry Sync Check/u);
     assert.doesNotMatch(visibleText(fixture.root), /Employee Sync State: SYNCED/u);
-    assert.match(visibleText(fixture.root), /Upload Session/u);
+    assert.doesNotMatch(visibleText(fixture.root), /Upload Session/u);
     assert.equal(fixture.adapter.calls.length, 0);
     unavailable = false;
     assert.equal(await fixture.sidecar.retrySyncCheck(), true);
@@ -568,6 +611,8 @@ test("ambiguous sync never becomes SYNCED and retry performs no business write",
       fixture.sidecar.getSessionUploadState().status,
       "CLOUD_MISSING",
     );
+    assert.doesNotMatch(visibleText(fixture.root), /Upload Session/u);
+    await validateCurrent(fixture);
     assert.match(visibleText(fixture.root), /Upload Session/u);
   } finally {
     fixture.restoreDocument();
@@ -588,6 +633,7 @@ test("ambiguous upload survives refresh as sync-only and cannot be resubmitted",
       sessionId: "ambiguous-upload-session",
       entry: entry(),
     });
+    await validateCurrent(first);
     assert.equal(await first.sidecar.uploadSession(), false);
     assert.equal(first.adapter.calls.length, 1);
     assert.equal(
@@ -710,6 +756,7 @@ test("exact enabled capability permits one isolated Bed Transfer POST only", asy
       sessionId: "bed-transfer-session",
       entry: entry("bed-transfer", "transfer-one"),
     });
+    await validateCurrent(fixture);
     assert.match(visibleText(fixture.root), /Upload Session/u);
     assert.equal(await fixture.sidecar.uploadSession(), true);
     assert.equal(fixture.adapter.calls.length, 1);
@@ -784,6 +831,7 @@ test("transport and server failures retain the unsynced Expense without retry", 
         sessionId: "local-session",
         entry: entry(),
       });
+      await validateCurrent(fixture);
       const before = structuredClone(fixture.sidecar.drafts.getSession());
       assert.equal(await fixture.sidecar.uploadExpense(), false);
       assert.equal(fixture.adapter.calls.length, 1);

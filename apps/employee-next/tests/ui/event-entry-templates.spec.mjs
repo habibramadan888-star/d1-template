@@ -390,6 +390,43 @@ test("Bed Transfer form is local-capable and explicitly keeps formal write disab
   }
 });
 
+test("Expense money inputs preserve the original decimal text before validation", () => {
+  const previousDocument = globalThis.document;
+  globalThis.document = {
+    createElement(tagName) {
+      return new FakeElement(tagName);
+    },
+  };
+  try {
+    const registry = runtime.createEmployeeEntryTemplateRegistry(
+      mainRuntime.createEmployeeSevenEventRegistry(),
+    );
+    const template = registry.get("expense");
+    const draft = template.createInitialFormState();
+    const changes = [];
+    const root = new FakeElement("section");
+    template.mount(root, {
+      draft,
+      issues: [],
+      canAdd: false,
+      busy: false,
+      onChange(field, value) {
+        changes.push([field, value]);
+      },
+      onAdd() {},
+    });
+    const amount = byDataset(root, "fieldInput", "expenseAmountAed");
+    amount.value = "100000000000000.25";
+    amount.listeners.get("input")();
+    assert.deepEqual(changes.at(-1), [
+      "expenseAmountAed",
+      "100000000000000.25",
+    ]);
+  } finally {
+    globalThis.document = previousDocument;
+  }
+});
+
 test("real Expense DOM Add to Session is scoped, atomic, and transport-free", async () => {
   const previousDocument = globalThis.document;
   globalThis.document = {

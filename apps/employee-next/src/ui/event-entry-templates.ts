@@ -32,6 +32,7 @@ import {
   EMPLOYEE_EXPENSE_CATEGORIES,
   EMPLOYEE_EXPENSE_PAYMENT_METHODS,
   EMPLOYEE_EXPENSE_SCOPES,
+  employeeExpenseAedToFils,
 } from "../events/expense";
 import {
   EMPLOYEE_RENT_PAYMENT_METHODS,
@@ -56,6 +57,11 @@ export interface EmployeeEntryContextPort {
     eventId: EmployeeEventId,
     draft: Readonly<Record<string, unknown>>,
   ): EmployeeEntryContextSnapshot | undefined;
+  refresh?(
+    eventId: EmployeeEventId,
+    draft: Readonly<Record<string, unknown>>,
+    force?: boolean,
+  ): Promise<void>;
 }
 
 type FieldKind = "text" | "date" | "number" | "select" | "checkbox" | "textarea";
@@ -66,6 +72,7 @@ interface FieldDefinition {
   readonly kind: FieldKind;
   readonly options?: readonly string[];
   readonly systemRead?: boolean;
+  readonly preserveDecimalText?: boolean;
 }
 
 export interface EmployeeEntryTemplate {
@@ -107,6 +114,7 @@ export interface EmployeeEntryTemplateMountOptions {
   readonly bedTransferFormalWriteEnabled?: boolean;
   readonly onChange: (field: string, value: unknown) => void;
   readonly onAdd: () => void;
+  readonly onRetryContext: () => void;
 }
 
 export interface EmployeeEntryTemplateRegistry {
@@ -126,6 +134,7 @@ export interface EmployeeEntryUiControllerOptions {
   readonly session: () => EmployeeNextSessionDraft | undefined;
   readonly draftView: () => EmployeeNextSessionDraftView;
   readonly requestRender: () => void | Promise<void>;
+  readonly onBusinessFieldChange?: () => void;
 }
 
 export interface EmployeeEntryUiController {
@@ -238,7 +247,11 @@ function readInputValue(field: FieldDefinition, input: HTMLInputElement | HTMLSe
     return (input as HTMLInputElement).checked;
   }
   if (field.kind === "number") {
-    return input.value.trim() === "" ? null : Number(input.value);
+    return input.value.trim() === ""
+      ? null
+      : field.preserveDecimalText === true
+        ? input.value
+        : Number(input.value);
   }
   return input.value;
 }
@@ -291,6 +304,14 @@ function mountFields(
     context.dataset.contextStatus = options.context.ready ? "ready" : "unavailable";
     context.textContent = options.context.summary;
     parent.append(context);
+    if (!options.context.ready) {
+      const retry = document.createElement("button");
+      retry.type = "button";
+      retry.textContent = "Retry Context";
+      retry.dataset.action = "retry-context";
+      retry.addEventListener("click", options.onRetryContext);
+      parent.append(retry);
+    }
   }
 
   const issueByField = new Map<string, EventValidationIssue[]>();
@@ -359,7 +380,12 @@ function syncPayment(
   bankField: string,
 ): DraftRecord {
   const next = { ...draft };
-  const amount = typeof next[amountField] === "number" ? next[amountField] : null;
+  const amount = (
+    typeof next[amountField] === "number"
+    || typeof next[amountField] === "string"
+  )
+    ? next[amountField]
+    : null;
   if (next[methodField] === "cash") {
     next[cashField] = amount;
     next[bankField] = 0;
@@ -479,6 +505,13 @@ const date = (name: string, label: string): FieldDefinition =>
   Object.freeze({ name, label, kind: "date" as const });
 const number = (name: string, label: string, systemRead = false): FieldDefinition =>
   Object.freeze({ name, label, kind: "number" as const, systemRead });
+const decimalMoney = (name: string, label: string): FieldDefinition =>
+  Object.freeze({
+    name,
+    label,
+    kind: "number" as const,
+    preserveDecimalText: true,
+  });
 const textarea = (name: string, label: string): FieldDefinition =>
   Object.freeze({ name, label, kind: "textarea" as const });
 const checkbox = (name: string, label: string): FieldDefinition =>
@@ -656,10 +689,10 @@ function expenseDefinition(): TemplateDefinition {
     fields: Object.freeze([
       date("expenseDate", "Expense date"),
       select("expenseCategory", "Category", EMPLOYEE_EXPENSE_CATEGORIES),
-      number("expenseAmountAed", "Amount (AED)"),
+      decimalMoney("expenseAmountAed", "Amount (AED)"),
       select("paymentMethod", "Payment", EMPLOYEE_EXPENSE_PAYMENT_METHODS),
-      number("cashPaidAed", "Cash (AED)"),
-      number("bankPaidAed", "Bank (AED)"),
+      decimalMoney("cashPaidAed", "Cash (AED)"),
+      decimalMoney("bankPaidAed", "Bank (AED)"),
       select("expenseScope", "Expense target", EMPLOYEE_EXPENSE_SCOPES),
       text("apartmentLabel", "Apartment"),
       text("bedLabel", "Bed"),
@@ -684,8 +717,7 @@ function expenseDefinition(): TemplateDefinition {
     ),
     extraValidate(draft: Readonly<DraftRecord>): readonly EventValidationIssue[] {
       return (
-        typeof draft.expenseAmountAed === "number"
-        && draft.expenseAmountAed >= 100
+        (employeeExpenseAedToFils(draft.expenseAmountAed) ?? 0n) >= 10_000n
         && (
           draft.receiptAvailable !== true
           || typeof draft.receiptNote !== "string"
@@ -840,6 +872,27 @@ export function createEmployeeEntryUiController(
     void options.requestRender();
   }
 
+  function refreshContext(
+    template: EmployeeEntryTemplate,
+    currentDraft: Readonly<DraftRecord>,
+    force = false,
+  ): void {
+    if (
+      options.contexts === undefined
+      || typeof options.contexts.refresh !== "function"
+      || template.eventType === "expense"
+    ) {
+      return;
+    }
+    void options.contexts.refresh(template.eventType, currentDraft, force)
+      .finally(() => {
+        if (selected === template && draft !== undefined) {
+          context = readContext(template, draft);
+          rerender();
+        }
+      });
+  }
+
   const controller: EmployeeEntryUiController = {
     selectEvent(value): boolean {
       const template = templates.get(value);
@@ -853,6 +906,9 @@ export function createEmployeeEntryUiController(
       }
       selected = template;
       reset(template);
+      if (draft !== undefined) {
+        refreshContext(template, draft);
+      }
       rerender();
       return true;
     },
@@ -867,6 +923,12 @@ export function createEmployeeEntryUiController(
         return;
       }
       context = readContext(selected, draft);
+      draft = selected.updateFormState(
+        draft,
+        "__context_refresh__",
+        undefined,
+        context,
+      );
       const issues = selected.validate(draft, context);
       const draftReady = options.draftView().status === "CURRENT_SESSION_READY";
       const canAdd = (
@@ -887,10 +949,17 @@ export function createEmployeeEntryUiController(
             return;
           }
           draft = selected.updateFormState(draft, field, value, context);
+          options.onBusinessFieldChange?.();
           context = readContext(selected, draft);
           draft = selected.updateFormState(draft, field, draft[field], context);
           errorCode = undefined;
+          refreshContext(selected, draft);
           rerender();
+        },
+        onRetryContext(): void {
+          if (selected !== undefined && draft !== undefined) {
+            refreshContext(selected, draft, true);
+          }
         },
         onAdd(): void {
           if (busy || !canAdd || selected === undefined || draft === undefined) {

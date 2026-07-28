@@ -74,7 +74,9 @@ const adapters = createEmployeeNextSidecarAdapters({
   sessionPath,
   submitPath,
 });
-startEmployeeNextSidecarRoute(root, adapters);
+startEmployeeNextSidecarRoute(root, adapters, {
+  entryContexts: adapters.entryContexts,
+});
 `;
 
 const build = await esbuild.build({

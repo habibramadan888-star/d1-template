@@ -16,6 +16,9 @@ import {
 import type {
   EmployeeSubmitEntryContext,
 } from "./core/submit-entry";
+import type {
+  EmployeeEventId,
+} from "./core/event-contract";
 import {
   createEmployeeNextSessionDraftController,
   type EmployeeNextSessionDraftController,
@@ -32,6 +35,9 @@ import {
 import {
   createEmployeeSevenEventRegistry,
 } from "./events";
+import {
+  employeeExpenseAedToFils,
+} from "./events/expense";
 
 export const employeeNextRouteId = "employee-next-route-candidate";
 
@@ -60,6 +66,7 @@ export interface EmployeeNextSidecarAdapterOptions {
   readonly submitPath: string;
   readonly capabilitiesPath?: string;
   readonly syncStatePath?: string;
+  readonly validatePath?: string;
 }
 
 export interface EmployeeBedTransferCapability {
@@ -73,6 +80,10 @@ export interface EmployeeNextSidecarAdapters {
   readonly submitPath: string;
   readonly restoreSession: () => Promise<EmployeeAuthSession>;
   readonly restoreBedTransferCapability: () => Promise<EmployeeBedTransferCapability>;
+  readonly entryContexts?: EmployeeEntryContextPort;
+  readonly validateSessionRequest?: (
+    request: EmployeeApiRequest,
+  ) => Promise<EmployeeApiResponse>;
   readonly checkSyncState?: (
     session: EmployeeNextSessionDraft,
   ) => Promise<EmployeeCloudSyncState>;
@@ -115,6 +126,20 @@ export type EmployeeSessionUploadState =
     sessionId?: string;
   }>;
 export type EmployeeExpenseUploadCanaryState = EmployeeSessionUploadState;
+
+export type EmployeeSessionValidationState =
+  | Readonly<{ status: "NOT_VALIDATED" }>
+  | Readonly<{ status: "VALIDATING"; payloadFingerprint: string }>
+  | Readonly<{
+    status: "VALIDATED";
+    payloadFingerprint: string;
+    resultCount: number;
+  }>
+  | Readonly<{
+    status: "VALIDATION_FAILED";
+    payloadFingerprint?: string;
+    errorCode: string;
+  }>;
 
 type JsonRecord = Readonly<Record<string, EmployeeApiJsonValue>>;
 
@@ -194,6 +219,373 @@ const disabledBedTransferCapability: EmployeeBedTransferCapability =
     writeEnabled: false,
     canonicalWritePath: "",
   });
+
+const contextUnavailable = (
+  summary = "Required read-only business context is not available.",
+) => Object.freeze({
+  ready: false,
+  values: Object.freeze({}),
+  summary,
+});
+
+function responseData(value: unknown): Readonly<Record<string, unknown>> | undefined {
+  if (!isPlainRecord(value) || value.success === false || value.ok === false) {
+    return undefined;
+  }
+  if (isPlainRecord(value.data)) {
+    return value.data;
+  }
+  return value;
+}
+
+function safeBedLabel(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const bed = value.trim();
+  return (
+    bed.length > 0
+    && bed.length <= 80
+    && !/[\u0000-\u001f\u007f]/u.test(bed)
+  )
+    ? bed
+    : undefined;
+}
+
+function finiteMoney(value: unknown): number | undefined {
+  const amount = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(amount) && amount >= 0
+    ? Math.round(amount * 100) / 100
+    : undefined;
+}
+
+function openArrearsRows(value: unknown): readonly Readonly<Record<string, unknown>>[] | undefined {
+  const data = responseData(value);
+  if (data?.readonly !== true || data.no_write !== true) return undefined;
+  const rows = data?.tasks ?? data?.items;
+  if (!Array.isArray(rows)) return undefined;
+  const mapped: Readonly<Record<string, unknown>>[] = [];
+  for (const item of rows) {
+    if (!isPlainRecord(item)) return undefined;
+    const reference = [
+      item.cloud_arrears_ref,
+      item.arrears_ref,
+      item.task_id,
+      item.id,
+    ].find((candidate) =>
+      typeof candidate === "string" && candidate.trim().length > 0
+    );
+    const remaining = finiteMoney(
+      item.remaining_arrears ?? item.remaining_amount ?? item.amount,
+    );
+    if (typeof reference !== "string" || remaining === undefined) {
+      return undefined;
+    }
+    mapped.push(Object.freeze({
+      cloudArrearsRef: reference.trim(),
+      remainingArrearsAed: remaining,
+    }));
+  }
+  return Object.freeze(mapped);
+}
+
+function bedAccessSnapshot(
+  bed: string,
+  value: unknown,
+  arrears: readonly Readonly<Record<string, unknown>>[],
+): Readonly<Record<string, unknown>> | undefined {
+  const data = responseData(value);
+  const occupancy = data === undefined
+    ? undefined
+    : responseData(data.occupancy_gateway);
+  const access = data === undefined
+    ? undefined
+    : responseData(data.access_snapshot_context);
+  if (
+    data === undefined
+    || occupancy === undefined
+    || access === undefined
+    || data.gateway !== "canonical_bed_context_gateway"
+    || data.readonly !== true
+    || data.no_write !== true
+    || access.candidate_count !== 1
+    || access.ambiguous === true
+    || access.conflict === true
+    || access.stale === true
+    || access.status !== "ready"
+    || access.parse_status !== "parsed"
+  ) {
+    return undefined;
+  }
+  const vacancy = access.parsed_vacancy_marker === true;
+  const physical = vacancy
+    ? "vacant"
+    : occupancy.physical_bed_status === "vacant"
+      ? "unknown"
+      : "occupied";
+  const deposit = finiteMoney(
+    access.parsed_deposit_amount ?? occupancy.deposit_recorded_amount,
+  );
+  const checkin = typeof access.parsed_checkin_mmdd === "string"
+    ? access.parsed_checkin_mmdd.trim()
+    : "";
+  const coverageStart = typeof occupancy.current_rent_coverage_start === "string"
+    ? occupancy.current_rent_coverage_start.trim()
+    : "";
+  const coverageEnd = typeof occupancy.current_rent_coverage_end === "string"
+    ? occupancy.current_rent_coverage_end.trim()
+    : "";
+  return Object.freeze({
+    bedLabel: bed,
+    companyScope: "",
+    snapshotAvailable: true,
+    snapshotStale: false,
+    snapshotAmbiguous: false,
+    physicalBedStatus: physical,
+    physicalBedStatusSource: vacancy
+      ? "access_snapshot_E_marker"
+      : "access_snapshot_no_E",
+    parsedVacancyMarker: vacancy,
+    depositSnapshotAed: deposit ?? null,
+    depositSource: deposit === undefined ? "unknown" : "access_snapshot_D",
+    depositAmbiguous: deposit === undefined,
+    firstStayMmdd: checkin,
+    firstStayMmddConfirmed: checkin.length > 0,
+    rentCoverageStart: coverageStart,
+    rentCoverageEnd: coverageEnd,
+    openArrears: Object.freeze(arrears.map((row) => Object.freeze({
+      cloudArrearsRef: row.cloudArrearsRef,
+      remainingArrearsAed: row.remainingArrearsAed,
+      arrearsSource: "cloud_arrears",
+    }))),
+  });
+}
+
+export function createEmployeeNextEntryContextPort(
+  requestPort: EmployeeNextBrowserRequestPort,
+  session: () => EmployeeAuthSession | undefined,
+  paths: Readonly<{
+    rentConfig: string;
+    arrears: string;
+    deposit: string;
+    bedContext: string;
+  }>,
+): EmployeeEntryContextPort {
+  if (
+    !safeRequestPort(requestPort)
+    || typeof session !== "function"
+    || !safePath(paths?.rentConfig)
+    || !safePath(paths?.arrears)
+    || !safePath(paths?.deposit)
+    || !safePath(paths?.bedContext)
+  ) {
+    throw new Error("SIDECAR_CONTEXT_INVALID_OPTIONS");
+  }
+  const snapshots = new Map<string, ReturnType<typeof contextUnavailable> | {
+    readonly ready: true;
+    readonly values: Readonly<Record<string, unknown>>;
+    readonly summary: string;
+  }>();
+  const generations = new Map<EmployeeEventId, number>();
+
+  function key(eventId: EmployeeEventId, draft: Readonly<Record<string, unknown>>): string {
+    return eventId === "bed-transfer"
+      ? `${eventId}:${String(draft.fromBed ?? "").trim()}:${String(draft.toBed ?? "").trim()}`
+      : eventId === "expense"
+        ? eventId
+        : `${eventId}:${String(draft.bedLabel ?? "").trim()}`;
+  }
+
+  async function get(path: string): Promise<unknown> {
+    const response = await requestPort.request(path, Object.freeze({
+      method: "GET",
+      credentials: "same-origin",
+      headers: Object.freeze({ Accept: "application/json" }),
+    }));
+    if (!responsePort(response) || response.status !== 200) {
+      throw new Error("SIDECAR_CONTEXT_UNAVAILABLE");
+    }
+    return response.json();
+  }
+
+  async function loadArrears(bed: string): Promise<readonly Readonly<Record<string, unknown>>[]> {
+    const rows = openArrearsRows(
+      await get(`${paths.arrears}?bed=${encodeURIComponent(bed)}`),
+    );
+    if (rows === undefined || rows.length > 1) {
+      throw new Error("SIDECAR_CONTEXT_ARREARS_AMBIGUOUS");
+    }
+    return rows;
+  }
+
+  async function load(
+    eventId: EmployeeEventId,
+    draft: Readonly<Record<string, unknown>>,
+  ): Promise<Readonly<{ values: Readonly<Record<string, unknown>>; summary: string }>> {
+    const currentSession = session();
+    if (
+      !isEmployeeAuthSession(currentSession)
+      || !["EMPLOYEE", "STAFF"].includes(currentSession.user.role)
+      || currentSession.user.corpid !== "homelink"
+    ) {
+      throw new Error("SIDECAR_CONTEXT_AUTH_REQUIRED");
+    }
+    if (eventId === "expense") {
+      return Object.freeze({
+        values: Object.freeze({}),
+        summary: "No business identity is required for this local expense draft.",
+      });
+    }
+    if (eventId === "bed-transfer") {
+      const fromBed = safeBedLabel(draft.fromBed);
+      const toBed = safeBedLabel(draft.toBed);
+      if (fromBed === undefined || toBed === undefined || fromBed === toBed) {
+        throw new Error("SIDECAR_CONTEXT_BED_REQUIRED");
+      }
+      const [sourceValue, targetValue, arrears] = await Promise.all([
+        get(`${paths.bedContext}?bed=${encodeURIComponent(fromBed)}`),
+        get(`${paths.bedContext}?bed=${encodeURIComponent(toBed)}`),
+        loadArrears(fromBed),
+      ]);
+      const source = bedAccessSnapshot(fromBed, sourceValue, arrears);
+      const target = bedAccessSnapshot(toBed, targetValue, Object.freeze([]));
+      if (
+        source === undefined
+        || target === undefined
+        || source.physicalBedStatus !== "occupied"
+        || target.physicalBedStatus !== "vacant"
+      ) {
+        throw new Error("SIDECAR_CONTEXT_BED_CONTRACT_MISMATCH");
+      }
+      const arrearsRow = arrears[0];
+      return Object.freeze({
+        values: Object.freeze({
+          companyScope: currentSession.user.corpid,
+          sourceAccessSnapshot: Object.freeze({
+            ...source,
+            companyScope: currentSession.user.corpid,
+          }),
+          targetAccessSnapshot: Object.freeze({
+            ...target,
+            companyScope: currentSession.user.corpid,
+          }),
+          cloudArrearsRef: arrearsRow?.cloudArrearsRef ?? "",
+          carriedArrearsAmountAed: arrearsRow?.remainingArrearsAed ?? 0,
+        }),
+        summary: `Read-only Bed Context ready for ${fromBed} → ${toBed}.`,
+      });
+    }
+    const bed = safeBedLabel(draft.bedLabel);
+    if (bed === undefined) throw new Error("SIDECAR_CONTEXT_BED_REQUIRED");
+    if (eventId === "rent") {
+      const data = responseData(await get(paths.rentConfig));
+      const config = data === undefined ? undefined : responseData(data.config);
+      const amount = config === undefined ? undefined : finiteMoney(config[bed]);
+      if (amount === undefined || amount <= 0) {
+        throw new Error("SIDECAR_CONTEXT_RENT_CONFIG_MISSING");
+      }
+      return Object.freeze({
+        values: Object.freeze({ amountDueAed: amount }),
+        summary: `Read-only rent configuration ready for ${bed}.`,
+      });
+    }
+    if (eventId === "arrears-payment") {
+      const rows = await loadArrears(bed);
+      if (rows.length !== 1) throw new Error("SIDECAR_CONTEXT_ARREARS_REQUIRED");
+      return Object.freeze({
+        values: Object.freeze({
+          cloudArrearsRef: rows[0].cloudArrearsRef,
+          remainingArrearsAed: rows[0].remainingArrearsAed,
+        }),
+        summary: `Read-only arrears context ready for ${bed}.`,
+      });
+    }
+    const depositData = responseData(
+      await get(`${paths.deposit}?bed=${encodeURIComponent(bed)}&allow_live_fetch=0`),
+    );
+    const requiredTotal = depositData === undefined
+      ? undefined
+      : finiteMoney(depositData.deposit_required_total);
+    const currentDeposit = depositData === undefined
+      ? undefined
+      : finiteMoney(
+        depositData.deposit_recorded_amount ?? depositData.balance,
+      );
+    if (requiredTotal === undefined || currentDeposit === undefined) {
+      throw new Error("SIDECAR_CONTEXT_DEPOSIT_CONTRACT_MISMATCH");
+    }
+    if (depositData.readonly !== true || depositData.no_write !== true) {
+      throw new Error("SIDECAR_CONTEXT_DEPOSIT_NOT_READONLY");
+    }
+    if (eventId === "deposit-in") {
+      return Object.freeze({
+        values: Object.freeze({
+          depositRequiredTotalAed: requiredTotal,
+          currentDepositSnapshotAed: currentDeposit,
+        }),
+        summary: `Read-only deposit context ready for ${bed}.`,
+      });
+    }
+    if (eventId === "deposit-out") {
+      return Object.freeze({
+        values: Object.freeze({ currentDepositSnapshotAed: currentDeposit }),
+        summary: `Read-only deposit context ready for ${bed}.`,
+      });
+    }
+    if (eventId === "checkout") {
+      const rows = await loadArrears(bed);
+      return Object.freeze({
+        values: Object.freeze({
+          currentDepositSnapshotAed: currentDeposit,
+          outstandingArrearsSnapshotAed: rows[0]?.remainingArrearsAed ?? 0,
+          cloudArrearsRef: rows[0]?.cloudArrearsRef ?? "",
+        }),
+        summary: `Read-only checkout context ready for ${bed}.`,
+      });
+    }
+    throw new Error("SIDECAR_CONTEXT_EVENT_UNSUPPORTED");
+  }
+
+  return Object.freeze({
+    read(
+      eventId: EmployeeEventId,
+      draft: Readonly<Record<string, unknown>>,
+    ) {
+      if (eventId === "expense") {
+        return Object.freeze({
+          ready: true,
+          values: Object.freeze({}),
+          summary: "No business identity is required for this local expense draft.",
+        });
+      }
+      return snapshots.get(key(eventId, draft)) ?? contextUnavailable();
+    },
+    async refresh(
+      eventId: EmployeeEventId,
+      draft: Readonly<Record<string, unknown>>,
+      force = false,
+    ): Promise<void> {
+      const snapshotKey = key(eventId, draft);
+      if (!force && snapshots.has(snapshotKey)) return;
+      const generation = (generations.get(eventId) ?? 0) + 1;
+      generations.set(eventId, generation);
+      try {
+        const result = await load(eventId, draft);
+        if (generations.get(eventId) === generation) {
+          snapshots.set(snapshotKey, Object.freeze({
+            ready: true,
+            values: result.values,
+            summary: result.summary,
+          }));
+        }
+      } catch {
+        if (generations.get(eventId) === generation) {
+          snapshots.set(snapshotKey, contextUnavailable(
+            "Required read-only business context is unavailable. Retry Context.",
+          ));
+        }
+      }
+    },
+  });
+}
 
 export function mapEmployeeNextBedTransferCapability(
   value: unknown,
@@ -410,8 +802,9 @@ function stableJson(value: EmployeeApiJsonValue): string {
     return `[${value.map((item) => stableJson(item)).join(",")}]`;
   }
   if (value !== null && typeof value === "object") {
-    return `{${Object.keys(value).sort().map(
-      (key) => `${JSON.stringify(key)}:${stableJson(value[key])}`,
+    const record = value as Readonly<Record<string, EmployeeApiJsonValue>>;
+    return `{${Object.keys(record).sort().map(
+      (key) => `${JSON.stringify(key)}:${stableJson(record[key])}`,
     ).join(",")}}`;
   }
   return JSON.stringify(value);
@@ -748,6 +1141,28 @@ function expenseEntry(
   if (method !== "cash" && method !== "bank") {
     throw new Error("SIDECAR_ADAPTER_UNSUPPORTED_PAYMENT");
   }
+  const amount = submission.expenseAmountAed;
+  const cash = payment.cashPaidAed;
+  const bank = payment.bankPaidAed;
+  const amountFils = employeeExpenseAedToFils(amount);
+  const cashFils = employeeExpenseAedToFils(cash);
+  const bankFils = employeeExpenseAedToFils(bank);
+  if (
+    amountFils === undefined
+    || amountFils <= 0n
+    || cashFils === undefined
+    || bankFils === undefined
+    || cashFils + bankFils !== amountFils
+    || (method === "cash" && (cashFils !== amountFils || bankFils !== 0n))
+    || (method === "bank" && (cashFils !== 0n || bankFils !== amountFils))
+    || !Array.isArray(payment.legs)
+    || payment.legs.length !== 1
+    || !isPlainRecord(payment.legs[0])
+    || payment.legs[0].method !== method
+    || employeeExpenseAedToFils(payment.legs[0].amountAed) !== amountFils
+  ) {
+    throw new Error("SIDECAR_ADAPTER_EXPENSE_PAYMENT_VECTOR_INVALID");
+  }
   const allocation = requiredRecord(submission.allocation);
   const target = requiredString(allocation, "targetBedOrRoomLabel");
   const description = requiredString(submission, "expenseDescription");
@@ -757,8 +1172,8 @@ function expenseEntry(
     event_type: "expense",
     room: target,
     target_bed: target,
-    amount: requiredMoney(submission, "expenseAmountAed"),
-    expense_amount: requiredMoney(submission, "expenseAmountAed"),
+    amount: amount as number,
+    expense_amount: amount as number,
     expense_category: requiredString(submission, "expenseCategory"),
     expense_description: description,
     expense_desc: description,
@@ -917,6 +1332,10 @@ export function createEmployeeNextSidecarAdapters(
       options.syncStatePath !== undefined
       && !safePath(options.syncStatePath)
     )
+    || (
+      options.validatePath !== undefined
+      && !safePath(options.validatePath)
+    )
   ) {
     throw new Error("SIDECAR_ADAPTER_INVALID_OPTIONS");
   }
@@ -927,6 +1346,8 @@ export function createEmployeeNextSidecarAdapters(
     ?? sessionPath.replace(/\/me$/u, "/capabilities");
   const syncStatePath = options.syncStatePath
     ?? `${submitPath}/sync-state`;
+  const validatePath = options.validatePath
+    ?? `${submitPath}/validate`;
   if (
     !safePath(capabilitiesPath)
     || capabilitiesPath === sessionPath
@@ -935,6 +1356,11 @@ export function createEmployeeNextSidecarAdapters(
     || syncStatePath === sessionPath
     || syncStatePath === submitPath
     || syncStatePath === capabilitiesPath
+    || !safePath(validatePath)
+    || validatePath === sessionPath
+    || validatePath === submitPath
+    || validatePath === capabilitiesPath
+    || validatePath === syncStatePath
   ) {
     throw new Error("SIDECAR_ADAPTER_INVALID_OPTIONS");
   }
@@ -994,9 +1420,63 @@ export function createEmployeeNextSidecarAdapters(
       });
     },
   });
+  let restoredSession: EmployeeAuthSession | undefined;
+  const entryContexts = createEmployeeNextEntryContextPort(
+    requestPort,
+    () => restoredSession,
+    Object.freeze({
+      rentConfig: sessionPath.replace(/\/me$/u, "/rent_config"),
+      arrears: sessionPath.replace(/\/me$/u, "/arrear_tasks"),
+      deposit: submitPath.replace(/\/entry$/u, "/deposit"),
+      bedContext: submitPath.replace(/\/entry$/u, "/bed-context"),
+    }),
+  );
   return Object.freeze({
     transport,
     submitPath,
+    entryContexts,
+    async validateSessionRequest(
+      request: EmployeeApiRequest,
+    ): Promise<EmployeeApiResponse> {
+      if (
+        request.method !== "POST"
+        || request.path !== validatePath
+        || !safeHeaders(request.headers)
+        || !isPlainRecord(request.body)
+      ) {
+        throw new Error("SIDECAR_VALIDATE_REQUEST_REJECTED");
+      }
+      let response: EmployeeNextBrowserResponse;
+      try {
+        response = await requestPort.request(validatePath, Object.freeze({
+          method: "POST",
+          credentials: "same-origin",
+          headers: Object.freeze({
+            Accept: "application/json",
+            "Content-Type": "application/json",
+          }),
+          body: JSON.stringify(request.body),
+        }));
+      } catch {
+        throw new Error("SIDECAR_VALIDATE_TRANSPORT_FAILED");
+      }
+      if (!responsePort(response)) {
+        throw new Error("SIDECAR_VALIDATE_INVALID_RESPONSE");
+      }
+      let body: unknown;
+      try {
+        body = await response.json();
+      } catch {
+        throw new Error("SIDECAR_VALIDATE_INVALID_RESPONSE");
+      }
+      if (!isPlainRecord(body)) {
+        throw new Error("SIDECAR_VALIDATE_INVALID_RESPONSE");
+      }
+      return Object.freeze({
+        status: response.status,
+        body: body as EmployeeApiJsonValue,
+      });
+    },
     async restoreSession(): Promise<EmployeeAuthSession> {
       let response: EmployeeNextBrowserResponse;
       let body: unknown;
@@ -1017,6 +1497,7 @@ export function createEmployeeNextSidecarAdapters(
       if (session === undefined) {
         throw new Error("SIDECAR_SESSION_RESTORE_FAILED");
       }
+      restoredSession = session;
       return session;
     },
     async restoreBedTransferCapability(): Promise<EmployeeBedTransferCapability> {
@@ -1151,6 +1632,156 @@ function aggregateSessionRequest(
   });
 }
 
+function singleBedTransferSessionRequest(
+  session: EmployeeNextSessionDraft,
+  authSession: EmployeeAuthSession,
+  buildApiRequest: EmployeeNextSidecarAdapters["buildApiRequest"],
+  submitPath: string,
+): EmployeeApiRequest | undefined {
+  const draft = session.entries[0];
+  if (
+    session.entries.length !== 1
+    || draft?.event_type !== "bed-transfer"
+  ) {
+    return undefined;
+  }
+  const request = buildApiRequest(Object.freeze({
+    session: authSession,
+    eventId: "bed-transfer",
+    submission: draft.payload as object,
+  }));
+  if (
+    request.method !== "POST"
+    || request.path !== submitPath
+    || !isPlainRecord(request.body)
+    || !isPlainRecord(request.body.entry)
+    || !isPlainRecord(request.body.session)
+  ) {
+    return undefined;
+  }
+  const entry = Object.freeze({
+    ...request.body.entry,
+    id: draft.entry_id,
+    entry_id: draft.entry_id,
+    event_id: draft.entry_id,
+    session_id: session.session_id,
+  });
+  return Object.freeze({
+    method: "POST",
+    path: submitPath,
+    body: Object.freeze({
+      ...request.body,
+      entry_identity: draft.entry_id,
+      entry,
+      event_index: 0,
+      session: Object.freeze({
+        ...request.body.session,
+        id: session.session_id,
+        session_id: session.session_id,
+        entries_count: 1,
+        entries: Object.freeze([entry]),
+      }),
+    }),
+  });
+}
+
+function pendingSessionRequest(
+  session: EmployeeNextSessionDraft,
+  authSession: EmployeeAuthSession,
+  buildApiRequest: EmployeeNextSidecarAdapters["buildApiRequest"],
+  submitPath: string,
+): EmployeeApiRequest | undefined {
+  return session.entries.length === 1
+    && session.entries[0]?.event_type === "bed-transfer"
+    ? singleBedTransferSessionRequest(
+      session,
+      authSession,
+      buildApiRequest,
+      submitPath,
+    )
+    : aggregateSessionRequest(
+      session,
+      authSession,
+      buildApiRequest,
+      submitPath,
+    );
+}
+
+function validateOnlyRequest(
+  request: EmployeeApiRequest,
+  validatePath: string,
+): EmployeeApiRequest | undefined {
+  if (
+    request.method !== "POST"
+    || !safePath(validatePath)
+    || !isPlainRecord(request.body)
+    || !isPlainRecord(request.body.session)
+  ) {
+    return undefined;
+  }
+  const entries = request.body.aggregate_write === true
+    ? request.body.session.entries
+    : isPlainRecord(request.body.entry)
+      ? [request.body.entry]
+      : undefined;
+  if (
+    !Array.isArray(entries)
+    || entries.length === 0
+    || entries.some((entry) => !isPlainRecord(entry))
+  ) {
+    return undefined;
+  }
+  const session = request.body.session;
+  return Object.freeze({
+    method: "POST",
+    path: validatePath,
+    body: Object.freeze({
+      aggregate_preflight: true,
+      dry_run: true,
+      validate_only: true,
+      no_write: true,
+      source: "employee_entry",
+      validation_requests: Object.freeze(entries.map((entry, eventIndex) =>
+        Object.freeze({
+          entry_identity: entry.id,
+          entry,
+          event_index: eventIndex,
+          session,
+          dry_run: true,
+          validate_only: true,
+          no_write: true,
+          source: "employee_entry",
+        })
+      )),
+    }),
+  });
+}
+
+function acceptedValidationResult(
+  response: EmployeeApiResponse,
+  expectedCount: number,
+): boolean {
+  const data = responseData(response.body);
+  return (
+    response.status >= 200
+    && response.status <= 299
+    && data?.ok === true
+    && data.no_write === true
+    && data.write_attempted === false
+    && data.formal_write_count === 0
+    && data.validation_result_count === expectedCount
+    && data.passed_result_count === expectedCount
+    && data.failed_result_count === 0
+    && Array.isArray(data.validation_results)
+    && data.validation_results.length === expectedCount
+    && data.validation_results.every((row) =>
+      isPlainRecord(row)
+      && row.ok === true
+      && row.write_attempted === false
+    )
+  );
+}
+
 function expectedAggregateUploadReceipt(
   request: EmployeeApiRequest,
 ): Readonly<{ entryIds: readonly string[]; sessionId: string }> | undefined {
@@ -1264,6 +1895,9 @@ function createLocalRenderPort(
   expenseUploadRef?: () => Readonly<{
     enabled: boolean;
     state: EmployeeExpenseUploadCanaryState;
+    validationState: EmployeeSessionValidationState;
+    payloadPreview?: string;
+    validate: () => Promise<boolean>;
     upload: () => Promise<boolean>;
     retrySyncCheck: () => Promise<boolean>;
   }>,
@@ -1371,6 +2005,28 @@ function createLocalRenderPort(
         }
       }
       if (expenseUpload !== undefined) {
+        appendText(
+          root,
+          "p",
+          `Validation: ${expenseUpload.validationState.status}`,
+        );
+        if (expenseUpload.payloadPreview !== undefined) {
+          appendText(root, "p", "Payload Preview");
+          const preview = document.createElement("pre");
+          preview.dataset.payloadPreview = "employee-entry";
+          preview.textContent = expenseUpload.payloadPreview;
+          root.append(preview);
+          const validate = document.createElement("button");
+          validate.type = "button";
+          validate.textContent = "Validate";
+          validate.dataset.action = "validate-session";
+          validate.disabled =
+            expenseUpload.validationState.status === "VALIDATING";
+          validate.addEventListener("click", () => {
+            void expenseUpload.validate();
+          });
+          root.append(validate);
+        }
         appendText(
           root,
           "p",
@@ -1517,6 +2173,8 @@ export function startEmployeeNextSidecarRoute(
   getExpenseUploadState: () => EmployeeExpenseUploadCanaryState;
   uploadExpense: () => Promise<boolean>;
   getSessionUploadState: () => EmployeeSessionUploadState;
+  getSessionValidationState: () => EmployeeSessionValidationState;
+  validateSession: () => Promise<boolean>;
   uploadSession: () => Promise<boolean>;
   retrySyncCheck: () => Promise<boolean>;
 }> {
@@ -1539,7 +2197,11 @@ export function startEmployeeNextSidecarRoute(
   let bedTransferCapability = disabledBedTransferCapability;
   let sessionUploadState: EmployeeSessionUploadState =
     Object.freeze({ status: "IDLE" });
+  let sessionValidationState: EmployeeSessionValidationState =
+    Object.freeze({ status: "NOT_VALIDATED" });
+  let validationRevision = 0;
   let sessionUploadInFlight = false;
+  let sessionValidationInFlight = false;
   let syncCheckInFlight = false;
   let uploadAttemptedSessionId: string | undefined;
   const removingEntryIds = new Set<string>();
@@ -1554,6 +2216,97 @@ export function startEmployeeNextSidecarRoute(
       ))
       : ((session: EmployeeNextSessionDraft) =>
         options.confirmExpenseUpload?.(session.entries[0])));
+  function invalidateValidation(): void {
+    validationRevision += 1;
+    sessionValidationState = Object.freeze({ status: "NOT_VALIDATED" });
+  }
+  function currentPendingRequest(): EmployeeApiRequest | undefined {
+    const session = drafts.getSession();
+    if (
+      !isEmployeeAuthSession(authenticatedSession)
+      || session === undefined
+      || session.entries.length === 0
+    ) {
+      return undefined;
+    }
+    try {
+      return pendingSessionRequest(
+        session,
+        authenticatedSession,
+        adapters.buildApiRequest,
+        adapters.submitPath,
+      );
+    } catch {
+      return undefined;
+    }
+  }
+  function currentPayloadFingerprint(): string | undefined {
+    const body = currentPendingRequest()?.body;
+    return body === undefined ? undefined : stableIdentity(body);
+  }
+  async function validateSession(): Promise<boolean> {
+    if (sessionValidationInFlight) return false;
+    const session = drafts.getSession();
+    const request = currentPendingRequest();
+    const payloadFingerprint = currentPayloadFingerprint();
+    const validationRequest = request === undefined
+      ? undefined
+      : validateOnlyRequest(request, `${adapters.submitPath}/validate`);
+    const startedRevision = validationRevision;
+    if (
+      session === undefined
+      || request === undefined
+      || payloadFingerprint === undefined
+      || validationRequest === undefined
+      || (
+        session.entries.some((entry) => entry.event_type === "bed-transfer")
+        && !bedTransferCapability.validateEnabled
+      )
+    ) {
+      sessionValidationState = Object.freeze({
+        status: "VALIDATION_FAILED",
+        errorCode: "VALIDATION_REQUEST_UNAVAILABLE",
+      });
+      await controller?.render();
+      return false;
+    }
+    sessionValidationInFlight = true;
+    sessionValidationState = Object.freeze({
+      status: "VALIDATING",
+      payloadFingerprint,
+    });
+    await controller?.render();
+    try {
+      if (typeof adapters.validateSessionRequest !== "function") {
+        throw new Error("SIDECAR_VALIDATION_UNAVAILABLE");
+      }
+      const response = await adapters.validateSessionRequest(validationRequest);
+      if (
+        validationRevision !== startedRevision
+        ||
+        currentPayloadFingerprint() !== payloadFingerprint
+        || !acceptedValidationResult(response, session.entries.length)
+      ) {
+        throw new Error("SIDECAR_VALIDATION_REJECTED");
+      }
+      sessionValidationState = Object.freeze({
+        status: "VALIDATED",
+        payloadFingerprint,
+        resultCount: session.entries.length,
+      });
+      return true;
+    } catch {
+      sessionValidationState = Object.freeze({
+        status: "VALIDATION_FAILED",
+        payloadFingerprint,
+        errorCode: "SERVER_VALIDATION_FAILED",
+      });
+      return false;
+    } finally {
+      sessionValidationInFlight = false;
+      await controller?.render();
+    }
+  }
   async function refreshSyncState(): Promise<boolean> {
     if (syncCheckInFlight) return false;
     const session = drafts.getSession();
@@ -1612,6 +2365,7 @@ export function startEmployeeNextSidecarRoute(
   }
   function uploadableSession(): EmployeeNextSessionDraft | undefined {
     const session = drafts.getSession();
+    const payloadFingerprint = currentPayloadFingerprint();
     return (
       isEmployeeAuthSession(authenticatedSession)
       && ["EMPLOYEE", "STAFF"].includes(authenticatedSession.user.role)
@@ -1620,6 +2374,9 @@ export function startEmployeeNextSidecarRoute(
       && session !== undefined
       && session.entries.length > 0
       && uploadAttemptedSessionId !== session.session_id
+      && sessionValidationState.status === "VALIDATED"
+      && payloadFingerprint !== undefined
+      && sessionValidationState.payloadFingerprint === payloadFingerprint
       && (
         (
           sessionUploadState.status === "IDLE"
@@ -1685,18 +2442,12 @@ export function startEmployeeNextSidecarRoute(
         session.entries.length === 1
         && session.entries[0]?.event_type === "bed-transfer"
       );
-      const request = bedTransferOnly
-        ? adapters.buildApiRequest(Object.freeze({
-          session: authenticatedSession,
-          eventId: "bed-transfer",
-          submission: session.entries[0].payload as object,
-        }))
-        : aggregateSessionRequest(
-          session,
-          authenticatedSession,
-          adapters.buildApiRequest,
-          adapters.submitPath,
-        );
+      const request = pendingSessionRequest(
+        session,
+        authenticatedSession,
+        adapters.buildApiRequest,
+        adapters.submitPath,
+      );
       const expected = request === undefined
         ? undefined
         : bedTransferOnly
@@ -1713,7 +2464,14 @@ export function startEmployeeNextSidecarRoute(
       ) {
         throw new Error("SESSION_UPLOAD_REQUEST_REJECTED");
       }
-      const response = await adapters.transport.request(request);
+      const responseValue = await adapters.transport.request(request);
+      if (
+        !isPlainRecord(responseValue)
+        || !Number.isInteger(responseValue.status)
+      ) {
+        throw new Error("SESSION_UPLOAD_RESPONSE_REJECTED");
+      }
+      const response = responseValue as unknown as EmployeeApiResponse;
       const receipt = bedTransferOnly
         ? (
           response.status >= 200
@@ -1758,7 +2516,8 @@ export function startEmployeeNextSidecarRoute(
         removingEntryIds.add(entry.entry_id);
         try {
           if (await confirmLocalDraftRemoval(entry)) {
-            await drafts.removeLocalDraft(entry.entry_id);
+            const removed = await drafts.removeLocalDraft(entry.entry_id);
+            if (removed.ok) invalidateValidation();
           }
         } finally {
           removingEntryIds.delete(entry.entry_id);
@@ -1768,6 +2527,13 @@ export function startEmployeeNextSidecarRoute(
       () => Object.freeze({
         enabled: uploadableSession() !== undefined,
         state: sessionUploadState,
+        validationState: sessionValidationState,
+        payloadPreview: currentPendingRequest()?.body === undefined
+          ? undefined
+          : stableJson(
+            currentPendingRequest()?.body as EmployeeApiJsonValue,
+          ),
+        validate: validateSession,
         upload: uploadSession,
         retrySyncCheck: refreshSyncState,
       }),
@@ -1778,15 +2544,17 @@ export function startEmployeeNextSidecarRoute(
   });
   entryUi = createEmployeeEntryUiController({
     registry: createEmployeeSevenEventRegistry(),
-    contexts: options.entryContexts,
+    contexts: options.entryContexts ?? adapters.entryContexts,
     createId: options.createId ?? createBrowserId,
     session: () => drafts.getSession(),
     draftView: () => drafts.getView(),
     async requestRender(): Promise<void> {
       await controller?.render();
     },
+    onBusinessFieldChange: invalidateValidation,
     async addToSession(input): Promise<boolean> {
       const result = await drafts.addToSession(input);
+      if (result.ok) invalidateValidation();
       return result.ok;
     },
   });
@@ -1828,6 +2596,10 @@ export function startEmployeeNextSidecarRoute(
     getSessionUploadState(): EmployeeSessionUploadState {
       return sessionUploadState;
     },
+    getSessionValidationState(): EmployeeSessionValidationState {
+      return sessionValidationState;
+    },
+    validateSession,
     uploadSession,
     retrySyncCheck: refreshSyncState,
     async addToSession(input): Promise<boolean> {
@@ -1835,6 +2607,7 @@ export function startEmployeeNextSidecarRoute(
       if (result.ok) {
         sessionUploadState = Object.freeze({ status: "IDLE" });
         uploadAttemptedSessionId = undefined;
+        invalidateValidation();
       }
       await controller?.render();
       return result.ok;

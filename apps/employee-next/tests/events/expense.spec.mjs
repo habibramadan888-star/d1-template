@@ -41,6 +41,7 @@ const runtimeExports = [
   "EMPLOYEE_EXPENSE_SCOPES",
   "EMPLOYEE_EXPENSE_VALIDATION_CODES",
   "createEmployeeExpenseEventContract",
+  "employeeExpenseAedToFils",
   "isEmployeeExpenseCategory",
   "isEmployeeExpenseDraft",
   "isEmployeeExpensePaymentMethod",
@@ -320,6 +321,55 @@ test("expense runtime fail-closed contract", () => {
   }
 });
 
+test("expense AED values use deterministic integer fils", () => {
+  const contract = expenseModule.createEmployeeExpenseEventContract();
+  for (const [value, fils] of [
+    ["0.01", 1n],
+    ["0.10", 10n],
+    ["0.29", 29n],
+    ["1", 100n],
+    ["1.20", 120n],
+    ["10.05", 1005n],
+    ["999999.99", 99999999n],
+    ["100000000000000", 10000000000000000n],
+    ["100000000000000.25", 10000000000000025n],
+  ]) {
+    assert.equal(expenseModule.employeeExpenseAedToFils(value), fils);
+    for (const paymentMethod of ["cash", "bank"]) {
+      const draft = cashDraft({
+        expenseAmountAed: value,
+        paymentMethod,
+        cashPaidAed: paymentMethod === "cash" ? value : 0,
+        bankPaidAed: paymentMethod === "bank" ? value : 0,
+      });
+      assert.deepEqual(contract.validateDraft(draft), []);
+      const submission = contract.buildSubmission(draft);
+      assert.equal(submission.expenseAmountAed, Number(value));
+      assert.doesNotThrow(() => JSON.stringify(submission));
+      assert.doesNotMatch(JSON.stringify(submission), /n(?:,|\})/u);
+    }
+  }
+  for (const value of [
+    -1,
+    Number.NaN,
+    Number.POSITIVE_INFINITY,
+    "",
+    "0.001",
+    "0.299",
+    "1e2",
+    "2.9e-1",
+    "1abc",
+    "+1",
+    "-1",
+    " 1",
+    "1 ",
+    0.001,
+    0.299,
+  ]) {
+    assert.equal(expenseModule.employeeExpenseAedToFils(value), undefined);
+  }
+});
+
 function semanticDiagnosticsFor(source) {
   const virtualFileName = resolve(employeeNextRoot, "tests", "expense-fixture.ts");
   const compilerOptions = {
@@ -393,6 +443,7 @@ test("expense TypeScript semantic fixtures", () => {
     `${imports} const value: EmployeeExpensePaymentMethod = "cash"; void value;`,
     `${imports} const value: EmployeeExpenseScope = "apartment"; void value;`,
     `${imports} const value: EmployeeExpenseDraft = ${validDraft}; void value;`,
+    `${imports} const value: EmployeeExpenseDraft = { ...${validDraft}, expenseAmountAed: "125.00", cashPaidAed: "125.00", bankPaidAed: "0" }; void value;`,
     `${imports} declare const value: EmployeeExpenseSubmission; const id: "expense" = value.eventId; void id;`,
     `${imports} const value: EmployeeExpensePaymentLeg = { method: "cash", amountAed: 1 }; void value;`,
     `${imports} const value: EmployeeExpenseEventContract = createEmployeeExpenseEventContract(); void value;`,
@@ -416,7 +467,7 @@ test("expense TypeScript semantic fixtures", () => {
     [`${imports} const value: EmployeeExpenseScope = "general";`, /general/u],
     [`${imports} const value: EmployeeExpenseDraft = { ...${validDraft}, expenseDate: undefined };`, /undefined/u],
     [`${imports} const { expenseAmountAed, ...rest } = ${validDraft}; const value: EmployeeExpenseDraft = rest;`, /expenseAmountAed/u],
-    [`${imports} const value: EmployeeExpenseDraft = { ...${validDraft}, expenseAmountAed: "125" };`, /string/u],
+    [`${imports} const value: EmployeeExpenseDraft = { ...${validDraft}, expenseAmountAed: 125n };`, /bigint/u],
     [`${imports} const { vendorName, ...rest } = ${validDraft}; const value: EmployeeExpenseDraft = rest;`, /vendorName/u],
     [`${imports} const { expenseDescription, ...rest } = ${validDraft}; const value: EmployeeExpenseDraft = rest;`, /expenseDescription/u],
     [`${imports} const value: EmployeeExpenseDraft = { ...${validDraft}, providerPhone: "x" };`, /providerPhone/u],

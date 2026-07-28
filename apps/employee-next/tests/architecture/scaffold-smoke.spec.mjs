@@ -49,6 +49,7 @@ const expectedFiles = [
   "tests/events/register-seven-events.spec.mjs",
   "tests/events/rent.spec.mjs",
   "tests/integration/capability-chain.spec.mjs",
+  "tests/integration/confirmed-blockers-closure.spec.mjs",
   "tests/integration/expense-upload-canary.spec.mjs",
   "tests/integration/local-isolation-gates.spec.mjs",
   "tests/integration/production-sidecar-adapters.spec.mjs",
@@ -135,7 +136,7 @@ test("scaffold does not implement runtime integration or legacy behavior", async
   const expenseForbidden = /\b(?:fetch|localStorage|sessionStorage|XMLHttpRequest)\b|\/api\/|employee-v3|canonical|finance[_ ]ledger|ttlock|void|correction|reversal/i;
   const bedTransferForbidden = /\b(?:fetch|localStorage|sessionStorage|XMLHttpRequest)\b|\/api\/|employee-v3|canonical|finance[_ ]ledger|ttlock[_ ]adapter|void|correction|reversal/i;
   const routeBuildForbidden = /\b(?:fetch|localStorage|sessionStorage|XMLHttpRequest)\b|\/api\/|employee-v3|canonical|finance|ttlock|correction|reversal/i;
-  const sidecarMainForbidden = /\b(?:fetch|sessionStorage|XMLHttpRequest)\b|\/api\/|employee-v3|canonical(?!_anchor_count|_sync_state_gateway|_write_path|WritePath)|finance|ttlock|correction|reversal/i;
+  const sidecarMainForbidden = /\b(?:fetch|sessionStorage|XMLHttpRequest)\b|\/api\/|employee-v3|canonical(?!_anchor_count|_sync_state_gateway|_bed_context_gateway|_write_path|WritePath)|finance|ttlock|correction|reversal/i;
   const sessionDraftForbidden = /\b(?:fetch|localStorage|sessionStorage|XMLHttpRequest)\b|\/api\/|employee-v3|canonical|finance|ttlock|correction|reversal/i;
   const eventEntryUiForbidden = /\b(?:fetch|localStorage|sessionStorage|XMLHttpRequest|WebSocket|EventSource)\b|\/api\/|employee-v3|finance[_ ]ledger|ttlock[_ ]adapter|correction|reversal/i;
 
