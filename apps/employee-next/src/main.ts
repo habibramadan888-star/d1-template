@@ -1509,9 +1509,7 @@ export function startEmployeeNextSidecarRoute(
       const draftRestore = drafts.restore(session);
       await controller?.render();
       const restored = await draftRestore;
-      authenticatedSession = result?.ok === true && restored.ok
-        ? session
-        : undefined;
+      authenticatedSession = result?.ok === true ? session : undefined;
       bedTransferCapability = authenticatedSession === undefined
         ? disabledBedTransferCapability
         : typeof adapters.restoreBedTransferCapability === "function"

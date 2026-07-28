@@ -48,6 +48,7 @@ const expectedFiles = [
   "tests/events/expense.spec.mjs",
   "tests/events/register-seven-events.spec.mjs",
   "tests/events/rent.spec.mjs",
+  "tests/integration/capability-chain.spec.mjs",
   "tests/integration/expense-upload-canary.spec.mjs",
   "tests/integration/local-isolation-gates.spec.mjs",
   "tests/integration/production-sidecar-adapters.spec.mjs",
