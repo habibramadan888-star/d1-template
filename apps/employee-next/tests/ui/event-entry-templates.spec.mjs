@@ -163,7 +163,13 @@ const contexts = {
   },
   "deposit-out": {
     ready: true,
-    values: { currentDepositSnapshotAed: 500 },
+    values: {
+      currentDepositSnapshotAed: 500,
+      openArrears: [],
+      openArrearsTotalAed: 0,
+      openArrearsSnapshotComplete: true,
+      openArrearsSummary: "No open arrears.",
+    },
     summary: "TTLock D snapshot verified.",
   },
   checkout: {
@@ -218,6 +224,7 @@ const editable = {
     refundAmountAed: 500,
     refundMethod: "cash",
     refundDate: "2026-07-27",
+    arrearsNonRepaymentReason: "",
   },
   checkout: {
     bedLabel: "B-501",

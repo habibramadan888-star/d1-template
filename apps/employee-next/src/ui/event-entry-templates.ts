@@ -627,10 +627,22 @@ function depositOutDefinition(): TemplateDefinition {
       number("cashRefundedAed", "Cash refund (AED)"),
       number("bankRefundedAed", "Bank refund (AED)"),
       date("refundDate", "Refund date"),
+      text("openArrearsSummary", "All open arrears (reference and amount)", true),
+      number("openArrearsTotalAed", "Open arrears total (AED)", true),
+      textarea(
+        "arrearsNonRepaymentReason",
+        "Why refund the deposit without first repaying open arrears?",
+      ),
       textarea("differenceReason", "Difference reason"),
       textarea("note", "Note"),
     ]),
-    systemReadFields: Object.freeze(["currentDepositSnapshotAed"]),
+    systemReadFields: Object.freeze([
+      "currentDepositSnapshotAed",
+      "openArrears",
+      "openArrearsTotalAed",
+      "openArrearsSnapshotComplete",
+      "openArrearsSummary",
+    ]),
     requiredFields: Object.freeze([
       "bedLabel", "currentDepositSnapshotAed", "refundAmountAed",
       "refundMethod", "refundDate",
@@ -857,7 +869,15 @@ export function createEmployeeEntryUiController(
     void options.contexts.refresh(template.eventType, currentDraft, force)
       .finally(() => {
         if (selected === template && draft !== undefined) {
-          context = readContext(template, draft);
+          const nextContext = readContext(template, draft);
+          if (
+            template.eventType === "deposit-out"
+            && JSON.stringify(nextContext?.values)
+              !== JSON.stringify(context?.values)
+          ) {
+            options.onBusinessFieldChange?.();
+          }
+          context = nextContext;
           rerender();
         }
       });

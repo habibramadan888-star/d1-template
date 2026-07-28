@@ -121,6 +121,11 @@ function validDrafts() {
       bankRefundedAed: 0,
       refundDate: "2026-07-26",
       differenceReason: "",
+      openArrears: [],
+      openArrearsTotalAed: 0,
+      openArrearsSnapshotComplete: true,
+      openArrearsSummary: "No open arrears.",
+      arrearsNonRepaymentReason: "",
       note: "",
     },
     checkout: {

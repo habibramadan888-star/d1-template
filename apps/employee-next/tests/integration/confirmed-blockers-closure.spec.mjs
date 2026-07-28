@@ -80,10 +80,14 @@ function arrearsPayload(rows = []) {
     ok: true,
     readonly: true,
     no_write: true,
+    source: "canonical_arrears_gateway",
+    gateway: "canonical_arrears_gateway",
     tasks: rows.map((row, index) => ({
       task_id: `arrears-${index + 1}`,
       remaining_arrears: row,
     })),
+    total_count: rows.length,
+    total_remaining: rows.reduce((sum, amount) => sum + amount, 0),
   };
 }
 
@@ -170,7 +174,17 @@ test("six event contexts use authenticated GET gateways and fail closed", async 
       { bedLabel: "145" },
       ["depositRequiredTotalAed", "currentDepositSnapshotAed"],
     ],
-    ["deposit-out", { bedLabel: "145" }, ["currentDepositSnapshotAed"]],
+    [
+      "deposit-out",
+      { bedLabel: "145" },
+      [
+        "currentDepositSnapshotAed",
+        "openArrears",
+        "openArrearsTotalAed",
+        "openArrearsSnapshotComplete",
+        "openArrearsSummary",
+      ],
+    ],
     [
       "checkout",
       { bedLabel: "145" },
@@ -210,6 +224,83 @@ test("six event contexts use authenticated GET gateways and fail closed", async 
   assert.equal(calls.length, beforeRetry + 1);
   assert.equal(calls.every((call) => call.init.method === "GET"), true);
   assert.equal(calls.some((call) => call.init.method === "POST"), false);
+});
+
+test("Deposit Out loads every Canonical open arrears item and rejects partial snapshots", async () => {
+  let partial = false;
+  const calls = [];
+  const contexts = runtime.createEmployeeNextEntryContextPort(
+    {
+      async request(path, init) {
+        calls.push({ path, init });
+        if (path.startsWith(paths.deposit)) {
+          return response(depositPayload());
+        }
+        if (path.startsWith(paths.arrears)) {
+          const payload = arrearsPayload([25, 75]);
+          return response(partial
+            ? { ...payload, total_count: 3 }
+            : payload);
+        }
+        return response({ success: false }, 500);
+      },
+    },
+    () => authSession,
+    paths,
+  );
+  const draft = { bedLabel: "145" };
+  await contexts.refresh("deposit-out", draft);
+  const ready = contexts.read("deposit-out", draft);
+  assert.equal(ready.ready, true);
+  assert.deepEqual(ready.values.openArrears, [
+    { cloudArrearsRef: "arrears-1", remainingArrearsAed: 25 },
+    { cloudArrearsRef: "arrears-2", remainingArrearsAed: 75 },
+  ]);
+  assert.equal(ready.values.openArrearsTotalAed, 100);
+  assert.equal(ready.values.openArrearsSnapshotComplete, true);
+  assert.match(ready.values.openArrearsSummary, /arrears-1.*25\.00/u);
+  assert.match(ready.values.openArrearsSummary, /arrears-2.*75\.00/u);
+  assert.equal(calls.every((call) => call.init.method === "GET"), true);
+  assert.equal(calls.every(
+    (call) => call.init.credentials === "same-origin",
+  ), true);
+
+  partial = true;
+  await contexts.refresh("deposit-out", draft, true);
+  assert.equal(contexts.read("deposit-out", draft).ready, false);
+});
+
+test("Deposit Out fails closed when the Canonical arrears gateway is unavailable", async () => {
+  for (const arrearsResponse of [
+    response({ success: false, ok: false }, 500),
+    response({ success: false, ok: false }, 401),
+    response({
+      success: true,
+      ok: true,
+      source: "canonical_arrears_gateway",
+      gateway: "canonical_arrears_gateway",
+      readonly: true,
+      no_write: true,
+      tasks: "not-an-array",
+      total_count: 0,
+      total_remaining: 0,
+    }),
+  ]) {
+    const contexts = runtime.createEmployeeNextEntryContextPort(
+      {
+        async request(path) {
+          return path.startsWith(paths.deposit)
+            ? response(depositPayload())
+            : arrearsResponse;
+        },
+      },
+      () => authSession,
+      paths,
+    );
+    const draft = { bedLabel: "145" };
+    await contexts.refresh("deposit-out", draft);
+    assert.equal(contexts.read("deposit-out", draft).ready, false);
+  }
 });
 
 test("stale context response cannot overwrite the latest bed selection", async () => {
@@ -455,12 +546,19 @@ test("all seven events expose Add, Preview and Validate; upload needs current PA
         sidecar.getSessionValidationState().status,
         "VALIDATED_VALIDATE_ONLY",
       );
-      const editable = find(
-        root,
-        (element) =>
-          typeof element.dataset.fieldInput === "string"
-          && element.disabled !== true,
-      );
+      const editable = eventType === "deposit-out"
+        ? find(
+          root,
+          (element) =>
+            element.dataset.fieldInput === "arrearsNonRepaymentReason"
+            && element.disabled !== true,
+        )
+        : find(
+          root,
+          (element) =>
+            typeof element.dataset.fieldInput === "string"
+            && element.disabled !== true,
+        );
       editable.value = "changed";
       editable.listeners.get("input")();
       assert.equal(sidecar.getSessionValidationState().status, "NOT_VALIDATED");

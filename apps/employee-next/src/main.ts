@@ -288,6 +288,33 @@ function openArrearsRows(value: unknown): readonly Readonly<Record<string, unkno
   return Object.freeze(mapped);
 }
 
+function canonicalOpenArrearsSnapshot(value: unknown): Readonly<{
+  rows: readonly Readonly<Record<string, unknown>>[];
+  totalAed: number;
+}> | undefined {
+  const data = responseData(value);
+  const rows = openArrearsRows(value);
+  if (
+    data === undefined
+    || rows === undefined
+    || data.source !== "canonical_arrears_gateway"
+    || data.gateway !== "canonical_arrears_gateway"
+    || !Number.isInteger(data.total_count)
+    || data.total_count !== rows.length
+  ) {
+    return undefined;
+  }
+  const declaredTotal = finiteMoney(data.total_remaining);
+  const computedTotal = Math.round(rows.reduce(
+    (sum, row) => sum + Number(row.remainingArrearsAed),
+    0,
+  ) * 100) / 100;
+  if (declaredTotal === undefined || declaredTotal !== computedTotal) {
+    return undefined;
+  }
+  return Object.freeze({ rows, totalAed: declaredTotal });
+}
+
 function bedAccessSnapshot(
   bed: string,
   value: unknown,
@@ -407,11 +434,22 @@ export function createEmployeeNextEntryContextPort(
     return response.json();
   }
 
-  async function loadArrears(bed: string): Promise<readonly Readonly<Record<string, unknown>>[]> {
-    const rows = openArrearsRows(
+  async function loadArrearsSnapshot(bed: string): Promise<Readonly<{
+    rows: readonly Readonly<Record<string, unknown>>[];
+    totalAed: number;
+  }>> {
+    const snapshot = canonicalOpenArrearsSnapshot(
       await get(`${paths.arrears}?bed=${encodeURIComponent(bed)}`),
     );
-    if (rows === undefined || rows.length > 1) {
+    if (snapshot === undefined) {
+      throw new Error("SIDECAR_CONTEXT_ARREARS_INCOMPLETE");
+    }
+    return snapshot;
+  }
+
+  async function loadArrears(bed: string): Promise<readonly Readonly<Record<string, unknown>>[]> {
+    const { rows } = await loadArrearsSnapshot(bed);
+    if (rows.length > 1) {
       throw new Error("SIDECAR_CONTEXT_ARREARS_AMBIGUOUS");
     }
     return rows;
@@ -526,9 +564,25 @@ export function createEmployeeNextEntryContextPort(
       });
     }
     if (eventId === "deposit-out") {
+      const arrears = await loadArrearsSnapshot(bed);
+      const openArrearsSummary = arrears.rows.length === 0
+        ? "No open arrears."
+        : arrears.rows.map((row) =>
+          `${String(row.cloudArrearsRef)} — AED ${
+            Number(row.remainingArrearsAed).toFixed(2)
+          }`
+        ).join("; ");
       return Object.freeze({
-        values: Object.freeze({ currentDepositSnapshotAed: currentDeposit }),
-        summary: `Read-only deposit context ready for ${bed}.`,
+        values: Object.freeze({
+          currentDepositSnapshotAed: currentDeposit,
+          openArrears: arrears.rows,
+          openArrearsTotalAed: arrears.totalAed,
+          openArrearsSnapshotComplete: true,
+          openArrearsSummary,
+        }),
+        summary: `Read-only deposit and Canonical arrears context ready for ${bed}; ${
+          arrears.rows.length
+        } open item(s), AED ${arrears.totalAed.toFixed(2)} total.`,
       });
     }
     if (eventId === "checkout") {
@@ -1059,11 +1113,35 @@ function depositOutEntry(
 ): JsonRecord {
   const refund = singlePayment(submission.refund, "amountAed");
   const difference = requiredRecord(submission.difference);
-  const reason = optionalString(difference, "reason")
-    ?? optionalString(submission, "note");
-  if (reason === undefined) {
+  const differenceReason = optionalString(difference, "reason");
+  const arrearsReview = isPlainRecord(submission.arrearsReview)
+    ? submission.arrearsReview
+    : undefined;
+  const arrearsReason = arrearsReview === undefined
+    ? undefined
+    : optionalString(arrearsReview, "nonRepaymentReason");
+  if (
+    arrearsReview !== undefined
+    && (
+      arrearsReason === undefined
+      || arrearsReview.automaticArrearsOffset !== false
+      || arrearsReview.automaticArrearsPayment !== false
+      || arrearsReview.openArrearsRemainOpen !== true
+      || !Array.isArray(arrearsReview.openArrears)
+      || arrearsReview.openArrears.length === 0
+    )
+  ) {
+    throw new Error("SIDECAR_ADAPTER_UNPROVEN_ARREARS_REVIEW");
+  }
+  const refundReason = arrearsReason
+    ?? optionalString(submission, "note")
+    ?? differenceReason;
+  if (refundReason === undefined) {
     throw new Error("SIDECAR_ADAPTER_UNPROVEN_REFUND_REASON");
   }
+  const openArrearsAmount = arrearsReview === undefined
+    ? 0
+    : requiredMoney(arrearsReview, "openArrearsTotalAed");
   return Object.freeze({
     ...base,
     type: "DR",
@@ -1082,9 +1160,12 @@ function depositOutEntry(
     payment_method: refund.method,
     pay_type: refund.method,
     refund_date: requiredString(submission, "refundDate"),
-    refund_reason: reason,
-    difference_reason: reason,
-    note: reason,
+    refund_reason: refundReason,
+    difference_reason: differenceReason ?? refundReason,
+    open_arrears_amount: openArrearsAmount,
+    outstanding_arrears: openArrearsAmount,
+    arrears_offset_amount: 0,
+    note: optionalString(submission, "note") ?? refundReason,
   });
 }
 

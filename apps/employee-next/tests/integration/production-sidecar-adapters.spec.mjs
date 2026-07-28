@@ -108,6 +108,11 @@ function validDrafts() {
       bankRefundedAed: 0,
       refundDate: "2026-07-26",
       differenceReason: "",
+      openArrears: [],
+      openArrearsTotalAed: 0,
+      openArrearsSnapshotComplete: true,
+      openArrearsSummary: "No open arrears.",
+      arrearsNonRepaymentReason: "",
       note: "Approved full deposit refund",
     },
     checkout: {
@@ -706,6 +711,38 @@ test("all seven real event contracts form exact single-path requests", () => {
   });
   assert.equal(requests.length, 7);
   assert.equal(new Set(requests.map((item) => item.path)).size, 1);
+});
+
+test("Deposit Out maps independent arrears and deposit difference reasons", () => {
+  const registry = runtime.createEmployeeSevenEventRegistry();
+  const submission = registry.get("deposit-out").buildSubmission({
+    ...validDrafts()["deposit-out"],
+    refundAmountAed: 400,
+    cashRefundedAed: 400,
+    differenceReason: "AED 100 retained for documented damage",
+    openArrears: [
+      { cloudArrearsRef: "AR-1", remainingArrearsAed: 25 },
+      { cloudArrearsRef: "AR-2", remainingArrearsAed: 75 },
+    ],
+    openArrearsTotalAed: 100,
+    openArrearsSummary: "AR-1 — AED 25.00; AR-2 — AED 75.00",
+    arrearsNonRepaymentReason: "Existing arrears follow a separate plan",
+  });
+  const request = runtime.buildEmployeeNextSidecarRequest(
+    { session, eventId: "deposit-out", submission },
+    submitPath,
+  );
+  const entry = request.body.entry;
+  assert.equal(entry.event_type, "deposit_out");
+  assert.equal(entry.refund_reason, "Existing arrears follow a separate plan");
+  assert.equal(entry.difference_reason, "AED 100 retained for documented damage");
+  assert.equal(entry.open_arrears_amount, 100);
+  assert.equal(entry.outstanding_arrears, 100);
+  assert.equal(entry.arrears_offset_amount, 0);
+  assert.equal("arrears_offset_ref" in entry, false);
+  assert.equal("provider_identity" in entry, false);
+  assert.equal("ttlock_id" in entry, false);
+  assert.equal(JSON.stringify(request).includes("BigInt"), false);
 });
 
 test("production request mapping is deterministic and immutable", () => {

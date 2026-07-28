@@ -28,6 +28,9 @@ export const EMPLOYEE_DEPOSIT_OUT_VALIDATION_CODES = Object.freeze([
   "DEPOSIT_OUT_REFUND_LEGS_INVALID",
   "DEPOSIT_OUT_REFUND_TOTAL_MISMATCH",
   "DEPOSIT_OUT_REFUND_DATE_REQUIRED",
+  "DEPOSIT_OUT_OPEN_ARREARS_SNAPSHOT_INVALID",
+  "DEPOSIT_OUT_ARREARS_NON_REPAYMENT_REASON_REQUIRED",
+  "DEPOSIT_OUT_ARREARS_NON_REPAYMENT_REASON_PLACEHOLDER",
   "DEPOSIT_OUT_PROVIDER_IDENTITY_FORBIDDEN",
   "DEPOSIT_OUT_SCOPE_FIELD_FORBIDDEN",
 ] as const);
@@ -40,6 +43,11 @@ export interface EmployeeDepositOutRefundLeg {
   readonly amountAed: number;
 }
 
+export interface EmployeeDepositOutOpenArrearsItem {
+  readonly cloudArrearsRef: string;
+  readonly remainingArrearsAed: number;
+}
+
 export interface EmployeeDepositOutDraft {
   readonly bedLabel: string;
   readonly currentDepositSnapshotAed: number | null;
@@ -49,6 +57,11 @@ export interface EmployeeDepositOutDraft {
   readonly bankRefundedAed: number | null;
   readonly refundDate: string;
   readonly differenceReason: string;
+  readonly openArrears: readonly EmployeeDepositOutOpenArrearsItem[];
+  readonly openArrearsTotalAed: number | null;
+  readonly openArrearsSnapshotComplete: boolean;
+  readonly openArrearsSummary: string;
+  readonly arrearsNonRepaymentReason: string;
   readonly note: string;
 }
 
@@ -68,6 +81,14 @@ export interface EmployeeDepositOutSubmission {
     amountAed: number;
     reasonRequired: boolean;
     reason: string | null;
+  }>;
+  readonly arrearsReview?: Readonly<{
+    openArrears: readonly EmployeeDepositOutOpenArrearsItem[];
+    openArrearsTotalAed: number;
+    nonRepaymentReason: string;
+    automaticArrearsOffset: false;
+    automaticArrearsPayment: false;
+    openArrearsRemainOpen: true;
   }>;
   readonly accountingPreview: Readonly<{
     depositRefundedAed: number;
@@ -95,6 +116,11 @@ const DEPOSIT_OUT_DRAFT_KEYS = Object.freeze([
   "bankRefundedAed",
   "refundDate",
   "differenceReason",
+  "openArrears",
+  "openArrearsTotalAed",
+  "openArrearsSnapshotComplete",
+  "openArrearsSummary",
+  "arrearsNonRepaymentReason",
   "note",
 ] as const);
 
@@ -135,6 +161,32 @@ function moneyEqual(left: number, right: number): boolean {
   return Math.abs(normalizeMoney(left) - normalizeMoney(right)) < 1e-9;
 }
 
+const ARREARS_REASON_PLACEHOLDERS = new Set([
+  "-",
+  "default",
+  "enter reason",
+  "n/a",
+  "none",
+  "reason",
+  "tbd",
+  "无",
+  "请输入原因",
+]);
+
+function isOpenArrearsItem(
+  value: unknown,
+): value is EmployeeDepositOutOpenArrearsItem {
+  if (!isPlainRecord(value) || Object.keys(value).length !== 2) return false;
+  return (
+    typeof value.cloudArrearsRef === "string"
+    && value.cloudArrearsRef.trim().length > 0
+    && typeof value.remainingArrearsAed === "number"
+    && Number.isFinite(value.remainingArrearsAed)
+    && value.remainingArrearsAed > 0
+    && hasAtMostTwoDecimalPlaces(value.remainingArrearsAed)
+  );
+}
+
 function issue(
   code: EmployeeDepositOutValidationCode,
   message: string,
@@ -164,6 +216,11 @@ function createInitialDraft(): EmployeeDepositOutDraft {
     bankRefundedAed: null,
     refundDate: "",
     differenceReason: "",
+    openArrears: Object.freeze([]),
+    openArrearsTotalAed: 0,
+    openArrearsSnapshotComplete: false,
+    openArrearsSummary: "",
+    arrearsNonRepaymentReason: "",
     note: "",
   });
 }
@@ -193,6 +250,12 @@ export function isEmployeeDepositOutDraft(
       && isNullableFiniteNumber(value.bankRefundedAed)
       && typeof value.refundDate === "string"
       && typeof value.differenceReason === "string"
+      && Array.isArray(value.openArrears)
+      && value.openArrears.every(isOpenArrearsItem)
+      && isNullableFiniteNumber(value.openArrearsTotalAed)
+      && typeof value.openArrearsSnapshotComplete === "boolean"
+      && typeof value.openArrearsSummary === "string"
+      && typeof value.arrearsNonRepaymentReason === "string"
       && typeof value.note === "string"
     );
   } catch {
@@ -246,6 +309,11 @@ function validateDraft(
   const bankRefunded = draft.bankRefundedAed;
   const refundDate = draft.refundDate;
   const differenceReason = draft.differenceReason;
+  const openArrears = draft.openArrears;
+  const openArrearsTotal = draft.openArrearsTotalAed;
+  const openArrearsSnapshotComplete = draft.openArrearsSnapshotComplete;
+  const openArrearsSummary = draft.openArrearsSummary;
+  const arrearsNonRepaymentReason = draft.arrearsNonRepaymentReason;
   const note = draft.note;
 
   if (typeof bedLabel !== "string" || bedLabel.trim().length === 0) {
@@ -325,6 +393,53 @@ function validateDraft(
         "refundAmountAed",
       ),
     );
+  }
+
+  const openArrearsValid = (
+    Array.isArray(openArrears)
+    && openArrears.every(isOpenArrearsItem)
+    && new Set(openArrears.map((item) => item.cloudArrearsRef.trim())).size
+      === openArrears.length
+  );
+  const computedOpenArrearsTotal = openArrearsValid
+    ? normalizeMoney(openArrears.reduce(
+      (sum, item) => sum + item.remainingArrearsAed,
+      0,
+    ))
+    : -1;
+  if (
+    openArrearsSnapshotComplete !== true
+    || !openArrearsValid
+    || typeof openArrearsTotal !== "number"
+    || !Number.isFinite(openArrearsTotal)
+    || openArrearsTotal < 0
+    || !hasAtMostTwoDecimalPlaces(openArrearsTotal)
+    || !moneyEqual(openArrearsTotal, computedOpenArrearsTotal)
+    || typeof openArrearsSummary !== "string"
+  ) {
+    issues.push(issue(
+      "DEPOSIT_OUT_OPEN_ARREARS_SNAPSHOT_INVALID",
+      "A complete Canonical open arrears snapshot is required.",
+      "openArrears",
+    ));
+  }
+  if (openArrearsValid && openArrears.length > 0) {
+    const reason = typeof arrearsNonRepaymentReason === "string"
+      ? arrearsNonRepaymentReason.trim()
+      : "";
+    if (reason.length === 0) {
+      issues.push(issue(
+        "DEPOSIT_OUT_ARREARS_NON_REPAYMENT_REASON_REQUIRED",
+        "Explain why the deposit is refunded without first repaying open arrears.",
+        "arrearsNonRepaymentReason",
+      ));
+    } else if (ARREARS_REASON_PLACEHOLDERS.has(reason.toLowerCase())) {
+      issues.push(issue(
+        "DEPOSIT_OUT_ARREARS_NON_REPAYMENT_REASON_PLACEHOLDER",
+        "A specific open arrears non-repayment reason is required.",
+        "arrearsNonRepaymentReason",
+      ));
+    }
   }
 
   if (
@@ -443,7 +558,11 @@ function validateDraft(
       ),
     );
   }
-  if (typeof differenceReason !== "string" || typeof note !== "string") {
+  if (
+    typeof differenceReason !== "string"
+    || typeof arrearsNonRepaymentReason !== "string"
+    || typeof note !== "string"
+  ) {
     issues.push(
       issue(
         "DEPOSIT_OUT_DRAFT_NOT_OBJECT",
@@ -505,6 +624,24 @@ function buildSubmission(
     currentDepositReconciliationRequired: true as const,
     reason: "deposit-out-does-not-control-current-balance" as const,
   });
+  const openArrears = Object.freeze(draft.openArrears.map((item) =>
+    Object.freeze({
+      cloudArrearsRef: item.cloudArrearsRef.trim(),
+      remainingArrearsAed: normalizeMoney(item.remainingArrearsAed),
+    })
+  ));
+  const arrearsReview = openArrears.length === 0
+    ? undefined
+    : Object.freeze({
+      openArrears,
+      openArrearsTotalAed: normalizeMoney(
+        draft.openArrearsTotalAed as number,
+      ),
+      nonRepaymentReason: draft.arrearsNonRepaymentReason.trim(),
+      automaticArrearsOffset: false as const,
+      automaticArrearsPayment: false as const,
+      openArrearsRemainOpen: true as const,
+    });
   const note = draft.note.trim();
 
   return Object.freeze({
@@ -517,6 +654,7 @@ function buildSubmission(
     refund,
     refundDate: draft.refundDate,
     difference,
+    ...(arrearsReview === undefined ? {} : { arrearsReview }),
     accountingPreview,
     reconciliationPreview,
     ...(note.length === 0 ? {} : { note }),

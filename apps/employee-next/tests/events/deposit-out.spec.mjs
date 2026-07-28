@@ -69,6 +69,9 @@ const validationCodes = [
   "DEPOSIT_OUT_REFUND_LEGS_INVALID",
   "DEPOSIT_OUT_REFUND_TOTAL_MISMATCH",
   "DEPOSIT_OUT_REFUND_DATE_REQUIRED",
+  "DEPOSIT_OUT_OPEN_ARREARS_SNAPSHOT_INVALID",
+  "DEPOSIT_OUT_ARREARS_NON_REPAYMENT_REASON_REQUIRED",
+  "DEPOSIT_OUT_ARREARS_NON_REPAYMENT_REASON_PLACEHOLDER",
   "DEPOSIT_OUT_PROVIDER_IDENTITY_FORBIDDEN",
   "DEPOSIT_OUT_SCOPE_FIELD_FORBIDDEN",
 ];
@@ -83,6 +86,11 @@ function cashDraft(overrides = {}) {
     bankRefundedAed: 0,
     refundDate: "2026-07-26",
     differenceReason: "",
+    openArrears: [],
+    openArrearsTotalAed: 0,
+    openArrearsSnapshotComplete: true,
+    openArrearsSummary: "No open arrears.",
+    arrearsNonRepaymentReason: "",
     note: "",
     ...overrides,
   };
@@ -142,6 +150,11 @@ test("deposit-out runtime success contract", () => {
     bankRefundedAed: null,
     refundDate: "",
     differenceReason: "",
+    openArrears: [],
+    openArrearsTotalAed: 0,
+    openArrearsSnapshotComplete: false,
+    openArrearsSummary: "",
+    arrearsNonRepaymentReason: "",
     note: "",
   }));
   check(() => assert.equal(Object.isFrozen(firstContract.createInitialDraft()), true));
@@ -182,6 +195,7 @@ test("deposit-out runtime success contract", () => {
     reason: "deposit-out-does-not-control-current-balance",
   }));
   check(() => assert.equal(cash.note, "returned at desk"));
+  check(() => assert.equal("arrearsReview" in cash, false));
   check(() => assert.equal(Object.isFrozen(cash), true));
   check(() => assert.equal(Object.isFrozen(cash.refund), true));
   check(() => assert.equal(Object.isFrozen(cash.refund.legs), true));
@@ -216,6 +230,41 @@ test("deposit-out runtime success contract", () => {
   check(() => assert.equal(partial.accountingPreview.depositRefundedAed, 350));
   check(() => assert.equal(partial.accountingPreview.rentIncomeAed, 0));
   check(() => assert.equal(partial.accountingPreview.currentDepositMutationAed, 0));
+  const withOneArrear = firstContract.buildSubmission(cashDraft({
+    openArrears: [
+      { cloudArrearsRef: "AR-ONE", remainingArrearsAed: 50 },
+    ],
+    openArrearsTotalAed: 50,
+    openArrearsSummary: "AR-ONE — AED 50.00",
+    arrearsNonRepaymentReason: "Owner approved repayment outside this refund",
+  }));
+  check(() => assert.equal(withOneArrear.refundAmountAed, 500));
+  check(() => assert.equal(
+    withOneArrear.arrearsReview.nonRepaymentReason,
+    "Owner approved repayment outside this refund",
+  ));
+  const withArrears = firstContract.buildSubmission(cashDraft({
+    openArrears: [
+      { cloudArrearsRef: "AR-1", remainingArrearsAed: 40 },
+      { cloudArrearsRef: "AR-2", remainingArrearsAed: 60 },
+    ],
+    openArrearsTotalAed: 100,
+    openArrearsSummary: "AR-1 — AED 40.00; AR-2 — AED 60.00",
+    arrearsNonRepaymentReason: " Owner approved a separate repayment plan ",
+  }));
+  check(() => assert.deepEqual(withArrears.arrearsReview, {
+    openArrears: [
+      { cloudArrearsRef: "AR-1", remainingArrearsAed: 40 },
+      { cloudArrearsRef: "AR-2", remainingArrearsAed: 60 },
+    ],
+    openArrearsTotalAed: 100,
+    nonRepaymentReason: "Owner approved a separate repayment plan",
+    automaticArrearsOffset: false,
+    automaticArrearsPayment: false,
+    openArrearsRemainOpen: true,
+  }));
+  check(() => assert.equal(Object.isFrozen(withArrears.arrearsReview), true));
+  check(() => assert.equal(Object.isFrozen(withArrears.arrearsReview.openArrears), true));
   check(() => assert.equal("occupancy" in partial, false));
   check(() => assert.equal(successCases >= 32, true));
 });
@@ -277,6 +326,60 @@ test("deposit-out runtime fail-closed contract", () => {
   for (const value of ["", "2026/07/26", "26-07-2026", 20260726]) {
     expectCode(cashDraft({ refundDate: value }), "DEPOSIT_OUT_REFUND_DATE_REQUIRED");
   }
+  const oneArrear = {
+    openArrears: [{ cloudArrearsRef: "AR-1", remainingArrearsAed: 50 }],
+    openArrearsTotalAed: 50,
+    openArrearsSummary: "AR-1 — AED 50.00",
+  };
+  expectCode(
+    cashDraft({ ...oneArrear }),
+    "DEPOSIT_OUT_ARREARS_NON_REPAYMENT_REASON_REQUIRED",
+  );
+  expectCode(
+    cashDraft({ ...oneArrear, arrearsNonRepaymentReason: "   " }),
+    "DEPOSIT_OUT_ARREARS_NON_REPAYMENT_REASON_REQUIRED",
+  );
+  expectCode(
+    cashDraft({ ...oneArrear, arrearsNonRepaymentReason: "N/A" }),
+    "DEPOSIT_OUT_ARREARS_NON_REPAYMENT_REASON_PLACEHOLDER",
+  );
+  expectCode(
+    cashDraft({
+      ...oneArrear,
+      refundAmountAed: 400,
+      cashRefundedAed: 400,
+      differenceReason: "AED 100 retained for documented damage",
+    }),
+    "DEPOSIT_OUT_ARREARS_NON_REPAYMENT_REASON_REQUIRED",
+  );
+  expectCode(
+    cashDraft({
+      ...oneArrear,
+      refundAmountAed: 400,
+      cashRefundedAed: 400,
+      arrearsNonRepaymentReason: "Existing arrears follow a separate plan",
+    }),
+    "DEPOSIT_OUT_DIFFERENCE_REASON_REQUIRED",
+  );
+  expectCode(
+    cashDraft({ openArrearsSnapshotComplete: false }),
+    "DEPOSIT_OUT_OPEN_ARREARS_SNAPSHOT_INVALID",
+  );
+  expectCode(
+    cashDraft({ ...oneArrear, openArrearsTotalAed: 49 }),
+    "DEPOSIT_OUT_OPEN_ARREARS_SNAPSHOT_INVALID",
+  );
+  expectCode(
+    cashDraft({
+      openArrears: [
+        { cloudArrearsRef: "AR-1", remainingArrearsAed: 25 },
+        { cloudArrearsRef: "AR-1", remainingArrearsAed: 25 },
+      ],
+      openArrearsTotalAed: 50,
+      openArrearsSummary: "duplicate",
+    }),
+    "DEPOSIT_OUT_OPEN_ARREARS_SNAPSHOT_INVALID",
+  );
 
   const forbiddenExtras = [
     ["providerPhone", "hidden"],
@@ -425,6 +528,11 @@ test("deposit-out TypeScript semantic fixtures", () => {
     bankRefundedAed: 0,
     refundDate: "2026-07-26",
     differenceReason: "",
+    openArrears: [],
+    openArrearsTotalAed: 0,
+    openArrearsSnapshotComplete: true,
+    openArrearsSummary: "No open arrears.",
+    arrearsNonRepaymentReason: "",
     note: ""
   }`;
   const positives = [
@@ -486,7 +594,7 @@ test("deposit-out source boundary excludes integrations and other event rules", 
   );
   assert.doesNotMatch(
     depositOutSource,
-    /tenant_card_id|card_id|old_ttlock_ref|provider_phone|providerPhone|phone|ttlockId|customerName|tenantName|previewText|whatsappText|arrearsRef|cloudArrearsRef|event_type|canonical_anchor_id|deposit_ledger_id|finance_ledger_id|owner_history_id|sync_state_id|real_endpoint|headers|token|idempotency_key/iu,
+    /tenant_card_id|card_id|old_ttlock_ref|provider_phone|providerPhone|phone|ttlockId|customerName|tenantName|previewText|whatsappText|event_type|canonical_anchor_id|deposit_ledger_id|finance_ledger_id|owner_history_id|sync_state_id|real_endpoint|headers|token|idempotency_key/iu,
   );
   assert.doesNotMatch(
     depositOutSource,
