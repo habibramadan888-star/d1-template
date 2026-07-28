@@ -143,21 +143,12 @@ function validDrafts() {
       finalNote: "",
     },
     expense: {
-      expenseDate: "2026-07-26",
-      expenseCategory: "maintenance",
+      targetRoom: "LOCAL-APARTMENT-021",
       expenseAmountAed: 125,
       paymentMethod: "cash",
       cashPaidAed: 125,
       bankPaidAed: 0,
-      expenseScope: "apartment",
-      apartmentLabel: "LOCAL-APARTMENT-021",
-      bedLabel: "",
-      vendorName: "Local vendor",
-      paidBy: "",
       expenseDescription: "Repair supplies",
-      receiptAvailable: false,
-      receiptNote: "",
-      finalNote: "",
     },
     "bed-transfer": {
       fromBed: "144",
@@ -387,7 +378,7 @@ test("local-isolation failures stay closed, isolated and safely summarized", asy
       eventId: "expense",
       contract: expenseRuntime.createEmployeeExpenseEventContract(),
       draft: { ...validDrafts().expense, expenseScope: "general" },
-      expectedValidationCode: "EXPENSE_SCOPE_INVALID",
+      expectedValidationCode: "EXPENSE_PROVIDER_IDENTITY_FORBIDDEN",
     },
     {
       eventId: "expense",
@@ -398,7 +389,7 @@ test("local-isolation failures stay closed, isolated and safely summarized", asy
         cashPaidAed: 50,
         bankPaidAed: 75,
       },
-      expectedValidationCode: "EXPENSE_MIXED_PAYMENT_UNSUPPORTED_BY_WORKER",
+      expectedValidationCode: "EXPENSE_PAYMENT_METHOD_INVALID",
     },
   ];
   for (const validationCase of validationCases) {

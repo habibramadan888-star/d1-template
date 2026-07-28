@@ -29,10 +29,7 @@ import {
   EMPLOYEE_DEPOSIT_OUT_REFUND_METHODS,
 } from "../events/deposit-out";
 import {
-  EMPLOYEE_EXPENSE_CATEGORIES,
   EMPLOYEE_EXPENSE_PAYMENT_METHODS,
-  EMPLOYEE_EXPENSE_SCOPES,
-  employeeExpenseAedToFils,
 } from "../events/expense";
 import {
   EMPLOYEE_RENT_PAYMENT_METHODS,
@@ -687,26 +684,14 @@ function expenseDefinition(): TemplateDefinition {
   return Object.freeze({
     eventType: "expense",
     fields: Object.freeze([
-      date("expenseDate", "Expense date"),
-      select("expenseCategory", "Category", EMPLOYEE_EXPENSE_CATEGORIES),
+      text("targetRoom", "Room Number"),
       decimalMoney("expenseAmountAed", "Amount (AED)"),
       select("paymentMethod", "Payment", EMPLOYEE_EXPENSE_PAYMENT_METHODS),
-      decimalMoney("cashPaidAed", "Cash (AED)"),
-      decimalMoney("bankPaidAed", "Bank (AED)"),
-      select("expenseScope", "Expense target", EMPLOYEE_EXPENSE_SCOPES),
-      text("apartmentLabel", "Apartment"),
-      text("bedLabel", "Bed"),
-      text("vendorName", "Vendor"),
-      text("paidBy", "Paid by"),
-      textarea("expenseDescription", "Reason / description"),
-      checkbox("receiptAvailable", "Evidence available"),
-      textarea("receiptNote", "Evidence note"),
-      textarea("finalNote", "Final note"),
+      textarea("expenseDescription", "Expense Description"),
     ]),
     systemReadFields: Object.freeze([]),
     requiredFields: Object.freeze([
-      "expenseDate", "expenseCategory", "expenseAmountAed", "paymentMethod",
-      "expenseScope", "vendorName", "expenseDescription",
+      "targetRoom", "expenseAmountAed", "paymentMethod", "expenseDescription",
     ]),
     update: (draft: DraftRecord) => syncPayment(
       draft,
@@ -715,22 +700,7 @@ function expenseDefinition(): TemplateDefinition {
       "cashPaidAed",
       "bankPaidAed",
     ),
-    extraValidate(draft: Readonly<DraftRecord>): readonly EventValidationIssue[] {
-      return (
-        (employeeExpenseAedToFils(draft.expenseAmountAed) ?? 0n) >= 10_000n
-        && (
-          draft.receiptAvailable !== true
-          || typeof draft.receiptNote !== "string"
-          || draft.receiptNote.trim().length === 0
-        )
-      )
-        ? Object.freeze([issue(
-          "EXPENSE_EVIDENCE_REQUIRED",
-          "Evidence and an evidence note are required for expenses of AED 100 or more.",
-          "receiptAvailable",
-        )])
-        : Object.freeze([]);
-    },
+    extraValidate: () => Object.freeze([]),
   });
 }
 

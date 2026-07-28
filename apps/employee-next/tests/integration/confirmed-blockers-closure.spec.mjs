@@ -485,21 +485,12 @@ test("Expense public adapter uses the shared exact AED payment vector guard", as
   assert.doesNotMatch(expenseSource, /1e-9/u);
   const contract = runtime.createEmployeeSevenEventRegistry().get("expense");
   const draft = {
-    expenseDate: "2026-07-28",
-    expenseCategory: "maintenance",
+    targetRoom: "TEST-ROOM",
     expenseAmountAed: 50,
     paymentMethod: "cash",
     cashPaidAed: 50,
     bankPaidAed: 0,
-    expenseScope: "apartment",
-    apartmentLabel: "TEST-APARTMENT",
-    bedLabel: "",
-    vendorName: "Test Vendor",
-    paidBy: "",
     expenseDescription: "Vector contract test",
-    receiptAvailable: false,
-    receiptNote: "",
-    finalNote: "",
   };
   const cash = contract.buildSubmission(draft);
   const context = (submission) => ({

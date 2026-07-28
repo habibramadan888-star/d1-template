@@ -890,7 +890,6 @@ function eventDate(submission: JsonRecord): string {
       "depositReceivedDate",
       "refundDate",
       "checkoutDate",
-      "expenseDate",
       "transferDate",
     ]
   ) {
@@ -898,6 +897,9 @@ function eventDate(submission: JsonRecord): string {
     if (value !== undefined) {
       return value;
     }
+  }
+  if (submission.eventId === "expense") {
+    return "";
   }
   throw new Error("SIDECAR_ADAPTER_INVALID_SUBMISSION");
 }
@@ -1163,23 +1165,24 @@ function expenseEntry(
   ) {
     throw new Error("SIDECAR_ADAPTER_EXPENSE_PAYMENT_VECTOR_INVALID");
   }
-  const allocation = requiredRecord(submission.allocation);
-  const target = requiredString(allocation, "targetBedOrRoomLabel");
+  const target = requiredString(submission, "targetRoom");
   const description = requiredString(submission, "expenseDescription");
+  if (submission.expenseCategory !== "EXPENSE") {
+    throw new Error("SIDECAR_ADAPTER_INVALID_SUBMISSION");
+  }
   return Object.freeze({
     ...base,
     type: "E",
     event_type: "expense",
     room: target,
     target_bed: target,
-    amount: amount as number,
-    expense_amount: amount as number,
-    expense_category: requiredString(submission, "expenseCategory"),
+    amount: amount as string | number,
+    expense_amount: amount as string | number,
+    expense_category: "EXPENSE",
     expense_description: description,
     expense_desc: description,
     payment_method: method,
     pay_type: method,
-    expense_date: requiredString(submission, "expenseDate"),
     note: description,
   });
 }
@@ -1296,7 +1299,7 @@ export function buildEmployeeNextSidecarRequest(
     session: Object.freeze({
       id: sessionId,
       session_id: sessionId,
-      date,
+      ...(date === "" ? {} : { date }),
       entries_count: 1,
       entries: Object.freeze([entry]),
       cash_handover: 0,

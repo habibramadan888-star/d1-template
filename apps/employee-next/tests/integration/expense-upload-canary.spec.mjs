@@ -110,21 +110,12 @@ function expenseSubmission() {
   return runtime.createEmployeeSevenEventRegistry()
     .get("expense")
     .buildSubmission({
-      expenseDate: "2026-07-27",
-      expenseCategory: "maintenance",
+      targetRoom: "Apartment Test Fixture",
       expenseAmountAed: 50,
       paymentMethod: "cash",
       cashPaidAed: 50,
       bankPaidAed: 0,
-      expenseScope: "apartment",
-      apartmentLabel: "Apartment Test Fixture",
-      bedLabel: "",
-      vendorName: "Fixture Vendor",
-      paidBy: "",
       expenseDescription: "Fixture maintenance",
-      receiptAvailable: false,
-      receiptNote: "",
-      finalNote: "",
     });
 }
 

@@ -28,7 +28,10 @@ test("Expense has only room, amount, payment, and description without a bed look
   assert.match(template, /required_fields:\['target_bed','expense_amount','payment_method','reason'\]/);
   assert.match(inputListener, /if\(type==='E'\)\{syncForm\(\);return;\}/);
   assert.ok(inputListener.indexOf("type==='E'") < inputListener.indexOf("employeeScheduleLookupBed"));
-  assert.match(source, /if\(\['TF','E'\]\.includes\(\$\('entryType'\)\?\.value\)\)return saveEntryWithoutTtlockGate\(\);/);
+  assert.ok(
+    source.includes("if(['TF','E','DR','CO'].includes($('entryType')?.value)"),
+    "Expense, Deposit Refund and Checkout must use the existing no-TTLock dispatch path",
+  );
 });
 
 test("Preview renders the exact WhatsApp ledger text and empty sessions stay disabled", async () => {

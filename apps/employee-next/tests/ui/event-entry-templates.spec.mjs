@@ -227,13 +227,9 @@ const editable = {
     depositDifferenceReason: "Owner reconciliation required",
   },
   expense: {
-    expenseDate: "2026-07-27",
-    expenseCategory: "supplies",
+    targetRoom: "LOCAL-CANARY",
     expenseAmountAed: 1,
     paymentMethod: "cash",
-    expenseScope: "apartment",
-    apartmentLabel: "LOCAL-CANARY",
-    vendorName: "LOCAL-VENDOR",
     expenseDescription: "LOCAL_DRAFT_CANARY_TEST",
   },
   "bed-transfer": {
@@ -327,14 +323,12 @@ test("context-dependent events block while safe local expense remains available"
   const expense = registry.get("expense");
   const oneAed = complete(expense, contexts.expense, editable.expense);
   assert.deepEqual(expense.validate(oneAed, contexts.expense), []);
-  assert.equal(oneAed.apartmentLabel, "LOCAL-CANARY");
+  assert.equal(oneAed.targetRoom, "LOCAL-CANARY");
   assert.equal(Object.hasOwn(oneAed, "tenantId"), false);
 
   const fifty = complete(expense, contexts.expense, {
     ...editable.expense,
     expenseAmountAed: 50,
-    receiptAvailable: true,
-    receiptNote: "Paper receipt retained",
   });
   assert.deepEqual(expense.validate(fifty, contexts.expense), []);
 
@@ -342,9 +336,10 @@ test("context-dependent events block while safe local expense remains available"
     ...editable.expense,
     expenseAmountAed: 100,
   });
-  assert.ok(
-    expense.validate(hundredWithoutEvidence, contexts.expense)
-      .some((entry) => entry.code === "EXPENSE_EVIDENCE_REQUIRED"),
+  assert.deepEqual(expense.validate(hundredWithoutEvidence, contexts.expense), []);
+  assert.deepEqual(
+    expense.employeeEditableFields,
+    ["targetRoom", "expenseAmountAed", "paymentMethod", "expenseDescription"],
   );
 });
 
@@ -490,13 +485,9 @@ test("real Expense DOM Add to Session is scoped, atomic, and transport-free", as
       await Promise.resolve();
     }
 
-    await enter("expenseDate", "2026-07-27");
-    await enter("expenseCategory", "supplies");
+    await enter("targetRoom", "LOCAL-CANARY");
     await enter("expenseAmountAed", 1);
     await enter("paymentMethod", "cash");
-    await enter("expenseScope", "apartment");
-    await enter("apartmentLabel", "LOCAL-CANARY");
-    await enter("vendorName", "LOCAL-VENDOR");
     await enter("expenseDescription", "LOCAL_DRAFT_CANARY_TEST");
 
     const add = byDataset(root, "action", "add-to-session");
@@ -590,10 +581,8 @@ test("storage failure retains Expense form values and Current Session count", as
       await Promise.resolve();
       await Promise.resolve();
     }
-    await enter("expenseDate", "2026-07-27");
+    await enter("targetRoom", "LOCAL-CANARY");
     await enter("expenseAmountAed", 1);
-    await enter("apartmentLabel", "LOCAL-CANARY");
-    await enter("vendorName", "LOCAL-VENDOR");
     await enter("expenseDescription", "LOCAL_DRAFT_CANARY_TEST");
     byDataset(root, "action", "add-to-session").listeners.get("click")();
     await Promise.resolve();
