@@ -1,0 +1,27 @@
+{
+  "schema_version": "homelink-qa-artifact-v1",
+  "candidate_sha256": "b294f7a323496db8027c1b32e5ee7eab2d96d92ced9c9ad5e867e8b56b084b17",
+  "git_commit": "d99f34d6ecf1f856d432c925cb8e404fc981d020",
+  "built_at": "2026-07-16T08:04:39.530Z",
+  "worker_entry": "deploy-worker/src/index.js",
+  "bundled_worker_sha256": "a272d2ee01ccce7fcdd99be81efad97e0a3635dc202aa05bc6d05a999baba953",
+  "asset_count": 11,
+  "assets": [
+    { "path": "employee-v2.html", "bytes": 30882, "sha256": "c7d2b011bdd016181b3d102b085e781c3dab023a25af14b35c93828f66f6790a" },
+    { "path": "employee-v3.html", "bytes": 593770, "sha256": "35a89a9469ec638a87698ff680c3b72401aeb17db7b8b1798b7d6fd6a56d1d77" },
+    { "path": "employee.html", "bytes": 434, "sha256": "52aee8421dcaa4601b988d885b9124f037a56c288b34e5e0cd4095110a620ce8" },
+    { "path": "index-51-cp.js", "bytes": 25682, "sha256": "c9ba0829da7ab3617951c6b24f0871646a4ce011dc9ac46719cc2452acfc3456" },
+    { "path": "index-51-main.js", "bytes": 495558, "sha256": "acf8aae97c54ad53c166a5228966da7be61c553e2ff682cd93e659bd24f04359" },
+    { "path": "index-51.html", "bytes": 126011, "sha256": "9762c23b30e5346a5e015e314b8f360e8ae0c8501ac4ba6a291cc7453f9915d6" },
+    { "path": "index.html", "bytes": 121973, "sha256": "f3e49ddcf6f2ce04d5ac0d43f72f71cbf5b1b8bb30258bd35e054c886f9ec73e" },
+    { "path": "portal.html", "bytes": 11471, "sha256": "a0413a65e9fe40f4cf3dcfe18e5699fa4e2fbdcffa20b8ea7625401c5f19ce2b" },
+    { "path": "qa-acceptance.html", "bytes": 5646, "sha256": "b4d3203fad1ea95db3be395fdf80b68aad466453bcf73e668c638173f8dbc927" },
+    { "path": "shared-design-tokens.css", "bytes": 8398, "sha256": "8a836830256f9423a2164ae3d6c53787440ace9b29854f6fc3d6101a1f9a4f44" },
+    { "path": "unified-login.html", "bytes": 14835, "sha256": "63b5969e212bda698aa7b52724282040ce921a266a444783a8aeefb983a248b7" }
+  ],
+  "binding_contract_sha256": "aaa5d370f52b103b17718432596e0dae3db5b7500150d4081bad27ef0cad9afd",
+  "schema_version_qa": "qa-acceptance-schema-v1",
+  "test_matrix_version": "employee-qa-matrix-v1",
+  "reproducible_build": true,
+  "production_promoted": false
+}

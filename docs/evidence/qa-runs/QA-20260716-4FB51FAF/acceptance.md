@@ -1,0 +1,24 @@
+# QA Acceptance QA-20260716-4FB51FAF
+
+- Mode: quick
+- Status: UPLOAD_PASS
+- Real Employee Validate Session: 16/16 passed; aggregate HTTP 200
+- Validation attempt: `qa-val-c32c97cd-e91a-4cbc-bee0-71d62fe8ada6`
+- Payload hash: `74c8dd64a3c79be7a566b2008ae5acd479876c604cfdb081d51ea2e52fc53ab3`
+- Employee manual acceptance: ACCEPTED at `2026-07-16T17:19:15.416Z`; preserved without replay
+- Upload: completed before task 083A; all 16 canonical entries are preserved
+- Owner manual acceptance: pending
+- Final reconciliation: pending
+- Run historical formal write count: 16
+- Task 083A additional formal write count: 0
+- TTLock external calls: 0
+- Refresh: 16/16 validation state retained across three reloads and a second browser
+- Reviewed QA Worker: `16c0304b-4aaa-4ebd-8057-f51921acb1da`
+- Current QA Owner identity-closure Worker: `37c4546d-4ae9-44a7-8d58-065ad62fa878`
+- Reviewed artifact: `a49ac3590b25a8567a6bf8362cf7968fdf17f4cabae476218eb437342113b304`
+- Current QA Owner identity-closure artifact: `f81ecc993782350dec281eaf5a73c54302cefb6d66a218d9b6be6fd33f0bfa70`
+- Server Entry/anchor identity set: `16/16`, missing `0`, extra `0`, duplicate `0`, orphan transaction `0`
+- Owner mobile verification: History `16`, Period Analysis `16/16`, Finance oracle exact, Arrears `2 / AED 150`, Today Todo `13`
+- Owner evidence: `screenshots/owner-history-083a.png`, `screenshots/owner-detail-083a.png`, `screenshots/owner-period-analysis-083a.png`
+- Owner manual status: PENDING; `Accept Owner Review` was not clicked
+- Production business data changed: no

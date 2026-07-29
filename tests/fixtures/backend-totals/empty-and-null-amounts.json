@@ -1,0 +1,10 @@
+{
+  "name": "empty-and-null-amounts",
+  "rows": [
+    { "id": "empty", "type": "R", "pay_type": "C", "amount": "" },
+    { "id": "null", "type": "R", "pay_type": "C", "amount": null }
+  ],
+  "expected": {
+    "errorsAtLeast": 2
+  }
+}

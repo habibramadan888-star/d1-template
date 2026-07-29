@@ -1,0 +1,116 @@
+# Employee Arrears Follow-Up Lock
+
+## Final Employee Scope
+
+Employee arrears follow-up is a task feedback workflow, not a finance amount editing workflow.
+
+Employees only need to:
+
+1. View arrears tasks assigned or visible to them.
+2. Fill promise payment date.
+3. Fill staff note.
+4. Submit follow-up feedback.
+
+Employees do not need to:
+
+1. Fill promised amount.
+2. Modify arrears amount.
+3. Modify source.
+4. Close task.
+5. Void task.
+6. Delete task.
+7. Modify accounting/finance status.
+
+## Employee Action Matrix
+
+| Employee Action                    | Allowed | Required Fields                                                             | Owner Sees               |
+| ---------------------------------- | ------- | --------------------------------------------------------------------------- | ------------------------ |
+| View assigned arrears task         | yes     | none                                                                        | Task status unchanged    |
+| Set follow-up status               | yes     | `followup_status`                                                           | Business status          |
+| Fill promise payment date          | yes     | `promise_date` when status is `承诺付款`                                    | `承诺日期`               |
+| Fill staff note                    | yes     | `staff_note` when status is not `待跟进`                                    | `备注`                   |
+| Submit feedback                    | yes     | `followup_status`, optional/required `promise_date`, `staff_note` by status | Updated date/note/status |
+| Fill promised amount               | no      | none                                                                        | Not shown                |
+| Modify arrears amount              | no      | none                                                                        | Not allowed              |
+| Modify source                      | no      | none                                                                        | Not allowed              |
+| Close task                         | no      | none                                                                        | Not allowed              |
+| Void/delete task                   | no      | none                                                                        | Not allowed              |
+| Modify financial/accounting status | no      | none                                                                        | Not allowed              |
+
+## Current Implementation Gap
+
+| Layer                 | Current                                                                                      | Lock Status |
+| --------------------- | -------------------------------------------------------------------------------------------- | ----------- |
+| Employee v3 UI        | Follow-up card has date and note inputs; save payload sends `promise_date` and `staff_note`. | Aligned     |
+| Employee v2 legacy UI | Promised amount input removed from follow-up section.                                        | Aligned     |
+| Backend staff patch   | `staffAllowed` still includes `promise_amount` for compatibility.                            | Gap         |
+| Owner card            | No longer displays promised amount.                                                          | Aligned     |
+
+## Required Future Fix
+
+Create a dedicated compatibility task to remove or ignore `promise_amount` from employee follow-up updates in the backend. This must be done separately because the same schema field is still used in legacy arrears/task compatibility paths.
+
+## Required Tests
+
+1. Employee follow-up UI has no promised amount input.
+2. Employee follow-up save payload does not include `promise_amount`.
+3. Backend staff patch rejects amount changes after compatibility review.
+4. Owner card does not display promised amount.
+
+## Promise Amount Contract Cleanup
+
+- Employees only fill promised payment date and follow-up note in the default arrears follow-up flow.
+- Arrears amount is system-controlled and must not be entered by employees as a promised amount.
+- `promise_amount`, `promised_amount`, and `promised_amount_fils` are legacy optional compatibility fields only.
+- Default employee UI must not display or submit promised amount fields.
+- No migration or D1 write was performed.
+- Production cutover remains `PRODUCTION_NO_GO`.
+
+## Persisted Feedback State Lock - 2026-06-01
+
+- Saved employee feedback and currently unsaved edits must be distinct states.
+- Write gate off must not negate feedback that is already saved and visible to owner.
+- Gate-off warning is only for new or modified feedback that is not yet persisted.
+- Unchanged persisted feedback should show saved/owner-visible copy and must not show a production-write-disabled error.
+- Owner-side assigned or followed-up tasks must not keep a primary clickable `下发员工` action.
+- No production write, write gate opening, migration, batch dispatch, TTLock smoke, financial formula change, or dashboard calculation change is part of this UI lock.
+- Production cutover remains `PRODUCTION_NO_GO`.
+
+## Live Deploy Audit Lock - 2026-06-01
+
+- If the live phone still shows gate-off warning for unchanged saved feedback, first verify that the deployed asset contains the persisted-state markers.
+- `LIVE_NOT_DEPLOYED` must be treated as a deploy approval question, not as a reason to perform another production write.
+- Date comparison must be normalized and note comparison must be trimmed before deploying any further hardening.
+- All employee boss directive renderers must use the same saved/dirty state model.
+- Production cutover remains `PRODUCTION_NO_GO`.
+
+## Owner Batch Directive UI Lock
+
+- Current owner-side "send employee" flow is dry-run/list-generation only unless a separate write approval is issued.
+- The owner UI no longer asks for a directive date before generating the employee execution list.
+- Employee write flows are not executed by owner arrears batch selection tests.
+- Production cutover remains `PRODUCTION_NO_GO`.
+# Acceptance Bugfix Lock - 2026-05-31
+
+- Employee can receive/read arrears follow-up tasks through existing task loading paths.
+- Real boss-to-employee directive delivery is not executed in this task and remains approval-required.
+- Owner-side “下发员工” generates a dry-run execution list only.
+- Production cutover remains `PRODUCTION_NO_GO`.
+## Employee Arrears Directive Follow-Up Lock - 2026-05-31
+
+- Employee must be able to read assigned directives.
+- Employee feedback contains promised payment date and note only.
+- Employee cannot submit promised amount.
+- Employee cannot modify arrears amount.
+- Employee cannot close directive/task.
+- Write path is approval gated for production.
+
+## Boss Directive Inbox Lock - 2026-05-31
+
+- Employee FOLLOW-UP must show two separate sections: `老板下发任务` and `系统提醒`.
+- Boss directive tasks must be read from `GET /api/employee/arrears/directives`.
+- Empty boss directive state must say `暂无老板下发任务`.
+- Employee directive feedback may only collect `promised_payment_date` and `followup_note`.
+- The UI must not expose promised amount, amount edit, close, void, or employee entry write actions in the boss directive card.
+- If production write approval is required, UI must say the feedback was not written to production.
+- Production cutover remains `PRODUCTION_NO_GO`.

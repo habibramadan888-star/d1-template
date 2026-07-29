@@ -1,0 +1,45 @@
+{
+  "description": "Arrears repayment is classified separately from rent.",
+  "context": {
+    "role": "staff",
+    "employeeId": "emp-a",
+    "allowedEmployeeIds": ["emp-a"],
+    "allowedPropertyIds": ["HL-009"]
+  },
+  "input": {
+    "session_id": "S-ARREARS-001",
+    "idempotency_key": "key-arrears-001",
+    "employee_id": "emp-a",
+    "property_id": "HL-009",
+    "submitted_at": "2026-05-24T03:20:00+04:00",
+    "frontend_totals": {
+      "cash_handover": "100.00",
+      "bank_transfer_total": "0.00",
+      "bank_transfer_count": 0,
+      "gross_received": "100.00",
+      "session_total": "100.00"
+    },
+    "rows": [
+      {
+        "client_entry_id": "arrears-row-1",
+        "event_type": "AP",
+        "payment_method": "C",
+        "amount": "100.00",
+        "bed": "325"
+      }
+    ]
+  },
+  "existing_state": {
+    "commits": []
+  },
+  "expected": {
+    "status": "ACCEPTED",
+    "cash_handover": "100.00",
+    "gross_received": "100.00",
+    "arrears_paid": "100.00",
+    "accepted_rows": 1,
+    "rejected_rows": 0,
+    "idempotency_status": "NEW",
+    "errors": 0
+  }
+}

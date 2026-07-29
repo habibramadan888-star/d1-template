@@ -1,0 +1,12 @@
+{
+  "name": "invalid-decimal-3dp",
+  "rows": [
+    { "id": "bad-money", "type": "R", "pay_type": "C", "amount": "100.999" }
+  ],
+  "frontendTotals": {
+    "cash_handover": "100.999"
+  },
+  "expected": {
+    "errorsAtLeast": 1
+  }
+}

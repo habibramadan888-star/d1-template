@@ -1,0 +1,55 @@
+import assert from 'node:assert/strict';import {readFile} from 'node:fs/promises';import test from 'node:test';import vm from 'node:vm';import {classifyExistingCanonicalTransfer,prepareCanonicalTransferArchiveWrite} from '../modules/employees/bed-transfer-canonical-archive-write.mjs';
+const path=new URL('../deploy-worker/src/index.js',import.meta.url);function block(s,n){let a=s.indexOf(`function ${n}`);if(s.slice(a-6,a)==='async ')a-=6;const b=s.indexOf(`__name(${n},`,a);assert.ok(a>=0&&b>a,n);return s.slice(a,b)}
+test('gate rejects absent false and malformed before DB access',async()=>{const s=await readFile(path,'utf8'),writer=block(s,'handleEmployeeEntry'),gate=block(s,'bedTransferWriteApproved');assert.match(gate,/===\"true\"/);assert.ok(writer.indexOf('!bedTransferWriteApproved(env)')<writer.indexOf('empTableExists(env,"sessions")'));});
+test('gate true path uses one explicit entries_json insert and no side-effect fact tables',async()=>{const s=await readFile(path,'utf8'),persist=block(s,'persistEmployeeBedTransferCanonicalArchive');assert.equal((persist.match(/INSERT INTO sessions/g)||[]).length,1);assert.match(persist,/source,entries_json\)/);assert.doesNotMatch(persist,/empInsertDynamic|transactions|entry_events|audit\(|bed_transfer_events|DB\.batch/);});
+test('write boundary requires exactly one TF entry and canonical resolver validation',async()=>{const s=await readFile(path,'utf8'),boundary=block(s,'employeeBedTransferSingleEntryFailure'),writer=block(s,'handleEmployeeEntry');assert.match(boundary,/rows\.length!==1/);assert.match(boundary,/!==\'TF\'/);assert.match(writer,/canonical_transfer_link_anchor:\[\"TF\",\"TFF\"\]\.includes\(writeGateType\)/);assert.match(writer,/persistEmployeeBedTransferCanonicalArchive/);});
+test('session primary key and race recovery provide at-most-one canonical fact',async()=>{const s=await readFile(path,'utf8'),schema=s.slice(s.indexOf('CREATE TABLE IF NOT EXISTS sessions'),s.indexOf('CREATE TABLE IF NOT EXISTS sessions')+180),persist=block(s,'persistEmployeeBedTransferCanonicalArchive');assert.match(schema,/id TEXT PRIMARY KEY/);assert.match(persist,/catch\(error\)/);assert.match(persist,/classifyExistingCanonicalTransfer/);assert.match(persist,/classified\.error_code/);});
+async function harness({corruptAfterInsert=false}={}){
+  const s=await readFile(path,'utf8'),store=new Map();let ids=0,writes=0;
+  const context={
+    Map,Set,JSON,Math,Number,Object,String,
+    prepareCanonicalTransferArchiveWrite,classifyExistingCanonicalTransfer,
+    findEffectiveCanonicalTransferByFingerprint:async()=>({status:'missing',matches:[]}),
+    cleanId:v=>String(v||''),cleanText:v=>String(v||''),empNow:()=> '2026-07-12T12:00:00+04:00',
+    cleanDate:v=>String(v||'').slice(0,10),
+    ownerOverviewMoney:value=>Math.round((Number(value)||0)*100)/100,
+    entryAnchorType:row=>String(row?.type||''),
+    entryAnchorEventType:type=>({R:'rent',AP:'arrears_payment',D:'deposit_in',DR:'deposit_out',CO:'checkout',E:'expense',TF:'bed_transfer'})[String(type||'').toUpperCase()]||'',
+    crypto:{randomUUID:()=>`00000000-0000-4000-8000-${String(++ids).padStart(12,'0')}`},
+    json:(body,status)=>({body,status}),success:body=>body
+  };
+  const summaryBlocks=[
+    'canonicalFinanceProjectionZeroTotals','canonicalFinanceProjectionRoundTotals','canonicalFinanceProjectionPaymentMethod',
+    'canonicalFinanceProjectionAmount','canonicalFinanceProjectionEventType','canonicalFinanceProjectionAddInflow',
+    'canonicalFinanceProjectionAddOutflow','canonicalFinanceProjectionApplyAnchor','qaAcceptanceFinanceComparable',
+    'canonicalSessionSummaryEntryIdentity','canonicalSessionSummaryNormalizeAnchor','calculateCanonicalSessionSummary',
+    'canonicalSessionSummaryClientDiagnostic','canonicalSessionSummaryWithClientDiagnostic','canonicalSessionSummaryPersistenceFields'
+  ].map(name=>block(s,name)).join('\n');
+  vm.createContext(context);vm.runInContext(`${summaryBlocks};${block(s,'empTableColumns')};${block(s,'persistEmployeeBedTransferCanonicalArchive')};this.persist=persistEmployeeBedTransferCanonicalArchive`,context);
+  const env={DB:{prepare:(sql)=>({
+    all:async()=>/^PRAGMA table_info\(sessions\)/.test(sql)?{results:[{name:'entries_json'},{name:'summary_json'}]}:{results:[]},
+    bind:(...args)=>({
+    first:async()=>store.get(args[0])||null,
+    run:async()=>{
+      if(/^INSERT INTO sessions/.test(sql)){
+        writes++;
+        if(store.has(args[0]))throw new Error('constraint');
+        store.set(args[0],{id:args[0],anchor_id:args[2],entries_json:corruptAfterInsert?'{"entries":[]}':args[17],voided_at:null});
+        return{meta:{changes:1}};
+      }
+      if(/^UPDATE sessions/.test(sql)){
+        const row=store.get(args[2]);
+        if(row&&row.anchor_id===args[4]){row.voided_at=args[0];row.void_reason='CANONICAL_ARCHIVE_PERSISTENCE_VERIFICATION_FAILED';return{meta:{changes:1}};}
+      }
+      return{meta:{changes:0}};
+    }
+  })})}};
+  const user={corpid:'corp',userid:'employee-1',employee_name:'Employee'};
+  const preview={event_type:'bed_transfer',type:'TF',from_bed:'A',to_bed:'B',transfer_at:'2026-07-12',transfer_reason:'move',corpid:'corp',source_context_anchor_refs:['a'],carried_arrears_refs:['r1','r2'],rent_coverage_ref:'rent-ref-0000001',deposit_context_ref:'deposit-ref-0001',expiry_context_ref:'expiry-ref-000001',snapshot_fingerprint:'snap',ttlock_sequence:'employee_first_pre_move',source_snapshot_fingerprint:'source-snap',target_snapshot_fingerprint:'target-snap',ttlock_observation_at:'2026-07-12',physical_state_before_submission:{source:'not_marked_vacant',target:'vacant'},continuity_checks:{corpid:'matched'},reconciliation_required:true,fee_mode:'paid',fee_amount_aed:50,payment_method:'cash'};
+  return{context,env,user,store,get writes(){return writes},preview};
+}
+test('gate-enabled fixture writes once and retry returns same canonical IDs',async()=>{const h=await harness(),body={session:{id:'session-1'}};const first=await h.context.persist(h.env,h.user,body,{bed_transfer_phase1_preview:h.preview});const retry=await h.context.persist(h.env,h.user,body,{bed_transfer_phase1_preview:h.preview});assert.equal(h.store.size,1);assert.equal(h.writes,1);assert.equal(retry.idempotent,true);assert.equal(retry.canonical_entry.transfer_anchor_id,first.canonical_entry.transfer_anchor_id);assert.deepEqual(Array.from(retry.canonical_entry.carried_arrears_refs),['r1','r2']);});
+test('same identity with changed payload conflicts without another insert',async()=>{const h=await harness(),body={session:{id:'session-1'}};await h.context.persist(h.env,h.user,body,{bed_transfer_phase1_preview:h.preview});const result=await h.context.persist(h.env,h.user,body,{bed_transfer_phase1_preview:{...h.preview,to_bed:'C'}});assert.equal(result.status,409);assert.equal(result.body.error_code,'BED_TRANSFER_IDEMPOTENCY_CONFLICT');assert.equal(h.store.size,1);});
+test('concurrent duplicate simulation leaves at most one canonical fact',async()=>{const h=await harness(),body={session:{id:'session-1'}};const results=await Promise.all([h.context.persist(h.env,h.user,body,{bed_transfer_phase1_preview:h.preview}),h.context.persist(h.env,h.user,body,{bed_transfer_phase1_preview:h.preview})]);assert.equal(h.store.size,1);assert.equal(results.filter(r=>r.idempotent).length,1);});
+test('owner-first gated fixture stores completed TTLock observation',async()=>{const h=await harness(),owner={...h.preview,ttlock_sequence:'owner_first_post_move',source_snapshot_fingerprint:'source-vacant',target_snapshot_fingerprint:'target-occupied',physical_state_before_submission:{source:'vacant',target:'not_marked_vacant'},continuity_checks:{mmdd:'matched',deposit:'target_D_present',expiry:'target_normalized_expiry_present'},reconciliation_required:false};const result=await h.context.persist(h.env,h.user,{session:{id:'owner-first-session'}},{bed_transfer_phase1_preview:owner});assert.equal(result.canonical_entry.ttlock_sequence,'owner_first_post_move');assert.equal(result.canonical_entry.reconciliation_required,false);assert.equal(h.store.size,1);});
+test('post-insert mismatch never returns success and soft-voids the new shell',async()=>{const h=await harness({corruptAfterInsert:true}),result=await h.context.persist(h.env,h.user,{session:{id:'bad-session'}},{bed_transfer_phase1_preview:h.preview});assert.equal(result.status,500);assert.equal(result.body.error_code,'CANONICAL_ARCHIVE_PERSISTENCE_VERIFICATION_FAILED');assert.equal(result.body.session_soft_void_attempted,true);assert.ok(h.store.get('bad-session').voided_at);});

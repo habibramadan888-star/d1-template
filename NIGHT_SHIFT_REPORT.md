@@ -1,0 +1,2003 @@
+# Night Shift Report
+
+Date: 2026-05-23  
+Mode: autonomous safe engineering  
+Goal: improve commercial readiness without changing business logic  
+Production deploy: not executed  
+Production database mutation: not executed
+
+## Global Compliance
+
+- No large-scale refactor performed.
+- No core business logic deleted.
+- No financial calculation result changed.
+- No production configuration changed.
+- No production deployment executed.
+- No dangerous SQL executed.
+- No business code was migrated.
+- No UI redesign was performed.
+- No credentials, tokens, or tenant identifiers were hardcoded.
+
+## Stage A: Governance Documents
+
+### Modified
+
+- Verified `AI_CONTRACT.md`
+- Verified `ARCHITECTURE.md`
+- Verified `PROJECT_MAP.md`
+
+### Why
+
+- Confirmed the governance layer covers module boundaries, Worker structure, API layering, Cloudflare architecture, data flow, multi-tenant rules, permission rules, and financial rules.
+
+### Risk
+
+- Low. Read-only verification and existing governance document validation.
+
+### Database Impact
+
+- None.
+
+### Permission Impact
+
+- None.
+
+### Worker Impact
+
+- None.
+
+### Rollback
+
+- No rollback needed for verification.
+
+## Stage B: Engineering Baseline
+
+### Modified
+
+- Added `package.json`
+- Added `package-lock.json`
+- Added `.gitignore`
+- Added `.prettierrc`
+- Added `.prettierignore`
+- Added `eslint.config.mjs`
+- Added `.env.example`
+- Added `README.md`
+- Added `tools/check-governance.cjs`
+
+### Why
+
+- The project had no root engineering baseline for repeatable validation.
+- Added scripts for governance check, lint, format check, syntax check, and Worker dry-run build.
+- Added `.env.example` to document required local secrets without committing real secrets.
+
+### Risk
+
+- Low to medium.
+- Tooling can reveal failures but does not alter runtime behavior.
+- `node_modules` and `.wrangler-dryrun` are local artifacts and are ignored.
+
+### Database Impact
+
+- None from file creation.
+
+### Permission Impact
+
+- None.
+
+### Worker Impact
+
+- No Worker source logic changed.
+- Dry-run build reads Worker configs and emits local dry-run artifacts only.
+
+### Rollback
+
+- Remove the added engineering files and `node_modules`.
+- No data migration required.
+
+## Stage C: Directory Governance
+
+### Modified
+
+- Added `DIRECTORY_GOVERNANCE.md`
+
+### Why
+
+- Defined the target modular structure:
+  - `modules/auth/`
+  - `modules/finance/`
+  - `modules/contracts/`
+  - `modules/properties/`
+  - `modules/employees/`
+  - `modules/reports/`
+  - `modules/settings/`
+  - `modules/audit/`
+- Explicitly stated that no migration happens tonight.
+
+### Risk
+
+- Low. Documentation only.
+
+### Database Impact
+
+- None.
+
+### Permission Impact
+
+- None.
+
+### Worker Impact
+
+- None.
+
+### Rollback
+
+- Delete `DIRECTORY_GOVERNANCE.md`.
+
+## Stage D: Local Validation
+
+### Commands Passed
+
+- `npm run governance:check`
+- `npm run typecheck`
+- `npm run format:check`
+- `npm run build`
+- local Worker startup with `wrangler.toml`
+- local embedded Worker startup with `wrangler.embedded.toml`
+- local D1 read query
+
+### Commands Failed
+
+- `npm run lint`
+- local employee login after page startup
+
+### Why Failures Were Not Auto-Fixed
+
+- Lint failures are in legacy business files.
+- Fixing them safely requires isolated review and regression checks.
+- Local login failure is caused by missing secrets; hardcoding or using fake production-like secrets would violate the security rules.
+
+### Database Impact
+
+- No production database impact.
+- Local D1 was read through Wrangler.
+- Worker auth path can create local helper tables during local testing; this is local-only and not production data.
+
+### Permission Impact
+
+- Unauthenticated API behavior was validated.
+- Authenticated role behavior was not fully validated because local secrets are missing.
+
+### Worker Impact
+
+- Worker startup and dry-run build are verified.
+- No Worker source logic changed.
+
+### Rollback
+
+- No runtime changes to roll back.
+- Remove local `.wrangler-dryrun` and `node_modules` if needed.
+
+## Current Blocking Items
+
+See `BLOCKER_REPORT.md`.
+
+Main blockers:
+
+- missing local authentication secrets,
+- incomplete clean D1 bootstrap proof,
+- existing float/REAL money model,
+- hard-delete financial path,
+- owner-side duplicate function declaration blocking lint.
+
+## Final State
+
+The system is safer than before because governance and repeatable validation now exist. It is not yet commercial-ready. The next work should be small, isolated, and blocker-driven.
+
+## Recommended Next Step
+
+Start with local environment safety:
+
+1. Add a non-production `.dev.vars` locally, not committed.
+2. Add a password hash helper.
+3. Re-run authenticated employee and owner flows.
+4. Then fix lint blockers one by one.
+
+## NIGHT SHIFT V2 Continuation
+
+### Current Status
+
+The V2 loop continued from local validation into safe engineering fixes and report generation. Production deployment and production database mutation were not executed.
+
+### Modified
+
+- `deploy-worker/src/index.js`
+- `eslint.config.mjs`
+- `.gitignore`
+- `.env.local.example`
+- `package.json`
+- `package-lock.json`
+- `scripts/smoke-worker.mjs`
+- `scripts/audit-api.mjs`
+- `scripts/audit-db.mjs`
+- `tests/governance.spec.mjs`
+- `tests/source-risk.spec.mjs`
+- `API_INVENTORY.md`
+- `DATABASE_AUDIT.md`
+- `FINANCE_AUDIT.md`
+- `AUTH_TENANCY_AUDIT.md`
+- `EMPLOYEE_FLOW_REPORT.md`
+- `OWNER_FLOW_REPORT.md`
+- `MANUAL_TEST_PLAN.md`
+- `COMMERCIALIZATION_BACKLOG.md`
+- `NEXT_MORNING_REVIEW.md`
+
+### Why
+
+- Establish repeatable local checks.
+- Make API/database/finance/auth risks visible before business logic changes.
+- Add smoke tests without weakening auth or changing financial behavior.
+- Add governance tests that verify commercial blockers remain visible instead of hidden.
+- Track commercial blockers by priority.
+
+### Risk
+
+- Low for reports and tooling.
+- Low for Worker lint cleanup because no financial formula, permission rule, database write, or route behavior was intentionally changed.
+- Medium operational risk remains because authenticated flows and clean D1 bootstrap are not fully validated yet.
+
+### Database Impact
+
+- No production or local business data migration was executed by V2 report generation.
+- Local Worker smoke may create local auth helper tables only in Wrangler local storage.
+
+### Permission Impact
+
+- No permission logic was changed.
+- Unauthenticated API protection was smoke-tested.
+- Authenticated permission tests remain blocked until safe local secrets exist.
+
+### Worker Impact
+
+- Source Worker lint issues were fixed.
+- Embedded generated Worker was not regenerated under the no-giant-file-expansion rule.
+- Dry-run build passed for current configurations.
+
+### Verification
+
+Commands passing:
+
+```bash
+npm run governance:check
+npm run format:check
+npm run lint
+npm run typecheck
+npm run test
+npm run build
+npm run smoke
+npm run check
+```
+
+### Next Step
+
+Configure local-only `.dev.vars` with non-production secrets, then run authenticated smoke tests for employee and owner roles.
+
+### Test Layer Added
+
+Created minimal Node test coverage:
+
+- report existence and completeness checks,
+- blocker tracking checks,
+- env protection checks,
+- dry-run-only deploy script checks,
+- Worker auth gate presence checks,
+- known-risk documentation checks.
+
+These tests do not claim the system is commercial-ready. They ensure the current risk state cannot be silently hidden while future fixes proceed.
+
+## V2 Migration Draft Follow-Up
+
+### Task
+
+Create a non-production commercial bootstrap SQL draft and validate it statically.
+
+### Current Status
+
+Completed.
+
+### Findings
+
+- The employee entry smoke failure confirmed that clean D1 bootstrap is incomplete.
+- The project needs a reviewed, append-only migration path instead of request-path schema mutation.
+- Commercial accounting tables must use integer minor units, tenant/property scope, lifecycle status fields, and audit linkage.
+
+### Code Modified
+
+Yes, but only governance/testing/migration-draft files were changed:
+
+- `migration-drafts/002_commercial_bootstrap.sql`
+- `tests/migration-draft.spec.mjs`
+- `package.json`
+- `MIGRATION_BOOTSTRAP_PLAN.md`
+- `DATABASE_AUDIT.md`
+- `RUN_REPORT.md`
+- `NEXT_MORNING_REVIEW.md`
+- `NIGHT_SHIFT_REPORT.md`
+
+### Why
+
+To create a reviewable commercial schema target without touching production data, runtime business logic, or real migrations.
+
+### Risk
+
+Low. The SQL is intentionally kept outside the executable `migrations/` directory and was not applied to any D1 database.
+
+### Database Impact
+
+None. No local or remote migration was executed.
+
+### Permission Impact
+
+None. No auth or role logic was changed.
+
+### Worker Impact
+
+None. Worker source and embedded Worker source were not changed.
+
+### Verification
+
+Command:
+
+```bash
+npm run check
+```
+
+Result:
+
+```text
+PASS
+tests 11
+pass 11
+fail 0
+```
+
+Additional isolated SQL syntax validation:
+
+```bash
+wrangler d1 execute homelink --local --persist-to <temp-dir> --config wrangler.toml --file ../migration-drafts/002_commercial_bootstrap.sql --yes
+```
+
+Result:
+
+```text
+32 commands executed successfully.
+```
+
+The disposable local D1 state was removed after validation. No remote database or existing project local D1 state was modified.
+
+### Next Step
+
+Create a reviewed promotion checklist before moving this draft into `migrations/`, including backfill, rollback, and compatibility checks for existing production data.
+
+## V2 Migration Promotion Gate Follow-Up
+
+### Task
+
+Create a commercial promotion checklist for moving SQL drafts into executable migrations.
+
+### Current Status
+
+Completed.
+
+### Code Modified
+
+Yes, but only documentation and static tests:
+
+- `MIGRATION_PROMOTION_CHECKLIST.md`
+- `MIGRATION_BOOTSTRAP_PLAN.md`
+- `DATABASE_AUDIT.md`
+- `tests/migration-draft.spec.mjs`
+- `RUN_REPORT.md`
+- `NEXT_MORNING_REVIEW.md`
+- `NIGHT_SHIFT_REPORT.md`
+
+### Why
+
+The project needs an explicit gate that prevents a clean-bootstrap SQL draft from being promoted without rollback, backup, staging, reconciliation, and tenant-isolation review.
+
+### Risk
+
+Low. This is a governance/test change only.
+
+### Database Impact
+
+None. No local or remote database migration was executed.
+
+### Permission Impact
+
+None. No auth code was changed.
+
+### Worker Impact
+
+None. No Worker source was changed.
+
+## V2 Migration Rehearsal Follow-Up
+
+### Task
+
+Create a repeatable local migration rehearsal command.
+
+### Current Status
+
+Completed.
+
+### Code Modified
+
+Yes, but only tooling/tests/reports:
+
+- `scripts/rehearse-migration.mjs`
+- `package.json`
+- `tests/source-risk.spec.mjs`
+- `MIGRATION_PROMOTION_CHECKLIST.md`
+- `RUN_REPORT.md`
+- `NEXT_MORNING_REVIEW.md`
+- `NIGHT_SHIFT_REPORT.md`
+
+### Why
+
+Manual SQL validation is not enough for a commercial migration path. The project now has a repeatable command that applies the draft to disposable local D1 state and verifies table creation plus a basic accounting chain.
+
+### Risk
+
+Low. The rehearsal is explicitly local-only and uses a temporary `--persist-to` directory.
+
+### Database Impact
+
+No production or existing local D1 was changed. The disposable D1 directory was removed after the rehearsal.
+
+### Permission Impact
+
+None. No auth code was changed.
+
+### Worker Impact
+
+None. No Worker source was changed.
+
+### Verification
+
+Command:
+
+```bash
+npm run migration:rehearse
+```
+
+Result:
+
+```text
+Migration rehearsal passed.
+Validated tables: 14
+Validated accounting fixture: session, transactions, receivable, payment, arrear task, deposit ledger, audit event.
+```
+
+### D1 Transaction Finding
+
+Wrangler D1 rejects SQL `BEGIN TRANSACTION` and `ROLLBACK` in SQL files. Rollback rehearsal is therefore represented by disposable local D1 cleanup. Production rollback must still be handled with backup restore or forward rollback migration planning.
+
+## V2 Legacy Backfill Mapping Follow-Up
+
+### Task
+
+Create a read-only legacy-to-commercial backfill map and static audit.
+
+### Current Status
+
+Completed.
+
+### Code Modified
+
+Yes, but only tooling/tests/reports:
+
+- `LEGACY_BACKFILL_MAP.md`
+- `LEGACY_BACKFILL_AUDIT.md`
+- `scripts/audit-legacy-backfill.mjs`
+- `package.json`
+- `tests/migration-draft.spec.mjs`
+- `RUN_REPORT.md`
+- `NEXT_MORNING_REVIEW.md`
+- `NIGHT_SHIFT_REPORT.md`
+
+### Why
+
+Commercial backfill cannot safely proceed until legacy accounting fields are mapped to the target schema and the non-negotiable reconciliation anchors are documented.
+
+### Risk
+
+Low. This is documentation and static analysis only.
+
+### Database Impact
+
+None. No D1 connection was opened and no SQL was executed.
+
+### Permission Impact
+
+None. No auth code was changed.
+
+### Worker Impact
+
+None. No Worker source was changed.
+
+### Verification
+
+Command:
+
+```bash
+npm run audit:legacy-backfill
+```
+
+Result:
+
+```text
+Legacy backfill audit written: 0 static findings
+```
+
+## V2 Legacy Reconciliation Template Follow-Up
+
+### Task
+
+Define the dry-run reconciliation output schema and generate non-executing templates.
+
+### Current Status
+
+Completed.
+
+### Code Modified
+
+Yes, but only tooling/tests/reports:
+
+- `LEGACY_RECONCILIATION_SPEC.md`
+- `scripts/generate-reconciliation-template.mjs`
+- `reconciliation-templates/legacy-reconciliation-report.template.json`
+- `reconciliation-templates/legacy-reconciliation-report.template.md`
+- `reconciliation-templates/legacy-reconciliation-exceptions.template.csv`
+- `package.json`
+- `tests/migration-draft.spec.mjs`
+- `RUN_REPORT.md`
+- `NEXT_MORNING_REVIEW.md`
+- `NIGHT_SHIFT_REPORT.md`
+
+### Why
+
+A commercial backfill must produce a repeatable reconciliation report before any data is written. The report shape is now fixed before database-reading code is introduced.
+
+### Risk
+
+Low. Template generation is local file generation only.
+
+### Database Impact
+
+None. No D1 connection was opened and no SQL was executed.
+
+### Permission Impact
+
+None. No auth code was changed.
+
+### Worker Impact
+
+None. No Worker source was changed.
+
+### Verification
+
+Command:
+
+```bash
+npm run reconciliation:template
+```
+
+Result:
+
+```text
+Legacy reconciliation templates generated.
+```
+
+## V2 Local Legacy Reconciliation Dry-Run Follow-Up
+
+### Task
+
+Implement a local-only, read-only legacy reconciliation dry-run command.
+
+### Current Status
+
+Completed.
+
+### Code Modified
+
+Yes, but only tooling/tests/reports:
+
+- `scripts/reconcile-legacy-dry-run.mjs`
+- `.gitignore`
+- `package.json`
+- `LEGACY_RECONCILIATION_SPEC.md`
+- `tests/source-risk.spec.mjs`
+- `RUN_REPORT.md`
+- `NEXT_MORNING_REVIEW.md`
+- `NIGHT_SHIFT_REPORT.md`
+
+### Why
+
+The project now needs a controlled way to inspect a local/staging D1 copy and generate reconciliation reports before any commercial backfill is written.
+
+### Risk
+
+Low. The command refuses to run without `--persist-to`, rejects remote flags, and writes reports to ignored `reconciliation-output/`.
+
+### Database Impact
+
+No production or existing local D1 was changed. Validation used an empty disposable local D1 state directory and removed it after the run.
+
+### Permission Impact
+
+None. No auth code was changed.
+
+### Worker Impact
+
+None. No Worker source was changed.
+
+### Verification
+
+Command:
+
+```bash
+npm run reconciliation:dry-run -- --persist-to <temp-dir> --company-id company_default --property-id property_default --legacy-corpid homelink --source-label temp-empty-local
+```
+
+Result:
+
+```text
+Legacy reconciliation dry-run completed.
+Tables detected: 0
+Exceptions: 9
+No-go: 0
+```
+
+The 9 exceptions are expected for an empty local D1 and confirm that missing source tables are reported rather than hidden.
+
+## V2 API Inventory Drift Gate Follow-Up
+
+### Task
+
+Make API inventory reproducible and enforce route metadata drift checks.
+
+### Current Status
+
+Completed.
+
+### Code Modified
+
+Yes, but only tooling/tests/reports:
+
+- `scripts/audit-api.mjs`
+- `package.json`
+- `API_INVENTORY.md`
+- `tests/source-risk.spec.mjs`
+- `COMMERCIALIZATION_BACKLOG.md`
+- `RUN_REPORT.md`
+- `NIGHT_SHIFT_REPORT.md`
+
+### Why
+
+The previous API inventory could drift because it was effectively manual. Commercial SaaS work needs every route to have reviewed metadata for auth, role, tenant scope, financial impact, delete behavior, audit coverage, and risk.
+
+### Risk
+
+Low. The change scans existing Worker source and checks documentation drift. It does not change route behavior.
+
+### Database Impact
+
+None.
+
+### Permission Impact
+
+None. No auth logic was changed.
+
+### Worker Impact
+
+No runtime Worker logic changed. The build still runs in dry-run mode only.
+
+### Verification
+
+Command:
+
+```bash
+npm run check
+```
+
+Result:
+
+```text
+API inventory is up to date.
+tests 20
+pass 20
+build:worker:assets --dry-run passed
+build:worker:embedded --dry-run passed
+```
+
+## V2 Database Static Scan Drift Gate Follow-Up
+
+### Task
+
+Make database static scan reproducible without overwriting the manual commercial database audit.
+
+### Current Status
+
+Completed.
+
+### Code Modified
+
+Yes, but only tooling/tests/reports:
+
+- `scripts/audit-db.mjs`
+- `DATABASE_STATIC_SCAN.md`
+- `DATABASE_AUDIT.md`
+- `package.json`
+- `tests/source-risk.spec.mjs`
+- `RUN_REPORT.md`
+- `NIGHT_SHIFT_REPORT.md`
+
+### Why
+
+The previous database audit script wrote directly to `DATABASE_AUDIT.md`, which risks destroying manual commercial accounting/database conclusions. The generated scan now lives in a separate artifact and has a drift check.
+
+### Risk
+
+Low. The script only reads source files and migration drafts. It does not connect to D1.
+
+### Database Impact
+
+None.
+
+### Permission Impact
+
+None.
+
+### Worker Impact
+
+No runtime Worker logic changed.
+
+### Verification
+
+Command:
+
+```bash
+npm run check
+```
+
+Result:
+
+```text
+Database static scan is up to date.
+tests 21
+pass 21
+build:worker:assets --dry-run passed
+build:worker:embedded --dry-run passed
+```
+
+## V2 Authenticated Core Smoke Script Follow-Up
+
+### Task
+
+Add a local/staging authenticated smoke script for owner and employee permission boundaries.
+
+### Current Status
+
+Completed.
+
+### Code Modified
+
+Yes, but only testing/tooling/reports:
+
+- `scripts/smoke-core-flows.mjs`
+- `package.json`
+- `tests/source-risk.spec.mjs`
+- `RUN_REPORT.md`
+- `NIGHT_SHIFT_REPORT.md`
+
+### Why
+
+Commercial validation needs a repeatable way to verify that employees can access staff workflow APIs while being denied owner-only reads and writes.
+
+### Risk
+
+Low. The script is not part of default `npm run check` because it requires a running Worker and local/staging credentials.
+
+### Database Impact
+
+No production database impact. The script is intended only for local/staging Worker smoke tests.
+
+### Permission Impact
+
+No permission code changed. The script verifies existing permission boundaries.
+
+### Worker Impact
+
+No runtime Worker logic changed.
+
+### Static Verification
+
+Command:
+
+```bash
+npm run check
+```
+
+Result:
+
+```text
+tests 22
+pass 22
+```
+
+### Local Authenticated Smoke Verification
+
+```bash
+npm run smoke:core
+```
+
+Result:
+
+```text
+PASS unauthenticated /api/me 401
+PASS owner login 200
+PASS owner /api/me 200
+PASS owner /api/history 200
+PASS owner /api/arrears 200
+PASS employee login 200
+PASS employee /api/me 200
+PASS employee allowed /api/rent_config 200
+PASS employee allowed /api/arrear_tasks 200
+PASS employee denied owner-only APIs 403
+```
+
+The local Worker was stopped after the smoke run.
+
+## V2 Commercial CI Workflow Follow-Up
+
+### Task
+
+Add a non-deploying CI workflow for commercial checks.
+
+### Current Status
+
+Completed.
+
+### Code Modified
+
+Yes, but only workflow/tests/reports:
+
+- `.github/workflows/commercial-check.yml`
+- `tests/source-risk.spec.mjs`
+- `COMMERCIALIZATION_BACKLOG.md`
+- `RUN_REPORT.md`
+- `NIGHT_SHIFT_REPORT.md`
+
+### Why
+
+Local gates are not enough for commercial SaaS. The repository needs a repeatable check path that runs governance, formatting, lint, typecheck, API/DB drift checks, tests, and dry-run Worker builds before merge/deploy.
+
+### Risk
+
+Low. The workflow does not configure Cloudflare API tokens and does not deploy.
+
+### Database Impact
+
+None. No remote D1 command is added.
+
+### Permission Impact
+
+None.
+
+### Worker Impact
+
+No Worker source changed. CI runs the existing dry-run builds.
+
+### Verification
+
+The workflow is statically checked to ensure it runs `npm ci` and `npm run check` without deployment secrets or remote D1 mutation commands.
+
+## V2 Secret Hygiene Gate Follow-Up
+
+### Task
+
+Add an automated guard against accidentally tracking local secrets.
+
+### Current Status
+
+Completed.
+
+### Code Modified
+
+Yes, but only tooling/tests/reports:
+
+- `scripts/check-secrets.mjs`
+- `package.json`
+- `tests/source-risk.spec.mjs`
+- `RUN_REPORT.md`
+- `NIGHT_SHIFT_REPORT.md`
+
+### Why
+
+Commercial SaaS work must prevent local `.dev.vars`, `.env.local`, Cloudflare tokens, TTLock secrets, and password/JWT secrets from entering Git history.
+
+### Risk
+
+Low. The gate scans only Git-tracked files and does not read ignored local secret files unless they become tracked.
+
+### Database Impact
+
+None.
+
+### Permission Impact
+
+None.
+
+### Worker Impact
+
+None.
+
+### Verification
+
+The gate is included in `npm run check` as `npm run security:secrets`.
+
+## V2 Clean Worker Bootstrap Probe Follow-Up
+
+### Task
+
+Create a reproducible local probe for the clean D1 employee-entry bootstrap blocker.
+
+### Current Status
+
+Completed. The blocker is confirmed.
+
+### Code Modified
+
+Yes, but only tooling/tests/reports:
+
+- `scripts/probe-clean-worker-bootstrap.mjs`
+- `package.json`
+- `tests/source-risk.spec.mjs`
+- `BLOCKER_REPORT.md`
+- `RUN_REPORT.md`
+- `NIGHT_SHIFT_REPORT.md`
+
+### Why
+
+The project needs a deterministic way to prove whether a clean customer D1 can support the current Worker employee-entry flow. The previous blocker was documented but not repeatable as a single command.
+
+### Risk
+
+Low. The probe starts a local-only Worker with disposable D1 state and deletes the temporary state afterward.
+
+### Database Impact
+
+No production impact. The probe uses `--local` and `--persist-to` against a temporary directory.
+
+### Permission Impact
+
+None.
+
+### Worker Impact
+
+No runtime Worker logic changed.
+
+### Verification
+
+Command:
+
+```bash
+npm run probe:clean-bootstrap
+```
+
+Result:
+
+```text
+Employee entry smoke exit code: 1
+Caused by: Error: no such table: transactions: SQLITE_ERROR
+P0 confirmed: clean local Worker bootstrap cannot complete employee entry.
+```
+
+Closure rule:
+
+- This blocker is not closed until `npm run probe:clean-bootstrap` passes.
+
+## V2 Finance Minor-Unit Helper Follow-Up
+
+### Task
+
+Create a tested finance helper for AED-to-fils conversion and integer-only money arithmetic.
+
+### Current Status
+
+Completed.
+
+### Code Modified
+
+Yes, but only additive module/tests/reports:
+
+- `modules/finance/money.mjs`
+- `tests/finance-money.spec.mjs`
+- `package.json`
+- `RUN_REPORT.md`
+- `NIGHT_SHIFT_REPORT.md`
+
+### Why
+
+Commercial employee entry cannot safely move to the new schema while money is parsed or calculated as JavaScript floating point. This helper provides a small, tested boundary for future commercial write paths.
+
+### Risk
+
+Low. The helper is not wired into current Worker behavior yet.
+
+### Database Impact
+
+None.
+
+### Permission Impact
+
+None.
+
+### Worker Impact
+
+No Worker route or runtime behavior changed.
+
+### Verification
+
+Covered by `tests/finance-money.spec.mjs` and default `npm run check`.
+
+Latest result:
+
+```text
+npm run check passed
+tests 31 / pass 31
+Worker assets dry-run build passed
+Worker embedded dry-run build passed
+```
+
+## V2 Automatic Syntax Gate Follow-Up
+
+### Task
+
+Replace manual syntax-check file lists with an automatic scanner.
+
+### Current Status
+
+Completed.
+
+### Code Modified
+
+Yes, but only tooling/tests/reports:
+
+- `scripts/check-syntax.mjs`
+- `tests/source-risk.spec.mjs`
+- `package.json`
+- `RUN_REPORT.md`
+- `NIGHT_SHIFT_REPORT.md`
+
+### Why
+
+Manual typecheck lists do not scale. Future commercial modules must not be able to bypass syntax checks simply because a developer forgot to add a new file to `package.json`.
+
+### Risk
+
+Low. This only changes validation tooling.
+
+### Database Impact
+
+None.
+
+### Permission Impact
+
+None.
+
+### Worker Impact
+
+No Worker route or runtime behavior changed.
+
+### Verification
+
+```text
+npm run check passed
+Syntax check passed for 31 file(s).
+tests 52 / pass 52
+Worker assets dry-run build passed
+Worker embedded dry-run build passed
+```
+
+## V2 Employee Rent Entry Draft Contract Follow-Up
+
+### Task
+
+Create a tested pure contract for future server-side rent entry writes.
+
+### Current Status
+
+Completed.
+
+### Code Modified
+
+Yes, but only additive module/tests/reports:
+
+- `modules/employees/entry-draft.mjs`
+- `tests/employee-entry-draft.spec.mjs`
+- `RUN_REPORT.md`
+- `NIGHT_SHIFT_REPORT.md`
+
+### Why
+
+The current P0 cannot be safely closed by adding ad hoc legacy tables. The next commercial-grade step is defining a reviewed rent-entry draft that includes tenant/property/operator/session anchors, TTLock anchors, rent period anchors, payment method, paid/due amounts, and arrears drafts.
+
+### Risk
+
+Low. This is not wired into Worker or frontend runtime behavior.
+
+### Database Impact
+
+None.
+
+### Permission Impact
+
+None.
+
+### Worker Impact
+
+No Worker route or runtime behavior changed.
+
+### Verification
+
+```text
+npm run check passed
+Syntax check passed for 33 file(s).
+tests 57 / pass 57
+Worker assets dry-run build passed
+Worker embedded dry-run build passed
+```
+
+## V2 Commercial Entry Write Contract Follow-Up
+
+### Task
+
+Document the future server-side rent entry write sequence before modifying Worker routes.
+
+### Current Status
+
+Completed.
+
+### Code Modified
+
+Yes, but only documentation/tests/reports:
+
+- `COMMERCIAL_ENTRY_WRITE_CONTRACT.md`
+- `tests/migration-draft.spec.mjs`
+- `RUN_REPORT.md`
+- `NIGHT_SHIFT_REPORT.md`
+
+### Why
+
+The P0 clean-bootstrap issue must be solved through a commercial write path, not by patching legacy tables blindly. The write contract defines the table sequence, atomicity requirement, idempotency requirement, audit events, and backend recomputation of handover totals.
+
+### Risk
+
+Low. This is not executable code and does not touch production data.
+
+### Database Impact
+
+None. No migration was run.
+
+### Permission Impact
+
+None. The contract requires server-side auth but does not implement it.
+
+### Worker Impact
+
+No Worker route or runtime behavior changed.
+
+### Verification
+
+```text
+npm run check passed
+Syntax check passed for 33 file(s).
+tests 58 / pass 58
+Worker assets dry-run build passed
+Worker embedded dry-run build passed
+```
+
+## V2 Employee Rent Write Plan Follow-Up
+
+### Task
+
+Create a pure write-plan generator for the commercial rent entry contract.
+
+### Current Status
+
+Completed.
+
+### Code Modified
+
+Yes, but only additive module/tests/reports:
+
+- `modules/employees/rent-write-plan.mjs`
+- `tests/employee-rent-write-plan.spec.mjs`
+- `RUN_REPORT.md`
+- `NIGHT_SHIFT_REPORT.md`
+
+### Why
+
+Before writing to D1, the project needs a deterministic mapping from a validated rent entry draft to commercial table operations. This prevents Worker implementation from inventing ad hoc row shapes.
+
+### Risk
+
+Low. It generates a plan only and does not execute SQL.
+
+### Database Impact
+
+None.
+
+### Permission Impact
+
+None.
+
+### Worker Impact
+
+No Worker route or runtime behavior changed.
+
+### Verification
+
+```text
+npm run check passed
+Syntax check passed for 35 file(s).
+tests 63 / pass 63
+Worker assets dry-run build passed
+Worker embedded dry-run build passed
+```
+
+## V2 Rent Write Plan Local D1 Rehearsal Follow-Up
+
+### Task
+
+Create a disposable local D1 rehearsal for the commercial rent write plan.
+
+### Current Status
+
+Completed.
+
+### Code Modified
+
+Yes, but only tooling/tests/reports:
+
+- `scripts/rehearse-rent-write-plan.mjs`
+- `package.json`
+- `tests/source-risk.spec.mjs`
+- `RUN_REPORT.md`
+- `NIGHT_SHIFT_REPORT.md`
+
+### Why
+
+The write plan must be proven against the commercial schema before touching Worker routes. This rehearsal verifies the planned rows can be inserted into a clean local D1 and that handover totals can be recomputed from stored rows.
+
+### Risk
+
+Low. The rehearsal uses local-only D1 with a temporary `--persist-to` directory and removes it afterward.
+
+### Database Impact
+
+No production impact. No remote D1 command was used.
+
+### Permission Impact
+
+None.
+
+### Worker Impact
+
+No Worker route or runtime behavior changed.
+
+### Verification
+
+```text
+npm run check passed
+npm run rehearsal:rent-write-plan passed
+Syntax check passed for 36 file(s).
+tests 64 / pass 64
+Validated operations: 10
+Temporary D1 directory removed
+```
+
+## V2 TTLock Remark Parser Follow-Up
+
+### Task
+
+Create a tested pure helper for TTLock remark parsing and rent-follow-up exclusion.
+
+### Current Status
+
+Completed.
+
+### Code Modified
+
+Yes, but only additive module/tests/reports:
+
+- `modules/properties/ttlock-remark.mjs`
+- `tests/ttlock-remark.spec.mjs`
+- `package.json`
+- `RUN_REPORT.md`
+- `NIGHT_SHIFT_REPORT.md`
+
+### Why
+
+The follow-up page must show the full TTLock remark while using structured anchors for bed, deposit, check-in month/day, and exclusion rules. This prevents accidental year fabrication and prevents employee/vacant beds from entering rent collection tasks.
+
+### Risk
+
+Low. The helper is not wired into current Worker or frontend behavior.
+
+### Database Impact
+
+None.
+
+### Permission Impact
+
+None.
+
+### Worker Impact
+
+No Worker route or runtime behavior changed.
+
+### Verification
+
+```text
+npm run check passed
+tests 51 / pass 51
+Worker assets dry-run build passed
+Worker embedded dry-run build passed
+```
+
+## V2 Finance Rent Period Follow-Up
+
+### Task
+
+Create a tested pure helper for rent period anchors and cycle pricing.
+
+### Current Status
+
+Completed.
+
+### Code Modified
+
+Yes, but only additive module/tests/reports:
+
+- `modules/finance/periods.mjs`
+- `tests/finance-periods.spec.mjs`
+- `package.json`
+- `RUN_REPORT.md`
+- `NIGHT_SHIFT_REPORT.md`
+
+### Why
+
+The commercial flow must derive period dates and expected rent from system rules, not staff input. This helper makes the expected monthly, 15-day, and custom-day calculations explicit and testable.
+
+### Risk
+
+Low. The helper is not wired into current Worker or frontend behavior.
+
+### Database Impact
+
+None.
+
+### Permission Impact
+
+None.
+
+### Worker Impact
+
+No Worker route or runtime behavior changed.
+
+### Verification
+
+```text
+npm run check passed
+tests 46 / pass 46
+Worker assets dry-run build passed
+Worker embedded dry-run build passed
+```
+
+## V2 Finance Receivables Settlement Follow-Up
+
+### Task
+
+Create a tested pure helper for `due vs paid` settlement and arrears-task draft creation.
+
+### Current Status
+
+Completed.
+
+### Code Modified
+
+Yes, but only additive module/tests/reports:
+
+- `modules/finance/receivables.mjs`
+- `tests/finance-receivables.spec.mjs`
+- `package.json`
+- `RUN_REPORT.md`
+- `NIGHT_SHIFT_REPORT.md`
+
+### Why
+
+Partial payments need a structured closeout path. Otherwise short-paid rent can become an untracked note instead of a recoverable arrears task with amount, reason, promise date, operator, and tenant snapshot.
+
+### Risk
+
+Low. The helper is not wired into current Worker or frontend behavior.
+
+### Database Impact
+
+None.
+
+### Permission Impact
+
+None.
+
+### Worker Impact
+
+No Worker route or runtime behavior changed.
+
+### Verification
+
+```text
+npm run check passed
+tests 41 / pass 41
+Worker assets dry-run build passed
+Worker embedded dry-run build passed
+```
+
+Additional guard:
+
+- `modules/**/*.mjs` is now included in `format:check`, so future finance modules cannot bypass formatting checks.
+
+## V2 Finance Handover Summary Follow-Up
+
+### Task
+
+Create a tested pure helper for employee session handover totals.
+
+### Current Status
+
+Completed.
+
+### Code Modified
+
+Yes, but only additive module/tests/reports:
+
+- `modules/finance/handover.mjs`
+- `tests/finance-handover.spec.mjs`
+- `package.json`
+- `RUN_REPORT.md`
+- `NIGHT_SHIFT_REPORT.md`
+
+### Why
+
+The handover UI must not invent totals independently. It needs a backend-compatible calculation contract for the three business-critical values: cash handover, bank transfer total/count, and gross received.
+
+### Risk
+
+Low. The helper is not wired into current Worker or frontend behavior.
+
+### Database Impact
+
+None.
+
+### Permission Impact
+
+None.
+
+### Worker Impact
+
+No Worker route or runtime behavior changed.
+
+### Verification
+
+```text
+npm run check passed
+tests 35 / pass 35
+Worker assets dry-run build passed
+Worker embedded dry-run build passed
+```
+
+## V2 Employee Entry Idempotency Follow-Up
+
+### Task
+
+Create a tested pure helper for scoped employee entry idempotency.
+
+### Current Status
+
+Completed.
+
+### Code Modified
+
+Yes, but only additive module/tests/reports:
+
+- `modules/employees/idempotency.mjs`
+- `tests/employee-idempotency.spec.mjs`
+- `RUN_REPORT.md`
+- `NIGHT_SHIFT_REPORT.md`
+- `NEXT_MORNING_REVIEW.md`
+
+### Why
+
+Employee entry writes must tolerate weak network retries, refreshes, and repeated submit clicks without creating duplicate financial records. The key must include company, property, session, operator, and client entry anchors so future multi-tenant writes remain isolated.
+
+### Risk
+
+Low. The helper is not wired into current Worker or frontend behavior.
+
+### Database Impact
+
+None.
+
+### Permission Impact
+
+None.
+
+### Worker Impact
+
+No Worker route or runtime behavior changed.
+
+### Verification
+
+```text
+npm run check passed
+npm run rehearsal:rent-write-plan passed
+Syntax check passed for 38 file(s).
+tests 67 / pass 67
+Worker assets dry-run build passed
+Worker embedded dry-run build passed
+Rent write plan local D1 rehearsal passed
+Validated operations: 10
+Mode: local-only disposable D1; no production mutation.
+```
+
+### Next Step
+
+Do not wire this into the Worker yet. First document or draft the transaction-level idempotency storage contract so duplicate detection is backed by a database uniqueness constraint, not only by frontend state.
+
+## V2 Transaction Idempotency Storage Contract Follow-Up
+
+### Task
+
+Add transaction-level idempotency to the commercial schema draft and rent write plan.
+
+### Current Status
+
+Completed.
+
+### Code Modified
+
+Yes, but only draft schema, pure write plan, local rehearsal, tests, and reports:
+
+- `COMMERCIAL_ENTRY_WRITE_CONTRACT.md`
+- `migration-drafts/002_commercial_bootstrap.sql`
+- `modules/employees/rent-write-plan.mjs`
+- `scripts/rehearse-rent-write-plan.mjs`
+- `tests/employee-rent-write-plan.spec.mjs`
+- `tests/migration-draft.spec.mjs`
+- `RUN_REPORT.md`
+- `NIGHT_SHIFT_REPORT.md`
+- `NEXT_MORNING_REVIEW.md`
+
+### Why
+
+Duplicate prevention for employee financial entries must be enforced by a scoped database uniqueness constraint. Frontend disabled buttons and generated keys are not sufficient in weak-network or retry scenarios.
+
+### Risk
+
+Low to medium. This changes only draft migration and pure modules, not the live Worker route. Any future production migration still requires explicit promotion review.
+
+### Database Impact
+
+Draft only. No production D1 mutation was executed.
+
+### Permission Impact
+
+None.
+
+### Worker Impact
+
+No Worker route or runtime behavior changed.
+
+### Verification
+
+```text
+npm run check passed
+npm run rehearsal:rent-write-plan passed
+Syntax check passed for 38 file(s).
+tests 68 / pass 68
+Worker assets dry-run build passed
+Worker embedded dry-run build passed
+Rent write plan local D1 rehearsal passed
+Validated operations: 10
+Mode: local-only disposable D1; no production mutation.
+```
+
+### Next Step
+
+The Worker implementation must handle unique-key conflicts by returning the original committed result. Do not insert a second transaction or generate a replacement key after conflict.
+
+## V2 Duplicate Idempotency Rehearsal Follow-Up
+
+### Task
+
+Extend the local D1 rent write rehearsal to prove duplicate idempotency writes are blocked.
+
+### Current Status
+
+Completed.
+
+### Code Modified
+
+Yes, but only local rehearsal script and reports:
+
+- `scripts/rehearse-rent-write-plan.mjs`
+- `RUN_REPORT.md`
+- `NIGHT_SHIFT_REPORT.md`
+- `NEXT_MORNING_REVIEW.md`
+
+### Why
+
+A schema-level unique index is only useful if the actual write plan surfaces and respects the conflict. The local rehearsal now confirms that a retry using different row ids but the same scoped idempotency key fails before duplicate accounting rows are created.
+
+### Risk
+
+Low. This is a local-only verification change.
+
+### Database Impact
+
+Disposable local D1 only. No production database mutation.
+
+### Permission Impact
+
+None.
+
+### Worker Impact
+
+No Worker route or runtime behavior changed.
+
+### Verification
+
+```text
+npm run check passed
+npm run rehearsal:rent-write-plan passed
+Syntax check passed for 38 file(s).
+tests 68 / pass 68
+Worker assets dry-run build passed
+Worker embedded dry-run build passed
+Duplicate idempotency write blocked: true
+Mode: local-only disposable D1; no production mutation.
+```
+
+### Next Step
+
+When implementing the Worker route, add explicit conflict handling that fetches and returns the original committed transaction bundle. The Worker should not expose the raw SQLite error to staff users.
+
+## V2 Clean Worker Bootstrap Recheck
+
+### Task
+
+Re-run the clean Worker bootstrap probe after the commercial schema/write-plan work.
+
+### Current Status
+
+Still blocked.
+
+### Code Modified
+
+No.
+
+### Why
+
+The commercial draft path is now rehearsed locally, but the production Worker route is unchanged. The probe verifies whether the current runtime can serve a clean-customer environment.
+
+### Risk
+
+No mutation risk. Probe uses temporary local D1 state and deletes it after completion.
+
+### Database Impact
+
+Disposable local D1 only.
+
+### Permission Impact
+
+None.
+
+### Worker Impact
+
+No Worker code changed.
+
+### Verification
+
+```text
+npm run probe:clean-bootstrap failed as expected
+Employee entry expected 200, got 500
+Caused by: Error: no such table: transactions: SQLITE_ERROR
+P0 remains open.
+```
+
+### Next Step
+
+Do not patch this with ad hoc runtime table creation. The safe path is a reviewed Worker migration to the commercial schema and write-plan contract, then the same probe must pass.
+
+## V2 Employee Entry Worker Migration Plan Follow-Up
+
+### Task
+
+Document the safe Worker migration boundary for `/api/employee/entry`.
+
+### Current Status
+
+Completed.
+
+### Code Modified
+
+Yes, but only documentation and a documentation test:
+
+- `EMPLOYEE_ENTRY_WORKER_MIGRATION_PLAN.md`
+- `tests/migration-draft.spec.mjs`
+- `RUN_REPORT.md`
+- `NIGHT_SHIFT_REPORT.md`
+- `NEXT_MORNING_REVIEW.md`
+
+### Why
+
+The next implementation step touches the highest-risk Worker route. A migration plan is required so future work does not expand the monolith, create runtime schema patches, bypass authorization, or keep frontend totals as accounting truth.
+
+### Risk
+
+Low. No runtime behavior changed.
+
+### Database Impact
+
+None.
+
+### Permission Impact
+
+None.
+
+### Worker Impact
+
+No Worker route or runtime behavior changed.
+
+### Verification
+
+```text
+npm run check passed
+Syntax check passed for 38 file(s).
+tests 69 / pass 69
+Worker assets dry-run build passed
+Worker embedded dry-run build passed
+```
+
+### Next Step
+
+If moving into implementation, create the adapter module outside `deploy-worker/src/index.js` first. Do not edit the Worker route until adapter tests exist.
+
+## V2 Employee Entry Commercial Adapter Follow-Up
+
+### Task
+
+Create the first Worker-migration adapter outside the monolith.
+
+### Current Status
+
+Completed.
+
+### Code Modified
+
+Yes, but only additive module/tests/docs/reports:
+
+- `modules/worker/employee-entry-commercial-adapter.mjs`
+- `tests/employee-entry-commercial-adapter.spec.mjs`
+- `EMPLOYEE_ENTRY_WORKER_MIGRATION_PLAN.md`
+- `RUN_REPORT.md`
+- `NIGHT_SHIFT_REPORT.md`
+- `NEXT_MORNING_REVIEW.md`
+
+### Why
+
+The adapter isolates conversion from the existing employee rent payload to commercial accounting primitives. This keeps the next Worker integration step small and testable instead of expanding `deploy-worker/src/index.js`.
+
+### Risk
+
+Low. The adapter is not wired into live routes and contains no direct D1 calls.
+
+### Database Impact
+
+None.
+
+### Permission Impact
+
+None. The adapter requires authenticated `companyId`, `propertyId`, and `operatorId` to be passed in by the future route.
+
+### Worker Impact
+
+No Worker route or runtime behavior changed.
+
+### Verification
+
+```text
+npm run check passed
+npm run rehearsal:rent-write-plan passed
+Syntax check passed for 40 file(s).
+tests 73 / pass 73
+Worker assets dry-run build passed
+Worker embedded dry-run build passed
+Duplicate idempotency write blocked: true
+```
+
+### Next Step
+
+Create the D1 write-plan executor module and tests before wiring the adapter into the Worker.
+
+## V2 D1 Write Plan Executor Follow-Up
+
+### Task
+
+Create a tested D1 execution boundary for commercial write plans.
+
+### Current Status
+
+Completed.
+
+### Code Modified
+
+Yes, but only additive module/tests/docs/reports:
+
+- `modules/worker/d1-write-plan-executor.mjs`
+- `tests/d1-write-plan-executor.spec.mjs`
+- `EMPLOYEE_ENTRY_WORKER_MIGRATION_PLAN.md`
+- `RUN_REPORT.md`
+- `NIGHT_SHIFT_REPORT.md`
+- `NEXT_MORNING_REVIEW.md`
+
+### Why
+
+The Worker route should call a small tested executor instead of building SQL inside the monolith. The executor enforces table allowlists, parameterized bindings, `db.batch`, and idempotency-conflict mapping.
+
+### Risk
+
+Low. The executor is not wired into live routes.
+
+### Database Impact
+
+None in runtime. Tests use a fake D1 object.
+
+### Permission Impact
+
+None.
+
+### Worker Impact
+
+No Worker route or runtime behavior changed.
+
+### Verification
+
+```text
+npm run check passed
+npm run rehearsal:rent-write-plan passed
+Syntax check passed for 42 file(s).
+tests 77 / pass 77
+Worker assets dry-run build passed
+Worker embedded dry-run build passed
+Duplicate idempotency write blocked: true
+```
+
+### Next Step
+
+Build a route-level commercial handler wrapper test before touching `deploy-worker/src/index.js`.
+
+## V2 Employee Entry Commercial Handler Wrapper Follow-Up
+
+### Task
+
+Create a tested route-level wrapper before modifying the live Worker route.
+
+### Current Status
+
+Completed.
+
+### Code Modified
+
+Yes, but only additive module/tests/docs/reports:
+
+- `modules/worker/employee-entry-commercial-handler.mjs`
+- `tests/employee-entry-commercial-handler.spec.mjs`
+- `EMPLOYEE_ENTRY_WORKER_MIGRATION_PLAN.md`
+- `RUN_REPORT.md`
+- `NIGHT_SHIFT_REPORT.md`
+- `NEXT_MORNING_REVIEW.md`
+
+### Why
+
+The wrapper fixes the next integration boundary before touching `deploy-worker/src/index.js`: role authorization, property membership, adapter invocation, executor invocation, idempotency conflict mapping, and safe employee-facing errors.
+
+### Risk
+
+Low. The wrapper is not wired into live routes.
+
+### Database Impact
+
+None. Tests use injected executors.
+
+### Permission Impact
+
+Positive test coverage: role and property membership denial are explicitly tested.
+
+### Worker Impact
+
+No Worker route or runtime behavior changed.
+
+### Verification
+
+```text
+npm run check passed
+npm run rehearsal:rent-write-plan passed
+Syntax check passed for 44 file(s).
+tests 81 / pass 81
+Worker assets dry-run build passed
+Worker embedded dry-run build passed
+Duplicate idempotency write blocked: true
+```
+
+### Next Step
+
+The remaining risky step is actual Worker integration behind a default-off feature flag. Do not enable in production until clean bootstrap passes.
+
+## V2 Worker Source Boundary Recheck
+
+### Task
+
+Check whether the tested commercial modules can be safely wired into the Worker.
+
+### Current Status
+
+Blocked.
+
+### Code Modified
+
+Only reports and migration plan.
+
+### Why
+
+`deploy-worker/src/index.js` is a bundled monolith, and `wrangler.toml` points directly to it. There is no clear source-level import/build boundary for safely adding `modules/worker/*`.
+
+### Risk
+
+High if modified directly. Manual integration into a bundled file would expand the monolith and weaken maintainability.
+
+### Database Impact
+
+None.
+
+### Permission Impact
+
+None.
+
+### Worker Impact
+
+No Worker route or runtime behavior changed.
+
+### Verification
+
+```text
+Read deploy-worker/src/index.js top-level structure.
+Read deploy-worker/wrangler.toml.
+Confirmed no source-level import graph.
+```
+
+### Next Step
+
+Identify or create the canonical Worker source module tree and build step before default-off route integration.

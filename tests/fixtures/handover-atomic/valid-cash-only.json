@@ -1,0 +1,48 @@
+{
+  "description": "Valid one-row cash rent handover.",
+  "context": {
+    "role": "staff",
+    "employeeId": "emp-a",
+    "allowedEmployeeIds": ["emp-a"],
+    "allowedPropertyIds": ["HL-009"]
+  },
+  "input": {
+    "session_id": "S-CASH-001",
+    "idempotency_key": "key-cash-001",
+    "employee_id": "emp-a",
+    "property_id": "HL-009",
+    "submitted_at": "2026-05-24T03:00:00+04:00",
+    "frontend_totals": {
+      "cash_handover": "640.00",
+      "bank_transfer_total": "0.00",
+      "bank_transfer_count": 0,
+      "gross_received": "640.00",
+      "session_total": "640.00"
+    },
+    "rows": [
+      {
+        "client_entry_id": "cash-row-1",
+        "event_type": "R",
+        "payment_method": "C",
+        "amount": "640.00",
+        "bed": "144"
+      }
+    ]
+  },
+  "existing_state": {
+    "commits": []
+  },
+  "expected": {
+    "status": "ACCEPTED",
+    "cash_handover": "640.00",
+    "bank_transfer_total": "0.00",
+    "gross_received": "640.00",
+    "session_total": "640.00",
+    "accepted_rows": 1,
+    "rejected_rows": 0,
+    "idempotency_status": "NEW",
+    "min_warnings": 1,
+    "errors": 0,
+    "audit_events": ["handover_commit_attempt", "handover_commit_accepted"]
+  }
+}

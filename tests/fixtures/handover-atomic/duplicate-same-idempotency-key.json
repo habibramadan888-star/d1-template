@@ -1,0 +1,41 @@
+{
+  "description": "Same idempotency key and same payload is an idempotent replay.",
+  "context": {
+    "role": "staff",
+    "employeeId": "emp-a",
+    "allowedEmployeeIds": ["emp-a"],
+    "allowedPropertyIds": ["HL-009"]
+  },
+  "existing_state": {
+    "mode": "same_idempotency_key"
+  },
+  "input": {
+    "session_id": "S-DUP-SAME-001",
+    "idempotency_key": "key-dup-same-001",
+    "employee_id": "emp-a",
+    "property_id": "HL-009",
+    "submitted_at": "2026-05-24T03:30:00+04:00",
+    "frontend_totals": {
+      "cash_handover": "640.00",
+      "bank_transfer_total": "0.00",
+      "bank_transfer_count": 0,
+      "gross_received": "640.00",
+      "session_total": "640.00"
+    },
+    "rows": [
+      {
+        "client_entry_id": "dup-same-row-1",
+        "event_type": "R",
+        "payment_method": "C",
+        "amount": "640.00",
+        "bed": "144"
+      }
+    ]
+  },
+  "expected": {
+    "status": "IDEMPOTENT_REPLAY",
+    "idempotency_status": "IDEMPOTENT_REPLAY",
+    "accepted_rows": 1,
+    "error_code_absent": "IDEMPOTENCY_CONFLICT"
+  }
+}

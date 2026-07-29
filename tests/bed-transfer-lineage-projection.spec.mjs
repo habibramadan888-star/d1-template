@@ -1,0 +1,7 @@
+import assert from 'node:assert/strict';import test from 'node:test';import {projectBedTransferLineage} from '../modules/owner-history/bed-transfer-lineage-projection.mjs';
+const ab={event_type:'bed_transfer',transfer_anchor_id:'anchor-opaque-0001',transfer_lineage_id:'lineage-opaque-0001',previous_transfer_anchor_id:null,from_bed:'A',to_bed:'B',source_context_anchor_refs:['rent-A'],carried_arrears_refs:['arr-1']};
+const bc={...ab,transfer_anchor_id:'anchor-opaque-0002',previous_transfer_anchor_id:'anchor-opaque-0001',from_bed:'B',to_bed:'C',source_context_anchor_refs:['rent-A','deposit-A'],carried_arrears_refs:['arr-1','arr-2']};
+test('A to B projects A and B history',()=>assert.deepEqual(projectBedTransferLineage({transfer_anchors:[ab]}).bed_history,['A','B']));
+test('A to B to C projects full history and current C',()=>{const r=projectBedTransferLineage({transfer_anchors:[ab,bc]});assert.equal(r.current_bed,'C');assert.deepEqual(r.bed_history,['A','B','C']);assert.deepEqual(r.carried_arrears_refs,['arr-1','arr-2']);assert.equal(r.original_events_mutated,false);});
+test('void terminal A to B restores A',()=>{const r=projectBedTransferLineage({transfer_anchors:[ab],void_anchors:[{target_transfer_anchor_id:'anchor-opaque-0001'}]});assert.equal(r.ok,true);assert.equal(r.current_bed,'A');});
+test('void non-terminal edge fails closed',()=>assert.equal(projectBedTransferLineage({transfer_anchors:[ab,bc],void_anchors:[{target_transfer_anchor_id:'anchor-opaque-0001'}]}).error_code,'BED_TRANSFER_LINEAGE_DISCONTINUOUS'));

@@ -1,0 +1,14 @@
+{
+  "qa_run_id": "QA-20260717-7783E84E",
+  "mode": "full",
+  "status": "DRAFT_READY",
+  "artifact_sha256": "00832f3b2b6064b7f6248fa335995100199c819476398390ac1705da0f34e021",
+  "artifact_commit": "e32e5df78cc55333f939d8f5cb94cf00fd0f1883",
+  "qa_worker_version": "eed18402-a41d-412f-aef2-4f7f7fcf22a7",
+  "scenario_count": 46,
+  "employee_record_count": 41,
+  "payload_hash": "d2718dada761570747d5586d81c73558995b7927aa840db3abe795a4b6955573",
+  "created_at": "2026-07-17T10:25:20.950Z",
+  "formal_write_count": 0,
+  "production_business_data_changed": false
+}

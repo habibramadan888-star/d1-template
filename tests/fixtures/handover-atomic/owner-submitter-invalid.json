@@ -1,0 +1,35 @@
+{
+  "description": "Owner role is not a valid employee handover submitter.",
+  "context": {
+    "role": "owner",
+    "employeeId": "owner-1",
+    "allowedEmployeeIds": ["emp-a"],
+    "allowedPropertyIds": ["HL-009"]
+  },
+  "input": {
+    "session_id": "S-OWNER-001",
+    "idempotency_key": "key-owner-001",
+    "employee_id": "emp-a",
+    "property_id": "HL-009",
+    "submitted_at": "2026-05-24T04:15:00+04:00",
+    "frontend_totals": {
+      "cash_handover": "640.00",
+      "bank_transfer_total": "0.00",
+      "bank_transfer_count": 0,
+      "gross_received": "640.00",
+      "session_total": "640.00"
+    },
+    "rows": [
+      {
+        "client_entry_id": "owner-row-1",
+        "event_type": "R",
+        "payment_method": "C",
+        "amount": "640.00"
+      }
+    ]
+  },
+  "expected": {
+    "status": "UNAUTHORIZED",
+    "error_code": "INVALID_SUBMITTER_ROLE"
+  }
+}

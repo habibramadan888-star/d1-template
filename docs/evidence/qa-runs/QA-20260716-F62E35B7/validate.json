@@ -1,0 +1,147 @@
+{
+  "ok": true,
+  "validation_result_count": 16,
+  "passed_result_count": 16,
+  "failed_result_count": 0,
+  "formal_write_count": 0,
+  "request_context_metrics": {
+    "capabilities_read_count": 1,
+    "archive_read_count": 1,
+    "entries_json_parse_count": 1,
+    "ttlock_snapshot_count": 1,
+    "ttlock_external_call_count": 0,
+    "kv_read_count": 1,
+    "kv_write_count": 0,
+    "last_successful_stage": "canonical_link_validated"
+  },
+  "validation_results": [
+    {
+      "entry_identity": "QA-20260716-F62E35B7-E01",
+      "event_type": "rent",
+      "ok": true,
+      "error_code": "",
+      "idempotent": false,
+      "write_attempted": false
+    },
+    {
+      "entry_identity": "QA-20260716-F62E35B7-E02",
+      "event_type": "rent",
+      "ok": true,
+      "error_code": "",
+      "idempotent": false,
+      "write_attempted": false
+    },
+    {
+      "entry_identity": "QA-20260716-F62E35B7-E03",
+      "event_type": "rent",
+      "ok": true,
+      "error_code": "",
+      "idempotent": false,
+      "write_attempted": false
+    },
+    {
+      "entry_identity": "QA-20260716-F62E35B7-E04",
+      "event_type": "arrears_payment",
+      "ok": true,
+      "error_code": "",
+      "idempotent": false,
+      "write_attempted": false
+    },
+    {
+      "entry_identity": "QA-20260716-F62E35B7-E05",
+      "event_type": "arrears_payment",
+      "ok": true,
+      "error_code": "",
+      "idempotent": false,
+      "write_attempted": false
+    },
+    {
+      "entry_identity": "QA-20260716-F62E35B7-E06",
+      "event_type": "deposit_in",
+      "ok": true,
+      "error_code": "",
+      "idempotent": false,
+      "write_attempted": false
+    },
+    {
+      "entry_identity": "QA-20260716-F62E35B7-E07",
+      "event_type": "deposit_in",
+      "ok": true,
+      "error_code": "",
+      "idempotent": false,
+      "write_attempted": false
+    },
+    {
+      "entry_identity": "QA-20260716-F62E35B7-E08",
+      "event_type": "deposit_out",
+      "ok": true,
+      "error_code": "",
+      "idempotent": false,
+      "write_attempted": false
+    },
+    {
+      "entry_identity": "QA-20260716-F62E35B7-E09",
+      "event_type": "deposit_out",
+      "ok": true,
+      "error_code": "",
+      "idempotent": false,
+      "write_attempted": false
+    },
+    {
+      "entry_identity": "QA-20260716-F62E35B7-E10",
+      "event_type": "checkout",
+      "ok": true,
+      "error_code": "",
+      "idempotent": false,
+      "write_attempted": false
+    },
+    {
+      "entry_identity": "QA-20260716-F62E35B7-E11",
+      "event_type": "left_with_arrears",
+      "ok": true,
+      "error_code": "",
+      "idempotent": false,
+      "write_attempted": false
+    },
+    {
+      "entry_identity": "QA-20260716-F62E35B7-E12",
+      "event_type": "expense",
+      "ok": true,
+      "error_code": "",
+      "idempotent": false,
+      "write_attempted": false
+    },
+    {
+      "entry_identity": "QA-20260716-F62E35B7-E13",
+      "event_type": "expense",
+      "ok": true,
+      "error_code": "",
+      "idempotent": false,
+      "write_attempted": false
+    },
+    {
+      "entry_identity": "QA-20260716-F62E35B7-E14",
+      "event_type": "bed_transfer",
+      "ok": true,
+      "error_code": "",
+      "idempotent": false,
+      "write_attempted": false
+    },
+    {
+      "entry_identity": "QA-20260716-F62E35B7-E15",
+      "event_type": "bed_transfer",
+      "ok": true,
+      "error_code": "",
+      "idempotent": false,
+      "write_attempted": false
+    },
+    {
+      "entry_identity": "QA-20260716-F62E35B7-E16",
+      "event_type": "bed_transfer",
+      "ok": true,
+      "error_code": "",
+      "idempotent": false,
+      "write_attempted": false
+    }
+  ]
+}

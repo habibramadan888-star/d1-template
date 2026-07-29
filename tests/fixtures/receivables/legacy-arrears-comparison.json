@@ -1,0 +1,19 @@
+{
+  "legacyArrears": {
+    "task_id": "legacy_arrear_1",
+    "arrear_amount": "770.00",
+    "actual_received": "80.00"
+  },
+  "receivable": {
+    "receivableId": "rec_legacy_arrear_1",
+    "sourceType": "RENT",
+    "propertyId": "staging-property",
+    "amountAed": "770.00",
+    "paidAed": "80.00",
+    "dueDate": "2026-05-20"
+  },
+  "expected": {
+    "status": "MATCH",
+    "deltaAed": "0.00"
+  }
+}

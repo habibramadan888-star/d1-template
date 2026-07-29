@@ -1,0 +1,10 @@
+{
+  "status": "AUTOMATION_PASS",
+  "aggregate_http_status": 200,
+  "validation_result_count": 16,
+  "passed_result_count": 16,
+  "failed_result_count": 0,
+  "formal_write_count": 0,
+  "cleanup_status": "COMPLETED",
+  "superseded_by": "QA-20260716-66031569"
+}

@@ -1,0 +1,15 @@
+{
+  "input": {
+    "receivableId": "rec_due_today",
+    "sourceType": "RENT",
+    "propertyId": "staging-property",
+    "amountAed": "500.00",
+    "paidAed": "100.00",
+    "dueDate": "2026-05-25"
+  },
+  "businessDate": "2026-05-25",
+  "expected": {
+    "status": "DUE_TODAY",
+    "dueTodayAed": "400.00"
+  }
+}

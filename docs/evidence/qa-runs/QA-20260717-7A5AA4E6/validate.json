@@ -1,0 +1,12 @@
+{
+  "status": "AUTOMATION_PASS",
+  "aggregate_http_status": 200,
+  "validation_result_count": 41,
+  "passed_result_count": 41,
+  "failed_result_count": 0,
+  "formal_write_count": 0,
+  "ttlock_external_calls": 0,
+  "payload_hash": "e4766f3087b3f60205131d8caede988ba4cf61f71a9ae83eaf6d139bead210fe",
+  "result_origin": "LIVE_SERVER",
+  "upload_executed": false
+}

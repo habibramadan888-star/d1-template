@@ -1,0 +1,55 @@
+{
+  "description": "Valid mixed cash and bank handover.",
+  "context": {
+    "role": "staff",
+    "employeeId": "emp-a",
+    "allowedEmployeeIds": ["emp-a"],
+    "allowedPropertyIds": ["HL-009"]
+  },
+  "input": {
+    "session_id": "S-MIXED-001",
+    "idempotency_key": "key-mixed-001",
+    "employee_id": "emp-a",
+    "property_id": "HL-009",
+    "submitted_at": "2026-05-24T03:10:00+04:00",
+    "frontend_totals": {
+      "cash_handover": "640.00",
+      "bank_transfer_total": "200.00",
+      "bank_transfer_count": 1,
+      "gross_received": "840.00",
+      "session_total": "840.00"
+    },
+    "rows": [
+      {
+        "client_entry_id": "mixed-row-1",
+        "event_type": "R",
+        "payment_method": "C",
+        "amount": "640.00",
+        "bed": "144"
+      },
+      {
+        "client_entry_id": "mixed-row-2",
+        "event_type": "R",
+        "payment_method": "B",
+        "amount": "200.00",
+        "bed": "852"
+      }
+    ]
+  },
+  "existing_state": {
+    "commits": []
+  },
+  "expected": {
+    "status": "ACCEPTED",
+    "cash_handover": "640.00",
+    "bank_transfer_total": "200.00",
+    "gross_received": "840.00",
+    "session_total": "840.00",
+    "accepted_rows": 2,
+    "rejected_rows": 0,
+    "idempotency_status": "NEW",
+    "bank_transfer_count": 1,
+    "min_warnings": 2,
+    "errors": 0
+  }
+}

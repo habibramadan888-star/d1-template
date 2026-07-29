@@ -1,0 +1,17 @@
+HOMELINK LEDGER QA PREVIEW VERIFIED
+Records 16
+Cash Received AED 1,620
+Bank Received AED 880
+Total Received AED 2,500
+Expenses AED 799
+Net Funds AED 1,701
+Cash Net AED 1,421
+Bank Net AED 280
+Outstanding AED 150
+Arrears Opened AED 150
+Arrears Repaid AED 70
+Deposit Included AED 200
+Transfer AED 100
+Two paid Bed Transfers: AED 50 Cash and AED 50 Bank
+One waived Bed Transfer: AED 0
+Upload Session was not clicked.

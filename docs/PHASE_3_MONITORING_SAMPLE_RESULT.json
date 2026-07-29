@@ -1,0 +1,17 @@
+{
+  "generatedAt": "2026-05-30T08:28:06.049Z",
+  "baseUrl": null,
+  "networkApproved": false,
+  "thresholds": {
+    "healthLatencyWarningMs": 200,
+    "healthLatencyRollbackMs": 300,
+    "errorRateWarning": 0.001,
+    "errorRateRollback": 0.01
+  },
+  "results": [],
+  "warnings": [
+    "Set PHASE3_PRODUCTION_COPY_BASE_URL and PHASE3_MONITOR_NETWORK_APPROVED=YES to sample production-copy."
+  ],
+  "failures": [],
+  "decision": "MANUAL_REQUIRED"
+}

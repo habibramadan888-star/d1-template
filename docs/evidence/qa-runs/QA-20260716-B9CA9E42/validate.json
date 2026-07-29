@@ -1,0 +1,24 @@
+{
+  "status": "AUTOMATION_PASS",
+  "validation_source": "real_same_origin_employee_browser",
+  "aggregate_http_status": 200,
+  "validation_result_count": 16,
+  "passed_result_count": 16,
+  "failed_result_count": 0,
+  "unmatched_result_count": 0,
+  "duplicate_entry_id_count": 0,
+  "formal_write_count": 0,
+  "ttlock_external_calls": 0,
+  "record_5_result": {
+    "entry_identity": "QA-20260716-B9CA9E42-E05",
+    "event_type": "arrears_payment",
+    "ok": true,
+    "error_code": ""
+  },
+  "record_11_result": {
+    "entry_identity": "QA-20260716-B9CA9E42-E11",
+    "event_type": "left_with_arrears",
+    "ok": true,
+    "error_code": ""
+  }
+}

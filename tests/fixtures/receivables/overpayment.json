@@ -1,0 +1,21 @@
+{
+  "receivable": {
+    "receivableId": "rec_overpayment",
+    "sourceType": "RENT",
+    "propertyId": "staging-property",
+    "amountAed": "770.00",
+    "paidAed": "700.00",
+    "dueDate": "2026-05-20"
+  },
+  "payment": {
+    "allocationId": "alloc_overpayment",
+    "paymentSourceType": "TRANSACTION",
+    "paymentSourceId": "tx_overpayment",
+    "amountAed": "100.00"
+  },
+  "expected": {
+    "status": "OVERPAID",
+    "outstandingAed": "0.00",
+    "overpaidAed": "30.00"
+  }
+}

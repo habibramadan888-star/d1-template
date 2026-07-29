@@ -1,0 +1,22 @@
+{
+  "name": "multi-session-dashboard",
+  "rows": [
+    { "id": "s1-rent", "session_id": "s1", "type": "R", "pay_type": "C", "amount": "640.00" },
+    { "id": "s1-bank", "session_id": "s1", "type": "D", "pay_type": "B", "amount": "200.00" },
+    { "id": "s2-rent", "session_id": "s2", "type": "R", "pay_type": "B", "amount": "770.00" },
+    { "id": "s2-refund", "session_id": "s2", "type": "DR", "pay_type": "C", "amount": "100.00" }
+  ],
+  "arrearsRows": [
+    { "task_id": "open-1", "arrear_amount": "300.00", "actual_received": "100.00" },
+    { "task_id": "closed-1", "arrear_amount": "200.00", "actual_received": "0.00", "close_status": "PAID" }
+  ],
+  "expected": {
+    "cashTotalAed": "640.00",
+    "cashHandoverAed": "540.00",
+    "bankTransferAed": "970.00",
+    "grossReceivedAed": "1610.00",
+    "sessionTotalAed": "1510.00",
+    "arrearsOutstandingAed": "200.00",
+    "errors": 0
+  }
+}

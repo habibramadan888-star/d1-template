@@ -1,0 +1,3193 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Homelink 员工端 v3</title>
+<style>
+:root{
+  --bg:#f4f6f8;--surface:#fff;--surface2:#f7faf8;--line:#dfe5e8;--line2:#cfd8dc;
+  --text:#111827;--muted:#5f6877;--soft:#8a94a3;--green:#09a64f;--green2:#078d42;
+  --green-bg:rgba(9,166,79,.10);--orange:#e16b00;--red:#d93025;--blue:#1a73e8;
+  --shadow:0 16px 38px rgba(20,32,51,.10);--r:22px;--r2:30px;
+}
+*{box-sizing:border-box}html{background:var(--bg)}
+body{margin:0;min-height:100vh;overflow-x:hidden;color:var(--text);font-family:Inter,"Microsoft YaHei","PingFang SC","Noto Sans SC",system-ui,sans-serif;background:
+  radial-gradient(circle at 86% 8%,rgba(9,166,79,.18),transparent 24rem),
+  linear-gradient(180deg,#fff 0,#f2faf7 19rem,#eef3f1 100%)}
+button,input,select,textarea{font:inherit}
+.appbar{height:68px;background:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 24px;border-bottom:1px solid #edf0f2}
+.appbar strong{font-size:26px;font-weight:500}.appbar span{font-size:36px;line-height:1}
+.top{position:sticky;top:0;z-index:5;background:linear-gradient(100deg,rgba(255,255,255,.97),rgba(237,250,244,.95));backdrop-filter:blur(18px);border-bottom:1px solid rgba(177,204,191,.55);box-shadow:0 2px 14px rgba(20,32,51,.06)}
+.brand{max-width:980px;margin:0 auto;padding:22px 28px;display:flex;justify-content:space-between;gap:16px;align-items:center}
+.logo{display:flex;align-items:center;gap:16px}.badge{width:70px;height:70px;border-radius:17px;background:linear-gradient(145deg,#0bb25b,#078d42);color:#fff;display:grid;place-items:center;font-weight:950;line-height:1.05;box-shadow:inset 0 -10px 20px rgba(0,0,0,.08)}.badge small{display:block;color:#f1d800;font-size:12px}.word{font-size:32px;font-weight:950;letter-spacing:-.04em}.word .g{color:var(--green)}.word .dot,.word i{color:#d5c100}.word i{font-style:normal}.word em{display:inline-block;margin-left:10px;color:#142033;font-size:.72em;font-style:normal;font-weight:760;letter-spacing:-.04em}
+.actions{display:flex;align-items:center;gap:12px}.pill{border:1.5px solid rgba(9,166,79,.24);color:var(--green2);background:#fff;border-radius:999px;padding:11px 18px;font-weight:950}.pill.main{background:linear-gradient(180deg,#10ad5a,#078d42);color:#fff;border:0}
+.operator{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px;font-weight:900}.operator input{width:92px;border:1px solid var(--line);border-radius:12px;padding:8px 10px}
+.tabs{max-width:980px;margin:0 auto;padding:0 28px 20px;display:flex;overflow-x:auto;scrollbar-width:none}.tabs::-webkit-scrollbar{display:none}
+.tab{min-width:190px;height:86px;border:1px solid var(--line);border-right:0;background:rgba(255,255,255,.94);cursor:pointer;color:#243044;font-size:25px;font-weight:950;display:flex;align-items:center;justify-content:center;gap:10px;letter-spacing:.05em}
+.tab:first-child{border-radius:27px 0 0 27px}.tab:last-child{border-right:1px solid var(--line);border-radius:0 27px 27px 0}.tab.active{background:linear-gradient(180deg,#10ad5a,#078d42);color:#fff;border-color:rgba(9,166,79,.7);box-shadow:0 12px 26px rgba(9,166,79,.24)}.en{font-family:Consolas,"JetBrains Mono",monospace;font-size:13px;font-weight:700;letter-spacing:.08em;opacity:.78}
+.wrap{max-width:980px;margin:0 auto;padding:52px 28px 110px}.page-title{font-size:50px;font-weight:950;letter-spacing:-.04em;margin:0 0 12px}.page-title .en{display:block;color:#697386;font-size:23px;margin-top:14px}.page-sub{font-size:22px;line-height:1.45;color:#586273;font-weight:850;margin-bottom:30px}
+.card{background:rgba(255,255,255,.94);border:1px solid var(--line);border-radius:var(--r2);box-shadow:var(--shadow);margin-bottom:24px;overflow:hidden}.head{padding:22px 26px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:12px}.title{font-size:26px;font-weight:950}.body{padding:26px}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.field{margin-bottom:16px}label{display:block;color:#435168;font-size:14px;font-weight:900;margin-bottom:8px}input,select,textarea{width:100%;border:1.5px solid #d4dde0;border-radius:16px;padding:16px 17px;background:#fff;color:var(--text);outline:none}textarea{min-height:104px;resize:vertical}input:focus,select:focus,textarea:focus{border-color:var(--green);box-shadow:0 0 0 4px rgba(9,166,79,.12)}input[readonly],select:disabled{background:#f2f6f4;color:#607086;border-style:dashed;cursor:not-allowed}
+.hint{font-size:14px;color:#566174;line-height:1.75;background:rgba(255,255,255,.75);border:1px dashed #d7e3dd;border-radius:18px;padding:16px 18px;margin-bottom:20px}.ctx{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:20px}.ctx div{background:linear-gradient(180deg,#f9fcfb,#f4f8f6);border:1px solid var(--line);border-radius:17px;padding:14px}.ctx span{display:block;color:#697386;font-size:12px;font-weight:850}.ctx b{display:block;margin-top:6px;font-family:Consolas,"JetBrains Mono",monospace;font-size:13px;word-break:break-all}
+.btn{border:1px solid var(--line);border-radius:17px;padding:16px 20px;font-weight:950;cursor:pointer;background:#fff;color:#263246;box-shadow:0 8px 22px rgba(20,32,51,.07)}.btn.primary{background:linear-gradient(180deg,#10ad5a,#078d42);color:#fff;border-color:transparent}.btn.danger{background:#fff0ee;color:var(--red)}.row{display:flex;gap:12px;flex-wrap:wrap}.row .btn{flex:1}.hidden{display:none!important}.warn{color:var(--orange);font-weight:900}.bad{color:var(--red);font-weight:900}
+.step{border:1px solid rgba(207,216,220,.85);border-radius:24px;padding:20px;margin-bottom:18px;background:rgba(255,255,255,.72)}.step-title{display:flex;align-items:center;gap:10px;margin-bottom:14px;color:#142033;font-size:18px;font-weight:950}.step-title span{display:grid;place-items:center;width:30px;height:30px;border-radius:999px;background:var(--green);color:#fff;font-family:Consolas,monospace;font-size:15px}.event-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.event-chip{border:1.5px solid var(--line);border-radius:18px;padding:18px 14px;background:#fff;color:#263246;font-size:17px;font-weight:950;cursor:pointer;box-shadow:0 8px 20px rgba(20,32,51,.06)}.event-chip.active{background:linear-gradient(180deg,#10ad5a,#078d42);color:#fff;border-color:transparent}.context-note{border:1px solid #dbe7df;border-radius:18px;background:#f8fcfa;padding:14px 16px;margin:0 0 16px;color:#445063;font-size:14px;line-height:1.7}.context-note strong{color:#142033}.kpi-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px}.kpi-card{background:rgba(255,255,255,.88);border:1px solid var(--line);border-radius:20px;padding:18px;box-shadow:0 10px 24px rgba(20,32,51,.06)}.kpi-card span{display:block;color:#516176;font-size:12px;font-weight:950}.kpi-card small{display:block;color:#7b8797;font-family:Consolas,monospace;font-size:10px;margin-top:2px}.kpi-card b{display:block;margin-top:8px;font-family:Consolas,"JetBrains Mono",monospace;font-size:20px;color:var(--green)}.kpi-card b.orange{color:var(--orange)}.kpi-card b.red{color:var(--red)}.kpi-card b.blue{color:var(--blue)}.summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.summary div{border:1px solid var(--line);border-radius:16px;background:#f8fbfa;padding:13px}.summary span{display:block;color:#697386;font-size:12px;font-weight:900}.summary b{display:block;margin-top:5px;font-family:Consolas,"JetBrains Mono",monospace;font-size:14px;word-break:break-word}.diffbox{border-left:5px solid var(--orange);background:#fffaf2}.preview-list{min-height:190px}.preview-empty{height:190px;display:grid;place-items:center;text-align:center;color:#617086}.preview-entry{border:1px solid var(--line);border-radius:18px;padding:14px;margin-bottom:10px;background:#fff;display:grid;grid-template-columns:1fr auto;gap:10px}.preview-entry b{font-family:Consolas,"JetBrains Mono",monospace}.preview-entry .amt{font-family:Consolas,"JetBrains Mono",monospace;font-weight:950;color:var(--green)}.preview-entry .amt.red{color:var(--red)}.preview-tools{display:flex;gap:8px;justify-content:flex-end;align-items:center;margin-top:8px}.mini-btn{border:1px solid var(--line);border-radius:999px;background:#fff;padding:6px 10px;font-size:12px;font-weight:900;color:#435168;cursor:pointer}.mini-btn.danger{color:var(--red);background:#fff7f6}.status-pill{display:inline-block;border-radius:999px;padding:2px 8px;font-size:11px;font-weight:900;background:#eef8f2;color:var(--green2)}.status-pill.local{background:#fff7e8;color:var(--orange)}
+.task{border:1px solid var(--line);border-left:5px solid #aab4c2;border-radius:21px;padding:20px;margin-bottom:14px;background:#fff}.task-top{display:flex;justify-content:space-between;gap:12px}.bed{font-size:24px;font-weight:950;font-family:Consolas,"JetBrains Mono",monospace}.money{font-family:Consolas,"JetBrains Mono",monospace;font-size:20px;font-weight:950;color:var(--orange)}.small{font-size:14px;color:var(--muted);line-height:1.75}.toast{position:fixed;left:24px;right:24px;bottom:22px;background:#142033;color:#fff;padding:17px 20px;border-radius:20px;display:none;z-index:20;font-weight:900;box-shadow:var(--shadow)}
+.preview-modal{position:fixed;inset:0;z-index:40;display:none;align-items:center;justify-content:center;padding:28px;background:rgba(226,236,232,.48);backdrop-filter:blur(26px) saturate(170%);-webkit-backdrop-filter:blur(26px) saturate(170%)}
+.preview-modal.show{display:flex}
+.preview-panel{width:min(1080px,96vw);max-height:88vh;overflow:hidden;border-radius:34px;background:linear-gradient(145deg,rgba(255,255,255,.72),rgba(255,255,255,.42));border:1px solid rgba(255,255,255,.78);box-shadow:0 36px 110px rgba(15,23,42,.20),inset 0 1px 0 rgba(255,255,255,.92)}
+.preview-panel-head{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:22px 24px;border-bottom:1px solid rgba(203,213,225,.52)}
+.preview-panel-title{color:#111827;font-size:24px;font-weight:780}.preview-panel-title small{display:block;margin-top:4px;color:#7b8797;font-size:10px;letter-spacing:.12em}
+.preview-panel-body{padding:22px;max-height:calc(88vh - 92px);overflow:auto}
+.preview-anchor-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:16px}
+.preview-anchor{padding:15px 16px;border-radius:20px;background:rgba(255,255,255,.56);border:1px solid rgba(255,255,255,.74)}
+.preview-anchor span{display:block;color:#657287;font-size:12px;font-weight:650}.preview-anchor b{display:block;margin-top:7px;color:#0b1220;font-size:23px;font-weight:760}
+.preview-detail-card{margin-bottom:12px;padding:16px;border-radius:22px;background:rgba(255,255,255,.58);border:1px solid rgba(255,255,255,.74);box-shadow:inset 0 1px 0 rgba(255,255,255,.85)}
+.preview-detail-top{display:flex;justify-content:space-between;gap:14px;margin-bottom:12px}.preview-detail-top b{font-size:20px;color:#111827}.preview-detail-top .money{color:#059447;white-space:nowrap}
+.preview-detail-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.preview-field{padding:10px 12px;border-radius:16px;background:rgba(255,255,255,.46)}
+.preview-field span{display:block;color:#7b8797;font-size:11px;font-weight:650}.preview-field b{display:block;margin-top:5px;color:#172033;font-size:14px;word-break:break-word}
+@media(max-width:720px){.preview-modal{padding:12px}.preview-panel{border-radius:26px;max-height:92vh}.preview-anchor-row,.preview-detail-grid{grid-template-columns:1fr}.preview-detail-top{display:block}}
+pre{white-space:pre-wrap;background:#111827;color:#e5e7eb;padding:22px;border-radius:22px;max-height:440px;overflow:auto;font-family:Consolas,"JetBrains Mono",monospace}
+@media(max-width:720px){.appbar{height:58px;padding:0 16px}.appbar strong{font-size:22px}.brand{padding:16px}.badge{width:56px;height:56px}.word{font-size:26px}.actions{gap:8px}.operator{position:absolute;right:16px;top:70px;background:rgba(255,255,255,.9);border:1px solid var(--line);border-radius:14px;padding:7px}.pill{font-size:14px;padding:10px 13px}.tabs{padding:0 16px 14px}.tab{min-width:124px;height:70px;font-size:20px}.tab .en{font-size:10px}.wrap{padding:38px 16px 90px}.page-title{font-size:38px}.page-title .en{font-size:16px}.page-sub{font-size:17px}.grid,.grid3,.event-grid,.summary,.kpi-grid{grid-template-columns:1fr}.ctx{grid-template-columns:1fr 1fr}.body{padding:18px}.head{padding:18px}.title{font-size:21px}.preview-entry{grid-template-columns:1fr}}
+/* Responsive premium layer: desktop, foldable/tablet, phone */
+:root{
+  --glass:rgba(255,255,255,.66);
+  --glass-strong:rgba(255,255,255,.78);
+  --glass-line:rgba(255,255,255,.72);
+  --ink:#111827;
+  --halo:0 24px 70px rgba(31,41,55,.14);
+  --inner:inset 0 1px 0 rgba(255,255,255,.88);
+}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","PingFang SC","Microsoft YaHei",sans-serif;
+  background:
+    radial-gradient(circle at 10% -8%,rgba(255,255,255,.95),transparent 30rem),
+    radial-gradient(circle at 86% 6%,rgba(18,183,106,.22),transparent 28rem),
+    radial-gradient(circle at 12% 72%,rgba(26,115,232,.12),transparent 24rem),
+    linear-gradient(145deg,#f7fbf9 0%,#eef7f3 42%,#e9f0ef 100%);
+}
+body:before{
+  content:"";
+  position:fixed;
+  inset:0;
+  pointer-events:none;
+  z-index:-1;
+  background:
+    linear-gradient(90deg,rgba(255,255,255,.28) 1px,transparent 1px),
+    linear-gradient(180deg,rgba(255,255,255,.20) 1px,transparent 1px);
+  background-size:44px 44px;
+  mask-image:linear-gradient(180deg,rgba(0,0,0,.45),transparent 70%);
+}
+.top,.card,.step,.kpi-card,.ctx div,.context-note,.preview-entry,.task,.hint{
+  backdrop-filter:blur(28px) saturate(170%);
+  -webkit-backdrop-filter:blur(28px) saturate(170%);
+  box-shadow:var(--halo),var(--inner);
+}
+.top{
+  background:linear-gradient(120deg,rgba(255,255,255,.76),rgba(239,250,246,.68));
+  border-bottom:1px solid rgba(255,255,255,.7);
+}
+.appbar{
+  background:rgba(255,255,255,.72);
+  backdrop-filter:blur(24px) saturate(160%);
+  -webkit-backdrop-filter:blur(24px) saturate(160%);
+}
+.brand,.tabs,.wrap{max-width:min(1480px,calc(100vw - 40px))}
+.card{
+  background:linear-gradient(145deg,rgba(255,255,255,.78),rgba(255,255,255,.52));
+  border:1px solid rgba(255,255,255,.78);
+  box-shadow:0 28px 80px rgba(15,23,42,.13),inset 0 1px 0 rgba(255,255,255,.9);
+}
+.head{
+  background:linear-gradient(180deg,rgba(255,255,255,.44),rgba(255,255,255,.18));
+  border-bottom:1px solid rgba(203,213,225,.52);
+}
+.step,.hint,.context-note,.ctx div,.summary div{
+  background:linear-gradient(145deg,rgba(255,255,255,.62),rgba(255,255,255,.36));
+  border-color:rgba(255,255,255,.72);
+}
+input,select,textarea{
+  background:rgba(255,255,255,.68);
+  border-color:rgba(148,163,184,.38);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.9);
+}
+input:focus,select:focus,textarea:focus{
+  border-color:rgba(9,166,79,.72);
+  box-shadow:0 0 0 5px rgba(9,166,79,.13),inset 0 1px 0 rgba(255,255,255,.95);
+}
+.btn,.event-chip,.tab,.pill,.operator input{
+  backdrop-filter:blur(18px) saturate(160%);
+  -webkit-backdrop-filter:blur(18px) saturate(160%);
+}
+.btn,.event-chip,.tab{
+  background:rgba(255,255,255,.62);
+  border-color:rgba(255,255,255,.82);
+  box-shadow:0 14px 36px rgba(15,23,42,.10),inset 0 1px 0 rgba(255,255,255,.92);
+}
+.btn.primary,.event-chip.active,.tab.active,.pill.main{
+  background:linear-gradient(180deg,#20bf6b 0%,#079447 100%);
+  box-shadow:0 18px 40px rgba(9,166,79,.24),inset 0 1px 0 rgba(255,255,255,.25);
+}
+.page-title{
+  letter-spacing:-.055em;
+  text-wrap:balance;
+}
+.page-sub{
+  max-width:860px;
+}
+.kpi-card{
+  background:linear-gradient(145deg,rgba(255,255,255,.70),rgba(255,255,255,.42));
+  border:1px solid rgba(255,255,255,.76);
+}
+@media(min-width:1180px){
+  .wrap{padding-top:64px}
+  #view-entry{
+    display:grid;
+    grid-template-columns:minmax(620px,1.22fr) minmax(380px,.78fr);
+    gap:26px;
+    align-items:start;
+  }
+  #view-entry>.card:first-child{grid-column:1/-1}
+  #view-entry>.card:nth-child(2){grid-column:1}
+  #view-entry>.card:nth-child(3){grid-column:2;position:sticky;top:184px}
+  .kpi-grid{grid-template-columns:repeat(7,minmax(0,1fr))}
+  .ctx{grid-template-columns:repeat(6,minmax(0,1fr))}
+  .event-grid{grid-template-columns:repeat(7,minmax(0,1fr))}
+  .tab{min-width:230px}
+}
+@media(min-width:721px) and (max-width:1179px){
+  .brand,.tabs,.wrap{max-width:min(1080px,calc(100vw - 28px))}
+  .wrap{padding:46px 10px 100px}
+  .kpi-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .ctx{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .event-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .tab{min-width:170px}
+  .page-title{font-size:46px}
+}
+@media(max-width:720px){
+  body{
+    background:
+      radial-gradient(circle at 80% 0%,rgba(18,183,106,.18),transparent 18rem),
+      linear-gradient(180deg,#f9fcfb,#eef4f2);
+  }
+  .brand,.tabs,.wrap{max-width:100%}
+  .top{border-radius:0 0 26px 26px}
+  .appbar{height:54px}
+  .actions .pill{display:none}
+  .card{border-radius:26px;margin-bottom:18px}
+  .step{border-radius:22px;padding:16px}
+  .event-chip{min-height:58px}
+  input,select,textarea{border-radius:15px;padding:14px 15px}
+  .ctx{grid-template-columns:1fr 1fr}
+  .kpi-card{padding:16px}
+}
+/* Product polish: single clean brand bar and readable lock-card context */
+.appbar{display:none}
+.top{position:sticky;top:0}
+.brand{padding:18px 24px 12px}
+.badge{width:48px;height:48px;border-radius:14px;font-size:16px;letter-spacing:-.03em}
+.badge small{font-size:9px;letter-spacing:.06em}
+.word{font-size:24px;font-weight:850;letter-spacing:-.035em;color:#111827}
+.word .g{color:#0a9f4b}
+.actions .pill:not(.main){display:none}
+.operator{background:rgba(255,255,255,.50);border:1px solid rgba(255,255,255,.74);border-radius:16px;padding:6px 8px}
+.operator input{height:34px;background:rgba(255,255,255,.58)}
+.tabs{padding:8px 24px 18px}
+.tab{height:64px;min-width:160px;font-size:22px;border-radius:22px!important;border:1px solid rgba(255,255,255,.72);margin-right:10px}
+.tab .en{font-size:10px}
+.ctx .wide{grid-column:1/-1}
+.ctx .wide b{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","Microsoft YaHei",sans-serif;font-size:14px;line-height:1.65;white-space:pre-wrap}
+@media(min-width:1180px){
+  #view-entry>.card:nth-child(3){top:150px}
+  .event-grid{grid-template-columns:repeat(6,minmax(0,1fr))}
+}
+@media(max-width:720px){
+  .brand{padding:14px 16px 8px}
+  .badge{width:42px;height:42px}
+  .word{font-size:20px}
+  .operator{position:static;font-size:11px}
+  .tabs{padding:6px 16px 14px}
+  .tab{height:58px;min-width:108px;font-size:18px}
+}
+/* Typography pass: readable numbers, lighter Chinese weight, small English aids */
+:root{--num-font:"Segoe UI","Microsoft YaHei UI","Arial",sans-serif}
+body{font-weight:500}
+.word,.title,.step-title,.tab,.event-chip,.btn{font-weight:760}
+.pill,.operator,label,.ctx span,.kpi-card span,.summary span{font-weight:680}
+.small,.hint,.context-note{font-weight:450}
+.en,.kpi-card small,label::after{
+  font-family:var(--num-font);
+  font-size:10px;
+  font-weight:520;
+  letter-spacing:.075em;
+  text-transform:uppercase;
+}
+.kpi-card span,.ctx span,.summary span,label{
+  font-size:14px;
+  line-height:1.25;
+}
+.kpi-card small{font-size:10px;color:#7d8795}
+.kpi-card b,.ctx b,.summary b,.preview-entry .amt,.bed,.money,input[inputmode="decimal"],#periodDays,#periodDue,#due,#paid,#listPrice,#depositDeduction,#depositReturnAmount,#overdayDeduction{
+  font-family:var(--num-font);
+  font-variant-numeric:tabular-nums;
+  font-feature-settings:"tnum" 1;
+  letter-spacing:.01em;
+}
+.kpi-card b{
+  font-size:19px;
+  font-weight:700;
+  line-height:1.15;
+}
+.ctx b,.summary b{
+  font-size:14px;
+  font-weight:620;
+}
+input,select,textarea{
+  font-weight:480;
+}
+.event-chip{
+  font-size:18px;
+}
+.step-title{
+  font-size:19px;
+}
+.field label{
+  color:#3f4d63;
+}
+/* Hard typography override: visible change for staff readability */
+:root{--num-font:"Segoe UI","Microsoft YaHei UI","Arial",sans-serif}
+.kpi-card b,.ctx b,.summary b,.preview-entry .amt,.bed,.money,input[inputmode="decimal"],#periodDays,#periodDue,#due,#paid,#listPrice,#depositDeduction,#depositReturnAmount,#overdayDeduction,#noNoticeDeduction,#otherDeduction,#amount{
+  font-family:var(--num-font)!important;
+  font-variant-numeric:tabular-nums!important;
+  font-feature-settings:"tnum" 1!important;
+}
+.kpi-card b{
+  font-size:21px!important;
+  font-weight:650!important;
+  letter-spacing:.005em!important;
+  font-style:normal!important;
+}
+.kpi-card span{
+  font-size:13px!important;
+  font-weight:650!important;
+}
+.kpi-card small{
+  font-size:9px!important;
+  font-weight:500!important;
+  letter-spacing:.09em!important;
+}
+.ctx b,.summary b{
+  font-weight:560!important;
+}
+.event-chip{
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:5px!important;
+  font-size:18px!important;
+  font-weight:700!important;
+}
+.event-chip small,.label-en{
+  display:block;
+  font-family:var(--num-font);
+  font-size:10px!important;
+  font-weight:500!important;
+  letter-spacing:.10em!important;
+  color:#7c8798;
+  text-transform:uppercase;
+}
+.event-chip.active small{color:rgba(255,255,255,.82)}
+label{
+  font-size:14px!important;
+  font-weight:650!important;
+  line-height:1.25!important;
+}
+label .label-en{
+  margin-top:3px;
+}
+.step-title,.title{
+  font-weight:720!important;
+}
+/* Compact header: toolbar, not hero */
+.top{
+  box-shadow:0 10px 28px rgba(15,23,42,.08)!important;
+}
+.brand{
+  min-height:54px!important;
+  padding:10px 24px 4px!important;
+}
+.badge{
+  width:38px!important;
+  height:38px!important;
+  border-radius:11px!important;
+  font-size:14px!important;
+}
+.badge small{font-size:8px!important}
+.logo{gap:10px!important}
+.word{
+  font-size:20px!important;
+  font-weight:760!important;
+}
+.actions{gap:8px!important}
+.operator{
+  padding:4px 7px!important;
+  border-radius:14px!important;
+}
+.operator input{
+  height:30px!important;
+  width:84px!important;
+  padding:5px 9px!important;
+}
+.pill.main{
+  padding:9px 15px!important;
+  font-size:14px!important;
+}
+.tabs{
+  padding:6px 24px 10px!important;
+}
+.tab{
+  height:48px!important;
+  min-width:118px!important;
+  border-radius:17px!important;
+  margin-right:8px!important;
+  font-size:20px!important;
+  gap:6px!important;
+  padding:0 16px!important;
+}
+.tab .en{
+  font-size:8px!important;
+}
+.wrap{
+  padding-top:26px!important;
+}
+@media(min-width:1180px){
+  #view-entry>.card:nth-child(3){top:126px!important}
+}
+@media(max-width:720px){
+  .brand{padding:10px 14px 4px!important}
+  .tabs{padding:5px 14px 9px!important}
+  .tab{height:46px!important;min-width:92px!important;font-size:17px!important}
+  .word{font-size:18px!important}
+  .badge{width:34px!important;height:34px!important}
+}
+/* Current session and context cleanup */
+.session-kpi-grid{
+  display:grid!important;
+  grid-template-columns:repeat(7,minmax(132px,1fr))!important;
+  gap:12px!important;
+  align-items:stretch!important;
+}
+.session-kpi-grid .kpi-card{
+  min-height:96px!important;
+  padding:15px 16px!important;
+  border-radius:20px!important;
+}
+.session-kpi-grid .kpi-card span{
+  display:block!important;
+  font-size:14px!important;
+  line-height:1.2!important;
+  color:#263246!important;
+}
+.session-kpi-grid .kpi-card small{
+  display:block!important;
+  margin-top:3px!important;
+  font-size:9px!important;
+  color:#7a8494!important;
+  letter-spacing:.08em!important;
+}
+.session-kpi-grid .kpi-card b{
+  display:block!important;
+  margin-top:10px!important;
+  font-size:22px!important;
+  font-weight:650!important;
+  line-height:1.05!important;
+}
+.session-kpi-grid .kpi-card.anchor{
+  min-height:122px!important;
+  border-color:rgba(9,166,79,.22)!important;
+  background:linear-gradient(145deg,rgba(236,253,245,.86),rgba(255,255,255,.62))!important;
+}
+.session-kpi-grid .kpi-card.anchor b{
+  font-size:30px!important;
+  font-weight:760!important;
+  color:#059447!important;
+}
+.session-kpi-grid .kpi-card.anchor.bank b{color:#1a73e8!important}
+.session-kpi-grid .kpi-card.anchor.total b{color:#142033!important}
+.session-strip{
+  grid-column:1/-1;
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+  padding:11px 14px;
+  border-radius:18px;
+  color:#445063;
+  background:rgba(255,255,255,.48);
+  border:1px solid rgba(255,255,255,.72);
+  font-size:13px;
+}
+.session-strip strong{color:#142033}
+.clean-context{
+  display:grid!important;
+  grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  gap:14px!important;
+  margin-bottom:16px!important;
+  align-items:stretch!important;
+}
+.ctx-panel{
+  border-radius:20px!important;
+  padding:16px!important;
+  min-height:214px;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+.ctx-panel.identity{grid-row:auto}
+.ctx-panel.remark{grid-column:1/-1;min-height:94px}
+.ctx-panel .ctx-title{
+  display:block;
+  margin:0 0 2px;
+  color:#142033;
+  font-size:16px;
+  font-weight:720;
+  line-height:1.15;
+}
+.ctx-panel .ctx-title small{
+  display:block;
+  margin-top:4px;
+  color:#7b8797;
+  font-size:9px;
+  letter-spacing:.09em;
+}
+.ctx-row{
+  display:grid;
+  grid-template-columns:minmax(88px,.9fr) minmax(80px,1.1fr);
+  gap:14px;
+  align-items:center;
+  min-height:48px;
+  padding:11px 0;
+  border-radius:0;
+  border:0;
+  border-top:1px solid rgba(148,163,184,.22);
+  background:transparent;
+  box-shadow:none;
+}
+.ctx-row:first-of-type{
+  border-top:0;
+}
+.ctx-label{
+  color:#6b7688;
+  font-size:12px;
+  line-height:1.25;
+  font-weight:560;
+}
+.ctx-label small{
+  display:block;
+  margin-top:2px;
+  font-size:8px;
+  letter-spacing:.07em;
+  color:#9aa4b2;
+}
+.ctx-value{
+  margin-top:0;
+  color:#111827;
+  font-size:17px;
+  font-weight:620;
+  line-height:1.35;
+  word-break:break-word;
+  text-align:right;
+}
+.ctx-value.money{font-size:16px;font-weight:650}
+.ctx-panel.remark .ctx-value{
+  min-height:44px;
+  margin-top:4px;
+  padding:12px 14px;
+  border-radius:16px;
+  border:1px solid rgba(255,255,255,.64);
+  background:rgba(255,255,255,.42);
+  text-align:left;
+}
+.ctx-note-clean{
+  margin:0 0 16px!important;
+  padding:12px 14px!important;
+  border-radius:18px!important;
+  font-size:13px!important;
+  line-height:1.65!important;
+}
+@media(max-width:1100px){
+  .session-kpi-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important}
+  .clean-context{grid-template-columns:1fr 1fr!important}
+  .ctx-panel.identity{grid-row:auto;grid-column:auto}
+  .ctx-panel.remark{grid-column:1/-1}
+}
+@media(max-width:720px){
+  .session-kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+  .session-strip{display:block}
+  .clean-context{grid-template-columns:1fr!important}
+  .ctx-panel.remark{grid-column:auto}
+}
+/* Cleaner bilingual hierarchy */
+.step-title{
+  align-items:flex-start!important;
+}
+.step-title>div{
+  display:flex!important;
+  flex-direction:column!important;
+  gap:4px!important;
+  line-height:1.15!important;
+}
+.step-title small{
+  display:block!important;
+  color:#7b8797!important;
+  font-size:10px!important;
+  font-weight:560!important;
+  letter-spacing:.08em!important;
+}
+.field label .label-en{
+  display:block!important;
+  margin-top:3px!important;
+}
+.ctx-panel{
+  min-height:0!important;
+}
+.ctx-panel.identity,.ctx-panel:not(.remark){
+  min-height:238px!important;
+}
+.ctx-value.money{
+  white-space:nowrap!important;
+  word-break:normal!important;
+}
+@media(min-width:900px){
+  .ctx-panel:not(.remark){
+    min-height:238px!important;
+  }
+}
+/* Professional context layout: compact ledger rows, not nested cards */
+.clean-context{
+  gap:16px!important;
+}
+.ctx-panel{
+  padding:18px!important;
+  border-radius:24px!important;
+}
+.ctx-panel.identity{
+  grid-column:auto!important;
+}
+.ctx-panel .ctx-title{
+  min-height:38px;
+  padding-bottom:10px;
+  border-bottom:1px solid rgba(148,163,184,.24);
+}
+.ctx-value.warn{
+  color:#d93025!important;
+  font-weight:760!important;
+}
+@media(max-width:720px){
+  .ctx-row{
+    grid-template-columns:1fr!important;
+    gap:6px!important;
+  }
+  .ctx-value{
+    text-align:left!important;
+  }
+}
+/* Context board: one decision surface instead of three tall columns */
+.context-board{
+  grid-column:1/-1;
+  padding:18px;
+  border-radius:26px;
+  background:linear-gradient(145deg,rgba(255,255,255,.66),rgba(255,255,255,.38));
+  border:1px solid rgba(255,255,255,.76);
+  box-shadow:0 20px 58px rgba(15,23,42,.10),inset 0 1px 0 rgba(255,255,255,.9);
+}
+.context-hero{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:10px;
+  margin-bottom:14px;
+}
+.context-chip{
+  padding:14px 16px;
+  border-radius:18px;
+  background:rgba(255,255,255,.58);
+  border:1px solid rgba(255,255,255,.72);
+}
+.context-chip span,.context-section h4 small{
+  display:block;
+  color:#7b8797;
+  font-size:9px;
+  letter-spacing:.09em;
+  text-transform:uppercase;
+}
+.context-chip b{
+  display:block;
+  margin-top:6px;
+  color:#111827;
+  font-size:18px;
+  font-weight:720;
+  line-height:1.25;
+  word-break:break-word;
+}
+.context-chip.warn b{color:#d93025}
+.context-sections{
+  display:grid;
+  grid-template-columns:1.1fr 1fr 1fr;
+  gap:14px;
+}
+.context-section{
+  padding:15px 16px;
+  border-radius:20px;
+  background:rgba(255,255,255,.44);
+  border:1px solid rgba(255,255,255,.68);
+}
+.context-section h4{
+  margin:0 0 8px;
+  color:#142033;
+  font-size:15px;
+  line-height:1.15;
+}
+.context-line{
+  display:grid;
+  grid-template-columns:90px 1fr;
+  gap:12px;
+  padding:10px 0;
+  border-top:1px solid rgba(148,163,184,.22);
+}
+.context-line:first-of-type{border-top:0}
+.context-line span{
+  color:#6b7688;
+  font-size:12px;
+}
+.context-line span small{
+  display:block;
+  margin-top:2px;
+  color:#9aa4b2;
+  font-size:8px;
+  letter-spacing:.07em;
+}
+.context-line b{
+  color:#111827;
+  font-size:15px;
+  font-weight:620;
+  text-align:right;
+  word-break:break-word;
+}
+.context-remark{
+  grid-column:1/-1;
+}
+.context-remark b{
+  text-align:left;
+  font-size:15px;
+}
+@media(max-width:900px){
+  .context-hero,.context-sections{grid-template-columns:1fr 1fr}
+  .context-remark{grid-column:1/-1}
+}
+@media(max-width:720px){
+  .context-hero,.context-sections{grid-template-columns:1fr}
+  .context-line{grid-template-columns:1fr;gap:5px}
+  .context-line b{text-align:left}
+}
+/* Isolate the new board from legacy `.ctx div` card styling */
+.clean-context .context-board,
+.clean-context .context-board div{
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+}
+.clean-context .context-board{
+  padding:18px!important;
+  background:linear-gradient(145deg,rgba(255,255,255,.66),rgba(255,255,255,.38))!important;
+  border:1px solid rgba(255,255,255,.76)!important;
+  box-shadow:0 20px 58px rgba(15,23,42,.10),inset 0 1px 0 rgba(255,255,255,.9)!important;
+}
+.clean-context .context-hero,
+.clean-context .context-sections{
+  padding:0!important;
+  background:transparent!important;
+  border:0!important;
+  border-radius:0!important;
+  box-shadow:none!important;
+}
+.clean-context .context-sections{
+  align-items:start!important;
+}
+.clean-context .context-chip{
+  padding:14px 16px!important;
+  background:rgba(255,255,255,.58)!important;
+  border:1px solid rgba(255,255,255,.72)!important;
+  box-shadow:none!important;
+}
+.clean-context .context-section{
+  padding:15px 16px!important;
+  background:rgba(255,255,255,.44)!important;
+  border:1px solid rgba(255,255,255,.68)!important;
+  box-shadow:none!important;
+  align-self:start!important;
+}
+.clean-context .context-line{
+  padding:10px 0!important;
+  background:transparent!important;
+  border-left:0!important;
+  border-right:0!important;
+  border-bottom:0!important;
+  border-radius:0!important;
+  box-shadow:none!important;
+}
+.clean-context .context-line span,
+.clean-context .context-line b{
+  padding:0!important;
+  background:transparent!important;
+  border:0!important;
+  box-shadow:none!important;
+}
+.readonly-pill{
+  min-height:52px;
+  display:flex;
+  align-items:center;
+  padding:0 17px;
+  border:1.5px solid rgba(148,163,184,.38);
+  border-radius:16px;
+  background:rgba(255,255,255,.58);
+  color:#142033;
+  font-size:17px;
+  font-weight:720;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.88);
+}
+.field input,.field select,.readonly-pill{
+  height:56px!important;
+  min-height:56px!important;
+}
+.field input,.field select{
+  padding-top:0!important;
+  padding-bottom:0!important;
+}
+.pay-toggle{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:12px;
+}
+.pay-option{
+  height:58px;
+  border:1.5px solid rgba(148,163,184,.38);
+  border-radius:18px;
+  background:rgba(255,255,255,.62);
+  color:#263246;
+  font-size:18px;
+  font-weight:780;
+  cursor:pointer;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 10px 24px rgba(15,23,42,.06);
+}
+.pay-option span{
+  display:block;
+  margin-top:3px;
+  color:#8b96a7;
+  font-size:9px;
+  letter-spacing:.1em;
+}
+.pay-option.active{
+  color:#fff;
+  border-color:transparent;
+  background:linear-gradient(180deg,#20bf6b 0%,#079447 100%);
+  box-shadow:0 18px 34px rgba(9,166,79,.22),inset 0 1px 0 rgba(255,255,255,.22);
+}
+.pay-option.active span{color:rgba(255,255,255,.76)}
+.arrear-plan{
+  padding:18px;
+  border-radius:22px;
+  background:linear-gradient(145deg,rgba(255,251,235,.78),rgba(255,255,255,.66));
+  border:1px solid rgba(245,158,11,.28);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 16px 34px rgba(146,64,14,.08);
+}
+.arrear-plan .plan-head{
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:14px;
+  color:#142033;
+  font-size:17px;
+  font-weight:760;
+}
+.arrear-plan .plan-head small{
+  display:block;
+  margin-top:3px;
+  color:#8a94a5;
+  font-size:9px;
+  letter-spacing:.1em;
+}
+.arrear-plan .plan-amount{
+  color:#d93025;
+  font-family:"Courier New",monospace;
+  font-size:22px;
+  font-weight:800;
+  white-space:nowrap;
+}
+.amount-hint{
+  margin:12px 0;
+  padding:13px 15px;
+  border-radius:16px;
+  background:rgba(255,255,255,.62);
+  border:1px solid rgba(255,255,255,.76);
+  color:#526174;
+  font-size:13px;
+  line-height:1.55;
+}
+#btnSaveEntry:disabled,
+#btnSaveEntry.disabled{
+  cursor:not-allowed!important;
+  color:#7a8494!important;
+  background:rgba(255,255,255,.58)!important;
+  border:1px solid rgba(148,163,184,.35)!important;
+  box-shadow:none!important;
+}
+/* Employee-first context board */
+.priority-grid{
+  display:grid;
+  grid-template-columns:repeat(6,minmax(0,1fr));
+  gap:12px;
+  margin-bottom:12px;
+  align-items:stretch;
+}
+.priority-card{
+  min-height:92px;
+  padding:15px 16px;
+  border-radius:20px;
+  background:rgba(255,255,255,.62);
+  border:1px solid rgba(255,255,255,.76);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.9);
+  display:flex;
+  flex-direction:column;
+  justify-content:space-between;
+}
+.priority-card.bed-check,
+.priority-card.arrears-check,
+.priority-card.date-check{
+  grid-column:span 2;
+}
+.priority-card.deposit-check,
+.priority-card.rent-check{
+  grid-column:span 3;
+}
+.priority-card.strong{
+  background:linear-gradient(145deg,rgba(9,166,79,.12),rgba(255,255,255,.66));
+  border-color:rgba(9,166,79,.18);
+}
+.priority-card.warn{
+  background:linear-gradient(145deg,rgba(217,48,37,.10),rgba(255,255,255,.66));
+  border-color:rgba(217,48,37,.20);
+}
+.priority-card span{
+  display:block;
+  color:#667285;
+  font-size:11px;
+  font-weight:650;
+  letter-spacing:.02em;
+}
+.priority-card span small{
+  display:block;
+  margin-top:3px;
+  color:#99a3b2;
+  font-size:8px;
+  letter-spacing:.08em;
+}
+.priority-card b{
+  display:block;
+  margin-top:10px;
+  color:#111827;
+  font-size:22px;
+  font-weight:780;
+  line-height:1.1;
+}
+.priority-card.date-check b{
+  font-size:18px;
+  white-space:nowrap;
+  letter-spacing:-.02em;
+}
+.priority-card.warn b{color:#d93025}
+.priority-card .sub{
+  margin-top:8px;
+  color:#617086;
+  font-size:12px;
+  line-height:1.35;
+}
+.secondary-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:12px;
+}
+.secondary-box{
+  padding:14px 16px;
+  border-radius:18px;
+  background:rgba(255,255,255,.42);
+  border:1px solid rgba(255,255,255,.66);
+}
+.secondary-box h4{
+  margin:0 0 8px;
+  color:#142033;
+  font-size:14px;
+  line-height:1.15;
+}
+.secondary-box h4 small{
+  display:block;
+  margin-top:3px;
+  color:#8b96a7;
+  font-size:8px;
+  letter-spacing:.08em;
+}
+@media(max-width:900px){
+  .priority-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .priority-card.bed-check,
+  .priority-card.arrears-check,
+  .priority-card.date-check,
+  .priority-card.deposit-check,
+  .priority-card.rent-check{grid-column:auto}
+  .priority-card.date-check{grid-column:1/-1}
+  .secondary-grid{grid-template-columns:1fr}
+}
+@media(max-width:720px){
+  .priority-grid{grid-template-columns:1fr}
+  .priority-card.date-check b{white-space:normal}
+}
+/* Refined HOME LINK logo */
+.badge{
+  background:linear-gradient(145deg,#08a64f 0%,#078c43 100%)!important;
+  box-shadow:0 12px 26px rgba(7,140,67,.20),inset 0 1px 0 rgba(255,255,255,.20)!important;
+}
+.badge div{
+  font-size:10px!important;
+  line-height:.92!important;
+  letter-spacing:.03em!important;
+}
+.badge small{
+  color:#dce600!important;
+  font-size:8px!important;
+  letter-spacing:.04em!important;
+}
+.word{
+  display:flex!important;
+  align-items:baseline!important;
+  gap:0!important;
+  font-weight:820!important;
+  letter-spacing:-.055em!important;
+}
+.word .g{color:#079b4a!important}
+.word i{
+  margin-left:2px!important;
+  color:#d7d900!important;
+  font-style:normal!important;
+}
+.word em{
+  margin-left:12px!important;
+  color:#162033!important;
+  font-size:.76em!important;
+  font-style:normal!important;
+  font-weight:760!important;
+  letter-spacing:-.045em!important;
+}
+/* Session summary hierarchy: core handover anchors first, details second */
+.session-kpi-grid{
+  display:block!important;
+}
+.kpi-section-label{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin:0 0 10px;
+  color:#172033;
+  font-size:13px;
+  font-weight:760;
+  letter-spacing:.01em;
+}
+.kpi-section-label small{
+  color:#8792a3;
+  font-size:9px;
+  letter-spacing:.14em;
+}
+.handover-anchors{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:14px;
+  margin-bottom:18px;
+}
+.handover-details{
+  display:grid;
+  grid-template-columns:repeat(6,minmax(0,1fr));
+  gap:12px;
+}
+.handover-anchors .kpi-card{
+  min-height:132px!important;
+  padding:20px 22px!important;
+  border-radius:24px!important;
+}
+.handover-anchors .kpi-card:nth-child(1){
+  background:linear-gradient(145deg,rgba(218,255,236,.92),rgba(255,255,255,.62))!important;
+  border-color:rgba(9,166,79,.30)!important;
+  box-shadow:0 18px 44px rgba(9,166,79,.13),inset 0 1px 0 rgba(255,255,255,.92)!important;
+}
+.handover-anchors .kpi-card:nth-child(2){
+  background:linear-gradient(145deg,rgba(219,237,255,.94),rgba(255,255,255,.62))!important;
+  border-color:rgba(26,115,232,.28)!important;
+  box-shadow:0 18px 44px rgba(26,115,232,.13),inset 0 1px 0 rgba(255,255,255,.92)!important;
+}
+.handover-anchors .kpi-card:nth-child(3){
+  background:linear-gradient(145deg,rgba(255,244,210,.94),rgba(255,255,255,.62))!important;
+  border-color:rgba(245,158,11,.30)!important;
+  box-shadow:0 18px 44px rgba(245,158,11,.13),inset 0 1px 0 rgba(255,255,255,.92)!important;
+}
+.handover-anchors .kpi-card span{
+  font-size:15px!important;
+}
+.handover-anchors .kpi-card b{
+  margin-top:14px!important;
+  font-size:34px!important;
+  line-height:1!important;
+}
+.handover-anchors .kpi-card:nth-child(1) b{color:#04964d!important}
+.handover-anchors .kpi-card:nth-child(2) b{color:#1769e0!important}
+.handover-anchors .kpi-card:nth-child(3) b{color:#d97706!important}
+.handover-details .kpi-card{
+  min-height:92px!important;
+  padding:15px 16px!important;
+  opacity:.92;
+}
+.handover-details .kpi-card b{
+  font-size:20px!important;
+}
+@media(max-width:980px){
+  .handover-anchors{grid-template-columns:1fr}
+  .handover-details{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:560px){
+  .handover-details{grid-template-columns:1fr}
+}
+/* Final context alignment: five equal business anchors, then secondary evidence. */
+.priority-grid{
+  grid-template-columns:repeat(5,minmax(0,1fr))!important;
+}
+.priority-card.bed-check,
+.priority-card.arrears-check,
+.priority-card.date-check,
+.priority-card.deposit-check,
+.priority-card.rent-check{
+  grid-column:auto!important;
+  min-height:128px!important;
+}
+.priority-card b{
+  min-height:34px;
+  display:flex!important;
+  align-items:flex-end;
+}
+.priority-card.date-check b{
+  white-space:normal!important;
+  word-break:keep-all;
+}
+@media(max-width:1180px){
+  .priority-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+}
+@media(max-width:720px){
+  .priority-grid{grid-template-columns:1fr!important}
+}
+.login-overlay{
+  position:fixed;
+  inset:0;
+  z-index:80;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:24px;
+  background:radial-gradient(circle at 70% 20%,rgba(9,166,79,.22),transparent 28rem),rgba(237,247,242,.78);
+  backdrop-filter:blur(30px) saturate(170%);
+  -webkit-backdrop-filter:blur(30px) saturate(170%);
+}
+.login-overlay.hidden{display:none!important}
+.login-card{
+  width:min(420px,96vw);
+  padding:28px;
+  border-radius:32px;
+  background:linear-gradient(145deg,rgba(255,255,255,.78),rgba(255,255,255,.48));
+  border:1px solid rgba(255,255,255,.78);
+  box-shadow:0 32px 90px rgba(15,23,42,.18),inset 0 1px 0 rgba(255,255,255,.92);
+}
+.login-brand{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  margin-bottom:24px;
+}
+.login-title{
+  font-size:26px;
+  font-weight:820;
+  color:#111827;
+}
+.login-title small{
+  display:block;
+  margin-top:4px;
+  color:#7b8797;
+  font-size:10px;
+  letter-spacing:.12em;
+}
+.login-card .btn{
+  width:100%;
+  margin-top:10px;
+}
+.followup-dashboard{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:12px;
+  margin-bottom:18px;
+}
+.followup-metric{
+  padding:16px 18px;
+  border-radius:22px;
+  background:linear-gradient(145deg,rgba(255,255,255,.82),rgba(255,255,255,.48));
+  border:1px solid rgba(255,255,255,.78);
+  box-shadow:0 14px 38px rgba(15,23,42,.08),inset 0 1px 0 rgba(255,255,255,.92);
+}
+.followup-metric span{
+  display:block;
+  color:#516176;
+  font-size:13px;
+  font-weight:900;
+}
+.followup-metric small{
+  display:block;
+  color:#7b8797;
+  font-family:Consolas,"JetBrains Mono",monospace;
+  font-size:10px;
+  letter-spacing:.08em;
+  margin-top:2px;
+}
+.followup-metric b{
+  display:block;
+  margin-top:8px;
+  color:#111827;
+  font-family:Consolas,"JetBrains Mono",monospace;
+  font-size:22px;
+  font-weight:850;
+}
+.followup-metric.warn b{color:#d97706}
+.followup-metric.bad b{color:#dc2626}
+.followup-list{
+  display:grid;
+  gap:14px;
+}
+.followup-card{
+  border:1px solid rgba(255,255,255,.78);
+  border-left:5px solid #aab4c2;
+  border-radius:24px;
+  padding:18px;
+  background:linear-gradient(145deg,rgba(255,255,255,.84),rgba(255,255,255,.52));
+  box-shadow:0 18px 46px rgba(15,23,42,.09),inset 0 1px 0 rgba(255,255,255,.9);
+}
+.followup-card.overdue{border-left-color:#f59e0b}
+.followup-card.force{border-left-color:#dc2626}
+.followup-card.history{border-left-color:#2563eb}
+.followup-top{
+  display:grid;
+  grid-template-columns:1fr auto;
+  gap:16px;
+  align-items:start;
+}
+.followup-bed{
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","Microsoft YaHei",sans-serif;
+  font-size:22px;
+  line-height:1.25;
+  font-weight:820;
+  color:#111827;
+  word-break:break-word;
+}
+.followup-tags{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin-top:8px;
+}
+.followup-tag{
+  border-radius:999px;
+  padding:5px 10px;
+  background:rgba(255,255,255,.68);
+  border:1px solid rgba(207,216,220,.72);
+  color:#516176;
+  font-size:12px;
+  font-weight:800;
+}
+.followup-tag.bad{color:#dc2626;background:#fff5f5}
+.followup-money{
+  text-align:right;
+  font-family:Consolas,"JetBrains Mono",monospace;
+  font-size:24px;
+  font-weight:900;
+  color:#d97706;
+  white-space:nowrap;
+}
+.followup-actions{
+  display:grid;
+  grid-template-columns:180px 1fr 1.2fr auto auto;
+  gap:10px;
+  margin-top:16px;
+  align-items:end;
+}
+.followup-actions select,
+.followup-actions input{
+  min-height:44px;
+  border-radius:14px;
+  border:1px solid rgba(203,213,225,.9);
+  background:rgba(255,255,255,.72);
+  padding:0 12px;
+  color:#142033;
+  font-size:14px;
+}
+.followup-actions .mini-btn{
+  min-height:44px;
+  border-radius:14px;
+}
+.followup-note{
+  margin-top:10px;
+  color:#617086;
+  line-height:1.7;
+  font-size:13px;
+}
+@media(max-width:900px){
+  .followup-dashboard{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .followup-actions{grid-template-columns:1fr}
+  .followup-money{text-align:left}
+}
+
+/* Mobile final pass: rebuild the phone layout instead of shrinking desktop cards. */
+@media(max-width:600px){
+  :root{
+    --r:16px;
+    --r2:22px;
+    --shadow:0 14px 34px rgba(15,23,42,.10);
+  }
+  html,body{width:100%;overflow-x:hidden}
+  body{
+    font-size:14px;
+    background:
+      radial-gradient(circle at 86% -4%,rgba(9,166,79,.16),transparent 16rem),
+      linear-gradient(180deg,#fbfdfc 0%,#eef5f2 100%);
+  }
+  .top{
+    border-radius:0 0 20px 20px!important;
+    position:sticky;
+    top:0;
+    z-index:10;
+  }
+  .brand{
+    padding:10px 12px 6px!important;
+    display:grid!important;
+    grid-template-columns:minmax(0,1fr) auto;
+    gap:8px!important;
+    align-items:center!important;
+  }
+  .logo{gap:8px!important;min-width:0}
+  .badge{
+    width:38px!important;
+    height:38px!important;
+    border-radius:11px!important;
+    flex:0 0 auto;
+  }
+  .badge div{font-size:8px!important}
+  .badge small{font-size:7px!important}
+  .word{
+    min-width:0;
+    font-size:18px!important;
+    line-height:1!important;
+    white-space:nowrap!important;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .word em{
+    margin-left:6px!important;
+    font-size:13px!important;
+    letter-spacing:-.04em!important;
+  }
+  .actions{gap:6px!important;min-width:0}
+  .actions .pill.main{display:none!important}
+  .operator{
+    position:static!important;
+    padding:5px 6px!important;
+    border-radius:14px!important;
+    gap:5px!important;
+    font-size:10px!important;
+    line-height:1.15;
+    max-width:118px;
+  }
+  .operator input{
+    width:64px!important;
+    height:30px!important;
+    padding:5px 7px!important;
+    border-radius:11px!important;
+    font-size:13px!important;
+  }
+  .tabs{
+    padding:5px 10px 10px!important;
+    display:grid!important;
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    gap:8px!important;
+    overflow:visible!important;
+  }
+  .tab{
+    min-width:0!important;
+    width:100%!important;
+    height:50px!important;
+    margin:0!important;
+    border-radius:17px!important;
+    font-size:18px!important;
+    letter-spacing:0!important;
+    gap:4px!important;
+    line-height:1!important;
+    box-shadow:0 10px 24px rgba(15,23,42,.08),inset 0 1px 0 rgba(255,255,255,.9)!important;
+  }
+  .tab .en{
+    font-size:8px!important;
+    letter-spacing:.06em!important;
+    line-height:1.05!important;
+    max-width:48px;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .wrap{
+    padding:14px 9px 72px!important;
+    max-width:100%!important;
+  }
+  .card{
+    border-radius:21px!important;
+    margin-bottom:12px!important;
+  }
+  .head{
+    padding:14px 15px!important;
+    align-items:center!important;
+  }
+  .title{
+    font-size:20px!important;
+    line-height:1.12!important;
+    letter-spacing:-.03em!important;
+  }
+  .small{
+    font-size:11px!important;
+    line-height:1.45!important;
+  }
+  .body{padding:14px!important}
+  .btn{
+    min-height:44px!important;
+    padding:10px 12px!important;
+    border-radius:15px!important;
+    font-size:14px!important;
+    line-height:1.15!important;
+  }
+  .btn .label-en,.label-en{
+    display:block;
+    margin-top:2px;
+    font-size:8px!important;
+    letter-spacing:.10em!important;
+    line-height:1!important;
+  }
+
+  .session-kpi-grid{display:block!important}
+  .kpi-section-label{
+    margin:0 0 8px!important;
+    font-size:12px!important;
+  }
+  .handover-anchors{
+    grid-template-columns:repeat(3,minmax(0,1fr))!important;
+    gap:8px!important;
+    margin-bottom:12px!important;
+  }
+  .handover-anchors .kpi-card{
+    min-height:92px!important;
+    padding:12px 10px!important;
+    border-radius:18px!important;
+  }
+  .handover-anchors .kpi-card span,
+  .handover-details .kpi-card span{
+    font-size:11px!important;
+    line-height:1.15!important;
+  }
+  .handover-anchors .kpi-card small,
+  .handover-details .kpi-card small{
+    font-size:7px!important;
+    letter-spacing:.07em!important;
+  }
+  .handover-anchors .kpi-card b{
+    margin-top:9px!important;
+    font-size:20px!important;
+    line-height:1.05!important;
+    white-space:nowrap!important;
+  }
+  .handover-details{
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    gap:8px!important;
+  }
+  .handover-details .kpi-card,
+  .kpi-card{
+    min-height:78px!important;
+    padding:11px 10px!important;
+    border-radius:17px!important;
+  }
+  .handover-details .kpi-card b,
+  .kpi-card b{
+    font-size:17px!important;
+    margin-top:7px!important;
+  }
+
+  .grid,.grid3{grid-template-columns:1fr!important;gap:8px!important}
+  .field{margin-bottom:10px!important}
+  label{
+    margin-bottom:5px!important;
+    font-size:12px!important;
+    line-height:1.25!important;
+  }
+  input,select,textarea{
+    min-height:44px!important;
+    padding:11px 12px!important;
+    border-radius:14px!important;
+    font-size:15px!important;
+  }
+  textarea{min-height:78px!important}
+  .hint,.context-note{
+    padding:11px 12px!important;
+    border-radius:15px!important;
+    margin-bottom:10px!important;
+    font-size:12px!important;
+    line-height:1.55!important;
+  }
+  .step{
+    padding:12px!important;
+    margin-bottom:12px!important;
+    border-radius:19px!important;
+  }
+  .step-title{
+    gap:8px!important;
+    margin-bottom:10px!important;
+    font-size:17px!important;
+    line-height:1.18!important;
+  }
+  .step-title span{
+    width:26px!important;
+    height:26px!important;
+    font-size:13px!important;
+    flex:0 0 auto;
+  }
+  .step-title small{
+    margin-top:2px!important;
+    font-size:8px!important;
+    letter-spacing:.08em!important;
+  }
+  .event-grid{
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    gap:8px!important;
+  }
+  .event-chip{
+    min-height:48px!important;
+    padding:10px 8px!important;
+    border-radius:15px!important;
+    font-size:16px!important;
+    line-height:1.08!important;
+    text-align:center!important;
+  }
+  .event-chip small{
+    display:block;
+    margin-top:3px;
+    font-size:8px!important;
+    letter-spacing:.05em!important;
+  }
+
+  .priority-grid{
+    display:grid!important;
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    gap:8px!important;
+  }
+  .context-board,
+  .clean-context .context-board{
+    padding:12px!important;
+    border-radius:20px!important;
+  }
+  .priority-card,
+  .priority-card.bed-check,
+  .priority-card.arrears-check,
+  .priority-card.date-check,
+  .priority-card.deposit-check,
+  .priority-card.rent-check{
+    grid-column:auto!important;
+    min-height:84px!important;
+    padding:12px!important;
+    border-radius:17px!important;
+  }
+  .priority-card.bed-check,
+  .priority-card.arrears-check,
+  .priority-card.date-check{
+    grid-column:1/-1!important;
+  }
+  .priority-card h3{
+    font-size:12px!important;
+    line-height:1.15!important;
+    margin-bottom:6px!important;
+  }
+  .priority-card h3 small{font-size:7px!important}
+  .priority-card b{
+    min-height:auto!important;
+    font-size:18px!important;
+    line-height:1.15!important;
+    align-items:flex-start!important;
+  }
+  .priority-card .sub{
+    margin-top:6px!important;
+    font-size:10px!important;
+    line-height:1.35!important;
+  }
+  .secondary-grid{display:none!important}
+  .secondary-box{
+    padding:11px 12px!important;
+    border-radius:15px!important;
+  }
+
+  .summary{
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    gap:8px!important;
+  }
+  .summary div{
+    padding:10px!important;
+    border-radius:14px!important;
+  }
+  .summary span{font-size:10px!important}
+  .summary b{font-size:13px!important}
+  #entrySummary .diffbox{grid-column:1/-1}
+  #validationBox{
+    margin-top:8px!important;
+    font-size:12px!important;
+  }
+
+  #view-entry>.card:nth-child(3) .head{
+    display:grid!important;
+    grid-template-columns:1fr;
+    gap:10px!important;
+  }
+  #view-entry>.card:nth-child(3) .row{
+    display:grid!important;
+    grid-template-columns:1fr 1fr;
+    gap:8px!important;
+    width:100%;
+  }
+  .preview-list{min-height:120px!important}
+  .preview-empty{height:120px!important}
+  .preview-entry{
+    grid-template-columns:1fr!important;
+    padding:11px!important;
+    border-radius:16px!important;
+    gap:8px!important;
+  }
+  .preview-entry .amt{
+    justify-self:start;
+    font-size:17px!important;
+  }
+
+  .followup-dashboard{
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    gap:8px!important;
+    margin-bottom:12px!important;
+  }
+  .followup-metric{
+    padding:12px!important;
+    border-radius:17px!important;
+  }
+  .followup-metric span{font-size:11px!important}
+  .followup-metric small{font-size:7px!important}
+  .followup-metric b{font-size:20px!important}
+  .followup-list{gap:10px!important}
+  .followup-card{
+    padding:12px!important;
+    border-radius:18px!important;
+    border-left-width:4px!important;
+  }
+  .followup-top{
+    display:grid!important;
+    grid-template-columns:1fr!important;
+    gap:8px!important;
+  }
+  .followup-bed{
+    font-size:17px!important;
+    line-height:1.22!important;
+    word-break:break-word!important;
+  }
+  .followup-money{
+    text-align:left!important;
+    font-size:17px!important;
+  }
+  .followup-tags{gap:5px!important}
+  .followup-tag{
+    padding:4px 7px!important;
+    font-size:9px!important;
+  }
+  .followup-note{
+    font-size:11px!important;
+    line-height:1.45!important;
+    max-height:58px;
+    overflow:auto;
+  }
+  .followup-actions{
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    gap:7px!important;
+    margin-top:10px!important;
+  }
+  .followup-actions select,
+  .followup-actions input[id^="note_"]{
+    grid-column:1/-1!important;
+  }
+  .followup-actions select,
+  .followup-actions input,
+  .followup-actions .mini-btn{
+    min-height:38px!important;
+    border-radius:13px!important;
+    font-size:12px!important;
+    padding:8px 10px!important;
+  }
+
+  #view-export .head{
+    display:grid!important;
+    grid-template-columns:1fr auto;
+  }
+  #view-export .row{
+    display:grid!important;
+    grid-template-columns:1fr 1fr;
+    gap:8px!important;
+  }
+  pre,#exportText{
+    max-height:48vh!important;
+    padding:14px!important;
+    border-radius:17px!important;
+    font-size:12px!important;
+    line-height:1.45!important;
+    white-space:pre-wrap!important;
+    overflow:auto!important;
+    word-break:break-word!important;
+  }
+  .preview-modal{padding:8px!important}
+  .preview-panel{
+    width:100%!important;
+    max-height:94vh!important;
+    border-radius:22px!important;
+  }
+  .preview-panel-head{
+    padding:12px!important;
+  }
+  .preview-panel-title{font-size:18px!important}
+  .preview-panel-body{
+    padding:12px!important;
+    max-height:calc(94vh - 70px)!important;
+  }
+  .preview-anchor-row{
+    grid-template-columns:repeat(3,minmax(0,1fr))!important;
+    gap:7px!important;
+  }
+  .preview-anchor{
+    padding:10px 8px!important;
+    border-radius:15px!important;
+  }
+  .preview-anchor span{font-size:9px!important}
+  .preview-anchor b{font-size:15px!important}
+  .preview-detail-card{
+    padding:11px!important;
+    border-radius:16px!important;
+  }
+  .preview-detail-top b{font-size:15px!important}
+  .preview-detail-grid{
+    grid-template-columns:1fr!important;
+    gap:7px!important;
+  }
+  .toast{
+    left:10px!important;
+    right:10px!important;
+    bottom:12px!important;
+    padding:12px 14px!important;
+    border-radius:16px!important;
+    font-size:13px!important;
+  }
+}
+</style>
+</head>
+<body>
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-card">
+    <div class="login-brand">
+      <div class="badge"><div>HOME<small>LINK.</small></div></div>
+      <div class="login-title">员工登录<small>STAFF SIGN IN</small></div>
+    </div>
+    <div class="field"><label>员工编号 EMPLOYEE ID</label><input id="loginEmployeeId" placeholder="abdul" autocomplete="username"></div>
+    <div class="field"><label>员工密码 PIN</label><input id="loginPin" type="password" inputmode="numeric" placeholder="例如 8888" autocomplete="current-password"></div>
+    <button class="btn primary" id="btnEmployeeLogin">登录<span class="label-en">SIGN IN</span></button>
+    <div class="hint" id="loginHint" style="margin-top:16px">请使用个人员工编号和密码登录。所有流水、跟进、导出都会记录操作人。</div>
+  </div>
+</div>
+<div class="appbar"><span>‹</span><strong>Homelink · 流水管理</strong><span>⋮</span></div>
+<div class="top">
+  <div class="brand">
+    <div class="logo"><div class="badge"><div>HOME<small>LINK.</small></div></div><div class="word"><span class="g">HOME</span><span>LINK</span><i>.</i><em>流水管理</em></div></div>
+    <div class="actions"><div class="operator">员工编号 <input id="operatorId" placeholder="A01"></div><span class="pill">员工</span><span class="pill main">🔐 v3录入</span></div>
+  </div>
+  <div class="tabs">
+    <button class="tab active" data-view="entry">录入<span class="en">ENTRY</span></button>
+    <button class="tab" data-view="arrears">跟进<span class="en">FOLLOW-UP</span></button>
+    <button class="tab" data-view="export">导出<span class="en">EXPORT</span></button>
+  </div>
+</div>
+<main class="wrap">
+  <section id="view-entry">
+    <div class="card">
+      <div class="head"><div><div class="title">本票流水汇总</div><div class="small" id="sessionClock">CURRENT SESSION</div></div><button class="btn" id="btnNewSessionTop">新会话</button></div>
+      <div class="body">
+        <div class="kpi-grid" id="sessionKpis"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="head"><div class="title">事件录入</div><button class="btn" id="btnLoadLock">抓取通通锁</button></div>
+      <div class="body">
+        <div class="step">
+          <div class="step-title"><span>1</span><div>第一步：选择事件类型<small>STEP 1 · SELECT EVENT TYPE</small></div></div>
+          <div class="event-grid" id="eventChips">
+            <button class="event-chip" data-type="R"><span>收租</span><small>RENT</small></button>
+            <button class="event-chip" data-type="AP"><span>还欠款</span><small>ARREARS PAYMENT</small></button>
+            <button class="event-chip" data-type="D"><span>收押金</span><small>DEPOSIT IN</small></button>
+            <button class="event-chip" data-type="DR"><span>退押金</span><small>DEPOSIT OUT</small></button>
+            <button class="event-chip" data-type="CO"><span>退房</span><small>CHECKOUT</small></button>
+            <button class="event-chip" data-type="E"><span>支出</span><small>EXPENSE</small></button>
+            <button class="event-chip" data-type="TF"><span>换床</span><small>BED TRANSFER</small></button>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-title"><span>2</span><div>第二步：确定对象<small>STEP 2 · CONFIRM TARGET</small></div></div>
+        <div class="grid">
+          <div class="field hidden" id="entryTypeWrap"><label>事件类型 type</label><select id="entryType">
+            <option value="R">R 收租</option><option value="D">D 收押金</option><option value="DR">DR 退押金</option><option value="CO">CO 退房</option><option value="AP">AP 还欠款</option><option value="E">E 支出</option><option value="TF">TF 换床</option>
+          </select></div>
+          <div class="field" id="selectedEventWrap"><label>已选事件<span class="label-en">SELECTED EVENT</span></label><div id="selectedEventDisplay" class="readonly-pill">收租 RENT</div></div>
+          <div class="field"><label>床位 BED</label><input id="bed" placeholder="431" autocomplete="off"></div>
+        </div>
+        <div class="small" id="objectHint">收租/收押金/退押金/还欠款：填写床位号；换床：填写原床位后再填新床位；支出：选择支出类别。</div>
+        </div>
+        <div class="step">
+          <div class="step-title"><span>3</span>第三步：系统展示上下文，员工核对</div>
+        <div class="ctx" id="bedContext"></div>
+        <div class="context-note" id="contextNotice"></div>
+        <div class="grid">
+          <div class="field hidden" id="tenantNameWrap"><label>通通锁备注快照 TTLOCK REMARK SNAPSHOT</label><input id="tenantName" placeholder="自动抓取，不让员工自由猜填"></div>
+          <div class="field hidden" id="tenantCardWrap"><label>通通锁卡号 CID</label><input id="tenantCardId" placeholder="自动抓取或手动填写"></div>
+        </div>
+        </div>
+        <div class="step" id="paymentStep">
+          <div class="step-title"><span>4</span>第四步：付款方式</div>
+        <div class="grid" id="paymentFields">
+          <div class="field"><label>付款方式 PY</label><select id="payType" class="hidden"><option value="C">现金 C</option><option value="B">银行 B</option></select><div class="pay-toggle"><button type="button" class="pay-option active" data-pay="C">现金<span>CASH</span></button><button type="button" class="pay-option" data-pay="B">银行<span>BANK</span></button></div></div>
+          <div class="field hidden" id="bankRefWrap"><label>银行参考 bank_ref</label><input id="bankRef" placeholder="系统保留字段，员工无需填写"></div>
+        </div>
+        </div>
+        <div class="step">
+          <div class="step-title"><span>5</span>第五步：填写金额，系统对比应收和实收</div>
+        <div class="grid">
+          <div class="field"><label>实收/支出金额 AMT</label><input id="amount" inputmode="decimal" placeholder="0.00"></div>
+          <div class="field"><label>系统月租 LP（老板端配置）</label><input id="listPrice" inputmode="decimal" placeholder="系统自动读取" readonly></div>
+        </div>
+        </div>
+
+        <div class="step" id="periodStep">
+          <div class="step-title"><span>6</span>第六步：确认账期</div>
+        <div id="periodFields">
+          <div class="grid3">
+            <div class="field"><label>账期类型 cycle</label><select id="cycle"><option value="1M">整月 1M</option><option value="15D">15天 15D</option><option value="CUST">自定义天数 CUSTOM</option></select></div>
+            <div class="field"><label>账期开始 period_start</label><input id="periodStart" type="date"></div>
+            <div class="field"><label>账期截止 period_end</label><input id="periodEnd" type="date"></div>
+          </div>
+          <div class="grid3">
+            <div class="field"><label>账期天数 PD</label><input id="periodDays" inputmode="numeric" readonly></div>
+            <div class="field"><label>账期应收 period_due（系统计算）</label><input id="periodDue" inputmode="decimal" placeholder="系统计算" readonly></div>
+            <div class="field"><label>本条应收 DUE（系统计算）</label><input id="due" inputmode="decimal" placeholder="系统计算" readonly></div>
+          </div>
+        </div>
+        </div>
+
+        <div class="field hidden" id="apFields">
+          <label>选择欠款任务 linked_task_id</label>
+          <select id="linkedTaskId"><option value="">先刷新欠款任务</option></select>
+          <div class="context-note" id="apTaskInfo" style="margin-top:12px"></div>
+        </div>
+
+        <div class="grid" id="checkoutFields">
+          <div class="field"><label>实际离开日期 checkout_date</label><input id="checkoutDate" type="date"></div>
+          <div class="field"><label>超期扣款 OVERDAY</label><input id="overdayDeduction" readonly></div>
+          <div class="field"><label>未提前告知扣款 NO_NOTICE</label><input id="noNoticeDeduction" inputmode="decimal" placeholder="0"></div>
+          <div class="field"><label>其他扣款 OTHER</label><input id="otherDeduction" inputmode="decimal" placeholder="0"></div>
+          <div class="field"><label>押金扣款合计 deposit_deduction</label><input id="depositDeduction" inputmode="decimal" placeholder="系统合计" readonly></div>
+          <div class="field"><label>应退押金 deposit_amt</label><input id="depositReturnAmount" readonly></div>
+          <div class="field"><label>扣款说明 ded_note</label><input id="dedNote" placeholder="其他扣款必须说明"></div>
+        </div>
+        <div class="grid" id="transferFields">
+          <div class="field"><label>换至床位 bed_to</label><input id="bedTo" placeholder="852"></div>
+          <div class="field"><label>换床费处理</label><select id="feePaid"><option value="Y">收取 50 AED</option><option value="N">免收，必须填原因</option></select></div>
+        </div>
+        <div class="grid" id="expenseFields">
+          <div class="field"><label>支出类别</label><select id="expenseCategory"><option value="ROOM">指定房间</option><option value="COMMON">公共区域</option><option value="SUPPLIES">采购耗材</option><option value="OTHER">其他</option></select></div>
+          <div class="field"><label>支出说明</label><input id="expenseDesc" placeholder="维修、采购、耗材等"></div>
+        </div>
+
+        <div class="grid">
+          <div class="field"><label>系统计入 paid</label><input id="paid" inputmode="decimal" placeholder="系统自动计算" readonly></div>
+          <div class="field"><label>系统结清 entry_clr</label><select id="entryClr" disabled><option value="Y">Y 已够本期</option><option value="N">N 不足</option><option value="P">P 部分</option></select></div>
+        </div>
+        <div class="step diffbox hidden" id="exceptionStep">
+          <div class="step-title"><span>7</span>第七步：处理异常或差额</div>
+        <div class="field hidden" id="excessWrap"><label>超收处理 excess_to</label><select id="excessTo"><option value="">请选择超收处理</option><option value="RETURNED">找零/零头已退还</option><option value="MANAGER">转老板处理，不作为本期收入</option></select></div>
+        <div class="arrear-plan hidden" id="arrearPlan">
+          <div class="plan-head">
+            <div>尾款任务<small>TAIL BALANCE TASK</small></div>
+            <div class="plan-amount"><span id="arrearAmountText">0.00</span> AED</div>
+          </div>
+          <div class="amount-hint" id="amountFitHint"></div>
+          <div class="grid3">
+            <div class="field"><label>尾款金额 arrear_amount</label><input id="arrearAmount" inputmode="decimal" readonly></div>
+            <div class="field"><label>承诺支付日期 promise_date</label><input id="arrearPromiseDate" type="date"></div>
+            <div class="field"><label>处理方式 arrear_handling</label><select id="arrearHandling"><option value="ARREAR">生成尾款任务 TAIL BALANCE</option><option value="FIX">返回修改 ENTRY ERROR</option><option value="DISCOUNT" disabled>折扣/减免需老板授权 DISCOUNT</option></select></div>
+          </div>
+          <div class="field"><label>尾款原因 arrear_reason_detail</label><textarea id="arrearReasonDetail" placeholder="例如：客户今天只付 100，承诺 5/25 补齐尾款。"></textarea></div>
+        </div>
+        <div class="field hidden"><label>原因代码 RC</label><select id="reasonCode"><option value="">无</option><option value="SHORT_PAID">SHORT_PAID 短付</option><option value="DISCOUNT">DISCOUNT 折扣</option><option value="FIRST_PRO">FIRST_PRO 首月比例</option><option value="LAST_PRO">LAST_PRO 末月比例</option><option value="OTHER">OTHER 其他</option></select></div>
+        <div class="field hidden" id="customReasonWrap"><label>自定义/折扣/异常原因 custom_reason</label><input id="customReason" placeholder="CUST、折扣、短付、免收时必填"></div>
+        <div class="field"><label>备注 RMK</label><textarea id="remark" placeholder="必要时说明承诺日期、折扣原因、免收原因、退房扣款原因等"></textarea></div>
+        </div>
+        <div class="step">
+          <div class="step-title"><span>8</span>第八步：摘要确认 + 提交</div>
+          <div class="summary" id="entrySummary"></div>
+          <div class="small" style="margin-top:10px">提交前请核对：对象、金额、账期、付款方式和异常原因。提交后会同步到云端并保留操作人和时间。</div>
+        </div>
+        <div id="validationBox" class="hint"></div>
+        <div class="row"><button class="btn primary" id="btnSaveEntry">加入本票</button><button class="btn" id="btnReset">清空</button></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="head">
+        <div><div class="title">本次会话</div><div class="small" id="sessionMeta">0 条记录</div></div>
+        <div class="row" style="flex:0 0 auto"><button class="btn" id="btnPreviewSession">预览<span class="label-en">PREVIEW</span></button><button class="btn primary" id="btnExportSession">导出交接<span class="label-en">EXPORT HANDOVER</span></button></div>
+      </div>
+      <div class="body"><div class="preview-list" id="sessionPreview"></div></div>
+    </div>
+  </section>
+
+  <section id="view-arrears" class="hidden"><div class="card"><div class="head"><div><div class="title">收租跟进</div><div class="small">FOLLOW-UP · 通通锁过期 + 历史欠款</div></div><button class="btn primary" id="btnRefreshTasks">刷新通通锁</button></div><div class="body"><div id="taskList" class="small">点击刷新通通锁后生成过期租金提醒。</div></div></div></section>
+  <section id="view-export" class="hidden"><div class="card"><div class="head"><div class="title">TXT 导出</div><button class="btn" id="btnCopyExport">复制</button></div><div class="body"><div class="row" style="margin-bottom:12px"><button class="btn primary" id="btnBuildExport">生成今日文本</button><button class="btn danger" id="btnClearLocal">清空本机草稿</button></div><div class="hint" id="exportStatus">点击导出交接后，系统会上传整票流水并生成交接文本。</div><pre id="exportText">暂无导出内容</pre></div></div></section>
+</main>
+<div class="toast" id="toast"></div>
+<div class="preview-modal" id="previewModal">
+  <div class="preview-panel">
+    <div class="preview-panel-head">
+      <div class="preview-panel-title">本票流水预览<small>CURRENT SESSION PREVIEW</small></div>
+      <button class="btn" id="btnClosePreview">关闭</button>
+    </div>
+    <div class="preview-panel-body" id="previewModalBody"></div>
+  </div>
+</div>
+<script>
+const API_ORIGIN='https://homelink-finance.habibramadan888.workers.dev';
+const $=id=>document.getElementById(id);
+const pad=n=>String(n).padStart(2,'0');
+const num=v=>Number(String(v||'').replace(/,/g,''));
+const fmtMoney=n=>(Number(n)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmtDisplayMoney=n=>fmtMoney(n);
+const today=()=>{const d=new Date();return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`};
+const nowIso=()=>{const d=new Date();const off=4*60;const u=new Date(d.getTime()+off*60000);return `${u.getUTCFullYear()}-${pad(u.getUTCMonth()+1)}-${pad(u.getUTCDate())}T${pad(u.getUTCHours())}:${pad(u.getUTCMinutes())}:${pad(u.getUTCSeconds())}+04:00`};
+const uid=p=>p+new Date().toISOString().slice(0,10).replaceAll('-','')+'-'+Date.now().toString(36).slice(-5);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function employeeStorageKey(base,userid=state.user?.userid){
+  return userid?`${base}:${userid}`:`${base}:locked`;
+}
+function readDrafts(userid){
+  try{
+    const key=employeeStorageKey('empv3:drafts',userid);
+    const scoped=JSON.parse(localStorage.getItem(key)||'[]')||[];
+    if(scoped.length||!userid)return scoped;
+    const legacy=JSON.parse(localStorage.getItem('empv3:drafts')||'[]')||[];
+    if(legacy.length&&!localStorage.getItem('empv3:legacyDraftsMigrated')){
+      localStorage.setItem(key,JSON.stringify(legacy));
+      localStorage.setItem('empv3:legacyDraftsMigrated',userid);
+      return legacy;
+    }
+    return [];
+  }catch{return []}
+}
+function readSessionId(userid){
+  try{return localStorage.getItem(employeeStorageKey('empv3:sessionId',userid))||''}
+  catch{return ''}
+}
+const state={lockCards:[],current:null,depositBalance:null,rentConfig:{},rentConfigLoaded:false,drafts:[],tasks:[],followupItems:[],sessionId:'',user:null};
+function apiUrl(path){return location.protocol!=='file:'&&location.host.includes('workers.dev')?path:API_ORIGIN+path}
+async function apiFetch(path,opts={}){return fetch(apiUrl(path),{credentials:'include',...opts,headers:{'Content-Type':'application/json',...(opts.headers||{})}})}
+function toast(msg,duration=2600){const el=$('toast');el.textContent=msg;el.style.display='block';clearTimeout(window.__toast);window.__toast=setTimeout(()=>el.style.display='none',duration)}
+function showStatus(msg,type='ok'){
+  const box=$('validationBox');
+  if(box)box.innerHTML=`<div class="${type==='bad'?'bad':type==='warn'?'warn':''}">${esc(msg)}</div>`;
+  const exp=$('exportStatus');
+  if(exp)exp.innerHTML=`<div class="${type==='bad'?'bad':type==='warn'?'warn':''}">${esc(msg)}</div>`;
+}
+window.addEventListener('error',e=>{console.error(e.error||e.message);toast('页面脚本错误：'+(e.message||'unknown'),6000);showStatus('页面脚本错误：'+(e.message||'unknown'),'bad')});
+window.addEventListener('unhandledrejection',e=>{const msg=e.reason?.message||String(e.reason||'unknown');console.error(e.reason);toast('操作失败：'+msg,6000);showStatus('操作失败：'+msg,'bad')});
+function operatorId(){return state.user?.userid||$('operatorId').value.trim()||localStorage.getItem('empv3:operator')||'EMP'}
+function operatorName(){return state.user?.employee_name||state.user?.userid||operatorId()}
+function setOperator(v){try{localStorage.setItem('empv3:operator',v||'EMP')}catch{}}
+function saveDrafts(){
+  if(!state.user?.userid)return false;
+  try{
+    localStorage.setItem(employeeStorageKey('empv3:drafts'),JSON.stringify(state.drafts));
+    if(state.sessionId)localStorage.setItem(employeeStorageKey('empv3:sessionId'),state.sessionId);
+    return true;
+  }
+  catch{return false}
+}
+function currentSessionId(){
+  if(!state.user?.userid)return '';
+  if(!state.sessionId){
+    state.sessionId=uid('S');
+    try{localStorage.setItem(employeeStorageKey('empv3:sessionId'),state.sessionId)}catch{}
+  }
+  return state.sessionId;
+}
+function currentSessionPayload(){
+  const id=currentSessionId();
+  const s=sessionStats();
+  return {
+    id,
+    date:today(),
+    anchorId:'EMPV3-'+today().replaceAll('-','')+'-'+operatorId()+'-'+id.slice(-5),
+    operator_id:operatorId(),
+    operator_name:operatorName(),
+    cash_handover:s.cashBalance,
+    bank_transfer_total:s.bankIn,
+    bank_transfer_count:s.bankCount,
+    gross_received:s.grossReceived,
+    handover_status:hasLocalOnly()?'EXPORTING':'COMPLETED',
+    exported_at:nowIso(),
+    export_text:$('exportText')?.textContent||'',
+    source:'EMP',
+    entries:state.drafts
+  };
+}
+function applyEmployeeUser(user){
+  state.user=user||null;
+  if(user){
+    state.drafts=readDrafts(user.userid);
+    state.sessionId=readSessionId(user.userid);
+    $('operatorId').value=user.userid||'';
+    $('operatorId').readOnly=true;
+    document.querySelector('.pill.main').innerHTML=`${esc(user.employee_name||user.userid)}<span class="label-en">SIGNED IN</span>`;
+    $('loginOverlay').classList.add('hidden');
+    try{localStorage.setItem('empv3:lastEmployeeId',user.userid||'')}catch{}
+    loadRentConfig();
+    loadTasks(false);
+  }else{
+    state.drafts=[];
+    state.sessionId='';
+    state.rentConfig={};
+    state.rentConfigLoaded=false;
+    $('operatorId').value='';
+    $('operatorId').readOnly=false;
+    document.querySelector('.pill.main').innerHTML='🔐 v3录入';
+    try{localStorage.removeItem('empv3:user')}catch{}
+    try{localStorage.removeItem('empv3:operator')}catch{}
+    $('loginOverlay').classList.remove('hidden');
+  }
+  refreshSessionViews();
+}
+async function checkEmployeeSession(){
+  try{
+    const cached=JSON.parse(localStorage.getItem('empv3:user')||'null');
+    const last=localStorage.getItem('empv3:lastEmployeeId')||cached?.userid||localStorage.getItem('empv3:operator')||'';
+    if(last)$('loginEmployeeId').value=last;
+    localStorage.removeItem('empv3:user');
+  }catch{}
+  applyEmployeeUser(null);
+  // 员工端按追责设计：刷新页面必须重新输入 PIN，不复用旧会话自动进入。
+  await apiFetch('/auth/logout',{method:'POST'}).catch(()=>{});
+}
+async function employeeLogin(){
+  const btn=$('btnEmployeeLogin');
+  const employee_id=$('loginEmployeeId').value.trim();
+  const pin=$('loginPin').value.trim();
+  if(!employee_id||!pin){$('loginHint').innerHTML='<span class="bad">请填写员工编号和密码。</span>';return}
+  const old=btn.innerHTML;
+  btn.disabled=true;btn.classList.add('disabled');btn.innerHTML='正在登录<span class="label-en">SIGNING IN</span>';
+  try{
+    const r=await apiFetch('/auth/employee-login',{method:'POST',body:JSON.stringify({employee_id,pin})});
+    const data=await r.json().catch(()=>null);
+    if(!r.ok||!data?.success)throw new Error(data?.error||'login_failed');
+    applyEmployeeUser({userid:data.userid,employee_name:data.employee_name||data.userid,role:data.role});
+    $('loginPin').value='';
+    toast(`已登录：${data.employee_name||data.userid}`,6000);
+  }catch(err){
+    $('loginHint').innerHTML=`<span class="bad">登录失败：${esc(err?.message||err)}</span>`;
+    toast('登录失败，请检查员工编号和密码',6000);
+  }finally{
+    btn.disabled=false;btn.classList.remove('disabled');btn.innerHTML=old;
+  }
+}
+async function loadRentConfig(){
+  if(!state.user){
+    state.rentConfig={};
+    state.rentConfigLoaded=false;
+    syncForm();
+    return;
+  }
+  try{
+    const r=await apiFetch('/api/rent_config');
+    const data=r.ok?await r.json():{};
+    state.rentConfig=data.config||{};
+    state.rentConfigLoaded=true;
+  }catch{state.rentConfigLoaded=false}
+  syncForm();
+}
+function rentForBed(bed=$('bed').value){
+  const key=String(bed||'').trim().replace(/^#/,'');
+  const v=Number(state.rentConfig[key]);
+  return Number.isFinite(v)&&v>0?v:0;
+}
+function addMonths(dateStr,n){const d=new Date(dateStr+'T00:00:00');const day=d.getDate();d.setMonth(d.getMonth()+Number(n||0));if(d.getDate()!==day)d.setDate(0);return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`}
+function addDays(dateStr,n){const d=new Date(dateStr+'T00:00:00');d.setDate(d.getDate()+Number(n||0));return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`}
+function daysBetween(a,b){if(!a||!b)return 0;return Math.max(0,Math.round((new Date(b+'T00:00:00')-new Date(a+'T00:00:00'))/86400000))}
+function nextAnchor(dateStr){const d=new Date((dateStr||today())+'T00:00:00');let y=d.getFullYear(),m=d.getMonth();if(d.getDate()>=2)m+=1;return `${new Date(y,m,2).getFullYear()}-${pad(new Date(y,m,2).getMonth()+1)}-02`}
+function findDateText(s){s=String(s||'');const full=s.match(/(20\d{2})[-/.年](\d{1,2})[-/.月](\d{1,2})/);if(full)return `${full[1]}-${pad(full[2])}-${pad(full[3])}`;const md=s.match(/(?:^|\D)(\d{1,2})[-/.月](\d{1,2})(?:日|\D|$)/);if(md)return `${new Date().getFullYear()}-${pad(md[1])}-${pad(md[2])}`;for(const c of s.matchAll(/(?:^|\D)(0[1-9]|1[0-2])([0-3]\d)(?=\D|$)/g)){const m=Number(c[1]),d=Number(c[2]);const x=new Date(new Date().getFullYear(),m-1,d);if(x.getMonth()===m-1&&x.getDate()===d)return `${x.getFullYear()}-${pad(m)}-${pad(d)}`;}return ''}
+function dateFromAny(v){if(!v)return '';if(typeof v==='number'||/^\d{10,13}$/.test(String(v))){const n=Number(v);const d=new Date(n<1e12?n*1000:n);if(!isNaN(d))return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;}return findDateText(v)}
+function depositFromRemark(s){s=String(s||'');const m=s.match(/\bD\s*(\d{1,5}(?:\.\d{1,2})?)\b/i)||s.match(/押金\D{0,8}(\d{1,5}(?:\.\d{1,2})?)/);return m?m[1]:''}
+function monthDayFromRemark(s){
+  s=String(s||'');
+  const full=s.match(/20\d{2}[-/.年](\d{1,2})[-/.月](\d{1,2})/);
+  if(full)return `${pad(full[1])}-${pad(full[2])}`;
+  const md=s.match(/(?:^|\D)(\d{1,2})[-/.月](\d{1,2})(?:日|\D|$)/);
+  if(md)return `${pad(md[1])}-${pad(md[2])}`;
+  for(const c of s.matchAll(/(?:^|\D)(0[1-9]|1[0-2])([0-3]\d)(?=\D|$)/g)){
+    const m=Number(c[1]),d=Number(c[2]);
+    const x=new Date(2024,m-1,d);
+    if(x.getMonth()===m-1&&x.getDate()===d)return `${pad(m)}-${pad(d)}`;
+  }
+  return '';
+}
+function parseLockRemark(s){
+  s=String(s||'').trim();
+  const normalized=s.replace(/[，,;；|]+/g,' ').replace(/\s+/g,' ').trim();
+  const tokens=normalized?normalized.split(' '):[];
+  let bed=(tokens[0]?.match(/^#?(\d{2,5})$/)||[])[1]||'';
+  let deposit=depositFromRemark(normalized);
+  if(!deposit&&bed&&tokens[1]&&/^(?:D)?\d{1,5}(?:\.\d{1,2})?$/i.test(tokens[1]))deposit=tokens[1].replace(/^D/i,'');
+  let start_md=monthDayFromRemark(tokens.slice(2).join(' ')||normalized);
+  if((!bed||deposit===''||!start_md)&&tokens.length>=3){
+    for(let i=0;i<=tokens.length-3;i++){
+      const b=(tokens[i].match(/^#?(\d{2,5})$/)||[])[1]||'';
+      const d=(tokens[i+1].match(/^(?:D)?(\d{1,5}(?:\.\d{1,2})?)$/i)||[])[1]||'';
+      const md=monthDayFromRemark(tokens.slice(i+2).join(' '));
+      if(b&&d!==''&&md){bed=bed||b;deposit=deposit||d;start_md=start_md||md;break}
+    }
+  }
+  const missing=[];
+  if(!bed)missing.push('床位');
+  if(deposit==='')missing.push('押金');
+  if(!start_md)missing.push('入住月日');
+  return {bed,deposit,start_md,ok:missing.length===0,missing,raw:normalized};
+}
+function uniqueTextParts(parts){
+  const seen=new Set();
+  return parts.map(v=>String(v??'').trim()).filter(Boolean).filter(v=>{
+    const key=v.toLowerCase();
+    if(seen.has(key))return false;
+    seen.add(key);
+    return true;
+  });
+}
+function lockText(raw,keys){
+  return uniqueTextParts(keys.map(k=>raw?.[k]));
+}
+function isVacantRemark(text){
+  return /(^|[\s,，;；|/])e($|[\s,，;；|/])/i.test(String(text||'').trim());
+}
+function isStaffRemark(text){
+  return /(阿布都|阿布杜|阿卜杜|abdul|abdu|bilal|bilali|bilaili|比拉尔|比拉力|比لال)/i.test(String(text||''));
+}
+function cardFollowupClass(card){
+  if(!card)return {kind:'unmatched',label:'未匹配当前通通锁'};
+  if(card.vacant)return {kind:'vacant',label:'空床'};
+  if(card.staff_bed)return {kind:'staff',label:'员工床'};
+  return {kind:'customer',label:'客户床'};
+}
+function followupTextClass(text){
+  const raw=String(text||'').trim();
+  if(isVacantRemark(raw))return {kind:'vacant',label:'空床'};
+  if(isStaffRemark(raw))return {kind:'staff',label:'员工床'};
+  return {kind:'unknown',label:'未分类'};
+}
+function arrearTaskText(t){
+  return [t?.bed,t?.tenant_name,t?.arrear_reason,t?.owner_note,t?.staff_note].map(v=>String(v||'').trim()).filter(Boolean).join(' ');
+}
+function cardRemarkText(card){
+  return String(card?.remark||card?.cardText||card?.tenant||card?.searchText||'').trim();
+}
+function normalizeCard(raw){
+  const humanFields=['remark','remarks','cardRemark','memo','note','description','desc','comment','cardName','identityCardName','cardAlias','alias','name','tenant_name','tenant','userName','nickName','keyName','keyboardPwdName'];
+  const nameFields=['cardName','identityCardName','cardAlias','alias','name','tenant_name','tenant','userName','nickName','keyName','keyboardPwdName'];
+  const remarkFields=['remark','remarks','cardRemark','memo','note','description','desc','comment'];
+  const humanText=lockText(raw,humanFields).join(' ');
+  const cardText=lockText(raw,nameFields).join(' ');
+  const room=String(raw.room||raw.bed||raw.roomName||'').trim();
+  const remark=lockText(raw,remarkFields).join(' ')||humanText||cardText;
+  const anchors=parseLockRemark(remark||cardText||humanText);
+  const text=[room,cardText,remark,humanText].filter(Boolean).join(' ');
+  const bed=anchors.bed||((remark.match(/\b(\d{2,5})\b/)||[])[1])||((cardText.match(/\b(\d{2,5})\b/)||[])[1])||((room.match(/\b(\d{2,5})\b/)||[])[1])||room;
+  const deposit=anchors.deposit||depositFromRemark(remark)||depositFromRemark(cardText)||'';
+  const cid=raw.cardId||raw.cardNumber||raw.cardNo||raw.identityCardId||raw.identityCardNo||'';
+  const start=dateFromAny(raw.startDate||raw.start_date||raw.beginDate||raw.begin_date||raw.cardStartDate||raw.validFrom);
+  const end=dateFromAny(raw.endDate||raw.end_date||raw.expireDate||raw.expire_date||raw.cardEndDate||raw.validTo);
+  const rawTenant=raw.tenant_name||raw.tenant||raw.cardName||raw.name||'';
+  const tenant=String(rawTenant).trim()===String(remark||cardText).trim()&&anchors.bed?'':rawTenant;
+  const fullCardText=[remark,cardText,humanText,room].filter(Boolean).join(' ');
+  const vacant=isVacantRemark(fullCardText);
+  const staff_bed=isStaffRemark(fullCardText);
+  return {bed,remark_bed:anchors.bed,room,tenant,tenant_card_id:String(cid),deposit,start,start_md:anchors.start_md,end,remark,cardText,vacant,staff_bed,followup_class:staff_bed?'staff':(vacant?'vacant':'customer'),searchText:text,remark_parse_ok:anchors.ok,remark_parse_missing:anchors.missing||[],raw};
+}
+function lookupBed(){
+  const bed=$('bed').value.trim().replace(/^#/,'');if(!bed){state.current=null;renderContext();return}
+  const exact=state.lockCards.filter(c=>String(c.bed)===bed);
+  const loose=state.lockCards.filter(c=>new RegExp(`(^|\\D)${bed}(\\D|$)`).test(String(c.searchText||'')));
+  if(!exact.length){
+    state.current=null;$('tenantName').value='';$('tenantCardId').value='';state.depositBalance=null;renderContext();
+    toast(loose.length?'找到相关文本，但没有可靠的备注床位匹配。请检查通通锁备注格式：床位 D押金 入住月日。':'未找到该床位的通通锁卡片，请先刷新或检查备注。',6000);
+    syncForm();
+    return;
+  }
+  state.current=exact.find(c=>!c.vacant)||exact[0]||null;
+  const c=state.current||{};
+  $('tenantName').value=c.remark||c.cardText||c.tenant||'';
+  $('tenantCardId').value=c.tenant_card_id||'';
+  const rent=rentForBed(bed);
+  $('listPrice').value=rent?fmtMoney(rent):'';
+  if(c.deposit&&$('entryType').value==='D'&&!$('amount').value)$('amount').value=fmtMoney(c.deposit);
+  state.depositBalance=null;
+  renderContext();
+  const cid=$('tenantCardId').value.trim()||c.tenant_card_id||'';
+  if(cid)loadDepositBalance(cid);
+  syncForm();
+}
+function depositHeld(){
+  return state.depositBalance!=null?num(state.depositBalance):num(state.current?.deposit);
+}
+async function loadDepositBalance(cid){
+  try{
+    const r=await apiFetch('/api/employee/deposit?cid='+encodeURIComponent(cid));
+    const data=r.ok?await r.json():null;
+    state.depositBalance=data&&data.success?num(data.balance):null;
+  }catch{state.depositBalance=null}
+  renderContext();syncForm();
+}
+function renderContextLegacyGrid(){
+  const c=state.current;
+  const ledger=state.depositBalance!=null?fmtMoney(state.depositBalance):'未建立';
+  $('bedContext').innerHTML=[
+    ['匹配床位','MATCHED BED',c?.bed||$('bed').value||'未抓取',''],['CID','TTLOCK CID',$('tenantCardId')?.value||c?.tenant_card_id||'未抓取',''],['租客','TENANT',$('tenantName')?.value||c?.tenant||'未抓取',''],['系统月租','LIST PRICE',rentForBed()?fmtMoney(rentForBed()):'未配置',''],['卡片押金','CARD DEPOSIT',c?.deposit?fmtMoney(c.deposit):'未抓取',''],['台账押金','LEDGER DEPOSIT',ledger,''],['入住','CHECK-IN',c?.start||'未抓取',''],['当前截止','CURRENT END',c?.end||'未抓取',''],['通通锁备注','TTLOCK REMARK',c?.remark||c?.cardText||'未抓取','wide']
+  ].map(([zh,en,v,cls])=>`<div class="${cls||''}"><span>${zh}<small>${en}</small></span><b>${esc(v)}</b></div>`).join('');
+}
+async function loadLock(){
+  try{const r=await apiFetch('/api/employee/lock/cards');if(!r.ok)throw new Error('HTTP '+r.status);const data=await r.json();const list=data.roomsData?Object.entries(data.roomsData).flatMap(([room,cards])=>(cards||[]).map(card=>({...card,room}))):[];state.lockCards=list.map(normalizeCard).filter(x=>x.bed);toast('已抓取通通锁 '+state.lockCards.length+' 条');lookupBed();return true}catch(e){toast('抓取失败，可继续手动录入');return false}
+}
+loadTasks(false);
+function visible(ids,show){ids.forEach(id=>$(id).classList.toggle('hidden',!show))}
+function taskRemain(t){return Math.max(0,num(t.arrear_amount)-num(t.actual_received))}
+function populateTaskSelect(){
+  const sel=$('linkedTaskId');
+  const open=state.tasks.filter(t=>!['PAID','CLEARED','CLOSED','VOID','已结清','结清','作废','WRITTEN_OFF','WAIVED'].includes(String(t.close_status||''))&&taskRemain(t)>0);
+  sel.innerHTML='<option value="">请选择要偿还的欠款</option>'+open.map(t=>`<option value="${esc(t.task_id)}">#${esc(t.bed||'')} ${esc(t.tenant_name||'-')} · ${fmtMoney(taskRemain(t))} AED · ${esc(t.original_period_start||'-')}→${esc(t.original_period_end||'-')}</option>`).join('');
+}
+function selectedTask(){
+  return state.tasks.find(t=>t.task_id===$('linkedTaskId').value)||null;
+}
+function rentShortfall(){
+  if($('entryType').value!=='R')return 0;
+  const due=num($('periodDue').value)||num($('due').value);
+  const amt=num($('amount').value);
+  if(!due||!amt||amt>=due)return 0;
+  return Math.max(0,due-Math.min(amt,due));
+}
+function amountFitHintText(){
+  const amt=num($('amount').value);
+  const due=num($('periodDue').value)||num($('due').value);
+  if(!amt||!due)return '录入实收金额后，系统会判断这笔钱是完整账期、15天、日租，还是只能作为部分收款生成尾款。';
+  if(Math.abs(amt-400)<0.01&&$('cycle').value!=='15D')return '实收金额刚好等于 15 天租金 400 AED。如果业务实际只收 15 天，应回到第六步选择 15天；如果本次仍是整月账期，则必须生成尾款任务。';
+  const days=amt/40;
+  if(Number.isInteger(days)&&days>0&&amt!==due&&$('cycle').value!=='CUST')return `实收金额等于 ${days} 天日租。如果业务实际是日租，应回到第六步选择自定义 ${days} 天；如果本次仍按当前账期核算，则必须生成尾款任务。`;
+  if(amt<due)return '实收金额小于账期应收，且不自动改变账期性质。系统会把差额作为尾款任务，后续在“还欠款”中回收。';
+  if(amt>due)return '实收金额大于应收，必须明确超收去向，不能自动计入本期收入。';
+  return '实收金额与账期应收一致，可以按本期结清提交。';
+}
+function syncArrearPlan(){
+  const tail=rentShortfall();
+  visible(['arrearPlan'],tail>0);
+  if(tail>0){
+    $('reasonCode').value='SHORT_PAID';
+    if(!$('arrearHandling').value)$('arrearHandling').value='ARREAR';
+    $('arrearAmount').value=fmtMoney(tail);
+    $('arrearAmountText').textContent=fmtMoney(tail);
+    $('amountFitHint').textContent=amountFitHintText();
+    $('arrearPromiseDate').min=today();
+  }else{
+    $('arrearAmount').value='';
+    $('arrearAmountText').textContent='0.00';
+    $('amountFitHint').textContent='';
+    if($('entryType').value==='R'&&$('reasonCode').value==='SHORT_PAID')$('reasonCode').value='';
+  }
+}
+function openTasksForBed(){
+  const bed=$('bed').value.trim().replace(/^#/,'');
+  const cid=$('tenantCardId').value.trim();
+  return state.tasks.filter(t=>!['PAID','CLEARED','CLOSED','VOID','已结清','结清','作废','WRITTEN_OFF','WAIVED'].includes(String(t.close_status||''))&&taskRemain(t)>0&&((bed&&String(t.bed||'')===bed)||(cid&&String(t.tenant_card_id||'')===cid)));
+}
+function openTaskForCurrentRentPeriod(){
+  const ps=$('periodStart').value;
+  const pe=$('periodEnd').value;
+  if(!ps||!pe)return null;
+  return openTasksForBed().find(t=>{
+    const start=String(t.original_period_start||t.period_start||'').slice(0,10);
+    const end=String(t.original_period_end||t.period_end||'').slice(0,10);
+    return start===ps&&end===pe;
+  })||null;
+}
+function renderContextNotice(){
+  $('contextNotice').innerHTML='';
+  $('contextNotice').style.display='none';
+}
+function renderTaskInfo(){
+  const t=selectedTask();
+  $('apTaskInfo').innerHTML=t?`关联欠款：<strong>#${esc(t.bed||'')}</strong> ${esc(t.tenant_name||'-')}，剩余 <strong>${fmtMoney(taskRemain(t))} AED</strong>，账期 ${esc(t.original_period_start||'-')} → ${esc(t.original_period_end||'-')}，状态 ${esc(t.followup_status||'待跟进')}`:'请选择一条欠款任务；系统会把本次收款自动回写到该任务。';
+}
+function applyLinkedTask(){
+  const task=state.tasks.find(t=>t.task_id===$('linkedTaskId').value);
+  if(!task)return;
+  $('bed').value=task.bed||'';
+  $('tenantName').value=task.tenant_name||'';
+  $('tenantCardId').value=task.tenant_card_id||'';
+  $('periodStart').value=task.original_period_start||'';
+  $('periodEnd').value=task.original_period_end||'';
+  const remain=taskRemain(task);
+  $('amount').value=fmtMoney(remain);
+  $('due').value=fmtMoney(remain);
+  $('paid').value=fmtMoney(remain);
+  $('periodDue').value=fmtMoney(num(task.arrear_amount));
+  $('reasonCode').value='SHORT_PAID';
+  renderTaskInfo();
+  syncForm();
+}
+function eventLabel(type){
+  return {R:'收租',AP:'还欠款',D:'收押金',DR:'退押金',CO:'退房',E:'支出',TF:'换床',TFF:'换床费'}[type]||type;
+}
+function entryDirection(e){
+  if(['E','DR'].includes(e.type))return 'out';
+  if(e.type==='TF')return num(e.amount)>0?'in':'none';
+  if(['R','D','AP','TFF'].includes(e.type))return 'in';
+  return 'none';
+}
+function sessionStats(){
+  const rows=state.drafts;
+  const cashIn=rows.filter(e=>e.pay_type==='C'&&entryDirection(e)==='in').reduce((s,e)=>s+num(e.amount),0);
+  const bankIn=rows.filter(e=>e.pay_type==='B'&&entryDirection(e)==='in').reduce((s,e)=>s+num(e.amount),0);
+  const bankCount=rows.filter(e=>e.pay_type==='B'&&entryDirection(e)==='in'&&num(e.amount)>0).length;
+  const rentIn=rows.filter(e=>e.type==='R').reduce((s,e)=>s+num(e.paid||e.amount),0);
+  const depositIn=rows.filter(e=>e.type==='D').reduce((s,e)=>s+num(e.amount),0);
+  const arrearsIn=rows.filter(e=>e.type==='AP').reduce((s,e)=>s+num(e.amount),0);
+  const transferFee=rows.filter(e=>e.type==='TF'||e.type==='TFF').reduce((s,e)=>s+num(e.amount),0);
+  const depRefund=rows.filter(e=>e.type==='DR').reduce((s,e)=>s+num(e.amount),0);
+  const expenses=rows.filter(e=>e.type==='E').reduce((s,e)=>s+num(e.amount),0);
+  const cashOut=rows.filter(e=>e.pay_type==='C'&&entryDirection(e)==='out').reduce((s,e)=>s+num(e.amount),0);
+  const bankOut=rows.filter(e=>e.pay_type==='B'&&entryDirection(e)==='out').reduce((s,e)=>s+num(e.amount),0);
+  const cashBalance=cashIn-cashOut;
+  const grossReceived=cashIn+bankIn;
+  const operatingIn=rentIn+transferFee;
+  const localOnly=rows.filter(e=>e.sync_status!=='SYNCED').length;
+  return {rows,cashIn,bankIn,bankCount,rentIn,depositIn,arrearsIn,transferFee,depRefund,expenses,cashBalance,grossReceived,operatingIn,bankOut,localOnly};
+}
+function renderSessionKpisLegacy(){
+  const s=sessionStats();
+  $('sessionClock').textContent=`${today()} · ${operatorId()} · ${s.rows.length} 条记录`;
+  const cards=[
+    ['租金收入','RENT',s.rentIn,'','本期租金入账'],
+    ['押金收取','DEPOSIT IN',s.depositIn,'blue','押金是负债'],
+    ['欠款回收','ARREARS',s.arrearsIn,'orange','历史应收回款'],
+    ['换床费','TRANSFER FEE',s.transferFee,'','服务费收入'],
+    ['押金退款','DEP. REFUND',s.depRefund,'orange','押金流出'],
+    ['其他支出','EXPENSES',s.expenses,'red','经营支出'],
+    ['现金应交','CASH DUE',s.cashBalance,'blue','员工本票应交现金']
+  ];
+  $('sessionKpis').innerHTML=cards.map(([cn,en,v,cls,note])=>`<div class="kpi-card"><span>${cn}</span><small>${en}</small><b class="${cls}">${fmtDisplayMoney(v)}</b><small>${note}</small></div>`).join('')+`<div class="context-note" style="grid-column:1/-1;margin:0">本票状态：共 <strong>${s.rows.length}</strong> 条，云端未确认 <strong>${s.localOnly}</strong> 条；现金入 <strong>${fmtDisplayMoney(s.cashIn)}</strong>，银行入 <strong>${fmtDisplayMoney(s.bankIn)}</strong>，银行流出 <strong>${fmtDisplayMoney(s.bankOut)}</strong> AED。</div>`;
+}
+function canUndo(e){
+  return e.sync_status!=='SYNCED'&&Date.now()-new Date(e.created_at||e.ts||0).getTime()<=5*60*1000;
+}
+function undoDraft(id){
+  const item=state.drafts.find(e=>e.id===id);
+  if(!item)return;
+  if(item.sync_status==='SYNCED'){toast('已同步云端的记录不能本地撤销，需走作废流程');return}
+  if(!canUndo(item)){toast('超过5分钟，本机不再允许撤销');return}
+  if(!confirm('仅撤销本机本票草稿。若已同步云端，后续需要老板端作废处理。确认？'))return;
+  state.drafts=state.drafts.filter(e=>e.id!==id);
+  saveDrafts();
+  refreshSessionViews();
+  buildExport();
+  toast('已从本机会话撤销');
+}
+function renderSessionPreview(){
+  const rows=state.drafts;
+  $('sessionMeta').textContent=`${today()} ${new Date().toTimeString().slice(0,8)} · ${rows.length} 条记录`;
+  if(!rows.length){$('sessionPreview').innerHTML='<div class="preview-empty"><div><b>尚无记录</b><br><span>选择类别，填写信息后添加</span></div></div>';return}
+  $('sessionPreview').innerHTML=rows.map((e,i)=>{
+    const dir=entryDirection(e);
+    const sign=dir==='out'?'-':(dir==='in'?'+':'');
+    const cls=dir==='out'?'red':'';
+    const subject=e.type==='TF'?`#${esc(e.bed_from||e.room||'')} → #${esc(e.bed_to||'')}`:(e.type==='E'?esc(e.expense_category||'支出'):`#${esc(e.room||'')}`);
+    const detail=[eventLabel(e.type),e.tenant_name||'',e.pay_type==='B'?'银行':'现金',e.period_start&&e.period_end?`${e.period_start}→${e.period_end}`:''].filter(Boolean).join(' · ');
+    const status=e.sync_status==='SYNCED'?'<span class="status-pill">已同步</span>':'<span class="status-pill local">本机</span>';
+    const undo=canUndo(e)?`<button class="mini-btn danger" data-undo="${esc(e.id)}">撤销</button>`:'';
+    return `<div class="preview-entry"><div><b>${rows.length-i}. ${subject}</b> ${status}<div class="small">${esc(detail)}</div><div class="small">EID ${esc(e.id)} · ${esc(e.created_at||'')}</div><div class="small">${esc(e.note||e.expense_desc||'')}</div><div class="preview-tools">${undo}</div></div><div class="amt ${cls}">${sign}${fmtMoney(e.amount)}</div></div>`;
+  }).join('');
+  document.querySelectorAll('[data-undo]').forEach(btn=>btn.onclick=()=>undoDraft(btn.dataset.undo));
+}
+function refreshSessionViews(){
+  renderSessionKpis();
+  renderSessionPreview();
+}
+function setEntryType(type){
+  const prev=$('entryType').value;
+  $('entryType').value=type;
+  if(prev!==type){
+    ['amount','due','paid','periodStart','periodEnd','periodDays','periodDue','customReason','remark','arrearAmount','arrearPromiseDate','arrearReasonDetail','depositDeduction','depositReturnAmount','overdayDeduction','noNoticeDeduction','otherDeduction','dedNote','bedTo','expenseDesc','excessTo'].forEach(id=>$(id).value='');
+    $('arrearHandling').value='ARREAR';
+    $('reasonCode').value='';
+    $('entryClr').value='Y';
+  }
+  syncForm();
+}
+function updateEventChips(){
+  document.querySelectorAll('.event-chip').forEach(btn=>btn.classList.toggle('active',btn.dataset.type===$('entryType').value));
+  const map={R:'收租 RENT',AP:'还欠款 ARREARS PAYMENT',D:'收押金 DEPOSIT IN',DR:'退押金 DEPOSIT OUT',CO:'退房 CHECKOUT',E:'支出 EXPENSE',TF:'换床 BED TRANSFER'};
+  if($('selectedEventDisplay'))$('selectedEventDisplay').textContent=map[$('entryType').value]||$('entryType').value;
+}
+function updatePaymentButtons(){
+  document.querySelectorAll('.pay-option').forEach(btn=>btn.classList.toggle('active',btn.dataset.pay===$('payType').value));
+}
+function setPaymentType(type){
+  $('payType').value=type;
+  updatePaymentButtons();
+  syncForm();
+}
+function needsException(){
+  const type=$('entryType').value, amt=num($('amount').value), due=num($('due').value), paid=num($('paid').value);
+  return (due>0&&amt!==due)||($('entryClr').value!=='Y')||['DISCOUNT','OTHER'].includes($('reasonCode').value)||$('feePaid').value==='N'||type==='CO';
+}
+function checkoutCalc(){
+  const end=state.current?.end||$('periodEnd').value||'';
+  const leave=$('checkoutDate').value;
+  const overDays=end&&leave?Math.max(0,daysBetween(end,leave)):0;
+  const earlyDays=end&&leave?Math.max(0,daysBetween(leave,end)):0;
+  const overDed=overDays*40;
+  const noNotice=num($('noNoticeDeduction').value);
+  const other=num($('otherDeduction').value);
+  const total=overDed+noNotice+other;
+  return {overDays,earlyDays,overDed,noNotice,other,total};
+}
+function depositReturnStatus(held,totalDeduction){
+  const ret=Math.max(0,num(held)-num(totalDeduction));
+  if(ret<=0)return 'N';
+  if(num(totalDeduction)<=0)return 'Y';
+  return 'PARTIAL';
+}
+function renderSummary(){
+  const type=$('entryType').value, pay=$('payType').value;
+  const period=$('periodStart').value&&$('periodEnd').value?`${$('periodStart').value} → ${$('periodEnd').value}`:'无';
+  const diff=Math.max(0,num($('due').value)-num($('paid').value||$('amount').value));
+  const task=selectedTask();
+  const items=[
+    ['事件',eventLabel(type)],
+    ['对象',type==='TF'?`#${$('bed').value||'-'} → #${$('bedTo').value||'-'}`:(type==='E'?$('expenseCategory').value:`#${$('bed').value||'-'}`)],
+    ['备注/CID',`${$('tenantName').value||'-'} / ${$('tenantCardId').value||'-'}`],
+    ['金额',`${fmtMoney(num($('amount').value))} AED`],
+    ['应收/计入',`${fmtMoney(num($('due').value))} / ${fmtMoney(num($('paid').value||$('amount').value))}`],
+    ['账期',period],
+    ['付款',type==='E'?'支出跳过':(pay==='B'?'银行':'现金')],
+    ['差额',diff?`${fmtMoney(diff)} AED`:'无'],
+    ['押金余额',depositHeld()?`${fmtMoney(depositHeld())} AED`:'无'],
+    ['欠款任务',task?`${task.task_id} / 剩余 ${fmtMoney(taskRemain(task))}`:'无']
+  ];
+  const tail=rentShortfall();
+  if(tail>0){
+    items.push(['尾款任务',`${fmtMoney(tail)} AED / ${$('arrearPromiseDate').value||'未填日期'}`]);
+    items.push(['尾款原因',$('arrearReasonDetail').value.trim()||'未填写']);
+  }
+  if(type==='R'&&num($('amount').value)>num($('due').value))items.push(['超收处理',$('excessTo').value||'未选择']);
+  if(type==='CO'){const co=checkoutCalc();items.push(['退房扣款',`${fmtMoney(co.total)} / 超期${co.overDays}天 / 提前${co.earlyDays}天`]);}
+  $('entrySummary').innerHTML=items.map(([k,v])=>`<div><span>${esc(k)}</span><b>${esc(v)}</b></div>`).join('');
+}
+function syncForm(){
+  const type=$('entryType').value, c=state.current||{};
+  const hasPeriod=['R','AP','TFF'].includes(type);
+  const rent=rentForBed();
+  if(type==='R')$('listPrice').value=rent?fmtMoney(rent):'';
+  updateEventChips();
+  $('objectHint').textContent=type==='E'?'支出不需要床位时可以只选择类别；如果是指定房间维修，可在备注写床位。':(type==='TF'?'换床需要填写原床位和新床位，系统会保留换床前后锚点。':'收租/收押金/退押金/还欠款：填写床位号，系统自动抓取租客上下文。');
+  visible(['periodStep'],hasPeriod);visible(['apFields'],type==='AP');visible(['checkoutFields'],type==='CO');visible(['transferFields'],type==='TF');visible(['expenseFields'],type==='E');visible(['paymentStep'],!['E','CO'].includes(type));
+  updatePaymentButtons();
+  visible(['exceptionStep'],needsException());
+  visible(['excessWrap'],type==='R'&&num($('amount').value)>num($('due').value));
+  visible(['customReasonWrap'],['DISCOUNT','OTHER'].includes($('reasonCode').value)||$('feePaid').value==='N');
+  $('bankRefWrap').classList.add('hidden');
+  if(type==='AP'&&!state.tasks.length)loadTasks(false);
+  $('periodStart').readOnly=true;$('periodEnd').readOnly=true;$('periodDays').readOnly=$('cycle').value!=='CUST';
+  if(type==='R'&&!$('periodStart').value)$('periodStart').value=c.end||nextAnchor(today());
+  if(type==='R'&&$('cycle').value==='1M'){$('periodStart').value=c.end||nextAnchor(today());$('periodEnd').value=addMonths($('periodStart').value,1);}
+  if(type==='R'&&$('cycle').value==='15D'){$('periodStart').value=c.end||nextAnchor(today());$('periodEnd').value=addDays($('periodStart').value,14);}
+  if(type==='R'&&$('cycle').value==='CUST'){
+    if(document.activeElement===$('cycle')){$('periodDays').value='';$('periodEnd').value='';}
+    if(!$('periodStart').value)$('periodStart').value=c.end||nextAnchor(today());
+    const customDays=num($('periodDays').value);
+    $('periodEnd').value=customDays>0?addDays($('periodStart').value,customDays-1):'';
+  }
+  if(type==='TF'&&$('feePaid').value==='Y'){$('amount').value='50.00';$('due').value='50.00';$('paid').value='50.00';$('periodDue').value='';}
+  if(type==='TF'&&$('feePaid').value==='N'){$('amount').value='0.00';$('due').value='0.00';$('paid').value='0.00';$('periodDue').value='';}
+  if(type==='CO'){if(!$('checkoutDate').value)$('checkoutDate').value=today();if(!$('amount').value)$('amount').value='0.00';if(!$('due').value)$('due').value='0.00';if(!$('paid').value)$('paid').value='0.00';}
+  if(type==='TFF'){if(!$('amount').value||num($('amount').value)===0)$('amount').value='50.00';$('due').value='50.00';$('periodDue').value='50.00';$('cycle').value='1M';}
+  if(!hasPeriod){$('periodStart').value='';$('periodEnd').value='';$('periodDays').value='';$('periodDue').value='';}
+  const pd=daysBetween($('periodStart').value,$('periodEnd').value);
+  if($('cycle').value==='15D')$('periodDays').value='15';
+  else if($('cycle').value!=='CUST')$('periodDays').value=pd||'';
+  const lp=rent;
+  let periodDue=num($('periodDue').value);
+  if(type==='AP'){
+    periodDue=num($('periodDue').value);
+  }else if(hasPeriod&&(!periodDue||document.activeElement===$('cycle')||document.activeElement===$('periodStart')||document.activeElement===$('periodEnd')||type==='R'||type==='TFF')){
+    periodDue=$('cycle').value==='15D'?400:($('cycle').value==='CUST'?num($('periodDays').value)*40:(type==='TFF'?50:lp));
+    $('periodDue').value=periodDue?fmtMoney(periodDue):'';
+  }
+  if(type==='R'||type==='TFF')$('due').value=$('periodDue').value||'';
+  else if(hasPeriod&&!$('due').value)$('due').value=$('periodDue').value||$('amount').value;
+  const amt=num($('amount').value), due=num($('due').value);
+  if(['R','AP','TFF'].includes(type))$('paid').value=fmtMoney(Math.min(amt,due||amt));
+  else if(['TF','CO'].includes(type)&&amt===0)$('paid').value='0.00';
+  else if(amt)$('paid').value=fmtMoney(amt);
+  $('entryClr').value=due&&amt<due?'N':'Y';
+  if(type==='R'&&due>0&&amt>0&&amt<due&&!$('reasonCode').value)$('reasonCode').value='SHORT_PAID';
+  if(type==='DR'&&depositHeld()>0&&!$('amount').value)$('amount').value=fmtMoney(depositHeld());
+  if(type==='CO'){const co=checkoutCalc();$('overdayDeduction').value=fmtMoney(co.overDed);$('depositDeduction').value=fmtMoney(co.total);$('depositReturnAmount').value=fmtMoney(Math.max(0,depositHeld()-co.total));}
+  syncArrearPlan();
+  visible(['exceptionStep'],needsException());
+  visible(['excessWrap'],type==='R'&&num($('amount').value)>num($('due').value));
+  renderTaskInfo();
+  renderContextNotice();
+  renderSummary();
+  validate();
+}
+function validate(){
+  const type=$('entryType').value, errors=[], warns=[];
+  const amt=num($('amount').value), due=num($('due').value);
+  const amountOptional=['CO','TF'].includes(type)&&amt===0;
+  if(!$('bed').value.trim()&&type!=='E')errors.push('必须填写床位。');
+  if((!amt||amt<=0)&&!amountOptional)errors.push('AMT 必须大于 0。');
+  if(['D','DR','CO'].includes(type)&&!$('tenantCardId').value.trim())errors.push('押金相关事件必须有通通锁 CID，押金台账需要跟着租客走。');
+  if(state.current&&!state.current.remark_parse_ok)warns.push(`通通锁备注解析不完整：缺少 ${state.current.remark_parse_missing.join('、')}。请先检查卡片备注是否为“床位 D押金 入住月日”。`);
+  if(['D','DR','CO'].includes(type)&&state.current&&!state.current.deposit)errors.push('押金相关事件必须从通通锁备注解析到押金金额，不能靠员工猜。');
+  if(type==='D'&&state.current?.deposit&&amt>0&&Math.abs(amt-num(state.current.deposit))>0.01&&!$('remark').value.trim())errors.push('收押金金额与通通锁备注押金不一致，必须填写原因。');
+  if(type==='R'&&$('cycle').value==='1M'&&!rentForBed())errors.push('该床位没有老板端月租配置，不能提交整月收租。请先到老板端设置租金。');
+  if(type==='R'&&$('cycle').value==='CUST'&&num($('periodDays').value)<=0)errors.push('自定义天数必须填写大于 0 的天数，系统按每天 40 AED 计算。');
+  if(type==='R'&&$('cycle').value==='CUST'&&num($('periodDays').value)>0&&!Number.isInteger(num($('periodDays').value)))errors.push('自定义天数必须是整数天。金额不等于 40 的整数倍时，应作为尾款或异常处理，不能改成小数天。');
+  if(['R','AP','TFF'].includes(type)&&(!$('periodStart').value||!$('periodEnd').value))errors.push('账期事件必须有开始和截止日期。');
+  if(type==='R'&&!num($('periodDue').value))errors.push('收租必须确认 period_due，作为账期应收锚点。');
+  if(type==='R'&&$('periodEnd').value&&$('periodStart').value&&$('periodEnd').value<$('periodStart').value)errors.push('period_end 不能早于 period_start。');
+  const tail=rentShortfall();
+  const samePeriodTask=openTaskForCurrentRentPeriod();
+  if(type==='R'&&samePeriodTask)errors.push(`当前账期已有未清尾款任务 ${fmtMoney(taskRemain(samePeriodTask))} AED，请改用“还欠款 AP”处理，不能重复按收租录入。`);
+  if(type==='R'&&tail>0){
+    if($('arrearHandling').value!=='ARREAR')errors.push('实收小于账期应收时，只能生成尾款任务；如金额或账期录错，请先返回修改，不能提交。');
+    if(!$('arrearPromiseDate').value)errors.push('尾款必须填写承诺支付日期，作为后续跟进锚点。');
+    if($('arrearPromiseDate').value&&$('arrearPromiseDate').value<today())errors.push('尾款承诺支付日期不能早于今天。');
+    if(!$('arrearReasonDetail').value.trim())errors.push('尾款必须填写原因或承诺说明，方便老板端追踪。');
+  }
+  if(type==='CO'&&!$('checkoutDate').value)errors.push('退房必须填写实际离开日期。');
+  if(type==='DR'&&depositHeld()&&amt>depositHeld())errors.push('退押金金额不能超过当前押金可用余额。');
+  if(type==='CO'&&num($('depositDeduction').value)>depositHeld())errors.push('退房押金扣款不能超过当前押金余额。');
+  if(type==='CO'&&num($('otherDeduction').value)>0&&!$('dedNote').value.trim())errors.push('退房其他扣款必须填写扣款说明。');
+  if(type==='CO'&&Math.max(0,depositHeld()-num($('depositDeduction').value))>0)warns.push('退房后仍有应退押金，请继续录入 DR 退押金完成现金流。');
+  if(type==='R'&&due>0&&amt>due&&!$('excessTo').value)errors.push('收租超收必须选择处理方式：找零已退还，或转老板处理。');
+  if(type==='TF'&&!$('bedTo').value.trim())errors.push('换床必须填写目标床位。');
+  if(type==='TF'&&$('feePaid').value==='Y'&&amt!==50)errors.push('换床收取费用时，系统固定按 50 AED 计入，员工不能手动改金额。');
+  if(type==='E'&&!$('expenseDesc').value.trim())errors.push('支出必须填写说明。');
+  if(type==='AP'&&!$('linkedTaskId').value)errors.push('还欠款必须选择一条欠款任务，不能自由录入。');
+  if($('reasonCode').value==='OTHER'&&!$('remark').value.trim())errors.push('RC=OTHER 时备注不能为空。');
+  if($('reasonCode').value==='DISCOUNT'&&!$('customReason').value.trim())errors.push('折扣必须填写原因，方便老板端复核。');
+  if($('feePaid').value==='N'&&!$('customReason').value.trim())errors.push('免收换床费必须填写原因。');
+  if(amt>due&&due>0&&type==='R')warns.push('AMT>DUE：系统不会自动把超收当作本期收入，必须明确超收去向。');
+  $('validationBox').innerHTML=[...errors.map(x=>`<div class="bad">阻断：${esc(x)}</div>`),...warns.map(x=>`<div class="warn">提醒：${esc(x)}</div>`),(!errors.length&&!warns.length?'<div>校验通过，可以加入本票。整票上云请点击“导出交接”。</div>':'')].join('');
+  const submit=$('btnSaveEntry');
+  if(submit){submit.disabled=errors.length>0;submit.classList.toggle('disabled',errors.length>0);submit.classList.toggle('primary',errors.length===0);}
+  return {errors,warns};
+}
+function entryPayload(){
+  const type=$('entryType').value, amt=num($('amount').value), due=num($('due').value), paid=num($('paid').value)||Math.min(amt,due||amt);
+  const pay=$('payType').value;
+  const co=checkoutCalc();
+  const dedReasons=[];
+  if(co.overDed>0)dedReasons.push('OVERDAY');
+  if(co.noNotice>0)dedReasons.push('NO_NOTICE');
+  if(co.other>0)dedReasons.push('OTHER');
+  const tail=rentShortfall();
+  const tailReason=$('arrearReasonDetail').value.trim();
+  const noteText=$('remark').value.trim()||tailReason;
+  const reasonCode=tail>0?'SHORT_PAID':($('reasonCode').value||type);
+  return {
+    id:uid('E'),entry_id:null,type,reason_code:reasonCode,cat:pay==='B'?'bank':(type==='E'||type==='DR'?'expense':'cash'),pay_type:pay,bank_ref:$('bankRef').value.trim(),
+    room:$('bed').value.trim().replace(/^#/,''),roomTo:$('bedTo').value.trim().replace(/^#/,''),bed_from:$('bed').value.trim().replace(/^#/,''),bed_to:$('bedTo').value.trim().replace(/^#/,''),
+    tenant_name:$('tenantName').value.trim(),tenant_card_id:$('tenantCardId').value.trim(),tag:type==='D'?'N':type==='TF'?'T':'O',
+    amount:amt,due,paid,deficit:Math.max(0,due-paid),entry_clr:$('entryClr').value,clr:$('entryClr').value,excess:Math.max(0,amt-due),excess_to:$('excessTo').value,
+    list_price:num($('listPrice').value),period_start:$('periodStart').value,period_end:$('periodEnd').value,cycle:$('cycle').value,
+    period_day_count:num($('periodDays').value),period_due:num($('periodDue').value)||due,custom_reason:$('customReason').value.trim()||tailReason,
+    checkout_date:$('checkoutDate').value,deposit_held:depositHeld(),deposit_return:type==='CO'?depositReturnStatus(depositHeld(),co.total):'',deposit_amt:type==='CO'?Math.max(0,depositHeld()-co.total):0,deposit_deduction:type==='CO'?co.total:num($('depositDeduction').value),
+    ded_reason:dedReasons.join('+'),ded_days:co.overDays,ded_rate:40,ded_note:$('dedNote').value.trim(),early_days:co.earlyDays,
+    fee_paid:$('feePaid').value,fee_waiver_reason:$('feePaid').value==='N'?$('customReason').value.trim():'',
+    expense_category:$('expenseCategory').value,expense_desc:$('expenseDesc').value.trim(),
+    linked_task_id:$('linkedTaskId').value,original_period_start:$('periodStart').value,original_period_end:$('periodEnd').value,
+    arrear_handling:tail>0?$('arrearHandling').value:'',arrear_promise_date:tail>0?$('arrearPromiseDate').value:'',arrear_reason_detail:tail>0?tailReason:'',
+    promise_date:tail>0?$('arrearPromiseDate').value:'',promise_amount:tail>0?tail:0,
+    note:noteText,remark:noteText,operator_id:operatorId(),operator_name:operatorName(),src:'EMP',status:'ACTIVE',created_at:nowIso(),ts:nowIso()
+  };
+}
+function exportLine(e){
+  const name=e.tenant_name||'-', cid=e.tenant_card_id||'-', period=e.period_start&&e.period_end?` ${e.period_start}->${e.period_end}`:'';
+  if(e.type==='R'){
+    const tail=Math.max(0,num(e.period_due)-num(e.paid));
+    const tailText=tail>0?` TAIL${fmtMoney(tail)} PROMISE:${e.arrear_promise_date||'-'} REASON:${e.arrear_reason_detail||e.custom_reason||'-'}`:'';
+    return `#${e.room} ${name} R ${e.tag} ${fmtMoney(e.amount)} AED ${e.entry_clr==='Y'?'CLR':'short paid'}${tailText}${num(e.excess)>0?' EXCESS'+fmtMoney(e.excess)+' '+(e.excess_to||'-'):''}\n  card ${cid}${period} LP${fmtMoney(e.list_price)} DUE${fmtMoney(e.period_due)} PAID${fmtMoney(e.paid)} EID ${e.id}`;
+  }
+  if(e.type==='D')return `#${e.room} ${name} D ${e.tag} ${fmtMoney(e.amount)} AED\n  card ${cid} EID ${e.id}`;
+  if(e.type==='DR')return `#${e.room} ${name} DR ${fmtMoney(e.amount)} AED ${e.pay_type}\n  card ${cid} EID ${e.id}`;
+  if(e.type==='CO')return `#${e.room} ${name} left ${e.checkout_date||'-'} CO\n  card ${cid}\n  deposit held ${fmtMoney(e.deposit_held)} deducted ${fmtMoney(e.deposit_deduction)} return ${fmtMoney(e.deposit_amt)} DED ${e.ded_reason||'-'} ${e.ded_days||0}D rate ${fmtMoney(e.ded_rate||40)} early ${e.early_days||0}D note ${e.ded_note||'-'} EID ${e.id}`;
+  if(e.type==='AP')return `#${e.room} ${name} AP ${fmtMoney(e.amount)} AED ${e.pay_type} closes TASK ${e.linked_task_id||'-'}\n  card ${cid}${period} EID ${e.id}`;
+  if(e.type==='TF')return `#${e.bed_from} -> #${e.bed_to} ${name} TF ${e.fee_paid==='Y'?'FEE50 '+e.pay_type:'FEE0 waived '+(e.fee_waiver_reason||'-')}\n  card ${cid} EID ${e.id}`;
+  if(e.type==='TFF')return `#${e.room} ${name} TFF ${fmtMoney(e.amount)} AED ${e.pay_type}\n  card ${cid} EID ${e.id}`;
+  return `#${e.room||e.expense_category} ${fmtMoney(e.amount)} AED ${e.pay_type} ${e.expense_desc||e.note||''}\n  EID ${e.id}`;
+}
+async function saveEntry(){
+  if(!state.user){applyEmployeeUser(null);toast('请先登录员工账号',6000);return}
+  const btn=$('btnSaveEntry');
+  if(btn?.dataset.busy==='1')return;
+  const v=validate();if(v.errors.length){toast('请先处理阻断校验');return}
+  let e;
+  try{e=entryPayload();}catch(err){
+    console.error('entryPayload failed',err);
+    $('validationBox').innerHTML=`<div class="bad">阻断：页面数据异常，未提交。${esc(err?.message||err)}</div>`;
+    toast('提交失败：页面数据异常');
+    return;
+  }
+  setOperator(operatorId());
+  e.sync_status='DRAFT';
+  e.session_id=currentSessionId();
+  state.drafts.unshift(e);
+  const localOk=saveDrafts();
+  refreshSessionViews();
+  buildExport();
+  resetForm();
+  $('validationBox').innerHTML=localOk?'<div>已加入本票流水。本笔暂存本地，点击“导出交接”后整票统一上传云端并生成交接文本。</div>':'<div class="warn">已加入页面本票，但本地保存失败，请先不要关闭页面。</div>';
+  toast(localOk?'已加入本票流水；整票上云请点导出交接':'已加入页面本票，本地保存失败');
+}
+function resetForm(){['bed','bedTo','amount','due','paid','tenantName','tenantCardId','periodStart','periodEnd','periodDays','periodDue','listPrice','customReason','bankRef','checkoutDate','depositDeduction','depositReturnAmount','overdayDeduction','noNoticeDeduction','otherDeduction','dedNote','expenseDesc','remark','excessTo','arrearAmount','arrearPromiseDate','arrearReasonDetail'].forEach(id=>$(id).value='');$('arrearHandling').value='ARREAR';state.current=null;state.depositBalance=null;renderContext();syncForm();refreshSessionViews()}
+function hasLocalOnly(){return state.drafts.some(e=>e.sync_status!=='SYNCED')}
+function newSession(){
+  if(hasLocalOnly()){toast('仍有云端未确认记录，不能开始新会话');return}
+  if(state.drafts.length&&!confirm('开始新会话会清空本机本票草稿，确认？'))return;
+  state.drafts=[];
+  state.sessionId='';
+  saveDrafts();
+  try{localStorage.removeItem(employeeStorageKey('empv3:sessionId'))}catch{}
+  resetForm();
+  buildExport();
+  toast('已开始新会话');
+}
+async function loadTasks(render=true){
+  try{
+    const r=await apiFetch('/api/arrear_tasks');
+    const data=r.ok?await r.json():{tasks:[]};
+    state.tasks=data.tasks||[];
+    populateTaskSelect();
+    if(render)renderTasks();
+  }catch{
+    if(render)$('taskList').textContent='欠款任务加载失败';
+  }
+}
+function safeDomId(v){return String(v||'').replace(/[^a-zA-Z0-9_-]/g,'_')}
+function openArrearTasks(){
+  return state.tasks.filter(t=>!['PAID','CLEARED','CLOSED','VOID','已结清','结清','作废','WRITTEN_OFF','WAIVED'].includes(String(t.close_status||''))&&taskRemain(t)>0);
+}
+function dueFromLockCards(){
+  return state.lockCards.map(c=>{
+    const cls=cardFollowupClass(c);
+    if(cls.kind!=='customer'||!c.bed||!c.end)return null;
+    const overdue=daysBetween(c.end,today());
+    if(overdue<=0)return null;
+    const amount=rentForBed(c.bed);
+    const start=c.end;
+    const end=addMonths(c.end,1);
+    const remark=cardRemarkText(c);
+    return {
+      source:'ttlock',
+      task_id:`LOCKDUE-${c.bed}-${String(c.end).replaceAll('-','')}`,
+      bed:c.bed,
+      tenant_name:remark,
+      tenant_card_id:c.tenant_card_id||'',
+      deposit:c.deposit||'',
+      lock_remark:remark,
+      lock_match:'MATCHED',
+      followup_class:cls.kind,
+      amount,
+      reason:'通通锁已过期，应收本月租金',
+      period_start:start,
+      period_end:end,
+      due_date:c.end,
+      overdue_days:overdue,
+      followup_status:overdue>3?'需承诺':'待跟进',
+      promise_date:'',
+      staff_note:'',
+      force:overdue>3,
+      raw:c
+    };
+  }).filter(Boolean);
+}
+function lockCardForFollowup(t){
+  const bed=String(t.bed||'').trim();
+  const cid=String(t.tenant_card_id||'').trim();
+  return state.lockCards.find(c=>(cid&&String(c.tenant_card_id||'')===cid)||(bed&&String(c.bed||'')===bed))||null;
+}
+function historyFollowupItems(){
+  return openArrearTasks().map(t=>{
+    const card=lockCardForFollowup(t);
+    const cls=cardFollowupClass(card);
+    if(cls.kind==='vacant'||cls.kind==='staff')return null;
+    if(!card){
+      const taskCls=followupTextClass(arrearTaskText(t));
+      if(taskCls.kind==='vacant'||taskCls.kind==='staff')return null;
+    }
+    const promise=t.promise_date||'';
+    const promiseOverdue=promise?daysBetween(promise,today()):0;
+    const remark=card?cardRemarkText(card):String(t.tenant_name||'').trim();
+    return {
+      source:card?'history':'history_unmatched',
+      task_id:t.task_id,
+      bed:t.bed||'',
+      tenant_name:remark,
+      tenant_card_id:t.tenant_card_id||card?.tenant_card_id||'',
+      deposit:card?.deposit||'',
+      lock_remark:remark,
+      lock_match:card?'MATCHED':'UNMATCHED',
+      followup_class:cls.kind,
+      amount:taskRemain(t),
+      reason:t.arrear_reason||'历史欠款',
+      period_start:t.original_period_start||'',
+      period_end:t.original_period_end||'',
+      due_date:promise||t.original_period_end||'',
+      overdue_days:promiseOverdue,
+      followup_status:t.followup_status||'待跟进',
+      promise_date:promise,
+      staff_note:t.staff_note||'',
+      force:promiseOverdue>3,
+      raw:t
+    };
+  }).filter(Boolean);
+}
+function currentFollowupItems(){
+  const history=historyFollowupItems();
+  const historyBeds=new Set(history.map(x=>String(x.bed||'')).filter(Boolean));
+  const items=[...dueFromLockCards().filter(x=>!historyBeds.has(String(x.bed||''))),...history];
+  items.sort((a,b)=>(Number(b.force)-Number(a.force))||(b.overdue_days-a.overdue_days)||(b.amount-a.amount));
+  state.followupItems=items;
+  return items;
+}
+function followupTitle(item){
+  const bed=String(item.bed||'').trim();
+  const remark=String(item.lock_remark||item.tenant_name||'').trim();
+  if(remark&&bed&&new RegExp(`(^|\\D)${bed}(\\D|$)`).test(remark))return remark;
+  return [bed,remark].filter(Boolean).join(' · ')||'-';
+}
+function followupCard(item){
+  const id=safeDomId(item.task_id);
+  const force=item.force;
+  const cls=force?'force':(item.source==='history'||item.source==='history_unmatched'?'history':'overdue');
+  const source=item.source==='ttlock'?'通通锁过期 TTLOCK':(item.source==='history_unmatched'?'历史欠款 / 未匹配当前通通锁':'历史欠款 HISTORY');
+  const matchTag=item.lock_match==='UNMATCHED'?'<span class="followup-tag bad">未匹配当前通通锁 · UNMATCHED</span>':'';
+  const rentNote=item.amount>0?`${fmtMoney(item.amount)} AED`:'未配置月租';
+  const editableStatuses=['待跟进','已联系','承诺付款','无法联系','转老板处理'];
+  const currentStatus=String(item.followup_status||'待跟进');
+  const statusOptions=[
+    ...(!editableStatuses.includes(currentStatus)?[`<option value="${esc(currentStatus)}" selected disabled>${esc(currentStatus)} · 系统状态</option>`]:[]),
+    ...editableStatuses.map(s=>`<option value="${s}" ${s===currentStatus?'selected':''}>${s}</option>`)
+  ].join('');
+  return `<div class="followup-card ${cls}" data-followup-id="${esc(item.task_id)}">
+    <div class="followup-top">
+      <div>
+        <div class="followup-bed">${esc(followupTitle(item))}</div>
+        <div class="followup-tags">
+          <span class="followup-tag">${esc(source)}</span>
+          <span class="followup-tag ${item.overdue_days>0?'bad':''}">过期 ${esc(item.overdue_days)} 天 · OVERDUE ${esc(item.overdue_days)}D</span>
+          ${matchTag}
+          ${force?'<span class="followup-tag bad">必须承诺 · REQUIRED</span>':''}
+        </div>
+      </div>
+      <div class="followup-money">${esc(rentNote)}</div>
+    </div>
+    <div class="followup-note">
+      备注锚点 REMARK: ${esc(item.lock_remark||item.tenant_name||'-')} · CID: ${esc(item.tenant_card_id||'-')} · 押金 DEPOSIT: ${esc(item.deposit?fmtMoney(item.deposit):'-')}<br>
+      日期锚点 PERIOD: ${esc(item.period_start||'-')} → ${esc(item.period_end||'-')} · 到期 DUE: ${esc(item.due_date||'-')}<br>
+      原因 REASON: ${esc(item.reason||'-')}
+    </div>
+    <div class="followup-actions">
+      <select id="followStatus_${id}">
+        ${statusOptions}
+      </select>
+      <input id="promise_${id}" type="date" value="${esc(item.promise_date||'')}" min="${today()}" aria-label="承诺支付日期">
+      <input id="note_${id}" value="${esc(item.staff_note||'')}" placeholder="${force?'超过3天必须填写原因和承诺':'跟进说明，可填写客户原因'}">
+      <button class="mini-btn" data-save-follow="${esc(item.task_id)}">保存跟进</button>
+      <button class="mini-btn" data-fill-rent="${esc(item.task_id)}">去收租</button>
+    </div>
+  </div>`;
+}
+function renderTasks(){
+  const items=currentFollowupItems();
+  const history=items.filter(x=>x.source==='history'||x.source==='history_unmatched');
+  const due=items.filter(x=>x.source==='ttlock');
+  const force=items.filter(x=>x.force).length;
+  const total=items.reduce((s,x)=>s+num(x.amount),0);
+  const dashboard=`<div class="followup-dashboard">
+    <div class="followup-metric bad"><span>强制跟进</span><small>REQUIRED</small><b>${force}</b></div>
+    <div class="followup-metric warn"><span>通通锁过期</span><small>TTLOCK OVERDUE</small><b>${due.length}</b></div>
+    <div class="followup-metric"><span>历史欠款</span><small>ARREARS</small><b>${history.length}</b></div>
+    <div class="followup-metric"><span>应收提醒</span><small>AMOUNT</small><b>${fmtMoney(total)}</b></div>
+  </div>`;
+  if(!items.length){
+    $('taskList').innerHTML=dashboard+'<div class="hint">当前没有通通锁过期租金或历史欠款。若刚打开页面，请先点击“刷新通通锁”。</div>';
+    return;
+  }
+  $('taskList').innerHTML=dashboard+`<div class="followup-list">${items.map(followupCard).join('')}</div>`;
+  bindFollowupActions();
+}
+function bindFollowupActions(){
+  document.querySelectorAll('[data-save-follow]').forEach(btn=>btn.onclick=()=>saveFollowup(btn.dataset.saveFollow));
+  document.querySelectorAll('[data-fill-rent]').forEach(btn=>btn.onclick=()=>prefillRentFromFollowup(btn.dataset.fillRent));
+}
+async function refreshFollowup(){
+  if(!state.user){applyEmployeeUser(null);toast('请先登录员工账号',6000);return}
+  const btn=$('btnRefreshTasks');
+  const old=btn.innerHTML;
+  btn.disabled=true;btn.classList.add('disabled');btn.innerHTML='正在刷新<span class="label-en">REFRESHING</span>';
+  try{
+    await loadTasks(false);
+    await loadLock();
+    await loadTasks(false);
+    renderTasks();
+    toast(`跟进已刷新：${state.followupItems.length} 条提醒`,6000);
+  }finally{
+    btn.disabled=false;btn.classList.remove('disabled');btn.innerHTML=old;
+  }
+}
+function followupById(taskId){return state.followupItems.find(x=>x.task_id===taskId)}
+async function saveFollowup(taskId){
+  if(!state.user){applyEmployeeUser(null);toast('请先登录员工账号',6000);return}
+  const item=followupById(taskId);
+  if(!item)return;
+  const id=safeDomId(taskId);
+  const status=$(`followStatus_${id}`).value;
+  const promise=$(`promise_${id}`).value;
+  const note=$(`note_${id}`).value.trim();
+  if(num(item.amount)<=0){
+    toast('该床位没有有效应收金额，先到老板端配置月租后再保存跟进',6000);
+    return;
+  }
+  if(item.force&&(!promise||!note)){
+    toast('超过3天必须填写承诺支付日期和原因说明',6000);
+    return;
+  }
+  if(status==='承诺付款'&&!promise){
+    toast('承诺付款必须填写承诺支付日期',6000);
+    return;
+  }
+  if(status!=='待跟进'&&!note){
+    toast('已跟进必须填写说明，形成可追责锚点',6000);
+    return;
+  }
+  const patch={
+    followup_status:status,
+    promise_date:promise,
+    promise_amount:num(item.amount),
+    staff_note:note
+  };
+  if(item.source==='ttlock'){
+    Object.assign(patch,{
+      arrear_reason:item.reason,
+      tenant_name:item.tenant_name,
+      tenant_card_id:item.tenant_card_id,
+      bed:item.bed,
+      arrear_amount:num(item.amount),
+      original_period_start:item.period_start,
+      original_period_end:item.period_end,
+      owner_note:'通通锁过期自动生成的收租跟进任务'
+    });
+  }
+  const btn=document.querySelector(`[data-save-follow="${CSS.escape(taskId)}"]`);
+  if(btn){btn.disabled=true;btn.textContent='保存中';}
+  try{
+    const r=await apiFetch('/api/arrear_tasks/update',{method:'POST',body:JSON.stringify({task_id:taskId,patch})});
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    await loadTasks(false);
+    renderTasks();
+    toast('跟进锚点已保存',6000);
+  }catch(e){
+    toast('保存失败：'+(e.message||e),6000);
+  }finally{
+    if(btn){btn.disabled=false;btn.textContent='保存跟进';}
+  }
+}
+function prefillRentFromFollowup(taskId){
+  const item=followupById(taskId);
+  if(!item)return;
+  document.querySelector('[data-view="entry"]').click();
+  const chip=document.querySelector('.event-chip[data-type="R"]');
+  if(chip)chip.click();else $('entryType').value='R';
+  $('bed').value=item.bed||'';
+  lookupBed();
+  $('cycle').value='1M';
+  $('periodStart').value=item.period_start||item.due_date||today();
+  $('periodEnd').value=item.period_end||addMonths($('periodStart').value,1);
+  $('amount').value='';
+  $('remark').value=item.force?`过期${item.overdue_days}天，需跟进承诺付款。`:'';
+  syncForm();
+  toast(`#${item.bed} 已带入收租录入`);
+}
+function buildExport(){
+  const drafts=state.drafts;
+  const sessionId=currentSessionId();
+  const lines=[
+    'HOMELINK LEDGER',
+    'Property HL-009  Staff '+operatorName()+' / '+operatorId()+'  '+today()+'  Session '+sessionId,
+    'Period rule: 1M same-date anchor; 15D inclusive end date; CUST = days * 40 AED',
+    'Abbrev: O=续租 N=新入住 T=换床 C=现金 B=银行 CLR=结清',
+    '        R=租 D=押金 DR=退押金 CO=退房 AP=还欠款 E=支出 TF=换床含换床费 LP=月租参考 TASK=欠款编号 EID=记录编号'
+  ];
+  const section=(title,rows)=>{if(rows.length)lines.push('',`==== ${title} ====`,...rows.map(exportLine));};
+  section('CASH RECEIVED',drafts.filter(e=>e.pay_type==='C'&&['R','D','TF','TFF'].includes(e.type)&&num(e.amount)>0));
+  section('BANK RECEIVED',drafts.filter(e=>e.pay_type==='B'&&['R','D','TF','TFF'].includes(e.type)&&num(e.amount)>0));
+  section('ARREAR REPAID',drafts.filter(e=>e.type==='AP'));
+  section('CHECKOUT',drafts.filter(e=>e.type==='CO'));
+  section('DEPOSIT RETURN',drafts.filter(e=>e.type==='DR'));
+  section('EXPENSE',drafts.filter(e=>e.type==='E'));
+  section('TRANSFER',drafts.filter(e=>e.type==='TF'));
+  const opened=drafts.filter(e=>e.type==='R'&&e.entry_clr!=='Y'&&num(e.period_due)>num(e.paid));
+  if(opened.length){
+    lines.push('', '==== ARREARS OPENED ====');
+    opened.forEach(e=>lines.push(`TASK auto  #${e.room} ${e.tenant_name||'-'} ${e.tenant_card_id||'-'}  owes ${fmtMoney(num(e.period_due)-num(e.paid))}  ${e.reason_code||'SHORT_PAID'}  ${e.period_start}->${e.period_end}`));
+  }
+  const cashIn=drafts.filter(e=>e.pay_type==='C'&&!['E','DR'].includes(e.type)).reduce((s,e)=>s+num(e.amount),0);
+  const bankIn=drafts.filter(e=>e.pay_type==='B'&&!['E','DR'].includes(e.type)).reduce((s,e)=>s+num(e.amount),0);
+  const cashOut=drafts.filter(e=>e.pay_type==='C'&&['E','DR'].includes(e.type)).reduce((s,e)=>s+num(e.amount),0);
+  const bankOut=drafts.filter(e=>e.pay_type==='B'&&['E','DR'].includes(e.type)).reduce((s,e)=>s+num(e.amount),0);
+  const rentIn=drafts.filter(e=>e.type==='R').reduce((s,e)=>s+num(e.paid||e.amount),0);
+  const depositIn=drafts.filter(e=>e.type==='D').reduce((s,e)=>s+num(e.amount),0);
+  const arrearsIn=drafts.filter(e=>e.type==='AP').reduce((s,e)=>s+num(e.amount),0);
+  const feeIn=drafts.filter(e=>e.type==='TF'||e.type==='TFF').reduce((s,e)=>s+num(e.amount),0);
+  const bankCount=drafts.filter(e=>e.pay_type==='B'&&!['E','DR'].includes(e.type)&&num(e.amount)>0).length;
+  lines.push('','==== HANDOVER ANCHORS ====',`Cash handover: ${fmtMoney(cashIn-cashOut)}`,`Bank transfer total: ${fmtMoney(bankIn)} (${bankCount} txns)`,`Gross received: ${fmtMoney(cashIn+bankIn)}`);
+  lines.push('','==== SUMMARY ====',`Rent income: ${fmtMoney(rentIn)}`,`Deposit received: ${fmtMoney(depositIn)}`,`Arrears repaid: ${fmtMoney(arrearsIn)}`,`Transfer fee: ${fmtMoney(feeIn)}`,`Cash received: ${fmtMoney(cashIn)}`,`Cash out: ${fmtMoney(cashOut)}`,`Net cash: ${fmtMoney(cashIn-cashOut)}`,`Bank received: ${fmtMoney(bankIn)}`,`Bank out: ${fmtMoney(bankOut)}`,`Arrears opened: ${opened.length} total ${fmtMoney(opened.reduce((s,e)=>s+Math.max(0,num(e.period_due)-num(e.paid)),0))}`,`Entries: ${drafts.length}`,`Exported ${nowIso()}`,hasLocalOnly()?'Sync pending':'All synced');
+  $('exportText').textContent=lines.join('\n');
+  refreshSessionViews();
+  showStatus(`导出文本已生成：本票 ${drafts.length} 笔，现金结余 ${fmtMoney(cashIn-cashOut)}，银行 ${fmtMoney(bankIn)}，收款总计 ${fmtMoney(cashIn+bankIn)}。`);
+}
+function previewField(label,value){
+  return `<div class="preview-field"><span>${esc(label)}</span><b>${esc(value||'-')}</b></div>`;
+}
+function previewCard(e,i){
+  const tail=Math.max(0,num(e.period_due)-num(e.paid));
+  const subject=e.type==='TF'?`#${e.bed_from||e.room||'-'} → #${e.bed_to||'-'}`:(e.type==='E'?(e.expense_category||'支出'):`#${e.room||'-'}`);
+  const period=e.period_start&&e.period_end?`${e.period_start} → ${e.period_end}`:'-';
+  const pay=e.type==='E'?'支出':(e.pay_type==='B'?'银行':'现金');
+  const sync=e.sync_status==='SYNCED'?'已上传云端':'本票待导出';
+  return `<div class="preview-detail-card">
+    <div class="preview-detail-top"><b>${i+1}. ${esc(eventLabel(e.type))} · ${esc(subject)}</b><b class="money">${fmtMoney(e.amount)} AED</b></div>
+    <div class="preview-detail-grid">
+      ${previewField('付款方式 PAYMENT',pay)}
+      ${previewField('备注/CID REMARK',`${e.tenant_name||'-'} / ${e.tenant_card_id||'-'}`)}
+      ${previewField('账期 PERIOD',period)}
+      ${previewField('应收/计入 DUE/PAID',`${fmtMoney(e.due)} / ${fmtMoney(e.paid)}`)}
+      ${previewField('尾款 TAIL',tail>0?`${fmtMoney(tail)} AED · ${e.arrear_promise_date||'-'}`:'无')}
+      ${previewField('原因 REASON',e.arrear_reason_detail||e.custom_reason||e.reason_code||'-')}
+      ${previewField('状态 STATUS',sync)}
+      ${previewField('记录 EID',e.id||'-')}
+      ${previewField('备注 REMARK',e.note||e.remark||e.expense_desc||'-')}
+    </div>
+  </div>`;
+}
+function previewSession(){
+  refreshSessionViews();
+  const s=sessionStats();
+  const body=$('previewModalBody');
+  if(!state.drafts.length){
+    body.innerHTML='<div class="preview-empty"><div><b>当前本票没有流水</b><br><span>先完成单笔录入，再打开预览核对。</span></div></div>';
+  }else{
+    body.innerHTML=`<div class="preview-anchor-row">
+      <div class="preview-anchor"><span>现金结余 CASH HANDOVER</span><b>${fmtMoney(s.cashBalance)}</b></div>
+      <div class="preview-anchor"><span>银行转账 BANK TRANSFER</span><b>${fmtMoney(s.bankIn)} · ${s.bankCount}笔</b></div>
+      <div class="preview-anchor"><span>收款总计 GROSS RECEIVED</span><b>${fmtMoney(s.grossReceived)}</b></div>
+    </div>${state.drafts.map((e,i)=>previewCard(e,i)).join('')}`;
+  }
+  $('previewModal').classList.add('show');
+  showStatus(`预览已打开：当前本票 ${state.drafts.length} 笔流水。`);
+  toast(`预览已打开：${state.drafts.length} 笔流水`);
+}
+function closePreviewModal(){
+  $('previewModal').classList.remove('show');
+}
+async function commitSessionAndExport(){
+  if(!state.user){applyEmployeeUser(null);toast('请先登录员工账号',6000);return}
+  buildExport();
+  document.querySelector('[data-view="export"]').click();
+  if(!state.drafts.length){showStatus('当前本票没有流水，不能导出交接。','warn');toast('当前本票没有流水，不能导出交接',6000);return}
+  const btns=[$('btnExportSession'),$('btnBuildExport')].filter(Boolean);
+  if(btns.some(b=>b.dataset.busy==='1'))return;
+  const oldLabels=btns.map(b=>[b,b.innerHTML]);
+  btns.forEach(b=>{b.dataset.busy='1';b.disabled=true;b.classList.add('disabled');b.innerHTML='正在导出<span class="label-en">EXPORTING</span>'});
+  const pending=state.drafts.filter(e=>e.sync_status!=='SYNCED');
+  if(!pending.length){
+    const localOk=saveDrafts();
+    buildExport();
+    showStatus(localOk?'交接已完成：云端已完成，本地也已保存。':'云端已完成，但本地保存失败，请不要关闭页面。',localOk?'ok':'warn');
+    toast(localOk?'交接已完成：云端已完成，本地也已保存。':'云端已完成，但本地保存失败，请不要关闭页面。',6000);
+    oldLabels.forEach(([b,html])=>{b.dataset.busy='0';b.disabled=false;b.classList.remove('disabled');b.innerHTML=html});
+    return;
+  }
+  showStatus(`正在导出交接：上传 ${pending.length} 笔流水...`);
+  toast(`正在导出交接：上传 ${pending.length} 笔流水...`,6000);
+  const session=currentSessionPayload();
+  const completedExportText=($('exportText')?.textContent||'').replace(/Sync pending/g,'All synced');
+  const failed=[];
+  const uploadList=[...pending].reverse();
+  for(let i=0;i<uploadList.length;i++){
+    const e=uploadList[i];
+    const isFinal=i===uploadList.length-1;
+    const sessionForEntry={...session,handover_status:isFinal?'COMPLETED':'EXPORTING',export_text:isFinal?completedExportText:session.export_text};
+    try{
+      const r=await apiFetch('/api/employee/entry',{method:'POST',body:JSON.stringify({entry:e,session:sessionForEntry})});
+      const raw=await r.text();
+      let data=null;
+      try{data=raw?JSON.parse(raw):null}catch{}
+      if(!r.ok||data?.success===false)throw new Error(data?.error||data?.message||raw||('HTTP '+r.status));
+      e.sync_status='SYNCED';
+      e.cloud_entry_id=data?.entry_id||e.cloud_entry_id||'';
+      e.sync_error='';
+      if(data?.arrear_task)e.cloud_task_id=data.arrear_task.task_id||e.cloud_task_id||'';
+      saveDrafts();
+    }catch(err){
+      e.sync_status='LOCAL';
+      e.sync_error=String(err?.message||err||'cloud_submit_failed');
+      failed.push(e);
+      saveDrafts();
+      break;
+    }
+  }
+  if(!failed.length)await loadTasks(false);
+  renderContext();
+  refreshSessionViews();
+  buildExport();
+  oldLabels.forEach(([b,html])=>{b.dataset.busy='0';b.disabled=false;b.classList.remove('disabled');b.innerHTML=html});
+  if(failed.length){
+    $('validationBox').innerHTML=`<div class="bad">导出未完成：${esc(failed[0].sync_error)}</div><div class="warn">已上传成功的流水保留在云端；失败流水保留本地，修复后再次点击导出交接。</div>`;
+    toast('导出未完成：部分流水未上传，本地已保留。',6000);
+  }else{
+    const localOk=saveDrafts();
+    showStatus(localOk?'交接导出完成：云端已完成，本地也已保存。':'云端已完成，但本地保存失败，请不要关闭页面。',localOk?'ok':'warn');
+    toast(localOk?'交接导出完成：云端已完成，本地也已保存。':'云端已完成，但本地保存失败，请不要关闭页面。',6000);
+  }
+}
+document.querySelectorAll('.tab').forEach(btn=>btn.onclick=()=>{document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));btn.classList.add('active');['entry','arrears','export'].forEach(v=>$('view-'+v).classList.toggle('hidden',v!==btn.dataset.view));if(btn.dataset.view==='arrears')loadTasks(true);if(btn.dataset.view==='export')buildExport()});
+document.querySelectorAll('.event-chip').forEach(btn=>btn.addEventListener('click',e=>{e.preventDefault();setEntryType(btn.dataset.type);}));
+document.querySelectorAll('.pay-option').forEach(btn=>btn.addEventListener('click',e=>{e.preventDefault();setPaymentType(btn.dataset.pay);}));
+['entryType','cycle','payType','amount','reasonCode','feePaid','customReason','tenantName','bankRef','periodDays','depositDeduction','checkoutDate','noNoticeDeduction','otherDeduction','dedNote','excessTo','bedTo','expenseCategory','expenseDesc','remark','arrearHandling','arrearPromiseDate','arrearReasonDetail'].forEach(id=>$(id).addEventListener('input',syncForm));
+$('linkedTaskId').addEventListener('change',applyLinkedTask);
+$('bed').addEventListener('input',lookupBed);$('tenantCardId').addEventListener('change',e=>{state.depositBalance=null;if(e.target.value.trim())loadDepositBalance(e.target.value.trim());else renderContext();});$('btnLoadLock').onclick=loadLock;$('btnSaveEntry').onclick=saveEntry;$('btnReset').onclick=()=>{resetForm();showStatus('表单已清空。');toast('表单已清空')};$('btnRefreshTasks').onclick=refreshFollowup;$('btnBuildExport').onclick=commitSessionAndExport;$('btnCopyExport').onclick=async()=>{try{await navigator.clipboard.writeText($('exportText').textContent);showStatus('导出文本已复制。');toast('已复制')}catch{showStatus('复制失败，请手动选择导出文本。','warn');toast('复制失败，请手动选择文本',6000)}};$('btnClearLocal').onclick=()=>{if(hasLocalOnly()){showStatus('仍有云端未确认记录，不能清空。','warn');toast('仍有云端未确认记录，不能清空',6000);return}if(confirm('清空本机草稿？')){state.drafts=[];saveDrafts();buildExport();refreshSessionViews();showStatus('本机草稿已清空。');toast('已清空')}};$('btnNewSessionTop').onclick=newSession;$('btnPreviewSession').onclick=previewSession;$('btnExportSession').onclick=commitSessionAndExport;$('operatorId').value=localStorage.getItem('empv3:operator')||'';$('operatorId').onchange=e=>{setOperator(e.target.value.trim());refreshSessionViews();showStatus('员工编号已更新。')};
+$('btnClosePreview').onclick=closePreviewModal;
+$('previewModal').addEventListener('click',e=>{if(e.target===$('previewModal'))closePreviewModal()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closePreviewModal()});
+$('btnEmployeeLogin').onclick=employeeLogin;
+$('loginPin').addEventListener('keydown',e=>{if(e.key==='Enter')employeeLogin()});
+$('loginEmployeeId').addEventListener('keydown',e=>{if(e.key==='Enter')$('loginPin').focus()});
+function applyBilingualUILegacy(){
+  const label=(id,zh,en)=>{const el=$(id);const l=el?.closest('.field')?.querySelector('label');if(l)l.innerHTML=`${zh}<span class="label-en">${en}</span>`};
+  document.querySelectorAll('.body>.context-note:not(#contextNotice):not(#apTaskInfo)').forEach(el=>el.remove());
+  if(!$('validationBox')){
+    const actions=document.querySelector('#btnSaveEntry')?.closest('.row');
+    if(actions)actions.insertAdjacentHTML('beforebegin','<div id="validationBox" class="hint"></div>');
+  }
+  document.querySelector('.card .head .title').innerHTML='本票流水汇总<span class="label-en">CURRENT SESSION SUMMARY</span>';
+  const entryTitle=document.querySelector('#view-entry>.card:nth-child(2) .head .title');if(entryTitle)entryTitle.innerHTML='事件录入<span class="label-en">ADD ENTRY</span>';
+  $('btnLoadLock').innerHTML='抓取通通锁<span class="label-en">LOAD TTLOCK</span>';
+  $('btnSaveEntry').innerHTML='加入本票<span class="label-en">ADD TO SESSION</span>';
+  $('btnReset').innerHTML='清空<span class="label-en">RESET</span>';
+  const steps=[
+    ['第一步：选择事件类型','STEP 1 · SELECT EVENT TYPE'],
+    ['第二步：确定对象','STEP 2 · CONFIRM TARGET'],
+    ['第三步：核对系统资料','STEP 3 · VERIFY SYSTEM CONTEXT'],
+    ['第四步：付款方式','STEP 4 · PAYMENT METHOD'],
+    ['第五步：填写金额','STEP 5 · ENTER AMOUNT'],
+    ['第六步：确认账期','STEP 6 · CONFIRM PERIOD'],
+    ['第七步：处理异常或差额','STEP 7 · HANDLE EXCEPTION'],
+    ['第八步：摘要确认 + 提交','STEP 8 · REVIEW & SUBMIT']
+  ];
+  document.querySelectorAll('.step-title').forEach((el,i)=>{const n=el.querySelector('span')?.outerHTML||'';const s=steps[i];if(s)el.innerHTML=`${n}<div>${s[0]}<small>${s[1]}</small></div>`});
+  const eventNames={R:['收租','RENT'],AP:['还欠款','ARREARS PAYMENT'],D:['收押金','DEPOSIT IN'],DR:['退押金','DEPOSIT OUT'],CO:['退房','CHECKOUT'],E:['支出','EXPENSE'],TF:['换床','BED TRANSFER']};
+  document.querySelectorAll('.event-chip').forEach(btn=>{const v=btn.dataset.type,n=eventNames[v];if(n)btn.innerHTML=`<span>${n[0]}</span><small>${n[1]}</small>`});
+  $('entryType').innerHTML=[
+    ['R','收租','RENT'],['D','收押金','DEPOSIT IN'],['DR','退押金','DEPOSIT OUT'],['CO','退房','CHECKOUT'],['AP','还欠款','ARREARS PAYMENT'],['E','支出','EXPENSE'],['TF','换床','BED TRANSFER']
+  ].map(([v,zh,en])=>`<option value="${v}">${zh} ${en}</option>`).join('');
+  $('payType').innerHTML='<option value="C">现金 CASH</option><option value="B">银行 BANK</option>';
+  label('entryType','事件类型','EVENT TYPE');label('bed','床位','BED');label('tenantName','通通锁备注快照','TTLOCK REMARK SNAPSHOT');label('tenantCardId','通通锁卡号','TTLOCK CID');
+  label('payType','付款方式','PAYMENT METHOD');label('bankRef','银行参考','BANK REF');label('amount','实收/支出金额','AMOUNT');label('listPrice','系统月租','LIST PRICE');
+  label('cycle','账期类型','CYCLE');label('periodStart','账期开始','PERIOD START');label('periodEnd','账期截止','PERIOD END');label('periodDays','账期天数','PERIOD DAYS');
+  label('periodDue','账期应收','PERIOD DUE');label('due','本条应收','ENTRY DUE');label('linkedTaskId','选择欠款任务','ARREARS TASK');
+  label('checkoutDate','实际离开日期','CHECKOUT DATE');label('overdayDeduction','超期扣款','OVERDAY DEDUCTION');label('noNoticeDeduction','未提前告知扣款','NO NOTICE DEDUCTION');
+  label('otherDeduction','其他扣款','OTHER DEDUCTION');label('depositDeduction','押金扣款合计','DEPOSIT DEDUCTION');label('depositReturnAmount','应退押金','DEPOSIT REFUND');
+  label('dedNote','扣款说明','DEDUCTION NOTE');label('bedTo','换至床位','BED TO');label('feePaid','换床费处理','TRANSFER FEE');
+  label('expenseCategory','支出类别','EXPENSE CATEGORY');label('expenseDesc','支出说明','EXPENSE DESCRIPTION');label('paid','系统计入','SYSTEM PAID');label('entryClr','系统结清','SYSTEM CLEAR');
+  label('excessTo','超收处理','EXCESS HANDLING');label('arrearAmount','尾款金额','TAIL BALANCE');label('arrearPromiseDate','承诺支付日期','PROMISE DATE');label('arrearHandling','处理方式','HANDLING');label('arrearReasonDetail','尾款原因','TAIL REASON');label('reasonCode','原因代码','REASON CODE');label('customReason','异常原因','EXCEPTION REASON');label('remark','备注','REMARK');
+}
+function labelPair(zh,en){return `${esc(zh)}<small>${esc(en)}</small>`}
+function ctxRow(zh,en,value,extra=''){
+  return `<div class="ctx-row"><div class="ctx-label">${esc(zh)}<small>${esc(en)}</small></div><div class="ctx-value ${extra}">${esc(value||'未抓取')}</div></div>`;
+}
+function renderContextLegacyPanels(){
+  const c=state.current;
+  const ledger=state.depositBalance!=null?fmtMoney(state.depositBalance):'未建立';
+  const rent=rentForBed()?fmtMoney(rentForBed()):'未配置';
+  const bed=c?.bed||$('bed').value||'未抓取';
+  const cid=$('tenantCardId')?.value||c?.tenant_card_id||'未抓取';
+  const tenant=$('tenantName')?.value||c?.tenant||'未抓取';
+  const remark=c?.remark||c?.cardText||'未抓取';
+  const box=$('bedContext');
+  box.className='ctx clean-context';
+  box.innerHTML=[
+    `<div class="ctx-panel identity"><div class="ctx-title">身份核对<small>IDENTITY</small></div>${ctxRow('匹配床位','MATCHED BED',bed)}${ctxRow('CID','TTLOCK CID',cid)}${ctxRow('租客','TENANT',tenant)}</div>`,
+    `<div class="ctx-panel"><div class="ctx-title">金额锚点<small>AMOUNT ANCHORS</small></div>${ctxRow('系统月租','LIST PRICE',rent,'money')}${ctxRow('卡片押金','CARD DEPOSIT',c?.deposit?fmtMoney(c.deposit):'未抓取','money')}${ctxRow('台账押金','LEDGER DEPOSIT',ledger,'money')}</div>`,
+    `<div class="ctx-panel"><div class="ctx-title">日期锚点<small>DATE ANCHORS</small></div>${ctxRow('入住','CHECK-IN',c?.start||'未抓取')}${ctxRow('当前截止','CURRENT END',c?.end||'未抓取')}</div>`,
+    `<div class="ctx-panel remark"><div class="ctx-title">通通锁备注<small>TTLOCK REMARK</small></div><div class="ctx-value">${esc(remark)}</div></div>`
+  ].join('');
+}
+function renderSessionKpis(){
+  const s=sessionStats();
+  $('sessionClock').textContent=`${today()} · ${operatorId()} · ${s.rows.length} 条记录`;
+  const grid=$('sessionKpis');
+  grid.className='kpi-grid session-kpi-grid';
+  const anchors=[
+    ['现金结余','CASH HANDOVER',s.cashBalance,'anchor','应面对面交接现金'],
+    ['银行转账总计','BANK TRANSFER',s.bankIn,'anchor bank',`${s.bankCount} 笔银行入账`],
+    ['收款总计','GROSS RECEIVED',s.grossReceived,'anchor total','现金总收入 + 银行总收入']
+  ];
+  const details=[
+    ['租金收入','RENT',s.rentIn,'','本期租金入账'],
+    ['押金收取','DEPOSIT IN',s.depositIn,'blue','押金是负债'],
+    ['欠款回收','ARREARS',s.arrearsIn,'orange','历史应收回款'],
+    ['换床费','TRANSFER FEE',s.transferFee,'','服务费收入'],
+    ['押金退款','DEP. REFUND',s.depRefund,'orange','现金支出项'],
+    ['其他支出','EXPENSES',s.expenses,'red','现金支出项']
+  ];
+  const card=([cn,en,v,cls,note])=>`<div class="kpi-card ${esc(cls)}"><span>${esc(cn)}</span><small>${esc(en)}</small><b>${fmtDisplayMoney(v)}</b><small>${esc(note)}</small></div>`;
+  grid.innerHTML=`<div class="kpi-section-label">交接核心<small>HANDOVER CORE</small></div><div class="handover-anchors">${anchors.map(card).join('')}</div><div class="kpi-section-label">流水明细<small>DETAIL BREAKDOWN</small></div><div class="handover-details">${details.map(card).join('')}</div>`;
+}
+function applyBilingualUI(){
+  const label=(id,zh,en)=>{const el=$(id);const l=el?.closest('.field')?.querySelector('label');if(l)l.innerHTML=`${esc(zh)}<span class="label-en">${esc(en)}</span>`};
+  document.querySelectorAll('.body>.context-note:not(#contextNotice):not(#apTaskInfo)').forEach(el=>el.remove());
+  if(!$('validationBox')){
+    const actions=document.querySelector('#btnSaveEntry')?.closest('.row');
+    if(actions)actions.insertAdjacentHTML('beforebegin','<div id="validationBox" class="hint"></div>');
+  }
+  const topTitle=document.querySelector('#view-entry>.card:first-child .head .title');if(topTitle)topTitle.innerHTML='本票流水汇总<span class="label-en">CURRENT SESSION SUMMARY</span>';
+  const entryTitle=document.querySelector('#view-entry>.card:nth-child(2) .head .title');if(entryTitle)entryTitle.innerHTML='事件录入<span class="label-en">ADD ENTRY</span>';
+  const previewTitle=document.querySelector('#view-entry>.card:nth-child(3) .head .title');if(previewTitle)previewTitle.innerHTML='本次会话<span class="label-en">CURRENT SESSION</span>';
+  $('btnNewSessionTop').innerHTML='新会话<span class="label-en">NEW SESSION</span>';
+  $('btnLoadLock').innerHTML='抓取通通锁<span class="label-en">LOAD TTLOCK</span>';
+  $('btnSaveEntry').innerHTML='加入本票<span class="label-en">ADD TO SESSION</span>';
+  $('btnReset').innerHTML='清空<span class="label-en">RESET</span>';
+  const steps=[
+    ['第一步：选择事件类型','STEP 1 · SELECT EVENT TYPE'],
+    ['第二步：确定对象','STEP 2 · CONFIRM TARGET'],
+    ['第三步：核对系统资料','STEP 3 · VERIFY SYSTEM CONTEXT'],
+    ['第四步：付款方式','STEP 4 · PAYMENT METHOD'],
+    ['第五步：填写金额','STEP 5 · ENTER AMOUNT'],
+    ['第六步：确认账期','STEP 6 · CONFIRM PERIOD'],
+    ['第七步：处理异常或差额','STEP 7 · HANDLE EXCEPTION'],
+    ['第八步：摘要确认 + 提交','STEP 8 · REVIEW & SUBMIT']
+  ];
+  document.querySelectorAll('.step-title').forEach((el,i)=>{const n=el.querySelector('span')?.outerHTML||'';const s=steps[i];if(s)el.innerHTML=`${n}<div>${esc(s[0])}<small>${esc(s[1])}</small></div>`});
+  const eventNames={R:['收租','RENT'],AP:['还欠款','ARREARS PAYMENT'],D:['收押金','DEPOSIT IN'],DR:['退押金','DEPOSIT OUT'],CO:['退房','CHECKOUT'],E:['支出','EXPENSE'],TF:['换床','BED TRANSFER']};
+  document.querySelectorAll('.event-chip').forEach(btn=>{const v=btn.dataset.type,n=eventNames[v];if(n)btn.innerHTML=`<span>${esc(n[0])}</span><small>${esc(n[1])}</small>`});
+  $('entryType').innerHTML=[
+    ['R','收租','RENT'],['D','收押金','DEPOSIT IN'],['DR','退押金','DEPOSIT OUT'],['CO','退房','CHECKOUT'],['AP','还欠款','ARREARS PAYMENT'],['E','支出','EXPENSE'],['TF','换床','BED TRANSFER']
+  ].map(([v,zh,en])=>`<option value="${v}">${zh} ${en}</option>`).join('');
+  $('payType').innerHTML='<option value="C">现金 CASH</option><option value="B">银行 BANK</option>';
+  label('entryType','事件类型','EVENT TYPE');label('bed','床位','BED');label('tenantName','通通锁备注快照','TTLOCK REMARK SNAPSHOT');label('tenantCardId','通通锁卡号','TTLOCK CID');
+  label('payType','付款方式','PAYMENT METHOD');label('bankRef','银行参考','BANK REF');label('amount','实收/支出金额','AMOUNT');label('listPrice','系统月租','LIST PRICE');
+  label('cycle','账期类型','CYCLE');label('periodStart','账期开始','PERIOD START');label('periodEnd','账期截止','PERIOD END');label('periodDays','账期天数','PERIOD DAYS');
+  label('periodDue','账期应收','PERIOD DUE');label('due','本条应收','ENTRY DUE');label('linkedTaskId','选择欠款任务','ARREARS TASK');
+  label('checkoutDate','实际离开日期','CHECKOUT DATE');label('overdayDeduction','超期扣款','OVERDAY DEDUCTION');label('noNoticeDeduction','未提前告知扣款','NO NOTICE DEDUCTION');
+  label('otherDeduction','其他扣款','OTHER DEDUCTION');label('depositDeduction','押金扣款合计','DEPOSIT DEDUCTION');label('depositReturnAmount','应退押金','DEPOSIT REFUND');
+  label('dedNote','扣款说明','DEDUCTION NOTE');label('bedTo','换至床位','BED TO');label('feePaid','换床费处理','TRANSFER FEE');
+  label('expenseCategory','支出类别','EXPENSE CATEGORY');label('expenseDesc','支出说明','EXPENSE DESCRIPTION');label('paid','系统计入','SYSTEM PAID');label('entryClr','系统结清','SYSTEM CLEAR');
+  label('excessTo','超收处理','EXCESS HANDLING');label('arrearAmount','尾款金额','TAIL BALANCE');label('arrearPromiseDate','承诺支付日期','PROMISE DATE');label('arrearHandling','处理方式','HANDLING');label('arrearReasonDetail','尾款原因','TAIL REASON');label('reasonCode','原因代码','REASON CODE');label('customReason','异常原因','EXCEPTION REASON');label('remark','备注','REMARK');
+}
+function ctxRowFinal(zh,en,value,extra=''){
+  return `<div class="ctx-row"><div class="ctx-label">${esc(zh)}<small>${esc(en)}</small></div><div class="ctx-value ${extra}">${esc(value||'未抓取')}</div></div>`;
+}
+function contextLine(zh,en,value){
+  return `<div class="context-line"><span>${esc(zh)}<small>${esc(en)}</small></span><b>${esc(value||'未抓取')}</b></div>`;
+}
+function contextChip(zh,en,value,cls=''){
+  return `<div class="context-chip ${cls}"><span>${esc(zh)} · ${esc(en)}</span><b>${esc(value||'未抓取')}</b></div>`;
+}
+function renderContext(){
+  const c=state.current;
+  const ledger=state.depositBalance!=null?fmtMoney(state.depositBalance):'未建立';
+  const rent=rentForBed()?fmtMoney(rentForBed()):'未配置';
+  const inputBed=$('bed').value.trim().replace(/^#/,'');
+  const remark=c?.remark||c?.cardText||'未抓取';
+  const remarkBed=c?.bed||'未抓取';
+  const cid=$('tenantCardId')?.value||c?.tenant_card_id||'未抓取';
+  const checkin=c?.start_md||'未抓取';
+  const currentEnd=c?.end||'未抓取';
+  const parseState=c?(c.remark_parse_ok?'完整':'缺少 '+(c.remark_parse_missing||[]).join('、')):'未抓取';
+  const mismatch=inputBed&&c?.bed&&String(inputBed)!==String(c.bed);
+  const matchStatus=mismatch?`不一致：输入 ${inputBed} / 备注 ${c.bed}`:(inputBed||remarkBed);
+  const matchClass=mismatch?'warn':'';
+  const open=openTasksForBed();
+  const arrearTotal=open.reduce((s,t)=>s+taskRemain(t),0);
+  const arrearText=open.length?`${open.length} 笔 / ${fmtMoney(arrearTotal)} AED`:'无未清欠款';
+  const depositText=c?.deposit?fmtMoney(c.deposit):'未抓取';
+  const ledgerText=ledger;
+  const box=$('bedContext');
+  box.className='ctx clean-context';
+  box.innerHTML=`<div class="context-board">
+    <div class="priority-grid">
+      <div class="priority-card bed-check strong ${matchClass}"><span>床位核对<small>BED CHECK</small></span><b>${esc(matchStatus)}</b><div class="sub">输入 ${esc(inputBed||'未输入')} · 备注 ${esc(remarkBed)}</div></div>
+      <div class="priority-card arrears-check ${open.length?'warn':'strong'}"><span>历史欠款<small>ARREARS</small></span><b>${esc(arrearText)}</b><div class="sub">${open.length?'优先确认是否还旧账':'未发现未清任务'}</div></div>
+      <div class="priority-card date-check"><span>日期锚点<small>DATE ANCHORS</small></span><b>${esc(checkin)} → ${esc(currentEnd)}</b><div class="sub">备注入住月日 · 通通锁截止</div></div>
+      <div class="priority-card deposit-check"><span>押金<small>DEPOSIT</small></span><b>${esc(depositText)}</b><div class="sub">台账押金 ${esc(ledgerText)}</div></div>
+      <div class="priority-card rent-check"><span>系统月租<small>LIST PRICE</small></span><b>${esc(rent)}</b><div class="sub">老板端配置租金</div></div>
+    </div>
+    <div class="secondary-grid">
+      <div class="secondary-box"><h4>系统锚点<small>SYSTEM ANCHORS</small></h4>${contextLine('备注解析','REMARK PARSE',parseState)}${contextLine('通通锁卡号','TTLOCK CID',cid)}${contextLine('备注原文','TTLOCK REMARK',remark)}</div>
+      <div class="secondary-box"><h4>核对说明<small>CHECK GUIDE</small></h4>${contextLine('优先级','PRIORITY','床位 → 历史欠款 → 日期 → 押金 → 月租')}${contextLine('备注锚点','REMARK SNAPSHOT',remark)}</div>
+    </div>
+  </div>`;
+}
+applyBilingualUI();
+renderContext();syncForm();refreshSessionViews();
+checkEmployeeSession();
+loadRentConfig();
+</script>
+</body>
+</html>

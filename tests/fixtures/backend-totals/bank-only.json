@@ -1,0 +1,22 @@
+{
+  "name": "bank-only",
+  "rows": [
+    { "id": "bank-rent-1", "type": "R", "pay_type": "B", "amount": "770.00" },
+    { "id": "bank-fee-1", "type": "TF", "pay_type": "BANK", "amount": "30.00" }
+  ],
+  "frontendTotals": {
+    "cash_handover": "0.00",
+    "bank_transfer_total": "800.00",
+    "bank_transfer_count": 2,
+    "gross_received": "800.00",
+    "session_total": "800.00"
+  },
+  "expected": {
+    "cashTotalAed": "0.00",
+    "bankTransferAed": "800.00",
+    "bankTransferCount": 2,
+    "grossReceivedAed": "800.00",
+    "transferFeeAed": "30.00",
+    "errors": 0
+  }
+}

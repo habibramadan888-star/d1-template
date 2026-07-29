@@ -1,0 +1,21 @@
+{
+  "receivable": {
+    "receivableId": "rec_voided_payment",
+    "sourceType": "RENT",
+    "propertyId": "staging-property",
+    "amountAed": "770.00",
+    "paidAed": "80.00",
+    "dueDate": "2026-05-20"
+  },
+  "payment": {
+    "allocationId": "alloc_voided_payment",
+    "paymentSourceType": "TRANSACTION",
+    "paymentSourceId": "tx_voided_payment",
+    "amountAed": "690.00",
+    "status": "VOIDED"
+  },
+  "expected": {
+    "status": "PARTIAL",
+    "outstandingAed": "690.00"
+  }
+}
