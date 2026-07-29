@@ -10576,6 +10576,17 @@ function isPhase0RouteWiringEnabled(env){
   return enabled&&["development","dev","local","test","staging"].includes(appEnv);
 }
 __name(isPhase0RouteWiringEnabled,"isPhase0RouteWiringEnabled");
+function trustedRuntimeEnvironment(env){
+  const appEnv=String(env.APP_ENV||"").trim().toLowerCase();
+  return appEnv==="production"||appEnv==="staging"?appEnv:"";
+}
+__name(trustedRuntimeEnvironment,"trustedRuntimeEnvironment");
+function runtimeEnvironmentSignalResponse(env){
+  const environment=trustedRuntimeEnvironment(env);
+  if(!environment)return errorResponse("runtime_environment_unavailable",503);
+  return success({status:"healthy",environment});
+}
+__name(runtimeEnvironmentSignalResponse,"runtimeEnvironmentSignalResponse");
 async function phase0TableExists(env,table){
   try{
     const row=await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=? LIMIT 1").bind(table).first();
@@ -11738,7 +11749,6 @@ async function handlePhase0ReadOnlyApi(request,env,user){
   const url=new URL(request.url);
   const path=url.pathname;
   const method=request.method;
-  if(path==="/api/health"&&method==="GET")return success({status:"healthy",environment:env.APP_ENV||"",phase0RouteWiring:true});
   if(path==="/api/health/db"&&method==="GET")return success({status:env.DB?"connected":"missing",database:"D1"});
   if(path==="/api/metrics/errors"&&method==="GET")return success({errorRate:0,window:"local_phase0",readonly:true});
   if(path==="/api/entry/add"&&method==="POST"&&isReadonlyAdminRoleValue(user.role))return forbidden();
@@ -13927,6 +13937,9 @@ async function handleRequest(request, env, ctx) {
       return authFailureResponse(auth);
     }
     const user = auth.payload;
+    if(path==="/api/health"&&method==="GET"){
+      return runtimeEnvironmentSignalResponse(env);
+    }
     if(path==="/api/capabilities"&&method==="GET"){
       return success(bedTransferDeploymentCapabilities(env));
     }
