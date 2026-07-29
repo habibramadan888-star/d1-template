@@ -354,7 +354,7 @@ function bedAccessSnapshot(
     || access.ambiguous === true
     || access.conflict === true
     || access.stale === true
-    || access.status !== "ready"
+    || access.status !== "loaded"
     || access.parse_status !== "parsed"
   ) {
     return undefined;

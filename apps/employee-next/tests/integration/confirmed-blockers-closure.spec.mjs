@@ -103,7 +103,7 @@ function depositPayload() {
   });
 }
 
-function bedPayload(bed, vacant) {
+function bedPayload(bed, vacant, status = "loaded") {
   return success({
     gateway: "canonical_bed_context_gateway",
     bed,
@@ -116,7 +116,7 @@ function bedPayload(bed, vacant) {
       current_rent_coverage_end: "2026-07-31",
     },
     access_snapshot_context: {
-      status: "ready",
+      ...(status === null ? {} : { status }),
       parse_status: "parsed",
       candidate_count: 1,
       ambiguous: false,
@@ -313,6 +313,45 @@ test("six event contexts use authenticated GET gateways and fail closed", async 
   assert.equal(calls.length, beforeRetry + 1);
   assert.equal(calls.every((call) => call.init.method === "GET"), true);
   assert.equal(calls.some((call) => call.init.method === "POST"), false);
+});
+
+test("Bed Transfer accepts only the loaded access snapshot status", async () => {
+  for (const [status, expectedReady] of [
+    ["loaded", true],
+    ["ready", false],
+    ["not_found", false],
+    ["partial", false],
+    ["invalid", false],
+    ["ambiguous", false],
+    [null, false],
+  ]) {
+    const contexts = runtime.createEmployeeNextEntryContextPort(
+      {
+        async request(path) {
+          if (path.startsWith(paths.arrears)) {
+            return response(arrearsPayload([]));
+          }
+          if (path.includes("bed=144")) {
+            return response(bedPayload("144", false, status));
+          }
+          if (path.includes("bed=122")) {
+            return response(bedPayload("122", true, status));
+          }
+          return response({ success: false }, 404);
+        },
+      },
+      () => authSession,
+      productionEnvironment,
+      paths,
+    );
+    const draft = { fromBed: "144", toBed: "122" };
+    await contexts.refresh("bed-transfer", draft);
+    assert.equal(
+      contexts.read("bed-transfer", draft).ready,
+      expectedReady,
+      String(status),
+    );
+  }
 });
 
 test("Deposit Out loads every Canonical open arrears item and rejects partial snapshots", async () => {
