@@ -135,6 +135,60 @@ test("hard guards require correction before approval or rejection", () => {
   }
 });
 
+test("hard guards are derived from candidate facts without caller booleans", () => {
+  const cases = [
+    {
+      event_type: "bed_transfer",
+      candidate_payload: { from_bed: "334" },
+      expected: "BED_334",
+    },
+    {
+      event_type: "bed_transfer",
+      target_vacancy_marker: "occupied",
+      expected: "TARGET_NOT_VACANT_E",
+    },
+    {
+      event_type: "bed_transfer",
+      source_physical_status: "vacant",
+      expected: "SOURCE_NOT_OCCUPIED",
+    },
+    {
+      unresolved_d_conflict: true,
+      expected: "UNRESOLVED_D_CONFLICT",
+    },
+    {
+      open_arrears_count: 2,
+      open_arrears_complete: false,
+      expected: "MULTIPLE_OPEN_ARREARS_INCOMPLETE",
+    },
+  ];
+  for (const { expected, ...facts } of cases) {
+    const result = classify([], facts);
+    assert.equal(result.classification, "BUSINESS_ANOMALY", expected);
+    assert.equal(result.requires_correction_before_approve, true, expected);
+    assert.equal(result.correction_required_codes.includes(expected), true);
+  }
+  assert.equal(classify([], {
+    company_scope: "homelink",
+    authenticated_corpid: "other",
+  }).classification, "SECURITY_REJECTION");
+});
+
+test("classifier rejects accessor input without invoking it", () => {
+  let getterInvocationCount = 0;
+  const input = {};
+  Object.defineProperty(input, "event_type", {
+    enumerable: true,
+    get() {
+      getterInvocationCount += 1;
+      return "expense";
+    },
+  });
+  const result = classifyAcceptedOwnerReviewAnomaly(input);
+  assert.equal(result.classification, "SECURITY_REJECTION");
+  assert.equal(getterInvocationCount, 0);
+});
+
 test("direct approve candidate never substitutes for strict validator attestation", () => {
   const result = classify(["ARREARS_UNKNOWN"]);
   assert.equal(result.direct_approve_candidate, true);

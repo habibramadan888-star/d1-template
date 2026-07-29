@@ -1,5 +1,7 @@
 import {
   CANONICAL_EMPLOYEE_EVENT_TYPES,
+  createAcceptedOwnerReviewCandidateFingerprint,
+  createAcceptedOwnerReviewCommandFingerprint,
   deriveAcceptedOwnerReviewCanonicalResult,
   EFFECTIVE_ORIGINS,
   INTAKE_STATUSES,
@@ -8,7 +10,12 @@ import {
   LIFECYCLE_STATUSES,
   MATERIALIZATION_LEDGER_STATES,
   REVIEW_STATUSES,
+  validateAcceptedOwnerReviewJsonValue,
+  validateBoundStrictValidatorAttestation,
 } from "./accepted-owner-review-contract.mjs";
+import {
+  classifyAcceptedOwnerReviewAnomaly,
+} from "./accepted-owner-review-anomaly-classifier.mjs";
 
 function isPlainObject(value) {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
@@ -38,7 +45,12 @@ function failure(state, code) {
   return Object.freeze({
     ok: false,
     error_code: code,
-    state,
+    ...(Number.isInteger(state?.version)
+      ? { state_version: state.version }
+      : {}),
+    ...(safeText(state?.review_status, 60)
+      ? { review_status: safeText(state.review_status, 60) }
+      : {}),
     materialization_required: false,
   });
 }
@@ -79,16 +91,105 @@ function versionMatches(state, command) {
     && command.expected_version === state.version;
 }
 
-function hasStrictAttestation(command, eventType) {
-  const value = command?.strict_validator_attestation;
-  return isPlainObject(value)
-    && value.passed === true
-    && value.event_type === eventType
-    && safeText(value.payload_fingerprint, 180)
-    && safeText(value.validated_at, 80);
+function safeInput(value, section) {
+  const validation = validateAcceptedOwnerReviewJsonValue(value, section);
+  return validation.ok ? validation.value : null;
 }
 
-function ownerDecisionBase(state, command, reviewStatus, decision) {
+function candidateForDecision(state, command, action) {
+  const corrected = action === "CORRECT_APPROVE";
+  return {
+    event_type: state.event_type,
+    payload: {
+      business_payload: corrected
+        ? command.corrected_payload
+        : state.raw_employee_input,
+      classification_facts: corrected
+        ? command.corrected_classification_facts
+        : state.classification_facts,
+    },
+  };
+}
+
+function classificationForDecision(state, command, action) {
+  const corrected = action === "CORRECT_APPROVE";
+  const facts = corrected
+    ? command.corrected_classification_facts
+    : state.classification_facts;
+  const diagnostics = corrected
+    ? (facts?.diagnostics ?? [])
+    : [
+      ...(Array.isArray(state.anomaly_codes) ? state.anomaly_codes : []),
+      ...(Array.isArray(facts?.diagnostics) ? facts.diagnostics : []),
+    ];
+  return classifyAcceptedOwnerReviewAnomaly({
+    ...(isPlainObject(facts) ? facts : {}),
+    event_type: state.event_type,
+    candidate_payload: corrected
+      ? command.corrected_payload
+      : state.raw_employee_input,
+    diagnostics,
+    request_reached_server: facts?.request_reached_server !== false,
+    company_scope: state.company_scope,
+    authenticated_corpid: state.company_scope,
+    employee_explanation_complete:
+      state.employee_explanation_revisions.length > 0,
+  });
+}
+
+function decisionContext(state, command, action, ports) {
+  if (typeof ports?.hash_port !== "function") {
+    return { ok: false, error_code: "HASH_PORT_REQUIRED" };
+  }
+  const candidate = candidateForDecision(state, command, action);
+  let candidateFingerprint;
+  let commandFingerprint;
+  try {
+    candidateFingerprint = createAcceptedOwnerReviewCandidateFingerprint(
+      candidate,
+      ports.hash_port,
+    ).fingerprint;
+    commandFingerprint = createAcceptedOwnerReviewCommandFingerprint({
+      record_identity: {
+        company_scope: state.company_scope,
+        session_id: state.session_id,
+        entry_id: state.entry_id,
+        event_type: state.event_type,
+      },
+      expected_version: command.expected_version,
+      action,
+      actor: command.actor,
+      candidate_fingerprint: candidateFingerprint,
+      corrected_payload:
+        action === "CORRECT_APPROVE" ? command.corrected_payload : null,
+      correction_diff:
+        action === "CORRECT_APPROVE" ? command.correction_diff : null,
+      reason: command.reason,
+      strict_validator_attestation:
+        action === "REJECT" ? null : command.strict_validator_attestation,
+      classification_relevant_facts:
+        action === "CORRECT_APPROVE"
+          ? command.corrected_classification_facts
+          : state.classification_facts,
+    }, ports.hash_port).fingerprint;
+  } catch {
+    return { ok: false, error_code: "COMMAND_FINGERPRINT_INVALID" };
+  }
+  return {
+    ok: true,
+    candidate,
+    candidate_fingerprint: candidateFingerprint,
+    command_fingerprint: commandFingerprint,
+  };
+}
+
+function ownerDecisionBase(
+  state,
+  command,
+  reviewStatus,
+  decision,
+  context,
+) {
   return {
     ...state,
     version: nextVersion(state),
@@ -105,20 +206,25 @@ function ownerDecisionBase(state, command, reviewStatus, decision) {
       reason: safeText(command.reason, 1_000),
       decided_at: safeText(command.server_time, 80),
       idempotency_key: safeText(command.idempotency_key, 180),
+      command_fingerprint: context.command_fingerprint,
     },
     strict_validator_attestation: cloneFreeze(
       command.strict_validator_attestation,
     ),
+    bound_candidate_fingerprint: context.candidate_fingerprint,
     materialization_ledger_state: "NOT_APPLIED",
   };
 }
 
 export function createStrictDirectAcceptedState(input) {
+  input = safeInput(input, "direct_accept_input");
   if (
     !isPlainObject(input)
     || !CANONICAL_EMPLOYEE_EVENT_TYPES.includes(input.event_type)
     || !safeText(input.company_scope, 120)
     || !safeText(input.submitted_by, 120)
+    || !safeText(input.session_id, 180)
+    || !safeText(input.entry_id, 180)
   ) {
     throw new Error("DIRECT_ACCEPT_INPUT_INVALID");
   }
@@ -126,6 +232,8 @@ export function createStrictDirectAcceptedState(input) {
     version: 1,
     company_scope: safeText(input.company_scope, 120),
     submitted_by: safeText(input.submitted_by, 120),
+    session_id: safeText(input.session_id, 180),
+    entry_id: safeText(input.entry_id, 180),
     event_type: input.event_type,
     raw_employee_input: cloneFreeze(input.raw_employee_input ?? {}),
     employee_explanation_revisions: Object.freeze([]),
@@ -141,11 +249,14 @@ export function createStrictDirectAcceptedState(input) {
 }
 
 export function createPendingOwnerReviewState(input) {
+  input = safeInput(input, "owner_review_input");
   if (
     !isPlainObject(input)
     || !CANONICAL_EMPLOYEE_EVENT_TYPES.includes(input.event_type)
     || !safeText(input.company_scope, 120)
     || !safeText(input.submitted_by, 120)
+    || !safeText(input.session_id, 180)
+    || !safeText(input.entry_id, 180)
   ) {
     throw new Error("OWNER_REVIEW_INPUT_INVALID");
   }
@@ -168,18 +279,41 @@ export function createPendingOwnerReviewState(input) {
       content_hash: safeText(input.employee_explanation_hash, 180),
     }]
     : [];
+  const classificationFacts = isPlainObject(input.classification_facts)
+    ? input.classification_facts
+    : {};
+  const classification = classifyAcceptedOwnerReviewAnomaly({
+    ...classificationFacts,
+    event_type: input.event_type,
+    candidate_payload: input.raw_employee_input ?? {},
+    diagnostics: [
+      ...(Array.isArray(input.anomaly_codes) ? input.anomaly_codes : []),
+      ...(Array.isArray(classificationFacts.diagnostics)
+        ? classificationFacts.diagnostics
+        : []),
+    ],
+    request_reached_server:
+      classificationFacts.request_reached_server !== false,
+    company_scope: input.company_scope,
+    authenticated_corpid: input.company_scope,
+    employee_explanation_complete: revisions.length > 0,
+  });
+  if (classification.classification !== "BUSINESS_ANOMALY") {
+    throw new Error("OWNER_REVIEW_BUSINESS_ANOMALY_REQUIRED");
+  }
   return success({
     version: 1,
     company_scope: safeText(input.company_scope, 120),
     submitted_by: safeText(input.submitted_by, 120),
+    session_id: safeText(input.session_id, 180),
+    entry_id: safeText(input.entry_id, 180),
     event_type: input.event_type,
     raw_employee_input: cloneFreeze(input.raw_employee_input ?? {}),
     employee_explanation_revisions: cloneFreeze(revisions),
     system_evidence: cloneFreeze(input.system_evidence ?? {}),
     anomaly_codes: cloneFreeze(input.anomaly_codes ?? []),
-    requires_correction_before_approve:
-      input.requires_correction_before_approve === true,
-    hard_guard_codes: cloneFreeze(input.hard_guard_codes ?? []),
+    classification_facts: cloneFreeze(classificationFacts),
+    classification_snapshot: cloneFreeze(classification),
     intake_status: "ACCEPTED",
     review_status: "PENDING_OWNER_REVIEW",
     effective_origin: "NONE",
@@ -190,7 +324,9 @@ export function createPendingOwnerReviewState(input) {
   }).state;
 }
 
-export function transitionAcceptedOwnerReviewState(state, command) {
+export function transitionAcceptedOwnerReviewState(state, command, ports = {}) {
+  state = safeInput(state, "owner_review_state");
+  command = safeInput(command, "owner_review_command");
   if (!isPlainObject(state) || !isPlainObject(command)) {
     return failure(state, "STATE_OR_COMMAND_INVALID");
   }
@@ -199,18 +335,30 @@ export function transitionAcceptedOwnerReviewState(state, command) {
   }
 
   const action = safeText(command.action, 60).toUpperCase();
-  if (
-    ["APPROVE", "CORRECT_APPROVE", "REJECT"].includes(action)
-    && state.terminal_decision_record?.action === action
-    && safeText(state.terminal_decision_record.idempotency_key, 180)
+  let context = null;
+  if (["APPROVE", "CORRECT_APPROVE", "REJECT"].includes(action)) {
+    context = decisionContext(state, command, action, ports);
+    if (!context.ok) return failure(state, context.error_code);
+    if (
+      safeText(state.terminal_decision_record?.idempotency_key, 180)
       === safeText(command.idempotency_key, 180)
-  ) {
-    return Object.freeze({
-      ...success(state),
-      idempotent_replay: true,
-      materialization_required:
-        isOwnerReviewMaterializationEligible(state),
-    });
+      && safeText(command.idempotency_key, 180)
+    ) {
+      if (
+        state.terminal_decision_record?.action !== action
+        ||
+        state.terminal_decision_record.command_fingerprint
+        !== context.command_fingerprint
+      ) {
+        return failure(state, "IDEMPOTENCY_CONTENT_CONFLICT");
+      }
+      return Object.freeze({
+        ...success(state),
+        idempotent_replay: true,
+        materialization_required:
+          isOwnerReviewMaterializationEligible(state),
+      });
+    }
   }
   if (!versionMatches(state, command)) {
     return failure(state, "VERSION_CONFLICT");
@@ -279,18 +427,10 @@ export function transitionAcceptedOwnerReviewState(state, command) {
           reason: safeText(command.reason, 1_000),
           decided_at: safeText(command.server_time, 80),
           idempotency_key: safeText(command.idempotency_key, 180),
+          command_fingerprint: context.command_fingerprint,
         }),
         materialization_ledger_state: null,
       });
-    }
-    if (
-      action === "APPROVE"
-      && state.requires_correction_before_approve === true
-    ) {
-      return failure(state, "CORRECTION_REQUIRED_BEFORE_APPROVE");
-    }
-    if (!hasStrictAttestation(command, state.event_type)) {
-      return failure(state, "STRICT_VALIDATOR_ATTESTATION_REQUIRED");
     }
     if (
       state.employee_explanation_revisions.length === 0
@@ -308,16 +448,60 @@ export function transitionAcceptedOwnerReviewState(state, command) {
     ) {
       return failure(state, "CORRECTION_PAYLOAD_AND_DIFF_REQUIRED");
     }
+    if (
+      action === "CORRECT_APPROVE"
+      && !isPlainObject(command.corrected_classification_facts)
+    ) {
+      return failure(state, "CORRECTED_CLASSIFICATION_FACTS_REQUIRED");
+    }
+    const classification = classificationForDecision(
+      state,
+      command,
+      action,
+    );
+    if (classification.classification === "SECURITY_REJECTION") {
+      return failure(state, "SECURITY_REJECTION_NOT_APPROVABLE");
+    }
+    if (classification.classification === "SYSTEM_UNAVAILABLE") {
+      return failure(state, "SYSTEM_UNAVAILABLE_NOT_APPROVABLE");
+    }
+    if (classification.requires_correction_before_approve === true) {
+      return failure(
+        state,
+        action === "APPROVE"
+          ? "CORRECTION_REQUIRED_BEFORE_APPROVE"
+          : "CORRECTED_CANDIDATE_STILL_REQUIRES_CORRECTION",
+      );
+    }
+    if (
+      classification.classification === "BUSINESS_ANOMALY"
+      && classification.direct_approve_candidate !== true
+    ) {
+      return failure(state, "CANDIDATE_FACTS_NOT_APPROVABLE");
+    }
+    const attestation = validateBoundStrictValidatorAttestation(
+      command.strict_validator_attestation,
+      context.candidate,
+      ports.hash_port,
+    );
+    if (!attestation.ok) {
+      return failure(state, attestation.error_code);
+    }
     const next = ownerDecisionBase(
       state,
       command,
       action === "APPROVE" ? "APPROVED" : "CORRECT_APPROVED",
       action,
+      context,
     );
     if (action === "CORRECT_APPROVE") {
       next.corrected_payload = cloneFreeze(command.corrected_payload);
       next.correction_diff = cloneFreeze(command.correction_diff ?? {});
+      next.corrected_classification_facts = cloneFreeze(
+        command.corrected_classification_facts,
+      );
     }
+    next.decision_classification = cloneFreeze(classification);
     const result = success(next, { materialization_required: true });
     return Object.freeze({
       ...result,
@@ -357,6 +541,8 @@ export function transitionAcceptedOwnerReviewState(state, command) {
 }
 
 export function recordOwnerReviewMaterializationApplied(state, input) {
+  state = safeInput(state, "owner_review_state");
+  input = safeInput(input, "materialization_receipt");
   if (!isPlainObject(state) || !isPlainObject(input)) {
     return failure(state, "STATE_OR_MATERIALIZATION_INVALID");
   }

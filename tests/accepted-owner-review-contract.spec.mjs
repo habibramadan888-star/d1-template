@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import {
   CANONICAL_EMPLOYEE_EVENT_TYPES,
   CANONICAL_RESULTS,
+  createAcceptedOwnerReviewCandidateFingerprint,
   createAcceptedOwnerReviewFingerprint,
   deriveAcceptedOwnerReviewCanonicalResult,
   EFFECTIVE_ORIGINS,
@@ -17,11 +19,15 @@ import {
   LIFECYCLE_STATUSES,
   MATERIALIZATION_LEDGER_STATES,
   REVIEW_STATUSES,
+  validateAcceptedOwnerReviewRecordConsistency,
+  validateBoundStrictValidatorAttestation,
   validateAcceptedOwnerReviewEnvelope,
 } from "../modules/employees/accepted-owner-review-contract.mjs";
 
 const moduleUrl =
   new URL("../modules/employees/accepted-owner-review-contract.mjs", import.meta.url);
+const hashPort = (value) =>
+  createHash("sha256").update(value).digest("hex");
 
 function envelope(overrides = {}) {
   return {
@@ -53,6 +59,11 @@ function envelope(overrides = {}) {
 }
 
 function reviewRecord(overrides = {}) {
+  const payload = overrides.candidate_payload ?? { amount_aed: "50.00" };
+  const candidateFingerprint = createAcceptedOwnerReviewCandidateFingerprint({
+    event_type: "expense",
+    payload,
+  }, hashPort).fingerprint;
   return {
     intake_status: "ACCEPTED",
     review_status: "APPROVED",
@@ -62,11 +73,13 @@ function reviewRecord(overrides = {}) {
     materialization_ledger_state: "NOT_APPLIED",
     event_type: "expense",
     strict_validator_attestation: {
-      passed: true,
+      result: "PASS",
       event_type: "expense",
-      payload_fingerprint: "payload-1",
+      candidate_fingerprint: candidateFingerprint,
+      validator_contract_id: "employee-seven-event-strict-v1",
       validated_at: "2026-07-28T08:10:00.000Z",
     },
+    bound_candidate_fingerprint: candidateFingerprint,
     canonical_status: "CALLER_CANNOT_OVERRIDE",
     ...overrides,
   };
@@ -122,10 +135,12 @@ test("recursively rejects forbidden identity without echoing sensitive values", 
   const forbidden = findForbiddenIdentityFields({
     nested: [{ provider_phone: "+971-secret-number" }],
     deeper: { auth: { authorization: "Bearer secret-token" } },
+  }, {
+    trusted_section: "raw_input",
   });
   assert.deepEqual(forbidden, [
-    "$.deeper.auth.authorization",
-    "$.nested[0].provider_phone",
+    { trusted_section: "raw_input", depth: 3, index: 0 },
+    { trusted_section: "raw_input", depth: 3 },
   ]);
   const result = validateAcceptedOwnerReviewEnvelope(envelope({
     raw_employee_input: {
@@ -139,6 +154,7 @@ test("recursively rejects forbidden identity without echoing sensitive values", 
   );
   const serialized = JSON.stringify(result);
   assert.equal(serialized.includes("sensitive-card-value"), false);
+  assert.equal(serialized.includes("tenant_card_id"), false);
 });
 
 test("fails closed for circular, non-plain, over-deep, oversized and illegal JSON", () => {
@@ -180,12 +196,26 @@ test("fingerprint uses injected synchronous deterministic hash and not evidence"
     system_evidence: { different: "UNKNOWN" },
     submitted_at: "2026-07-29T08:00:00.000Z",
   }), hashPort);
+  const different = createAcceptedOwnerReviewFingerprint(envelope({
+    raw_employee_input: {
+      amount_aed: "51.00",
+      context_state: "UNKNOWN",
+    },
+  }), hashPort);
   assert.equal(first.fingerprint, second.fingerprint);
-  assert.equal(calls.length, 4);
+  assert.notEqual(first.fingerprint, different.fingerprint);
+  assert.equal(calls.length, 6);
   assert.equal(calls[0], calls[1]);
   assert.equal(first.canonical.includes("system_evidence"), false);
   assert.throws(
     () => createAcceptedOwnerReviewFingerprint(envelope(), () => Math.random().toString(16)),
+    /HASH_PORT_MUST_BE_SYNCHRONOUS_DETERMINISTIC_HEX/,
+  );
+  assert.throws(
+    () => createAcceptedOwnerReviewFingerprint(
+      envelope(),
+      async () => "a".repeat(64),
+    ),
     /HASH_PORT_MUST_BE_SYNCHRONOUS_DETERMINISTIC_HEX/,
   );
 });
@@ -259,12 +289,175 @@ test("effect firewall splits direct active, review eligibility and review active
 test("review attestation must match the event being materialized", () => {
   assert.equal(isOwnerReviewMaterializationEligible(reviewRecord({
     strict_validator_attestation: {
-      passed: true,
+      result: "PASS",
       event_type: "rent",
-      payload_fingerprint: "payload-1",
+      candidate_fingerprint: "owner_review_candidate_" + "a".repeat(64),
+      validator_contract_id: "employee-seven-event-strict-v1",
       validated_at: "2026-07-28T08:10:00.000Z",
     },
   })), false);
+});
+
+test("strict attestation is contract, event and actual-candidate bound", () => {
+  const candidate = {
+    event_type: "expense",
+    payload: { amount_aed: "50.00" },
+  };
+  const fingerprint = createAcceptedOwnerReviewCandidateFingerprint(
+    candidate,
+    hashPort,
+  ).fingerprint;
+  const attestation = {
+    result: "PASS",
+    event_type: "expense",
+    candidate_fingerprint: fingerprint,
+    validator_contract_id: "employee-seven-event-strict-v1",
+    validated_at: "2026-07-29T08:00:00.000Z",
+  };
+  assert.equal(
+    validateBoundStrictValidatorAttestation(
+      attestation,
+      candidate,
+      hashPort,
+    ).ok,
+    true,
+  );
+  assert.equal(validateBoundStrictValidatorAttestation(
+    { ...attestation, candidate_fingerprint: "owner_review_candidate_" + "f".repeat(64) },
+    candidate,
+    hashPort,
+  ).ok, false);
+  assert.equal(validateBoundStrictValidatorAttestation(
+    { ...attestation, validator_contract_id: "caller-invented-validator" },
+    candidate,
+    hashPort,
+  ).ok, false);
+  assert.equal(validateBoundStrictValidatorAttestation(
+    { passed: true, event_type: "expense", candidate_fingerprint: fingerprint },
+    candidate,
+    hashPort,
+  ).ok, false);
+  assert.equal(validateBoundStrictValidatorAttestation(
+    attestation,
+    { ...candidate, payload: { amount_aed: "51.00" } },
+    hashPort,
+  ).ok, false);
+});
+
+test("canonical result is a property of four axes only", () => {
+  const axes = {
+    intake_status: "ACCEPTED",
+    review_status: "APPROVED",
+    effective_origin: "OWNER_REVIEW_MATERIALIZATION",
+    lifecycle_status: "ACTIVE",
+  };
+  assert.equal(
+    deriveAcceptedOwnerReviewCanonicalResult(axes),
+    deriveAcceptedOwnerReviewCanonicalResult({
+      ...axes,
+      terminal_decision: "APPROVE",
+    }),
+  );
+  assert.equal(
+    deriveAcceptedOwnerReviewCanonicalResult({
+      ...axes,
+      terminal_decision: "CORRECT_APPROVE",
+    }),
+    "ACCEPTED_EFFECTIVE",
+  );
+  assert.equal(validateAcceptedOwnerReviewRecordConsistency({
+    ...axes,
+    terminal_decision: "CORRECT_APPROVE",
+  }).error_code, "TERMINAL_DECISION_STATUS_MISMATCH");
+  assert.equal(validateAcceptedOwnerReviewRecordConsistency({
+    ...axes,
+    terminal_decision: "APPROVE",
+    materialization_ledger_state: "NOT_REQUIRED",
+  }).error_code, "MATERIALIZATION_LEDGER_STATUS_MISMATCH");
+  assert.equal(validateAcceptedOwnerReviewRecordConsistency({
+    ...axes,
+    terminal_decision: "APPROVE",
+    materialization_ledger_state: "NOT_APPLIED",
+  }).ok, true);
+});
+
+test("getters, setters, symbols and dangerous prototype keys fail without invocation", () => {
+  for (const enumerable of [true, false]) {
+    let getterInvocationCount = 0;
+    const raw = {};
+    Object.defineProperty(raw, "amount", {
+      enumerable,
+      get() {
+        getterInvocationCount += 1;
+        return "50";
+      },
+    });
+    const result = validateAcceptedOwnerReviewEnvelope(envelope({
+      raw_employee_input: raw,
+    }));
+    assert.equal(result.ok, false);
+    assert.equal(
+      result.errors.some((error) =>
+        error.code === "JSON_ACCESSOR_PROPERTY_NOT_ALLOWED"
+      ),
+      true,
+    );
+    assert.equal(getterInvocationCount, 0);
+  }
+  const setterRaw = {};
+  Object.defineProperty(setterRaw, "amount", {
+    enumerable: true,
+    set(_value) {},
+  });
+  assert.equal(validateAcceptedOwnerReviewEnvelope(envelope({
+    raw_employee_input: setterRaw,
+  })).errors.some((error) =>
+    error.code === "JSON_ACCESSOR_PROPERTY_NOT_ALLOWED"
+  ), true);
+
+  const symbolRaw = { amount: "50" };
+  symbolRaw[Symbol("hidden")] = "secret";
+  assert.equal(validateAcceptedOwnerReviewEnvelope(envelope({
+    raw_employee_input: symbolRaw,
+  })).ok, false);
+
+  for (const key of [
+    "__proto__",
+    "PROTOtype",
+    "Constructor",
+    "con_struc-tor",
+  ]) {
+    const raw = JSON.parse(`{"${key}":{"polluted":true}}`);
+    const result = validateAcceptedOwnerReviewEnvelope(envelope({
+      raw_employee_input: raw,
+    }));
+    assert.equal(result.ok, false, key);
+    assert.equal(
+      result.errors.some((error) =>
+        error.code === "JSON_DANGEROUS_KEY_NOT_ALLOWED"
+      ),
+      true,
+      key,
+    );
+  }
+});
+
+test("safe errors never echo an untrusted sensitive field name", () => {
+  const sensitiveKey = "provider_phone_971501234567";
+  const result = validateAcceptedOwnerReviewEnvelope(envelope({
+    raw_employee_input: { [sensitiveKey]: "redacted" },
+  }));
+  const serialized = JSON.stringify(result);
+  assert.equal(result.ok, false);
+  assert.equal(serialized.includes(sensitiveKey), false);
+  assert.equal(serialized.includes("971501234567"), false);
+  assert.equal(
+    result.errors.some((error) =>
+      error.code === "FORBIDDEN_IDENTITY_FIELD"
+      && error.trusted_section === "raw_input"
+    ),
+    true,
+  );
 });
 
 test("contract source has no crypto, database, Worker, network or environment dependency", async () => {

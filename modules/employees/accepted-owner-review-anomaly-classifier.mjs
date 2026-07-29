@@ -1,5 +1,6 @@
 import {
   CANONICAL_EMPLOYEE_EVENT_TYPES,
+  validateAcceptedOwnerReviewJsonValue,
 } from "./accepted-owner-review-contract.mjs";
 
 export const ANOMALY_CLASSIFICATIONS = Object.freeze([
@@ -81,6 +82,71 @@ function normalizeCodes(values) {
   ).filter(Boolean))]);
 }
 
+function factText(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function deriveCandidateFactCodes(input, eventType) {
+  const codes = [];
+  const candidate = (
+    typeof input.candidate_payload === "object"
+    && input.candidate_payload !== null
+    && !Array.isArray(input.candidate_payload)
+  )
+    ? input.candidate_payload
+    : {};
+
+  const companyScope = factText(input.company_scope);
+  const authenticatedCorpid = factText(input.authenticated_corpid);
+  if (
+    companyScope
+    && authenticatedCorpid
+    && companyScope !== authenticatedCorpid
+  ) codes.push("CROSS_COMPANY_SCOPE");
+
+  if (eventType === "bed_transfer") {
+    const sourceBed = factText(
+      candidate.source_bed
+      ?? candidate.from_bed
+      ?? input.source_bed,
+    );
+    if (sourceBed === "334") codes.push("BED_334");
+
+    const vacancyMarker = factText(
+      input.target_vacancy_marker
+      ?? candidate.target_vacancy_marker,
+    );
+    if (vacancyMarker && !["E", "e"].includes(vacancyMarker)) {
+      codes.push("TARGET_NOT_VACANT_E");
+    }
+
+    const sourceStatus = factText(
+      input.source_physical_status
+      ?? candidate.source_physical_status,
+    ).toLowerCase();
+    if (sourceStatus && sourceStatus !== "occupied") {
+      codes.push("SOURCE_NOT_OCCUPIED");
+    }
+  }
+
+  const dConflict = factText(input.d_conflict_status).toUpperCase();
+  if (
+    input.unresolved_d_conflict === true
+    || ["CONFLICT", "UNRESOLVED"].includes(dConflict)
+  ) codes.push("UNRESOLVED_D_CONFLICT");
+
+  if (
+    input.incomplete_multiple_arrears === true
+    || (
+      Number.isInteger(input.open_arrears_count)
+      && input.open_arrears_count > 1
+      && input.open_arrears_complete !== true
+    )
+  ) codes.push("MULTIPLE_OPEN_ARREARS_INCOMPLETE");
+
+  return codes;
+}
+
 function result(classification, codes, extra = {}) {
   return Object.freeze({
     classification,
@@ -101,12 +167,22 @@ function result(classification, codes, extra = {}) {
 }
 
 export function classifyAcceptedOwnerReviewAnomaly(input) {
-  if (typeof input !== "object" || input === null || Array.isArray(input)) {
+  const validation = validateAcceptedOwnerReviewJsonValue(
+    input,
+    "anomaly_classifier_input",
+  );
+  if (
+    !validation.ok
+    || typeof validation.value !== "object"
+    || validation.value === null
+    || Array.isArray(validation.value)
+  ) {
     return result(
       "SECURITY_REJECTION",
       Object.freeze(["PAYLOAD_PARSE_FAILED"]),
     );
   }
+  input = validation.value;
   if (input.request_reached_server === false) {
     return result(
       "SYSTEM_UNAVAILABLE",
@@ -124,7 +200,10 @@ export function classifyAcceptedOwnerReviewAnomaly(input) {
     );
   }
 
-  const codes = normalizeCodes(input.diagnostics);
+  const codes = normalizeCodes([
+    ...(Array.isArray(input.diagnostics) ? input.diagnostics : []),
+    ...deriveCandidateFactCodes(input, eventType),
+  ]);
   if (codes.some((code) => SECURITY_CODES.has(code))) {
     return result("SECURITY_REJECTION", codes);
   }
