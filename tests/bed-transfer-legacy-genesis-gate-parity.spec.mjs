@@ -54,10 +54,15 @@ const safeLegacy = (extra = {}) => ({
 });
 
 test("production config restores only the existing internal-beta legacy genesis gates", () => {
-  assert.match(wrangler, /^APP_ENV = "internal_beta"$/m);
-  assert.match(wrangler, /^BED_TRANSFER_WRITE_APPROVED = "true"$/m);
-  assert.match(wrangler, /^BED_TRANSFER_LEGACY_GENESIS_MODE = "server_verified"$/m);
-  assert.equal((wrangler.match(/^BED_TRANSFER_LEGACY_GENESIS_MODE\s*=/gm) || []).length, 1);
+  const stagingStart = wrangler.indexOf("[env.staging]");
+  const production = wrangler.slice(0, stagingStart);
+  const staging = wrangler.slice(stagingStart);
+  assert.match(production, /^APP_ENV = "internal_beta"$/m);
+  assert.match(production, /^BED_TRANSFER_WRITE_APPROVED = "true"$/m);
+  assert.match(production, /^BED_TRANSFER_LEGACY_GENESIS_MODE = "server_verified"$/m);
+  assert.equal((production.match(/^BED_TRANSFER_LEGACY_GENESIS_MODE\s*=/gm) || []).length, 1);
+  assert.match(staging, /^BED_TRANSFER_WRITE_APPROVED = "false"$/m);
+  assert.match(staging, /^BED_TRANSFER_LEGACY_GENESIS_MODE = "server_verified"$/m);
 });
 
 test("single validate, mixed dry-run and canonical write converge on one server gate", () => {

@@ -32,6 +32,12 @@ import {
   validateOwnerCorrectionApplyRequest,
   validateOwnerCorrectionTargetScopedApplyAuthorization
 } from "../../modules/owner-corrections/correction-anchor-parser.mjs";
+import {
+  readStagingTtlockContextSnapshot,
+  stagingFormalWriteFailure,
+  stagingRequestBoundaryFailure,
+  stagingTtlockLiveFetchAllowed
+} from "./staging-runtime-isolation.mjs";
 import { prepareOwnerBedTransferVoid } from "../../modules/owner-corrections/bed-transfer-void.mjs";
 import { createDashboardTotalsPayload } from "./handlers/dashboard-totals.js";
 import { ErrorCodes } from "../../dist/lib/constants/error-codes.js";
@@ -1103,6 +1109,7 @@ function ttlockRequestContext(request,env,user,routeCategory="read",maxAgeMs=TTL
 __name(ttlockRequestContext,"ttlockRequestContext");
 function ttlockLiveFetchAllowed(env={},context={}){
   if(context.allow_live_fetch===false)return false;
+  if(!stagingTtlockLiveFetchAllowed(env))return false;
   const appEnv=cleanText(env.APP_ENV||"production",40).toLowerCase();
   const host=cleanText(context.request_host||"",160).toLowerCase();
   return !["staging","test","local","development"].includes(appEnv)&&host===TTLOCK_CANONICAL_PRODUCTION_HOST;
@@ -1236,6 +1243,14 @@ async function loadLockCards(env,opts={}) {
 __name(loadLockCards, "loadLockCards");
 async function getCanonicalTTLockSnapshot(env,corpid,options={}){
   const context=options.request_context||{},maxAgeMs=Math.max(0,Number(options.max_age_ms??context.max_age_ms??TTLOCK_READ_CACHE_MAX_AGE_MS)),now=Date.now(),scope=ttlockScopeKey(env,corpid),cacheKey=`ttlock:snapshot:v2:${scope}`;
+  const stagingSnapshot=await readStagingTtlockContextSnapshot(env,{bed:options.bed,now});
+  if(stagingSnapshot.handled){
+    context.kv_read_count=Number(context.kv_read_count||0)+1;
+    context.ttlock_snapshot_count=Number(context.ttlock_snapshot_count||0)+1;
+    context.ttlock_external_call_count=0;
+    context.ttlock_cache_state=stagingSnapshot.ok===true?"hit":"error";
+    return stagingSnapshot;
+  }
   if(context.ttlockSnapshotPromise){const reused=await context.ttlockSnapshotPromise;return {...reused,_ttlock_meta:{...(reused?._ttlock_meta||{}),snapshot_reused:true}};}
   context.ttlock_snapshot_count=Number(context.ttlock_snapshot_count||0)+1;
   const task=(async()=>{
@@ -1691,7 +1706,7 @@ async function canonicalDepositAccessSnapshotForBed(env,user,bed,opts={}){
   const cleanBed=cleanText(bed,80).replace(/^#/,"");
   if(!cleanBed)return {snapshot:null,card:null,source_status:"missing_bed",warning:"bed_required"};
   const strict=opts.strict_access_snapshot===true;
-  const lockResult=await empLoadLockCardsWithCacheFallback(env,user,{timeoutMs:8000,limit:500,strict_access_snapshot:strict,request_context:opts.request_context,max_age_ms:opts.max_age_ms}).catch(e=>({error:empTtlockReadErrorCode(e),roomsData:{},data_source:"live_api",fallback:false,strict_access_snapshot:strict}));
+  const lockResult=await empLoadLockCardsWithCacheFallback(env,user,{timeoutMs:8000,limit:500,bed:cleanBed,strict_access_snapshot:strict,request_context:opts.request_context,max_age_ms:opts.max_age_ms}).catch(e=>({error:empTtlockReadErrorCode(e),roomsData:{},data_source:"live_api",fallback:false,strict_access_snapshot:strict}));
   const candidates=[];
   for(const [lockRoom,cards] of Object.entries(lockResult?.roomsData||{})){
     for(const card of cards||[]){
@@ -4251,6 +4266,8 @@ async function handleEmployeeEntryAggregateWrite(request,env,user,body,requestCo
 }
 __name(handleEmployeeEntryAggregateWrite,"handleEmployeeEntryAggregateWrite");
 async function handleEmployeeEntry(request,env,user,options={}){
+  const stagingWriteFailure=stagingFormalWriteFailure(env);
+  if(stagingWriteFailure)return json(stagingWriteFailure,stagingWriteFailure.status||403);
   const timingEnabled=request.headers.get("X-Employee-Entry-Timing")==="1";
   const request_context=options.request_context||ttlockRequestContext(request,env,user,"employee_entry_upload",TTLOCK_STRICT_CACHE_MAX_AGE_MS);
   const timing={started_at:Date.now(),d1_write_ms:0,total_ms:0};
@@ -7450,8 +7467,9 @@ async function empLoadLockCardsWithCacheFallback(env,user,opts={}){
   const requestContext=opts.request_context||ttlockRequestContext(opts.request||null,env,user,opts.route_category||"employee_ttlock_read",opts.max_age_ms??(strict?TTLOCK_STRICT_CACHE_MAX_AGE_MS:TTLOCK_READ_CACHE_MAX_AGE_MS));
   requestContext.timeout_ms=Math.min(Math.max(Number(opts.timeoutMs||requestContext.timeout_ms||8000),1000),12000);
   try{
-    const live=await getCanonicalTTLockSnapshot(env,user?.corpid||env.CORPID||"default",{request_context:requestContext,max_age_ms:opts.max_age_ms??(strict?TTLOCK_STRICT_CACHE_MAX_AGE_MS:TTLOCK_READ_CACHE_MAX_AGE_MS)});
+    const live=await getCanonicalTTLockSnapshot(env,user?.corpid||env.CORPID||"default",{bed:opts.bed,request_context:requestContext,max_age_ms:opts.max_age_ms??(strict?TTLOCK_STRICT_CACHE_MAX_AGE_MS:TTLOCK_READ_CACHE_MAX_AGE_MS)});
     if(!live?.error)return {...live,strict_access_snapshot:strict};
+    if(live.staging_snapshot===true)return {...live,strict_access_snapshot:strict,fallback_rejected:true};
     if(String(live.error).startsWith("TTLOCK_LIVE_FETCH_DISABLED_"))return {...live,strict_access_snapshot:strict,fallback_rejected:true};
     if(strict)return {...live,strict_access_snapshot:true,fallback_rejected:true,candidate_count:0,ambiguous:false,conflict:false};
     const cached=await empCachedTtlockTaskRows(env,user,opts.limit||500);
@@ -14554,6 +14572,8 @@ async function handleRequest(request, env, ctx) {
 __name(handleRequest, "handleRequest");
 var index_default = {
   async fetch(request, env, ctx) {
+    const stagingBoundaryFailure=stagingRequestBoundaryFailure(request,env);
+    if(stagingBoundaryFailure)return await withSecurityHeaders(json(stagingBoundaryFailure,stagingBoundaryFailure.status||403),request,env);
     const requestContext = createRequestContext(request);
     attachRequestContext(request, requestContext);
     try {
