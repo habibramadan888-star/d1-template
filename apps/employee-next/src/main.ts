@@ -1299,7 +1299,8 @@ function bedTransferEntry(
   }
   return Object.freeze({
     ...base,
-    type: "TF",
+    type: "BT",
+    source: "employee_entry",
     event_type: "bed_transfer",
     from_bed: requiredString(submission, "fromBed"),
     to_bed: requiredString(submission, "toBed"),
@@ -1316,7 +1317,9 @@ function bedTransferEntry(
     ),
     bed_price_difference_due_date:
       optionalString(difference, "dueDate") ?? "",
-    bed_price_difference_payment_method: differenceMethod,
+    ...(differenceMode === "none"
+      ? {}
+      : { bed_price_difference_payment_method: differenceMethod }),
     bed_price_difference_reason:
       optionalString(difference, "reason") ?? "",
     arrears_carryover: arrears.carryoverRequired === true,

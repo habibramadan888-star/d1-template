@@ -112,6 +112,48 @@ test("runtime anchor contract exposes event-specific required fields from the so
   assert.deepEqual(missingRuntimeFields, []);
 });
 
+test("Bed Transfer anchor payment method is conditionally required by price-difference mode", async () => {
+  const worker = await readFile(workerPath, "utf8");
+  const runtime = Function(
+    `${contractBlock(worker)}};\n`
+      + `${functionBlock(worker, "cleanText")}\n`
+      + `${functionBlock(worker, "entryAnchorType")}\n`
+      + `${functionBlock(worker, "validateEntryAnchor")}\n`
+      + "return { entryAnchorContract, validateEntryAnchor };",
+  )();
+  const base = Object.fromEntries(
+    runtime.entryAnchorContract.TF.map((field) => [field, "fixture"]),
+  );
+  Object.assign(base, {
+    type: "BT",
+    event_type: "bed_transfer",
+    bed_price_difference_mode: "none",
+    bed_price_difference_amount_aed: 0,
+  });
+  delete base.bed_price_difference_payment_method;
+  assert.deepEqual(runtime.validateEntryAnchor(base), { ok: true, missing: [] });
+
+  const paid = {
+    ...base,
+    bed_price_difference_mode: "paid",
+    bed_price_difference_amount_aed: 25,
+    bed_price_difference_payment_method: "cash",
+  };
+  assert.deepEqual(runtime.validateEntryAnchor(paid), { ok: true, missing: [] });
+  assert.deepEqual(
+    runtime.validateEntryAnchor({
+      ...paid,
+      bed_price_difference_payment_method: "crypto",
+    }),
+    { ok: false, missing: ["bed_price_difference_payment_method"] },
+  );
+  delete paid.bed_price_difference_payment_method;
+  assert.deepEqual(
+    runtime.validateEntryAnchor(paid),
+    { ok: false, missing: ["bed_price_difference_payment_method"] },
+  );
+});
+
 test("forbidden provider identity fields cannot become business identity or duplicate matching keys", async () => {
   const worker = await readFile(workerPath, "utf8");
   const providerBoundary = worker.slice(

@@ -678,6 +678,7 @@ test("all seven real event contracts form exact single-path requests", () => {
     "expense",
     "bed_transfer",
   ];
+  const expectedWireTypes = ["R", "AP", "D", "DR", "CO", "E", "BT"];
   const requests = registry.eventIds.map((eventId, index) => {
     const contract = registry.get(eventId);
     const validation = contract.validateDraft(drafts[eventId]);
@@ -694,6 +695,12 @@ test("all seven real event contracts form exact single-path requests", () => {
     assert.equal(request.method, "POST", eventId);
     assert.equal(request.path, submitPath, eventId);
     assert.equal(request.body.entry.event_type, expectedTypes[index], eventId);
+    assert.equal(request.body.entry.type, expectedWireTypes[index], eventId);
+    assert.equal(
+      request.body.entry.source,
+      eventId === "bed-transfer" ? "employee_entry" : "employee_next",
+      eventId,
+    );
     assert.equal(request.body.session.entries.length, 1, eventId);
     assert.equal(
       request.body.session.entries[0].id,
@@ -711,6 +718,42 @@ test("all seven real event contracts form exact single-path requests", () => {
   });
   assert.equal(requests.length, 7);
   assert.equal(new Set(requests.map((item) => item.path)).size, 1);
+  assert.equal(
+    Object.hasOwn(
+      requests[6].body.entry,
+      "bed_price_difference_payment_method",
+    ),
+    false,
+  );
+});
+
+test("Bed Transfer keeps a required paid price-difference method", () => {
+  const registry = runtime.createEmployeeSevenEventRegistry();
+  const draft = {
+    ...validDrafts()["bed-transfer"],
+    bedPriceDifferenceMode: "paid",
+    bedPriceDifferenceAmountAed: 25,
+    bedPriceDifferencePaymentMethod: "cash",
+    bedPriceDifferenceReason: "Employee-entered price difference",
+  };
+  const contract = registry.get("bed-transfer");
+  assert.equal(
+    contract.validateDraft(draft).some((issue) => issue.blocking),
+    false,
+  );
+  const request = runtime.buildEmployeeNextSidecarRequest(
+    {
+      session,
+      eventId: "bed-transfer",
+      submission: contract.buildSubmission(draft),
+    },
+    submitPath,
+  );
+  assert.equal(request.body.entry.event_type, "bed_transfer");
+  assert.equal(request.body.entry.type, "BT");
+  assert.equal(request.body.entry.source, "employee_entry");
+  assert.equal(request.body.entry.bed_price_difference_mode, "paid");
+  assert.equal(request.body.entry.bed_price_difference_payment_method, "cash");
 });
 
 test("Deposit Out maps independent arrears and deposit difference reasons", () => {

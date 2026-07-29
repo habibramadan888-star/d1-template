@@ -150,8 +150,11 @@ test("unpaid fee requires exact 50 and due date without immediate payment", () =
 
 test("bed difference validates none paid and unpaid without calculating a price", () => {
   assertPass({ bed_price_difference_mode: "none", bed_price_difference_amount_aed: 0 });
+  assertReject({ bed_price_difference_mode: "none", bed_price_difference_amount_aed: 0, bed_price_difference_payment_method: "none" }, "BED_PRICE_DIFFERENCE_MODE_CONFLICT");
+  assertReject({ bed_price_difference_mode: "none", bed_price_difference_amount_aed: 0, bed_price_difference_payment_method: "cash" }, "BED_PRICE_DIFFERENCE_MODE_CONFLICT");
   const paid = assertPass({ bed_price_difference_mode: "paid", bed_price_difference_amount_aed: 120, bed_price_difference_payment_method: "cash" });
   assert.equal(paid.bed_price_difference_amount_aed, 120);
+  assertReject({ bed_price_difference_mode: "paid", bed_price_difference_amount_aed: 120 }, "BED_PRICE_DIFFERENCE_PAYMENT_METHOD_REQUIRED");
   assertPass({ bed_price_difference_mode: "unpaid", bed_price_difference_amount_aed: 120, bed_price_difference_due_date: "2026-08-02" });
   assertReject({ bed_price_difference_mode: "unpaid", bed_price_difference_amount_aed: 120 }, "BED_PRICE_DIFFERENCE_DUE_DATE_REQUIRED");
 });

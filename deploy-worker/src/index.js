@@ -4953,8 +4953,10 @@ function buildAccessSnapshotDTO(rawRemark,opts={}){
 __name(buildAccessSnapshotDTO,"buildAccessSnapshotDTO");
 function validateEntryAnchor(row){
   const type=entryAnchorType(row);
-  const required=entryAnchorContract[type]||[];
+  const differenceMode=type==="TF"?cleanText(row?.bed_price_difference_mode||"none",40).toLowerCase():"";
+  const required=(entryAnchorContract[type]||[]).filter(field=>field!=="bed_price_difference_payment_method"||type!=="TF"||differenceMode==="paid");
   const missing=required.filter(field=>!(field in (row||{})));
+  if(type==="TF"&&differenceMode==="paid"&&!["cash","bank","mixed"].includes(cleanText(row?.bed_price_difference_payment_method||"",40).toLowerCase())&&!missing.includes("bed_price_difference_payment_method"))missing.push("bed_price_difference_payment_method");
   return {ok:missing.length===0,missing};
 }
 __name(validateEntryAnchor,"validateEntryAnchor");
