@@ -2096,11 +2096,23 @@ function createLocalRenderPort(
         }
       }
       if (expenseUpload !== undefined) {
+        const validationPassed = (
+          expenseUpload.validationState.status === "VALIDATED_VALIDATE_ONLY"
+        );
         appendText(
           root,
           "p",
-          `Validation: ${expenseUpload.validationState.status}`,
+          validationPassed
+            ? "Validation passed / 测试验证通过"
+            : `Validation: ${expenseUpload.validationState.status}`,
         );
+        if (validationPassed) {
+          appendText(
+            root,
+            "p",
+            "Validate-only beta rehearsal. No business data was written to cloud. / 本次为公测演练，尚未正式写入云端。",
+          );
+        }
         if (expenseUpload.payloadPreview !== undefined) {
           appendText(root, "p", "Payload Preview");
           const preview = document.createElement("pre");

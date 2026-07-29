@@ -546,6 +546,12 @@ test("all seven events expose Add, Preview and Validate; upload needs current PA
         sidecar.getSessionValidationState().status,
         "VALIDATED_VALIDATE_ONLY",
       );
+      assert.match(visibleText(root), /Validation passed/u);
+      assert.match(visibleText(root), /本次为公测演练，尚未正式写入云端/u);
+      assert.doesNotMatch(
+        visibleText(root),
+        /Upload successful|Saved successfully|Cloud write completed|老板端已收到/u,
+      );
       const editable = eventType === "deposit-out"
         ? find(
           root,
