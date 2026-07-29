@@ -4938,7 +4938,7 @@ function parseAccessCardRemark(rawRemark){
   }
   if(!raw)return {bed:"",parsed_deposit_amount:null,parsed_checkin_mmdd:"",parsed_valid_until_mmdd:"",parsed_vacancy_marker:false,physical_bed_status:"unknown",physical_bed_status_source:"missing_access_snapshot",parsed_business_note:"",parse_status:"invalid",warnings:["empty_remark"]};
   if(!bed)return {bed:"",parsed_deposit_amount:parsedDepositAmount,parsed_checkin_mmdd:parsedCheckinMmdd,parsed_valid_until_mmdd:parsedValidUntilMmdd,parsed_vacancy_marker:parsedVacancyMarker,physical_bed_status:parsedVacancyMarker?"vacant":"unknown",physical_bed_status_source:parsedVacancyMarker?"access_snapshot_E_marker":"missing_access_snapshot",parsed_business_note:parsedBusinessNote,parse_status:"unparsed",warnings:["missing_bed"]};
-  if(parsedDepositAmount===null||!parsedCheckinMmdd)warnings.push("missing_deposit_or_checkin");
+  if(!parsedVacancyMarker&&(parsedDepositAmount===null||!parsedCheckinMmdd))warnings.push("missing_deposit_or_checkin");
   return {bed,parsed_deposit_amount:parsedDepositAmount,parsed_checkin_mmdd:parsedCheckinMmdd,parsed_valid_until_mmdd:parsedValidUntilMmdd,parsed_vacancy_marker:parsedVacancyMarker,physical_bed_status:parsedVacancyMarker?"vacant":"not_marked_vacant",physical_bed_status_source:parsedVacancyMarker?"access_snapshot_E_marker":"access_snapshot_no_E",parsed_business_note:parsedBusinessNote,parse_status:warnings.length?"partial":"parsed",warnings};
 }
 __name(parseAccessCardRemark,"parseAccessCardRemark");

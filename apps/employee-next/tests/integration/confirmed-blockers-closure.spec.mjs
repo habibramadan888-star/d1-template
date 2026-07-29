@@ -111,7 +111,7 @@ function bedPayload(bed, vacant) {
     no_write: true,
     occupancy_gateway: {
       physical_bed_status: vacant ? "vacant" : "not_marked_vacant",
-      deposit_recorded_amount: vacant ? 0 : 200,
+      deposit_recorded_amount: vacant ? null : 200,
       current_rent_coverage_start: "2026-07-01",
       current_rent_coverage_end: "2026-07-31",
     },
@@ -123,8 +123,8 @@ function bedPayload(bed, vacant) {
       conflict: false,
       stale: false,
       parsed_vacancy_marker: vacant,
-      parsed_deposit_amount: vacant ? 0 : 200,
-      parsed_checkin_mmdd: "0701",
+      parsed_deposit_amount: vacant ? null : 200,
+      parsed_checkin_mmdd: vacant ? "" : "0701",
     },
   });
 }

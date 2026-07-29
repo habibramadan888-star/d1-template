@@ -39,20 +39,53 @@ test("Access Snapshot parses bed deposit and check-in mmdd", () => {
 test("Access Snapshot parses E marker as canonical vacancy source", () => {
   const upper = buildAccessSnapshotDTO("611 E");
   const lower = buildAccessSnapshotDTO("611 e");
-  const withDeposit = buildAccessSnapshotDTO("611 D100 0802 E");
+  const explicitZero = buildAccessSnapshotDTO("611 D0 E");
+  const withDeposit = buildAccessSnapshotDTO("611 D200 E");
   const withoutMarker = buildAccessSnapshotDTO("611 D100 0802");
 
   assert.equal(upper.parsed_vacancy_marker, true);
   assert.equal(upper.physical_bed_status, "vacant");
   assert.equal(upper.physical_bed_status_source, "access_snapshot_E_marker");
+  assert.equal(upper.parsed_deposit_amount, null);
+  assert.equal(upper.parsed_checkin_mmdd, "");
+  assert.equal(upper.parse_status, "parsed");
+  assert.deepEqual(upper.warnings, []);
   assert.equal(lower.parsed_vacancy_marker, true);
   assert.equal(lower.physical_bed_status_source, "access_snapshot_E_marker");
-  assert.equal(withDeposit.parsed_deposit_amount, 100);
+  assert.equal(lower.parse_status, "parsed");
+  assert.equal(explicitZero.parsed_deposit_amount, 0);
+  assert.equal(explicitZero.parse_status, "parsed");
+  assert.equal(withDeposit.parsed_deposit_amount, 200);
   assert.equal(withDeposit.parsed_vacancy_marker, true);
   assert.equal(withDeposit.physical_bed_status, "vacant");
+  assert.equal(withDeposit.parse_status, "parsed");
   assert.equal(withoutMarker.parsed_vacancy_marker, false);
   assert.equal(withoutMarker.physical_bed_status, "not_marked_vacant");
   assert.equal(withoutMarker.physical_bed_status_source, "access_snapshot_no_E");
+});
+
+test("vacancy completeness differs from occupied completeness in module and Worker parsers", async () => {
+  const worker = await loadWorkerHarness();
+  const cases = [
+    ["111 E", "parsed"],
+    ["111 e", "parsed"],
+    ["111 D0 E", "parsed"],
+    ["111 D200 E", "parsed"],
+    ["111", "partial"],
+    ["111 D200", "partial"],
+    ["111 0729", "partial"],
+    ["111 D200 0729", "parsed"],
+  ];
+  for (const [remark, expected] of cases) {
+    assert.equal(buildAccessSnapshotDTO(remark).parse_status, expected, `module:${remark}`);
+    assert.equal(worker.buildAccessSnapshotDTO(remark).parse_status, expected, `worker:${remark}`);
+  }
+  for (const malformed of ["", "room E", "111 EMPTY"]) {
+    const moduleResult = buildAccessSnapshotDTO(malformed);
+    const workerResult = worker.buildAccessSnapshotDTO(malformed);
+    assert.equal(moduleResult.parse_status, workerResult.parse_status, malformed);
+    assert.equal(moduleResult.parsed_vacancy_marker, workerResult.parsed_vacancy_marker, malformed);
+  }
 });
 
 test("Access Snapshot parses inline business note after check-in mmdd", () => {

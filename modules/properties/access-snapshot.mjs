@@ -120,7 +120,9 @@ function parseAccessRemark(rawRemark) {
     : { parsedVacancyMarker, physicalBedStatus: bed ? "not_marked_vacant" : "unknown", physicalBedStatusSource: bed ? "access_snapshot_no_E" : "missing_access_snapshot" };
   if (!raw) return { bed: "", parsedDepositAmount, parsedCheckinMmdd, parsedValidUntilMmdd, ...vacancyFields, physicalBedStatus: "unknown", physicalBedStatusSource: "missing_access_snapshot", parsedBusinessNote, parseStatus: "invalid", warnings: ["empty_remark"] };
   if (!bed) return { bed: "", parsedDepositAmount, parsedCheckinMmdd, parsedValidUntilMmdd, ...vacancyFields, parsedBusinessNote, parseStatus: "unparsed", warnings: ["missing_bed"] };
-  if (parsedDepositAmount === null || !parsedCheckinMmdd) warnings.push("missing_deposit_or_checkin");
+  if (!parsedVacancyMarker && (parsedDepositAmount === null || !parsedCheckinMmdd)) {
+    warnings.push("missing_deposit_or_checkin");
+  }
   const parseStatus = warnings.length ? "partial" : "parsed";
   return { bed, parsedDepositAmount, parsedCheckinMmdd, parsedValidUntilMmdd, ...vacancyFields, parsedBusinessNote, parseStatus, warnings };
 }
