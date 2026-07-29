@@ -19,6 +19,7 @@ import {
   LIFECYCLE_STATUSES,
   MATERIALIZATION_LEDGER_STATES,
   REVIEW_STATUSES,
+  validateAcceptedOwnerReviewFourAxisCombination,
   validateAcceptedOwnerReviewRecordConsistency,
   validateBoundStrictValidatorAttestation,
   validateAcceptedOwnerReviewEnvelope,
@@ -235,6 +236,10 @@ test("canonical result is derived from axes and ignores caller canonical status"
   assert.equal(
     deriveAcceptedOwnerReviewCanonicalResult(reviewRecord({
       intake_status: "REJECTED_SECURITY",
+      review_status: "NOT_REQUIRED",
+      effective_origin: "NONE",
+      terminal_decision: "",
+      materialization_ledger_state: "NOT_REQUIRED",
     })),
     "REJECTED_SECURITY",
   );
@@ -344,6 +349,57 @@ test("strict attestation is contract, event and actual-candidate bound", () => {
   ).ok, false);
 });
 
+test("candidate is descriptor-safe before every top-level property read", () => {
+  const candidateFingerprint = createAcceptedOwnerReviewCandidateFingerprint({
+    event_type: "expense",
+    payload: { amount_aed: "50.00" },
+  }, hashPort);
+  assert.match(
+    candidateFingerprint.fingerprint,
+    /^owner_review_candidate_[a-f0-9]{64}$/u,
+  );
+
+  for (const [property, enumerable] of [
+    ["event_type", true],
+    ["payload", true],
+    ["event_type", false],
+    ["payload", false],
+  ]) {
+    let invocationCount = 0;
+    const candidate = property === "event_type"
+      ? { payload: { amount_aed: "50.00" } }
+      : { event_type: "expense" };
+    Object.defineProperty(candidate, property, {
+      enumerable,
+      get() {
+        invocationCount += 1;
+        return property === "event_type"
+          ? "expense"
+          : { amount_aed: "50.00" };
+      },
+    });
+    assert.throws(
+      () => createAcceptedOwnerReviewCandidateFingerprint(candidate, hashPort),
+      /OWNER_REVIEW_CANDIDATE_INVALID/u,
+    );
+    assert.equal(invocationCount, 0);
+  }
+
+  for (const property of ["event_type", "payload"]) {
+    const candidate = property === "event_type"
+      ? { payload: { amount_aed: "50.00" } }
+      : { event_type: "expense" };
+    Object.defineProperty(candidate, property, {
+      enumerable: true,
+      set(_value) {},
+    });
+    assert.throws(
+      () => createAcceptedOwnerReviewCandidateFingerprint(candidate, hashPort),
+      /OWNER_REVIEW_CANDIDATE_INVALID/u,
+    );
+  }
+});
+
 test("canonical result is a property of four axes only", () => {
   const axes = {
     intake_status: "ACCEPTED",
@@ -379,6 +435,92 @@ test("canonical result is a property of four axes only", () => {
     terminal_decision: "APPROVE",
     materialization_ledger_state: "NOT_APPLIED",
   }).ok, true);
+});
+
+test("explicit four-axis matrix accepts only legal combinations", () => {
+  const legal = new Map([
+    ["REJECTED_SECURITY|NOT_REQUIRED|NONE|ACTIVE", "REJECTED_SECURITY"],
+    ["ACCEPTED|PENDING_OWNER_REVIEW|NONE|ACTIVE", "ACCEPTED_OWNER_REVIEW"],
+    ["ACCEPTED|REJECTED|NONE|ACTIVE", "REJECTED_OWNER"],
+    ["ACCEPTED|NOT_REQUIRED|STRICT_DIRECT_ACCEPT|ACTIVE", "ACCEPTED_EFFECTIVE"],
+    [
+      "ACCEPTED|APPROVED|OWNER_REVIEW_MATERIALIZATION|ACTIVE",
+      "ACCEPTED_EFFECTIVE",
+    ],
+    [
+      "ACCEPTED|CORRECT_APPROVED|OWNER_REVIEW_MATERIALIZATION|ACTIVE",
+      "CORRECTED_EFFECTIVE",
+    ],
+    ["ACCEPTED|NOT_REQUIRED|STRICT_DIRECT_ACCEPT|VOIDED", "VOIDED"],
+    ["ACCEPTED|APPROVED|OWNER_REVIEW_MATERIALIZATION|VOIDED", "VOIDED"],
+    [
+      "ACCEPTED|CORRECT_APPROVED|OWNER_REVIEW_MATERIALIZATION|VOIDED",
+      "VOIDED",
+    ],
+    ["ACCEPTED|NOT_REQUIRED|STRICT_DIRECT_ACCEPT|REVERSED", "REVERSED"],
+    ["ACCEPTED|APPROVED|OWNER_REVIEW_MATERIALIZATION|REVERSED", "REVERSED"],
+    [
+      "ACCEPTED|CORRECT_APPROVED|OWNER_REVIEW_MATERIALIZATION|REVERSED",
+      "REVERSED",
+    ],
+  ]);
+
+  for (const intake_status of INTAKE_STATUSES) {
+    for (const review_status of REVIEW_STATUSES) {
+      for (const effective_origin of EFFECTIVE_ORIGINS) {
+        for (const lifecycle_status of LIFECYCLE_STATUSES) {
+          const axes = {
+            intake_status,
+            review_status,
+            effective_origin,
+            lifecycle_status,
+          };
+          const key = [
+            intake_status,
+            review_status,
+            effective_origin,
+            lifecycle_status,
+          ].join("|");
+          const expected = legal.get(key) ?? "INVALID_STATE";
+          const validation =
+            validateAcceptedOwnerReviewFourAxisCombination(axes);
+          assert.equal(validation.ok, legal.has(key), key);
+          assert.equal(validation.canonical_result, expected, key);
+          assert.equal(
+            deriveAcceptedOwnerReviewCanonicalResult({
+              ...axes,
+              terminal_decision: "CALLER_CANNOT_CHANGE_AXES_RESULT",
+            }),
+            expected,
+            key,
+          );
+        }
+      }
+    }
+  }
+
+  const impossible = {
+    intake_status: "REJECTED_SECURITY",
+    review_status: "APPROVED",
+    effective_origin: "OWNER_REVIEW_MATERIALIZATION",
+    lifecycle_status: "ACTIVE",
+  };
+  assert.deepEqual(
+    validateAcceptedOwnerReviewFourAxisCombination(impossible),
+    {
+      ok: false,
+      canonical_result: "INVALID_STATE",
+      error_code: "FOUR_AXIS_STATE_INVALID",
+    },
+  );
+  assert.equal(
+    validateAcceptedOwnerReviewRecordConsistency({
+      ...impossible,
+      terminal_decision: "CALLER_CANNOT_MASK_INVALID_AXES",
+      materialization_ledger_state: "NOT_APPLIED",
+    }).error_code,
+    "FOUR_AXIS_STATE_INVALID",
+  );
 });
 
 test("getters, setters, symbols and dangerous prototype keys fail without invocation", () => {

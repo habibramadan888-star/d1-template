@@ -59,6 +59,24 @@ export const ACCEPTED_STRICT_VALIDATOR_CONTRACT_IDS = Object.freeze([
   "employee-seven-event-strict-v1",
 ]);
 
+const FOUR_AXIS_CANONICAL_RESULTS = Object.freeze({
+  "REJECTED_SECURITY|NOT_REQUIRED|NONE|ACTIVE": "REJECTED_SECURITY",
+  "ACCEPTED|PENDING_OWNER_REVIEW|NONE|ACTIVE": "ACCEPTED_OWNER_REVIEW",
+  "ACCEPTED|REJECTED|NONE|ACTIVE": "REJECTED_OWNER",
+  "ACCEPTED|NOT_REQUIRED|STRICT_DIRECT_ACCEPT|ACTIVE": "ACCEPTED_EFFECTIVE",
+  "ACCEPTED|APPROVED|OWNER_REVIEW_MATERIALIZATION|ACTIVE":
+    "ACCEPTED_EFFECTIVE",
+  "ACCEPTED|CORRECT_APPROVED|OWNER_REVIEW_MATERIALIZATION|ACTIVE":
+    "CORRECTED_EFFECTIVE",
+  "ACCEPTED|NOT_REQUIRED|STRICT_DIRECT_ACCEPT|VOIDED": "VOIDED",
+  "ACCEPTED|APPROVED|OWNER_REVIEW_MATERIALIZATION|VOIDED": "VOIDED",
+  "ACCEPTED|CORRECT_APPROVED|OWNER_REVIEW_MATERIALIZATION|VOIDED": "VOIDED",
+  "ACCEPTED|NOT_REQUIRED|STRICT_DIRECT_ACCEPT|REVERSED": "REVERSED",
+  "ACCEPTED|APPROVED|OWNER_REVIEW_MATERIALIZATION|REVERSED": "REVERSED",
+  "ACCEPTED|CORRECT_APPROVED|OWNER_REVIEW_MATERIALIZATION|REVERSED":
+    "REVERSED",
+});
+
 const DANGEROUS_NORMALIZED_KEYS = new Set([
   "proto",
   "prototype",
@@ -536,14 +554,20 @@ export function createAcceptedOwnerReviewCandidateFingerprint(
   candidate,
   hashPort,
 ) {
+  const validation = validateAcceptedOwnerReviewJsonValue(
+    candidate,
+    "candidate",
+  );
+  const safeCandidate = validation.value;
   if (
-    !isPlainObject(candidate)
-    || !CANONICAL_EMPLOYEE_EVENT_TYPES.includes(candidate.event_type)
-    || !Object.hasOwn(candidate, "payload")
+    !validation.ok
+    || !isPlainObject(safeCandidate)
+    || !CANONICAL_EMPLOYEE_EVENT_TYPES.includes(safeCandidate.event_type)
+    || !Object.hasOwn(safeCandidate, "payload")
   ) {
     throw new Error("OWNER_REVIEW_CANDIDATE_INVALID");
   }
-  const forbidden = findForbiddenIdentityFields(candidate.payload, {
+  const forbidden = findForbiddenIdentityFields(safeCandidate.payload, {
     trusted_section: "candidate",
   });
   if (forbidden.length > 0) {
@@ -552,8 +576,8 @@ export function createAcceptedOwnerReviewCandidateFingerprint(
   return createStableFingerprint(
     "owner_review_candidate",
     {
-      event_type: candidate.event_type,
-      payload: candidate.payload,
+      event_type: safeCandidate.event_type,
+      payload: safeCandidate.payload,
     },
     hashPort,
     "candidate",
@@ -625,6 +649,30 @@ function statusValue(record, field) {
   return typeof record?.[field] === "string" ? record[field] : "";
 }
 
+function fourAxisKey(record) {
+  return [
+    statusValue(record, "intake_status"),
+    statusValue(record, "review_status"),
+    statusValue(record, "effective_origin"),
+    statusValue(record, "lifecycle_status"),
+  ].join("|");
+}
+
+export function validateAcceptedOwnerReviewFourAxisCombination(record) {
+  const canonicalResult = FOUR_AXIS_CANONICAL_RESULTS[fourAxisKey(record)];
+  if (!canonicalResult) {
+    return Object.freeze({
+      ok: false,
+      canonical_result: "INVALID_STATE",
+      error_code: "FOUR_AXIS_STATE_INVALID",
+    });
+  }
+  return Object.freeze({
+    ok: true,
+    canonical_result: canonicalResult,
+  });
+}
+
 function approvedDecision(record) {
   return ["APPROVE", "CORRECT_APPROVE"].includes(
     statusValue(record, "terminal_decision"),
@@ -632,34 +680,7 @@ function approvedDecision(record) {
 }
 
 export function deriveAcceptedOwnerReviewCanonicalResult(record) {
-  const intake = statusValue(record, "intake_status");
-  const review = statusValue(record, "review_status");
-  const origin = statusValue(record, "effective_origin");
-  const lifecycle = statusValue(record, "lifecycle_status");
-
-  if (intake === "REJECTED_SECURITY") return "REJECTED_SECURITY";
-  if (intake !== "ACCEPTED") return "INVALID_STATE";
-  if (lifecycle === "VOIDED") return "VOIDED";
-  if (lifecycle === "REVERSED") return "REVERSED";
-  if (lifecycle !== "ACTIVE") return "INVALID_STATE";
-  if (
-    review === "PENDING_OWNER_REVIEW"
-    && origin === "NONE"
-  ) return "ACCEPTED_OWNER_REVIEW";
-  if (review === "REJECTED" && origin === "NONE") return "REJECTED_OWNER";
-  if (
-    review === "NOT_REQUIRED"
-    && origin === "STRICT_DIRECT_ACCEPT"
-  ) return "ACCEPTED_EFFECTIVE";
-  if (
-    review === "APPROVED"
-    && origin === "OWNER_REVIEW_MATERIALIZATION"
-  ) return "ACCEPTED_EFFECTIVE";
-  if (
-    review === "CORRECT_APPROVED"
-    && origin === "OWNER_REVIEW_MATERIALIZATION"
-  ) return "CORRECTED_EFFECTIVE";
-  return "INVALID_STATE";
+  return validateAcceptedOwnerReviewFourAxisCombination(record).canonical_result;
 }
 
 export function validateAcceptedOwnerReviewRecordConsistency(record) {
@@ -669,6 +690,8 @@ export function validateAcceptedOwnerReviewRecordConsistency(record) {
       error_code: "OWNER_REVIEW_RECORD_INVALID",
     });
   }
+  const fourAxis = validateAcceptedOwnerReviewFourAxisCombination(record);
+  if (!fourAxis.ok) return fourAxis;
   const review = statusValue(record, "review_status");
   const terminal = statusValue(record, "terminal_decision");
   const expectedTerminal = review === "APPROVED"
@@ -696,14 +719,10 @@ export function validateAcceptedOwnerReviewRecordConsistency(record) {
       error_code: "MATERIALIZATION_LEDGER_STATUS_MISMATCH",
     });
   }
-  const canonical = deriveAcceptedOwnerReviewCanonicalResult(record);
-  if (canonical === "INVALID_STATE") {
-    return Object.freeze({
-      ok: false,
-      error_code: "FOUR_AXIS_STATE_INVALID",
-    });
-  }
-  return Object.freeze({ ok: true, canonical_result: canonical });
+  return Object.freeze({
+    ok: true,
+    canonical_result: fourAxis.canonical_result,
+  });
 }
 
 export function isDirectBusinessEffectActive(record) {

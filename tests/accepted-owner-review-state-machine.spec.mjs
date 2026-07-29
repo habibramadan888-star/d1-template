@@ -285,6 +285,10 @@ test("same terminal command is idempotent but competing terminal command loses",
   assert.equal(replay.idempotent_replay, true);
   assert.equal(replay.state.version, approved.state.version);
   assert.equal(replay.materialization_required, true);
+  assert.equal(
+    replay.state.terminal_decision_record.decided_at,
+    approved.state.terminal_decision_record.decided_at,
+  );
 
   const rejected = transitionAcceptedOwnerReviewState(
     approved.state,
@@ -311,6 +315,10 @@ test("same idempotency key with different command content conflicts", () => {
 
   const variants = [
     { ...command, reason: "different reason" },
+    {
+      ...command,
+      server_time: "2026-07-28T09:01:00.000Z",
+    },
     {
       ...command,
       corrected_payload: { amount_aed: "52.00" },

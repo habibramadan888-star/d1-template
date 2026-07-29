@@ -165,6 +165,7 @@ function decisionContext(state, command, action, ports) {
       correction_diff:
         action === "CORRECT_APPROVE" ? command.correction_diff : null,
       reason: command.reason,
+      server_time: command.server_time,
       strict_validator_attestation:
         action === "REJECT" ? null : command.strict_validator_attestation,
       classification_relevant_facts:
