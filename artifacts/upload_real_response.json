@@ -1,0 +1,10 @@
+{
+  "status_label": "NOT_VERIFIED",
+  "not_live_verified": true,
+  "endpoint": "POST /api/employee/entry",
+  "called": false,
+  "http_status": null,
+  "raw_response_body": null,
+  "parsed_json_response": null,
+  "reason": "Real upload was not called because dry-run validation was not reached."
+}

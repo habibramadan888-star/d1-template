@@ -1,0 +1,25 @@
+{
+  "status_label": "NOT_VERIFIED",
+  "not_live_verified": true,
+  "production_url": "https://homelink-finance.habibramadan888.workers.dev/employee",
+  "capture_attempted_at": "2026-07-07",
+  "capture_mode": "Chrome extension browser automation",
+  "upload_flow_reached": false,
+  "frontend_upload_click_called": false,
+  "post_validate_called": false,
+  "post_upload_called": false,
+  "network_events": [],
+  "blocker": {
+    "chrome_connection_error": "privileged native pipe bridge is not available; browser-client is not trusted",
+    "chrome_running": false,
+    "codex_chrome_extension_installed": false,
+    "codex_chrome_extension_enabled": false,
+    "native_host_manifest_correct": true
+  },
+  "redaction": {
+    "cookies": "not captured",
+    "authorization_headers": "not captured",
+    "passwords": "not captured",
+    "tokens": "not captured"
+  }
+}

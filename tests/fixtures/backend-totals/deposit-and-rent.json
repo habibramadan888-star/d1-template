@@ -1,0 +1,18 @@
+{
+  "name": "deposit-and-rent",
+  "rows": [
+    { "id": "rent", "type": "R", "pay_type": "C", "amount": "770.00" },
+    { "id": "deposit", "type": "D", "pay_type": "C", "amount": "200.00" }
+  ],
+  "frontendTotals": {
+    "cash_handover": "970.00",
+    "gross_received": "970.00",
+    "session_total": "970.00"
+  },
+  "expected": {
+    "rentReceivedAed": "770.00",
+    "depositReceivedAed": "200.00",
+    "grossReceivedAed": "970.00",
+    "errors": 0
+  }
+}

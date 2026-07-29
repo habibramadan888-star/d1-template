@@ -1,0 +1,25 @@
+# Owner UI Global Alignment Result
+
+Scope: owner UI style layer in `deploy-worker/public/index.html` and `deploy-worker/public/index-51.html`.
+
+| Area            | Before                                          | After                                                                | Matches Employee Design | Notes                                                                                                   |
+| --------------- | ----------------------------------------------- | -------------------------------------------------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------- |
+| body            | Mixed old flat gray and later glass overrides   | `hl-page owner-ui-unified` uses shared font/background               | YES                     | Page background now derives from employee atmospheric style.                                            |
+| app root        | Width/padding varied by old owner rules         | `hl-shell` shared max width and owner layer spacing                  | YES                     | Owner shell uses same product rhythm.                                                                   |
+| login area      | Auth handoff existed but fallback looked legacy | Glass lock card, shared loading state, no fallback flash before auth | YES                     | Behavior unchanged; visual layer aligned.                                                               |
+| dashboard shell | Dense internal admin feel                       | Glass header/nav/cards with employee green active state              | YES                     | Dashboard frame now belongs to same product family.                                                     |
+| page header     | Compact and mixed typography                    | Shared heading hierarchy and spacing                                 | PARTIAL                 | Some inline Chinese strings remain mojibake in local terminal output; browser source remains unchanged. |
+| nav / tabs      | Small compact owner nav                         | Larger glass nav buttons and shared active gradient                  | YES                     | Mobile nav remains horizontally scrollable.                                                             |
+| stat cards      | `.kpi` only, compact labels                     | `.kpi hl-stat-card` with shared label/value classes                  | YES                     | Dynamic owner KPI renderer updated.                                                                     |
+| tables/lists    | Dense table feel                                | Glass containers, contained mobile overflow                          | PARTIAL                 | Full table-to-card conversion is deferred to manual visual QA.                                          |
+| filters/search  | Mixed inline controls                           | Shared input/button radius, focus, spacing                           | PARTIAL                 | Inline styles still exist but are overridden for core controls.                                         |
+| form controls   | Compact 8px radius                              | Shared 54px field, 17px radius, green focus                          | YES                     | No business behavior changed.                                                                           |
+| buttons         | Compact 8px radius                              | Shared height/radius/gradient/shadow                                 | YES                     | Primary/secondary/danger aligned.                                                                       |
+| empty states    | Serviceable but old                             | Shared glass muted state                                             | YES                     | `.empty-state` now matches employee tone.                                                               |
+| loading states  | Auth loading present                            | Larger glass loading card, spinner tokenized                         | YES                     | Old login panel remains hidden until `/api/me` 401.                                                     |
+| error states    | Red text/toast existed                          | Semantic red remains, card style improved                            | PARTIAL                 | Detailed alert extraction can follow if needed.                                                         |
+| mobile layout   | Some dense owner/table patterns                 | One-column forms, larger nav/buttons, table containment              | PARTIAL                 | Needs manual phone screenshots before calling complete.                                                 |
+
+## Result
+
+Owner UI no longer depends on a separate old visual vocabulary for its primary shell, auth/loading, cards, buttons, inputs, and dashboard KPI cards. Some deep legacy inline panels remain visually overridden rather than structurally rewritten to avoid behavior risk in a single overnight pass.

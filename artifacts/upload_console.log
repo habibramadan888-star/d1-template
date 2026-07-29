@@ -1,0 +1,14 @@
+[2026-07-07] Production browser console capture was not available.
+
+Chrome automation connection error:
+privileged native pipe bridge is not available; browser-client is not trusted
+
+Local Chrome/plugin checks:
+- Google Chrome running: no
+- Codex Chrome Extension installed: false
+- Codex Chrome Extension enabled: false
+- Native host manifest correct: true
+
+No production browser page was controlled.
+No employee UI console logs were captured.
+No cookies, tokens, passwords, authorization headers, or secrets were read or printed.

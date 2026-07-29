@@ -1,59 +1,72 @@
-# Worker + D1 Database
+# Homelink Finance
 
-[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/cloudflare/templates/tree/main/d1-template)
+Homelink Finance is a Cloudflare Workers + D1 finance workflow for rental handover,
+employee entry, owner review, arrears follow-up, TTLock context, and future WiFi control.
 
-![Worker + D1 Template Preview](https://imagedelivery.net/wSMYJvS3Xw-n339CbDyDIA/cb7cb0a9-6102-4822-633c-b76b7bb25900/public)
+## Current Entrypoints
 
-<!-- dash-content-start -->
+- Employee page: `employee-v3.html`
+- Owner page: `index-51.html` and `index-51-main.js`
+- Worker source: `deploy-worker/src/index.js`
+- Embedded Worker: `deploy-worker/src/index.embedded.js`
+- Worker configs:
+  - `deploy-worker/wrangler.toml`
+  - `deploy-worker/wrangler.embedded.toml`
 
-D1 is Cloudflare's native serverless SQL database ([docs](https://developers.cloudflare.com/d1/)). This project demonstrates using a Worker with a D1 binding to execute a SQL statement. A simple frontend displays the result of this query:
+## Governance Documents
 
-```SQL
-SELECT * FROM comments LIMIT 3;
+Read these before making changes:
+
+- `AI_CONTRACT.md`
+- `ARCHITECTURE.md`
+- `PROJECT_MAP.md`
+
+## Local Setup
+
+Install dependencies:
+
+```bash
+npm install
 ```
 
-The D1 database is initialized with a `comments` table and this data:
+Create local Wrangler secrets:
 
-```SQL
-INSERT INTO comments (author, content)
-VALUES
-    ('Kristian', 'Congrats!'),
-    ('Serena', 'Great job!'),
-    ('Max', 'Keep up the good work!')
-;
+```bash
+cp .env.example deploy-worker/.dev.vars
 ```
 
-> [!IMPORTANT]
-> When using C3 to create this project, select "no" when it asks if you want to deploy. You need to follow this project's [setup steps](https://github.com/cloudflare/templates/tree/main/d1-template#setup-steps) before deploying.
+Then replace every placeholder with local development values. Do not commit real secrets.
 
-<!-- dash-content-end -->
+## Validation Commands
 
-## Getting Started
-
-Outside of this repo, you can start a new project with this template using [C3](https://developers.cloudflare.com/pages/get-started/c3/) (the `create-cloudflare` CLI):
-
+```bash
+npm run governance:check
+npm run lint
+npm run typecheck
+npm run build
+npm run check
 ```
-npm create cloudflare@latest -- --template=cloudflare/templates/d1-template
+
+## Local Worker
+
+Assets config:
+
+```bash
+cd deploy-worker
+npx wrangler dev --config wrangler.toml --port 8791
 ```
 
-A live public deployment of this template is available at [https://d1-template.templates.workers.dev](https://d1-template.templates.workers.dev)
+Embedded config:
 
-## Setup Steps
+```bash
+cd deploy-worker
+npx wrangler dev --config wrangler.embedded.toml --port 8792
+```
 
-1. Install the project dependencies with a package manager of your choice:
-   ```bash
-   npm install
-   ```
-2. Create a [D1 database](https://developers.cloudflare.com/d1/get-started/) with the name "d1-template-database":
-   ```bash
-   npx wrangler d1 create d1-template-database
-   ```
-   ...and update the `database_id` field in `wrangler.json` with the new database ID.
-3. Run the following db migration to initialize the database (notice the `migrations` directory in this project):
-   ```bash
-   npx wrangler d1 migrations apply --remote d1-template-database
-   ```
-4. Deploy the project!
-   ```bash
-   npx wrangler deploy
-   ```
+## Commercial Safety Notes
+
+- Do not store money as floating point values in new schema work.
+- Do not hard-delete financial records.
+- Do not rely on frontend visibility for security.
+- Do not hardcode production credentials or tenant identifiers.
+- Do not deploy production from local validation unless explicitly requested.

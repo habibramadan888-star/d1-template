@@ -1,0 +1,7 @@
+{
+  "status": "AUTOMATION_FAILED_QA_ARCHIVE_FINGERPRINT_COLLISION",
+  "validation_result_count": 41,
+  "passed_result_count": 8,
+  "failed_result_count": 33,
+  "formal_write_count": 0
+}

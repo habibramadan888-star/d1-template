@@ -1,0 +1,3 @@
+HOMELINK LEDGER capture held for pending manual Employee Review; Preview & Copy not invoked.
+Validated fixture summary: Cash 1620 | Bank 880 | Total 2500 | Expenses 799 | Net 1701 | Cash Net 1421 | Bank Net 280 | Outstanding 150 | Arrears Opened 150 | Arrears Repaid 70 | Deposit 200 | Transfer Fee 100 | Rent 2130.
+Upload Session: not clicked; formal write count: 0.

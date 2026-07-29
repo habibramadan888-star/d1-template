@@ -1,0 +1,24 @@
+{
+  "name": "voided-records",
+  "rows": [
+    { "id": "active-rent", "type": "R", "pay_type": "C", "amount": "500.00" },
+    {
+      "id": "voided-rent",
+      "type": "R",
+      "pay_type": "C",
+      "amount": "900.00",
+      "voided_at": "2026-05-24T00:00:00Z"
+    }
+  ],
+  "frontendTotals": {
+    "cash_handover": "1400.00",
+    "gross_received": "1400.00",
+    "session_total": "1400.00"
+  },
+  "expected": {
+    "cashHandoverAed": "500.00",
+    "includeVoidedCashHandoverAed": "1400.00",
+    "excludedVoidedRowCount": 1,
+    "errors": 0
+  }
+}

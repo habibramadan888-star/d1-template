@@ -1,0 +1,55 @@
+{
+  "description": "Rent and deposit are accepted but separated in backend totals.",
+  "context": {
+    "role": "staff",
+    "employeeId": "emp-a",
+    "allowedEmployeeIds": ["emp-a"],
+    "allowedPropertyIds": ["HL-009"]
+  },
+  "input": {
+    "session_id": "S-DEPOSIT-001",
+    "idempotency_key": "key-deposit-001",
+    "employee_id": "emp-a",
+    "property_id": "HL-009",
+    "submitted_at": "2026-05-24T03:15:00+04:00",
+    "frontend_totals": {
+      "cash_handover": "970.00",
+      "bank_transfer_total": "0.00",
+      "bank_transfer_count": 0,
+      "gross_received": "970.00",
+      "session_total": "970.00"
+    },
+    "rows": [
+      {
+        "client_entry_id": "deposit-row-1",
+        "event_type": "R",
+        "payment_method": "C",
+        "amount": "770.00",
+        "bed": "219"
+      },
+      {
+        "client_entry_id": "deposit-row-2",
+        "event_type": "D",
+        "payment_method": "C",
+        "amount": "200.00",
+        "bed": "219"
+      }
+    ]
+  },
+  "existing_state": {
+    "commits": []
+  },
+  "expected": {
+    "status": "ACCEPTED",
+    "cash_handover": "970.00",
+    "bank_transfer_total": "0.00",
+    "gross_received": "970.00",
+    "session_total": "970.00",
+    "deposit_received": "200.00",
+    "rent_received": "770.00",
+    "accepted_rows": 2,
+    "rejected_rows": 0,
+    "idempotency_status": "NEW",
+    "errors": 0
+  }
+}

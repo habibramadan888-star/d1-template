@@ -1,0 +1,24 @@
+HOMELINK LEDGER
+QA Run: QA-20260717-31978D7A
+Mode: Full
+Employee records: 41
+
+Cash Received: AED 3,800
+Bank Received: AED 2,620
+Total Received: AED 6,420
+Expenses: AED 1,798
+Net Funds: AED 4,622
+Cash Net: AED 2,801
+Bank Net: AED 1,821
+Outstanding: AED 300
+Deposit Included: AED 700
+Arrears Opened: AED 300
+Arrears Repaid: AED 160
+
+Rent: AED 5,360
+Deposit: AED 700
+Deposit Refund: AED 500
+Expense: AED 1,298
+Transfer: AED 200
+
+Preview and Copy Ledger used the same HOMELINK LEDGER renderer.

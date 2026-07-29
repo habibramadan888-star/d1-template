@@ -1,0 +1,13 @@
+{
+  "input": {
+    "receivableId": "rec_invalid_money",
+    "sourceType": "RENT",
+    "propertyId": "staging-property",
+    "amountAed": "770.001",
+    "paidAed": "0.00",
+    "dueDate": "2026-05-25"
+  },
+  "expected": {
+    "throws": "Invalid AED amount"
+  }
+}

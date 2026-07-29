@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Homelink 登录</title>
+<link rel="stylesheet" href="./shared-design-tokens.css">
+<style>
+:root{
+  --ink:#111827;
+  --muted:#5f6877;
+  --line:#dfe5e8;
+  --green:#09a64f;
+  --green2:#078d42;
+  --danger:#b42318;
+  --warn:#8a5a00;
+  --shadow:0 32px 90px rgba(15,23,42,.18),inset 0 1px 0 rgba(255,255,255,.92);
+}
+*{box-sizing:border-box}
+html{background:#f4f6f8}
+body{
+  margin:0;
+  min-height:100vh;
+  overflow-x:hidden;
+  color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","PingFang SC","Microsoft YaHei",sans-serif;
+  background:
+    radial-gradient(circle at 10% -8%,rgba(255,255,255,.95),transparent 30rem),
+    radial-gradient(circle at 86% 6%,rgba(18,183,106,.22),transparent 28rem),
+    radial-gradient(circle at 12% 72%,rgba(26,115,232,.12),transparent 24rem),
+    linear-gradient(145deg,#f7fbf9 0%,#eef7f3 42%,#e9f0ef 100%);
+}
+body:before{
+  content:"";
+  position:fixed;
+  inset:0;
+  pointer-events:none;
+  z-index:-1;
+  background:
+    linear-gradient(90deg,rgba(255,255,255,.28) 1px,transparent 1px),
+    linear-gradient(180deg,rgba(255,255,255,.20) 1px,transparent 1px);
+  background-size:44px 44px;
+  mask-image:linear-gradient(180deg,rgba(0,0,0,.45),transparent 70%);
+}
+.login-overlay{
+  min-height:100vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:24px;
+  background:radial-gradient(circle at 70% 20%,rgba(9,166,79,.22),transparent 28rem),rgba(237,247,242,.78);
+  backdrop-filter:blur(30px) saturate(170%);
+  -webkit-backdrop-filter:blur(30px) saturate(170%);
+}
+.login-card{
+  width:min(420px,96vw);
+  padding:28px;
+  border-radius:32px;
+  background:linear-gradient(145deg,rgba(255,255,255,.78),rgba(255,255,255,.48));
+  border:1px solid rgba(255,255,255,.78);
+  box-shadow:var(--shadow);
+  backdrop-filter:blur(28px) saturate(170%);
+  -webkit-backdrop-filter:blur(28px) saturate(170%);
+}
+.login-brand{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  margin-bottom:26px;
+}
+.badge{
+  width:48px;
+  height:48px;
+  border-radius:14px;
+  display:grid;
+  place-items:center;
+  color:#fff;
+  background:linear-gradient(145deg,#0bb25b,#078d42);
+  box-shadow:inset 0 -10px 20px rgba(0,0,0,.08);
+  font-size:16px;
+  font-weight:950;
+  letter-spacing:-.03em;
+  line-height:1.05;
+}
+.badge small{
+  display:block;
+  color:#f1d800;
+  font-size:9px;
+  letter-spacing:.06em;
+}
+.login-title{
+  color:#111827;
+  font-size:26px;
+  font-weight:820;
+  line-height:1.1;
+}
+.login-title small{
+  display:block;
+  margin-top:4px;
+  color:#7b8797;
+  font-size:10px;
+  font-weight:520;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+}
+.sr-only{
+  position:absolute;
+  width:1px;
+  height:1px;
+  padding:0;
+  margin:-1px;
+  overflow:hidden;
+  clip:rect(0,0,0,0);
+  white-space:nowrap;
+  border:0;
+}
+.field{margin-bottom:16px}
+.remember-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  margin:-2px 0 14px;
+  color:#4d5968;
+  font-size:13px;
+  font-weight:680;
+}
+.remember-row label{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  cursor:pointer;
+  user-select:none;
+}
+.remember-row input{
+  width:18px;
+  min-height:18px;
+  height:18px;
+  accent-color:var(--green);
+  box-shadow:none;
+}
+.field label{
+  display:block;
+  margin:0 0 8px;
+  color:#435168;
+  font-size:14px;
+  font-weight:680;
+  line-height:1.25;
+}
+.label-en{
+  display:inline-block;
+  margin-left:4px;
+  color:#7d8795;
+  font-size:10px;
+  font-weight:520;
+  letter-spacing:.075em;
+  text-transform:uppercase;
+}
+input{
+  width:100%;
+  min-height:54px;
+  border:1.5px solid rgba(148,163,184,.38);
+  border-radius:16px;
+  padding:14px 16px;
+  color:#111827;
+  background:rgba(255,255,255,.68);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.9);
+  font:inherit;
+  font-size:17px;
+  outline:none;
+}
+input:focus{
+  border-color:rgba(9,166,79,.72);
+  box-shadow:0 0 0 5px rgba(9,166,79,.13),inset 0 1px 0 rgba(255,255,255,.95);
+}
+.login-actions,.actions{
+  display:flex;
+  flex-wrap:wrap;
+  gap:12px;
+  margin-top:10px;
+}
+.login-actions{
+  display:grid;
+  grid-template-columns:1fr;
+}
+button{
+  min-height:54px;
+  border:1px solid rgba(255,255,255,.82);
+  border-radius:17px;
+  padding:14px 20px;
+  cursor:pointer;
+  font:inherit;
+  font-weight:950;
+  box-shadow:0 8px 22px rgba(20,32,51,.07);
+}
+.btn,.primary{
+  flex:1;
+  min-width:160px;
+}
+.primary{
+  color:#fff;
+  background:linear-gradient(180deg,#20bf6b 0%,#078d42 100%);
+  border-color:transparent;
+  box-shadow:0 18px 40px rgba(9,166,79,.24),inset 0 1px 0 rgba(255,255,255,.25);
+}
+.primary .label-en{
+  display:block;
+  margin:2px 0 0;
+  color:rgba(255,255,255,.7);
+  font-size:9px;
+  line-height:1;
+}
+.ghost{
+  color:#294235;
+  background:rgba(255,255,255,.62);
+  border:1px solid rgba(255,255,255,.82);
+}
+.login-actions .ghost{
+  justify-self:start;
+  min-height:42px;
+  min-width:0;
+  padding:10px 16px;
+  border-radius:999px;
+  font-size:14px;
+  font-weight:780;
+}
+button:disabled{
+  opacity:.64;
+  cursor:not-allowed;
+}
+.status{
+  font-size:14px;
+  color:#566174;
+  line-height:1.75;
+  background:rgba(255,255,255,.75);
+  border:1px dashed #d7e3dd;
+  border-radius:18px;
+  padding:16px 18px;
+}
+.status{
+  margin-top:12px;
+  padding:12px 14px;
+}
+.status[hidden]{
+  display:none;
+}
+.status.is-visible{
+  display:block;
+}
+.status.error{
+  color:var(--danger);
+  background:#fff4f2;
+  border-color:#ffd8d2;
+}
+.status.warn{
+  color:var(--warn);
+  background:#fff8e6;
+  border-color:#f5dfaa;
+}
+@media(max-width:720px){
+  body{
+    background:
+      radial-gradient(circle at 80% 0%,rgba(18,183,106,.18),transparent 18rem),
+      linear-gradient(180deg,#f9fcfb,#eef4f2);
+  }
+  .login-overlay{padding:18px}
+  .login-card{padding:24px;border-radius:30px}
+  .badge{width:42px;height:42px;font-size:14px}
+  .login-title{font-size:24px}
+  input{border-radius:15px}
+  .remember-row{font-size:12px;margin-bottom:12px}
+  .btn,.primary,.ghost{width:100%}
+  .login-actions .ghost{width:auto}
+}
+</style>
+</head>
+<body class="hl-page unified-login-page">
+<main class="login-overlay unified-login-shell" aria-label="Homelink unified login">
+  <section class="login-card employee-login-match" aria-label="Login form">
+    <div class="login-brand">
+      <div class="badge"><div>HOME<small>LINK.</small></div></div>
+      <div class="login-title">Homelink 登录</div>
+    </div>
+    <form id="loginForm">
+      <input class="sr-only" id="browserUsername" name="username" autocomplete="username" value="homelink-owner" aria-hidden="true" tabindex="-1">
+      <div class="field">
+        <label class="sr-only" for="accountId">用户名</label>
+        <input id="accountId" name="accountId" autocomplete="username" placeholder="用户名">
+      </div>
+      <div class="field">
+        <label class="sr-only" for="secret">密码</label>
+        <input id="secret" name="secret" type="password" autocomplete="current-password" placeholder="密码" required>
+      </div>
+      <div class="remember-row">
+        <label for="rememberAccount">
+          <input id="rememberAccount" name="rememberAccount" type="checkbox">
+          <span>记住账号</span>
+        </label>
+      </div>
+      <div class="login-actions">
+        <button class="btn primary" id="loginButton" type="submit">登录</button>
+        <button class="btn ghost" id="logoutButton" type="button">清除会话</button>
+      </div>
+    </form>
+    <div class="status" id="status" role="status" hidden></div>
+  </section>
+</main>
+
+<script>
+const API_ORIGIN = "https://homelink-finance.habibramadan888.workers.dev";
+const EMPLOYEE_DESTINATION = "./employee-v3.html";
+const OWNER_DESTINATION = "./index.html";
+const EMPLOYEE_ROLES = new Set(["employee", "staff"]);
+const OWNER_ROLES = new Set(["owner", "manager", "admin", "admin_readonly", "readonly_admin"]);
+const OWNER_ACCOUNT_IDS = new Set(["owner", "manager", "admin", "admin_readonly", "readonly_admin"]);
+const OWNER_PASSWORD_MANAGER_USERNAME = "homelink-owner";
+
+const statusEl = document.getElementById("status");
+const form = document.getElementById("loginForm");
+const accountId = document.getElementById("accountId");
+const browserUsername = document.getElementById("browserUsername");
+const secret = document.getElementById("secret");
+const rememberAccount = document.getElementById("rememberAccount");
+const loginButton = document.getElementById("loginButton");
+const logoutButton = document.getElementById("logoutButton");
+const REMEMBER_ACCOUNT_KEY = "homelink:remember_account";
+
+function apiUrl(path) {
+  if (/^https?:\/\//i.test(path)) return path;
+  const servedOverHttp = location.protocol === "http:" || location.protocol === "https:";
+  return servedOverHttp ? path : API_ORIGIN + path;
+}
+
+function setStatus(message, tone) {
+  const nextMessage = String(message || "").trim();
+  statusEl.textContent = nextMessage;
+  statusEl.hidden = !nextMessage;
+  statusEl.className = "status" + (nextMessage ? " is-visible" : "") + (tone ? " " + tone : "");
+}
+
+function shouldAutoRedirectExistingSession() {
+  return new URLSearchParams(location.search).get("auto") === "1";
+}
+
+function destinationForRole(role) {
+  const normalized = String(role || "").trim().toLowerCase();
+  if (EMPLOYEE_ROLES.has(normalized)) return EMPLOYEE_DESTINATION;
+  if (OWNER_ROLES.has(normalized)) return OWNER_DESTINATION;
+  return null;
+}
+
+function shouldUseOwnerLogin(account) {
+  const normalized = String(account || "").trim().toLowerCase();
+  return !normalized || OWNER_ACCOUNT_IDS.has(normalized);
+}
+
+function loadRememberedAccount() {
+  const remembered = localStorage.getItem(REMEMBER_ACCOUNT_KEY) || "";
+  if (remembered) {
+    accountId.value = remembered;
+    rememberAccount.checked = true;
+  }
+  browserUsername.value = remembered || OWNER_PASSWORD_MANAGER_USERNAME;
+}
+
+function persistRememberedAccount(account) {
+  if (rememberAccount.checked && account) localStorage.setItem(REMEMBER_ACCOUNT_KEY, account);
+  else localStorage.removeItem(REMEMBER_ACCOUNT_KEY);
+  browserUsername.value = account || OWNER_PASSWORD_MANAGER_USERNAME;
+}
+
+async function requestJson(path, options = {}) {
+  const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
+  const token = localStorage.getItem("homelink:cloud_token");
+  if (token && !headers.Authorization) headers.Authorization = "Bearer " + token;
+  const response = await fetch(apiUrl(path), {
+    credentials: "include",
+    ...options,
+    headers
+  });
+  const body = unwrapStandardResponse(await response.json().catch(() => null));
+  return { response, body };
+}
+
+function unwrapStandardResponse(body) {
+  return body && body.code === 0 && body.data ? body.data : body;
+}
+
+async function fetchMe() {
+  const { response, body } = await requestJson("/api/me", { method: "GET" });
+  if (response.status === 401 || response.status === 403) return null;
+  if (!response.ok) throw new Error(body?.error || "me_failed");
+  return unwrapStandardResponse(body);
+}
+
+function routeFromServerClaim(me, options = {}) {
+  const destination = destinationForRole(me?.role);
+  if (!destination) {
+    setStatus("登录成功，但当前账号暂不能进入系统。", "error");
+    return;
+  }
+  setStatus("已登录，正在进入系统...");
+  const nav = options.replace ? location.replace.bind(location) : location.assign.bind(location);
+  nav(destination);
+}
+
+function showLoginForm(message, tone) {
+  form.style.display = "block";
+  setStatus(message, tone);
+}
+
+async function checkExistingSession() {
+  try {
+    const me = await fetchMe();
+    if (me) {
+      if (shouldAutoRedirectExistingSession()) routeFromServerClaim(me, { replace: true });
+      else showLoginForm("");
+      return;
+    }
+    showLoginForm("");
+  } catch (error) {
+    showLoginForm("暂时无法检查当前会话，仍可继续登录。", "warn");
+  }
+}
+
+async function signIn(event) {
+  event.preventDefault();
+  const id = accountId.value.trim();
+  const password = secret.value.trim();
+  browserUsername.value = id || OWNER_PASSWORD_MANAGER_USERNAME;
+  if (!password) {
+    setStatus("请输入密码或 PIN。", "error");
+    return;
+  }
+  loginButton.disabled = true;
+  setStatus("正在登录...");
+  try {
+    let authResult;
+    if (shouldUseOwnerLogin(id)) {
+      authResult = await requestJson("/auth/login", {
+        method: "POST",
+        body: JSON.stringify({ password })
+      });
+    } else {
+      authResult = await requestJson("/auth/employee-login", {
+        method: "POST",
+        body: JSON.stringify({ employee_id: id, pin: password })
+      });
+    }
+    if (!authResult.response.ok) {
+      throw new Error(authResult.body?.error || "invalid_credentials");
+    }
+
+    // Do not trust the login response role. /api/me is the routing authority.
+    const me = await fetchMe();
+    if (!me) throw new Error("session_expired");
+    persistRememberedAccount(id);
+    secret.value = "";
+    routeFromServerClaim(me, { replace: true });
+  } catch (error) {
+    setStatus("用户名或密码错误", "error");
+  } finally {
+    loginButton.disabled = false;
+  }
+}
+
+async function clearSession() {
+  logoutButton.disabled = true;
+  try {
+    await requestJson("/api/logout", { method: "POST" });
+  } catch {}
+  [
+    "homelink:cloud_token",
+    "homelink:role",
+    "homelink:user",
+    "owner:role",
+    "owner:user",
+    "empv3:user",
+    "empv3:operator",
+    "empv3:lastEmployeeId",
+    "hl:wifi_accounts",
+    "hl:wifi_sessions",
+    "hl:wifi_blacklist",
+    "hl:wifi_config"
+  ].forEach((key) => {
+    localStorage.removeItem(key);
+    sessionStorage.removeItem(key);
+  });
+  if (rememberAccount.checked) accountId.value = localStorage.getItem(REMEMBER_ACCOUNT_KEY) || accountId.value;
+  else {
+    localStorage.removeItem(REMEMBER_ACCOUNT_KEY);
+    accountId.value = "";
+  }
+  browserUsername.value = accountId.value.trim() || OWNER_PASSWORD_MANAGER_USERNAME;
+  secret.value = "";
+  showLoginForm("");
+  logoutButton.disabled = false;
+  location.assign("/");
+}
+
+form.addEventListener("submit", signIn);
+rememberAccount.addEventListener("change", () => {
+  if (!rememberAccount.checked) localStorage.removeItem(REMEMBER_ACCOUNT_KEY);
+});
+logoutButton.addEventListener("click", clearSession);
+loadRememberedAccount();
+checkExistingSession();
+</script>
+</body>
+</html>

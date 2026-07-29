@@ -1,0 +1,41 @@
+name = "homelink-finance-qa"
+main = "src/index.js"
+compatibility_date = "2024-09-23"
+
+[version_metadata]
+binding = "CF_VERSION_METADATA"
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+run_worker_first = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "homelink-finance-qa-auth086"
+database_id = "44bacad0-9de9-4a27-a6ca-9f74d40db1ba"
+
+[[kv_namespaces]]
+binding = "RATE_LIMIT"
+id = "4fba90660a0f4c02ad6e4114f179e929"
+
+[vars]
+APP_NAME = "Homelink Finance QA"
+APP_VERSION = "2.0.0"
+APP_ENV = "internal_beta"
+CORPID = "HL-QA"
+QA_ACCEPTANCE_ENABLED = "true"
+QA_HOSTNAME = "homelink-finance-qa.habibramadan888.workers.dev"
+QA_EXPECTED_D1_ID = "44bacad0-9de9-4a27-a6ca-9f74d40db1ba"
+QA_EXPECTED_KV_ID = "4fba90660a0f4c02ad6e4114f179e929"
+QA_BINDING_CONTRACT_SHA256 = "7a3b133331e698544c819aa314f33a7d28aa98c53256c86ff8e3277544f47ebd"
+QA_MATRIX_VERSION = "employee-qa-matrix-v2"
+QA_CLIENT_ASSET_VERSION = "qa-idempotent-finalization-v1"
+BED_TRANSFER_WRITE_APPROVED = "true"
+BED_TRANSFER_LEGACY_GENESIS_MODE = "server_verified"
+BED_TRANSFER_OWNER_VOID_ENABLED = "true"
+OWNER_TODAY_TODO_ACK_ENABLED = "true"
+FF_BACKEND_TOTALS = "false"
+FF_RECEIVABLES_STATE = "false"
+FF_TENANT_ISOLATION = "false"
+FF_AUDIT_TRAIL = "false"

@@ -1,0 +1,62 @@
+name = "homelink-finance"
+main = "src/index.js"
+compatibility_date = "2024-09-23"
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+run_worker_first = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "homelink"
+database_id = "562aa079-1cca-4176-ba3b-7276a65f98fb"
+
+[[kv_namespaces]]
+binding = "RATE_LIMIT"
+id = "c7c64d522d964baba2e72454e7262da9"
+
+[vars]
+APP_NAME = "Homelink Finance"
+APP_VERSION = "2.0.0"
+APP_ENV = "internal_beta"
+BED_TRANSFER_WRITE_APPROVED = "true"
+BED_TRANSFER_LEGACY_GENESIS_MODE = "server_verified"
+CORPID = "homelink"
+FF_BACKEND_TOTALS = "false"
+FF_RECEIVABLES_STATE = "false"
+FF_TENANT_ISOLATION = "false"
+FF_AUDIT_TRAIL = "false"
+
+[env.staging]
+name = "homelink-finance-staging"
+main = "src/index.js"
+
+[env.staging.vars]
+APP_NAME = "Homelink Finance"
+APP_VERSION = "2.0.0"
+APP_ENV = "staging"
+CORPID = "homelink-staging"
+STAGING_ALLOWED_HOST = "homelink-finance-staging.habibramadan888.workers.dev"
+STAGING_ALLOWED_ORIGIN = "https://homelink-finance-staging.habibramadan888.workers.dev"
+STAGING_TTLOCK_MODE = "disabled_fail_closed"
+STAGING_CONTEXT_SNAPSHOT_MODE = "staging_kv_only"
+ENABLE_EMPLOYEE_ENTRY_ADAPTER_LIVE_ROUTE = "false"
+ENABLE_HANDOVER_ATOMIC_STAGING = "false"
+BED_TRANSFER_WRITE_APPROVED = "false"
+BED_TRANSFER_LEGACY_GENESIS_MODE = "server_verified"
+QA_ACCEPTANCE_ENABLED = "false"
+ALLOW_DEV_SEED = "false"
+FF_BACKEND_TOTALS = "false"
+FF_RECEIVABLES_STATE = "false"
+FF_TENANT_ISOLATION = "false"
+FF_AUDIT_TRAIL = "false"
+
+[[env.staging.d1_databases]]
+binding = "DB"
+database_name = "homelink-finance-staging"
+database_id = "4ff78bfc-3855-436b-aefb-6b492145d79c"
+
+[[env.staging.kv_namespaces]]
+binding = "RATE_LIMIT"
+id = "9e84150246204f01b3fd8c184761303e"

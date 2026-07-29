@@ -1,0 +1,23 @@
+{
+  "timestamp": "2026-05-30T11:37:24.028Z",
+  "url": "http://127.0.0.1:8824/api/rent_config",
+  "method": "POST",
+  "connections": 1,
+  "duration": 1,
+  "amount": 10,
+  "responseCheck": {
+    "status": 200,
+    "code": 0,
+    "ok": true
+  },
+  "qps": 10,
+  "p99": 51,
+  "errors": 0,
+  "non2xx": 0,
+  "statusCounts": {
+    "200": 10
+  },
+  "totalRequests": 10,
+  "status": "COMPLETE",
+  "error": null
+}

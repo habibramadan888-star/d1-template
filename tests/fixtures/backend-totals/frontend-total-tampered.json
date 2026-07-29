@@ -1,0 +1,20 @@
+{
+  "name": "frontend-total-tampered",
+  "rows": [
+    { "id": "rent", "type": "R", "pay_type": "C", "amount": "640.00" },
+    { "id": "deposit", "type": "D", "pay_type": "B", "amount": "200.00" }
+  ],
+  "frontendTotals": {
+    "cash_handover": "999.00",
+    "bank_transfer_total": "200.00",
+    "bank_transfer_count": 1,
+    "gross_received": "840.00",
+    "session_total": "840.00"
+  },
+  "expected": {
+    "cashHandoverAed": "640.00",
+    "grossReceivedAed": "840.00",
+    "discrepancy": true,
+    "errors": 0
+  }
+}

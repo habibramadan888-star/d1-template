@@ -1,0 +1,15 @@
+{
+  "input": {
+    "receivableId": "rec_overdue",
+    "sourceType": "RENT",
+    "propertyId": "staging-property",
+    "amountAed": "500.00",
+    "paidAed": "100.00",
+    "dueDate": "2026-05-24"
+  },
+  "businessDate": "2026-05-25",
+  "expected": {
+    "status": "OVERDUE",
+    "overdueAed": "400.00"
+  }
+}

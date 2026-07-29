@@ -1,0 +1,33 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import {readFile} from 'node:fs/promises';
+
+const workerPath=new URL('../deploy-worker/src/index.js',import.meta.url);
+const block=(source,name)=>{const start=source.indexOf(`function ${name}(`)>=0?source.indexOf(`function ${name}(`):source.indexOf(`async function ${name}(`);const end=source.indexOf(`__name(${name}`,start);assert.ok(start>=0&&end>start,`missing ${name}`);return source.slice(start,end);};
+
+test('legacy genesis resolver consumes centralized environment, employee, validation and write gates',async()=>{
+  const source=await readFile(workerPath,'utf8');
+  const allowlist=block(source,'bedTransferLegacyGenesisAllowlist');
+  const gate=block(source,'employeeBedTransferLegacyGenesisGate');
+  const resolver=block(source,'resolveEmployeeOwnerConfirmedLegacyGenesis');
+  assert.match(allowlist,/BED_TRANSFER_LEGACY_GENESIS_ALLOWLIST/);
+  assert.match(gate,/bedTransferDeploymentCapabilities\(env\)/);
+  assert.match(gate,/env\.APP_ENV/);
+  assert.match(gate,/\["staff","employee"\]\.includes\(role\)&&!!cleanText\(user\?\.corpid/);
+  assert.match(gate,/validateEnabled=capabilities\.bed_transfer_validate_enabled===true/);
+  assert.match(gate,/writeEnabled=capabilities\.bed_transfer_write_enabled===true/);
+  assert.match(gate,/legacyGenesisMode==="server_verified"/);
+  assert.match(gate,/serverVerifiedPermission=serverVerifiedValidationPermission&&writeEnabled/);
+  assert.match(resolver,/gate=employeeBedTransferLegacyGenesisGate\(env,user\)/);
+  assert.match(resolver,/options\.validation_only===true\?gate\.server_verified_validation_permission:gate\.server_verified_permission/);
+  assert.match(resolver,/app_env:gate\.app_env/);
+  assert.match(resolver,/write_approved:writeApproved/);
+  assert.match(resolver,/allowed_source_beds:bedTransferLegacyGenesisAllowlist\(env\)/);
+});
+test('legacy genesis snapshot fingerprints exclude provider identity',async()=>{const source=await readFile(workerPath,'utf8');const fingerprint=block(source,'bedTransferSafeSnapshotFingerprint');assert.match(fingerprint,/accessSnapshotRuntimeHash/);assert.match(fingerprint,/parsed_checkin_mmdd/);assert.match(fingerprint,/normalized_expiry_value/);assert.doesNotMatch(fingerprint,/card|phone|provider|99099/i);});
+test('canonical TF persistence exits before generic transaction path',async()=>{const source=await readFile(workerPath,'utf8');const handler=block(source,'handleEmployeeEntry');const canonical=handler.indexOf('return persistEmployeeBedTransferCanonicalArchive');const generic=handler.indexOf('empInsertDynamic(env,"transactions"');assert.ok(canonical>=0&&generic>canonical);assert.match(handler,/!\["TF","TFF"\]\.includes\(writeGateType\)&&!await empTableExists\(env,"transactions"\)/);});
+test('canonical archive decoder preserves server transfer identity without widening client fields',async()=>{const source=await readFile(workerPath,'utf8');const decoder=block(source,'extractEmployeeEntryAnchorsFromSession');assert.match(decoder,/canonicalTransferFields/);assert.match(decoder,/transfer_anchor_id/);assert.match(decoder,/transfer_lineage_id/);assert.match(decoder,/void_transfer/);assert.match(decoder,/Object\.prototype\.hasOwnProperty/);});
+test('canonical TF and void fail closed when sessions entries_json is unavailable',async()=>{const source=await readFile(workerPath,'utf8');const writer=block(source,'handleEmployeeEntry'),ownerVoid=block(source,'handleOwnerBedTransferVoid');assert.match(writer,/empTableColumns\(env,"sessions"\)/);assert.match(writer,/CANONICAL_ARCHIVE_SCHEMA_UNAVAILABLE/);assert.match(writer,/no_write:true/);assert.ok(writer.indexOf('CANONICAL_ARCHIVE_SCHEMA_UNAVAILABLE')<writer.indexOf('persistEmployeeBedTransferCanonicalArchive'));assert.match(ownerVoid,/empTableColumns\(env,"sessions"\)/);assert.match(ownerVoid,/BED_TRANSFER_CANONICAL_ARCHIVE_SCHEMA_NOT_READY/);assert.match(ownerVoid,/no_write:true/);});
+test('canonical TF validation bypasses generic room and amount fields',async()=>{const source=await readFile(workerPath,'utf8');const validator=block(source,'validateEmployeeEntryUploadPayload');assert.match(validator,/canonicalTransfer=\["TF","TFF"\]\.includes\(type\)/);assert.match(validator,/if\(!canonicalTransfer&&\(!room/);});
+test('owner transfer void is exact-target beta additive evidence with no hard delete',async()=>{const source=await readFile(workerPath,'utf8');const gate=block(source,'ownerBedTransferVoidWriteEnabled');const handler=block(source,'handleOwnerBedTransferVoid');assert.match(gate,/APP_ENV/);assert.match(gate,/BED_TRANSFER_OWNER_VOID_ENABLED/);assert.match(gate,/BED_TRANSFER_OWNER_VOID_TARGET_ANCHOR_ID/);assert.doesNotMatch(gate,/bedTransferWriteApproved/);assert.ok(handler.indexOf('ownerBedTransferVoidWriteEnabled(env,targetTransferAnchorId)')<handler.indexOf('empTableExists(env,"sessions")'));assert.doesNotMatch(handler,/UPDATE\s+sessions|DELETE\s+FROM|transactions.*INSERT/i);assert.match(handler,/exactActiveMatches\.length===1/);assert.match(handler,/corpid=\? AND anchor_id=\?/);assert.match(handler,/persistedRows\.length===1/);assert.match(handler,/matches\.length===1/);assert.match(handler,/source:"owner_transfer_void"/);assert.match(source,/path === "\/api\/owner\/bed-transfer\/void"/);});
+test('controlled void form is manager, exact-target, and retained-income protected',async()=>{const source=await readFile(workerPath,'utf8');const form=block(source,'ownerBedTransferVoidControlResponse');assert.match(form,/requireManager\(claim\)/);assert.match(form,/ownerBedTransferVoidWriteEnabled\(env,target\)/);assert.match(form,/CONTROLLED_BETA_TEST_CLEANUP/);assert.match(form,/financial_disposition/);assert.match(form,/retain_earned_income/);assert.match(form,/retain-earned-income-reversal/);assert.match(form,/form-action 'self'/);assert.match(source,/path === "\/owner\/beta-transfer-retain-earned-income"/);assert.match(source,/path === "\/api\/owner\/bed-transfer\/retain-earned-income-reversal"/);});

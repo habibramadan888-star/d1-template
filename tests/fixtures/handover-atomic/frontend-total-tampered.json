@@ -1,0 +1,44 @@
+{
+  "description": "Frontend totals are tampered and must not become accounting authority.",
+  "context": {
+    "role": "staff",
+    "employeeId": "emp-a",
+    "allowedEmployeeIds": ["emp-a"],
+    "allowedPropertyIds": ["HL-009"]
+  },
+  "input": {
+    "session_id": "S-TAMPER-001",
+    "idempotency_key": "key-tamper-001",
+    "employee_id": "emp-a",
+    "property_id": "HL-009",
+    "submitted_at": "2026-05-24T03:25:00+04:00",
+    "frontend_totals": {
+      "cash_handover": "999.00",
+      "bank_transfer_total": "0.00",
+      "bank_transfer_count": 0,
+      "gross_received": "999.00",
+      "session_total": "999.00"
+    },
+    "rows": [
+      {
+        "client_entry_id": "tamper-row-1",
+        "event_type": "R",
+        "payment_method": "C",
+        "amount": "640.00",
+        "bed": "144"
+      }
+    ]
+  },
+  "existing_state": {
+    "commits": []
+  },
+  "expected": {
+    "status": "DISCREPANCY",
+    "cash_handover": "640.00",
+    "gross_received": "640.00",
+    "accepted_rows": 1,
+    "rejected_rows": 0,
+    "idempotency_status": "NEW",
+    "warning_code": "FRONTEND_TOTAL_DISCREPANCY"
+  }
+}

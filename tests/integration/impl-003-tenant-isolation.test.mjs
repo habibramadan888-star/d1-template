@@ -1,0 +1,90 @@
+import assert from "node:assert/strict";
+import { describe, it } from "node:test";
+
+import {
+  addPropertyFilter,
+  addTenantFilter,
+  appendScopeFilter,
+  buildSecureQuery,
+  buildScopeFilter,
+  normalizeAllowedProperties
+} from "../../deploy-worker/src/db/query-filters.js";
+
+describe("IMPL-003: Tenant/Property Isolation", () => {
+  it("scopes employees by tenant and assigned property IDs", () => {
+    const filter = buildScopeFilter({
+      role: "employee",
+      tenant_id: "tenant-a",
+      allowed_properties: ["101", "102"]
+    });
+
+    assert.equal(filter.clause, "tenant_id = ? AND property_id IN (?, ?)");
+    assert.deepEqual(filter.params, ["tenant-a", "101", "102"]);
+  });
+
+  it("scopes owners by tenant without property restriction", () => {
+    const filter = buildScopeFilter({ role: "owner", tenant_id: "tenant-a" });
+
+    assert.equal(filter.clause, "tenant_id = ?");
+    assert.deepEqual(filter.params, ["tenant-a"]);
+  });
+
+  it("denies employees with no allowed properties", () => {
+    const filter = buildScopeFilter({ role: "employee", tenant_id: "tenant-a" });
+
+    assert.equal(filter.clause, "1 = 0");
+    assert.equal(filter.reason, "no_allowed_properties");
+  });
+
+  it("appends scoped WHERE before ORDER BY while preserving parameter order", () => {
+    const query = appendScopeFilter("SELECT * FROM entries ORDER BY created_at DESC", {
+      role: "employee",
+      tenant_id: "tenant-a",
+      allowed_properties: "101, 102"
+    });
+
+    assert.match(query.sql, /WHERE \(tenant_id = \? AND property_id IN \(\?, \?\)\) ORDER BY/);
+    assert.deepEqual(query.params, ["tenant-a", "101", "102"]);
+  });
+
+  it("normalizes property lists from strings and arrays", () => {
+    assert.deepEqual(normalizeAllowedProperties({ allowed_properties: "101, 102" }), [
+      "101",
+      "102"
+    ]);
+    assert.deepEqual(normalizeAllowedProperties({ allowed_properties: [101, "102"] }), [
+      "101",
+      "102"
+    ]);
+  });
+
+  it("keeps compatibility wrappers parameterized", () => {
+    const tenantQuery = addTenantFilter("SELECT * FROM entries", {
+      role: "owner",
+      tenant_id: "tenant-a"
+    });
+    assert.equal(tenantQuery.sql, "SELECT * FROM entries WHERE (tenant_id = ?)");
+    assert.deepEqual(tenantQuery.params, ["tenant-a"]);
+
+    const propertyQuery = addPropertyFilter("SELECT * FROM entries WHERE active = 1", {
+      role: "employee",
+      allowed_properties: ["101"]
+    });
+    assert.equal(
+      propertyQuery.sql,
+      "SELECT * FROM entries WHERE active = 1 AND (property_id IN (?))"
+    );
+    assert.deepEqual(propertyQuery.params, ["101"]);
+
+    const secureQuery = buildSecureQuery("SELECT * FROM entries LIMIT 10", {
+      role: "employee",
+      tenant_id: "tenant-a",
+      allowed_properties: ["101"]
+    });
+    assert.equal(
+      secureQuery.sql,
+      "SELECT * FROM entries WHERE (tenant_id = ? AND property_id IN (?)) LIMIT 10"
+    );
+    assert.deepEqual(secureQuery.params, ["tenant-a", "101"]);
+  });
+});

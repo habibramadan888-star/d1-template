@@ -1,0 +1,42 @@
+{
+  "description": "Expected row count proves partial upload should not be accepted.",
+  "context": {
+    "role": "staff",
+    "employeeId": "emp-a",
+    "allowedEmployeeIds": ["emp-a"],
+    "allowedPropertyIds": ["HL-009"]
+  },
+  "input": {
+    "session_id": "S-PARTIAL-001",
+    "idempotency_key": "key-partial-001",
+    "employee_id": "emp-a",
+    "property_id": "HL-009",
+    "submitted_at": "2026-05-24T03:45:00+04:00",
+    "expected_row_count": 3,
+    "frontend_totals": {
+      "cash_handover": "840.00",
+      "bank_transfer_total": "0.00",
+      "bank_transfer_count": 0,
+      "gross_received": "840.00",
+      "session_total": "840.00"
+    },
+    "rows": [
+      {
+        "client_entry_id": "partial-row-1",
+        "event_type": "R",
+        "payment_method": "C",
+        "amount": "640.00"
+      },
+      {
+        "client_entry_id": "partial-row-2",
+        "event_type": "R",
+        "payment_method": "C",
+        "amount": "200.00"
+      }
+    ]
+  },
+  "expected": {
+    "status": "REJECTED",
+    "error_code": "PARTIAL_HANDOVER_ROWS"
+  }
+}

@@ -1,0 +1,132 @@
+import { classifyBedTransferTtlockSequence } from './bed-transfer-ttlock-sequence.mjs';
+const SERVER_FIELDS = new Set(["transferanchorid", "transferlineageid", "previoustransferanchorid", "sourcecontextanchorrefs", "carriedarrearsrefs", "rentcoverageref", "depositcontextref", "expirycontextref", "snapshotfingerprint", "snapshotprovenance", "sourcecontextmode", "lineagegenesis", "ownerconfirmationscope", "currentbed", "corpid", "companyscope", "staycontextid", "lifecycle", "lifecyclestatus", "status", "void", "voided", "voidedat", "voidstatus", "reversalstatus", "ttlocksequence", "sourcesnapshotfingerprint", "targetsnapshotfingerprint", "ttlockobservationat", "physicalstatebeforesubmission", "continuitychecks", "reconciliationrequired"]);
+const IDENTITY_FIELDS = new Set([
+  "tenantcardid", "cardid", "oldttlockref", "providerphone", "phone99099",
+  "creatorphone", "creatortime", "cardcreationtime", "providermetadata",
+  "ttlockprovidermetadata", "localcache", "uitext", "preview", "whatsapptext"
+]);
+
+const clean = value => String(value ?? "").trim();
+const key = value => clean(value).replace(/[^a-z0-9]/gi, "").toLowerCase();
+const bed = value => clean(value).replace(/^#+/, "");
+const money = value => value === "" || value == null ? null : Number(value);
+const unique = values => [...new Set((Array.isArray(values) ? values : []).map(clean).filter(Boolean))];
+
+function collectForbidden(value, output = new Set(), seen = new Set()) {
+  if (!value || typeof value !== "object" || seen.has(value)) return output;
+  seen.add(value);
+  if (Array.isArray(value)) value.forEach(item => collectForbidden(item, output, seen));
+  else Object.entries(value).forEach(([name, child]) => {
+    if (SERVER_FIELDS.has(key(name)) || IDENTITY_FIELDS.has(key(name))) output.add(name);
+    collectForbidden(child, output, seen);
+  });
+  return output;
+}
+
+export function findCanonicalTransferLinkForbiddenFields(value) {
+  return [...collectForbidden(value)].sort((a, b) => a.localeCompare(b));
+}
+
+function fail(error_code, invalid_fields = [], missing_fields = []) {
+  return { ok: false, error_code, invalid_fields, missing_fields, no_write: true };
+}
+
+function exactOpaque(value) {
+  return clean(value).length >= 16;
+}
+
+function validateFee(input) {
+  const mode = clean(input.fee_mode).toLowerCase();
+  const amount = money(input.fee_amount_aed);
+  if (!['paid', 'waived', 'unpaid'].includes(mode)) return fail('BED_TRANSFER_FEE_MODE_INVALID', ['fee_mode']);
+  if (mode === 'paid' && amount !== 50) return fail('BED_TRANSFER_FEE_AMOUNT_INVALID', ['fee_amount_aed']);
+  if (mode === 'paid' && !clean(input.payment_method)) return fail('BED_TRANSFER_PAYMENT_METHOD_REQUIRED', [], ['payment_method']);
+  if (mode === 'paid' && clean(input.fee_due_date)) return fail('BED_TRANSFER_FEE_MODE_CONFLICT', ['fee_due_date']);
+  if (mode === 'waived' && amount !== 0) return fail('BED_TRANSFER_FEE_AMOUNT_INVALID', ['fee_amount_aed']);
+  if (mode === 'waived' && !clean(input.fee_waiver_reason)) return fail('BED_TRANSFER_FEE_WAIVER_REASON_REQUIRED', [], ['fee_waiver_reason']);
+  if (mode === 'unpaid' && amount !== 50) return fail('BED_TRANSFER_FEE_AMOUNT_INVALID', ['fee_amount_aed']);
+  if (mode === 'unpaid' && !/^\d{4}-\d{2}-\d{2}$/.test(clean(input.fee_due_date))) return fail('BED_TRANSFER_FEE_DUE_DATE_REQUIRED', [], ['fee_due_date']);
+  if (mode === 'unpaid' && clean(input.payment_method) && clean(input.payment_method).toLowerCase() !== 'none') return fail('BED_TRANSFER_FEE_MODE_CONFLICT', ['payment_method']);
+  if (money(input.fee_paid_amount_aed ?? input.fee_partial_amount_aed ?? 0) > 0) return fail('BED_TRANSFER_FEE_PARTIAL_PAYMENT_FORBIDDEN', ['fee_paid_amount_aed', 'fee_partial_amount_aed']);
+  return { ok: true, mode, amount };
+}
+
+function validateBedPriceDifference(input) {
+  const mode = clean(input.bed_price_difference_mode || 'none').toLowerCase();
+  const amount = money(input.bed_price_difference_amount_aed ?? 0);
+  const dueDate = clean(input.bed_price_difference_due_date);
+  const paymentMethod = clean(input.bed_price_difference_payment_method);
+  if (!['none', 'paid', 'unpaid'].includes(mode)) return fail('BED_PRICE_DIFFERENCE_MODE_INVALID', ['bed_price_difference_mode']);
+  if (mode === 'none' && (amount !== 0 || dueDate || paymentMethod)) return fail('BED_PRICE_DIFFERENCE_MODE_CONFLICT', ['bed_price_difference_mode']);
+  if (mode === 'paid' && !(amount > 0)) return fail('BED_PRICE_DIFFERENCE_AMOUNT_INVALID', ['bed_price_difference_amount_aed']);
+  if (mode === 'paid' && !paymentMethod) return fail('BED_PRICE_DIFFERENCE_PAYMENT_METHOD_REQUIRED', [], ['bed_price_difference_payment_method']);
+  if (mode === 'paid' && dueDate) return fail('BED_PRICE_DIFFERENCE_MODE_CONFLICT', ['bed_price_difference_due_date']);
+  if (mode === 'unpaid' && !(amount > 0)) return fail('BED_PRICE_DIFFERENCE_AMOUNT_INVALID', ['bed_price_difference_amount_aed']);
+  if (mode === 'unpaid' && !/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) return fail('BED_PRICE_DIFFERENCE_DUE_DATE_REQUIRED', [], ['bed_price_difference_due_date']);
+  if (mode === 'unpaid' && paymentMethod) return fail('BED_PRICE_DIFFERENCE_MODE_CONFLICT', ['bed_price_difference_payment_method']);
+  if (money(input.bed_price_difference_paid_amount_aed ?? input.bed_price_difference_unpaid_amount_aed ?? 0) > 0) return fail('BED_PRICE_DIFFERENCE_PARTIAL_PAYMENT_FORBIDDEN', ['bed_price_difference_paid_amount_aed', 'bed_price_difference_unpaid_amount_aed']);
+  return { ok: true, mode, amount, dueDate, paymentMethod, reason: clean(input.bed_price_difference_reason) };
+}
+
+export function buildBedTransferCanonicalLinkAnchor(input = {}, options = {}) {
+  const forbidden = findCanonicalTransferLinkForbiddenFields(input.client_payload || {});
+  if (forbidden.length) return { ...fail(SERVER_FIELDS.has(key(forbidden[0])) ? 'BED_TRANSFER_SERVER_MANAGED_FIELD_FORBIDDEN' : 'BED_TRANSFER_FORBIDDEN_IDENTITY_FIELD', forbidden), forbidden_fields: forbidden, before_db: true };
+  const fromBed = bed(input.from_bed);
+  const toBed = bed(input.to_bed);
+  if (!fromBed || !toBed) return fail('BED_TRANSFER_REQUIRED_FIELD_MISSING', [], [!fromBed ? 'from_bed' : '', !toBed ? 'to_bed' : ''].filter(Boolean));
+  if (fromBed === '334' || toBed === '334') return fail('BED_TRANSFER_334_FORBIDDEN', ['from_bed', 'to_bed']);
+  if (fromBed === toBed) return fail('BED_TRANSFER_SAME_BED_NOT_ALLOWED', ['from_bed', 'to_bed']);
+  const corpid = clean(input.corpid);
+  const source = input.canonical_source_context || {};
+  const target = input.canonical_target_context || {};
+  if (!corpid || clean(source.corpid) !== corpid || clean(target.corpid) !== corpid) return fail('BED_TRANSFER_COMPANY_SCOPE_MISMATCH', ['corpid']);
+  if (!['confirmed','resolved'].includes(source.resolution_status) || Number(source.candidate_count??source.candidate_group_count) !== 1) return fail('BED_TRANSFER_SOURCE_CONTEXT_AMBIGUOUS', ['canonical_source_context']);
+  const refs = unique(source.source_context_anchor_refs);
+  if (!refs.length || refs.length !== (source.source_context_anchor_refs || []).length) return fail('BED_TRANSFER_SOURCE_CONTEXT_AMBIGUOUS', ['source_context_anchor_refs']);
+  for (const field of ['rent_coverage_ref', 'deposit_context_ref', 'expiry_context_ref']) if (!exactOpaque(source[field])) return fail(`BED_TRANSFER_${field.toUpperCase()}_UNAVAILABLE`, [field]);
+  const arrears = Array.isArray(source.open_arrears) ? source.open_arrears : [];
+  const carried = arrears.map(row => clean(row.arrears_ref || row.cloud_arrears_ref));
+  if (carried.some(ref => !ref) || unique(carried).length !== carried.length) return fail('BED_TRANSFER_ARREARS_REFS_INVALID', ['open_arrears']);
+  const fee = validateFee(input);
+  if (!fee.ok) return fee;
+  const bedDifference = validateBedPriceDifference(input);
+  if (!bedDifference.ok) return bedDifference;
+  if (!clean(input.transfer_reason)) return fail('BED_TRANSFER_REASON_REQUIRED', [], ['transfer_reason']);
+  const active = input.active_lineage || null;
+  if (active && bed(active.current_bed) !== fromBed) return fail('BED_TRANSFER_LINEAGE_DISCONTINUOUS', ['from_bed']);
+  if (active && (!exactOpaque(active.transfer_lineage_id) || !exactOpaque(active.last_active_transfer_anchor_id))) return fail('BED_TRANSFER_PREVIOUS_ANCHOR_INVALID', ['active_lineage']);
+  const idFactory = options.idFactory || (() => null);
+  const sequence=classifyBedTransferTtlockSequence({corpid,from_bed:fromBed,to_bed:toBed,source_resolution:source,source_snapshot:source,target_snapshot:target,observation_at:input.ttlock_observation_at||input.transfer_at});
+  if(sequence.status==='invalid_state')return fail(sequence.error_code,['ttlock_context']);
+  const transferAnchorId = idFactory('transfer_anchor_id');
+  const lineageId = active ? clean(active.transfer_lineage_id) : idFactory('transfer_lineage_id');
+  return {
+    ok: true, event_type: 'bed_transfer', type: 'TF',
+    transfer_anchor_id: transferAnchorId,
+    transfer_lineage_id: lineageId,
+    previous_transfer_anchor_id: active ? clean(active.last_active_transfer_anchor_id) : null,
+    source_context_mode: clean(source.source_context_mode),
+    lineage_genesis: source.lineage_genesis===true,
+    owner_confirmation_scope: clean(source.owner_confirmation_scope),
+    from_bed: fromBed, to_bed: toBed, transfer_at: clean(input.transfer_at), corpid,
+    source_context_anchor_refs: refs,
+    carried_arrears_refs: carried,
+    rent_coverage_ref: clean(source.rent_coverage_ref),
+    deposit_context_ref: clean(sequence.deposit_context_ref),
+    expiry_context_ref: clean(sequence.expiry_context_ref),
+    fee_mode: fee.mode, fee_amount_aed: fee.amount,
+    fee_due_date: fee.mode === 'unpaid' ? clean(input.fee_due_date) : '',
+    fee_waiver_reason: fee.mode === 'waived' ? clean(input.fee_waiver_reason) : '',
+    bed_price_difference_mode: bedDifference.mode,
+    bed_price_difference_amount_aed: bedDifference.amount,
+    bed_price_difference_due_date: bedDifference.mode === 'unpaid' ? bedDifference.dueDate : '',
+    bed_price_difference_payment_method: bedDifference.mode === 'paid' ? bedDifference.paymentMethod : '',
+    bed_price_difference_reason: bedDifference.reason,
+    transfer_reason: clean(input.transfer_reason), payment_method: clean(input.payment_method),
+    snapshot_fingerprint: clean(source.snapshot_fingerprint),
+    ttlock_sequence:sequence.ttlock_sequence,source_snapshot_fingerprint:sequence.source_snapshot_fingerprint,target_snapshot_fingerprint:sequence.target_snapshot_fingerprint,ttlock_observation_at:sequence.ttlock_observation_at,physical_state_before_submission:sequence.physical_state_before_submission,continuity_checks:sequence.continuity_checks,reconciliation_required:sequence.reconciliation_required,
+    finance_effect: { rent_income: 0, deposit_received: 0, deposit_refund: 0, arrears_repaid: 0, expense: 0 },
+    id_generation: transferAnchorId && lineageId ? 'server_generated_preview' : 'server_generated_on_write',
+    readonly: true, no_write: true
+  };
+}

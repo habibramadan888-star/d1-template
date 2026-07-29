@@ -1,0 +1,6 @@
+node_modules/
+.wrangler/
+.wrangler-dryrun/
+deploy-worker/src/index.embedded.js
+deploy-worker/public/
+*.html

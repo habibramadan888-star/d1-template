@@ -1,0 +1,14 @@
+{
+  "status": "AUTOMATION_PASS",
+  "aggregate_http_status": 200,
+  "validation_result_count": 41,
+  "passed_result_count": 41,
+  "failed_result_count": 0,
+  "validation_attempt_id": "qa-val-0bef064c-c3c1-4e90-96a4-7bb246a0352a",
+  "trace_id": "qa-trace-7ed28d59-8b5d-42d7-9cb9-a3f40df8918c",
+  "server_validated_at": "2026-07-17T10:47:39.429Z",
+  "formal_write_count": 0,
+  "ttlock_external_calls": 0,
+  "session_count": 0,
+  "transaction_count": 0
+}

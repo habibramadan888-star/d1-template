@@ -1,0 +1,20 @@
+{
+  "receivable": {
+    "receivableId": "rec_repayment_partial",
+    "sourceType": "RENT",
+    "propertyId": "staging-property",
+    "amountAed": "770.00",
+    "paidAed": "80.00",
+    "dueDate": "2026-05-20"
+  },
+  "payment": {
+    "allocationId": "alloc_repayment_partial",
+    "paymentSourceType": "TRANSACTION",
+    "paymentSourceId": "tx_repayment_partial",
+    "amountAed": "200.00"
+  },
+  "expected": {
+    "status": "PARTIAL",
+    "outstandingAed": "490.00"
+  }
+}

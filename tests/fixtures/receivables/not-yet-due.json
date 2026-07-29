@@ -1,0 +1,15 @@
+{
+  "input": {
+    "receivableId": "rec_not_yet_due",
+    "sourceType": "RENT",
+    "propertyId": "staging-property",
+    "amountAed": "500.00",
+    "paidAed": "0.00",
+    "dueDate": "2026-05-26"
+  },
+  "businessDate": "2026-05-25",
+  "expected": {
+    "status": "OPEN",
+    "outstandingAed": "500.00"
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "description": "Voided transaction row is rejected from handover commit.",
+  "context": {
+    "role": "staff",
+    "employeeId": "emp-a",
+    "allowedEmployeeIds": ["emp-a"],
+    "allowedPropertyIds": ["HL-009"]
+  },
+  "input": {
+    "session_id": "S-VOID-TX-001",
+    "idempotency_key": "key-void-tx-001",
+    "employee_id": "emp-a",
+    "property_id": "HL-009",
+    "submitted_at": "2026-05-24T03:55:00+04:00",
+    "frontend_totals": {
+      "cash_handover": "640.00",
+      "bank_transfer_total": "0.00",
+      "bank_transfer_count": 0,
+      "gross_received": "640.00",
+      "session_total": "640.00"
+    },
+    "rows": [
+      {
+        "client_entry_id": "void-tx-row-1",
+        "event_type": "R",
+        "payment_method": "C",
+        "amount": "640.00",
+        "transaction_voided_at": "2026-05-24T04:00:00+04:00"
+      }
+    ]
+  },
+  "expected": {
+    "status": "VOIDED_REJECTED",
+    "accepted_rows": 0,
+    "rejected_rows": 1,
+    "error_code": "VOIDED_ROW_REJECTED"
+  }
+}

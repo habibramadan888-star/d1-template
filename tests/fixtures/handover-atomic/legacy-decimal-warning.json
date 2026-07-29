@@ -1,0 +1,43 @@
+{
+  "description": "Legacy numeric amount can be converted but must carry warning.",
+  "context": {
+    "role": "staff",
+    "employeeId": "emp-a",
+    "allowedEmployeeIds": ["emp-a"],
+    "allowedPropertyIds": ["HL-009"]
+  },
+  "input": {
+    "session_id": "S-LEGACY-001",
+    "idempotency_key": "key-legacy-001",
+    "employee_id": "emp-a",
+    "property_id": "HL-009",
+    "submitted_at": "2026-05-24T04:25:00+04:00",
+    "frontend_totals": {
+      "cash_handover": "100.50",
+      "bank_transfer_total": "0.00",
+      "bank_transfer_count": 0,
+      "gross_received": "100.50",
+      "session_total": "100.50"
+    },
+    "rows": [
+      {
+        "client_entry_id": "legacy-row-1",
+        "event_type": "R",
+        "payment_method": "C",
+        "amount": 100.5,
+        "bed": "652"
+      }
+    ]
+  },
+  "existing_state": {
+    "commits": []
+  },
+  "expected": {
+    "status": "ACCEPTED",
+    "cash_handover": "100.50",
+    "gross_received": "100.50",
+    "accepted_rows": 1,
+    "rejected_rows": 0,
+    "warning_code": "LEGACY_NUMBER_AMOUNT"
+  }
+}

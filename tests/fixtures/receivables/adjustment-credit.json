@@ -1,0 +1,20 @@
+{
+  "receivable": {
+    "receivableId": "rec_adjustment_credit",
+    "sourceType": "RENT",
+    "propertyId": "staging-property",
+    "amountAed": "770.00",
+    "paidAed": "700.00",
+    "dueDate": "2026-05-25"
+  },
+  "adjustment": {
+    "adjustmentId": "adj_credit",
+    "adjustmentType": "CREDIT",
+    "amountAed": "70.00",
+    "reason": "OWNER_APPROVED"
+  },
+  "expected": {
+    "status": "SETTLED",
+    "outstandingAed": "0.00"
+  }
+}

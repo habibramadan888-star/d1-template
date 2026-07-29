@@ -1,0 +1,77 @@
+{
+  "description": "Multi-row handover with rent, deposit, arrears, transfer fee, and expense.",
+  "context": {
+    "role": "staff",
+    "employeeId": "emp-a",
+    "allowedEmployeeIds": ["emp-a"],
+    "allowedPropertyIds": ["HL-009"]
+  },
+  "input": {
+    "session_id": "S-LARGE-001",
+    "idempotency_key": "key-large-001",
+    "employee_id": "emp-a",
+    "property_id": "HL-009",
+    "submitted_at": "2026-05-24T04:20:00+04:00",
+    "frontend_totals": {
+      "cash_handover": "940.00",
+      "bank_transfer_total": "70.00",
+      "bank_transfer_count": 2,
+      "gross_received": "1040.00",
+      "session_total": "1010.00"
+    },
+    "rows": [
+      {
+        "client_entry_id": "large-row-1",
+        "event_type": "R",
+        "payment_method": "C",
+        "amount": "770.00",
+        "bed": "101"
+      },
+      {
+        "client_entry_id": "large-row-2",
+        "event_type": "D",
+        "payment_method": "C",
+        "amount": "200.00",
+        "bed": "101"
+      },
+      {
+        "client_entry_id": "large-row-3",
+        "event_type": "AP",
+        "payment_method": "B",
+        "amount": "50.00",
+        "bed": "102"
+      },
+      {
+        "client_entry_id": "large-row-4",
+        "event_type": "TF",
+        "payment_method": "B",
+        "amount": "20.00",
+        "bed": "103"
+      },
+      {
+        "client_entry_id": "large-row-5",
+        "event_type": "E",
+        "payment_method": "C",
+        "amount": "30.00",
+        "bed": "public"
+      }
+    ]
+  },
+  "existing_state": {
+    "commits": []
+  },
+  "expected": {
+    "status": "ACCEPTED",
+    "cash_handover": "940.00",
+    "bank_transfer_total": "70.00",
+    "gross_received": "1040.00",
+    "session_total": "1010.00",
+    "deposit_received": "200.00",
+    "rent_received": "770.00",
+    "arrears_paid": "50.00",
+    "accepted_rows": 5,
+    "rejected_rows": 0,
+    "bank_transfer_count": 2,
+    "idempotency_status": "NEW"
+  }
+}
