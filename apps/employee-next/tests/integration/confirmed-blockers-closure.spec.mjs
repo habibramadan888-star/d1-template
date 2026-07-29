@@ -26,6 +26,8 @@ const bundle = await esbuild.build({
       export {
         buildEmployeeNextSidecarRequest,
         createEmployeeNextEntryContextPort,
+        createEmployeeNextSidecarAdapters,
+        expectedEmployeeNextCorpid,
         startEmployeeNextSidecarRoute,
       } from "./apps/employee-next/src/main.ts";
       export {
@@ -60,6 +62,7 @@ const paths = Object.freeze({
   deposit: "/readonly/deposit",
   bedContext: "/readonly/bed-context",
 });
+const productionEnvironment = async () => "production";
 
 function response(body, status = 200) {
   return Object.freeze({
@@ -126,6 +129,91 @@ function bedPayload(bed, vacant) {
   });
 }
 
+test("runtime environment selects one exact corpid and fails closed", async () => {
+  assert.equal(runtime.expectedEmployeeNextCorpid("production"), "homelink");
+  assert.equal(runtime.expectedEmployeeNextCorpid("internal_beta"), "homelink");
+  assert.equal(
+    runtime.expectedEmployeeNextCorpid("staging"),
+    "homelink-staging",
+  );
+  for (const environment of [undefined, null, "", "qa", "development"]) {
+    assert.equal(runtime.expectedEmployeeNextCorpid(environment), undefined);
+  }
+
+  const cases = [
+    ["production", "homelink", true],
+    ["production", "homelink-staging", false],
+    ["staging", "homelink-staging", true],
+    ["staging", "homelink", false],
+    [undefined, "homelink", false],
+    ["production", "", false],
+  ];
+  for (const [environment, corpid, ready] of cases) {
+    let requestCount = 0;
+    const contexts = runtime.createEmployeeNextEntryContextPort(
+      {
+        async request() {
+          requestCount += 1;
+          return response(success({ config: { "145": 1300 } }));
+        },
+      },
+      () => Object.freeze({
+        user: Object.freeze({
+          ...authSession.user,
+          corpid,
+        }),
+      }),
+      async () => environment,
+      paths,
+    );
+    const draft = { bedLabel: "145" };
+    await contexts.refresh("rent", draft);
+    assert.equal(contexts.read("rent", draft).ready, ready);
+    assert.equal(requestCount, ready ? 1 : 0);
+  }
+});
+
+test("public adapter trusts the exact same-origin health environment", async () => {
+  const calls = [];
+  const adapters = runtime.createEmployeeNextSidecarAdapters({
+    requestPort: {
+      async request(path, init) {
+        calls.push({ path, init });
+        if (path === "/api/me") {
+          return response(success({
+            userid: "abdul",
+            employee_id: "abdul",
+            display_name: "Abdul",
+            corpid: "homelink-staging",
+            role: "staff",
+          }));
+        }
+        if (path === "/api/health") {
+          return response(success({ environment: "staging" }));
+        }
+        if (path === "/api/rent_config") {
+          return response(success({ config: { "146": 700 } }));
+        }
+        return response({ success: false }, 404);
+      },
+    },
+    sessionPath: "/api/me",
+    submitPath: "/api/employee/entry",
+  });
+  await adapters.restoreSession();
+  const draft = { bedLabel: "146" };
+  await adapters.entryContexts.refresh("rent", draft);
+  assert.equal(adapters.entryContexts.read("rent", draft).ready, true);
+  assert.deepEqual(
+    calls.map((call) => [call.path, call.init.method]),
+    [
+      ["/api/me", "GET"],
+      ["/api/health", "GET"],
+      ["/api/rent_config", "GET"],
+    ],
+  );
+});
+
 test("six event contexts use authenticated GET gateways and fail closed", async () => {
   const productionBuild = await readFile(
     resolve(worktreeRoot, "scripts", "build-employee-next-sidecar.mjs"),
@@ -160,6 +248,7 @@ test("six event contexts use authenticated GET gateways and fail closed", async 
   const contexts = runtime.createEmployeeNextEntryContextPort(
     port,
     () => authSession,
+    productionEnvironment,
     paths,
   );
   const cases = [
@@ -246,6 +335,7 @@ test("Deposit Out loads every Canonical open arrears item and rejects partial sn
       },
     },
     () => authSession,
+    productionEnvironment,
     paths,
   );
   const draft = { bedLabel: "145" };
@@ -295,6 +385,7 @@ test("Deposit Out fails closed when the Canonical arrears gateway is unavailable
         },
       },
       () => authSession,
+      productionEnvironment,
       paths,
     );
     const draft = { bedLabel: "145" };
@@ -314,10 +405,12 @@ test("stale context response cannot overwrite the latest bed selection", async (
       },
     },
     () => authSession,
+    productionEnvironment,
     paths,
   );
   const first = contexts.refresh("rent", { bedLabel: "145" });
   const second = contexts.refresh("rent", { bedLabel: "146" });
+  await Promise.resolve();
   pending[1].resolveRequest(response(success({ config: { "146": 1400 } })));
   await second;
   pending[0].resolveRequest(response(success({ config: { "145": 1300 } })));

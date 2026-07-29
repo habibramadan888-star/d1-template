@@ -65,6 +65,7 @@ export interface EmployeeNextSidecarAdapterOptions {
   readonly requestPort: EmployeeNextBrowserRequestPort;
   readonly sessionPath: string;
   readonly submitPath: string;
+  readonly environmentPath?: string;
   readonly capabilitiesPath?: string;
   readonly syncStatePath?: string;
   readonly validatePath?: string;
@@ -74,6 +75,21 @@ export interface EmployeeBedTransferCapability {
   readonly validateEnabled: boolean;
   readonly writeEnabled: boolean;
   readonly canonicalWritePath: string;
+}
+
+export type EmployeeNextRuntimeEnvironment =
+  | "production"
+  | "internal_beta"
+  | "staging";
+
+export function expectedEmployeeNextCorpid(
+  environment: unknown,
+): "homelink" | "homelink-staging" | undefined {
+  if (environment === "staging") return "homelink-staging";
+  if (environment === "production" || environment === "internal_beta") {
+    return "homelink";
+  }
+  return undefined;
 }
 
 export interface EmployeeNextSidecarAdapters {
@@ -390,6 +406,7 @@ function bedAccessSnapshot(
 export function createEmployeeNextEntryContextPort(
   requestPort: EmployeeNextBrowserRequestPort,
   session: () => EmployeeAuthSession | undefined,
+  runtimeEnvironment: () => Promise<unknown>,
   paths: Readonly<{
     rentConfig: string;
     arrears: string;
@@ -400,6 +417,7 @@ export function createEmployeeNextEntryContextPort(
   if (
     !safeRequestPort(requestPort)
     || typeof session !== "function"
+    || typeof runtimeEnvironment !== "function"
     || !safePath(paths?.rentConfig)
     || !safePath(paths?.arrears)
     || !safePath(paths?.deposit)
@@ -460,10 +478,17 @@ export function createEmployeeNextEntryContextPort(
     draft: Readonly<Record<string, unknown>>,
   ): Promise<Readonly<{ values: Readonly<Record<string, unknown>>; summary: string }>> {
     const currentSession = session();
+    let expectedCorpid: ReturnType<typeof expectedEmployeeNextCorpid>;
+    try {
+      expectedCorpid = expectedEmployeeNextCorpid(await runtimeEnvironment());
+    } catch {
+      expectedCorpid = undefined;
+    }
     if (
       !isEmployeeAuthSession(currentSession)
       || !["EMPLOYEE", "STAFF"].includes(currentSession.user.role)
-      || currentSession.user.corpid !== "homelink"
+      || expectedCorpid === undefined
+      || currentSession.user.corpid !== expectedCorpid
     ) {
       throw new Error("SIDECAR_CONTEXT_AUTH_REQUIRED");
     }
@@ -1413,6 +1438,10 @@ export function createEmployeeNextSidecarAdapters(
     || !safePath(options.submitPath)
     || options.sessionPath === options.submitPath
     || (
+      options.environmentPath !== undefined
+      && !safePath(options.environmentPath)
+    )
+    || (
       options.capabilitiesPath !== undefined
       && !safePath(options.capabilitiesPath)
     )
@@ -1430,6 +1459,8 @@ export function createEmployeeNextSidecarAdapters(
   const requestPort = options.requestPort;
   const sessionPath = options.sessionPath;
   const submitPath = options.submitPath;
+  const environmentPath = options.environmentPath
+    ?? sessionPath.replace(/\/me$/u, "/health");
   const capabilitiesPath = options.capabilitiesPath
     ?? sessionPath.replace(/\/me$/u, "/capabilities");
   const syncStatePath = options.syncStatePath
@@ -1438,16 +1469,22 @@ export function createEmployeeNextSidecarAdapters(
     ?? `${submitPath}/validate`;
   if (
     !safePath(capabilitiesPath)
+    || !safePath(environmentPath)
+    || environmentPath === sessionPath
+    || environmentPath === submitPath
+    || environmentPath === capabilitiesPath
     || capabilitiesPath === sessionPath
     || capabilitiesPath === submitPath
     || !safePath(syncStatePath)
     || syncStatePath === sessionPath
     || syncStatePath === submitPath
     || syncStatePath === capabilitiesPath
+    || syncStatePath === environmentPath
     || !safePath(validatePath)
     || validatePath === sessionPath
     || validatePath === submitPath
     || validatePath === capabilitiesPath
+    || validatePath === environmentPath
     || validatePath === syncStatePath
   ) {
     throw new Error("SIDECAR_ADAPTER_INVALID_OPTIONS");
@@ -1512,9 +1549,32 @@ export function createEmployeeNextSidecarAdapters(
     },
   });
   let restoredSession: EmployeeAuthSession | undefined;
+  let runtimeEnvironmentPromise: Promise<unknown> | undefined;
+  const runtimeEnvironment = (): Promise<unknown> => {
+    runtimeEnvironmentPromise ??= (async () => {
+      const response = await requestPort.request(
+        environmentPath,
+        Object.freeze({
+          method: "GET",
+          credentials: "same-origin",
+          headers: Object.freeze({ Accept: "application/json" }),
+        }),
+      );
+      if (!responsePort(response) || response.status !== 200) {
+        throw new Error("SIDECAR_RUNTIME_ENVIRONMENT_UNAVAILABLE");
+      }
+      const data = apiData(await response.json());
+      if (data === undefined || typeof data.environment !== "string") {
+        throw new Error("SIDECAR_RUNTIME_ENVIRONMENT_UNAVAILABLE");
+      }
+      return data.environment.trim().toLowerCase();
+    })();
+    return runtimeEnvironmentPromise;
+  };
   const entryContexts = createEmployeeNextEntryContextPort(
     requestPort,
     () => restoredSession,
+    runtimeEnvironment,
     Object.freeze({
       rentConfig: sessionPath.replace(/\/me$/u, "/rent_config"),
       arrears: sessionPath.replace(/\/me$/u, "/arrear_tasks"),
