@@ -4577,11 +4577,20 @@ function employeePaymentMethodDisplay(entry={}){
   const method=paymentMethodLabel(entry?.payment_method||entry?.pay_type);
   return method==='bank'?'Bank':method==='cash'?'Cash':method==='mixed'?'Cash + Bank':'No payment';
 }
+function employeeRentPaidAmount(amountValue,paidValue){
+  const amountNumber=Number(amountValue);
+  const paidText=String(paidValue??'').trim();
+  const paidNumber=Number(paidText);
+  if(paidText!==''&&Number.isFinite(paidNumber)&&paidNumber>=0)return paidNumber;
+  return Number.isFinite(amountNumber)&&amountNumber>=0?amountNumber:0;
+}
 function employeeBaseEntryPayload(type,overrides={}){
   const pay=employeePaymentMethodValue();
   const amount=num(employeeFieldValue('amount'));
   const due=num(employeeFieldValue('due'));
-  const paid=num(employeeFieldValue('paid'))||Math.min(amount,due||amount);
+  const paid=type==='R'
+    ?employeeRentPaidAmount(amount,employeeFieldValue('paid'))
+    :(num(employeeFieldValue('paid'))||Math.min(amount,due||amount));
   const tailReason=employeeTrimField('arrearReasonDetail');
   const noteText=employeeTrimField('remark')||tailReason||employeeTrimField('expenseDesc');
   const room=employeeTrimField('bed').replace(/^#/,'');
@@ -4972,7 +4981,7 @@ function employeeInvalidateBedTransferValidation(){
 function buildRentAnchor(){
   const amount=num(employeeFieldValue('amount'));
   const due=num(employeeFieldValue('due'))||num(employeeFieldValue('periodDue'));
-  const paid=num(employeeFieldValue('paid'))||Math.min(amount,due||amount);
+  const paid=employeeRentPaidAmount(amount,employeeFieldValue('paid'));
   const tail=Math.max(0,due-paid);
   const payload=employeeBaseEntryPayload('R',{
     tag:employeeRentCustomerTagValue(),
@@ -5298,7 +5307,8 @@ function validateEntryAnchor(e){
 }
 function applyEntryAnchors(e){
   const type=e.type;
-  const tail=type==='R'?Math.max(0,num(e.period_due||e.due)-num(e.paid||e.amount)):0;
+  const rentPaid=type==='R'?employeeRentPaidAmount(e.amount,e.paid):0;
+  const tail=type==='R'?Math.max(0,num(e.period_due||e.due)-rentPaid):0;
   const method=type==='TF'?String(e.payment_method||'').trim().toLowerCase():paymentMethodLabel(e.pay_type||e.payment_method);
   const base={event_type:entryEventType(type),source:e.source||'employee_entry',payment_method:method,operator:e.operator_name||operatorName(),operator_id:e.operator_id||operatorId(),employee:e.employee||e.operator_name||operatorName(),created_at:e.created_at||nowIso()};
   Object.assign(e,base);
@@ -5309,7 +5319,7 @@ function applyEntryAnchors(e){
     Object.assign(e,{
       bed:e.room,
       expected_rent:num(e.period_due||e.due),
-      paid_amount:num(e.paid||e.amount),
+      paid_amount:rentPaid,
       rent_period_start:e.period_start||'',
       rent_period_end:e.period_end||'',
       deposit_included_amount:num(e.deposit_included_amount||0),
@@ -5859,7 +5869,8 @@ function syncForm(){
   else if(hasPeriod&&!$('due').value)$('due').value=$('periodDue').value||$('amount').value;
   const amt=num($('amount').value), due=num($('due').value);
   if(type==='R'&&employeePaymentMethodValue()==='M')$('paid').value=fmtMoney(amt);
-  else if(['R','TFF'].includes(type))$('paid').value=fmtMoney(Math.min(amt,due||amt));
+  else if(type==='R')$('paid').value=fmtMoney(employeeRentPaidAmount(amt,amt));
+  else if(type==='TFF')$('paid').value=fmtMoney(Math.min(amt,due||amt));
   else if(type==='AP')$('paid').value=fmtMoney(amt);
   else if(['TF','CO'].includes(type)&&amt===0)$('paid').value='0.00';
   else if(amt)$('paid').value=fmtMoney(amt);
