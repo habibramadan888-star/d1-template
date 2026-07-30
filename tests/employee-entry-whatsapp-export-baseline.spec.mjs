@@ -88,3 +88,46 @@ test("Rent short paid WhatsApp export preserves arrears anchor", async () => {
   assert.doesNotMatch(text, /short_paid/);
   assert.doesNotMatch(text, /2026-06-10/);
 });
+
+test("Current text export shows existing O/N customer tags without tagging Expense", async () => {
+  const text = await buildWhatsappTextWithDrafts([
+    {
+      type: "R",
+      tag: "O",
+      room: "9113",
+      amount: 700,
+      paid: 700,
+      due: 700,
+      period_due: 700,
+      pay_type: "C",
+      created_at: "2026-07-07T10:00:00Z"
+    },
+    {
+      type: "D",
+      tag: "N",
+      room: "211",
+      amount: 200,
+      deposit_amount: 200,
+      pay_type: "C",
+      created_at: "2026-07-07T10:01:00Z"
+    },
+    {
+      type: "E",
+      tag: "O",
+      room: "office",
+      amount: 50,
+      expense_amount: 50,
+      expense_desc: "test supplies",
+      pay_type: "C",
+      created_at: "2026-07-07T10:02:00Z"
+    }
+  ]);
+
+  assert.match(text, /\[9113\] paid 700 O cash 1000/);
+  assert.match(text, /\[211\] deposit 200 N cash 1001/);
+  assert.match(text, /\[office\] expense 50 cash 1002 test supplies/);
+  assert.doesNotMatch(text, /\[office\] expense 50 O\b/);
+  assert.match(text, /Cash Received .* AED 900/);
+  assert.match(text, /Expenses .* AED 50/);
+  assert.match(text, /Net Funds .* AED 850/);
+});
