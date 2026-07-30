@@ -7510,12 +7510,11 @@ function entryStatementLine(e){
     const shortPaid=num(e?.arrears_amount)||Math.max(0,expected-paid);
     const meta=entrySearchableArrearsTokens(e?.arrears_due_date||e?.arrear_promise_date||e?.promise_date||'',e?.arrears_note||e?.arrear_reason_detail||e?.custom_reason||e?.note||'');
     const short=shortPaid>0?` short ${entryStatementAmount(shortPaid)}${meta?' '+meta:''}`:'';
-    const stayDate=customerTag==='N'?String(e?.original_period_start||e?.period_start||e?.start_date||'').slice(0,10):'';
     const note=shortPaid>0?'':entryStatementNote(e?.custom_reason||e?.note||e?.remark||'');
     const split=employeeRentPaymentBreakdown(e);
     const funding=split.cash>0&&split.bank>0?`cash ${entryStatementAmount(split.cash)} + bank ${entryStatementAmount(split.bank)}`:pay;
     const deposit=e?._legacy_export_contract&&num(e?._legacy_deposit_amount)>0?` + deposit ${markedAmount(e._legacy_deposit_amount)}`:'';
-    return `${entryStatementBed(e?.room||e?.bed)} paid ${markedAmount(paid)}${deposit} ${funding} ${time}${stayDate?' '+stayDate:''}${short}${note?' '+note:''}`.trim();
+    return `${entryStatementBed(e?.room||e?.bed)} paid ${markedAmount(paid)}${deposit} ${funding} ${time}${short}${note?' '+note:''}`.trim();
   }
   if(type==='arrears_payment'){
     const note=entryStatementNote(e?.note||e?.remark||e?.arrears_note||e?.custom_reason||'');

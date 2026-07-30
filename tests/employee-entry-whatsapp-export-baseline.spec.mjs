@@ -163,7 +163,7 @@ test("Deposit Out and ordinary Expense remain separately classified in the text 
   assert.doesNotMatch(text, /\nExpense 350\n/);
 });
 
-test("Rent export preserves ordinary notes and new-customer stay dates", async () => {
+test("Rent export preserves ordinary notes and does not mislabel billing periods as stay dates", async () => {
   const text = await buildWhatsappTextWithDrafts([
     {
       type: "R",
@@ -185,7 +185,8 @@ test("Rent export preserves ordinary notes and new-customer stay dates", async (
       due: 680,
       pay_type: "C",
       created_at: "2026-07-31T01:25:00Z",
-      original_period_start: "2026-07-23"
+      period_start: "2026-08-23",
+      custom_reason: "original receipt 780 AED on 2026-07-23; rent 680 AED; deposit included 100 AED"
     },
     {
       type: "R",
@@ -196,11 +197,13 @@ test("Rent export preserves ordinary notes and new-customer stay dates", async (
       due: 700,
       pay_type: "C",
       created_at: "2026-07-31T01:31:00Z",
-      period_start: "2026-07-20"
+      period_start: "2026-08-20",
+      custom_reason: "original receipt 800 AED on 2026-07-20; rent 700 AED; deposit included 100 AED"
     }
   ]);
 
   assert.match(text, /\[9114\] paid 1,000 O cash 0125 250 balance from this month; 750 for next month advance/);
-  assert.match(text, /\[729\] paid 680 N cash 0125 2026-07-23/);
-  assert.match(text, /\[859\] paid 700 N cash 0131 2026-07-20/);
+  assert.match(text, /\[729\] paid 680 N cash 0125 original receipt 780 AED on 2026-07-23; rent 680 AED; deposit included 100 AED/);
+  assert.match(text, /\[859\] paid 700 N cash 0131 original receipt 800 AED on 2026-07-20; rent 700 AED; deposit included 100 AED/);
+  assert.doesNotMatch(text, /2026-08-23|2026-08-20/);
 });
