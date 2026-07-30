@@ -68,4 +68,10 @@ test("Owner history keeps the raw-held status card and separate audit disclosure
   assert.match(source, /data-owner-raw-held-audit="true"/);
   assert.match(source, /Raw Source &amp; Canonical Anchors/);
   assert.match(source, /Accepted · Held for Review · Not Yet Projected/);
+  assert.match(source, /<details class="card" data-owner-raw-held-session="true"/);
+  assert.doesNotMatch(source, /<details class="card" data-owner-raw-held-session="true" open/);
+  assert.match(source, /function ownerRawHeldHistorySummaryHtml/);
+  assert.match(source, /<span>总收款<\/span>/);
+  assert.match(source, /<span>总支出<\/span>/);
+  assert.match(source, /<span>净资金<\/span>/);
 });

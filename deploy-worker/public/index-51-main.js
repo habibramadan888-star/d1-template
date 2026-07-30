@@ -1116,7 +1116,31 @@ function ownerRawHeldSessionStatusHtml(session){
     const anomalyCount=Array.isArray(entry?.anomalies)?entry.anomalies.length:0;
     return `<div class="detail-row" data-owner-raw-held-entry="${esc(recordId)}"><div class="room">${esc(eventType)}</div><div class="note">Raw Employee Entry · ${esc(recordId)} · ${anomalyCount} warning(s)</div><div class="amount">${esc(ingestion)} · ${esc(projection)} · Not Yet Projected</div></div>`;
   }).join('');
-  return `<section class="card" data-owner-raw-held-session="true" style="margin-bottom:14px;border-color:var(--orange)"><div class="card-head"><div><div class="card-title">Raw Employee Entry</div><div class="card-sub">Accepted · Held for Review · Not Yet Projected</div></div><span class="hist-order">${entries.length} RAW</span></div><div class="card-body"><div class="detail-list">${rows}</div></div></section>`;
+  return `<details class="card" data-owner-raw-held-session="true" style="margin-bottom:14px;border-color:var(--orange)"><summary class="card-head" style="cursor:pointer;list-style:none"><div><div class="card-title">Raw Employee Entry</div><div class="card-sub">Accepted · Held for Review · Not Yet Projected</div></div><span class="hist-order">${entries.length} RAW · 展开</span></summary><div class="card-body"><div class="detail-list">${rows}</div></div></details>`;
+}
+
+function ownerRawHeldHistoryEntries(session){
+  if(String(session?.source||'').trim().toLowerCase()!=='employee_entry_raw_held')return [];
+  if(Array.isArray(session?.entries)&&session.entries.length)return session.entries;
+  let parsed=session?.entries_json;
+  if(typeof parsed==='string'){
+    try{parsed=JSON.parse(parsed);}catch(_){return [];}
+  }
+  return Array.isArray(parsed)?parsed:(Array.isArray(parsed?.entries)?parsed.entries:[]);
+}
+
+function ownerRawHeldHistorySummaryHtml(session,count){
+  const entries=ownerRawHeldHistoryEntries(session);
+  if(!entries.length)return '';
+  const ledger=ownerRawHeldLedgerText({...session,entries});
+  const value=label=>{
+    const match=ledger.match(new RegExp(`${label}[^\\n]*?AED\\s+([\\d,]+(?:\\.\\d+)?)`,'i'));
+    return Number(String(match?.[1]||'0').replace(/,/g,''))||0;
+  };
+  const received=value('Total Received');
+  const outflow=value('Total Outflow');
+  const net=value('Net Funds');
+  return `<div class="hist-stat"><span>记录</span><b>${Number(count||entries.length)}笔</b></div><div class="hist-stat"><span>总收款</span><b>AED ${fmtMoney(received)}</b></div><div class="hist-stat"><span>总支出</span><b>AED ${fmtMoney(outflow)}</b></div><div class="hist-stat"><span>净资金</span><b>AED ${fmtMoney(net)}</b></div>`;
 }
 
 function normalizeLedgerSession(session){
@@ -3304,7 +3328,7 @@ async function renderHistory(){
   };
   const visibleCloud=state.showDeletedHistory?cloud.filter(isVoidedHistorySession):cloud;
   const all=normalizeLedgerSessions([
-    ...visibleCloud.map(s=>({id:s.id,date:s.date,anchorId:s.anchor_id,entries:[],entriesCount:s.entries_count,export_text:s.export_text||'',_cloud:true,_voided:isVoidedHistorySession(s),createdBy:(s.source==='employee_entry'||s.source==='EMP'||s.source==='employee_entry_raw_held')?'staff':(s.created_by||''),operatorName:s.operator_name||'',operatorId:s.operator_id||'',source:s.source||'',cash_handover:s.cash_handover,bank_transfer_total:s.bank_transfer_total,gross_received:s.gross_received,voidedAt:s.voided_at||'',voidedBy:s.voided_by||'',voidReason:s.void_reason||'',voidSource:s.void_source||'',handover_status:s.handover_status||'',archive_state:s.archive_state||'',raw_totals:s.raw_totals||null,correction_totals:s.correction_totals||null,corrected_totals:s.corrected_totals||null,archive_effective_totals:s.archive_effective_totals||null,active_for_totals:s.active_for_totals,correction_history_visible:s.correction_history_visible,source_proof:s.source_proof||null,totals_mode:s.totals_mode||'',bed_transfer_history:s.bed_transfer_history||null})),
+    ...visibleCloud.map(s=>({id:s.id,date:s.date,anchorId:s.anchor_id,entries:[],entries_json:s.entries_json||'',entriesCount:s.entries_count,export_text:s.export_text||'',_cloud:true,_voided:isVoidedHistorySession(s),createdBy:(s.source==='employee_entry'||s.source==='EMP'||s.source==='employee_entry_raw_held')?'staff':(s.created_by||''),operatorName:s.operator_name||'',operatorId:s.operator_id||'',source:s.source||'',cash_handover:s.cash_handover,bank_transfer_total:s.bank_transfer_total,gross_received:s.gross_received,voidedAt:s.voided_at||'',voidedBy:s.voided_by||'',voidReason:s.void_reason||'',voidSource:s.void_source||'',handover_status:s.handover_status||'',archive_state:s.archive_state||'',raw_totals:s.raw_totals||null,correction_totals:s.correction_totals||null,corrected_totals:s.corrected_totals||null,archive_effective_totals:s.archive_effective_totals||null,active_for_totals:s.active_for_totals,correction_history_visible:s.correction_history_visible,source_proof:s.source_proof||null,totals_mode:s.totals_mode||'',bed_transfer_history:s.bed_transfer_history||null})),
     ...localOnly
   ]).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   const hasMoreCloud=cloud.length>=limit;
@@ -3349,6 +3373,7 @@ async function renderHistory(){
     const uploader=s.source==='employee_entry'||s.source==='EMP'||s.createdBy==='staff'||(s.createdBy&&s.createdBy!=='manager')?`员工上传 ${esc(s.operatorName||s.createdBy||s.operatorId||'')}`:(s.createdBy==='manager'?'老板上传':'');
     const mismatch=Number(s.entriesCount||0)&&hasEntries&&Number(s.entriesCount||0)!==s.entries.length;
     const deleted=s._voided;
+    const rawHeldSummary=ownerRawHeldHistorySummaryHtml(s,cnt);
     const exactBetaTransferVoidCandidate=isOwnerWriteRole()&&!deleted&&s.source==='employee_entry'&&cnt===1&&Number(s.gross_received||0)===0;
     const grossLabel=deleted?'原始流水金额，不计入有效收入':'总收入';
     const deletedTotals=ownerArchiveVoidedTotalsHtml(s,t);
@@ -3358,7 +3383,7 @@ async function renderHistory(){
       <div style="font-size:11px;color:${deleted?'var(--red)':'var(--text3)'};margin-top:2px">${deleted?`已删除/已作废 · ${esc(s.voidedBy||'未知')}`:(s.createdBy==='manager'?'老板上传':s.createdBy==='staff'?'员工上传':'')}</div>
       ${deleted?`<div style="font-size:11px;color:var(--text3);margin-top:2px;line-height:1.5">session ${esc(s.id||'')} · ${esc(s.voidedAt||'')}</div>`:''}
       ${mismatch?`<div style="font-size:11px;color:var(--red);font-weight:800;margin-top:6px">记录数与交易行数量不一致，需单独核对。</div>`:''}
-      ${has?`
+      ${rawHeldSummary||has?rawHeldSummary||`
         <div class="hist-stat"><span style="color:var(--text2)">现金收入</span><span class="mono" style="color:#c8902a">${fmtMoney(t.cashIn)}</span></div>
         <div class="hist-stat"><span style="color:var(--text2)">银行收入</span><span class="mono" style="color:#1a8a4a">${fmtMoney(t.bankIn)}</span></div>
         <div class="hist-stat"><span style="color:var(--text2)">支出</span><span class="mono" style="color:#d93025">-${fmtMoney(t.expOut+t.refundOut)}</span></div>
