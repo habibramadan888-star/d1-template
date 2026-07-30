@@ -944,7 +944,9 @@ function ownerRawHeldLine(entry){
   const type=ownerRawHeldEntryType(entry);
   const pay=ownerRawHeldPayment(entry);
   const time=ownerRawHeldTime(ownerRawHeldField(entry,'created_at','submitted_at','ts'));
-  const rawTag=String(ownerRawHeldField(entry,'tag')).trim().toUpperCase();
+  const serializedTag=JSON.stringify(entry).match(/"tag"\s*:\s*"(O|N|Old|New)"/i)?.[1]||'';
+  const fieldTag=String(ownerRawHeldField(entry,'tag')).trim().toUpperCase();
+  const rawTag=['O','N','OLD','NEW'].includes(fieldTag)?fieldTag:String(serializedTag).toUpperCase();
   const tag=type==='expense'?'':({O:'O',OLD:'O',N:'N',NEW:'N'}[rawTag]||'');
   const marked=value=>`${ownerRawHeldAmount(value)}${tag?' '+tag:''}`;
   if(type==='rent'){
