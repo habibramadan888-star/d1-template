@@ -131,3 +131,34 @@ test("Current text export shows existing O/N customer tags without tagging Expen
   assert.match(text, /Expenses .* AED 50/);
   assert.match(text, /Net Funds .* AED 850/);
 });
+
+test("Deposit Out and ordinary Expense remain separately classified in the text export", async () => {
+  const text = await buildWhatsappTextWithDrafts([
+    {
+      type: "DR",
+      room: "946",
+      amount: 200,
+      actual_refund_amount: 200,
+      refund_amount: 200,
+      refund_reason: "changed location",
+      pay_type: "C",
+      created_at: "2026-07-25T01:32:00Z"
+    },
+    {
+      type: "E",
+      room: "401-103",
+      amount: 150,
+      expense_amount: 150,
+      expense_desc: "AC service",
+      pay_type: "C",
+      created_at: "2026-07-25T01:33:00Z"
+    }
+  ]);
+
+  assert.match(text, /Expenses .* AED 350/);
+  assert.match(text, /Deposit Refund 200/);
+  assert.match(text, /Other Expense 150/);
+  assert.match(text, /Deposit Refund Details[\s\S]*\[946\] deposit refund 200 cash 0132 changed location/);
+  assert.match(text, /Expense Details[\s\S]*\[401-103\] expense 150 cash 0133 AC service/);
+  assert.doesNotMatch(text, /\nExpense 350\n/);
+});

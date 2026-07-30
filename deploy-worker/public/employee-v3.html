@@ -7627,7 +7627,8 @@ function buildEntrySessionLedgerText(){
   const arrears=rows.filter(e=>entryStatementType(e)==='arrears_payment');
   const deposits=rows.filter(e=>entryStatementType(e)==='deposit_in');
   const transfers=rows.filter(e=>entryStatementType(e)==='bed_transfer');
-  const expenses=rows.filter(e=>['expense','deposit_out'].includes(entryStatementType(e)));
+  const depositRefunds=rows.filter(e=>entryStatementType(e)==='deposit_out');
+  const expenses=rows.filter(e=>entryStatementType(e)==='expense');
   const sum=(list,selector)=>list.reduce((total,row)=>total+num(selector?selector(row):row.amount),0);
   const cashReceived=sum(rentCash,row=>row.paid_amount||row.paid||row.amount);
   const arrearsTotal=sum(arrears,row=>row.payment_amount||row.amount);
@@ -7652,7 +7653,8 @@ function buildEntrySessionLedgerText(){
       `Arrears Repaid / \u672c\u7968\u6536\u56de\u6b20\u6b3e AED ${entryStatementAmount(summary.arrearsRepaid)}`,
       `Deposit ${entryStatementAmount(depositTotal)}`,
       `Transfer ${entryStatementAmount(transferTotal)}`,
-      `Expense ${entryStatementAmount(summary.totalExpenses)}`
+      `Deposit Refund ${entryStatementAmount(summary.depRefund)}`,
+      `Other Expense ${entryStatementAmount(summary.expenses)}`
     ],'\u{1F4CA}','Breakdown'),
     entryStatementSection(rentCash.map(entryStatementLine),'\u{1F4B5}','Cash Details'),
     entryStatementSection(rentBank.map(entryStatementLine),'\u{1F3E6}','Bank Details'),
@@ -7660,6 +7662,7 @@ function buildEntrySessionLedgerText(){
     entryStatementSection(arrears.map(entryStatementLine),'\u{1F9FE}','Arrears Details'),
     entryStatementSection(deposits.map(entryStatementLine),'\u{1F3F7}\uFE0F','Deposit Details'),
     entryStatementSection(transfers.map(entryStatementLine),'\u{1F504}','Transfer Details'),
+    entryStatementSection(depositRefunds.map(entryStatementLine),'\u{1F4B8}','Deposit Refund Details'),
     entryStatementSection(expenses.map(entryStatementLine),'\u{1F4E4}','Expense Details')
   ].filter(Boolean);
   const text=[
