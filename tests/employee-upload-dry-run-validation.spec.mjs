@@ -241,3 +241,14 @@ test("left with arrears UI exposes required visible fields and preserves anchors
   assert.doesNotMatch(html, /Coverage End Date is required/);
   assert.match(html, /Left Arrears Amount is required/);
 });
+
+test("Rent can save a local raw draft without TTLock while contextual types retain the gate", async () => {
+  const html = await readFile(employeePath, "utf8");
+  const start = html.indexOf("async function saveEntryWithTtlockGate()");
+  const end = html.indexOf("saveEntry=saveEntryWithTtlockGate", start);
+  assert.ok(start >= 0 && end > start, "saveEntryWithTtlockGate must exist");
+  const saveGate = html.slice(start, end);
+
+  assert.match(saveGate, /\['TF','E','DR','CO','R'\]\.includes\(\$\('entryType'\)\?\.value\)/);
+  assert.match(saveGate, /ensureEntryTtlockReady\(\{auto:false\}\)/);
+});

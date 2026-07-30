@@ -6297,7 +6297,7 @@ async function saveEntry(){
 }
 const saveEntryWithoutTtlockGate=saveEntry;
 async function saveEntryWithTtlockGate(){
-  if(['TF','E','DR','CO'].includes($('entryType')?.value)||employeeLegacyArrearsSelected())return saveEntryWithoutTtlockGate();
+  if(['TF','E','DR','CO','R'].includes($('entryType')?.value)||employeeLegacyArrearsSelected())return saveEntryWithoutTtlockGate();
   if(state.user&&!(await ensureEntryTtlockReady({auto:false})))return;
   return saveEntryWithoutTtlockGate();
 }
