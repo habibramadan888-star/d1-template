@@ -134,8 +134,9 @@ test("employee UI runs dry-run validation before real upload and surfaces backen
   assert.match(commitBlock, /original\.upload_status=validated\.upload_status/);
   assert.match(commitBlock, /e\.upload_status='UPLOADING'/);
   assert.match(commitBlock, /e\.sync_status='LOCAL'/);
-  assert.match(commitBlock, /e\.upload_status='CHECKING_CLOUD'/);
-  assert.match(commitBlock, /e\.cloud_sync_status='CHECKING_CLOUD'/);
+  assert.match(commitBlock, /const rawIngestionConfirmed=data\?\.ingestion_status==='ACCEPTED'/);
+  assert.match(commitBlock, /e\.upload_status=rawIngestionConfirmed\?'RAW_ACCEPTED':'CHECKING_CLOUD'/);
+  assert.match(commitBlock, /e\.cloud_sync_status=rawIngestionConfirmed\?'CLOUD_CONFIRMED':'CHECKING_CLOUD'/);
   assert.doesNotMatch(html, /renderEmployeeButtonLabel\('Upload Failed','\\u4e0a\\u4f20\\u5931\\u8d25'\)/);
   assert.match(html, /exportBtn\.disabled=!hasRows/);
   assert.match(html, /renderEmployeeButtonLabel\('Done','Upload Complete'\)/);

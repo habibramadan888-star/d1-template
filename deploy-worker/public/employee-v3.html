@@ -4671,9 +4671,10 @@ function sanitizeCanonicalEmployeeEntry(eventType,entry){
   return entry;
 }
 function employeeSanitizeArrearsPaymentEntry(entry){return sanitizeCanonicalEmployeeEntry('arrears_payment',entry);}
-function employeeValidateCommonAmount(errors,{optional=false,label='Amount'}={}){
+function employeeValidateCommonAmount(errors,{optional=false,label='Amount',allowZeroWithExplanation=false}={}){
   const amt=num(employeeFieldValue('amount'));
-  if(!optional&&(!amt||amt<=0))errors.push(`${label} must be greater than 0.`);
+  if(!optional&&(!Number.isFinite(amt)||amt<0))errors.push(`${label} must be a valid non-negative amount.`);
+  if(!optional&&amt===0&&(!allowZeroWithExplanation||!employeeTrimField('remark')))errors.push(`${label} must be greater than 0, or include an explanation when the reported amount is zero.`);
 }
 function employeeRentPeriodDisclosureState(){
   const type=$('entryType')?.value||'';
@@ -4726,7 +4727,7 @@ function validateRentEntry(){
   const amount=num(employeeFieldValue('amount'));
   const due=num(employeeFieldValue('due'));
   employeeRequire(errors,!!employeeTrimField('bed'),'Bed is required.');
-  employeeValidateCommonAmount(errors,{label:'Paid Amount'});
+  employeeValidateCommonAmount(errors,{label:'Paid Amount',allowZeroWithExplanation:true});
   employeeRequire(errors,!!employeePaymentMethodValue(),'Payment Method is required.');
   if(employeePaymentMethodValue()==='M'){
     if(!employeeRentSplitPaymentV2Enabled())errors.push('Cash + Bank Rent is not enabled in this environment.');
@@ -4747,9 +4748,9 @@ function validateRentEntry(){
   const tail=Math.max(0,(due||num(employeeFieldValue('periodDue')))-amount);
   if(tail>0){
     if(employeeFieldValue('arrearHandling')!=='ARREAR')errors.push('Short-paid rent must create an arrears task.');
-    if(!employeeFieldValue('arrearPromiseDate'))errors.push('Short-paid rent requires a promised payment date.');
-    if(employeeFieldValue('arrearPromiseDate')&&employeeFieldValue('arrearPromiseDate')<today())errors.push('Promised payment date cannot be earlier than today.');
     if(!employeeTrimField('arrearReasonDetail'))errors.push('Short-paid rent requires a reason or note.');
+    if(!employeeFieldValue('arrearPromiseDate'))warns.push('Promised payment date is unknown. The employee explanation will be sent for Owner Review.');
+    if(employeeFieldValue('arrearPromiseDate')&&employeeFieldValue('arrearPromiseDate')<today())warns.push('Promised payment date is historical. The employee explanation will be sent for Owner Review.');
   }
   if(due>0&&amount>due&&!employeeFieldValue('excessTo'))errors.push('Overpaid rent requires an excess handling choice.');
   return employeeValidationResult(errors,warns);
@@ -6301,7 +6302,7 @@ async function saveEntryWithTtlockGate(){
   return saveEntryWithoutTtlockGate();
 }
 saveEntry=saveEntryWithTtlockGate;
-function resetForm(){['bed','transferFromBed','bedTo','transferReason','transferWaiverReason','transferFeeDueDate','transferFeePaymentMethod','bedDifferenceAmount','bedDifferencePaymentMethod','bedDifferenceDueDate','bedDifferenceReason','amount','rentCashAmount','rentBankAmount','due','paid','tenantName','tenantCardId','periodStart','periodEnd','periodDays','periodDue','listPrice','customReason','bankRef','checkoutDate','depositOutBalance','depositOutRefundDate','depositOutDifferenceReason','depositDeduction','depositReturnAmount','overdayDeduction','noNoticeDeduction','otherDeduction','dedNote','leftFormerCustomerName','leftWhatsappPhone','leftContactNote','leftDepositBalance','leftCoverageEndDate','leftArrearsAmount','leftBelongingsNote','leftPromisedPaymentDate','leftPromisedReturnDate','leftConfirmedNotReturningDate','leftGraceDays','expenseDesc','expenseEvidenceRef','remark','excessTo','reasonCode','linkedTaskId','arrearAmount','arrearPromiseDate','arrearReasonDetail'].forEach(id=>{if($(id))$(id).value=''});if($('amount'))delete $('amount').dataset.periodAmountComplete;if($('rentCustomerTag'))$('rentCustomerTag').value='O';$('payType').value='C';$('feePaid').value='paid';$('bedDifferenceMode').value='none';$('leftWithArrearsMode').value='normal';$('leftContactMethod').value='whatsapp';$('leftBelongingsHeld').value='no';$('arrearHandling').value='ARREAR';state.current=null;state.depositBalance=null;state.depositContext=null;state.bedTransferContext={status:'idle',source:null,target:null,requestKey:'',serverValidation:null};employeeRenderBedTransferContext();renderContext();syncForm();refreshSessionViews()}
+function resetForm(){['bed','transferFromBed','bedTo','transferReason','transferWaiverReason','transferFeeDueDate','transferFeePaymentMethod','bedDifferenceAmount','bedDifferencePaymentMethod','bedDifferenceDueDate','bedDifferenceReason','amount','rentCashAmount','rentBankAmount','due','paid','tenantName','tenantCardId','periodStart','periodEnd','periodDays','periodDue','listPrice','customReason','bankRef','checkoutDate','depositOutBalance','depositOutRefundDate','depositOutDifferenceReason','depositDeduction','depositReturnAmount','overdayDeduction','noNoticeDeduction','otherDeduction','dedNote','leftFormerCustomerName','leftWhatsappPhone','leftContactNote','leftDepositBalance','leftCoverageEndDate','leftArrearsAmount','leftBelongingsNote','leftPromisedPaymentDate','leftPromisedReturnDate','leftConfirmedNotReturningDate','leftGraceDays','expenseDesc','expenseEvidenceRef','remark','excessTo','reasonCode','linkedTaskId','arrearAmount','arrearPromiseDate','arrearReasonDetail'].forEach(id=>{if($(id))$(id).value=''});if($('amount'))delete $('amount').dataset.periodAmountComplete;if($('rentCustomerTag'))$('rentCustomerTag').value='O';$('cycle').value='1M';$('payType').value='C';$('feePaid').value='paid';$('bedDifferenceMode').value='none';$('leftWithArrearsMode').value='normal';$('leftContactMethod').value='whatsapp';$('leftBelongingsHeld').value='no';$('arrearHandling').value='ARREAR';state.current=null;state.depositBalance=null;state.depositContext=null;state.bedTransferContext={status:'idle',source:null,target:null,requestKey:'',serverValidation:null};employeeRenderBedTransferContext();renderContext();syncForm();refreshSessionViews()}
 function hasLocalOnly(){return state.drafts.some(e=>!employeeEntryCloudConfirmed(e))}
 function newSession(){
   if(hasLocalOnly()){toast('仍有云端未确认记录，不能开始新会话');return}
@@ -9059,12 +9060,18 @@ async function commitSessionAndExport(){
       uploadTiming.response_parse_ms+=Math.round(performance.now()-parseStart);
       if(data?.timing)employeeUploadTimingLog('server',data.timing);
       if(!r.ok||data?.success===false){const uploadError=new Error(data?.message||data?.error||raw||('HTTP '+r.status));uploadError.uploadResult=data;throw uploadError;}
-      e.sync_status='LOCAL';
-      e.upload_status='CHECKING_CLOUD';
+      const rawIngestionConfirmed=data?.ingestion_status==='ACCEPTED'&&data?.raw_event_saved===true&&data?.session_saved===true&&data?.entry_event_saved===true&&data?.canonical_anchor_saved===true;
+      e.sync_status=rawIngestionConfirmed?'SYNCED':'LOCAL';
+      e.upload_status=rawIngestionConfirmed?'RAW_ACCEPTED':'CHECKING_CLOUD';
       e.upload_validation_error=null;
-      e.cloud_sync_status='CHECKING_CLOUD';
+      e.cloud_sync_status=rawIngestionConfirmed?'CLOUD_CONFIRMED':'CHECKING_CLOUD';
       e.cloud_sync_checked_at=nowIso();
       e.cloud_entry_id=data?.entry_id||e.cloud_entry_id||'';
+      e.cloud_session_id=data?.session_id||e.cloud_session_id||'';
+      e.canonical_anchor_id=data?.canonical_anchor_id||e.canonical_anchor_id||'';
+      e.anomalies=Array.isArray(data?.anomalies)?data.anomalies:[];
+      e.review_required=data?.review_required===true;
+      e.projection_status=data?.projection_status||'HELD_FOR_REVIEW';
       e.sync_error='';
       if(data?.arrear_task)e.cloud_task_id=data.arrear_task.task_id||e.cloud_task_id||'';
     }catch(err){
@@ -9114,14 +9121,17 @@ async function commitSessionAndExport(){
     return;
   }
   const completedByIdentity=new Map(uploadList.map(entry=>[employeeEntryStableIdentity(entry),entry]));
-  state.drafts=employeeMarkDraftsAwaitingCloudConfirmation(allOriginalDrafts.map(original=>completedByIdentity.get(employeeEntryStableIdentity(original))||original),uploadSessionId);
+  const rawIngestionCloudConfirmed=uploadList.every(entry=>entry?.sync_status==='SYNCED'&&entry?.upload_status==='RAW_ACCEPTED'&&entry?.cloud_sync_status==='CLOUD_CONFIRMED');
+  state.drafts=rawIngestionCloudConfirmed
+    ?allOriginalDrafts.map(original=>completedByIdentity.get(employeeEntryStableIdentity(original))||original)
+    :employeeMarkDraftsAwaitingCloudConfirmation(allOriginalDrafts.map(original=>completedByIdentity.get(employeeEntryStableIdentity(original))||original),uploadSessionId);
   state.sessionId=uploadSessionId;
   state.uploadValidationFailedIndex=null;
   state.uploadValidationFailedEntryId='';
   state.uploadValidationFailedMessage='';
   saveDrafts();
-  const syncCheck=await reconcileEmployeeCloudSyncState({silent:true});
-  const cloudConfirmed=entrySessionUploaded();
+  const syncCheck=rawIngestionCloudConfirmed?{ok:true,session_status:'CLOUD_CONFIRMED'}:await reconcileEmployeeCloudSyncState({silent:true});
+  const cloudConfirmed=rawIngestionCloudConfirmed||entrySessionUploaded();
   if(cloudConfirmed){
     state.drafts=[];
     state.sessionId='';

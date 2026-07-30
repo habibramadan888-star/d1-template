@@ -802,6 +802,7 @@ function balanceTotalFromTotals(t){
 
 function historyDetailMismatchHtml(session,renderedCount){
   if(session?.bed_transfer_history)return '';
+  if(String(session?.source||'').trim().toLowerCase()==='employee_entry_raw_held')return '';
   const entries=Array.isArray(session?.entries)?session.entries:[];
   const rendered=totals(entries);
   const expectedCount=Number(session?.entriesCount||session?.entries_count||0)||0;
@@ -883,6 +884,28 @@ function employeeExportDisplayText(s){
 }
 
 function ownerHistoryDetailMainText(session){
+  if(String(session?.source||'').trim().toLowerCase()==='employee_entry_raw_held'){
+    const entries=Array.isArray(session?.entries)?session.entries:[];
+    return {txt:entries.map((entry,index)=>{
+      const eventType=entry?.event_type||entry?.type||'unknown';
+      const recordId=entry?.entry_id||entry?.event_id||entry?.anchor_id||entry?.id||`entry-${index+1}`;
+      const rawFields=entry?.raw_payload&&typeof entry.raw_payload==='object'?entry.raw_payload:entry;
+      return [
+        `[${index+1}] Raw Employee Entry`,
+        `record_id: ${recordId}`,
+        `event_type: ${eventType}`,
+        `employee: ${entry?.employee||entry?.operator||entry?.operator_id||''}`,
+        `source: ${entry?.source||'employee_entry'}`,
+        `submitted_at: ${entry?.submitted_at||entry?.created_at||''}`,
+        `ingestion_status: ${entry?.ingestion_status||'ACCEPTED'}`,
+        `projection_status: ${entry?.projection_status||'HELD_FOR_REVIEW'}`,
+        'business_status: Not Yet Projected',
+        `review_required: ${entry?.review_required===true?'yes':'no'}`,
+        `anomalies: ${JSON.stringify(entry?.anomalies||[])}`,
+        `raw_fields: ${JSON.stringify(rawFields)}`
+      ].join('\n');
+    }).join('\n\n')||'No raw employee entries found.',source:'employee_entry_raw_held'};
+  }
   const raw=employeeExportDisplayText(session);
   if(raw)return {txt:raw,source:'export_text'};
   return genTXT(session);
@@ -891,7 +914,21 @@ function ownerHistoryDetailMainText(session){
 function isEmployeeLedgerSession(s){
   const source=String(s?.source||s?.src||'').toLowerCase();
   const anchor=String(s?.anchorId||s?.anchor_id||'').toUpperCase();
-  return source==='employee_entry'||source==='emp'||anchor.startsWith('EMP')||anchor.startsWith('EMPV3');
+  return source==='employee_entry'||source==='employee_entry_raw_held'||source==='emp'||anchor.startsWith('EMP')||anchor.startsWith('EMPV3')||anchor.startsWith('RAW-');
+}
+
+function ownerRawHeldSessionStatusHtml(session){
+  if(String(session?.source||'').trim().toLowerCase()!=='employee_entry_raw_held')return '';
+  const entries=Array.isArray(session?.entries)?session.entries:[];
+  const rows=entries.map((entry,index)=>{
+    const eventType=entry?.event_type||entry?.type||'unknown';
+    const recordId=entry?.entry_id||entry?.event_id||entry?.anchor_id||entry?.id||`entry-${index+1}`;
+    const ingestion=entry?.ingestion_status||'ACCEPTED';
+    const projection=entry?.projection_status||'HELD_FOR_REVIEW';
+    const anomalyCount=Array.isArray(entry?.anomalies)?entry.anomalies.length:0;
+    return `<div class="detail-row" data-owner-raw-held-entry="${esc(recordId)}"><div class="room">${esc(eventType)}</div><div class="note">Raw Employee Entry · ${esc(recordId)} · ${anomalyCount} warning(s)</div><div class="amount">${esc(ingestion)} · ${esc(projection)} · Not Yet Projected</div></div>`;
+  }).join('');
+  return `<section class="card" data-owner-raw-held-session="true" style="margin-bottom:14px;border-color:var(--orange)"><div class="card-head"><div><div class="card-title">Raw Employee Entry</div><div class="card-sub">Accepted · Held for Review · Not Yet Projected</div></div><span class="hist-order">${entries.length} RAW</span></div><div class="card-body"><div class="detail-list">${rows}</div></div></section>`;
 }
 
 function normalizeLedgerSession(session){
@@ -3034,7 +3071,7 @@ async function renderHistory(){
     const countWarning=historyDetailMismatchHtml(s,cnt);
     const deletedMeta=s._voided?`<div class="card-sub" style="margin-top:8px;color:var(--red);line-height:1.6">已删除/已作废记录 · 删除人：${esc(s.voidedBy||s.voided_by||'未知')} · 时间：${esc(s.voidedAt||s.voided_at||'未知')}</div>`:'';
     const deletedTotals=ownerArchiveVoidedDetailHtml(s);
-    wrap.innerHTML=`${ownerHistoryTransferLineageHtml(s.transfer_lineage||state.ownerHistoryTransferLineage)}<button class="btn btn-ghost" id="btnHistBack" style="margin-bottom:14px"><svg class="ico"><use href="#i-back"/></svg>返回历史</button>
+    wrap.innerHTML=`${ownerHistoryTransferLineageHtml(s.transfer_lineage||state.ownerHistoryTransferLineage)}<button class="btn btn-ghost" id="btnHistBack" style="margin-bottom:14px"><svg class="ico"><use href="#i-back"/></svg>返回历史</button>${ownerRawHeldSessionStatusHtml(s)}
     <div class="card"><div class="card-head"><div>${s.anchorId?`<div class="card-sub" style="color:var(--accent);margin-bottom:3px">🔐 ${esc(s.anchorId)}</div>`:''}<div class="card-title">${esc((s.date||'').slice(0,10))}</div><div class="card-sub">${cnt} 笔记录</div>${deletedMeta}${deletedTotals}${countWarning}</div><div style="display:flex;gap:7px"><button class="btn btn-ghost" id="btnHistCopy"><svg class="ico"><use href="#i-copy"/></svg>复制</button><button class="btn btn-primary" id="btnHistDl"><svg class="ico"><use href="#i-download"/></svg>下载</button></div></div><div class="card-body"><pre style="background:var(--surface2);padding:14px;border-radius:8px;max-height:60vh;overflow:auto;line-height:1.7;font-size:12px;color:var(--text2);border:1px solid var(--border)">${esc(txt)}</pre></div></div>`;
     document.getElementById('btnHistBack').onclick=()=>{state.historyViewing=null;renderHistory();};
     document.getElementById('btnHistCopy').onclick=async()=>{try{await navigator.clipboard.writeText(txt);toast('已复制');}catch{toast('复制失败','err');}};
@@ -3077,7 +3114,7 @@ async function renderHistory(){
   };
   const visibleCloud=state.showDeletedHistory?cloud.filter(isVoidedHistorySession):cloud;
   const all=normalizeLedgerSessions([
-    ...visibleCloud.map(s=>({id:s.id,date:s.date,anchorId:s.anchor_id,entries:[],entriesCount:s.entries_count,export_text:s.export_text||'',_cloud:true,_voided:isVoidedHistorySession(s),createdBy:(s.source==='employee_entry'||s.source==='EMP')?'staff':(s.created_by||''),operatorName:s.operator_name||'',operatorId:s.operator_id||'',source:s.source||'',cash_handover:s.cash_handover,bank_transfer_total:s.bank_transfer_total,gross_received:s.gross_received,voidedAt:s.voided_at||'',voidedBy:s.voided_by||'',voidReason:s.void_reason||'',voidSource:s.void_source||'',handover_status:s.handover_status||'',archive_state:s.archive_state||'',raw_totals:s.raw_totals||null,correction_totals:s.correction_totals||null,corrected_totals:s.corrected_totals||null,archive_effective_totals:s.archive_effective_totals||null,active_for_totals:s.active_for_totals,correction_history_visible:s.correction_history_visible,source_proof:s.source_proof||null,totals_mode:s.totals_mode||'',bed_transfer_history:s.bed_transfer_history||null})),
+    ...visibleCloud.map(s=>({id:s.id,date:s.date,anchorId:s.anchor_id,entries:[],entriesCount:s.entries_count,export_text:s.export_text||'',_cloud:true,_voided:isVoidedHistorySession(s),createdBy:(s.source==='employee_entry'||s.source==='EMP'||s.source==='employee_entry_raw_held')?'staff':(s.created_by||''),operatorName:s.operator_name||'',operatorId:s.operator_id||'',source:s.source||'',cash_handover:s.cash_handover,bank_transfer_total:s.bank_transfer_total,gross_received:s.gross_received,voidedAt:s.voided_at||'',voidedBy:s.voided_by||'',voidReason:s.void_reason||'',voidSource:s.void_source||'',handover_status:s.handover_status||'',archive_state:s.archive_state||'',raw_totals:s.raw_totals||null,correction_totals:s.correction_totals||null,corrected_totals:s.corrected_totals||null,archive_effective_totals:s.archive_effective_totals||null,active_for_totals:s.active_for_totals,correction_history_visible:s.correction_history_visible,source_proof:s.source_proof||null,totals_mode:s.totals_mode||'',bed_transfer_history:s.bed_transfer_history||null})),
     ...localOnly
   ]).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   const hasMoreCloud=cloud.length>=limit;

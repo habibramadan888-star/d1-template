@@ -3742,6 +3742,7 @@ async function validateEmployeeEntryAggregatePreflight(env,user,body,opts={}){
     }catch(error){
       result=employeeEntryValidationFailure("validate_exception","VALIDATION_EXCEPTION","Upload validation threw an exception before cloud write.",{event_index:index,event_type:eventType,record_id:entryIdentity,invalid_fields:[],anchor_preview:{id:entryIdentity,exception_name:error?.name||"Error"}});
     }
+    result=employeeRawIngestionValidationResult(requestBody,result,index);
     validationResults.push({...result,event_index:index,event_type:result?.event_type||eventType,record_id:result?.record_id||entryIdentity,entry_identity:entryIdentity,write_attempted:false});
   }
   const failed=validationResults.filter(result=>result.ok!==true);
@@ -3765,6 +3766,105 @@ async function validateEmployeeEntryAggregatePreflight(env,user,body,opts={}){
   };
 }
 __name(validateEmployeeEntryAggregatePreflight,"validateEmployeeEntryAggregatePreflight");
+const EMPLOYEE_RAW_INGESTION_TYPES=new Set(["R","AP","D","DR","CO","E","TF"]);
+const EMPLOYEE_RAW_TECHNICAL_ERROR_CODES=new Set([
+  "PAYLOAD_PARSE_FAILED","UNKNOWN_EVENT_TYPE","EMPLOYEE_ENTRY_ID_REQUIRED","EMPLOYEE_SESSION_ID_REQUIRED",
+  "EMPLOYEE_IDEMPOTENCY_KEY_REQUIRED","EMPLOYEE_CORE_AMOUNT_INVALID","employee_entry_schema_not_ready",
+  "EMPLOYEE_ENTRY_SCHEMA_NOT_READY","CANONICAL_ARCHIVE_SCHEMA_UNAVAILABLE","VALIDATION_EXCEPTION",
+  "BED_TRANSFER_FORBIDDEN_IDENTITY_FIELD","ARREARS_PAYMENT_FORBIDDEN_IDENTITY_FIELD",
+  "RENT_SPLIT_LEG_AMOUNT_INVALID","RENT_SPLIT_LEG_COUNT_INVALID","RENT_SPLIT_LEG_METHOD_INVALID",
+  "RENT_SPLIT_PARENT_ID_MISMATCH","RENT_SPLIT_LEG_ID_INVALID","RENT_SPLIT_PAYMENT_V2_DISABLED"
+]);
+function employeeRawIngestionEnvelope(body={},eventIndex=0){
+  const entry=employeeEntryValidationEntryFromBody(body,eventIndex)||{};
+  const type=employeeEntryUploadType(entry);
+  const eventId=cleanId(entry.id||entry.entry_id||entry.event_id||entry.anchor_id||body?.entry_identity);
+  const session=body?.session||{};
+  const sessionId=cleanId(session.id||session.session_id||entry.session_id);
+  const idempotencyKey=cleanText(entry.idempotency_key||body?.idempotency_key||(eventId&&sessionId?`employee-entry-${sessionId}-${eventId}`:""),180);
+  if(!EMPLOYEE_RAW_INGESTION_TYPES.has(type))return {ok:false,error_code:"UNKNOWN_EVENT_TYPE",entry,type,event_id:eventId,session_id:sessionId,idempotency_key:idempotencyKey};
+  if(!eventId)return {ok:false,error_code:"EMPLOYEE_ENTRY_ID_REQUIRED",entry,type,event_id:"",session_id:sessionId,idempotency_key:idempotencyKey};
+  if(!sessionId)return {ok:false,error_code:"EMPLOYEE_SESSION_ID_REQUIRED",entry,type,event_id:eventId,session_id:"",idempotency_key:idempotencyKey};
+  if(!idempotencyKey)return {ok:false,error_code:"EMPLOYEE_IDEMPOTENCY_KEY_REQUIRED",entry,type,event_id:eventId,session_id:sessionId,idempotency_key:""};
+  const amountFields=["amount","paid","paid_amount","payment_amount","expense_amount","deposit_amount","refund_amount","fee_amount_aed"];
+  for(const field of amountFields){
+    if(entry[field]===undefined||entry[field]===null||entry[field]==="")continue;
+    const parsed=Number(String(entry[field]).replace(/,/g,""));
+    if(!Number.isFinite(parsed))return {ok:false,error_code:"EMPLOYEE_CORE_AMOUNT_INVALID",invalid_fields:[field],entry,type,event_id:eventId,session_id:sessionId,idempotency_key:idempotencyKey};
+  }
+  return {ok:true,entry,type,event_type:entryAnchorEventType(type),event_id:eventId,session_id:sessionId,idempotency_key:idempotencyKey};
+}
+__name(employeeRawIngestionEnvelope,"employeeRawIngestionEnvelope");
+function employeeRawIngestionTechnicalFailure(body={},result={},eventIndex=0){
+  const envelope=employeeRawIngestionEnvelope(body,eventIndex);
+  if(!envelope.ok)return envelope;
+  const code=cleanText(result?.error_code||"",120);
+  if(EMPLOYEE_RAW_TECHNICAL_ERROR_CODES.has(code))return {ok:false,error_code:code,...envelope};
+  return null;
+}
+__name(employeeRawIngestionTechnicalFailure,"employeeRawIngestionTechnicalFailure");
+function employeeRawAnomaly(code,message,fields=[],extra={}){
+  return {
+    code:cleanText(code||"BUSINESS_CONTEXT_REVIEW_REQUIRED",120),
+    severity:cleanText(extra.severity||"warning",20),
+    message:cleanText(message||"Business context requires review.",500),
+    field:cleanText(fields?.[0]||extra.field||"",120),
+    source:cleanText(extra.source||"employee_entry_validation",120),
+    observed_value:extra.observed_value??null,
+    expected_value:extra.expected_value??null,
+    review_required:true
+  };
+}
+__name(employeeRawAnomaly,"employeeRawAnomaly");
+function employeeRawEntryAnomalies(body={},validationResult={},eventIndex=0){
+  const envelope=employeeRawIngestionEnvelope(body,eventIndex);
+  const entry=envelope.entry||{};
+  const anomalies=Array.isArray(validationResult?.anomalies)?validationResult.anomalies.map(row=>({...row})):[];
+  if(validationResult?.ok!==true){
+    anomalies.push(employeeRawAnomaly(
+      validationResult?.error_code,
+      validationResult?.message_en||validationResult?.message,
+      [...(validationResult?.missing_fields||[]),...(validationResult?.invalid_fields||[])],
+      {source:validationResult?.stage||"employee_entry_validation"}
+    ));
+  }
+  if(["R","CO","TF"].includes(envelope.type)&&!entry.ttlock_context&&!entry.access_snapshot_context){
+    anomalies.push(employeeRawAnomaly("TTLOCK_CONTEXT_UNAVAILABLE","Access-card context was unavailable; the employee report was retained for review.",["ttlock_context"],{source:"ttlock_readonly_context"}));
+  }
+  if(["D","DR"].includes(envelope.type)){
+    const depositValues=[entry.deposit_balance,entry.previous_deposit_recorded_amount,entry.deposit_required_total];
+    if(depositValues.every(value=>value===undefined||value===null||value===""))anomalies.push(employeeRawAnomaly("DEPOSIT_D_MISSING","Deposit source amount D is unavailable.",["deposit_balance"],{source:"access_snapshot_D"}));
+    if(entry.deposit_conflict===true||entry.deposit_ambiguous===true)anomalies.push(employeeRawAnomaly("DEPOSIT_D_CONFLICT","Deposit source amount D is conflicting or ambiguous.",["deposit_balance"],{source:"access_snapshot_D"}));
+  }
+  if(envelope.type==="AP"&&!cleanId(entry.arrears_ref||entry.linked_task_id||entry.original_arrears_id)){
+    anomalies.push(employeeRawAnomaly("ARREARS_REFERENCE_NOT_FOUND","No canonical arrears reference was supplied.",["arrears_ref"],{source:"canonical_arrears"}));
+  }
+  const unique=new Map();
+  for(const anomaly of anomalies)unique.set(`${anomaly.code}|${anomaly.field}`,anomaly);
+  return [...unique.values()];
+}
+__name(employeeRawEntryAnomalies,"employeeRawEntryAnomalies");
+function employeeRawIngestionValidationResult(body={},result={},eventIndex=0){
+  const technical=employeeRawIngestionTechnicalFailure(body,result,eventIndex);
+  if(technical){
+    return {
+      ...result,ok:false,error_code:technical.error_code,
+      event_index:eventIndex,event_type:technical.event_type||entryAnchorEventType(technical.type||""),
+      record_id:technical.event_id||"",missing_fields:technical.error_code.endsWith("_REQUIRED")?[technical.error_code]:(result?.missing_fields||[]),
+      ingestion_status:"REJECTED_TECHNICAL",projection_status:"NOT_APPLICABLE",no_write:true,write_attempted:false
+    };
+  }
+  const envelope=employeeRawIngestionEnvelope(body,eventIndex);
+  const anomalies=employeeRawEntryAnomalies(body,result,eventIndex);
+  return {
+    ...result,ok:true,error_code:"",message:anomalies.length?"Record can be uploaded with anomalies for review.":"Record is ready for raw ingestion.",
+    message_en:anomalies.length?"Record can be uploaded with anomalies for review.":"Record is ready for raw ingestion.",
+    event_index:eventIndex,event_type:envelope.event_type,record_id:envelope.event_id,
+    ingestion_status:"ACCEPTED",projection_status:"HELD_FOR_REVIEW",review_required:anomalies.length>0,
+    anomalies,no_write:true,write_attempted:false,formal_write_count:0
+  };
+}
+__name(employeeRawIngestionValidationResult,"employeeRawIngestionValidationResult");
 async function qaAcceptanceValidateAcceptedAggregatePreflight(env,user,body,qaContext,requestContext,aggregateRequests=[]){
   if(qaContext?.ok!==true||String(qaContext.run?.status||"")!=="MANUAL_EMPLOYEE_ACCEPTED")return null;
   const stored=qaAcceptanceStoredValidation(qaContext.run),freshness=qaAcceptanceValidationAttestationCurrent(qaContext.run,qaContext.contract,stored);
@@ -3854,6 +3954,7 @@ async function handleEmployeeEntryValidate(request,env,user){
       anchor_preview:{exception_name:err?.name||"Error"}
     })},422);
   }
+  if(!aggregateRequested)result=employeeRawIngestionValidationResult(body,result,Number(body?.event_index||0)||0);
   result={...result,...assetInfo};
   if(Array.isArray(result.validation_results))result.validation_results=result.validation_results.map(row=>({...row,...assetInfo}));
   if(qaValidationContext?.ok===true&&Array.isArray(result.validation_results)){
@@ -3955,6 +4056,127 @@ async function persistEmployeeBedTransferCanonicalArchive(env,user,body,validati
   return success({success:true,ok:true,idempotent:false,canonical_write_status:'accepted',canonical_persistence_verified:true,session_id:sessionId,canonical_entry:stored});
 }
 __name(persistEmployeeBedTransferCanonicalArchive,"persistEmployeeBedTransferCanonicalArchive");
+async function employeeRawPreparedInsert(env,table,values,allowed,mode="INSERT"){
+  const columns=await empTableColumns(env,table);
+  const names=[],bindings=[];
+  for(const name of allowed){
+    if(columns.has(name)&&values[name]!==undefined){names.push(name);bindings.push(values[name]);}
+  }
+  if(!names.length)throw Object.assign(new Error(`RAW_INGESTION_${table.toUpperCase()}_SCHEMA_UNAVAILABLE`),{code:"EMPLOYEE_ENTRY_SCHEMA_NOT_READY"});
+  const verb=mode==="INSERT_OR_IGNORE"?"INSERT OR IGNORE":mode==="INSERT_OR_REPLACE"?"INSERT OR REPLACE":"INSERT";
+  return env.DB.prepare(`${verb} INTO ${table} (${names.join(",")}) VALUES (${names.map(()=>"?").join(",")})`).bind(...bindings);
+}
+__name(employeeRawPreparedInsert,"employeeRawPreparedInsert");
+function employeeRawCanonicalEntry(envelope,user,anomalies,submittedAt,rawPayload){
+  const entry=envelope.entry||{};
+  const sourceReferences={
+    arrears_ref:cleanId(entry.arrears_ref||entry.linked_task_id||entry.original_arrears_id||""),
+    deposit_ref:cleanId(entry.deposit_ref||entry.checkout_ref||""),
+    ttlock_context_present:!!(entry.ttlock_context||entry.access_snapshot_context),
+    original_session_id:cleanId(entry.original_session_id||""),
+    original_event_id:cleanId(entry.original_event_id||"")
+  };
+  return {
+    ...entry,
+    id:envelope.event_id,
+    entry_id:envelope.event_id,
+    event_id:envelope.event_id,
+    anchor_id:cleanId(entry.anchor_id||entry.event_id||entry.id)||envelope.event_id,
+    session_id:envelope.session_id,
+    type:envelope.type,
+    event_type:envelope.event_type,
+    employee:cleanText(user?.userid||"",120),
+    operator:cleanText(entry.operator||entry.operator_id||user?.userid||"",120),
+    submitted_at:submittedAt,
+    source:"employee_entry",
+    source_references:sourceReferences,
+    raw_payload:rawPayload,
+    idempotency_key:envelope.idempotency_key,
+    idempotency_fingerprint:accessSnapshotRuntimeHash(JSON.stringify({session_id:envelope.session_id,event_id:envelope.event_id,event_type:envelope.event_type,raw_payload:rawPayload})),
+    anomalies,
+    review_required:anomalies.length>0,
+    ingestion_status:"ACCEPTED",
+    projection_status:"HELD_FOR_REVIEW",
+    validation_status:anomalies.length?"accepted_with_anomaly":"accepted"
+  };
+}
+__name(employeeRawCanonicalEntry,"employeeRawCanonicalEntry");
+async function persistEmployeeRawIngestion(env,user,body,validationResult,requestContext=null){
+  const eventIndex=Number(body?.event_index||0)||0;
+  const envelope=employeeRawIngestionEnvelope(body,eventIndex);
+  if(!envelope.ok)return json({success:false,ok:false,error_code:envelope.error_code,ingestion_status:"REJECTED_TECHNICAL",projection_status:"NOT_APPLICABLE",no_write:true,write_attempted:false},422);
+  const technical=employeeRawIngestionTechnicalFailure(body,validationResult,eventIndex);
+  if(technical)return json({success:false,ok:false,error_code:technical.error_code,ingestion_status:"REJECTED_TECHNICAL",projection_status:"NOT_APPLICABLE",no_write:true,write_attempted:false},422);
+  const submittedAt=empNow();
+  const rawPayload=JSON.parse(JSON.stringify(envelope.entry||{}));
+  const anomalies=employeeRawEntryAnomalies(body,validationResult,eventIndex);
+  const canonicalEntry=employeeRawCanonicalEntry(envelope,user,anomalies,submittedAt,rawPayload);
+  const eventId=cleanId(`raw-${envelope.session_id}-${envelope.event_id}`).slice(0,180);
+  const existingEvent=await env.DB.prepare("SELECT new_value FROM entry_events WHERE event_id=? AND corpid=? LIMIT 1").bind(eventId,user.corpid).first().catch(()=>null);
+  if(existingEvent?.new_value){
+    let saved=null;
+    try{saved=JSON.parse(existingEvent.new_value);}catch{}
+    const savedAnchor=saved?.canonical_anchor||{};
+    const savedIdempotencyKey=cleanText(saved?.idempotency_key||savedAnchor?.idempotency_key||"",180);
+    if(savedIdempotencyKey!==envelope.idempotency_key&&cleanText(saved?.idempotency_fingerprint||savedAnchor?.idempotency_fingerprint||"",120)!==canonicalEntry.idempotency_fingerprint){
+      return json({success:false,ok:false,error_code:"EMPLOYEE_IDEMPOTENCY_CONFLICT",ingestion_status:"REJECTED_TECHNICAL",projection_status:"NOT_APPLICABLE",no_write:true,write_attempted:false},409);
+    }
+    return success({
+      success:true,ok:true,idempotent:true,entry_id:envelope.event_id,entry_event_id:eventId,
+      session_id:envelope.session_id,canonical_anchor_id:savedAnchor.anchor_id||envelope.event_id,
+      ingestion_status:"ACCEPTED",projection_status:"HELD_FOR_REVIEW",review_required:savedAnchor.review_required===true,
+      anomalies:saved?.anomalies||savedAnchor.anomalies||[],write_attempted:false,no_write:true,business_write_count:0,
+      raw_event_saved:true,session_saved:true,entry_event_saved:true,canonical_anchor_saved:true,
+      owner_finance_delta:0,owner_arrears_delta:0,owner_deposit_delta:0,owner_occupancy_delta:0,owner_todo_delta:0,ttlock_write_count:0
+    });
+  }
+  const existingSession=await env.DB.prepare("SELECT * FROM sessions WHERE id=? AND corpid=? LIMIT 1").bind(envelope.session_id,user.corpid).first().catch(()=>null);
+  let existingEntries=[];
+  if(existingSession?.entries_json){
+    try{const parsed=JSON.parse(existingSession.entries_json);existingEntries=Array.isArray(parsed)?parsed:(Array.isArray(parsed?.entries)?parsed.entries:[]);}catch{return json({success:false,ok:false,error_code:"CANONICAL_ARCHIVE_CORRUPT",ingestion_status:"REJECTED_TECHNICAL",no_write:true,write_attempted:false},409);}
+  }
+  if(existingEntries.some(row=>cleanId(row?.entry_id||row?.event_id||row?.id)===envelope.event_id)){
+    return json({success:false,ok:false,error_code:"EMPLOYEE_IDEMPOTENCY_CONFLICT",ingestion_status:"REJECTED_TECHNICAL",projection_status:"NOT_APPLICABLE",no_write:true,write_attempted:false},409);
+  }
+  const mergedEntries=[...existingEntries,canonicalEntry];
+  const mergedEntryCount=mergedEntries.length;
+  const entriesJson=JSON.stringify({anchor_contract_version:"employee_raw_ingestion_v1",projection_status:"HELD_FOR_REVIEW",entries:mergedEntries});
+  if(entriesJson.length>250000)return json({success:false,ok:false,error_code:"CANONICAL_ARCHIVE_PAYLOAD_TOO_LARGE",ingestion_status:"REJECTED_TECHNICAL",no_write:true,write_attempted:false},413);
+  const eventValue=JSON.stringify({
+    raw_payload:rawPayload,canonical_anchor:canonicalEntry,anomalies,
+    ingestion_status:"ACCEPTED",projection_status:"HELD_FOR_REVIEW",
+    idempotency_key:envelope.idempotency_key,idempotency_fingerprint:canonicalEntry.idempotency_fingerprint
+  });
+  const sessionStatement=await employeeRawPreparedInsert(env,"sessions",{
+    id:envelope.session_id,corpid:user.corpid,anchor_id:cleanId(body?.session?.anchor_id||`RAW-${envelope.session_id}`),
+    date:cleanDate(body?.session?.date||submittedAt.slice(0,10)),entries_count:mergedEntryCount,
+    created_by:user.userid,created_at:cleanText(body?.session?.created_at||submittedAt,40),
+    operator_id:user.userid,operator_name:cleanText(user.employee_name||user.userid,120),
+    cash_handover:0,bank_transfer_total:0,bank_transfer_count:0,gross_received:0,
+    handover_status:"RAW_ACCEPTED_HELD_FOR_REVIEW",exported_at:submittedAt,
+    export_text:"",source:"employee_entry_raw_held",entries_json:entriesJson,
+    summary_json:JSON.stringify({projection_status:"HELD_FOR_REVIEW",business_totals_applied:false,entries_count:mergedEntryCount})
+  },EMP_SESSION_COLUMNS,"INSERT_OR_REPLACE");
+  const eventStatement=await employeeRawPreparedInsert(env,"entry_events",{
+    event_id:eventId,corpid:user.corpid,userid:user.userid,ref_id:envelope.event_id,ref_type:"employee_raw_entry",
+    event_type:"raw_ingestion_accepted",field_name:"raw_payload",old_value:"",new_value:eventValue,
+    operator_id:user.userid,ts:submittedAt
+  },EMP_EVENT_COLUMNS,"INSERT_OR_IGNORE");
+  try{
+    await env.DB.batch([sessionStatement,eventStatement]);
+    if(requestContext)requestContext.d1_write_count=Number(requestContext.d1_write_count||0)+2;
+  }catch(error){
+    return json({success:false,ok:false,error_code:"RAW_EVENT_PERSISTENCE_FAILED",message:cleanText(error?.message||"",240),ingestion_status:"REJECTED_TECHNICAL",no_write:false,write_attempted:true},500);
+  }
+  return success({
+    success:true,ok:true,idempotent:false,entry_id:envelope.event_id,entry_event_id:eventId,
+    session_id:envelope.session_id,canonical_anchor_id:canonicalEntry.anchor_id,
+    ingestion_status:"ACCEPTED",projection_status:"HELD_FOR_REVIEW",review_required:anomalies.length>0,anomalies,
+    write_attempted:true,no_write:false,raw_event_saved:true,session_saved:true,entry_event_saved:true,canonical_anchor_saved:true,
+    business_write_count:0,owner_finance_delta:0,owner_arrears_delta:0,owner_deposit_delta:0,owner_occupancy_delta:0,owner_todo_delta:0,ttlock_write_count:0
+  });
+}
+__name(persistEmployeeRawIngestion,"persistEmployeeRawIngestion");
 async function handleEmployeeEntry(request,env,user,options={}){
   const timingEnabled=request.headers.get("X-Employee-Entry-Timing")==="1";
   const request_context=options.request_context||ttlockRequestContext(request,env,user,"employee_entry_upload",TTLOCK_STRICT_CACHE_MAX_AGE_MS);
@@ -3963,6 +4185,28 @@ async function handleEmployeeEntry(request,env,user,options={}){
   if(!body)try{body=await request.json();}catch{return badRequest("invalid_json");}
   const qaWriteGate=await qaAcceptanceEmployeeFormalWriteGate(env,user,body||{},options);
   if(qaWriteGate)return qaWriteGate;
+  const rawEnvelope=employeeRawIngestionEnvelope(body||{},body?.event_index??0);
+  if(!rawEnvelope.ok)return json({success:false,ok:false,error_code:rawEnvelope.error_code,ingestion_status:"REJECTED_TECHNICAL",projection_status:"NOT_APPLICABLE",no_write:true,write_attempted:false},422);
+  if(options.schema_prechecked!==true&&(!await empTableExists(env,"sessions")||!await empTableExists(env,"entry_events")))return errorResponse("employee_entry_schema_not_ready",503,"employee_entry_schema_not_ready");
+  const rawBody=normalizeEmployeeEntryBodyForValidation(body||{});
+  let rawValidation;
+  try{
+    rawValidation=options.prevalidated_result||await validateEmployeeEntryUploadPayload(env,user,rawBody,{
+      event_index:rawBody?.event_index,
+      canonical_transfer_link_anchor:true,
+      request_context,
+      legacy_genesis_gate:employeeBedTransferLegacyGenesisGate(env,user)
+    });
+  }catch(error){
+    rawValidation=employeeEntryValidationFailure("validate_exception","VALIDATION_EXCEPTION","Raw employee input could not be safely inspected.",{
+      event_index:Number(rawBody?.event_index||0)||0,
+      event_type:rawEnvelope.event_type,
+      record_id:rawEnvelope.event_id,
+      anchor_preview:{exception_name:error?.name||"Error"}
+    });
+  }
+  rawValidation=employeeRawIngestionValidationResult(rawBody,rawValidation,Number(rawBody?.event_index||0)||0);
+  return persistEmployeeRawIngestion(env,user,rawBody,rawValidation,request_context);
   if(["DR","CO"].includes(employeeEntryUploadType(employeeEntryValidationEntryFromBody(body||{},body?.event_index??0))))request_context.allow_live_fetch=false;
   const stayGenesisEnvelopeFailure=employeeEntryStayGenesisEnvelopeFailure(body||{},body?.event_index??0);
   const stayGenesisEntry=employeeEntryValidationEntryFromBody(body||{},body?.event_index??0);
@@ -6632,7 +6876,7 @@ __name(employeeEntryExportTextWithAnchors,"employeeEntryExportTextWithAnchors");
 function isEmployeeEntrySession(row){
   const source=String(row?.source||"").trim().toLowerCase();
   const anchor=String(row?.anchor_id||row?.anchorId||"").trim().toUpperCase();
-  return source==="employee_entry"||source==="emp"||anchor.startsWith("EMP")||anchor.startsWith("EMPV3");
+  return source==="employee_entry"||source==="employee_entry_raw_held"||source==="emp"||anchor.startsWith("EMP")||anchor.startsWith("EMPV3")||anchor.startsWith("RAW-");
 }
 __name(isEmployeeEntrySession,"isEmployeeEntrySession");
 function parseEmployeeExportAmount(raw){
