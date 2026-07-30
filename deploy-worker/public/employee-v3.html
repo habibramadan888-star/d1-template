@@ -7341,8 +7341,7 @@ function entryWhatsappSafe(value){
     .replace(/\b(EID|trace|trace_id|source_ref|request_id|idempotency_key|audit_id|debug)\b[:=]?\s*[\w:.-]*/ig,'')
     .replace(/[{}[\]"]/g,'')
     .replace(/\s+/g,' ')
-    .trim()
-    .slice(0,90);
+    .trim();
 }
 function entryWhatsappType(e){
   return ({R:'rent',AP:'arrears_payment',D:'deposit_in',DR:'deposit_out',CO:'checkout',E:'expense',TF:'bed_transfer',TFF:'bed_transfer'}[e?.type]||String(e?.type||'entry').toLowerCase());
@@ -7510,10 +7509,12 @@ function entryStatementLine(e){
     const shortPaid=num(e?.arrears_amount)||Math.max(0,expected-paid);
     const meta=entrySearchableArrearsTokens(e?.arrears_due_date||e?.arrear_promise_date||e?.promise_date||'',e?.arrears_note||e?.arrear_reason_detail||e?.custom_reason||e?.note||'');
     const short=shortPaid>0?` short ${entryStatementAmount(shortPaid)}${meta?' '+meta:''}`:'';
+    const stayDate=customerTag==='N'?String(e?.original_period_start||e?.period_start||e?.start_date||'').slice(0,10):'';
+    const note=shortPaid>0?'':entryStatementNote(e?.custom_reason||e?.note||e?.remark||'');
     const split=employeeRentPaymentBreakdown(e);
     const funding=split.cash>0&&split.bank>0?`cash ${entryStatementAmount(split.cash)} + bank ${entryStatementAmount(split.bank)}`:pay;
     const deposit=e?._legacy_export_contract&&num(e?._legacy_deposit_amount)>0?` + deposit ${markedAmount(e._legacy_deposit_amount)}`:'';
-    return `${entryStatementBed(e?.room||e?.bed)} paid ${markedAmount(paid)}${deposit} ${funding} ${time}${short}`.trim();
+    return `${entryStatementBed(e?.room||e?.bed)} paid ${markedAmount(paid)}${deposit} ${funding} ${time}${stayDate?' '+stayDate:''}${short}${note?' '+note:''}`.trim();
   }
   if(type==='arrears_payment'){
     const note=entryStatementNote(e?.note||e?.remark||e?.arrears_note||e?.custom_reason||'');
@@ -7640,7 +7641,7 @@ function buildEntrySessionLedgerText(){
       `Cash Received / 现金收款 AED ${entryStatementAmount(summary.cashReceived)}`,
       `Bank Received / 银行收款 AED ${entryStatementAmount(summary.bankReceived)}`,
       `Total Received / 本票总收款 AED ${entryStatementAmount(summary.totalReceived)}`,
-      `Expenses / 本票支出 AED ${entryStatementAmount(summary.totalExpenses)}`,
+      `Total Outflow / 本票总支出 AED ${entryStatementAmount(summary.totalExpenses)}`,
       `Net Funds / 本票净资金增加 AED ${entryStatementAmount(summary.netFunds)}`,
       `Cash Net / 本票现金净额 AED ${entryStatementAmount(summary.cashNet)}`,
       `Bank Net / 本票银行净额 AED ${entryStatementAmount(summary.bankNet)}`,

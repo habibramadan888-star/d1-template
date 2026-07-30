@@ -128,7 +128,7 @@ test("Current text export shows existing O/N customer tags without tagging Expen
   assert.match(text, /\[office\] expense 50 cash 1002 test supplies/);
   assert.doesNotMatch(text, /\[office\] expense 50 O\b/);
   assert.match(text, /Cash Received .* AED 900/);
-  assert.match(text, /Expenses .* AED 50/);
+  assert.match(text, /Total Outflow .* AED 50/);
   assert.match(text, /Net Funds .* AED 850/);
 });
 
@@ -140,7 +140,7 @@ test("Deposit Out and ordinary Expense remain separately classified in the text 
       amount: 200,
       actual_refund_amount: 200,
       refund_amount: 200,
-      refund_reason: "changed location",
+      refund_reason: "Employee-reported refund 200 AED; system deposit balance 100 AED; changed location; preserve employee-reported facts for owner review",
       pay_type: "C",
       created_at: "2026-07-25T01:32:00Z"
     },
@@ -149,16 +149,58 @@ test("Deposit Out and ordinary Expense remain separately classified in the text 
       room: "401-103",
       amount: 150,
       expense_amount: 150,
-      expense_desc: "AC service",
+      expense_desc: "APT-20260725-SAW89B; original statement date 2026-07-25; 100 for 103 1st room AC service; 50 for 401 1st room AC smart switch removing and fixing",
       pay_type: "C",
       created_at: "2026-07-25T01:33:00Z"
     }
   ]);
 
-  assert.match(text, /Expenses .* AED 350/);
+  assert.match(text, /Total Outflow .* AED 350/);
   assert.match(text, /Deposit Refund 200/);
   assert.match(text, /Other Expense 150/);
-  assert.match(text, /Deposit Refund Details[\s\S]*\[946\] deposit refund 200 cash 0132 changed location/);
-  assert.match(text, /Expense Details[\s\S]*\[401-103\] expense 150 cash 0133 AC service/);
+  assert.match(text, /Deposit Refund Details[\s\S]*\[946\] deposit refund 200 cash 0132 Employee-reported refund 200 AED; system deposit balance 100 AED; changed location; preserve employee-reported facts for owner review/);
+  assert.match(text, /Expense Details[\s\S]*\[401-103\] expense 150 cash 0133 APT-20260725-SAW89B; original statement date 2026-07-25; 100 for 103 1st room AC service; 50 for 401 1st room AC smart switch removing and fixing/);
   assert.doesNotMatch(text, /\nExpense 350\n/);
+});
+
+test("Rent export preserves ordinary notes and new-customer stay dates", async () => {
+  const text = await buildWhatsappTextWithDrafts([
+    {
+      type: "R",
+      room: "9114",
+      tag: "O",
+      amount: 1000,
+      paid: 1000,
+      due: 1000,
+      pay_type: "C",
+      created_at: "2026-07-31T01:25:00Z",
+      custom_reason: "250 balance from this month; 750 for next month advance"
+    },
+    {
+      type: "R",
+      room: "729",
+      tag: "N",
+      amount: 680,
+      paid: 680,
+      due: 680,
+      pay_type: "C",
+      created_at: "2026-07-31T01:25:00Z",
+      original_period_start: "2026-07-23"
+    },
+    {
+      type: "R",
+      room: "859",
+      tag: "N",
+      amount: 700,
+      paid: 700,
+      due: 700,
+      pay_type: "C",
+      created_at: "2026-07-31T01:31:00Z",
+      period_start: "2026-07-20"
+    }
+  ]);
+
+  assert.match(text, /\[9114\] paid 1,000 O cash 0125 250 balance from this month; 750 for next month advance/);
+  assert.match(text, /\[729\] paid 680 N cash 0125 2026-07-23/);
+  assert.match(text, /\[859\] paid 700 N cash 0131 2026-07-20/);
 });
