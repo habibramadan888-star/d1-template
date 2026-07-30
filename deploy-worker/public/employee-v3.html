@@ -10263,6 +10263,14 @@ const employeeLegacyValidate=validate;
 validate=function(){
   const result=employeeLegacyValidate();
   employeeRenderValidation(result);
+  const submit=$('btnSaveEntry');
+  const blocked=Array.isArray(result?.errors)&&result.errors.length>0;
+  if(submit){
+    submit.disabled=blocked;
+    submit.classList.toggle('disabled',blocked);
+    submit.classList.toggle('primary',!blocked);
+    if(blocked)submit.setAttribute('aria-disabled','true');else submit.removeAttribute('aria-disabled');
+  }
   return result;
 };
 renderSessionPreview=function(){
