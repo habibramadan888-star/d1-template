@@ -272,3 +272,14 @@ test("Rent without configured monthly rent is review-only and bed input revalida
   const bedInputLine = html.match(/\$\('bed'\)\.addEventListener\('input',[^\n]+/u)?.[0] || "";
   assert.match(bedInputLine, /syncForm\(\);employeeScheduleLookupBed\(\)/);
 });
+
+test("a null failed validation index does not mark record zero as pending validation", async () => {
+  const html = await readFile(employeePath, "utf8");
+  const stateStart = html.indexOf("function employeeRecordValidationError(entry,index)");
+  const stateEnd = html.indexOf("function employeeEntryArrearsRef(entry)", stateStart);
+  const stateBlock = html.slice(stateStart, stateEnd);
+
+  assert.match(stateBlock, /failedIndex!==null&&failedIndex!==undefined&&Number\.isInteger\(Number\(failedIndex\)\)/);
+  assert.match(stateBlock, /!failedIdentity&&hasFailedIndex&&Number\(failedIndex\)===index/);
+  assert.doesNotMatch(stateBlock, /!failedIdentity&&Number\(state\.uploadValidationFailedIndex\)===index/);
+});

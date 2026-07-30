@@ -8401,7 +8401,9 @@ function employeeRecordValidationError(entry,index){
   if(entry?.sync_status==='SYNCED'||entry?.upload_status==='SYNCED')return null;
   if(entry?.upload_validation_error)return normalizeEmployeeUploadDryRunError(entry.upload_validation_error,index,entry.sync_error||'');
   const failedIdentity=String(state.uploadValidationFailedEntryId||'');
-  if((failedIdentity&&employeeEntryStableIdentity(entry)===failedIdentity)||(!failedIdentity&&Number(state.uploadValidationFailedIndex)===index)){
+  const failedIndex=state.uploadValidationFailedIndex;
+  const hasFailedIndex=failedIndex!==null&&failedIndex!==undefined&&Number.isInteger(Number(failedIndex));
+  if((failedIdentity&&employeeEntryStableIdentity(entry)===failedIdentity)||(!failedIdentity&&hasFailedIndex&&Number(failedIndex)===index)){
     return normalizeEmployeeUploadDryRunError({
       event_index:index,
       event_type:entryEventType(entry?.type||entry?.event_type||'entry'),
