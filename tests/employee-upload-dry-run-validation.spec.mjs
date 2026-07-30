@@ -258,3 +258,17 @@ test("Rent can save a local raw draft without TTLock while contextual types reta
   assert.match(renderGate, /rawDraftWithoutTtlock=entryType==='R'\|\|exitEvent/);
   assert.match(renderGate, /rawDraftWithoutTtlock\?false:!ttlockCacheReady\(\)/);
 });
+
+test("Rent without configured monthly rent is review-only and bed input revalidates immediately", async () => {
+  const html = await readFile(employeePath, "utf8");
+  const validationStart = html.indexOf("function validateRentEntry()");
+  const validationEnd = html.indexOf("function validateArrearsPaymentEntry()", validationStart);
+  const validation = html.slice(validationStart, validationEnd);
+
+  assert.match(validation, /Monthly rent config is missing\. The employee-reported rent will be saved for Owner Review\./);
+  assert.match(validation, /Expected Rent \/ Period Due is unknown\. The employee-reported amount remains the raw fact\./);
+  assert.doesNotMatch(validation, /!rentForBed\(\)\)errors\.push\('Monthly rent config is missing for this bed\.'\)/);
+
+  const bedInputLine = html.match(/\$\('bed'\)\.addEventListener\('input',[^\n]+/u)?.[0] || "";
+  assert.match(bedInputLine, /syncForm\(\);employeeScheduleLookupBed\(\)/);
+});

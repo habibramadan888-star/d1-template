@@ -4741,10 +4741,14 @@ function validateRentEntry(){
   employeeRequire(errors,!!employeeFieldValue('periodStart'),'Rent Period Start is required.');
   employeeRequire(errors,!!employeeFieldValue('periodEnd'),'Rent Period End is required.');
   if(employeeFieldValue('periodEnd')&&employeeFieldValue('periodStart')&&employeeFieldValue('periodEnd')<employeeFieldValue('periodStart'))errors.push('Rent Period End cannot be before Rent Period Start.');
-  if(employeeFieldValue('cycle')==='1M'&&!rentForBed())errors.push('Monthly rent config is missing for this bed.');
+  const monthlyRentConfigured=rentForBed()>0;
+  if(employeeFieldValue('cycle')==='1M'&&!monthlyRentConfigured)warns.push('Monthly rent config is missing. The employee-reported rent will be saved for Owner Review.');
   if(employeeFieldValue('cycle')==='CUST'&&num(employeeFieldValue('periodDays'))<=0)errors.push('Custom rent days must be greater than 0.');
   if(employeeFieldValue('cycle')==='CUST'&&num(employeeFieldValue('periodDays'))>0&&!Number.isInteger(num(employeeFieldValue('periodDays'))))errors.push('Custom rent days must be an integer.');
-  if(!num(employeeFieldValue('periodDue')))errors.push('Expected Rent / Period Due is required.');
+  if(!num(employeeFieldValue('periodDue'))){
+    if(employeeFieldValue('cycle')==='1M'&&!monthlyRentConfigured)warns.push('Expected Rent / Period Due is unknown. The employee-reported amount remains the raw fact.');
+    else errors.push('Expected Rent / Period Due is required.');
+  }
   const samePeriodTask=openTaskForCurrentRentPeriod();
   if(samePeriodTask)errors.push(`This period already has an open arrears task: ${fmtMoney(taskRemain(samePeriodTask))} AED. Use Arrears Payment instead.`);
   const tail=Math.max(0,(due||num(employeeFieldValue('periodDue')))-amount);
@@ -9210,7 +9214,7 @@ $('amount').addEventListener('input',()=>{delete $('amount').dataset.periodAmoun
 $('amount').addEventListener('change',()=>{$('amount').dataset.periodAmountComplete='true';syncForm();});
 $('amount').addEventListener('blur',()=>{$('amount').dataset.periodAmountComplete='true';syncForm();});
 $('linkedTaskId').addEventListener('change',applyLinkedTask);
-$('bed').addEventListener('input',()=>{const type=$('entryType').value;if(type==='E'){syncForm();return;}if(type==='TF')$('transferFromBed').value=$('bed').value.trim().replace(/^#/,'');employeeScheduleLookupBed();if(type==='AP'){populateTaskSelect();syncForm();}});
+$('bed').addEventListener('input',()=>{const type=$('entryType').value;if(type==='E'){syncForm();return;}if(type==='TF')$('transferFromBed').value=$('bed').value.trim().replace(/^#/,'');syncForm();employeeScheduleLookupBed();if(type==='AP')populateTaskSelect();});
 $('transferFromBed').addEventListener('input',()=>{if($('entryType').value==='TF'){$('bed').value=$('transferFromBed').value.trim().replace(/^#/,'');employeeScheduleLookupBed();employeeScheduleBedTransferContexts();syncForm();}});
 $('transferFromBed').addEventListener('change',()=>{if($('entryType').value==='TF'){$('bed').value=$('transferFromBed').value.trim().replace(/^#/,'');lookupBed();syncForm();}});
 $('transferFromBed').addEventListener('change',()=>{if($('entryType').value==='TF'&&$('bedTo').value.trim())employeeLoadBedTransferContexts().catch(()=>validate());});
