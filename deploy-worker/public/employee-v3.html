@@ -2996,6 +2996,7 @@ label .label-en{
           </select></div>
           <div class="field hidden" id="selectedEventWrap"><label>Selected Event<span class="label-en">已选事件</span></label><div id="selectedEventDisplay" class="readonly-pill">Rent / 收租</div></div>
           <div class="field" id="genericBedFieldWrap"><label id="genericBedFieldLabel">床位 BED</label><input id="bed" autocomplete="off"><div id="employeeBedInfoStrip" class="bed-info-strip hidden" data-bed-info-strip="true"></div></div>
+          <div class="field" id="rentCustomerTagWrap"><label for="rentCustomerTag">Customer Status / 客户类型</label><select id="rentCustomerTag"><option value="O" selected>Old / 老客户 (O)</option><option value="N">New / 新客户 (N)</option></select></div>
         </div>
         <div class="small" id="objectHint">收租/收押金/退押金/还欠款：填写床位号；换床：填写原床位后再填新床位；支出：选择支出类别。</div>
         <div id="bedTransferStep2Mount" data-bed-transfer-step2="true"></div>
@@ -4548,6 +4549,7 @@ function employeeApplyEventSpecificFieldLabels(type){
 function employeeFieldValue(id){return $(id)?.value ?? '';}
 function employeeTrimField(id){return String(employeeFieldValue(id)||'').trim();}
 function employeePaymentMethodValue(){return employeeFieldValue('payType')||'C';}
+function employeeRentCustomerTagValue(){return employeeFieldValue('rentCustomerTag')==='N'?'N':'O';}
 function employeeRentLegId(parentEntryId,method){return `${String(parentEntryId||'').trim()}-${String(method||'').trim().toUpperCase()}`;}
 function employeeRentSplitFormLegs(parentEntryId){
   return [
@@ -4973,6 +4975,7 @@ function buildRentAnchor(){
   const paid=num(employeeFieldValue('paid'))||Math.min(amount,due||amount);
   const tail=Math.max(0,due-paid);
   const payload=employeeBaseEntryPayload('R',{
+    tag:employeeRentCustomerTagValue(),
     reason_code:tail>0?'SHORT_PAID':(employeeFieldValue('reasonCode')||'R'),
     amount,due,paid,deficit:tail,entry_clr:tail>0?'N':'Y',clr:tail>0?'N':'Y',
     excess:Math.max(0,amount-due),excess_to:employeeFieldValue('excessTo'),
@@ -5099,7 +5102,7 @@ function employeeEntryTemplateKeyForType(type){
 const entryTemplates={
   rent:{
     code:'R',event_type:'rent',title:['Rent','\u6536\u79df'],
-    fields:['selectedEventWrap','genericBedFieldWrap','paymentStep','amount','listPrice','periodStep','arrearPlan','remark'],
+    fields:['selectedEventWrap','genericBedFieldWrap','rentCustomerTagWrap','paymentStep','amount','listPrice','periodStep','arrearPlan','remark'],
     required_fields:['bed','payment_method','paid_amount','rent_period_start','rent_period_end'],
     system_read_fields:['expected_rent','open_arrears_alert','customer_card_info','deposit_info'],
     forbidden_fields:['arrears_ref','linkedTaskId','depositOutFields','checkoutFields','transferFields','expenseFields'],
@@ -5156,7 +5159,7 @@ const entryTemplates={
 };
 const employeeEntryTemplates=entryTemplates;
 const employeeEntryTemplateNodes=[
-  'selectedEventWrap','genericBedFieldWrap','paymentStep','amount','listPrice','periodStep','arrearPlan','apFields','arrearsPaymentCorePanel',
+  'selectedEventWrap','genericBedFieldWrap','rentCustomerTagWrap','paymentStep','amount','listPrice','periodStep','arrearPlan','apFields','arrearsPaymentCorePanel',
   'depositOutFields','checkoutFields','leftWithArrearsMode','checkoutDate','leftWithArrearsFields',
   'transferFields',
   'expenseFields','remark'
@@ -5653,6 +5656,7 @@ function setEntryType(type){
   const prev=$('entryType').value;
   $('entryType').value=type;
   if(prev!==type){
+    if($('rentCustomerTag'))$('rentCustomerTag').value='O';
     ['amount','due','paid','periodStart','periodEnd','periodDays','periodDue','customReason','remark','arrearAmount','arrearPromiseDate','arrearReasonDetail','depositDeduction','depositReturnAmount','overdayDeduction','noNoticeDeduction','otherDeduction','dedNote','transferFromBed','bedTo','transferReason','expenseDesc','excessTo'].forEach(id=>$(id).value='');
     $('arrearHandling').value='ARREAR';
     $('reasonCode').value='';
@@ -6263,7 +6267,7 @@ async function saveEntryWithTtlockGate(){
   return saveEntryWithoutTtlockGate();
 }
 saveEntry=saveEntryWithTtlockGate;
-function resetForm(){['bed','transferFromBed','bedTo','transferReason','transferWaiverReason','transferFeeDueDate','transferFeePaymentMethod','bedDifferenceAmount','bedDifferencePaymentMethod','bedDifferenceDueDate','bedDifferenceReason','amount','rentCashAmount','rentBankAmount','due','paid','tenantName','tenantCardId','periodStart','periodEnd','periodDays','periodDue','listPrice','customReason','bankRef','checkoutDate','depositOutBalance','depositOutRefundDate','depositOutDifferenceReason','depositDeduction','depositReturnAmount','overdayDeduction','noNoticeDeduction','otherDeduction','dedNote','leftFormerCustomerName','leftWhatsappPhone','leftContactNote','leftDepositBalance','leftCoverageEndDate','leftArrearsAmount','leftBelongingsNote','leftPromisedPaymentDate','leftPromisedReturnDate','leftConfirmedNotReturningDate','leftGraceDays','expenseDesc','expenseEvidenceRef','remark','excessTo','reasonCode','linkedTaskId','arrearAmount','arrearPromiseDate','arrearReasonDetail'].forEach(id=>{if($(id))$(id).value=''});if($('amount'))delete $('amount').dataset.periodAmountComplete;$('payType').value='C';$('feePaid').value='paid';$('bedDifferenceMode').value='none';$('leftWithArrearsMode').value='normal';$('leftContactMethod').value='whatsapp';$('leftBelongingsHeld').value='no';$('arrearHandling').value='ARREAR';state.current=null;state.depositBalance=null;state.depositContext=null;state.bedTransferContext={status:'idle',source:null,target:null,requestKey:'',serverValidation:null};employeeRenderBedTransferContext();renderContext();syncForm();refreshSessionViews()}
+function resetForm(){['bed','transferFromBed','bedTo','transferReason','transferWaiverReason','transferFeeDueDate','transferFeePaymentMethod','bedDifferenceAmount','bedDifferencePaymentMethod','bedDifferenceDueDate','bedDifferenceReason','amount','rentCashAmount','rentBankAmount','due','paid','tenantName','tenantCardId','periodStart','periodEnd','periodDays','periodDue','listPrice','customReason','bankRef','checkoutDate','depositOutBalance','depositOutRefundDate','depositOutDifferenceReason','depositDeduction','depositReturnAmount','overdayDeduction','noNoticeDeduction','otherDeduction','dedNote','leftFormerCustomerName','leftWhatsappPhone','leftContactNote','leftDepositBalance','leftCoverageEndDate','leftArrearsAmount','leftBelongingsNote','leftPromisedPaymentDate','leftPromisedReturnDate','leftConfirmedNotReturningDate','leftGraceDays','expenseDesc','expenseEvidenceRef','remark','excessTo','reasonCode','linkedTaskId','arrearAmount','arrearPromiseDate','arrearReasonDetail'].forEach(id=>{if($(id))$(id).value=''});if($('amount'))delete $('amount').dataset.periodAmountComplete;if($('rentCustomerTag'))$('rentCustomerTag').value='O';$('payType').value='C';$('feePaid').value='paid';$('bedDifferenceMode').value='none';$('leftWithArrearsMode').value='normal';$('leftContactMethod').value='whatsapp';$('leftBelongingsHeld').value='no';$('arrearHandling').value='ARREAR';state.current=null;state.depositBalance=null;state.depositContext=null;state.bedTransferContext={status:'idle',source:null,target:null,requestKey:'',serverValidation:null};employeeRenderBedTransferContext();renderContext();syncForm();refreshSessionViews()}
 function hasLocalOnly(){return state.drafts.some(e=>!employeeEntryCloudConfirmed(e))}
 function newSession(){
   if(hasLocalOnly()){toast('仍有云端未确认记录，不能开始新会话');return}
@@ -9143,7 +9147,7 @@ showEmployeeView(location.hash||'entry',{pushHash:false});
 document.querySelectorAll('.event-chip').forEach(btn=>btn.addEventListener('click',e=>{e.preventDefault();setEntryType(btn.dataset.type);}));
 document.querySelectorAll('#transferFields input,#transferFields select,#transferFields textarea').forEach(control=>control.addEventListener('input',employeeInvalidateBedTransferValidation));
 document.querySelectorAll('.pay-option').forEach(btn=>btn.addEventListener('click',e=>{e.preventDefault();setPaymentType(btn.dataset.pay);}));
-['entryType','cycle','payType','amount','rentCashAmount','rentBankAmount','reasonCode','feePaid','transferWaiverReason','transferFeePaymentMethod','transferFeeDueDate','bedDifferenceMode','bedDifferenceAmount','bedDifferencePaymentMethod','bedDifferenceDueDate','bedDifferenceReason','customReason','tenantName','bankRef','periodDays','depositOutRefundDate','depositOutDifferenceReason','depositDeduction','checkoutDate','noNoticeDeduction','otherDeduction','dedNote','leftWithArrearsMode','leftFormerCustomerName','leftWhatsappPhone','leftContactMethod','leftContactNote','leftDepositBalance','leftCoverageEndDate','leftArrearsAmount','leftBelongingsHeld','leftBelongingsNote','leftPromisedPaymentDate','leftPromisedReturnDate','leftConfirmedNotReturningDate','leftGraceDays','excessTo','bedTo','transferReason','expenseDesc','remark','arrearHandling','arrearPromiseDate','arrearReasonDetail'].forEach(id=>$(id).addEventListener('input',syncForm));
+['entryType','cycle','payType','rentCustomerTag','amount','rentCashAmount','rentBankAmount','reasonCode','feePaid','transferWaiverReason','transferFeePaymentMethod','transferFeeDueDate','bedDifferenceMode','bedDifferenceAmount','bedDifferencePaymentMethod','bedDifferenceDueDate','bedDifferenceReason','customReason','tenantName','bankRef','periodDays','depositOutRefundDate','depositOutDifferenceReason','depositDeduction','checkoutDate','noNoticeDeduction','otherDeduction','dedNote','leftWithArrearsMode','leftFormerCustomerName','leftWhatsappPhone','leftContactMethod','leftContactNote','leftDepositBalance','leftCoverageEndDate','leftArrearsAmount','leftBelongingsHeld','leftBelongingsNote','leftPromisedPaymentDate','leftPromisedReturnDate','leftConfirmedNotReturningDate','leftGraceDays','excessTo','bedTo','transferReason','expenseDesc','remark','arrearHandling','arrearPromiseDate','arrearReasonDetail'].forEach(id=>$(id).addEventListener('input',syncForm));
 $('amount').addEventListener('input',()=>{delete $('amount').dataset.periodAmountComplete;});
 $('amount').addEventListener('change',()=>{$('amount').dataset.periodAmountComplete='true';syncForm();});
 $('amount').addEventListener('blur',()=>{$('amount').dataset.periodAmountComplete='true';syncForm();});
