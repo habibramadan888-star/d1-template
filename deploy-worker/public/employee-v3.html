@@ -5618,6 +5618,7 @@ updateEntrySessionActionState=function(){
   const preview=$('btnPreviewSession');
   if(preview){
     preview.disabled=!hasRows;
+    if(hasRows)preview.removeAttribute('aria-disabled');else preview.setAttribute('aria-disabled','true');
     preview.classList.toggle('disabled',!hasRows);
     preview.title=hasRows?'':'Add a record before opening Preview / 请先加入一条本票记录';
   }
