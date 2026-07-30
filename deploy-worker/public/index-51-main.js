@@ -908,16 +908,22 @@ function ownerRawHeldSafe(value){
 }
 
 function ownerRawHeldField(entry,...fields){
-  const rawSources=[entry?.raw_fields,entry?.raw_payload].map(value=>{
-    if(typeof value!=='string')return value;
-    try{return JSON.parse(value);}catch(_){return {};}
-  }).filter(value=>value&&typeof value==='object');
-  for(const field of fields){
-    const direct=entry?.[field];
-    if(direct!==undefined&&direct!==null&&String(direct).trim()!=='')return direct;
-    for(const raw of rawSources){
-      const rawValue=raw[field]??raw?.raw_fields?.[field];
-      if(rawValue!==undefined&&rawValue!==null&&String(rawValue).trim()!=='')return rawValue;
+  const queue=[entry];
+  const seen=new Set();
+  for(let depth=0;queue.length&&depth<24;depth+=1){
+    let current=queue.shift();
+    if(typeof current==='string'&&/^\s*[{[]/.test(current)){
+      try{current=JSON.parse(current);}catch(_){continue;}
+    }
+    if(!current||typeof current!=='object'||seen.has(current))continue;
+    seen.add(current);
+    for(const field of fields){
+      const value=current[field];
+      if(value!==undefined&&value!==null&&String(value).trim()!=='')return value;
+    }
+    for(const value of Object.values(current)){
+      if(value&&typeof value==='object')queue.push(value);
+      else if(typeof value==='string'&&/^\s*[{[]/.test(value))queue.push(value);
     }
   }
   return '';
