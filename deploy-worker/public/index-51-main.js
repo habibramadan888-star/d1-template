@@ -908,16 +908,17 @@ function ownerRawHeldSafe(value){
 }
 
 function ownerRawHeldField(entry,...fields){
-  let raw=entry?.raw_fields;
-  if(typeof raw==='string'){
-    try{raw=JSON.parse(raw);}catch(_){raw={};}
-  }
-  if(!raw||typeof raw!=='object')raw={};
+  const rawSources=[entry?.raw_fields,entry?.raw_payload].map(value=>{
+    if(typeof value!=='string')return value;
+    try{return JSON.parse(value);}catch(_){return {};}
+  }).filter(value=>value&&typeof value==='object');
   for(const field of fields){
     const direct=entry?.[field];
     if(direct!==undefined&&direct!==null&&String(direct).trim()!=='')return direct;
-    const rawValue=raw[field];
-    if(rawValue!==undefined&&rawValue!==null&&String(rawValue).trim()!=='')return rawValue;
+    for(const raw of rawSources){
+      const rawValue=raw[field]??raw?.raw_fields?.[field];
+      if(rawValue!==undefined&&rawValue!==null&&String(rawValue).trim()!=='')return rawValue;
+    }
   }
   return '';
 }
