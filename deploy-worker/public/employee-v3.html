@@ -8911,6 +8911,9 @@ async function commitSessionAndExport(){
     state.aggregateValidationSessionError=employeeAggregateValidationSessionFailure('SERVER_VALIDATE_MALFORMED_RESPONSE',{http_status:aggregatePreflight?.aggregate_http_status||0,response_body_kind:'entry_identity_contract',validation_result_count:aggregateResults.length,unmatched_result_count:identityContract.unmatched_result_count,duplicate_entry_id_count:identityContract.duplicate_entry_id_count});
     buildExport();refreshSessionViews();oldLabels.forEach(([b,html])=>{b.dataset.busy='0';b.disabled=false;b.classList.remove('disabled');b.innerHTML=html});updateEntrySessionActionState();return;
   }
+  state.uploadValidationFailedIndex=null;
+  state.uploadValidationFailedEntryId='';
+  state.uploadValidationFailedMessage='';
   for(let i=0;i<uploadList.length;i++){
     const e=uploadList[i];
     const rawResult=aggregateResults.find(result=>String(result?.entry_identity||'')===employeeEntryStableIdentity(e));
@@ -9047,6 +9050,14 @@ async function commitSessionAndExport(){
     };
     try{
       e.upload_status='UPLOADING';
+      const activeDraft=state.drafts.find(row=>employeeEntryStableIdentity(row)===employeeEntryStableIdentity(e));
+      if(activeDraft){
+        activeDraft.upload_status='UPLOADING';
+        activeDraft.upload_validation_error=null;
+        activeDraft.upload_validation_error_code='';
+        activeDraft.sync_error='';
+        refreshSessionViews();
+      }
       setUploadPhase(`Uploading ${i+1}/${writeQueue.length}`,'Uploading');
       const apiStart=performance.now();
       const requestBody=bedTransferUploadPayloads.get(employeeEntryStableIdentity(e))||{entry:e,session:sessionForEntry,timing_debug:employeeUploadTimingEnabled()};

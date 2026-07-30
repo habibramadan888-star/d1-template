@@ -125,6 +125,7 @@ test("employee UI runs dry-run validation before real upload and surfaces backen
   assert.match(html, /const failedIdentity=employeeEntryStableIdentity\(firstDryRunFailure\.entry\)/);
   assert.match(html, /const failedIndex=Math\.max\(0,allOriginalDrafts\.findIndex\(row=>employeeEntryStableIdentity\(row\)===failedIdentity\)\)/);
   assert.match(html, /state\.uploadValidationFailedIndex=failedIndex/);
+  assert.match(commitBlock, /state\.uploadValidationFailedIndex=null;\s*state\.uploadValidationFailedEntryId='';\s*state\.uploadValidationFailedMessage='';\s*for\(let i=0;i<uploadList\.length;i\+\+\)/);
   assert.match(html, /data-session-record-index="\$\{recordIndex\}"/);
   assert.match(html, /upload-validation-failed/);
   assert.match(html, /data-remove-session-record/);
@@ -133,6 +134,9 @@ test("employee UI runs dry-run validation before real upload and surfaces backen
   assert.match(commitBlock, /const original=allOriginalDrafts\.find\(row=>employeeEntryStableIdentity\(row\)===employeeEntryStableIdentity\(validated\)\)/);
   assert.match(commitBlock, /original\.upload_status=validated\.upload_status/);
   assert.match(commitBlock, /e\.upload_status='UPLOADING'/);
+  assert.match(commitBlock, /const activeDraft=state\.drafts\.find\(row=>employeeEntryStableIdentity\(row\)===employeeEntryStableIdentity\(e\)\)/);
+  assert.match(commitBlock, /activeDraft\.upload_status='UPLOADING'/);
+  assert.match(commitBlock, /activeDraft\.upload_validation_error=null/);
   assert.match(commitBlock, /e\.sync_status='LOCAL'/);
   assert.match(commitBlock, /const rawIngestionConfirmed=data\?\.ingestion_status==='ACCEPTED'/);
   assert.match(commitBlock, /e\.upload_status=rawIngestionConfirmed\?'RAW_ACCEPTED':'CHECKING_CLOUD'/);
