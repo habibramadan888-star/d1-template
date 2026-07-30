@@ -945,7 +945,7 @@ function ownerRawHeldLine(entry){
   const pay=ownerRawHeldPayment(entry);
   const time=ownerRawHeldTime(ownerRawHeldField(entry,'created_at','submitted_at','ts'));
   const rawTag=String(ownerRawHeldField(entry,'tag')).trim().toUpperCase();
-  const tag=['O','N'].includes(rawTag)&&type!=='expense'?rawTag:'';
+  const tag=type==='expense'?'':({O:'O',OLD:'O',N:'N',NEW:'N'}[rawTag]||'');
   const marked=value=>`${ownerRawHeldAmount(value)}${tag?' '+tag:''}`;
   if(type==='rent'){
     const expected=Number(entry?.expected_rent??entry?.period_due??entry?.due??0);

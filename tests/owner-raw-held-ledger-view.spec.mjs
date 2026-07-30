@@ -24,7 +24,7 @@ test("raw-held Owner detail renders the employee Ledger while retaining full aud
     date: "2026-07-31",
     created_at: "2026-07-31T02:09:00+04:00",
     entries: [
-      { event_type: "rent", type: "R", room: "848", amount: 750, paid: 750, due: 750, payment_method: "cash", raw_envelope: { payload_json: JSON.stringify({ tag: "O", created_at: "2026-07-31T01:31:00+04:00" }) }, event_id: "rent-848", ingestion_status: "ACCEPTED", projection_status: "HELD_FOR_REVIEW" },
+      { event_type: "rent", type: "R", room: "848", amount: 750, paid: 750, due: 750, tag: "Old", payment_method: "cash", raw_envelope: { payload_json: JSON.stringify({ tag: "O", created_at: "2026-07-31T01:31:00+04:00" }) }, event_id: "rent-848", ingestion_status: "ACCEPTED", projection_status: "HELD_FOR_REVIEW" },
       { event_type: "rent", type: "R", room: "856", amount: 750, paid: 750, due: 750, tag: "O", payment_method: "cash", created_at: "2026-07-31T01:31:00+04:00", event_id: "rent-856" },
       { event_type: "rent", type: "R", room: "859", amount: 700, paid: 700, due: 700, tag: "N", payment_method: "cash", created_at: "2026-07-31T01:31:00+04:00", custom_reason: "original receipt 800 AED on 2026-07-20; rent 700 AED; deposit included 100 AED", event_id: "rent-859" },
       { event_type: "deposit_in", type: "D", room: "859", amount: 100, deposit_amount: 100, tag: "N", payment_method: "cash", created_at: "2026-07-31T01:31:00+04:00", event_id: "deposit-859" },
