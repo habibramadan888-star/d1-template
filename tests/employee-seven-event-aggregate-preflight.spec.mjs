@@ -65,7 +65,7 @@ test("Expense 99, 100, and 500 AED pass without evidence while description remai
   assert.deepEqual(Array.from(invalid.invalid_fields), ["payment_method"]);
 });
 
-test("13-record aggregate preflight returns every result with one shared request context and zero writes", async () => {
+test("13-record raw aggregate preflight returns every result without business-source reads or writes", async () => {
   const contexts = new Set();
   const sandbox = {
     cleanText: value => String(value ?? "").trim(),
@@ -87,6 +87,7 @@ test("13-record aggregate preflight returns every result with one shared request
       return context.existing_transactions_by_event_id;
     },
     employeeEntryValidationFailure: (stage, error_code, message, extra = {}) => ({ ok: false, stage, error_code, message, missing_fields: extra.missing_fields || [], invalid_fields: extra.invalid_fields || [], event_index: extra.event_index || 0, event_type: extra.event_type || "", record_id: extra.record_id || null }),
+    employeeRawIngestionValidationResult: (body, result, index) => ({ ...result, ok: true, error_code: "", event_index: index, event_type: sandbox.entryAnchorEventType(body.entry.type), record_id: body.entry.id }),
     validateEmployeeEntryUploadPayload: async (_env, _user, body, opts) => {
       contexts.add(opts.request_context);
       if (body.entry.type === "TF") opts.request_context.ttlock_snapshot_count ||= 1;
@@ -107,14 +108,14 @@ test("13-record aggregate preflight returns every result with one shared request
   const context = { archive_read_count: 0, archive_parse_count: 0, ttlock_snapshot_count: 0 };
   const result = await sandbox.validateEmployeeEntryAggregatePreflight({}, { role: "staff" }, { validation_requests }, { request_context: context });
   assert.equal(result.validation_result_count, 13);
-  assert.equal(result.failed_result_count, 2);
-  assert.equal(result.passed_result_count, 11);
+  assert.equal(result.failed_result_count, 0);
+  assert.equal(result.passed_result_count, 13);
   assert.equal(result.formal_write_count, 0);
   assert.equal(result.write_attempted, false);
-  assert.equal(contexts.size, 1);
-  assert.equal(context.archive_read_count, 1);
-  assert.equal(context.archive_parse_count, 1);
-  assert.equal(context.ttlock_snapshot_count, 1);
+  assert.equal(contexts.size, 0);
+  assert.equal(context.archive_read_count, 0);
+  assert.equal(context.archive_parse_count, 0);
+  assert.equal(context.ttlock_snapshot_count, 0);
   assert.deepEqual(Array.from(result.validation_results, row => row.event_index), Array.from({ length: 13 }, (_, index) => index));
   assert.deepEqual(Array.from(result.validation_results, row => row.entry_identity), Array.from({ length: 13 }, (_, index) => `entry-${index + 1}`));
 });

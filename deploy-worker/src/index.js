@@ -3718,31 +3718,16 @@ async function validateEmployeeEntryAggregatePreflight(env,user,body,opts={}){
     const failure=employeeEntryValidationFailure("aggregate_preflight","AGGREGATE_PREFLIGHT_EMPTY","Upload Session contains no validation requests.",{event_index:0,event_type:"session",missing_fields:["validation_requests"]});
     return {...failure,source:"aggregate_dry_run",validation_results:[failure],validation_result_count:1,failed_result_count:1,passed_result_count:0,no_write:true,write_attempted:false,formal_write_count:0,request_context_metrics:employeeEntryAggregateRequestMetrics(context)};
   }
-  const requestTypes=requests.map(row=>employeeEntryUploadType(employeeEntryValidationEntryFromBody(row,row.event_index)));
-  const hasTransfer=requestTypes.some(type=>["TF","TFF"].includes(type));
-  if(hasTransfer&&!context.legacy_genesis_gate){context.legacy_genesis_gate=employeeBedTransferLegacyGenesisGate(env,user);context.capabilities_read_count=1;}
-  if(requestTypes.some(type=>["TF","TFF","AP","DR","CO"].includes(type))){
-    const archiveSnapshot=await cloudArrearsFetchActiveSessionRows(env,user,{limit:1000,request_context:context}).catch(()=>[]);
-    employeeEntryPrepareArchiveSnapshotContext(archiveSnapshot,context);
-  }
-  if(context.sessions_table_exists!==true){
-    context.sessions_table_exists=await empTableExists(env,"sessions").catch(()=>false);
-    context.d1_read_count=Number(context.d1_read_count||0)+1;
-  }
-  await employeeEntryPreloadExistingTransactions(env,user,requests,context);
   const validationResults=[];
   for(let index=0;index<requests.length;index++){
     const requestBody=requests[index];
     const entry=employeeEntryValidationEntryFromBody(requestBody,index)||{};
     const eventType=entryAnchorEventType(employeeEntryUploadType(entry)||cleanText(entry.event_type||"entry",40));
     const entryIdentity=employeeEntryAggregateResultIdentity(requestBody,index);
-    let result;
-    try{
-      result=await validateEmployeeEntryUploadPayload(env,user,requestBody,{event_index:index,canonical_transfer_link_anchor:true,request_context:context,legacy_genesis_gate:context.legacy_genesis_gate});
-    }catch(error){
-      result=employeeEntryValidationFailure("validate_exception","VALIDATION_EXCEPTION","Upload validation threw an exception before cloud write.",{event_index:index,event_type:eventType,record_id:entryIdentity,invalid_fields:[],anchor_preview:{id:entryIdentity,exception_name:error?.name||"Error"}});
-    }
-    result=employeeRawIngestionValidationResult(requestBody,result,index);
+    const result=employeeRawIngestionValidationResult(requestBody,{
+      ok:true,stage:"raw_ingestion_preflight",event_index:index,event_type:eventType,record_id:entryIdentity,
+      message:"Raw employee input is technically valid for no-write preflight."
+    },index);
     validationResults.push({...result,event_index:index,event_type:result?.event_type||eventType,record_id:result?.record_id||entryIdentity,entry_identity:entryIdentity,write_attempted:false});
   }
   const failed=validationResults.filter(result=>result.ok!==true);
@@ -3939,7 +3924,7 @@ async function handleEmployeeEntryValidate(request,env,user){
     qaAcceptedResumePreflight=acceptedResult?.qa_accepted_resume_preflight===true;
     result=acceptedResult||(aggregateRequested
       ?await validateEmployeeEntryAggregatePreflight(env,user,body,{request_context})
-      :await validateEmployeeEntryUploadPayload(env,user,body,{event_index:body?.event_index,canonical_transfer_link_anchor:true,request_context,legacy_genesis_gate:request_context.legacy_genesis_gate}));
+      :employeeRawIngestionValidationResult(body,{ok:true,stage:"raw_ingestion_preflight",event_index:Number(body?.event_index||0)||0},Number(body?.event_index||0)||0));
   }catch(err){
     const eventIndex=Number(body?.event_index||0)||0;
     const eventType=entryAnchorEventType(cleanText(body?.entry?.type||body?.entry?.reason_code||"R",12).toUpperCase());
@@ -4189,22 +4174,11 @@ async function handleEmployeeEntry(request,env,user,options={}){
   if(!rawEnvelope.ok)return json({success:false,ok:false,error_code:rawEnvelope.error_code,ingestion_status:"REJECTED_TECHNICAL",projection_status:"NOT_APPLICABLE",no_write:true,write_attempted:false},422);
   if(options.schema_prechecked!==true&&(!await empTableExists(env,"sessions")||!await empTableExists(env,"entry_events")))return errorResponse("employee_entry_schema_not_ready",503,"employee_entry_schema_not_ready");
   const rawBody=normalizeEmployeeEntryBodyForValidation(body||{});
-  let rawValidation;
-  try{
-    rawValidation=options.prevalidated_result||await validateEmployeeEntryUploadPayload(env,user,rawBody,{
-      event_index:rawBody?.event_index,
-      canonical_transfer_link_anchor:true,
-      request_context,
-      legacy_genesis_gate:employeeBedTransferLegacyGenesisGate(env,user)
-    });
-  }catch(error){
-    rawValidation=employeeEntryValidationFailure("validate_exception","VALIDATION_EXCEPTION","Raw employee input could not be safely inspected.",{
-      event_index:Number(rawBody?.event_index||0)||0,
-      event_type:rawEnvelope.event_type,
-      record_id:rawEnvelope.event_id,
-      anchor_preview:{exception_name:error?.name||"Error"}
-    });
-  }
+  let rawValidation=options.prevalidated_result||{
+    ok:true,stage:"raw_ingestion_preflight",event_index:Number(rawBody?.event_index||0)||0,
+    event_type:rawEnvelope.event_type,record_id:rawEnvelope.event_id,
+    message:"Raw employee input is technically valid for ingestion."
+  };
   rawValidation=employeeRawIngestionValidationResult(rawBody,rawValidation,Number(rawBody?.event_index||0)||0);
   return persistEmployeeRawIngestion(env,user,rawBody,rawValidation,request_context);
   if(["DR","CO"].includes(employeeEntryUploadType(employeeEntryValidationEntryFromBody(body||{},body?.event_index??0))))request_context.allow_live_fetch=false;

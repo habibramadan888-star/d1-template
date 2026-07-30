@@ -16,6 +16,28 @@ test("raw ingestion keeps business anomalies non-blocking and technical failures
   assert.match(worker, /EMPLOYEE_IDEMPOTENCY_CONFLICT/);
 });
 
+test("raw aggregate preflight avoids business-source reads that can time out a whole session", () => {
+  const start = worker.indexOf("async function validateEmployeeEntryAggregatePreflight(");
+  const end = worker.indexOf("__name(validateEmployeeEntryAggregatePreflight", start);
+  const body = worker.slice(start, end);
+  assert.match(body, /stage:"raw_ingestion_preflight"/);
+  assert.match(body, /employeeRawIngestionValidationResult\(requestBody/);
+  assert.doesNotMatch(body, /cloudArrearsFetchActiveSessionRows/);
+  assert.doesNotMatch(body, /employeeEntryPreloadExistingTransactions/);
+  assert.doesNotMatch(body, /validateEmployeeEntryUploadPayload/);
+});
+
+test("formal raw ingestion does not re-run business validation before persistence", () => {
+  const start = worker.indexOf("async function handleEmployeeEntry(");
+  const end = worker.indexOf("__name(handleEmployeeEntry", start);
+  const body = worker.slice(start, end);
+  const rawReturn = body.indexOf("return persistEmployeeRawIngestion");
+  assert.ok(rawReturn > 0);
+  const active = body.slice(0, rawReturn);
+  assert.match(active, /stage:"raw_ingestion_preflight"/);
+  assert.doesNotMatch(active, /validateEmployeeEntryUploadPayload/);
+});
+
 test("raw ingestion persists only sessions and entry events with explicit zero projection deltas", () => {
   const start = worker.indexOf("async function persistEmployeeRawIngestion(");
   const end = worker.indexOf("async function handleEmployeeEntry(", start);
