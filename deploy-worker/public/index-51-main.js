@@ -883,28 +883,192 @@ function employeeExportDisplayText(s){
     .trim();
 }
 
+function ownerRawHeldEntryType(entry){
+  const event=String(entry?.event_type||'').trim().toLowerCase();
+  return event||({R:'rent',AP:'arrears_payment',D:'deposit_in',DR:'deposit_out',CO:'checkout',E:'expense',TF:'bed_transfer'}[String(entry?.type||'').trim().toUpperCase()]||'unknown');
+}
+
+function ownerRawHeldPayment(entry){
+  const value=String(entry?.payment_method||entry?.pay_type||entry?.cat||'').trim().toLowerCase();
+  return value==='b'||value==='bank'?'bank':value==='none'||value==='n'?'':value==='mixed'||value==='m'?'mixed':'cash';
+}
+
+function ownerRawHeldAmount(value){
+  const number=Number(value||0);
+  return Number.isFinite(number)?number.toLocaleString('en-US',{maximumFractionDigits:2}):'0';
+}
+
+function ownerRawHeldSafe(value){
+  return String(value||'')
+    .replace(/\+971[\d\s().-]{5,}/g,'')
+    .replace(/\b(EID|trace|trace_id|source_ref|request_id|idempotency_key|audit_id|debug)\b[:=]?\s*[\w:.-]*/ig,'')
+    .replace(/[{}[\]"]/g,'')
+    .replace(/\s+/g,' ')
+    .trim();
+}
+
+function ownerRawHeldTime(value){
+  const raw=String(value||'');
+  const iso=raw.match(/T(\d{2}):(\d{2})/);
+  return iso?`${iso[1]}${iso[2]}`:'';
+}
+
+function ownerRawHeldBed(entry,fallback='item'){
+  const value=String(entry?.room||entry?.bed||entry?.target_bed||entry?.expense_category||fallback).replace(/^#/,'').trim();
+  return `[${value||fallback}]`;
+}
+
+function ownerRawHeldLine(entry){
+  const type=ownerRawHeldEntryType(entry);
+  const pay=ownerRawHeldPayment(entry);
+  const time=ownerRawHeldTime(entry?.created_at||entry?.submitted_at||entry?.ts);
+  const rawTag=String(entry?.tag||'').trim().toUpperCase();
+  const tag=['O','N'].includes(rawTag)&&type!=='expense'?rawTag:'';
+  const marked=value=>`${ownerRawHeldAmount(value)}${tag?' '+tag:''}`;
+  if(type==='rent'){
+    const expected=Number(entry?.expected_rent??entry?.period_due??entry?.due??0);
+    const paid=Number(entry?.paid_amount??entry?.paid??entry?.amount??0);
+    const shortAmount=Number(entry?.arrears_amount??Math.max(0,expected-paid));
+    const dueDate=String(entry?.arrears_due_date||entry?.arrear_promise_date||entry?.promise_date||'').slice(5).replace('-','');
+    const note=ownerRawHeldSafe(entry?.arrears_note||entry?.arrear_reason_detail||entry?.custom_reason||entry?.note||entry?.remark||'');
+    const short=shortAmount>0?` short ${ownerRawHeldAmount(shortAmount)}${dueDate?` DUE:${dueDate}`:''}${note?` | NOTE:${note}`:''}`:(note?` ${note}`:'');
+    return `${ownerRawHeldBed(entry)} paid ${marked(paid)} ${pay} ${time}${short}`.trim();
+  }
+  if(type==='arrears_payment'){
+    const note=ownerRawHeldSafe(entry?.note||entry?.remark||entry?.arrears_note||entry?.custom_reason||'');
+    return `${ownerRawHeldBed(entry)} arrears paid ${marked(entry?.payment_amount??entry?.amount)} ${pay} ${time}${note?' '+note:''}`.trim();
+  }
+  if(type==='deposit_in')return `${ownerRawHeldBed(entry)} deposit ${marked(entry?.deposit_amount??entry?.amount)} ${pay} ${time}`.trim();
+  if(type==='deposit_out'){
+    const note=ownerRawHeldSafe(entry?.refund_reason||entry?.difference_reason||entry?.reason||entry?.note||entry?.remark||'');
+    return `${ownerRawHeldBed(entry)} deposit refund ${marked(entry?.actual_refund_amount??entry?.refund_amount??entry?.amount)} ${pay||'cash'} ${time}${note?' '+note:''}`.trim();
+  }
+  if(type==='expense'){
+    const note=ownerRawHeldSafe(entry?.expense_desc||entry?.reason||entry?.note||entry?.remark||'');
+    return `${ownerRawHeldBed(entry)} expense ${ownerRawHeldAmount(entry?.expense_amount??entry?.amount)} ${pay||'cash'} ${time}${note?' '+note:''}`.trim();
+  }
+  if(type==='checkout'){
+    const date=String(entry?.checkout_date||entry?.left_date||'').slice(0,10);
+    const note=ownerRawHeldSafe(entry?.note||entry?.final_note||entry?.remark||'');
+    return `${ownerRawHeldBed(entry)} checkout ${date}${tag?' '+tag:''}${note?' '+note:''}`.trim();
+  }
+  if(type==='bed_transfer'){
+    const from=String(entry?.from_bed||entry?.bed_from||entry?.room||'').replace(/^#/,'');
+    const to=String(entry?.to_bed||entry?.bed_to||entry?.roomTo||'').replace(/^#/,'');
+    const fee=Number(entry?.fee_amount_aed??entry?.fee_amount??entry?.amount??0);
+    const mode=String(entry?.fee_mode||entry?.fee_status||'').toLowerCase();
+    const feeText=mode==='waived'?'waived':`${ownerRawHeldAmount(fee)} ${pay}`.trim();
+    const note=ownerRawHeldSafe(entry?.transfer_reason||entry?.fee_waiver_reason||entry?.note||entry?.remark||'');
+    return `[${from||'from'}]\n[${to||'to'}]\ntransfer ${feeText} ${time}${note?' '+note:''}`.trim();
+  }
+  return `${ownerRawHeldBed(entry)} ${type} ${marked(entry?.amount)} ${pay} ${time}`.trim();
+}
+
+function ownerRawHeldLedgerSection(lines,emoji,title){
+  return lines.length?[`${emoji} ${'▬'.repeat(13)} ${emoji}`,title,...lines].join('\n'):'';
+}
+
+function ownerRawHeldLedgerText(session){
+  const entries=Array.isArray(session?.entries)?session.entries:[];
+  const typeRows=type=>entries.filter(entry=>ownerRawHeldEntryType(entry)===type);
+  const rents=typeRows('rent');
+  const deposits=typeRows('deposit_in');
+  const refunds=typeRows('deposit_out');
+  const expenses=typeRows('expense');
+  const arrears=typeRows('arrears_payment');
+  const transfers=typeRows('bed_transfer');
+  const rentCash=rents.filter(entry=>ownerRawHeldPayment(entry)==='cash');
+  const rentBank=rents.filter(entry=>ownerRawHeldPayment(entry)==='bank');
+  const rentMixed=rents.filter(entry=>ownerRawHeldPayment(entry)==='mixed');
+  const amount=(entry,fields)=>{for(const field of fields){const value=entry?.[field];if(value!==undefined&&value!==null&&String(value).trim()!=='')return Number(value)||0;}return 0;};
+  const sum=(rows,fields)=>rows.reduce((total,entry)=>total+amount(entry,fields),0);
+  const rentCashAmount=sum(rentCash,['paid_amount','paid','amount']);
+  const rentBankAmount=sum(rentBank,['paid_amount','paid','amount']);
+  const mixedCash=rentMixed.reduce((total,entry)=>total+Number(entry?.payment_legs?.find?.(leg=>String(leg?.method||'').toLowerCase()==='cash')?.amount||entry?.cash_amount||0),0);
+  const mixedBank=rentMixed.reduce((total,entry)=>total+Number(entry?.payment_legs?.find?.(leg=>String(leg?.method||'').toLowerCase()==='bank')?.amount||entry?.bank_amount||0),0);
+  const arrearsCash=arrears.filter(entry=>ownerRawHeldPayment(entry)==='cash').reduce((total,entry)=>total+amount(entry,['payment_amount','amount']),0);
+  const arrearsBank=arrears.filter(entry=>ownerRawHeldPayment(entry)==='bank').reduce((total,entry)=>total+amount(entry,['payment_amount','amount']),0);
+  const depositCash=deposits.filter(entry=>ownerRawHeldPayment(entry)==='cash').reduce((total,entry)=>total+amount(entry,['deposit_amount','amount']),0);
+  const depositBank=deposits.filter(entry=>ownerRawHeldPayment(entry)==='bank').reduce((total,entry)=>total+amount(entry,['deposit_amount','amount']),0);
+  const refundCash=refunds.filter(entry=>ownerRawHeldPayment(entry)!=='bank').reduce((total,entry)=>total+amount(entry,['actual_refund_amount','refund_amount','amount']),0);
+  const refundBank=refunds.filter(entry=>ownerRawHeldPayment(entry)==='bank').reduce((total,entry)=>total+amount(entry,['actual_refund_amount','refund_amount','amount']),0);
+  const expenseCash=expenses.filter(entry=>ownerRawHeldPayment(entry)!=='bank').reduce((total,entry)=>total+amount(entry,['expense_amount','amount']),0);
+  const expenseBank=expenses.filter(entry=>ownerRawHeldPayment(entry)==='bank').reduce((total,entry)=>total+amount(entry,['expense_amount','amount']),0);
+  const transferCash=transfers.filter(entry=>ownerRawHeldPayment(entry)!=='bank').reduce((total,entry)=>total+amount(entry,['fee_amount_aed','fee_amount','amount']),0);
+  const transferBank=transfers.filter(entry=>ownerRawHeldPayment(entry)==='bank').reduce((total,entry)=>total+amount(entry,['fee_amount_aed','fee_amount','amount']),0);
+  const cashReceived=rentCashAmount+mixedCash+arrearsCash+depositCash+transferCash;
+  const bankReceived=rentBankAmount+mixedBank+arrearsBank+depositBank+transferBank;
+  const depositIncluded=depositCash+depositBank;
+  const depositRefund=refundCash+refundBank;
+  const otherExpense=expenseCash+expenseBank;
+  const totalOutflow=depositRefund+otherExpense;
+  const totalReceived=cashReceived+bankReceived;
+  const cashNet=cashReceived-refundCash-expenseCash;
+  const bankNet=bankReceived-refundBank-expenseBank;
+  const outstanding=rents.reduce((total,entry)=>total+Number(entry?.arrears_amount??Math.max(0,Number(entry?.expected_rent??entry?.period_due??entry?.due??0)-Number(entry?.paid_amount??entry?.paid??entry?.amount??0))),0);
+  const date=String(session?.date||session?.created_at||'').slice(0,10);
+  const dateToken=/^\d{4}-\d{2}-\d{2}$/.test(date)?date.slice(5).replace('-',''):'';
+  const operator=entries.find(entry=>entry?.operator_name||entry?.operator||entry?.employee);
+  const sections=[
+    ownerRawHeldLedgerSection([
+      `Cash Handover ${ownerRawHeldAmount(cashNet)}`,
+      `Cash Received / 现金收款 AED ${ownerRawHeldAmount(cashReceived)}`,
+      `Bank Received / 银行收款 AED ${ownerRawHeldAmount(bankReceived)}`,
+      `Total Received / 本票总收款 AED ${ownerRawHeldAmount(totalReceived)}`,
+      `Total Outflow / 本票总支出 AED ${ownerRawHeldAmount(totalOutflow)}`,
+      `Net Funds / 本票净资金增加 AED ${ownerRawHeldAmount(totalReceived-totalOutflow)}`,
+      `Cash Net / 本票现金净额 AED ${ownerRawHeldAmount(cashNet)}`,
+      `Bank Net / 本票银行净额 AED ${ownerRawHeldAmount(bankNet)}`,
+      ...(outstanding>0?[`Outstanding / 本票未收金额 AED ${ownerRawHeldAmount(outstanding)}`]:[]),
+      ...(depositIncluded>0?[`Deposit Included / 其中押金 AED ${ownerRawHeldAmount(depositIncluded)}`]:[])
+    ],'💼','Core Summary'),
+    ownerRawHeldLedgerSection([
+      `Outstanding / 本票未收 AED ${ownerRawHeldAmount(outstanding)}`,
+      `Arrears Opened / 本票新增欠款 AED ${ownerRawHeldAmount(outstanding)}`,
+      `Arrears Repaid / 本票收回欠款 AED ${ownerRawHeldAmount(arrearsCash+arrearsBank)}`,
+      `Deposit ${ownerRawHeldAmount(depositIncluded)}`,
+      `Transfer ${ownerRawHeldAmount(transferCash+transferBank)}`,
+      `Deposit Refund ${ownerRawHeldAmount(depositRefund)}`,
+      `Other Expense ${ownerRawHeldAmount(otherExpense)}`
+    ],'📊','Breakdown'),
+    ownerRawHeldLedgerSection(rentCash.map(ownerRawHeldLine),'💵','Cash Details'),
+    ownerRawHeldLedgerSection(rentBank.map(ownerRawHeldLine),'🏦','Bank Details'),
+    ownerRawHeldLedgerSection(rentMixed.map(ownerRawHeldLine),'💳','Cash + Bank Rent Details'),
+    ownerRawHeldLedgerSection(arrears.map(ownerRawHeldLine),'🧾','Arrears Details'),
+    ownerRawHeldLedgerSection(deposits.map(ownerRawHeldLine),'🏷️','Deposit Details'),
+    ownerRawHeldLedgerSection(transfers.map(ownerRawHeldLine),'🔄','Transfer Details'),
+    ownerRawHeldLedgerSection(refunds.map(ownerRawHeldLine),'💸','Deposit Refund Details'),
+    ownerRawHeldLedgerSection(expenses.map(ownerRawHeldLine),'📤','Expense Details')
+  ].filter(Boolean);
+  return ['HOMELINK LEDGER',`Date ${dateToken} Time ${ownerRawHeldTime(session?.exported_at||session?.created_at)}`,`Employee ${ownerRawHeldSafe(operator?.operator_name||operator?.operator||operator?.employee||operator?.operator_id||'')}`,'','',sections.join('\n\n\n')].join('\n').trim();
+}
+
+function ownerRawHeldAuditText(session){
+  const entries=Array.isArray(session?.entries)?session.entries:[];
+  return entries.map((entry,index)=>{
+    const eventType=ownerRawHeldEntryType(entry);
+    const recordId=entry?.entry_id||entry?.event_id||entry?.anchor_id||entry?.id||`entry-${index+1}`;
+    const rawFields=entry?.raw_payload&&typeof entry.raw_payload==='object'?entry.raw_payload:entry;
+    return [
+      `[${index+1}] Raw Employee Entry`,
+      `record_id: ${recordId}`,
+      `event_type: ${eventType}`,
+      `employee: ${entry?.employee||entry?.operator||entry?.operator_id||''}`,
+      `source: ${entry?.source||'employee_entry'}`,
+      `submitted_at: ${entry?.submitted_at||entry?.created_at||''}`,
+      `ingestion_status: ${entry?.ingestion_status||'ACCEPTED'}`,
+      `projection_status: ${entry?.projection_status||'HELD_FOR_REVIEW'}`,
+      'business_status: Not Yet Projected',
+      `review_required: ${entry?.review_required===true?'yes':'no'}`,
+      `anomalies: ${JSON.stringify(entry?.anomalies||[])}`,
+      `raw_fields: ${JSON.stringify(rawFields)}`
+    ].join('\n');
+  }).join('\n\n')||'No raw employee entries found.';
+}
+
 function ownerHistoryDetailMainText(session){
   if(String(session?.source||'').trim().toLowerCase()==='employee_entry_raw_held'){
-    const entries=Array.isArray(session?.entries)?session.entries:[];
-    return {txt:entries.map((entry,index)=>{
-      const eventType=entry?.event_type||entry?.type||'unknown';
-      const recordId=entry?.entry_id||entry?.event_id||entry?.anchor_id||entry?.id||`entry-${index+1}`;
-      const rawFields=entry?.raw_payload&&typeof entry.raw_payload==='object'?entry.raw_payload:entry;
-      return [
-        `[${index+1}] Raw Employee Entry`,
-        `record_id: ${recordId}`,
-        `event_type: ${eventType}`,
-        `employee: ${entry?.employee||entry?.operator||entry?.operator_id||''}`,
-        `source: ${entry?.source||'employee_entry'}`,
-        `submitted_at: ${entry?.submitted_at||entry?.created_at||''}`,
-        `ingestion_status: ${entry?.ingestion_status||'ACCEPTED'}`,
-        `projection_status: ${entry?.projection_status||'HELD_FOR_REVIEW'}`,
-        'business_status: Not Yet Projected',
-        `review_required: ${entry?.review_required===true?'yes':'no'}`,
-        `anomalies: ${JSON.stringify(entry?.anomalies||[])}`,
-        `raw_fields: ${JSON.stringify(rawFields)}`
-      ].join('\n');
-    }).join('\n\n')||'No raw employee entries found.',source:'employee_entry_raw_held'};
+    return {txt:ownerRawHeldLedgerText(session),rawAudit:ownerRawHeldAuditText(session),source:'employee_entry_raw_held'};
   }
   const raw=employeeExportDisplayText(session);
   if(raw)return {txt:raw,source:'export_text'};
@@ -3066,13 +3230,15 @@ async function renderHistory(){
         state.historyViewing=s;
       }catch(e){console.warn('session_detail failed:',e);wrap.innerHTML=`<div class="card" style="padding:24px;text-align:center;color:var(--red)">历史详情加载失败：${esc(e.message||'网络错误')}</div>`;return;}
     }
-    const{txt}=ownerHistoryDetailMainText(s);
+    const detailMain=ownerHistoryDetailMainText(s);
+    const{txt}=detailMain;
+    const rawAudit=detailMain.rawAudit||'';
     const cnt=s.entries?s.entries.length:0;
     const countWarning=historyDetailMismatchHtml(s,cnt);
     const deletedMeta=s._voided?`<div class="card-sub" style="margin-top:8px;color:var(--red);line-height:1.6">已删除/已作废记录 · 删除人：${esc(s.voidedBy||s.voided_by||'未知')} · 时间：${esc(s.voidedAt||s.voided_at||'未知')}</div>`:'';
     const deletedTotals=ownerArchiveVoidedDetailHtml(s);
     wrap.innerHTML=`${ownerHistoryTransferLineageHtml(s.transfer_lineage||state.ownerHistoryTransferLineage)}<button class="btn btn-ghost" id="btnHistBack" style="margin-bottom:14px"><svg class="ico"><use href="#i-back"/></svg>返回历史</button>${ownerRawHeldSessionStatusHtml(s)}
-    <div class="card"><div class="card-head"><div>${s.anchorId?`<div class="card-sub" style="color:var(--accent);margin-bottom:3px">🔐 ${esc(s.anchorId)}</div>`:''}<div class="card-title">${esc((s.date||'').slice(0,10))}</div><div class="card-sub">${cnt} 笔记录</div>${deletedMeta}${deletedTotals}${countWarning}</div><div style="display:flex;gap:7px"><button class="btn btn-ghost" id="btnHistCopy"><svg class="ico"><use href="#i-copy"/></svg>复制</button><button class="btn btn-primary" id="btnHistDl"><svg class="ico"><use href="#i-download"/></svg>下载</button></div></div><div class="card-body"><pre style="background:var(--surface2);padding:14px;border-radius:8px;max-height:60vh;overflow:auto;line-height:1.7;font-size:12px;color:var(--text2);border:1px solid var(--border)">${esc(txt)}</pre></div></div>`;
+    <div class="card"><div class="card-head"><div>${s.anchorId?`<div class="card-sub" style="color:var(--accent);margin-bottom:3px">🔐 ${esc(s.anchorId)}</div>`:''}<div class="card-title">${esc((s.date||'').slice(0,10))}</div><div class="card-sub">${cnt} 笔记录</div>${deletedMeta}${deletedTotals}${countWarning}</div><div style="display:flex;gap:7px"><button class="btn btn-ghost" id="btnHistCopy"><svg class="ico"><use href="#i-copy"/></svg>复制</button><button class="btn btn-primary" id="btnHistDl"><svg class="ico"><use href="#i-download"/></svg>下载</button></div></div><div class="card-body"><pre style="background:var(--surface2);padding:14px;border-radius:8px;max-height:60vh;overflow:auto;line-height:1.7;font-size:12px;color:var(--text2);border:1px solid var(--border)">${esc(txt)}</pre>${rawAudit?`<details data-owner-raw-held-audit="true" style="margin-top:12px"><summary style="cursor:pointer;font-weight:800">Raw Source &amp; Canonical Anchors / 原始事实与信息锚点</summary><pre style="background:var(--surface2);padding:14px;border-radius:8px;max-height:50vh;overflow:auto;line-height:1.55;font-size:11px;color:var(--text2);border:1px solid var(--border);margin-top:8px">${esc(rawAudit)}</pre></details>`:''}</div></div>`;
     document.getElementById('btnHistBack').onclick=()=>{state.historyViewing=null;renderHistory();};
     document.getElementById('btnHistCopy').onclick=async()=>{try{await navigator.clipboard.writeText(txt);toast('已复制');}catch{toast('复制失败','err');}};
     document.getElementById('btnHistDl').onclick=()=>{const blob=new Blob([txt],{type:'text/plain;charset=utf-8'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`财务交接_${(s.date||'').split(' ')[0].replace(/-/g,'')}.txt`;a.click();URL.revokeObjectURL(url);};
