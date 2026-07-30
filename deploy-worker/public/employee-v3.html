@@ -4020,8 +4020,10 @@ function renderEntryTtlockStatus(){
   }
   const save=$('btnSaveEntry');
   if(save){
-    const isTransfer=$('entryType')?.value==='TF';
-    const blocked=isTransfer?!employeeBedTransferValidateEnabled():(exitEvent?false:!ttlockCacheReady());
+    const entryType=$('entryType')?.value;
+    const isTransfer=entryType==='TF';
+    const rawDraftWithoutTtlock=entryType==='R'||exitEvent;
+    const blocked=isTransfer?!employeeBedTransferValidateEnabled():(rawDraftWithoutTtlock?false:!ttlockCacheReady());
     save.disabled=blocked;
     save.classList.toggle('disabled',blocked);
     save.title=blocked?(isTransfer?employeeBedTransferUiGateState().error_code:'Load Cards before formal entry / 请先加载卡片'):'';

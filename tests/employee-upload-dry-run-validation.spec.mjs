@@ -248,7 +248,13 @@ test("Rent can save a local raw draft without TTLock while contextual types reta
   const end = html.indexOf("saveEntry=saveEntryWithTtlockGate", start);
   assert.ok(start >= 0 && end > start, "saveEntryWithTtlockGate must exist");
   const saveGate = html.slice(start, end);
+  const renderStart = html.indexOf("function renderEntryTtlockStatus()");
+  const renderEnd = html.indexOf("async function ensureEntryTtlockReady", renderStart);
+  assert.ok(renderStart >= 0 && renderEnd > renderStart, "renderEntryTtlockStatus must exist");
+  const renderGate = html.slice(renderStart, renderEnd);
 
   assert.match(saveGate, /\['TF','E','DR','CO','R'\]\.includes\(\$\('entryType'\)\?\.value\)/);
   assert.match(saveGate, /ensureEntryTtlockReady\(\{auto:false\}\)/);
+  assert.match(renderGate, /rawDraftWithoutTtlock=entryType==='R'\|\|exitEvent/);
+  assert.match(renderGate, /rawDraftWithoutTtlock\?false:!ttlockCacheReady\(\)/);
 });
