@@ -907,6 +907,16 @@ function ownerRawHeldSafe(value){
     .trim();
 }
 
+function ownerRawHeldField(entry,...fields){
+  for(const field of fields){
+    const direct=entry?.[field];
+    if(direct!==undefined&&direct!==null&&String(direct).trim()!=='')return direct;
+    const raw=entry?.raw_fields?.[field];
+    if(raw!==undefined&&raw!==null&&String(raw).trim()!=='')return raw;
+  }
+  return '';
+}
+
 function ownerRawHeldTime(value){
   const raw=String(value||'');
   const iso=raw.match(/T(\d{2}):(\d{2})/);
@@ -921,8 +931,8 @@ function ownerRawHeldBed(entry,fallback='item'){
 function ownerRawHeldLine(entry){
   const type=ownerRawHeldEntryType(entry);
   const pay=ownerRawHeldPayment(entry);
-  const time=ownerRawHeldTime(entry?.created_at||entry?.submitted_at||entry?.ts);
-  const rawTag=String(entry?.tag||'').trim().toUpperCase();
+  const time=ownerRawHeldTime(ownerRawHeldField(entry,'created_at','submitted_at','ts'));
+  const rawTag=String(ownerRawHeldField(entry,'tag')).trim().toUpperCase();
   const tag=['O','N'].includes(rawTag)&&type!=='expense'?rawTag:'';
   const marked=value=>`${ownerRawHeldAmount(value)}${tag?' '+tag:''}`;
   if(type==='rent'){
