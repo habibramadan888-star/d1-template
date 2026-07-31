@@ -57,8 +57,15 @@ export async function loadLedgerHarness() {
     function pad(n){ return String(n).padStart(2,'0'); }
     function fmtD(){ return '2026-06-02'; }
     function stableAnchor(s){ return s.anchorId || 'STA-TEST'; }
+    function ownerRentPaymentLegs(){ return null; }
+    function ownerEntryChannelAmounts(entry){
+      const amount=Number(entry?.amount??entry?.paid??entry?.paid_amount??entry?.payment_amount??0)||0;
+      const method=String(entry?.cat||entry?.payment_method||entry?.pay_type||'').trim().toLowerCase();
+      return {cash:method==='cash'||method==='c'?amount:0,bank:method==='bank'||method==='b'?amount:0};
+    }
     ${source.slice(start, end)}
     globalThis.parseTXT = parseTXT;
+    globalThis.normalizeCompactLedgerText = normalizeCompactLedgerText;
     globalThis.totals = totals;
     globalThis.normalizeLedgerSession = normalizeLedgerSession;
     globalThis.normalizeLedgerSessions = normalizeLedgerSessions;

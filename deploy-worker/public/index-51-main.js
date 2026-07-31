@@ -690,9 +690,19 @@ function reconcileDeclaredTotals(declared,parsed){
   return {ok:warnings.length===0,warnings};
 }
 
+function normalizeCompactLedgerText(text){
+  return String(text||'')
+    .replace(/(##ANCHOR:[A-Z0-9-]+)(?=##|\d{4}-\d{2}-\d{2})/gi,'$1\n')
+    .replace(/(##(?:DATE|EXPORT):\d{4}-\d{2}-\d{2}(?:T[^#\s]+)?)(?=\d{4}-\d{2}-\d{2}|[^\r\n])/gi,'$1\n')
+    .replace(/(?=(?:现金结余|银行收款|押金退款|其他支出|总收入)\s*[\d,]+(?:\.\d{1,2})?\s*AED)/gi,'\n')
+    .replace(/(?=(?:💵|🏦|💸|📤))/gu,'\n')
+    .replace(/(?=#\d)/g,'\n');
+}
+
 function parseTXT(text){
   if(!text||!text.trim()) return null;
-  const lines=text.split(/\r?\n/);
+  const normalizedText=normalizeCompactLedgerText(text);
+  const lines=normalizedText.split(/\r?\n/);
   const s={id:newId(),date:'',entries:[],anchorId:null,exportTime:null,isLegacy:false};
   s.export_text=String(text||'');
   for(const l of lines){
