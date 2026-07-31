@@ -10,6 +10,9 @@ test("analysis is driven only by paginated cloud history", async () => {
   assert.match(ui, /state\.analysisSessions=\[\]/);
   assert.match(ui, /function refreshAnalysisFromHistory\(\)/);
   assert.match(ui, /\/api\/history\?limit=30&offset=\$\{offset\}/);
+  assert.match(ui, /const seenHistorySessions=new Set\(\)/);
+  assert.match(ui, /if\(!identity\|\|seenHistorySessions\.has\(identity\)\)continue/);
+  assert.match(ui, /if\(page\.length<30\|\|added===0\)break/);
   assert.match(ui, /state\.analysisSessions=dedupSessions\(loaded\)/);
   assert.match(ui, /if\(raw\?\.bed_transfer_history\)continue/);
   assert.match(ui, /if\(state\.dateMode==='billing'\)return analysisLoadedPeriodInfo\(d\)\.current/);

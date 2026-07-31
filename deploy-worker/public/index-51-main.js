@@ -6961,13 +6961,21 @@ async function refreshAnalysisFromHistory(){
     const wrap=document.getElementById('analysisContent');
     if(wrap)wrap.innerHTML='<div class="empty-state card" style="padding:44px;margin-top:14px"><div class="empty-title">正在读取历史档案</div><div class="empty-text">分析页只使用云端历史记录，不读取浏览器测试缓存。</div></div>';
     const summaries=[];
+    const seenHistorySessions=new Set();
     for(let offset=0;offset<1000;offset+=30){
       const response=await apiFetch(ownerRunScopedApi(`/api/history?limit=30&offset=${offset}`));
       if(!response.ok)throw new Error(`HISTORY_HTTP_${response.status}`);
       const page=await response.json();
       if(!Array.isArray(page))throw new Error('HISTORY_RESPONSE_INVALID');
-      summaries.push(...page);
-      if(page.length<30)break;
+      let added=0;
+      for(const raw of page){
+        const identity=String(raw?.id||raw?.canonical_anchor_id||raw?.entry_id||raw?.anchor_id||'').trim();
+        if(!identity||seenHistorySessions.has(identity))continue;
+        seenHistorySessions.add(identity);
+        summaries.push(raw);
+        added+=1;
+      }
+      if(page.length<30||added===0)break;
     }
     const job={currentController:null,timings:{historyFetchMs:0}};
     const loaded=[];
