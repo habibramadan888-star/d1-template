@@ -10670,7 +10670,7 @@ async function ownerOverviewFetchSessionPeriodSummary(env,user,range){
     const source=cleanText(row?.source||"",80).toLowerCase();
     const anchor=cleanText(row?.anchor_id||"",160);
     const status=cleanText(row?.handover_status||"",40).toUpperCase();
-    if(source==="employee_entry_raw_held"||source.startsWith("owner_")||source.includes("correction"))return false;
+    if(source==="employee_entry"||source==="employee_entry_raw_held"||source.startsWith("owner_")||source.includes("correction"))return false;
     if(["RAW_ACCEPTED_HELD_FOR_REVIEW","TRANSFER_VOID_APPLIED","OWNER_ACKNOWLEDGED","CORRECTION_APPLIED"].includes(status))return false;
     if(/^(?:RAW-|QA-|CODEX_|HL_(?:EMPLOYEE|LIVE|QA|TEST|FULL|MATRIX))/i.test(anchor))return false;
     return true;
