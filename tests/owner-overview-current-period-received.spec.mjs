@@ -16,6 +16,13 @@ test("owner overview current period received uses owner-visible session summarie
   assert.match(worker, /COALESCE\(handover_status,''\)<>'VOID'/);
   assert.match(worker, /current_period_received:currentPeriodReceived/);
   assert.match(worker, /billing_period_3_to_2_owner_visible_sessions/);
+  assert.match(worker, /lightweight_owner_history_billing_period_summary/);
+  assert.match(worker, /const lightweightPeriods=\[-5,-4,-3,-2,-1,0\]/);
+  const summaryHandler=worker.slice(worker.indexOf("async function phase0OwnerOverviewComparativeSummary"),worker.indexOf("__name(phase0OwnerOverviewComparativeSummary"));
+  assert.ok(
+    summaryHandler.indexOf('rule:"lightweight_owner_history_billing_period_summary"') < summaryHandler.indexOf('resolveCurrentReceivablesSot(env,user'),
+    "lightweight history response must return before expensive TTLock and projection work"
+  );
   assert.doesNotMatch(worker, /current_period_received:\{\.\.\.billingPeriod/);
   assert.match(ui, /CURRENT PERIOD RECEIVED/);
   assert.match(ui, /ownerOverviewCurrentPeriodReceived/);

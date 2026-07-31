@@ -11475,8 +11475,42 @@ async function ownerOverviewFetchBedTransferReviews(env,user){
 __name(ownerOverviewFetchBedTransferReviews,"ownerOverviewFetchBedTransferReviews");
 async function phase0OwnerOverviewComparativeSummary(env,user,url){
   const today=empTodayDubai();
+  const lightweightPeriods=[-5,-4,-3,-2,-1,0].map(offset=>ownerOverviewBillingPeriodRange(today,offset));
+  const lightweightSummaries=await Promise.all(lightweightPeriods.map(range=>
+    ownerOverviewFetchSessionPeriodSummary(env,user,range).catch(()=>({rows_checked:0,gross_received:0,cash_handover:0,bank_transfer_total:0,sessions:[],source_table:"sessions",rule:"owner_visible_sessions_summary"}))
+  ));
+  const currentBillingPeriod=lightweightPeriods[lightweightPeriods.length-1];
+  const lightweightCurrentPeriodReceived={...lightweightSummaries[lightweightSummaries.length-1],range:currentBillingPeriod,rule:"billing_period_3_to_2_owner_visible_sessions",inclusion_rule:"active_owner_statement_sessions_only"};
+  const lightweightBillingPeriodTrend=lightweightSummaries.map((summary,index)=>({summary,range:lightweightPeriods[index]})).filter(({summary})=>summary.rows_checked&&ownerOverviewMoney(summary.gross_received)>0).map(({summary,range})=>({
+    label:range.label.slice(0,7),
+    start:range.start,
+    end:range.end,
+    gross_received:ownerOverviewMoney(summary.gross_received),
+    session_count:Number(summary.rows_checked||0)
+  }));
+  return success({
+    generated_at:empNow(),
+    production_cutover:"PRODUCTION_NO_GO",
+    readonly:true,
+    period:{today,current_billing_period:currentBillingPeriod},
+    current:{billing_period:lightweightCurrentPeriodReceived},
+    current_period_received:lightweightCurrentPeriodReceived,
+    billing_period_trend:lightweightBillingPeriodTrend,
+    comparisons:{},
+    accounting_separation:{},
+    occupancy_flow:{},
+    bed_transfer_review:{recorded_count:0,records:[],pending_review_count:0,pending_review:[]},
+    arrears:{cloud_arrears_collection:{total_remaining:0,open_count:0,partial_count:0,details:[]},cloud_arrears_details:[]},
+    current_receivables_sot:null,
+    risk_watch:{},
+    data_quality:{rows_checked:{current_billing_period_sessions:lightweightCurrentPeriodReceived.rows_checked},no_data:lightweightCurrentPeriodReceived.rows_checked?[]:["current_billing_period_sessions"],warnings:[]},
+    source_table:"sessions",
+    rule:"lightweight_owner_history_billing_period_summary"
+  });
+  /* Legacy expanded comparison pipeline retained below for reference, but intentionally unreachable:
+     the owner overview no longer renders those expensive projections automatically. */
   const currentMonth=ownerOverviewMonthRange(today,0);
-  const currentBillingPeriod=ownerOverviewBillingPeriodRange(today,0);
+  const legacyCurrentBillingPeriod=ownerOverviewBillingPeriodRange(today,0);
   const lastMonth=ownerOverviewMonthRange(today,-1);
   const sameMonthLastYear=ownerOverviewSameMonthLastYearRange(today);
   const currentQuarter=ownerOverviewQuarterRange(today,0);
@@ -11498,14 +11532,14 @@ async function phase0OwnerOverviewComparativeSummary(env,user,url){
     bedTransferReviews
   ]=await Promise.all([
     safeRows(ownerOverviewFetchTransactions(env,user,currentMonth)),
-    safeRows(ownerOverviewFetchTransactions(env,user,currentBillingPeriod)),
-    ownerOverviewFetchSessionPeriodSummary(env,user,currentBillingPeriod).catch(()=>({rows_checked:0,gross_received:0,cash_handover:0,bank_transfer_total:0,sessions:[],source_table:"sessions",rule:"owner_visible_sessions_summary"})),
+    safeRows(ownerOverviewFetchTransactions(env,user,legacyCurrentBillingPeriod)),
+    ownerOverviewFetchSessionPeriodSummary(env,user,legacyCurrentBillingPeriod).catch(()=>({rows_checked:0,gross_received:0,cash_handover:0,bank_transfer_total:0,sessions:[],source_table:"sessions",rule:"owner_visible_sessions_summary"})),
     safeRows(ownerOverviewFetchTransactions(env,user,lastMonth)),
     safeRows(ownerOverviewFetchTransactions(env,user,sameMonthLastYear)),
     safeRows(ownerOverviewFetchTransactions(env,user,currentQuarter)),
     safeRows(ownerOverviewFetchTransactions(env,user,lastQuarter)),
     safeRows(ownerOverviewFetchTransactions(env,user,sameQuarterLastYear)),
-    safeFinanceProjection(currentBillingPeriod),
+    safeFinanceProjection(legacyCurrentBillingPeriod),
     resolveCurrentReceivablesSot(env,user,{limit:500,ttlockTimeoutMs:8000}).catch(()=>null),
     safeRows(ownerOverviewFetchBedTransferReviews(env,user))
   ]);
