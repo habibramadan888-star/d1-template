@@ -3347,11 +3347,17 @@ async function renderHistory(){
   ]).filter(s=>!s.bed_transfer_history).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   const hasMoreCloud=cloud.length>=limit;
 
-  const monthKey=s=>{
-    const d=(s.date||'').slice(0,10);
-    const m=d.match(/^(\d{4})-(\d{2})/);
-    return m?`${m[1]}-${m[2]}`:'unknown';
+  const ownerHistoryBillingPeriod=dateValue=>{
+    const match=String(dateValue||'').slice(0,10).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if(!match)return {key:'unknown',start:'--',end:'--'};
+    const date=new Date(Date.UTC(Number(match[1]),Number(match[2])-1,Number(match[3])));
+    if(date.getUTCDate()<3)date.setUTCMonth(date.getUTCMonth()-1);
+    const start=new Date(Date.UTC(date.getUTCFullYear(),date.getUTCMonth(),3));
+    const end=new Date(Date.UTC(date.getUTCFullYear(),date.getUTCMonth()+1,2));
+    const format=value=>`${value.getUTCFullYear()}-${String(value.getUTCMonth()+1).padStart(2,'0')}-${String(value.getUTCDate()).padStart(2,'0')}`;
+    return {key:format(start).slice(0,7),start:format(start),end:format(end)};
   };
+  const monthKey=s=>ownerHistoryBillingPeriod(s.date).key;
   const monthLabel=key=>key==='unknown'?'未归档日期':`${key.slice(0,4)}年${key.slice(5,7)}月`;
   const monthMap=new Map();
   all.forEach(s=>{
@@ -3421,8 +3427,9 @@ async function renderHistory(){
   wrap.innerHTML=ownerHistoryBedControlsHtml()+ownerHistoryTransferLineageHtml(state.ownerHistoryTransferLineage)+`<div class="hist-toolbar"><span>${state.showDeletedHistory?'已删除/已作废记录 · 只读追踪':'按月份归类，优先显示最近记录'}</span><button class="btn btn-ghost" id="btnHistoryDeletedToggle" type="button">${state.showDeletedHistory?'返回正常历史':'已删除/已作废记录'}</button><span class="hist-order">${state.showDeletedHistory?'VOIDED · READ ONLY':'RECENT · FIRST'}</span></div>`+
     groups.map(([key,items],idx)=>{
       const totalEntries=items.reduce((sum,s)=>sum+ownerHistorySessionEntryCount(s),0);
-      const from=(items[0]?.date||'').slice(0,10)||'--';
-      const to=(items[items.length-1]?.date||'').slice(0,10)||from;
+      const period=ownerHistoryBillingPeriod(items[0]?.date);
+      const from=period.start;
+      const to=period.end;
       const mid=`hist-month-${idx}`;
       return `<section class="hist-month">
         <button class="hist-month-head" data-month-toggle="${mid}" aria-expanded="true" type="button">

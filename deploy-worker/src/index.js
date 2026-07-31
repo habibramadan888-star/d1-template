@@ -10665,8 +10665,20 @@ async function ownerOverviewFetchSessionPeriodSummary(env,user,range){
     "SELECT id, anchor_id, date, source, entries_count, cash_handover, bank_transfer_total, gross_received, handover_status, voided_at, created_at FROM sessions WHERE corpid=? AND COALESCE(voided_at,'')='' AND COALESCE(handover_status,'')<>'VOID' AND substr(COALESCE(date,created_at,''),1,10) BETWEEN ? AND ? ORDER BY substr(COALESCE(date,created_at,''),1,10) ASC, created_at ASC LIMIT 500",
     [user.corpid,range.start,range.end]
   ).catch(()=>[]);
-  summary.rows_checked=rows.length;
-  for(const row of rows){
+  const seenAnchors=new Set();
+  const eligibleRows=rows.filter(row=>{
+    const source=cleanText(row?.source||"",80).toLowerCase();
+    const anchor=cleanText(row?.anchor_id||"",160);
+    const status=cleanText(row?.handover_status||"",40).toUpperCase();
+    if(source==="employee_entry_raw_held"||source.startsWith("owner_")||source.includes("correction"))return false;
+    if(["RAW_ACCEPTED_HELD_FOR_REVIEW","TRANSFER_VOID_APPLIED","OWNER_ACKNOWLEDGED","CORRECTION_APPLIED"].includes(status))return false;
+    if(/^(?:RAW-|QA-|CODEX_|HL_(?:EMPLOYEE|LIVE|QA|TEST|FULL|MATRIX))/i.test(anchor))return false;
+    if(anchor&&seenAnchors.has(anchor))return false;
+    if(anchor)seenAnchors.add(anchor);
+    return true;
+  });
+  summary.rows_checked=eligibleRows.length;
+  for(const row of eligibleRows){
     const gross=ownerOverviewMoney(row?.gross_received);
     const cash=ownerOverviewMoney(row?.cash_handover);
     const bank=ownerOverviewMoney(row?.bank_transfer_total);
@@ -10682,7 +10694,7 @@ async function ownerOverviewFetchSessionPeriodSummary(env,user,range){
       cash,
       bank,
       gross,
-      included_reason:"owner_visible_session"
+      included_reason:"active_owner_statement_session"
     });
   }
   summary.gross_received=ownerOverviewMoney(summary.gross_received);
@@ -11482,10 +11494,8 @@ async function phase0OwnerOverviewComparativeSummary(env,user,url){
   ]);
   const financeOrLegacy=(projection,rows)=>projection?canonicalFinanceProjectionToOverviewSummary(projection):ownerOverviewSummarizeTransactions(rows);
   const month=ownerOverviewSummarizeTransactions(monthRows);
-  const billingPeriod=financeOrLegacy(billingPeriodFinanceProjection,billingPeriodRows);
-  const currentPeriodReceived=billingPeriodFinanceProjection
-    ? {...canonicalFinanceProjectionToOverviewSummary(billingPeriodFinanceProjection),range:currentBillingPeriod,rule:"canonical_finance_projection_gateway_billing_period_3_to_2"}
-    : {...billingPeriodSessionSummary,range:currentBillingPeriod,rule:"billing_period_3_to_2_owner_visible_sessions"};
+  const currentPeriodReceived={...ownerOverviewSummarizeTransactions([]),...billingPeriodSessionSummary,range:currentBillingPeriod,rule:"billing_period_3_to_2_owner_visible_sessions",inclusion_rule:"active_owner_statement_sessions_only"};
+  const billingPeriod=currentPeriodReceived;
   const prevMonth=ownerOverviewSummarizeTransactions(lastMonthRows);
   const sameLastYear=ownerOverviewSummarizeTransactions(sameMonthLastYearRows);
   const quarter=ownerOverviewSummarizeTransactions(quarterRows);
