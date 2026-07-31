@@ -11513,6 +11513,12 @@ async function phase0OwnerOverviewComparativeSummary(env,user,url){
   const month=ownerOverviewSummarizeTransactions(monthRows);
   const currentPeriodReceived={...ownerOverviewSummarizeTransactions([]),...billingPeriodSessionSummary,range:currentBillingPeriod,rule:"billing_period_3_to_2_owner_visible_sessions",inclusion_rule:"active_owner_statement_sessions_only"};
   const billingPeriod=currentPeriodReceived;
+  const billingPeriodTrend=(await Promise.all([-5,-4,-3,-2,-1,0].map(async offset=>{
+    const range=ownerOverviewBillingPeriodRange(today,offset);
+    const summary=offset===0?billingPeriodSessionSummary:await ownerOverviewFetchSessionPeriodSummary(env,user,range).catch(()=>null);
+    if(!summary||!summary.rows_checked||ownerOverviewMoney(summary.gross_received)<=0)return null;
+    return {label:range.label.slice(0,7),start:range.start,end:range.end,gross_received:ownerOverviewMoney(summary.gross_received),session_count:Number(summary.rows_checked||0)};
+  }))).filter(Boolean);
   const prevMonth=ownerOverviewSummarizeTransactions(lastMonthRows);
   const sameLastYear=ownerOverviewSummarizeTransactions(sameMonthLastYearRows);
   const quarter=ownerOverviewSummarizeTransactions(quarterRows);
@@ -11541,6 +11547,7 @@ async function phase0OwnerOverviewComparativeSummary(env,user,url){
     period:{today,current_billing_period:currentBillingPeriod,current_month:currentMonth,last_month:lastMonth,same_month_last_year:sameMonthLastYear,current_quarter:currentQuarter,last_quarter:lastQuarter,same_quarter_last_year:sameQuarterLastYear},
     current:{month,quarter,billing_period:billingPeriod},
     current_period_received:currentPeriodReceived,
+    billing_period_trend:billingPeriodTrend,
     last_month:prevMonth,
     same_month_last_year:sameLastYear,
     quarter_to_date:quarter,

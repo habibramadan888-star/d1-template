@@ -5600,6 +5600,25 @@ function ownerOverviewBiShell(){
     </div>
   </div>`;
 }
+function ownerOverviewBillingPeriodTrendChart(points=[]){
+  const rows=(Array.isArray(points)?points:[]).filter(row=>Number.isFinite(Number(row?.gross_received))&&Number(row.gross_received)>0);
+  if(!rows.length)return '<div class="empty-state hl-empty-state"><div class="empty-title">暂无可用账期数据</div><div class="empty-text">不使用缺失数据补零，也不展示推测趋势。</div></div>';
+  const width=340,height=170,padX=28,padTop=20,padBottom=38;
+  const values=rows.map(row=>Number(row.gross_received));
+  const max=Math.max(...values),min=Math.min(...values);
+  const span=Math.max(1,max-min);
+  const x=index=>rows.length===1?width/2:padX+index*(width-padX*2)/(rows.length-1);
+  const y=value=>padTop+(max-value)*(height-padTop-padBottom)/span;
+  const coords=rows.map((row,index)=>`${x(index).toFixed(1)},${y(Number(row.gross_received)).toFixed(1)}`).join(' ');
+  return `<div data-owner-billing-period-trend="true">
+    <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="账期实收趋势" style="width:100%;max-height:240px;overflow:visible">
+      <line x1="${padX}" y1="${height-padBottom}" x2="${width-padX}" y2="${height-padBottom}" stroke="var(--border)"/>
+      ${rows.length>1?`<polyline points="${coords}" fill="none" stroke="var(--color-primary)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>`:''}
+      ${rows.map((row,index)=>`<g><circle cx="${x(index)}" cy="${y(Number(row.gross_received))}" r="5" fill="var(--color-primary)"/><text x="${x(index)}" y="${Math.max(13,y(Number(row.gross_received))-10)}" text-anchor="middle" font-size="11" font-weight="800" fill="var(--text)">${esc(fmtMoney(row.gross_received))}</text><text x="${x(index)}" y="${height-13}" text-anchor="middle" font-size="10" fill="var(--text3)">${esc(String(row.label||''))}</text></g>`).join('')}
+    </svg>
+    ${rows.length<2?'<div class="hist-anchor">目前只有一个有数据账期，待下一账期后形成折线；没有虚构历史点。</div>':''}
+  </div>`;
+}
 function renderOwnerOverviewComparativePanel(){
   const panel=document.getElementById('ownerOverviewComparativePanel');
   if(!panel)return;
@@ -6144,73 +6163,13 @@ function renderOwnerOverviewComparativePanel(){
     return;
   }
   const data=state.overviewComparative||{};
-  const comp=data.comparisons||{};
-  const month=data.current?.month||{};
-  const currentPeriod=data.current_period_received||data.current?.billing_period||month;
-  const currentPeriodComparison={current:Number(currentPeriod.gross_received||0),absolute_delta:null,percent_delta:null,direction:'flat',interpretation:'no_data'};
-  const accounting=data.accounting_separation||{};
-  const flow=data.occupancy_flow||{};
-  const bedReview=data.bed_transfer_review||{};
-  const transferRecords=Array.isArray(bedReview.records)?bedReview.records:(Array.isArray(bedReview.pending_review)?bedReview.pending_review:[]);
-  const arrears=data.arrears||{};
-  const risk=data.risk_watch||{};
-  const quality=data.data_quality||{};
+  const trend=Array.isArray(data.billing_period_trend)?data.billing_period_trend:[];
   panel.innerHTML=`<div class="owner-overview-comparative-bi" data-owner-overview-comparative-bi="true">
     <div class="hist-toolbar">
-      <span>经营对比</span>
-      <span class="hist-order">本月 vs 上月 / 去年同月 / 本季度累计</span>
+      <span>账期实收趋势</span>
+      <span class="hist-order">每月3日 → 次月2日</span>
     </div>
-    <div class="ana-kpi-grid" data-owner-overview-business-snapshot="true">
-      ${ownerOverviewMetricCard('当前账期实收',currentPeriodComparison)}
-      ${ownerOverviewMetricCard('租金收入',comp.last_month?.rent_received)}
-      ${ownerOverviewMetricCard('净现金流',comp.last_month?.net_cashflow)}
-      ${ownerOverviewMetricCard('欠款回收',comp.last_month?.arrears_recovered)}
-    </div>
-    <div class="hist-grid" style="margin-top:12px" data-owner-overview-accounting-separation="true">
-      <div class="hist-card"><div class="hist-title">会计口径</div>
-        <div class="hist-stat"><span>租金收入</span><b>${fmtMoney(accounting.rent_received||0)}</b></div>
-        <div class="hist-stat"><span>押金收入</span><b>${fmtMoney(accounting.deposit_received||0)}</b></div>
-        <div class="hist-stat"><span>欠款回收</span><b>${fmtMoney(accounting.arrears_recovered||0)}</b></div>
-        <div class="hist-stat"><span>换床费</span><b>${fmtMoney(accounting.bed_transfer_fee||0)}</b></div>
-        <div class="hist-stat"><span>押金退款</span><b>${fmtMoney(accounting.deposit_refund||0)}</b></div>
-        <div class="hist-stat"><span>支出</span><b>${fmtMoney(accounting.expenses||0)}</b></div>
-      </div>
-      <div class="hist-card" data-owner-overview-cloud-arrears-detail="true"><div class="hist-title">Cloud Arrears Collection / 欠款代收</div>
-        <div class="hist-stat"><span>Total remaining</span><b>${fmtMoney(arrears.cloud_arrears_collection?.total_remaining||0)}</b></div>
-        <div class="hist-stat"><span>Open</span><b>${Number(arrears.cloud_arrears_collection?.open_count||0)}</b></div>
-        <div class="hist-stat"><span>Partial</span><b>${Number(arrears.cloud_arrears_collection?.partial_count||0)}</b></div>
-        <div class="hist-anchor">Only historical open/partial cloud arrears are included. Future rent is excluded.</div>
-      </div>
-      <div class="hist-card" data-owner-bed-transfer-records="true"><div class="hist-title">换床记录</div>
-        <div class="hist-stat"><span>已记录事件</span><b>${Number(bedReview.recorded_count||bedReview.pending_review_count||transferRecords.length||0)}</b></div>
-        ${transferRecords.length?transferRecords.map(t=>{
-          const feeMode=String(t.fee_mode||'charged').toLowerCase();
-          const feeLabel=feeMode==='waived'?'已豁免':`${fmtMoney(Number(t.amount_fils??t.transfer_fee_fils??5000)/100)} AED`;
-          const waiver=feeMode==='waived'&&t.waiver_reason?` · 豁免原因: ${esc(t.waiver_reason)}`:'';
-          const anchor=[t.transfer_date||'-',t.operator_employee||'-',feeLabel,t.reason||'-',t.note||'-'].map(x=>esc(x)).join(' · ');
-          return `<div class="hist-stat"><span>${esc(t.from_bed||'-')} → ${esc(t.to_bed||'-')}</span><b>${esc(t.status==='pending_review'?'已记录':t.status||'已记录')}</b></div><div class="hist-anchor">${anchor}${waiver} · entry ${esc(t.entry_event_id||'-')}</div>`;
-        }).join(''):'<div class="hist-anchor">暂无换床记录。</div>'}
-        <div class="hist-anchor">只读锚点：不改变入住、押金、欠款或门禁卡。</div>
-      </div>
-      <div class="hist-card" data-owner-overview-arrears-collection="true"><div class="hist-title">欠款与回收</div>
-        <div class="hist-stat"><span>未结清任务</span><b>${Number(arrears.open_count||0)}</b></div>
-        <div class="hist-stat"><span>待收尾款</span><b>${fmtMoney(arrears.outstanding_amount||0)}</b></div>
-        <div class="hist-stat"><span>员工已反馈</span><b>${Number(arrears.employee_followup?.followed_up_count||0)}</b></div>
-        <div class="hist-stat"><span>已下发</span><b>${Number(arrears.employee_followup?.assigned_count||0)}</b></div>
-      </div>
-      <div class="hist-card" data-owner-overview-risk-watch="true"><div class="hist-title">待办与风险</div>
-        <div class="hist-stat"><span>已逾期</span><b>${Number(risk.overdue_count||0)}</b></div>
-        <div class="hist-stat"><span>承诺逾期</span><b>${Number(risk.broken_promise_count||0)}</b></div>
-        <div class="hist-stat"><span>部分收款</span><b>${Number(risk.partial_payment_count||0)}</b></div>
-        <div class="hist-stat"><span>待核对</span><b>${Number(risk.needs_review_count||0)}</b></div>
-      </div>
-    </div>
-    <div class="hist-anchor" style="margin-top:10px" data-owner-overview-comparison-rules="true">
-      对比规则：本月按已过天数对比上月和去年同月，本季度按已过季度窗口对比。
-      ${quality.warnings?.length?` · ${esc(quality.warnings.join(' '))}`:''}
-      ${quality.no_data?.length?` · 历史数据不足: ${esc(quality.no_data.join(', '))}`:''}
-      · 已检查行数: ${Number(month.rows_checked||0)}
-    </div>
+    ${ownerOverviewBillingPeriodTrendChart(trend)}
   </div>`;
 }
 async function loadOwnerOverviewComparativeSummary(){
@@ -6343,18 +6302,14 @@ function renderOwnerOverview(){
       <div class="card-head"><div><div class="card-title">经营对比</div><div class="card-sub">COMPARATIVE BUSINESS INTELLIGENCE</div></div></div>
       <div class="card-body"><div id="ownerOverviewComparativePanel" data-owner-overview-comparative-section="true"></div></div>
     </div>
-    <div class="card hl-card owner-overview-section" style="margin-top:16px">
-      <div class="card-head"><div><div class="card-title">换床财务生命周期</div><div class="card-sub">CANONICAL FINANCE PROJECTION</div></div></div>
+    <details class="card hl-card owner-overview-section" style="margin-top:16px">
+      <summary class="card-head" style="cursor:pointer"><div><div class="card-title">换床财务生命周期</div><div class="card-sub">按需展开 · CANONICAL FINANCE PROJECTION</div></div></summary>
       <div class="card-body"><div id="ownerFinanceProjectionPanel"></div></div>
-    </div>
-    <div class="card hl-card owner-overview-section" style="margin-top:16px">
-      <div class="card-head"><div><div class="card-title">欠款跟进</div><div class="card-sub">ARREARS FOLLOW-UP · ASYNC</div></div></div>
+    </details>
+    <details class="card hl-card owner-overview-section" style="margin-top:16px">
+      <summary class="card-head" style="cursor:pointer"><div><div class="card-title">欠款跟进</div><div class="card-sub">按需展开 · ARREARS FOLLOW-UP</div></div></summary>
       <div class="card-body"><div id="ownerOverviewArrearsPanel" data-owner-overview-arrears-section="true"></div></div>
-    </div>
-    <div class="card hl-card owner-overview-section" style="margin-top:16px">
-      <div class="card-head"><div><div class="card-title">异常提醒</div><div class="card-sub">BUSINESS ALERTS</div></div></div>
-      <div class="card-body"><div class="detail-list">${alertHtml}</div></div>
-    </div>
+    </details>
     <div class="card hl-card owner-overview-section" style="margin-top:16px">
       <div class="card-head"><div><div class="card-title">最近会话</div><div class="card-sub">RECENT SESSIONS</div></div></div>
       <div class="card-body"><div class="detail-list">${latestHtml}</div></div>
