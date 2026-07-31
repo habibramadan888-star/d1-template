@@ -12,9 +12,12 @@ test("owner current-period received uses active statement sessions only", async 
   assert.match(worker,/export_text FROM sessions/);
   assert.match(worker,/\^Total Received/);
   assert.match(worker,/gross<=0/);
+  assert.match(worker,/if\(gross<=0\)continue;[\s\S]{0,180}seenAnchors\.has\(anchor\)/);
   assert.match(worker,/const billingPeriod=currentPeriodReceived/);
   assert.doesNotMatch(worker,/currentPeriodReceived=billingPeriodFinanceProjection/);
   assert.match(ui,/currentPeriodComparison/);
+  const html=await readFile("deploy-worker/public/index-51.html","utf8");
+  assert.match(html,/index-51-main\.js\?v=owner-billing-period-v12/);
 });
 
 test("owner history groups every month from the 3rd through the next month's 2nd", async () => {

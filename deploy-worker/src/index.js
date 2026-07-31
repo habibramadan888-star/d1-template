@@ -10673,8 +10673,6 @@ async function ownerOverviewFetchSessionPeriodSummary(env,user,range){
     if(source==="employee_entry_raw_held"||source.startsWith("owner_")||source.includes("correction"))return false;
     if(["RAW_ACCEPTED_HELD_FOR_REVIEW","TRANSFER_VOID_APPLIED","OWNER_ACKNOWLEDGED","CORRECTION_APPLIED"].includes(status))return false;
     if(/^(?:RAW-|QA-|CODEX_|HL_(?:EMPLOYEE|LIVE|QA|TEST|FULL|MATRIX))/i.test(anchor))return false;
-    if(anchor&&seenAnchors.has(anchor))return false;
-    if(anchor)seenAnchors.add(anchor);
     return true;
   });
   summary.rows_checked=eligibleRows.length;
@@ -10697,6 +10695,9 @@ async function ownerOverviewFetchSessionPeriodSummary(env,user,range){
     const bank=storedBank||textBank;
     const cash=storedCash||textCash||ownerOverviewMoney(Math.max(0,gross-bank));
     if(gross<=0)continue;
+    const anchor=cleanText(row?.anchor_id||"",160);
+    if(anchor&&seenAnchors.has(anchor))continue;
+    if(anchor)seenAnchors.add(anchor);
     summary.gross_received+=gross;
     summary.cash_handover+=cash;
     summary.bank_transfer_total+=bank;
