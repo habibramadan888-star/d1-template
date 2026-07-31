@@ -6972,6 +6972,7 @@ async function refreshAnalysisFromHistory(){
     const job={currentController:null,timings:{historyFetchMs:0}};
     const loaded=[];
     for(const raw of summaries){
+      if(raw?.bed_transfer_history)continue;
       const session=normalizeLedgerSession({id:raw.id,date:raw.date||'',anchorId:raw.canonical_anchor_id||raw.entry_id||raw.anchor_id||raw.id,canonicalAnchorId:raw.canonical_anchor_id||'',entryId:raw.entry_id||'',entries:[],entriesCount:raw.entries_count,export_text:raw.export_text||'',createdBy:raw.created_by||'',source:raw.source||'',_cloud:true});
       const entries=await loadHistoryImportEntries(session,job);
       if(entries.length)loaded.push(normalizeLedgerSession({...session,entries,entriesCount:entries.length}));
