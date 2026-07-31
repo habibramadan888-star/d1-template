@@ -3378,6 +3378,7 @@ async function renderHistory(){
     const exportParsed=!hasEntries&&s.export_text?parseTXT(s.export_text):null;
     const exportEntries=Array.isArray(exportParsed?.entries)?exportParsed.entries:[];
     const hasExportEntries=exportEntries.length>0;
+    const showParsedCashBalance=hasExportEntries||s._reparsedFromRaw===true;
     const has=hasEntries||hasExportEntries||Number(s.cash_handover||0)||Number(s.bank_transfer_total||0)||Number(s.gross_received||0);
     const t=hasEntries?totals(s.entries):hasExportEntries?totals(exportEntries):{
       cashIn:Number(s.cash_handover||0),
@@ -3405,7 +3406,7 @@ async function renderHistory(){
         <div class="hist-stat"><span style="color:var(--text2)">现金收入</span><span class="mono" style="color:#c8902a">${fmtMoney(t.cashIn)}</span></div>
         <div class="hist-stat"><span style="color:var(--text2)">银行收入</span><span class="mono" style="color:#1a8a4a">${fmtMoney(t.bankIn)}</span></div>
         <div class="hist-stat"><span style="color:var(--text2)">支出</span><span class="mono" style="color:#d93025">-${fmtMoney(t.expOut+t.refundOut)}</span></div>
-        ${hasExportEntries?`<div class="hist-stat"><span style="color:var(--text2)">现金结余</span><span class="mono" style="color:#1a73e8">${fmtMoney(t.cashBal)}</span></div>`:''}
+        ${showParsedCashBalance?`<div class="hist-stat"><span style="color:var(--text2)">现金结余</span><span class="mono" style="color:#1a73e8">${fmtMoney(t.cashBal)}</span></div>`:''}
         <div class="hist-stat"><span>${grossLabel}</span><span class="mono">${fmtMoney(t.total)}</span></div>
         ${deleted?`<div class="hist-stat"><span>当前有效金额：0</span><span class="mono">${fmtMoney(ownerArchiveTotalsValue(s.archive_effective_totals,'gross'))}</span></div>`:''}
       `:`<div class="hist-stat" style="justify-content:center;color:var(--text3);font-size:11px">${cnt}笔 · 点击查看详情</div>`}

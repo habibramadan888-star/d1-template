@@ -31,6 +31,7 @@ test("legacy history card derives and displays cash balance from export text", a
   const card = source.slice(start, end);
   assert.match(card, /exportParsed=.*parseTXT\(s\.export_text\)/);
   assert.match(card, /hasExportEntries\?totals\(exportEntries\)/);
+  assert.match(card, /hasExportEntries\|\|s\._reparsedFromRaw===true/);
   assert.match(card, /现金结余/);
   assert.match(card, /fmtMoney\(t\.cashBal\)/);
 });
