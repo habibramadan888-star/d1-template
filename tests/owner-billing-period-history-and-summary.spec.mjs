@@ -4,12 +4,17 @@ import test from "node:test";
 
 test("owner current-period received uses active statement sessions only", async () => {
   const worker=await readFile("deploy-worker/src/index.js","utf8");
+  const ui=await readFile("deploy-worker/public/index-51-main.js","utf8");
   assert.match(worker,/inclusion_rule:"active_owner_statement_sessions_only"/);
   assert.match(worker,/source==="employee_entry_raw_held"/);
   assert.match(worker,/RAW_ACCEPTED_HELD_FOR_REVIEW/);
   assert.match(worker,/seenAnchors\.has\(anchor\)/);
+  assert.match(worker,/export_text FROM sessions/);
+  assert.match(worker,/\^Total Received/);
+  assert.match(worker,/gross<=0/);
   assert.match(worker,/const billingPeriod=currentPeriodReceived/);
   assert.doesNotMatch(worker,/currentPeriodReceived=billingPeriodFinanceProjection/);
+  assert.match(ui,/currentPeriodComparison/);
 });
 
 test("owner history groups every month from the 3rd through the next month's 2nd", async () => {

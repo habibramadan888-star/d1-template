@@ -10662,7 +10662,7 @@ async function ownerOverviewFetchSessionPeriodSummary(env,user,range){
   };
   if(!await phase0TableExists(env,"sessions"))return summary;
   const rows=await phase0All(env,
-    "SELECT id, anchor_id, date, source, entries_count, cash_handover, bank_transfer_total, gross_received, handover_status, voided_at, created_at FROM sessions WHERE corpid=? AND COALESCE(voided_at,'')='' AND COALESCE(handover_status,'')<>'VOID' AND substr(COALESCE(date,created_at,''),1,10) BETWEEN ? AND ? ORDER BY substr(COALESCE(date,created_at,''),1,10) ASC, created_at ASC LIMIT 500",
+    "SELECT id, anchor_id, date, source, entries_count, cash_handover, bank_transfer_total, gross_received, handover_status, voided_at, created_at, export_text FROM sessions WHERE corpid=? AND COALESCE(voided_at,'')='' AND COALESCE(handover_status,'')<>'VOID' AND substr(COALESCE(date,created_at,''),1,10) BETWEEN ? AND ? ORDER BY substr(COALESCE(date,created_at,''),1,10) DESC, created_at DESC LIMIT 500",
     [user.corpid,range.start,range.end]
   ).catch(()=>[]);
   const seenAnchors=new Set();
@@ -10679,9 +10679,24 @@ async function ownerOverviewFetchSessionPeriodSummary(env,user,range){
   });
   summary.rows_checked=eligibleRows.length;
   for(const row of eligibleRows){
-    const gross=ownerOverviewMoney(row?.gross_received);
-    const cash=ownerOverviewMoney(row?.cash_handover);
-    const bank=ownerOverviewMoney(row?.bank_transfer_total);
+    const storedGross=ownerOverviewMoney(row?.gross_received);
+    const storedCash=ownerOverviewMoney(row?.cash_handover);
+    const storedBank=ownerOverviewMoney(row?.bank_transfer_total);
+    const text=String(row?.export_text||"");
+    const readTextMoney=(patterns)=>{
+      for(const pattern of patterns){
+        const match=text.match(pattern);
+        if(match)return ownerOverviewMoney(String(match[1]||"").replace(/,/g,""));
+      }
+      return 0;
+    };
+    const textGross=readTextMoney([/^Total Received[^\n]*?AED\s*([\d,.]+)/im,/总收入\s*([\d,.]+)\s*AED/i]);
+    const textBank=readTextMoney([/^Bank Received[^\n]*?AED\s*([\d,.]+)/im,/银行收款\s*([\d,.]+)\s*AED/i]);
+    const textCash=readTextMoney([/^Cash Received[^\n]*?AED\s*([\d,.]+)/im]);
+    const gross=storedGross||textGross;
+    const bank=storedBank||textBank;
+    const cash=storedCash||textCash||ownerOverviewMoney(Math.max(0,gross-bank));
+    if(gross<=0)continue;
     summary.gross_received+=gross;
     summary.cash_handover+=cash;
     summary.bank_transfer_total+=bank;
@@ -10697,6 +10712,7 @@ async function ownerOverviewFetchSessionPeriodSummary(env,user,range){
       included_reason:"active_owner_statement_session"
     });
   }
+  summary.rows_checked=summary.sessions.length;
   summary.gross_received=ownerOverviewMoney(summary.gross_received);
   summary.cash_handover=ownerOverviewMoney(summary.cash_handover);
   summary.bank_transfer_total=ownerOverviewMoney(summary.bank_transfer_total);

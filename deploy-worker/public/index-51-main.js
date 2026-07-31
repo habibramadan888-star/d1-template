@@ -5618,6 +5618,8 @@ function renderOwnerOverviewComparativePanel(){
   const data=state.overviewComparative||{};
   const comp=data.comparisons||{};
   const month=data.current?.month||{};
+  const currentPeriod=data.current_period_received||data.current?.billing_period||month;
+  const currentPeriodComparison={...(comp.last_month?.gross_received||{}),current:Number(currentPeriod.gross_received||0)};
   const accounting=data.accounting_separation||{};
   const flow=data.occupancy_flow||{};
   const bedReview=data.bed_transfer_review||{};
@@ -6157,7 +6159,7 @@ function renderOwnerOverviewComparativePanel(){
       <span class="hist-order">本月 vs 上月 / 去年同月 / 本季度累计</span>
     </div>
     <div class="ana-kpi-grid" data-owner-overview-business-snapshot="true">
-      ${ownerOverviewMetricCard('当前账期实收',comp.last_month?.gross_received)}
+      ${ownerOverviewMetricCard('当前账期实收',currentPeriodComparison)}
       ${ownerOverviewMetricCard('租金收入',comp.last_month?.rent_received)}
       ${ownerOverviewMetricCard('净现金流',comp.last_month?.net_cashflow)}
       ${ownerOverviewMetricCard('欠款回收',comp.last_month?.arrears_recovered)}
