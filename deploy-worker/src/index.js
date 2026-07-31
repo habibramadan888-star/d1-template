@@ -14412,6 +14412,15 @@ async function handleRequest(request, env, ctx) {
       if (!sessionId || session.entries.length > MAX_SESSION_ENTRIES) {
         return badRequest("bad_request");
       }
+      const anchorId = cleanText(session.anchorId || session.anchor_id || "", 80);
+      if (anchorId) {
+        const existingAnchor = await env.DB.prepare(
+          "SELECT id FROM sessions WHERE corpid=? AND anchor_id=? AND COALESCE(voided_at,'')='' AND COALESCE(handover_status,'')<>'VOID' ORDER BY created_at DESC LIMIT 1"
+        ).bind(user.corpid, anchorId).first();
+        if (existingAnchor?.id) {
+          return success({ success: true, sessionId: existingAnchor.id, status: "IDEMPOTENT_REPLAY", duplicate_anchor: true });
+        }
+      }
       const entries = session.entries.map(sanitizeEntry).filter(Boolean);
       if (entries.length !== session.entries.length) {
         return badRequest("invalid_entries");
@@ -14427,7 +14436,7 @@ async function handleRequest(request, env, ctx) {
       ).bind(
         sessionId,
         user.corpid,
-        cleanText(session.anchorId, 80),
+        anchorId,
         cleanDate(session.date),
         entries.length,
         user.userid,
@@ -14661,6 +14670,14 @@ async function handleRequest(request, env, ctx) {
           : "SELECT * FROM sessions WHERE corpid=? AND COALESCE(voided_at,'')='' AND COALESCE(handover_status,'')<>'VOID' ORDER BY created_at DESC";
         results=(await env.DB.prepare(`${baseSql} LIMIT ? OFFSET ?`).bind(user.corpid,limit,offset).all()).results||[];
       }
+      const seenHistoryAnchors=new Set();
+      results=(results||[]).filter(row=>{
+        const anchor=cleanText(row?.anchor_id||"",180);
+        if(!anchor)return true;
+        if(seenHistoryAnchors.has(anchor))return false;
+        seenHistoryAnchors.add(anchor);
+        return true;
+      });
       let data=await canonicalOwnerHistorySessionRowsForList(env,user,results||[]);
       if(qaScope.requested)data=data.map(row=>({...row,qa_run_id:qaScope.run_id}));
       const transferLineage=requestedBed

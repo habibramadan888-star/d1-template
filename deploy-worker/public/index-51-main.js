@@ -3375,13 +3375,17 @@ async function renderHistory(){
       return `<div class="hist-card" data-id="${s.id}" data-bed-transfer-history="true"><div class="hist-date">${esc((s.date||'').slice(0,10))}</div><div class="hist-anchor">${esc(transfer.transfer_anchor_id||s.anchorId||'-')}</div><div class="hist-stat"><span>Bed Transfer / 换床</span><b>${esc(transfer.from_bed||'-')} → ${esc(transfer.to_bed||'-')}</b></div><div class="hist-stat"><span>Due</span><b>AED ${fmtMoney(transfer.fee_due_amount??transfer.fee_amount_aed)}</b></div><div class="hist-stat"><span>Paid</span><b>AED ${fmtMoney(transfer.fee_paid_amount??0)}</b></div><div class="hist-stat"><span>Payment</span><b>${esc(String(transfer.payment_method||'-').toUpperCase())}</b></div><div class="hist-stat"><span>Status</span><b>${status==='VOIDED'?'Voided / 已撤销':esc(status)}</b></div><div class="hist-actions"><button class="btn btn-ghost" data-act="view"><svg class="ico"><use href="#i-eye"/></svg>查看</button></div></div>`;
     }
     const hasEntries=s.entries&&s.entries.length>0;
-    const has=hasEntries||Number(s.cash_handover||0)||Number(s.bank_transfer_total||0)||Number(s.gross_received||0);
-    const t=hasEntries?totals(s.entries):{
+    const exportParsed=!hasEntries&&s.export_text?parseTXT(s.export_text):null;
+    const exportEntries=Array.isArray(exportParsed?.entries)?exportParsed.entries:[];
+    const hasExportEntries=exportEntries.length>0;
+    const has=hasEntries||hasExportEntries||Number(s.cash_handover||0)||Number(s.bank_transfer_total||0)||Number(s.gross_received||0);
+    const t=hasEntries?totals(s.entries):hasExportEntries?totals(exportEntries):{
       cashIn:Number(s.cash_handover||0),
       bankIn:Number(s.bank_transfer_total||0),
       expOut:0,
       refundOut:0,
-      total:Number(s.gross_received||0)
+      total:Number(s.gross_received||0),
+      cashBal:Number(s.cash_handover||0)
     };
     const cnt=ownerHistorySessionEntryCount(s);
     const uploader=s.source==='employee_entry'||s.source==='EMP'||s.createdBy==='staff'||(s.createdBy&&s.createdBy!=='manager')?`员工上传 ${esc(s.operatorName||s.createdBy||s.operatorId||'')}`:(s.createdBy==='manager'?'老板上传':'');
@@ -3401,6 +3405,7 @@ async function renderHistory(){
         <div class="hist-stat"><span style="color:var(--text2)">现金收入</span><span class="mono" style="color:#c8902a">${fmtMoney(t.cashIn)}</span></div>
         <div class="hist-stat"><span style="color:var(--text2)">银行收入</span><span class="mono" style="color:#1a8a4a">${fmtMoney(t.bankIn)}</span></div>
         <div class="hist-stat"><span style="color:var(--text2)">支出</span><span class="mono" style="color:#d93025">-${fmtMoney(t.expOut+t.refundOut)}</span></div>
+        ${hasExportEntries?`<div class="hist-stat"><span style="color:var(--text2)">现金结余</span><span class="mono" style="color:#1a73e8">${fmtMoney(t.cashBal)}</span></div>`:''}
         <div class="hist-stat"><span>${grossLabel}</span><span class="mono">${fmtMoney(t.total)}</span></div>
         ${deleted?`<div class="hist-stat"><span>当前有效金额：0</span><span class="mono">${fmtMoney(ownerArchiveTotalsValue(s.archive_effective_totals,'gross'))}</span></div>`:''}
       `:`<div class="hist-stat" style="justify-content:center;color:var(--text3);font-size:11px">${cnt}笔 · 点击查看详情</div>`}
