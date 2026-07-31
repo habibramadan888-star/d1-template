@@ -3519,6 +3519,11 @@ function renderFilterControls(){
     const current=analysisLoadedPeriodInfo(fmtD(new Date()));
     wrap.innerHTML=`<div style="color:var(--text2);font-size:12px;padding:8px 0">当前账期：<b>${esc(current.startStr)}</b> → <b>${esc(current.endStr)}</b></div>${hint}`;
   }
+  else if(state.dateMode==='month'){
+    const selected=analysisLoadedPeriodInfo(`${state.month}-03`);
+    wrap.innerHTML=`<input type="month" class="inp" id="mInput" value="${state.month}" style="color-scheme:dark"><div style="color:var(--text2);font-size:12px;padding:8px 0">所选账期：<b>${esc(selected.startStr)}</b> → <b>${esc(selected.endStr)}</b></div>${hint}`;
+    document.getElementById('mInput').onchange=e=>{state.month=e.target.value;renderFilterControls();renderAnalysis();};
+  }
   else if(state.dateMode==='range'){wrap.innerHTML=`<div class="field"><label>起始</label><input type="date" class="inp" id="fInput" value="${state.from}" style="color-scheme:dark"></div><div class="field" style="margin-top:8px"><label>结束</label><input type="date" class="inp" id="tInput" value="${state.to}" style="color-scheme:dark"></div>${hint}${dates.length?`<button class="btn btn-ghost" id="btnFill" style="margin-top:8px;width:100%;font-size:11px">使用完整数据范围</button>`:''}`;
     document.getElementById('fInput').onchange=e=>{state.from=e.target.value;renderAnalysis();};
     document.getElementById('tInput').onchange=e=>{state.to=e.target.value;renderAnalysis();};
@@ -3528,7 +3533,7 @@ function renderFilterControls(){
 function filtered(){
   const sessions=normalizeLedgerSessions(state.analysisSessions);
   if(state.dateMode==='all')return sessions;
-  return sessions.filter(s=>{const d=(s.date||'').slice(0,10);if(state.dateMode==='billing')return analysisLoadedPeriodInfo(d).current;if(state.from&&d<state.from)return false;if(state.to&&d>state.to)return false;return true;});
+  return sessions.filter(s=>{const d=(s.date||'').slice(0,10);if(state.dateMode==='billing')return analysisLoadedPeriodInfo(d).current;if(state.dateMode==='month')return analysisLoadedPeriodInfo(d).key===state.month;if(state.from&&d<state.from)return false;if(state.to&&d>state.to)return false;return true;});
 }
 function computeAna(sessions){
   sessions=normalizeLedgerSessions(sessions);
@@ -5495,7 +5500,7 @@ function renderAnalysis(){
   const wrap=document.getElementById('analysisContent');
   Object.values(charts).forEach(c=>{try{c.destroy();}catch{}});Object.keys(charts).forEach(k=>delete charts[k]);
   if(!a){wrap.innerHTML=`<div class="empty-state card" style="padding:44px;margin-top:14px"><div class="empty-ico">📊</div><div class="empty-title">等待数据</div><div class="empty-text">${state.analysisSessions.length===0?'粘贴TXT、上传文件，或从历史导入':'当前筛选条件下无数据，请调整时间范围'}</div></div>`;return;}
-  const pl=state.dateMode==='billing'?'当前账期':state.dateMode==='range'?`${state.from||'起'} ~ ${state.to||'今'}`:'全部历史';
+  const pl=state.dateMode==='billing'?'当前账期':state.dateMode==='month'?`${state.month} 账期`:state.dateMode==='range'?`${state.from||'起'} ~ ${state.to||'今'}`:'全部历史';
   const financeBody='<div class="chart-wrap" style="height:200px"><canvas id="cFinTrend"></canvas></div>';
   const balanceTotal=balanceTotalFromTotals(a.totals);
   wrap.innerHTML=`
@@ -6442,7 +6447,7 @@ async function onPaste(){
   const sync=await syncImportedSessionsToCloud(addedSessions);
   renderImportSyncStatus(sync.fail?'err':'ok',sync.fail?'本地已保存，但云端同步失败':'本地和云端都已保存成功',importSyncDetail(added,dup,sync));
   toast(`已添加 ${added} 份，同步云端 ${sync.ok} 份${sync.fail?`，失败 ${sync.fail} 份`:''}${dup>0?`，${dup}份重复跳过`:''}`,sync.fail?'err':'ok');
-  renderFilterControls();renderAnalysis();
+  await refreshAnalysisFromHistory();
 }
 async function onFiles(files){
   let added=0,dup=0,addedSessions=[];
@@ -6985,13 +6990,8 @@ async function refreshAnalysisFromHistory(){
 }
 
 async function fromHistory(){
-  if(!Array.isArray(window._histSessions)) await updateHistCount();
-  const sessions=window._histSessions||[];
-  const checked=[...document.querySelectorAll('.hist-chk:checked')].map(cb=>cb.value);
-  if(!checked.length){toast('请先勾选要导入的会话','err');return;}
-  const selected=sessions.filter(s=>checked.includes(s.id));
-  if(!selected.length){toast('未找到选中的历史会话，请刷新历史列表','err');return;}
-  await importHistorySessions(selected);
+  const count=await refreshAnalysisFromHistory();
+  toast(`已从历史档案刷新 ${count} 个会话`,'ok');
 }
 
 /* ── BILLING PERIOD ANALYSIS ── */
@@ -8251,11 +8251,19 @@ function ccSubmitPayment(custId){
 
 /* ── VIEW SWITCH ── */
 function switchImportTab(tab){
-  ['paste','file','hist'].forEach(t=>{
+  ['paste','hist'].forEach(t=>{
     document.getElementById('i'+t).classList.toggle('hidden',t!==tab);
     document.getElementById('itab'+t.charAt(0).toUpperCase()+t.slice(1)).classList.toggle('active',t===tab);
   });
   if(tab==='hist') updateHistCount();
+}
+function toggleAnalysisImportPanel(){
+  const body=document.getElementById('analysisImportBody');
+  const label=document.getElementById('analysisImportToggleLabel');
+  if(!body)return;
+  const opening=body.classList.contains('hidden');
+  body.classList.toggle('hidden',!opening);
+  if(label)label.textContent=opening?'收起':'展开';
 }
 function switchView(v){
   if(isOwnerShellRole()&&v==='entry'){
@@ -8360,12 +8368,9 @@ function bindEvents(){
     if(a.dataset.action==='del')delEntry(id);
   });
   document.getElementById('filterTabs').addEventListener('click',e=>{const b=e.target.closest('.ftab');if(!b)return;state.dateMode=b.dataset.mode;document.querySelectorAll('#filterTabs .ftab').forEach(x=>x.classList.toggle('active',x.dataset.mode===state.dateMode));renderFilterControls();renderAnalysis();});
+  document.getElementById('analysisImportToggle').onclick=toggleAnalysisImportPanel;
   document.getElementById('btnPaste').onclick=onPaste;
   document.getElementById('btnFromHistory').onclick=fromHistory;
-  document.getElementById('dropzone').onclick=()=>document.getElementById('fileInput').click();
-  document.getElementById('fileInput').onchange=e=>{onFiles(Array.from(e.target.files||[]));e.target.value='';};
-  ['dragover','dragenter'].forEach(ev=>document.getElementById('dropzone').addEventListener(ev,e=>{e.preventDefault();e.stopPropagation();}));
-  document.getElementById('dropzone').addEventListener('drop',e=>{e.preventDefault();const f=Array.from(e.dataTransfer.files||[]).filter(f=>/\.txt$|text\/plain/i.test(f.name+f.type));if(f.length)onFiles(f);});
 
 }
 

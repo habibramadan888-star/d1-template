@@ -1703,14 +1703,16 @@ body::before{
     <div id="billingWidget" style="margin-bottom:14px"></div>
 
     <!-- 紧凑导入面板 -->
-    <div class="import-panel" style="display:none" aria-hidden="true">
+    <div class="import-panel">
+      <button class="btn btn-ghost btn-block" id="analysisImportToggle" type="button" aria-controls="analysisImportBody" style="justify-content:space-between;margin-bottom:0"><span>数据导入 · 粘贴TXT / 从历史</span><span id="analysisImportToggleLabel">展开</span></button>
+      <div id="analysisImportBody" class="hidden" style="margin-top:12px">
       <!-- 三个功能 tab -->
       <div class="import-actions">
         <button class="import-tab active" id="itabPaste" onclick="switchImportTab('paste')">
           <svg class="itab-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/></svg>
           <span class="itab-lbl">粘贴 TXT<span class="en-sub">PASTE</span></span>
         </button>
-        <button class="import-tab" id="itabFile" onclick="switchImportTab('file')">
+        <button class="import-tab" id="itabFile" onclick="switchImportTab('file')" style="display:none" aria-hidden="true" tabindex="-1">
           <svg class="itab-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
           <span class="itab-lbl">上传文件<span class="en-sub">UPLOAD</span></span>
         </button>
@@ -1745,6 +1747,7 @@ body::before{
           <button class="btn btn-primary btn-block" id="btnFromHistory">导入选中 (<span id="histCount2">0</span>)</button>
         </div>
       </div>
+      </div>
     </div>
 
     <!-- 时间筛选（紧凑单卡片） -->
@@ -1756,6 +1759,7 @@ body::before{
         </div>
         <div class="filter-tabs" id="filterTabs">
           <button class="ftab active" data-mode="billing">当前账期<span class="en-sub">CURRENT</span></button>
+          <button class="ftab" data-mode="month">选择账期<span class="en-sub">PERIOD</span></button>
           <button class="ftab" data-mode="all">全部<span class="en-sub">ALL</span></button>
           <button class="ftab" data-mode="range">区间<span class="en-sub">RANGE</span></button>
         </div>
@@ -1817,7 +1821,7 @@ body::before{
 </main>
 <footer id="footerEl" style="display:none">HOMELINK FINANCE LEDGER · 云端 D1 · v11.46-cloud</footer>
 
-<script src="./index-51-main.js?v=owner-history-analysis-v17"></script>
+<script src="./index-51-main.js?v=owner-history-analysis-v18"></script>
 
 <div id="cp-overlay" style="display:none;position:fixed;inset:0;z-index:9999;overflow-y:auto;background:#F5F5F0;">
 <!-- TOPBAR -->

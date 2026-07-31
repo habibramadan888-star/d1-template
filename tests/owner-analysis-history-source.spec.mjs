@@ -13,9 +13,12 @@ test("analysis is driven only by paginated cloud history", async () => {
   assert.match(ui, /state\.analysisSessions=dedupSessions\(loaded\)/);
   assert.match(ui, /if\(state\.dateMode==='billing'\)return analysisLoadedPeriodInfo\(d\)\.current/);
   assert.match(html, /data-mode="billing"/);
+  assert.match(html, /data-mode="month"/);
   assert.match(html, /data-mode="all"/);
   assert.match(html, /data-mode="range"/);
-  assert.match(html, /class="import-panel" style="display:none" aria-hidden="true"/);
+  assert.match(html, /id="analysisImportBody" class="hidden"/);
+  assert.match(html, /id="itabFile"[^>]*style="display:none"/);
+  assert.match(ui, /if\(state\.dateMode==='month'\)return analysisLoadedPeriodInfo\(d\)\.key===state\.month/);
 });
 
 test("analysis shows only core statistical outputs", async () => {
@@ -28,4 +31,5 @@ test("analysis shows only core statistical outputs", async () => {
   for (const removed of ["逐会话对比", "人员变动", "所有交易明细", "平均每次交接"]) {
     assert.doesNotMatch(render, new RegExp(removed));
   }
+  assert.ok(render.indexOf("历史档案 ·") < render.indexOf("收入与支出趋势"));
 });
