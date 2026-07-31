@@ -3344,7 +3344,7 @@ async function renderHistory(){
   const all=normalizeLedgerSessions([
     ...visibleCloud.map(s=>({id:s.id,date:s.date,anchorId:s.anchor_id,entries:[],entries_json:s.entries_json||'',raw_held_read_model:s.raw_held_read_model||null,entriesCount:s.entries_count,export_text:s.export_text||'',_cloud:true,_voided:isVoidedHistorySession(s),createdBy:(s.source==='employee_entry'||s.source==='EMP'||s.source==='employee_entry_raw_held')?'staff':(s.created_by||''),operatorName:s.operator_name||'',operatorId:s.operator_id||'',source:s.source||'',cash_handover:s.cash_handover,bank_transfer_total:s.bank_transfer_total,gross_received:s.gross_received,voidedAt:s.voided_at||'',voidedBy:s.voided_by||'',voidReason:s.void_reason||'',voidSource:s.void_source||'',handover_status:s.handover_status||'',archive_state:s.archive_state||'',raw_totals:s.raw_totals||null,correction_totals:s.correction_totals||null,corrected_totals:s.corrected_totals||null,archive_effective_totals:s.archive_effective_totals||null,active_for_totals:s.active_for_totals,correction_history_visible:s.correction_history_visible,source_proof:s.source_proof||null,totals_mode:s.totals_mode||'',bed_transfer_history:s.bed_transfer_history||null})),
     ...localOnly
-  ]).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  ]).filter(s=>!s.bed_transfer_history).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   const hasMoreCloud=cloud.length>=limit;
 
   const monthKey=s=>{
