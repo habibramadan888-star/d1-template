@@ -6146,6 +6146,8 @@ function renderOwnerOverviewComparativePanel(){
   const data=state.overviewComparative||{};
   const comp=data.comparisons||{};
   const month=data.current?.month||{};
+  const currentPeriod=data.current_period_received||data.current?.billing_period||month;
+  const currentPeriodComparison={...(comp.last_month?.gross_received||{}),current:Number(currentPeriod.gross_received||0)};
   const accounting=data.accounting_separation||{};
   const flow=data.occupancy_flow||{};
   const bedReview=data.bed_transfer_review||{};
