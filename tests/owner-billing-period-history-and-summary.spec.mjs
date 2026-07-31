@@ -16,8 +16,9 @@ test("owner current-period received uses active statement sessions only", async 
   assert.match(worker,/const billingPeriod=currentPeriodReceived/);
   assert.doesNotMatch(worker,/currentPeriodReceived=billingPeriodFinanceProjection/);
   assert.match(ui,/currentPeriodComparison/);
+  assert.match(ui,/currentPeriodComparison=\{current:Number\(currentPeriod\.gross_received\|\|0\),absolute_delta:null,percent_delta:null/);
   const html=await readFile("deploy-worker/public/index-51.html","utf8");
-  assert.match(html,/index-51-main\.js\?v=owner-billing-period-v13/);
+  assert.match(html,/index-51-main\.js\?v=owner-billing-period-v14/);
 });
 
 test("owner history groups every month from the 3rd through the next month's 2nd", async () => {

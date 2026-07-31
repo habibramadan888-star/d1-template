@@ -5619,7 +5619,7 @@ function renderOwnerOverviewComparativePanel(){
   const comp=data.comparisons||{};
   const month=data.current?.month||{};
   const currentPeriod=data.current_period_received||data.current?.billing_period||month;
-  const currentPeriodComparison={...(comp.last_month?.gross_received||{}),current:Number(currentPeriod.gross_received||0)};
+  const currentPeriodComparison={current:Number(currentPeriod.gross_received||0),absolute_delta:null,percent_delta:null,direction:'flat',interpretation:'no_data'};
   const accounting=data.accounting_separation||{};
   const flow=data.occupancy_flow||{};
   const bedReview=data.bed_transfer_review||{};
@@ -6147,7 +6147,7 @@ function renderOwnerOverviewComparativePanel(){
   const comp=data.comparisons||{};
   const month=data.current?.month||{};
   const currentPeriod=data.current_period_received||data.current?.billing_period||month;
-  const currentPeriodComparison={...(comp.last_month?.gross_received||{}),current:Number(currentPeriod.gross_received||0)};
+  const currentPeriodComparison={current:Number(currentPeriod.gross_received||0),absolute_delta:null,percent_delta:null,direction:'flat',interpretation:'no_data'};
   const accounting=data.accounting_separation||{};
   const flow=data.occupancy_flow||{};
   const bedReview=data.bed_transfer_review||{};
