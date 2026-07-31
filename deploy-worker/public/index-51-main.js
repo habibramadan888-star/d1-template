@@ -1217,7 +1217,7 @@ const state={
   view:'overview',session:{id:newId(),date:fmtDT(new Date()),entries:[]},saved:[],
   activeCat:'cash',formTag:'Old',formPayType:null,
   analysisSessions:[],
-  dateMode:'all',month:(()=>{const d=new Date();return `${d.getFullYear()}-${pad(d.getMonth()+1)}`;})(),
+  dateMode:'billing',month:(()=>{const d=new Date();return `${d.getFullYear()}-${pad(d.getMonth()+1)}`;})(),
   from:'',to:'',txCatFilter:'all',txSearch:'',historyViewing:null,historyLimit:HISTORY_PAGE_SIZE,showDeletedHistory:false,historyBedQuery:'',ownerHistoryTransferLineage:null,
   arrears:[],arrearsClosed:[], // canonical Gateway rows; never reconstructed from UI text
   arrearFilter:'all',
@@ -1295,7 +1295,7 @@ async function loadAll(){
   try{const cur=LS.get('current-session');if(cur){const p=JSON.parse(cur);if(p&&Array.isArray(p.entries))state.session=p;}}catch{}
   try{const keys=LS.keys('session:');const arr=[];for(const k of keys){try{const r=LS.get(k);if(r)arr.push(JSON.parse(r));}catch{}}arr.sort((a,b)=>(b.date||'').localeCompare(a.date||''));state.saved=arr;}catch{}
   if(isOwnerShellRole()&&ownerQaRunId())await loadQaRunAnalysisContract();
-  state.analysisSessions=isOwnerShellRole()?loadAnalysis():[];
+  state.analysisSessions=[];
   // Load customers from authenticated cloud storage first; keep sessionStorage only as a short-lived fallback.
   state.customers=[];
   if(isOwnerShellRole()){
@@ -3515,7 +3515,10 @@ function renderFilterControls(){
   const dates=state.analysisSessions.map(s=>(s.date||'').slice(0,10)).filter(Boolean).sort();
   const mn=dates[0]||'',mx=dates[dates.length-1]||'';
   const hint=dates.length?`<div class="hint" style="text-align:left;margin-top:8px">数据范围：<b>${esc(mn)}</b> ~ <b>${esc(mx)}</b></div>`:`<div class="hint" style="text-align:left;margin-top:8px">尚未加载数据</div>`;
-  if(state.dateMode==='month'){wrap.innerHTML=`<input type="month" class="inp" id="mInput" value="${state.month}" style="color-scheme:dark">${hint}`;document.getElementById('mInput').onchange=e=>{state.month=e.target.value;renderAnalysis();};}
+  if(state.dateMode==='billing'){
+    const current=analysisLoadedPeriodInfo(fmtD(new Date()));
+    wrap.innerHTML=`<div style="color:var(--text2);font-size:12px;padding:8px 0">当前账期：<b>${esc(current.startStr)}</b> → <b>${esc(current.endStr)}</b></div>${hint}`;
+  }
   else if(state.dateMode==='range'){wrap.innerHTML=`<div class="field"><label>起始</label><input type="date" class="inp" id="fInput" value="${state.from}" style="color-scheme:dark"></div><div class="field" style="margin-top:8px"><label>结束</label><input type="date" class="inp" id="tInput" value="${state.to}" style="color-scheme:dark"></div>${hint}${dates.length?`<button class="btn btn-ghost" id="btnFill" style="margin-top:8px;width:100%;font-size:11px">使用完整数据范围</button>`:''}`;
     document.getElementById('fInput').onchange=e=>{state.from=e.target.value;renderAnalysis();};
     document.getElementById('tInput').onchange=e=>{state.to=e.target.value;renderAnalysis();};
@@ -3525,7 +3528,7 @@ function renderFilterControls(){
 function filtered(){
   const sessions=normalizeLedgerSessions(state.analysisSessions);
   if(state.dateMode==='all')return sessions;
-  return sessions.filter(s=>{const d=(s.date||'').slice(0,10);if(state.dateMode==='month')return d.startsWith(state.month);if(state.from&&d<state.from)return false;if(state.to&&d>state.to)return false;return true;});
+  return sessions.filter(s=>{const d=(s.date||'').slice(0,10);if(state.dateMode==='billing')return analysisLoadedPeriodInfo(d).current;if(state.from&&d<state.from)return false;if(state.to&&d>state.to)return false;return true;});
 }
 function computeAna(sessions){
   sessions=normalizeLedgerSessions(sessions);
@@ -5488,32 +5491,18 @@ function renderAnalysis(){
   const hc=state.saved.length;
   document.getElementById('histCount').textContent=hc;
   const hc2=document.getElementById('histCount2');if(hc2)hc2.textContent=hc;
-  renderAnalysisChips();
   const filt=filtered(),a=computeAna(filt);
   const wrap=document.getElementById('analysisContent');
   Object.values(charts).forEach(c=>{try{c.destroy();}catch{}});Object.keys(charts).forEach(k=>delete charts[k]);
   if(!a){wrap.innerHTML=`<div class="empty-state card" style="padding:44px;margin-top:14px"><div class="empty-ico">📊</div><div class="empty-title">等待数据</div><div class="empty-text">${state.analysisSessions.length===0?'粘贴TXT、上传文件，或从历史导入':'当前筛选条件下无数据，请调整时间范围'}</div></div>`;return;}
-  const pl=state.dateMode==='month'?`${state.month} 月度`:state.dateMode==='range'?`${state.from||'起'} ~ ${state.to||'今'}`:'全部时段';
+  const pl=state.dateMode==='billing'?'当前账期':state.dateMode==='range'?`${state.from||'起'} ~ ${state.to||'今'}`:'全部历史';
   const financeBody='<div class="chart-wrap" style="height:200px"><canvas id="cFinTrend"></canvas></div>';
-  const peopleBody='<div class="chart-wrap" style="height:180px"><canvas id="cPeople"></canvas></div>';
-  const txBody=`<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px"><select class="sel" id="txCF" style="padding:7px 10px;font-size:12px;width:auto"><option value="all">全部</option><option value="cash">C 现金</option><option value="bank">B 银行</option><option value="refund">R 退款</option><option value="expense">E 支出</option><option value="tag:New">N 新入住</option><option value="tag:Transfer">T 换床位</option><option value="tag:Old">O 老租客</option><option value="ptype:discount">折扣</option><option value="ptype:installment">分期</option></select><div class="search-wrap"><svg class="ico"><use href="#i-search"/></svg><input class="inp" id="txS" placeholder="床位/备注" style="padding:7px 10px 7px 28px;font-size:12px;width:150px"></div><span id="txCounter" style="font-size:11px;color:var(--text3)"></span></div><div class="table-wrap" id="txWrap"></div>`;
   const balanceTotal=balanceTotalFromTotals(a.totals);
   wrap.innerHTML=`
-  <div class="card" style="margin-top:14px"><div class="card-head"><div><div class="card-title">${esc(pl)}</div><div class="card-sub">${a.n} 个会话 · ${a.all.length} 笔交易</div></div><div style="text-align:right"><div class="card-sub">期间总收入</div><div style="font-size:26px;font-weight:800;color:#1a9e3f;font-family:JetBrains Mono,monospace;letter-spacing:0">${fmtMoney(a.totals.total)} <span style="font-size:12px;color:var(--text3)">AED</span></div></div></div>
-  <div class="card-body"><div class="ana-kpi-grid">${[['现金收入',a.totals.cashIn,'#c8902a'],['银行收入',a.totals.bankIn,'#1a8a4a'],['押金退款',a.totals.refundOut,'#e06c00'],['其他支出',a.totals.expOut,'#d93025'],['现金结余',a.totals.cashBal,'#5b7fa6'],['结余总计',balanceTotal,'#0f766e']].map(([l,v,c])=>`<div class="ana-kpi"><div class="ana-kpi-lbl">${l}</div><div class="ana-kpi-val" style="color:${c}">${fmtMoney(v)}</div></div>`).join('')}</div>
-  <div class="hint" style="text-align:left;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">平均每次交接 <b style="color:var(--accent)">${fmtMoney(a.avg)} AED</b></div></div></div>
-  ${anaPanelHtml('session','逐会话对比','排查核账专用 · 默认收起','<div id="anaSessionBreakdown"></div>')}
-  ${anaPanelHtml('finance','财务趋势','每次交接 · 默认收起',financeBody)}
-  ${anaPanelHtml('people','人员变动','新入住 · 退房 · 柱形图',peopleBody)}
-  ${anaPanelHtml('tx','所有交易明细','流水较多，默认收起',txBody)}`;
+  <div class="card" style="margin-top:14px"><div class="card-head"><div><div class="card-title">${esc(pl)}</div><div class="card-sub">历史档案 · ${a.n} 个会话 · ${a.all.length} 笔记录</div></div><div style="text-align:right"><div class="card-sub">总收入</div><div style="font-size:26px;font-weight:800;color:#1a9e3f;font-family:JetBrains Mono,monospace;letter-spacing:0">${fmtMoney(a.totals.total)} <span style="font-size:12px;color:var(--text3)">AED</span></div></div></div>
+  <div class="card-body"><div class="ana-kpi-grid">${[['现金收入',a.totals.cashIn,'#c8902a'],['银行收入',a.totals.bankIn,'#1a8a4a'],['总支出',a.totals.refundOut+a.totals.expOut,'#d93025'],['现金净额',a.totals.cashBal,'#5b7fa6'],['净资金增加',balanceTotal,'#0f766e'],['记录数',a.all.length,'#142033']].map(([l,v,c])=>`<div class="ana-kpi"><div class="ana-kpi-lbl">${l}</div><div class="ana-kpi-val" style="color:${c}">${l==='记录数'?v:fmtMoney(v)}</div></div>`).join('')}</div></div></div>
+  <div class="card" style="margin-top:14px"><div class="card-head"><div><div class="card-title">收入与支出趋势</div><div class="card-sub">按历史档案日期统计 · 不补齐缺失数据</div></div></div><div class="card-body">${financeBody}</div></div>`;
   buildCharts(a);
-  if(state.anaOpen?.session)buildSessionTable(filt);
-  if(state.anaOpen?.tx){
-    buildTxTable(a.all);
-    document.getElementById('txCF').value=state.txCatFilter;document.getElementById('txS').value=state.txSearch;
-    document.getElementById('txCF').onchange=e=>{state.txCatFilter=e.target.value;buildTxTable(a.all);};
-    document.getElementById('txS').oninput=e=>{state.txSearch=e.target.value;buildTxTable(a.all);};
-  }
 }
 function dList(title,icon,items,rowFn,empty){
   return `<div class="card"><div class="card-head"><div class="card-title"><svg class="ico" style="color:var(--accent)"><use href="#${icon}"/></svg>${title}</div><span style="font-size:11px;color:var(--text3)">${items.length}笔</span></div><div class="card-body">${items.length===0?`<div style="text-align:center;color:var(--text3);font-size:12px;padding:22px">${empty}</div>`:`<div class="detail-list">${items.map(e=>`<div class="detail-row">${rowFn(e)}</div>`).join('')}</div>`}</div></div>`;
@@ -6960,6 +6949,41 @@ async function importHistorySessions(selected,{retry=false}={}){
   }
 }
 
+let analysisHistoryRefreshPromise=null;
+async function refreshAnalysisFromHistory(){
+  if(analysisHistoryRefreshPromise)return analysisHistoryRefreshPromise;
+  analysisHistoryRefreshPromise=(async()=>{
+    const wrap=document.getElementById('analysisContent');
+    if(wrap)wrap.innerHTML='<div class="empty-state card" style="padding:44px;margin-top:14px"><div class="empty-title">正在读取历史档案</div><div class="empty-text">分析页只使用云端历史记录，不读取浏览器测试缓存。</div></div>';
+    const summaries=[];
+    for(let offset=0;offset<1000;offset+=30){
+      const response=await apiFetch(ownerRunScopedApi(`/api/history?limit=30&offset=${offset}`));
+      if(!response.ok)throw new Error(`HISTORY_HTTP_${response.status}`);
+      const page=await response.json();
+      if(!Array.isArray(page))throw new Error('HISTORY_RESPONSE_INVALID');
+      summaries.push(...page);
+      if(page.length<30)break;
+    }
+    const job={currentController:null,timings:{historyFetchMs:0}};
+    const loaded=[];
+    for(const raw of summaries){
+      const session=normalizeLedgerSession({id:raw.id,date:raw.date||'',anchorId:raw.canonical_anchor_id||raw.entry_id||raw.anchor_id||raw.id,canonicalAnchorId:raw.canonical_anchor_id||'',entryId:raw.entry_id||'',entries:[],entriesCount:raw.entries_count,export_text:raw.export_text||'',createdBy:raw.created_by||'',source:raw.source||'',_cloud:true});
+      const entries=await loadHistoryImportEntries(session,job);
+      if(entries.length)loaded.push(normalizeLedgerSession({...session,entries,entriesCount:entries.length}));
+    }
+    state.analysisSessions=dedupSessions(loaded);
+    renderFilterControls();
+    renderAnalysis();
+    return state.analysisSessions.length;
+  })().catch(error=>{
+    state.analysisSessions=[];
+    const wrap=document.getElementById('analysisContent');
+    if(wrap)wrap.innerHTML=`<div class="empty-state card" style="padding:44px;margin-top:14px"><div class="empty-title">历史档案读取失败</div><div class="empty-text">${esc(error?.message||'读取失败')}</div></div>`;
+    return 0;
+  }).finally(()=>{analysisHistoryRefreshPromise=null;});
+  return analysisHistoryRefreshPromise;
+}
+
 async function fromHistory(){
   if(!Array.isArray(window._histSessions)) await updateHistCount();
   const sessions=window._histSessions||[];
@@ -8246,7 +8270,12 @@ function switchView(v){
   if(v==='arrears'){loadArrearsForOwner({showLoading:true});}
   if(v==='overview'){renderOwnerOverview();updateHistCount();}
   if(v==='history')renderHistory();
-  if(v==='analysis'){const bw=document.getElementById('billingWidget');if(bw)bw.innerHTML='';renderFilterControls();renderAnalysis();updateHistCount();}
+  if(v==='analysis'){
+    const bw=document.getElementById('billingWidget');if(bw)bw.innerHTML='';
+    state.analysisSessions=[];
+    renderFilterControls();
+    refreshAnalysisFromHistory();
+  }
   if(v==='clients'){ccOpenView();}
   if(v==='wifi'){wmRenderPage();}
 }

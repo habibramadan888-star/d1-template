@@ -1697,13 +1697,13 @@ body::before{
   <!-- ANALYSIS -->
   <section id="view-analysis" class="view hidden">
     <div class="page-title">阶段性分析<span class="en-sub" style="font-size:12px;letter-spacing:0.08em;margin-top:3px">PERIOD ANALYSIS</span></div>
-    <div class="page-sub">导入 TXT 锚点文档 · 选择时间段 · 生成报告</div>
+    <div class="page-sub">数据来源：云端历史档案 · 当前账期、全部历史或自选区间</div>
 
     <!-- 账期收款概览 -->
     <div id="billingWidget" style="margin-bottom:14px"></div>
 
     <!-- 紧凑导入面板 -->
-    <div class="import-panel">
+    <div class="import-panel" style="display:none" aria-hidden="true">
       <!-- 三个功能 tab -->
       <div class="import-actions">
         <button class="import-tab active" id="itabPaste" onclick="switchImportTab('paste')">
@@ -1755,15 +1755,15 @@ body::before{
           时间筛选
         </div>
         <div class="filter-tabs" id="filterTabs">
-          <button class="ftab active" data-mode="all">全部<span class="en-sub">ALL</span></button>
-          <button class="ftab" data-mode="month">月度<span class="en-sub">MONTHLY</span></button>
+          <button class="ftab active" data-mode="billing">当前账期<span class="en-sub">CURRENT</span></button>
+          <button class="ftab" data-mode="all">全部<span class="en-sub">ALL</span></button>
           <button class="ftab" data-mode="range">区间<span class="en-sub">RANGE</span></button>
         </div>
         <div id="filterControls"></div>
       </div>
     </div>
 
-    <div id="analysisChips"></div>
+    <div id="analysisChips" style="display:none"></div>
     <div id="analysisContent"></div>
   </section>
   <!-- CLIENTS -->
@@ -1817,7 +1817,7 @@ body::before{
 </main>
 <footer id="footerEl" style="display:none">HOMELINK FINANCE LEDGER · 云端 D1 · v11.46-cloud</footer>
 
-<script src="./index-51-main.js?v=owner-outstanding-ttlock-overdue-v16"></script>
+<script src="./index-51-main.js?v=owner-history-analysis-v17"></script>
 
 <div id="cp-overlay" style="display:none;position:fixed;inset:0;z-index:9999;overflow-y:auto;background:#F5F5F0;">
 <!-- TOPBAR -->
