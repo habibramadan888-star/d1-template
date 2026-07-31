@@ -6104,8 +6104,7 @@ function ownerOverviewConsoleSotCloud(){
 }
 function ownerOverviewConsoleSotRows(){
   const sot=ownerOverviewConsoleSotCloud();
-  if(Array.isArray(sot.rows))return sot.rows;
-  if(Array.isArray(sot.all_rows))return sot.all_rows;
+  if(Array.isArray(sot.overdue))return sot.overdue.filter(row=>String(row?.source_type||'')==='ttlock_expired_unpaid');
   return [];
 }
 function ownerOverviewReceivableAmount(row){
@@ -6247,9 +6246,9 @@ function renderOwnerOverview(){
   const cloudRisk=ownerOverviewRiskCloud();
   const consoleSot=ownerOverviewConsoleSotCloud();
   const consoleSummary=consoleSot.summary||{};
-  const hasConsoleSot=!!consoleSot.summary;
-  const outstandingAmount=hasConsoleSot?Number(consoleSummary.outstanding_amount_fils||consoleSummary.total_amount_fils||0)/100:0;
-  const outstandingCount=hasConsoleSot?Number(consoleSummary.action_count??consoleSummary.total_count??0):0;
+  const outstandingRows=ownerOverviewConsoleSotRows();
+  const outstandingAmount=outstandingRows.reduce((sum,row)=>sum+ownerOverviewReceivableAmount(row),0);
+  const outstandingCount=outstandingRows.length;
   const todayTodo=ownerOverviewTodayTodoCount();
   const consoleRiskNote=`欠款中 ${Number(consoleSummary.overdue_count||0)} / 今天 ${Number(consoleSummary.due_today_count||0)} / 3天内 ${Number(consoleSummary.due_soon_count||0)}`;
   const todoRiskNote=ownerOverviewTodayTodoNote();
