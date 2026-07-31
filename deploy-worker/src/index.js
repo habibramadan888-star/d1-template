@@ -44,6 +44,9 @@ import {
   employeeValidationErrorCatalogEntry,
   normalizeEmployeeValidationErrorCode
 } from "../../modules/employees/validation-error-catalog.mjs";
+import { buildEmployeeRawCanonicalEntry } from "../../modules/employees/raw-ingestion-contract.mjs";
+import { appendRawArchiveEntry } from "../../modules/canonical/raw-event-archive.mjs";
+import { projectRawHeldSessionReadModel } from "../../modules/owner-history/raw-held-session-read-model.mjs";
 
 // src/lib/jwt.js
 var ALGO = { name: "HMAC", hash: "SHA-256" };
@@ -4053,37 +4056,7 @@ async function employeeRawPreparedInsert(env,table,values,allowed,mode="INSERT")
 }
 __name(employeeRawPreparedInsert,"employeeRawPreparedInsert");
 function employeeRawCanonicalEntry(envelope,user,anomalies,submittedAt,rawPayload){
-  const entry=envelope.entry||{};
-  const sourceReferences={
-    arrears_ref:cleanId(entry.arrears_ref||entry.linked_task_id||entry.original_arrears_id||""),
-    deposit_ref:cleanId(entry.deposit_ref||entry.checkout_ref||""),
-    ttlock_context_present:!!(entry.ttlock_context||entry.access_snapshot_context),
-    original_session_id:cleanId(entry.original_session_id||""),
-    original_event_id:cleanId(entry.original_event_id||"")
-  };
-  return {
-    ...entry,
-    id:envelope.event_id,
-    entry_id:envelope.event_id,
-    event_id:envelope.event_id,
-    anchor_id:cleanId(entry.anchor_id||entry.event_id||entry.id)||envelope.event_id,
-    session_id:envelope.session_id,
-    type:envelope.type,
-    event_type:envelope.event_type,
-    employee:cleanText(user?.userid||"",120),
-    operator:cleanText(entry.operator||entry.operator_id||user?.userid||"",120),
-    submitted_at:submittedAt,
-    source:"employee_entry",
-    source_references:sourceReferences,
-    raw_payload:rawPayload,
-    idempotency_key:envelope.idempotency_key,
-    idempotency_fingerprint:accessSnapshotRuntimeHash(JSON.stringify({session_id:envelope.session_id,event_id:envelope.event_id,event_type:envelope.event_type,raw_payload:rawPayload})),
-    anomalies,
-    review_required:anomalies.length>0,
-    ingestion_status:"ACCEPTED",
-    projection_status:"HELD_FOR_REVIEW",
-    validation_status:anomalies.length?"accepted_with_anomaly":"accepted"
-  };
+  return buildEmployeeRawCanonicalEntry({envelope,user,anomalies,submitted_at:submittedAt,raw_payload:rawPayload},{cleanText,cleanId,hash:accessSnapshotRuntimeHash});
 }
 __name(employeeRawCanonicalEntry,"employeeRawCanonicalEntry");
 async function persistEmployeeRawIngestion(env,user,body,validationResult,requestContext=null){
@@ -4116,16 +4089,11 @@ async function persistEmployeeRawIngestion(env,user,body,validationResult,reques
     });
   }
   const existingSession=await env.DB.prepare("SELECT * FROM sessions WHERE id=? AND corpid=? LIMIT 1").bind(envelope.session_id,user.corpid).first().catch(()=>null);
-  let existingEntries=[];
-  if(existingSession?.entries_json){
-    try{const parsed=JSON.parse(existingSession.entries_json);existingEntries=Array.isArray(parsed)?parsed:(Array.isArray(parsed?.entries)?parsed.entries:[]);}catch{return json({success:false,ok:false,error_code:"CANONICAL_ARCHIVE_CORRUPT",ingestion_status:"REJECTED_TECHNICAL",no_write:true,write_attempted:false},409);}
-  }
-  if(existingEntries.some(row=>cleanId(row?.entry_id||row?.event_id||row?.id)===envelope.event_id)){
-    return json({success:false,ok:false,error_code:"EMPLOYEE_IDEMPOTENCY_CONFLICT",ingestion_status:"REJECTED_TECHNICAL",projection_status:"NOT_APPLICABLE",no_write:true,write_attempted:false},409);
-  }
-  const mergedEntries=[...existingEntries,canonicalEntry];
+  const archive=appendRawArchiveEntry(existingSession?.entries_json||"",canonicalEntry);
+  if(!archive.ok)return json({success:false,ok:false,error_code:archive.error_code,ingestion_status:"REJECTED_TECHNICAL",projection_status:"NOT_APPLICABLE",no_write:true,write_attempted:false},409);
+  const mergedEntries=archive.entries;
   const mergedEntryCount=mergedEntries.length;
-  const entriesJson=JSON.stringify({anchor_contract_version:"employee_raw_ingestion_v1",projection_status:"HELD_FOR_REVIEW",entries:mergedEntries});
+  const entriesJson=archive.entries_json;
   if(entriesJson.length>250000)return json({success:false,ok:false,error_code:"CANONICAL_ARCHIVE_PAYLOAD_TOO_LARGE",ingestion_status:"REJECTED_TECHNICAL",no_write:true,write_attempted:false},413);
   const eventValue=JSON.stringify({
     raw_payload:rawPayload,canonical_anchor:canonicalEntry,anomalies,
@@ -7202,10 +7170,12 @@ function canonicalOwnerHistorySessionRow(session={},correctionFields=null){
   const active=canonicalOwnerHistoryActiveForTotals(archiveState);
   const summary=correctionFields?.correction_summary||null;
   const sessionSummary=canonicalSessionSummaryRead(session);
+  const rawHeldReadModel=projectRawHeldSessionReadModel(session);
   return {
     ...session,
     ...(sessionSummary||{}),
     session_summary:sessionSummary,
+    raw_held_read_model:rawHeldReadModel,
     archive_state:archiveState,
     canonical_archive_gateway:"canonical_owner_history_archive_gateway",
     active_archive_record:active,
