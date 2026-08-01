@@ -14754,7 +14754,7 @@ async function handleRequest(request, env, ctx) {
       await audit(env, user, "arrear.clear", id, { changed });
       return success({ success: true, changed });
     }
-    if (path === "/api/owner/overview/comparative-summary" && method === "GET") {
+    if ((path === "/api/owner/history-projection-snapshot" || path === "/api/owner/overview/comparative-summary") && method === "GET") {
       if (!canReadOwnerData(user)) return forbidden();
       return phase0OwnerOverviewComparativeSummary(env,user,url);
     }

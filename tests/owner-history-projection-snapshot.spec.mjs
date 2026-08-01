@@ -16,6 +16,7 @@ test("owner history projection snapshot reads cloud projection tables directly",
   const receivables = block(worker, "async function ownerHistoryProjectionReceivables", "__name(ownerHistoryProjectionReceivables");
 
   assert.match(worker, /\/api\/owner\/history-projection-snapshot/);
+  assert.match(worker, /\(path === "\/api\/owner\/history-projection-snapshot" \|\| path === "\/api\/owner\/overview\/comparative-summary"\) && method === "GET"/);
   assert.match(receivables, /FROM arrear_tasks/);
   assert.match(receivables, /source_type==="ttlock_expired_unpaid"/);
   assert.match(receivables, /mode:"direct_cloud_projection"/);
