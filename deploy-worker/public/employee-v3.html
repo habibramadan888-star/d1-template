@@ -5624,6 +5624,7 @@ updateEntrySessionActionState=function(){
   }
   const exportBtn=$('btnExportSession');
   if(exportBtn&&exportBtn.dataset.busy!=='1'){
+    exportBtn.removeAttribute('aria-disabled');
     let qaFinalizeOnlyReady=false;
     if(state.qaAcceptance?.runId){
       const qaPolicy=employeeQaAcceptanceStatePolicy(state.qaAcceptance.status,state.qaAcceptance.cleanupStatus,state.qaAcceptance.loadStatus);
