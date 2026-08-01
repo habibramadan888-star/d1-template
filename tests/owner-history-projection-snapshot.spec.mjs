@@ -29,9 +29,11 @@ test("owner history projection snapshot reads cloud projection tables directly",
   assert.match(handler, /today_todos:ownerHistoryProjectionTodos\(historyReceivables\)/);
   assert.match(handler, /nested_gateway_calls:0/);
   assert.doesNotMatch(handler.slice(0, handler.indexOf("Legacy expanded comparison pipeline")), /resolveCurrentReceivablesSot|canonicalFinanceProjectionBuild|empLoadLockCards/);
-  assert.match(reconcile, /resolveConsoleReceivablesSot/);
-  assert.match(reconcile, /Array\.isArray\(sot\.overdue\)\?sot\.overdue:\[\]/);
-  assert.match(reconcile, /sourceStatus\.ok!==true\|\|sourceStatus\.data_source!=="live_api"/);
+  assert.match(reconcile, /empLoadLockCardsWithCacheFallback/);
+  assert.match(reconcile, /strict_access_snapshot:true/);
+  assert.match(reconcile, /consoleSotRowsFromLockCards/);
+  assert.match(reconcile, /mapped\.byStatus\.overdue/);
+  assert.match(reconcile, /lockResult\?\.error\|\|lockResult\?\.fallback/);
   assert.match(reconcile, /TTLOCK_NO_LONGER_EXPIRED/);
   assert.match(reconcile, /ttlock_projection_reconcile/);
   assert.match(reconcile, /existing\.source_fingerprint===fingerprint&&empCloseStatusIsOpen/);

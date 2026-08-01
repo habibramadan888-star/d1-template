@@ -11474,18 +11474,26 @@ async function ownerOverviewFetchBedTransferReviews(env,user){
 }
 __name(ownerOverviewFetchBedTransferReviews,"ownerOverviewFetchBedTransferReviews");
 async function reconcileOwnerTtlockReceivablesProjection(env,user,opts={}){
-  const sot=await resolveConsoleReceivablesSot(env,user,{
-    limit:500,
-    ttlockTimeoutMs:Math.min(Math.max(Number(opts.ttlockTimeoutMs||8000),1000),12000),
-    request_context:opts.request_context,
-    max_age_ms:opts.max_age_ms
-  });
-  const sourceStatus=sot?.source_status?.ttlock_expired_unpaid||{};
-  if(sourceStatus.ok!==true||sourceStatus.data_source!=="live_api"){
-    return {ok:false,reconciled:false,reason:"LIVE_TTLOCK_SOURCE_UNAVAILABLE",source_status:sourceStatus};
+  const timeoutMs=Math.min(Math.max(Number(opts.ttlockTimeoutMs||8000),1000),12000);
+  const [lockResult,rentConfig]=await Promise.all([
+    empLoadLockCardsWithCacheFallback(env,user,{
+      timeoutMs,limit:500,strict_access_snapshot:true,
+      request_context:opts.request_context,
+      max_age_ms:opts.max_age_ms
+    }),
+    empRentConfigReadOnly(env,user.corpid).catch(()=>({}))
+  ]);
+  if(lockResult?.error||lockResult?.fallback){
+    return {ok:false,reconciled:false,reason:"LIVE_TTLOCK_SOURCE_UNAVAILABLE",source_status:{
+      ok:false,error:empTtlockReadErrorCode(lockResult),data_source:lockResult?.data_source||"live_api"
+    }};
   }
+  const mapped=consoleSotRowsFromLockCards(lockResult?.roomsData||{},rentConfig);
+  const rows=Array.isArray(mapped?.byStatus?.overdue)?mapped.byStatus.overdue:[];
+  const sourceStatus=empSourceStatus(true,"",{
+    data_source:"live_api",count:rows.length,locks_count:Number(lockResult?.locksCount||0),missing_rent_count:mapped.missingRent.length
+  });
   const now=empNow();
-  const rows=Array.isArray(sot.overdue)?sot.overdue:[];
   const liveRefs=new Set();
   let created=0;
   let updated=0;
@@ -11535,7 +11543,7 @@ async function reconcileOwnerTtlockReceivablesProjection(env,user,opts={}){
       .bind(user.userid,now,row.task_id,user.corpid).run();
     closed++;
   }
-  return {ok:true,reconciled:true,active_count:liveRefs.size,created_count:created,updated_count:updated,closed_count:closed,
+  return {ok:true,reconciled:true,active_count:liveRefs.size,created_count:created,updated_count:updated,closed_count:closed,source_status:sourceStatus,
     source:{gateway:"owner_console_current_view",projection_table:"arrear_tasks",nested_client_gateways:0},generated_at:now};
 }
 __name(reconcileOwnerTtlockReceivablesProjection,"reconcileOwnerTtlockReceivablesProjection");
