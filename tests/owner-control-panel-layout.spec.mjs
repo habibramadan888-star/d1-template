@@ -11,8 +11,10 @@ test("control panel mobile shell avoids compressed topbar layout", async () => {
   );
   assert.match(
     html,
-    /#cp-overlay \.topbar-actions\{display:grid!important;grid-template-columns:repeat\(2,minmax\(0,1fr\)\)!important/
+    /#cp-overlay \.topbar-actions\{display:grid!important;grid-template-columns:repeat\(5,minmax\(0,1fr\)\)!important;gap:5px!important;width:100%!important/
   );
+  assert.match(html, /#cp-overlay \.topbar-actions \.btn\{[^}]*min-height:42px!important;[^}]*background:transparent!important;[^}]*box-shadow:none!important/);
+  assert.match(html, /#cp-overlay \.topbar-actions #btnGlobalRent\.btn-green\{[^}]*background:rgba\(17,154,75,\.11\)!important/);
   assert.match(
     html,
     /#cp-overlay \.filter-pills\{display:grid!important;grid-template-columns:repeat\(3,minmax\(0,1fr\)\)!important/
