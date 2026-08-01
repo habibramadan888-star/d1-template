@@ -4581,9 +4581,12 @@ function rc_saveCfgFromUI(){
    2. 用户手动输入当前批次价格，不预设快捷金额。
    3. 勾选床位后点“确认本批”，才保存这一批床位的价格。 */
 var _rcCfgOpenGroups=_rcCfgOpenGroups||{};
+function rc_activeCfgContainer(){
+  return document.getElementById('cpGlobalRentConfig')||document.getElementById('rc_cfgPanel');
+}
 function rc_toggleCfgGroup(group){
   _rcCfgOpenGroups[group]=!_rcCfgOpenGroups[group];
-  const c=document.getElementById('rc_cfgPanel');if(c)rc_renderCfg(c);
+  const c=rc_activeCfgContainer();if(c)rc_renderCfg(c);
 }
 function rc_collectRentBeds(){
   const map=new Map();
@@ -4663,12 +4666,12 @@ function rc_renderCfg(container){
     </div>`;
   }).join('');
   container.innerHTML=`
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:10px">
+    <div class="rc-config-head" style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:10px">
       <div>
         <div style="font-size:13px;font-weight:800;color:var(--text)">参考租金设置</div>
         <div style="font-size:11px;color:var(--text3);margin-top:3px">显示门禁卡全部床位，空床也包含 · 已设置 <b style="color:${configured?'var(--green)':'var(--text3)'}">${configured}</b>/${beds.length} (${pct}%)</div>
       </div>
-      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
+      <div class="rc-config-actions" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
         <input id="rc_batchVal" type="number" placeholder="AED" style="width:76px;padding:6px 8px;border:1px solid var(--border);border-radius:7px;font-size:12px;text-align:right">
         <button onclick="rc_applySelected()" class="btn btn-primary" style="font-size:11px;padding:6px 12px">确认本批</button>
         <button onclick="rc_selectEmpty()" class="btn btn-ghost" style="font-size:11px;padding:6px 10px">勾选未设置</button>
@@ -4676,7 +4679,7 @@ function rc_renderCfg(container){
       </div>
     </div>
     <div style="font-size:10px;color:var(--text3);padding:7px;background:rgba(26,115,232,0.06);border-radius:6px;margin-bottom:10px">手动输入本批租金，再勾选对应床位，最后点“确认本批”。绿色表示已完成设置，橙色表示还未设置。</div>
-    <div id="rc_cfgRows" style="max-height:410px;overflow-y:auto;padding-right:4px">
+    <div id="rc_cfgRows" class="rc-config-rows">
       ${beds.length?rows:'<div style="color:var(--text3);font-size:12px;padding:14px 0;text-align:center">No bed data. Reload cards first. / 暂无床位数据，请先重新读取卡片</div>'}
     </div>`;
 }
@@ -4698,7 +4701,7 @@ function rc_applySelected(){
   rooms.forEach(r=>{cfg[r]=v;});
   rc_saveRoomCfg(cfg);
   toast(`已确认 ${rooms.length} 个床位为 ${v} AED`);
-  const c=document.getElementById('rc_cfgPanel');if(c)rc_renderCfg(c);
+  const c=rc_activeCfgContainer();if(c)rc_renderCfg(c);
 }
 function rc_selectEmpty(){
   const cfg=rc_getRoomCfg();let count=0;

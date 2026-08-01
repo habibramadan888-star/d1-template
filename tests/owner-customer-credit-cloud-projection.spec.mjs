@@ -33,12 +33,19 @@ test('credit uses live request context and a bounded last-good cloud snapshot', 
 test('global rent configuration is restored in owner control panel', async () => {
   const html = await readFile(ownerHtmlPath, 'utf8');
   const control = await readFile(ownerControlPath, 'utf8');
+  const owner = await readFile(ownerJsPath, 'utf8');
   assert.match(html, /id="btnGlobalRent"/);
   assert.match(html, /id="cpGlobalRentSection"/);
   assert.match(html, /id="cpGlobalRentConfig"/);
   assert.match(html, /云端唯一配置/);
   assert.match(control, /async function cp_toggleRentConfig/);
   assert.match(control, /await rc_loadRoomCfgFromCloud\(\);rc_renderCfg\(panel\)/);
+  assert.match(owner, /function rc_activeCfgContainer\(\)/);
+  assert.match(owner, /getElementById\('cpGlobalRentConfig'\)\|\|document\.getElementById\('rc_cfgPanel'\)/);
+  assert.match(owner, /function rc_toggleCfgGroup\(group\)[\s\S]*?const c=rc_activeCfgContainer\(\);if\(c\)rc_renderCfg\(c\)/);
+  assert.match(owner, /id="rc_cfgRows" class="rc-config-rows"/);
+  assert.doesNotMatch(owner.slice(owner.lastIndexOf('function rc_renderCfg(container)'), owner.indexOf('function rc_setBatchValue', owner.lastIndexOf('function rc_renderCfg(container)'))), /max-height:410px;overflow-y:auto/);
+  assert.match(html, /#cpGlobalRentSection \.rc-config-rows\{overflow:visible/);
 });
 test('owner client page consumes only the cloud projection endpoint', async () => {
   const source = await readFile(ownerJsPath, 'utf8');
