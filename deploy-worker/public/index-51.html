@@ -427,8 +427,13 @@ label .en-sub{letter-spacing:0.04em;font-size:8.5px}
 #cp-overlay .kpi-alerts {
   display:grid;
   grid-template-columns:repeat(3,1fr);
-  gap:10px;
+  gap:0;
   margin-bottom:10px;
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:var(--r2);
+  box-shadow:var(--sh);
+  overflow:hidden;
 }
 /* 统计区：4等分 */
 #cp-overlay .kpi-stats {
@@ -439,11 +444,11 @@ label .en-sub{letter-spacing:0.04em;font-size:8.5px}
 }
 
 @media(max-width:540px){
-  .kpi-alerts{grid-template-columns:repeat(3,1fr);gap:7px;}
+  .kpi-alerts{grid-template-columns:repeat(3,1fr);gap:0;}
   .kpi-stats {grid-template-columns:repeat(2,1fr);gap:7px;}
 }
 @media(max-width:360px){
-  .kpi-alerts{grid-template-columns:repeat(1,1fr);}
+  .kpi-alerts{grid-template-columns:repeat(3,1fr);}
   .kpi-stats {grid-template-columns:repeat(2,1fr);}
 }
 
@@ -464,8 +469,11 @@ label .en-sub{letter-spacing:0.04em;font-size:8.5px}
 #cp-overlay .kpi-sub{font-size:10px;color:var(--text3);margin-top:5px;font-family:var(--mono);}
 
 /* 警示卡：更大数字，有颜色底色 */
-#cp-overlay .kpi-alerts .kpi{padding:16px 16px 14px;}
-#cp-overlay .kpi-alerts .kpi-val{font-size:36px;}
+#cp-overlay .kpi-alerts .kpi{padding:13px 14px 12px;border:0;border-right:1px solid var(--border);border-radius:0;box-shadow:none;min-width:0;}
+#cp-overlay .kpi-alerts .kpi:last-child{border-right:0;}
+#cp-overlay .kpi-alerts .kpi:hover{box-shadow:none;transform:none;filter:brightness(.985);}
+#cp-overlay .kpi-alerts .kpi:active{transform:none;filter:brightness(.97);}
+#cp-overlay .kpi-alerts .kpi-val{font-size:30px;}
 
 #cp-overlay .kpi-red{background:var(--red-bg);   border-color:var(--red-b)!important;}
 #cp-overlay .kpi-red   .kpi-val{color:var(--red);}
@@ -971,7 +979,13 @@ body::before{
   .ana-kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
   .ana-kpi-val{font-size:22px}
   #cp-overlay .wrap{padding:16px 14px 72px}
-  #cp-overlay .kpi-alerts{grid-template-columns:1fr!important}
+  #cp-overlay .kpi-alerts{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:0!important}
+  #cp-overlay .kpi-alerts .kpi{padding:12px 10px 10px!important;min-height:102px!important}
+  #cp-overlay .kpi-alerts .kpi-cn{font-size:11px!important;white-space:nowrap}
+  #cp-overlay .kpi-alerts .kpi-en{display:none}
+  #cp-overlay .kpi-alerts .kpi-val{font-size:27px!important;margin-top:7px}
+  #cp-overlay .kpi-alerts .kpi-sub{font-size:9px!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #cp-overlay .kpi-alerts .kpi-tap{display:none}
   #cp-overlay .kpi-stats{grid-template-columns:repeat(2,minmax(0,1fr))!important}
   #cp-overlay .kpi-val{font-size:28px!important}
   #cp-overlay .topbar-inner{display:grid!important;grid-template-columns:1fr!important;gap:10px!important}
