@@ -39,6 +39,9 @@ test("owner history projection snapshot reads cloud projection tables directly",
   assert.match(reconcile, /TTLOCK_NO_LONGER_EXPIRED/);
   assert.match(reconcile, /ttlock_projection_reconcile/);
   assert.match(reconcile, /existing\.source_fingerprint===fingerprint&&empCloseStatusIsOpen/);
+  assert.match(reconcile, /const persistedByRef=new Map/);
+  assert.match(reconcile, /const existing=persistedByRef\.get\(sourceRef\)\|\|null/);
+  assert.doesNotMatch(reconcile, /WHERE corpid=\? AND source_type='ttlock_expired_unpaid' AND source_ref=\? LIMIT 1/);
   assert.doesNotMatch(reconcile, /DELETE\s+FROM/i);
 });
 

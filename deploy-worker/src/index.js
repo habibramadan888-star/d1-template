@@ -11495,6 +11495,10 @@ async function reconcileOwnerTtlockReceivablesProjection(env,user,opts={}){
   });
   const now=empNow();
   const liveRefs=new Set();
+  const persistedResult=await env.DB.prepare(`SELECT task_id,source_ref,source_fingerprint,close_status FROM arrear_tasks
+    WHERE corpid=? AND source_type='ttlock_expired_unpaid' AND COALESCE(voided_at,'')=''`).bind(user.corpid).all();
+  const persistedRows=Array.isArray(persistedResult?.results)?persistedResult.results:[];
+  const persistedByRef=new Map(persistedRows.map(row=>[cleanText(row?.source_ref||"",180),row]).filter(([ref])=>!!ref));
   let created=0;
   let updated=0;
   for(const source of rows){
@@ -11508,8 +11512,7 @@ async function reconcileOwnerTtlockReceivablesProjection(env,user,opts={}){
       corpid:user.corpid,source_type:"ttlock_expired_unpaid",source_ref:sourceRef,bed,
       due_date:dueDate,amount_fils:Math.round(amount*100),card_code:cleanText(source?.card_code||source?.customer_code||"",120)
     })));
-    const existing=await env.DB.prepare("SELECT task_id,source_fingerprint,close_status FROM arrear_tasks WHERE corpid=? AND source_type='ttlock_expired_unpaid' AND source_ref=? LIMIT 1")
-      .bind(user.corpid,sourceRef).first();
+    const existing=persistedByRef.get(sourceRef)||null;
     if(existing?.task_id){
       if(existing.source_fingerprint===fingerprint&&empCloseStatusIsOpen(existing.close_status))continue;
       await env.DB.prepare(`UPDATE arrear_tasks SET bed=?, tenant_name=?, tenant_card_id=?, arrear_amount=?, arrear_reason=?, promise_date=?,
@@ -11531,11 +11534,9 @@ async function reconcileOwnerTtlockReceivablesProjection(env,user,opts={}){
       created++;
     }
   }
-  const persisted=await env.DB.prepare(`SELECT task_id,source_ref FROM arrear_tasks
-    WHERE corpid=? AND source_type='ttlock_expired_unpaid' AND COALESCE(close_status,'') NOT IN ('CLOSED','closed') AND COALESCE(voided_at,'')=''`)
-    .bind(user.corpid).all();
   let closed=0;
-  for(const row of persisted.results||[]){
+  for(const row of persistedRows){
+    if(!empCloseStatusIsOpen(row?.close_status))continue;
     const sourceRef=cleanText(row?.source_ref||"",180);
     if(sourceRef&&liveRefs.has(sourceRef))continue;
     await env.DB.prepare(`UPDATE arrear_tasks SET close_status='closed', close_reason='TTLOCK_NO_LONGER_EXPIRED',
