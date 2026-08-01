@@ -5661,14 +5661,6 @@ updateEntrySessionActionState=function(){
         exportBtn.title=`Resume this QA Run: ${alreadyPersisted} already saved, ${remaining} remaining.`;
       }
     }
-    const transferWriteBlocked=!qaFinalizeOnlyReady&&state.drafts.some(entry=>entry.type==='TF'&&!employeeEntryCloudConfirmed(entry))&&!employeeBedTransferWriteEnabled();
-    if(transferWriteBlocked){
-      exportBtn.innerHTML=renderEmployeeButtonLabel('Upload Disabled','Bed Transfer validation only');
-      exportBtn.disabled=true;
-      exportBtn.classList.add('disabled');
-      exportBtn.title=BED_TRANSFER_WRITE_DISABLED_MESSAGE;
-      return;
-    }
     if(uploaded&&hasRows){
       exportBtn.innerHTML=renderEmployeeButtonLabel('Done','Upload Complete');
       exportBtn.disabled=true;
@@ -8776,12 +8768,6 @@ async function commitSessionAndExport(){
     refreshSessionViews();
     toast('Cloud already confirms this session / 云端已确认本票',5000);
     updateEntrySessionActionState();
-    return;
-  }
-  if(currentSessionHasCloudReviewBlock()){
-    refreshSessionViews();
-    showStatus('Cloud state changed. Owner review is required before upload. / 云端状态已变化，需要老板复核后再上传','warn');
-    toast('Cloud state changed. Owner review required / 云端状态已变化，需要复核',7000);
     return;
   }
   const btns=[$('btnExportSession'),$('btnBuildExport')].filter(Boolean);
