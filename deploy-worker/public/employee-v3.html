@@ -3400,6 +3400,7 @@ function employeeSetAuthInteractionLocked(locked){
     if(control.disabled)control.setAttribute('aria-disabled','true');else control.removeAttribute('aria-disabled');
     delete control.dataset.authLockPrevious;
   });
+  if(!locked)updateEntrySessionActionState();
 }
 function employeeRenderAuthWorkspacePlaceholder(status=EMPLOYEE_AUTH_STATES.REHYDRATING){
   if(state.user?.userid)return;

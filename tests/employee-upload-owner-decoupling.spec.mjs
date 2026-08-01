@@ -29,6 +29,8 @@ test('Bed Transfer capability state cannot disable the whole Session upload', ()
 test('enabled Upload Session clears stale auth aria-disabled state', () => {
   const actions = block('updateEntrySessionActionState=function()', 'function refreshSessionViews()');
   assert.match(actions, /exportBtn\.removeAttribute\('aria-disabled'\)/);
+  const authLock = block('function employeeSetAuthInteractionLocked(locked)', 'function employeeRenderAuthWorkspacePlaceholder(');
+  assert.match(authLock, /if\(!locked\)updateEntrySessionActionState\(\)/);
 });
 
 test('technical failures still preserve drafts and do not report false success', () => {
