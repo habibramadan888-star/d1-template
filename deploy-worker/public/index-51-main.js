@@ -6173,7 +6173,7 @@ async function loadOwnerOverviewComparativeSummary(){
   try{
     const qaRunId=ownerQaRunId();
     const [res,qaArrears]=await Promise.all([
-      apiFetch('/api/owner/overview/comparative-summary?period=month&include_last_month=true&include_same_month_last_year=true&include_quarter=true'),
+      apiFetch('/api/owner/history-projection-snapshot'),
       qaRunId?ownerGatewayJson(ownerRunScopedApi('/api/owner/cloud-arrears/projection'),{},10000).catch(()=>null):Promise.resolve(null)
     ]);
     const data=await res.json();
@@ -6185,6 +6185,11 @@ async function loadOwnerOverviewComparativeSummary(){
       data.qa_run_scope=qaArrears.qa_run_scope||{qa_run_id:qaRunId};
     }
     state.overviewComparative=data||{};
+    if(data?.today_todos){
+      state.ownerTodayTodos=data.today_todos;
+      state.ownerTodayTodosStatus='success';
+      state.ownerTodayTodosError='';
+    }
     state.overviewComparativeStatus='success';
     renderOwnerOverview();
     return true;
@@ -6322,8 +6327,10 @@ function renderOwnerOverview(){
     });
   });
   ensureOwnerOverviewComparativeAsync();
-  ensureOwnerFinanceAsync();
-  ensureOwnerOverviewArrearsAsync();
+  const financeDetails=wrap.querySelector('#ownerFinanceProjectionPanel')?.closest('details');
+  if(financeDetails)financeDetails.addEventListener('toggle',()=>{if(financeDetails.open)ensureOwnerFinanceAsync();},{once:true});
+  const arrearsDetails=wrap.querySelector('#ownerOverviewArrearsPanel')?.closest('details');
+  if(arrearsDetails)arrearsDetails.addEventListener('toggle',()=>{if(arrearsDetails.open)ensureOwnerOverviewArrearsAsync();},{once:true});
   ensureOwnerTodayTodosAsync();
 }
 

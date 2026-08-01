@@ -11473,12 +11473,77 @@ async function ownerOverviewFetchBedTransferReviews(env,user){
   return (rows.results||[]).map(bedTransferEventView);
 }
 __name(ownerOverviewFetchBedTransferReviews,"ownerOverviewFetchBedTransferReviews");
+async function ownerHistoryProjectionReceivables(env,user,limit=500){
+  const empty={all_rows:[],rows:[],overdue:[],due_today:[],due_soon:[],summary:{total_count:0,action_count:0,ttlock_expired_unpaid_count:0,existing_arrears_count:0,outstanding_amount_fils:0},source_breakdown:{ttlock_expired_unpaid_count:0,existing_arrears_count:0},source:{table:"arrear_tasks",mode:"direct_cloud_projection"}};
+  if(!await phase0TableExists(env,"arrear_tasks"))return empty;
+  const rows=await phase0All(env,`SELECT task_id, entry_id, bed, tenant_name, arrear_amount, actual_received, close_status, followup_status, promise_date, staff_note, owner_note, source_type, source_ref, created_at, updated_at
+    FROM arrear_tasks
+    WHERE corpid=? AND COALESCE(close_status,'')<>'closed' AND COALESCE(voided_at,'')=''
+    ORDER BY COALESCE(updated_at,created_at,'') DESC
+    LIMIT ?`,[user.corpid,Math.min(Math.max(Number(limit||500),1),500)]).catch(()=>[]);
+  const mapped=rows.map(row=>{
+    const amount=ownerOverviewMoney(row?.arrear_amount);
+    const received=ownerOverviewMoney(row?.actual_received);
+    const remaining=ownerOverviewMoney(Math.max(0,amount-received));
+    return {
+      task_id:cleanText(row?.task_id||"",160),
+      entry_id:cleanText(row?.entry_id||"",160),
+      bed:cleanText(row?.bed||"",80),
+      tenant_name:cleanText(row?.tenant_name||"",160),
+      source_type:cleanText(row?.source_type||"existing_arrears_record",80),
+      source_ref:cleanText(row?.source_ref||"",160),
+      amount:remaining,
+      remain:remaining,
+      remaining_arrears:remaining,
+      amount_fils:Math.round(remaining*100),
+      due_date:cleanDate(row?.promise_date||""),
+      note:cleanText(row?.staff_note||row?.owner_note||"",500),
+      status:"overdue",
+      source_table:"arrear_tasks",
+      source_mode:"direct_cloud_projection"
+    };
+  }).filter(row=>row.amount_fils>0);
+  const ttlock=mapped.filter(row=>row.source_type==="ttlock_expired_unpaid");
+  const existing=mapped.filter(row=>row.source_type!=="ttlock_expired_unpaid");
+  const outstandingFils=mapped.reduce((sum,row)=>sum+row.amount_fils,0);
+  return {
+    all_rows:mapped,
+    rows:mapped,
+    overdue:ttlock,
+    due_today:[],
+    due_soon:[],
+    summary:{total_count:mapped.length,action_count:mapped.length,ttlock_expired_unpaid_count:ttlock.length,existing_arrears_count:existing.length,outstanding_amount_fils:outstandingFils},
+    source_breakdown:{ttlock_expired_unpaid_count:ttlock.length,existing_arrears_count:existing.length},
+    source:{table:"arrear_tasks",mode:"direct_cloud_projection",nested_gateway_calls:0}
+  };
+}
+__name(ownerHistoryProjectionReceivables,"ownerHistoryProjectionReceivables");
+function ownerHistoryProjectionTodos(receivables={}){
+  const rows=Array.isArray(receivables.all_rows)?receivables.all_rows:[];
+  const todos=rows.map(row=>({
+    task_id:`history_receivable__${cleanText(row.task_id||row.source_ref||row.bed||"row",180)}`,
+    task_type:"CURRENT_RECEIVABLE_REQUIRED",
+    category:"receivables",
+    severity:"high",
+    bed:row.bed,
+    entry_id:row.entry_id,
+    title:`Bed ${row.bed||"-"} receivable requires follow-up`,
+    description:`Cloud arrears projection shows ${ownerOverviewMoney(row.amount)} AED requiring follow-up.`,
+    source_gateway:"owner_history_projection_snapshot",
+    source_proof:{table:"arrear_tasks",task_id:row.task_id,source_type:row.source_type,direct_cloud_projection:true},
+    status:"open",
+    due_date:row.due_date||""
+  }));
+  return {ok:true,success:true,gateway:"owner_history_projection_snapshot",source:"direct_cloud_projection",summary:{total_count:todos.length,open_count:todos.length,high_count:todos.length,reconciliation_count:0,receivables_count:todos.length},todos,items:todos,readonly:true,no_write:true};
+}
+__name(ownerHistoryProjectionTodos,"ownerHistoryProjectionTodos");
 async function phase0OwnerOverviewComparativeSummary(env,user,url){
   const today=empTodayDubai();
   const lightweightPeriods=[-5,-4,-3,-2,-1,0].map(offset=>ownerOverviewBillingPeriodRange(today,offset));
-  const lightweightSummaries=await Promise.all(lightweightPeriods.map(range=>
-    ownerOverviewFetchSessionPeriodSummary(env,user,range).catch(()=>({rows_checked:0,gross_received:0,cash_handover:0,bank_transfer_total:0,sessions:[],source_table:"sessions",rule:"owner_visible_sessions_summary"}))
-  ));
+  const [lightweightSummaries,historyReceivables]=await Promise.all([
+    Promise.all(lightweightPeriods.map(range=>ownerOverviewFetchSessionPeriodSummary(env,user,range).catch(()=>({rows_checked:0,gross_received:0,cash_handover:0,bank_transfer_total:0,sessions:[],source_table:"sessions",rule:"owner_visible_sessions_summary"})))),
+    ownerHistoryProjectionReceivables(env,user,500)
+  ]);
   const currentBillingPeriod=lightweightPeriods[lightweightPeriods.length-1];
   const lightweightCurrentPeriodReceived={...lightweightSummaries[lightweightSummaries.length-1],range:currentBillingPeriod,rule:"billing_period_3_to_2_owner_visible_sessions",inclusion_rule:"active_owner_statement_sessions_only"};
   const lightweightBillingPeriodTrend=lightweightSummaries.map((summary,index)=>({summary,range:lightweightPeriods[index]})).filter(({summary})=>summary.rows_checked&&ownerOverviewMoney(summary.gross_received)>0).map(({summary,range})=>({
@@ -11501,11 +11566,13 @@ async function phase0OwnerOverviewComparativeSummary(env,user,url){
     occupancy_flow:{},
     bed_transfer_review:{recorded_count:0,records:[],pending_review_count:0,pending_review:[]},
     arrears:{cloud_arrears_collection:{total_remaining:0,open_count:0,partial_count:0,details:[]},cloud_arrears_details:[]},
-    current_receivables_sot:null,
-    risk_watch:{},
+    current_receivables_sot:historyReceivables,
+    today_todos:ownerHistoryProjectionTodos(historyReceivables),
+    risk_watch:{action_count:historyReceivables.summary.action_count,outstanding_amount_fils:historyReceivables.summary.outstanding_amount_fils},
     data_quality:{rows_checked:{current_billing_period_sessions:lightweightCurrentPeriodReceived.rows_checked},no_data:lightweightCurrentPeriodReceived.rows_checked?[]:["current_billing_period_sessions"],warnings:[]},
     source_table:"sessions",
-    rule:"lightweight_owner_history_billing_period_summary"
+    rule:"owner_history_projection_snapshot",
+    nested_gateway_calls:0
   });
   /* Legacy expanded comparison pipeline retained below for reference, but intentionally unreachable:
      the owner overview no longer renders those expensive projections automatically. */
@@ -11703,7 +11770,7 @@ async function handlePhase0ReadOnlyApi(request,env,user){
       const limit=Math.min(Math.max(Number(url.searchParams.get("limit")||500),1),500);
       return success(await resolveConsoleReceivablesSot(env,user,{limit,ttlockTimeoutMs:8000,request_context:ttlockRequestContext(request,env,user,"owner_console_receivables",TTLOCK_READ_CACHE_MAX_AGE_MS)}));
     }
-    if(path==="/api/owner/overview/comparative-summary")return phase0OwnerOverviewComparativeSummary(env,user,url);
+    if(path==="/api/owner/history-projection-snapshot"||path==="/api/owner/overview/comparative-summary")return phase0OwnerOverviewComparativeSummary(env,user,url);
     if(path==="/api/owner/history")return phase0Entries(env,user,url);
     if(path==="/api/owner/arrears")return phase0Receivables(env,user,url);
     return success({status:"ok",scope:"owner",path});

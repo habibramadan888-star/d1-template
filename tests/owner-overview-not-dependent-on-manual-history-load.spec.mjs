@@ -19,7 +19,7 @@ test("owner overview comparative cards are not dependent on manual history impor
   const ui = await readFile("deploy-worker/public/index-51-main.js", "utf8");
   const load = extractLastFunction(ui, "loadOwnerOverviewComparativeSummary");
 
-  assert.match(load, /apiFetch\('\/api\/owner\/overview\/comparative-summary/);
+  assert.match(load, /apiFetch\('\/api\/owner\/history-projection-snapshot/);
   assert.doesNotMatch(load, /renderHistory\(/);
   assert.doesNotMatch(load, /syncImportedSessionsToCloud/);
   assert.doesNotMatch(load, /analysisSessions\.push/);
