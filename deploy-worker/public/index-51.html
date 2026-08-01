@@ -1832,6 +1832,7 @@ body::before{
     <div class="topbar-actions">
       <button class="btn btn-sm" onclick="closePanel()" style="background:#fff;border:1.5px solid #ddd;color:#333;font-weight:600">← 返回</button>
       <button class="btn btn-sm" onclick="cp_toggleStaff()" id="btnStaff">👤 员工</button>
+      <button class="btn btn-sm" id="btnGlobalRent">租金设置</button>
       <button class="btn btn-sm btn-green" onclick="cp_loadAll()">🔄 刷新</button>
       <button class="btn btn-sm btn-yellow" onclick="cp_exportTxt()">📤 导出</button>
     </div>
@@ -1841,6 +1842,14 @@ body::before{
 
 <!-- MAIN -->
 <div class="wrap">
+
+  <section id="cpGlobalRentSection" style="display:none;background:var(--surface);border:1px solid var(--border);border-radius:var(--r2);padding:14px;margin-bottom:16px;box-shadow:var(--sh)">
+    <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:10px">
+      <div><div style="font-size:15px;font-weight:800">全局参考租金</div><div style="font-size:10px;color:var(--text3);margin-top:3px">云端唯一配置 · 员工Rent、待收尾款、信用档案与网络建议共同读取</div></div>
+      <button class="btn btn-sm" id="btnGlobalRentClose">收起</button>
+    </div>
+    <div id="cpGlobalRentConfig"><div class="state-box" style="padding:20px">正在读取云端租金配置…</div></div>
+  </section>
 
   <div class="section-label">
     <span class="cn">本次会话概览</span>

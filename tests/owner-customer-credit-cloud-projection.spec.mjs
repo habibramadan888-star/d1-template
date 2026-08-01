@@ -5,6 +5,7 @@ import { readFile } from 'node:fs/promises';
 const workerPath = new URL('../deploy-worker/src/index.js', import.meta.url);
 const ownerJsPath = new URL('../deploy-worker/public/index-51-main.js', import.meta.url);
 const ownerHtmlPath = new URL('../deploy-worker/public/index-51.html', import.meta.url);
+const ownerControlPath = new URL('../deploy-worker/public/index-51-cp.js', import.meta.url);
 
 test('customer credit is exposed as one authenticated read-only cloud projection', async () => {
   const source = await readFile(workerPath, 'utf8');
@@ -13,9 +14,31 @@ test('customer credit is exposed as one authenticated read-only cloud projection
   assert.match(source, /canonicalFinanceProjectionFetchSessions\(env,user,historyRange/);
   assert.match(source, /empLoadLockCardsWithCacheFallback/);
   assert.match(source, /ownerHistoryProjectionReceivables\(env,user,500\)/);
+  assert.match(source, /ownerCustomerCreditLockSnapshot\(env,user,options\.request\|\|null\)/);
+  assert.match(source, /buildOwnerCustomerCreditProjection\(env,user,\{today:url\.searchParams\.get\("today"\)\|\|"",request\}\)/);
   assert.match(source, /browser_storage_used:false,analysis_sessions_used:false,display_text_used:false/);
   assert.match(source, /readonly:true,no_write:true/);
   assert.match(source, /path === "\/api\/owner\/customer-credit-projection"/);
+});
+
+test('credit uses live request context and a bounded last-good cloud snapshot', async () => {
+  const worker = await readFile(workerPath, 'utf8');
+  assert.match(worker, /TTLOCK_CREDIT_CACHE_MAX_AGE_MS=24\*60\*60\*1000/);
+  assert.match(worker, /data_source:"credit_last_good_snapshot"/);
+  assert.match(worker, /network_authority:false/);
+  assert.match(worker, /networkRecommendation=lockResult\.network_authority===false\|\|score\.grade==="new"\?"MANUAL_REVIEW"/);
+  assert.match(worker, /occupancy_snapshot_stale:lockResult\?\.credit_snapshot_stale===true/);
+});
+
+test('global rent configuration is restored in owner control panel', async () => {
+  const html = await readFile(ownerHtmlPath, 'utf8');
+  const control = await readFile(ownerControlPath, 'utf8');
+  assert.match(html, /id="btnGlobalRent"/);
+  assert.match(html, /id="cpGlobalRentSection"/);
+  assert.match(html, /id="cpGlobalRentConfig"/);
+  assert.match(html, /云端唯一配置/);
+  assert.match(control, /async function cp_toggleRentConfig/);
+  assert.match(control, /await rc_loadRoomCfgFromCloud\(\);rc_renderCfg\(panel\)/);
 });
 test('owner client page consumes only the cloud projection endpoint', async () => {
   const source = await readFile(ownerJsPath, 'utf8');

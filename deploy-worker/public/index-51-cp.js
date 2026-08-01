@@ -55,12 +55,27 @@ async function cp_loadAll(){
     cp_computeMetrics();
     cp_buildChart();
     cp_render();
+    const rentPanel=document.getElementById('cpGlobalRentConfig');
+    if(rentPanel&&document.getElementById('cpGlobalRentSection')?.style.display!=='none')rc_renderCfg(rentPanel);
     _ccCache=null; // 门禁卡数据更新，使客户评分缓存失效
     document.getElementById('lastUpdate').textContent='最后更新 · '+new Date().toLocaleTimeString('zh-CN');
   }catch(e){
     console.error(e);
     document.getElementById('roomList').innerHTML=`<div class="state-box"><div class="state-icon">❌</div>加载失败：${esc(e.message)}</div>`;
   }
+}
+
+async function cp_toggleRentConfig(){
+  const section=document.getElementById('cpGlobalRentSection');
+  const button=document.getElementById('btnGlobalRent');
+  const panel=document.getElementById('cpGlobalRentConfig');
+  if(!section||!panel)return;
+  const opening=section.style.display==='none';
+  section.style.display=opening?'block':'none';
+  if(button)button.classList.toggle('btn-green',opening);
+  if(!opening)return;
+  panel.innerHTML='<div class="state-box" style="padding:20px">正在读取云端租金配置…</div>';
+  try{await rc_loadRoomCfgFromCloud();rc_renderCfg(panel)}catch(error){panel.innerHTML=`<div class="state-box" style="padding:20px">云端租金配置读取失败：${esc(error?.message||'unknown')}</div>`;}
 }
 
 /* ── cp_computeMetrics（新增列表收集）── */
@@ -530,6 +545,8 @@ function cp_exportTxt(){
 
 
 document.getElementById('filterPills').addEventListener('click',e=>{if(e.target.classList.contains('pill'))cp_setFilter(e.target.dataset.filter);});
+document.getElementById('btnGlobalRent')?.addEventListener('click',cp_toggleRentConfig);
+document.getElementById('btnGlobalRentClose')?.addEventListener('click',cp_toggleRentConfig);
 document.addEventListener('keydown',e=>{if(e.key==='Escape')document.getElementById('modalOverlay').classList.remove('open');});
 
 var _cpReady=false;

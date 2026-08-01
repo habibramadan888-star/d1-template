@@ -1082,6 +1082,7 @@ async function fetchJsonOrNull(url, init) {
 __name(fetchJsonOrNull, "fetchJsonOrNull");
 const TTLOCK_READ_CACHE_MAX_AGE_MS=5*60*1000;
 const TTLOCK_STRICT_CACHE_MAX_AGE_MS=60*1000;
+const TTLOCK_CREDIT_CACHE_MAX_AGE_MS=24*60*60*1000;
 const TTLOCK_TOKEN_SAFETY_MARGIN_SECONDS=24*60*60;
 const TTLOCK_CANONICAL_PRODUCTION_HOST="homelink-finance.habibramadan888.workers.dev";
 const ttlockSnapshotFlights=new Map();
@@ -1244,7 +1245,7 @@ async function getCanonicalTTLockSnapshot(env,corpid,options={}){
     if(!ttlockLiveFetchAllowed(env,context))return {error:context.allow_live_fetch===false?"TTLOCK_LIVE_FETCH_DISABLED_FOR_EXIT_EVENT":(["staging","test","local","development"].includes(cleanText(env.APP_ENV||"",40).toLowerCase())?"TTLOCK_LIVE_FETCH_DISABLED_IN_STAGING":"TTLOCK_LIVE_FETCH_DISABLED_IN_PREVIEW"),status:503,roomsData:{},locksCount:0,data_source:"cache_miss_firewall",access_context_available:false,_ttlock_meta:{external_call_count:0,cache_hit:false}};
     const flightKey=`${scope}:v2`;
     if(ttlockSnapshotFlights.has(flightKey)){const joined=await ttlockSnapshotFlights.get(flightKey);return {...joined,_ttlock_meta:{...(joined?._ttlock_meta||{}),single_flight_joined:true}};}
-    const flight=(async()=>{const live=await loadLockCards(env,{corpid,route_category:context.route_category,cache_state:cached?"stale":"miss",timeout_ms:context.timeout_ms||8000});if(!live?.error){const record={roomsData:live.roomsData,locksCount:live.locksCount,observed_at:live.loadedAt,expires_at:new Date(Date.parse(live.loadedAt)+TTLOCK_READ_CACHE_MAX_AGE_MS).toISOString(),snapshot_fingerprint:live.snapshot_fingerprint,loadedAt:live.loadedAt};context.kv_write_count=Number(context.kv_write_count||0)+1;await ttlockKvWriteJson(env,cacheKey,record,10*60);return {...live,data_source:"live_api",fallback:false};}return live;})();
+    const flight=(async()=>{const live=await loadLockCards(env,{corpid,route_category:context.route_category,cache_state:cached?"stale":"miss",timeout_ms:context.timeout_ms||8000});if(!live?.error){const record={roomsData:live.roomsData,locksCount:live.locksCount,observed_at:live.loadedAt,expires_at:new Date(Date.parse(live.loadedAt)+TTLOCK_READ_CACHE_MAX_AGE_MS).toISOString(),snapshot_fingerprint:live.snapshot_fingerprint,loadedAt:live.loadedAt};context.kv_write_count=Number(context.kv_write_count||0)+1;await ttlockKvWriteJson(env,cacheKey,record,Math.ceil(TTLOCK_CREDIT_CACHE_MAX_AGE_MS/1000));return {...live,data_source:"live_api",fallback:false};}return live;})();
     ttlockSnapshotFlights.set(flightKey,flight);try{return await flight;}finally{if(ttlockSnapshotFlights.get(flightKey)===flight)ttlockSnapshotFlights.delete(flightKey);}
   })();
   context.ttlockSnapshotPromise=task;
@@ -11359,13 +11360,28 @@ function ownerCustomerCreditLedgerRows(sessions=[]){
   return {rows,evidence};
 }
 __name(ownerCustomerCreditLedgerRows,"ownerCustomerCreditLedgerRows");
+async function ownerCustomerCreditLockSnapshot(env,user,request){
+  const corpid=user?.corpid||env.CORPID||"default";
+  const requestContext=ttlockRequestContext(request,env,user,"owner_customer_credit",TTLOCK_READ_CACHE_MAX_AGE_MS);
+  const current=await getCanonicalTTLockSnapshot(env,corpid,{request_context:requestContext,max_age_ms:TTLOCK_READ_CACHE_MAX_AGE_MS});
+  if(!current?.error)return {...current,credit_snapshot_stale:false,network_authority:true};
+  const cacheKey=`ttlock:snapshot:v2:${ttlockScopeKey(env,corpid)}`;
+  const cached=await ttlockKvReadJson(env,cacheKey);
+  const observedAt=cleanText(cached?.observed_at||cached?.loadedAt||"",80);
+  const observedMs=Date.parse(observedAt),ageMs=Number.isFinite(observedMs)?Math.max(0,Date.now()-observedMs):Infinity;
+  if(cached?.roomsData&&ageMs<=TTLOCK_CREDIT_CACHE_MAX_AGE_MS){
+    return {...cached,loadedAt:observedAt,data_source:"credit_last_good_snapshot",fallback:true,fallback_reason:current.error,credit_snapshot_stale:true,network_authority:false,_ttlock_meta:{snapshot_age_ms:ageMs,cache_hit:true,external_call_count:Number(current?._ttlock_meta?.external_call_count||0)}};
+  }
+  return {...current,credit_snapshot_stale:false,network_authority:false};
+}
+__name(ownerCustomerCreditLockSnapshot,"ownerCustomerCreditLockSnapshot");
 async function buildOwnerCustomerCreditProjection(env,user,options={}){
   const today=cleanText(options.today||empTodayDubai(),20);
   const period=ownerOverviewBillingPeriodRange(today,0);
   const historyRange={start:empAddMonths(period.start,-24)||"2024-01-01",end:period.end};
   const [sessions,lockResult,rentConfig,receivables]=await Promise.all([
     canonicalFinanceProjectionFetchSessions(env,user,historyRange,{include_voided:false}),
-    empLoadLockCardsWithCacheFallback(env,user,{timeoutMs:8000,limit:500,max_age_ms:300000}),
+    ownerCustomerCreditLockSnapshot(env,user,options.request||null),
     empRentConfigReadOnly(env,user.corpid),
     ownerHistoryProjectionReceivables(env,user,500)
   ]);
@@ -11391,19 +11407,21 @@ async function buildOwnerCustomerCreditProjection(env,user,options={}){
       const cycles=stayStart?allCycles.filter(cycle=>cycle.paidTs>=stayStart):allCycles;
       const score=ownerCustomerCreditScore(cycles,rent.amount);
       const dataQuality=!rent.amount?"MANUAL_REVIEW_REQUIRED":score.cycle_count>0&&score.anchored_count===0?"PARTIAL":"CONFIRMED";
-      customers.push({bed:card.bed,lock_room:card.lockRoom,card_label:card.cardName,card_expires_at:card.end?new Date(card.end).toISOString():null,monthly_rent:rent.amount||null,rent_mapping_key:rent.key||null,stay_started_at:stayStart?new Date(stayStart).toISOString():null,classification:score.grade,network_access_recommendation:score.grade==="risk"?"REVIEW_BEFORE_ACCESS":dataQuality==="CONFIRMED"?"NORMAL_ACCESS":"MANUAL_REVIEW",score,review_required:dataQuality!=="CONFIRMED",data_quality:dataQuality});
+      const networkRecommendation=lockResult.network_authority===false||score.grade==="new"?"MANUAL_REVIEW":score.grade==="risk"?"REVIEW_BEFORE_ACCESS":dataQuality==="CONFIRMED"?"NORMAL_ACCESS":"MANUAL_REVIEW";
+      customers.push({bed:card.bed,lock_room:card.lockRoom,card_label:card.cardName,card_expires_at:card.end?new Date(card.end).toISOString():null,monthly_rent:rent.amount||null,rent_mapping_key:rent.key||null,stay_started_at:stayStart?new Date(stayStart).toISOString():null,classification:score.grade,network_access_recommendation:networkRecommendation,score,review_required:dataQuality!=="CONFIRMED"||lockResult.network_authority===false,data_quality:dataQuality});
     }
   }
   const grades={good:0,watch:0,risk:0,new:0};
   customers.forEach(row=>{grades[row.classification]=(grades[row.classification]||0)+1});
   const receivableSummary=receivables?.summary||{};
-  return {ok:true,projection_version:"owner-customer-credit-v1",generated_at:empNow(),period,summary:{outstanding_arrears:ownerOverviewMoney(Number(receivableSummary.outstanding_amount_fils||0)/100),outstanding_arrears_count:Number(receivableSummary.action_count||0),customer_count:customers.length,grades},customers,source_proof:{history:"canonical_event_archive/sessions.entries_json",occupancy:lockOk?"TTLock gateway with server cache fallback":"unavailable",rent:"cloud rent configuration",arrears:"owner_history_projection_snapshot/arrear_tasks",browser_storage_used:false,analysis_sessions_used:false,display_text_used:false,financial_period_totals_used_for_credit:false},source_status:{history:"ready",occupancy:lockOk?"ready":"unavailable",rent:Object.keys(rentConfig||{}).length?"ready":"partial",arrears:"ready"},warnings:[...(!lockOk?[{code:empTtlockReadErrorCode(lockResult),message:"Access-card source unavailable; no customer rows were guessed."}]:[])],readonly:true,no_write:true};
+  const occupancyStatus=lockOk?(lockResult.credit_snapshot_stale?"stale":"ready"):"unavailable";
+  return {ok:true,projection_version:"owner-customer-credit-v1",generated_at:empNow(),period,summary:{outstanding_arrears:ownerOverviewMoney(Number(receivableSummary.outstanding_amount_fils||0)/100),outstanding_arrears_count:Number(receivableSummary.action_count||0),customer_count:customers.length,grades},customers,source_proof:{history:"canonical_event_archive/sessions.entries_json",occupancy:lockOk?(lockResult.credit_snapshot_stale?"TTLock last good cloud snapshot":"TTLock live/canonical cache"):"unavailable",occupancy_observed_at:cleanText(lockResult?.observed_at||lockResult?.loadedAt||"",80),occupancy_snapshot_stale:lockResult?.credit_snapshot_stale===true,network_authority:lockResult?.network_authority===true,rent:"cloud rent configuration",arrears:"owner_history_projection_snapshot/arrear_tasks",browser_storage_used:false,analysis_sessions_used:false,display_text_used:false,financial_period_totals_used_for_credit:false},source_status:{history:"ready",occupancy:occupancyStatus,rent:Object.keys(rentConfig||{}).length?"ready":"partial",arrears:"ready"},warnings:[...(!lockOk?[{code:empTtlockReadErrorCode(lockResult),message:"Access-card source unavailable; no customer rows were guessed."}]:[]),...(lockResult?.credit_snapshot_stale?[{code:"TTLOCK_LAST_GOOD_SNAPSHOT",message:"Showing the last good cloud snapshot. Network changes require live confirmation."}]:[])],readonly:true,no_write:true};
 }
 __name(buildOwnerCustomerCreditProjection,"buildOwnerCustomerCreditProjection");
 async function handleOwnerCustomerCreditProjection(request,env,user){
   if(!canReadOwnerData(user))return forbidden();
   const url=new URL(request.url);
-  return success(await buildOwnerCustomerCreditProjection(env,user,{today:url.searchParams.get("today")||""}));
+  return success(await buildOwnerCustomerCreditProjection(env,user,{today:url.searchParams.get("today")||"",request}));
 }
 __name(handleOwnerCustomerCreditProjection,"handleOwnerCustomerCreditProjection");
 async function handleOwnerFinanceProjection(request,env,user){
