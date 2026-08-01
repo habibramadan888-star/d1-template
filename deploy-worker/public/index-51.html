@@ -1787,11 +1787,9 @@ body::before{
       </div>
       <select id="ccFilter" class="sel hl-select cc-filter-select" onchange="ccRender()">
         <option value="all">全部客户</option>
-        <option value="excellent">🌟 优质</option>
-        <option value="good">✅ 良好</option>
-        <option value="fair">⚠️ 需留意</option>
-        <option value="poor">🔶 问题</option>
-        <option value="bad">🚨 高风险</option>
+        <option value="good">✅ 正常</option>
+        <option value="watch">⚠️ 留意</option>
+        <option value="risk">🚨 需复核</option>
         <option value="new">🆕 新客户</option>
       </select>
       <button class="btn btn-ghost hl-button hl-button-secondary cc-refresh-btn" onclick="ccRender(true)"><svg class="ico"><use href="#i-refresh"/></svg>刷新</button>
@@ -1809,7 +1807,7 @@ body::before{
     <div id="ccCards"></div>
     <!-- 评级说明 -->
     <div style="margin-top:14px;padding:12px 14px;background:var(--surface);border:1px solid var(--border);border-radius:10px">
-      <div style="font-size:10px;color:var(--text3);line-height:1.9"><span style="color:var(--text2);font-weight:600">评级规则 </span>🌟 优质（逾期率&lt;5%）· ✅ 良好（5-20%）· ⚠️ 留意（20-40% 或均延&gt;6天）· 🔶 问题（40-60% 或均延&gt;12天）· 🚨 高风险（≥60% 或均延&gt;20天）· 记录少于2次显示 🆕 新客户</div>
+      <div style="font-size:10px;color:var(--text3);line-height:1.9"><span style="color:var(--text2);font-weight:600">简单规则 </span>✅ 正常 · ⚠️ 留意 · 🚨 需复核 · 记录少于2个付款周期显示 🆕 新记录。网络控制只读取云端建议状态，不在页面重复计算。</div>
     </div>
   </section>
   <!-- WIFI -->

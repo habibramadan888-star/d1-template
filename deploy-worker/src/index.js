@@ -11314,6 +11314,98 @@ function canonicalFinanceProjectionToOverviewSummary(projection={}){
   };
 }
 __name(canonicalFinanceProjectionToOverviewSummary,"canonicalFinanceProjectionToOverviewSummary");
+function ownerCustomerCreditScoreCycle(cycle={},monthly=0){
+  const dayMs=86400000;
+  const daysLate=cycle.cycleAnchored&&cycle.coverTs
+    ?Math.max(0,Math.round((cycle.paidTs-cycle.coverTs)/dayMs))
+    :0;
+  const extraPayments=Math.max(0,Number(cycle.paymentCount||1)-1);
+  const fragmentationPenalty=extraPayments*(daysLate>0?6:2);
+  const completeness=monthly>0?Math.min(1,Number(cycle.rentPaid||0)/monthly):1;
+  const shortPenalty=completeness<0.85?Math.round((1-completeness)*30):0;
+  return {days_late:daysLate,payment_count:Number(cycle.paymentCount||1),completeness:Math.round(completeness*1000)/1000,score:daysLate+fragmentationPenalty+shortPenalty,anchored:!!cycle.cycleAnchored,paid_at:cycle.paidTs?new Date(cycle.paidTs).toISOString():null,coverage_until:cycle.coverTs?new Date(cycle.coverTs).toISOString():null};
+}
+__name(ownerCustomerCreditScoreCycle,"ownerCustomerCreditScoreCycle");
+function ownerCustomerCreditScore(cycles=[],monthly=0){
+  const details=(cycles||[]).slice().sort((a,b)=>a.paidTs-b.paidTs).map(cycle=>ownerCustomerCreditScoreCycle(cycle,monthly));
+  if(!details.length)return {grade:"new",score:0,cycle_count:0,average_days_late:0,late_streak:0,anchored_count:0,cycles:[]};
+  const weights=details.map((_,index)=>Math.pow(1.5,index));
+  const totalWeight=weights.reduce((sum,value)=>sum+value,0);
+  const score=details.reduce((sum,row,index)=>sum+row.score*weights[index],0)/totalWeight;
+  let lateStreak=0;
+  for(let index=details.length-1;index>=0;index-=1){if(details[index].score>=3)lateStreak+=1;else break}
+  let grade="new";
+  if(details.length>=2)grade=score<=4&&lateStreak<3?"good":score<=12&&lateStreak<5?"watch":"risk";
+  return {grade,score:Math.round(score*10)/10,cycle_count:details.length,average_days_late:Math.round(details.reduce((sum,row)=>sum+row.days_late,0)/details.length),late_streak:lateStreak,anchored_count:details.filter(row=>row.anchored).length,cycles:details};
+}
+__name(ownerCustomerCreditScore,"ownerCustomerCreditScore");
+function ownerCustomerCreditLedgerRows(sessions=[]){
+  const rows=[],evidence=[];
+  for(const session of sessions||[]){
+    const sessionId=cleanText(session?.id||"",160);
+    const sessionDate=cleanText(session?.date||session?.created_at||"",40).slice(0,10);
+    for(const anchor of extractEmployeeEntryAnchorsFromSession(session)){
+      const eventType=canonicalFinanceProjectionEventType(anchor);
+      const bed=sotNormalizeBed(anchor?.bed||anchor?.room||anchor?.from_bed||"");
+      const entryId=canonicalSessionSummaryEntryIdentity(anchor);
+      if(!bed)continue;
+      const method=canonicalFinanceProjectionPaymentMethod(anchor);
+      const paid=eventType==="rent"?canonicalFinanceProjectionAmount(anchor.paid_amount,anchor.payment_amount,anchor.amount,anchor.paid):0;
+      const deposit=eventType==="rent"?canonicalFinanceProjectionAmount(anchor.deposit_included_amount,anchor.deposit_amount,anchor.deposit_paid_amount):0;
+      rows.push({room:bed,bed,cat:method,type:eventType==="rent"?"R":eventType,tag:cleanText(anchor?.tag||anchor?.customer_status||"",20),paid,amount:paid,deposit_amt:deposit,ts:cleanText(anchor?.event_effective_time||anchor?.effective_date||anchor?.transaction_date||sessionDate,40),note:cleanText(anchor?.note||anchor?.remark||anchor?.remarks||"",1000),session_id:sessionId,entry_id:entryId});
+      evidence.push({session_id:sessionId,entry_id:entryId,event_type:eventType,bed,date:sessionDate});
+    }
+  }
+  return {rows,evidence};
+}
+__name(ownerCustomerCreditLedgerRows,"ownerCustomerCreditLedgerRows");
+async function buildOwnerCustomerCreditProjection(env,user,options={}){
+  const today=cleanText(options.today||empTodayDubai(),20);
+  const period=ownerOverviewBillingPeriodRange(today,0);
+  const historyRange={start:empAddMonths(period.start,-24)||"2024-01-01",end:period.end};
+  const [finance,sessions,lockResult,rentConfig,arrears]=await Promise.all([
+    canonicalFinanceProjectionBuild(env,user,period,{include_voided:false,include_corrections:true}),
+    canonicalFinanceProjectionFetchSessions(env,user,historyRange,{include_voided:false}),
+    empLoadLockCardsWithCacheFallback(env,user,{timeoutMs:8000,limit:500,max_age_ms:300000}),
+    empRentConfigReadOnly(env,user.corpid),
+    canonicalArrearsGateway(env,user,{limit:1000}).catch(error=>({ok:false,error_code:empReadErrorCode(error),open_items:[],closed_items:[]}))
+  ]);
+  const ledger=ownerCustomerCreditLedgerRows(sessions);
+  const tenancyStartByBed=new Map();
+  for(const session of sessions||[]){
+    const sessionTs=sotDateMs(session?.date||session?.created_at);
+    for(const anchor of extractEmployeeEntryAnchorsFromSession(session)){
+      const eventType=canonicalFinanceProjectionEventType(anchor);
+      const tag=String(anchor?.tag||anchor?.customer_status||"").toLowerCase();
+      const bed=sotNormalizeBed(eventType==="bed_transfer"?anchor?.to_bed:(anchor?.bed||anchor?.room));
+      if(!bed||!(tag==="n"||tag==="new"||eventType==="bed_transfer"))continue;
+      if(sessionTs>(tenancyStartByBed.get(bed)||0))tenancyStartByBed.set(bed,sessionTs);
+    }
+  }
+  const customers=[];
+  const lockOk=!lockResult?.error;
+  if(lockOk){
+    for(const card of sotCurrentOccupiedCards(lockResult?.roomsData||{})){
+      const rent=empRentForTtlockCard(rentConfig,card.lockRoom,card.bed,card.cardName);
+      const allCycles=rent.amount>0?sotLedgerPaymentCandidates(card,rent.amount,ledger.rows):[];
+      const stayStart=tenancyStartByBed.get(card.bed)||0;
+      const cycles=stayStart?allCycles.filter(cycle=>cycle.paidTs>=stayStart):allCycles;
+      const score=ownerCustomerCreditScore(cycles,rent.amount);
+      const dataQuality=!rent.amount?"MANUAL_REVIEW_REQUIRED":score.cycle_count>0&&score.anchored_count===0?"PARTIAL":"CONFIRMED";
+      customers.push({bed:card.bed,lock_room:card.lockRoom,card_label:card.cardName,card_expires_at:card.end?new Date(card.end).toISOString():null,monthly_rent:rent.amount||null,rent_mapping_key:rent.key||null,stay_started_at:stayStart?new Date(stayStart).toISOString():null,classification:score.grade,network_access_recommendation:score.grade==="risk"?"REVIEW_BEFORE_ACCESS":dataQuality==="CONFIRMED"?"NORMAL_ACCESS":"MANUAL_REVIEW",score,review_required:dataQuality!=="CONFIRMED",data_quality:dataQuality});
+    }
+  }
+  const grades={good:0,watch:0,risk:0,new:0};
+  customers.forEach(row=>{grades[row.classification]=(grades[row.classification]||0)+1});
+  return {ok:true,projection_version:"owner-customer-credit-v1",generated_at:empNow(),period,summary:{cash_received:ownerOverviewMoney(finance.cash_received),bank_received:ownerOverviewMoney(finance.bank_received),total_received:ownerOverviewMoney(finance.gross_received),active_session_count:Number(finance.active_session_count||0),outstanding_arrears:ownerOverviewMoney(arrears?.total_remaining),outstanding_arrears_count:Array.isArray(arrears?.open_items)?arrears.open_items.length:0,customer_count:customers.length,grades},customers,source_proof:{history:"canonical_event_archive/sessions.entries_json",finance:finance.source_proof,occupancy:lockOk?"TTLock gateway with server cache fallback":"unavailable",rent:"cloud rent configuration",arrears:"Canonical Arrears Gateway",browser_storage_used:false,analysis_sessions_used:false,display_text_used:false},source_status:{history:"ready",finance:"ready",occupancy:lockOk?"ready":"unavailable",rent:Object.keys(rentConfig||{}).length?"ready":"partial",arrears:arrears?.ok===false?"unavailable":"ready"},warnings:[...(finance.reconciliation_warnings||[]),...(!lockOk?[{code:empTtlockReadErrorCode(lockResult),message:"Access-card source unavailable; no customer rows were guessed."}]:[])],readonly:true,no_write:true};
+}
+__name(buildOwnerCustomerCreditProjection,"buildOwnerCustomerCreditProjection");
+async function handleOwnerCustomerCreditProjection(request,env,user){
+  if(!canReadOwnerData(user))return forbidden();
+  const url=new URL(request.url);
+  return success(await buildOwnerCustomerCreditProjection(env,user,{today:url.searchParams.get("today")||""}));
+}
+__name(handleOwnerCustomerCreditProjection,"handleOwnerCustomerCreditProjection");
 async function handleOwnerFinanceProjection(request,env,user){
   if(!canReadOwnerData(user))return forbidden();
   const url=new URL(request.url);
@@ -14847,6 +14939,9 @@ async function handleRequest(request, env, ctx) {
     if (path === "/api/owner/finance/projection" && method === "GET") {
       if (!canReadOwnerData(user)) return forbidden();
       return handleOwnerFinanceProjection(request, env, user);
+    }
+    if (path === "/api/owner/customer-credit-projection" && method === "GET") {
+      return handleOwnerCustomerCreditProjection(request, env, user);
     }
     if (path === "/api/owner/cloud-arrears/projection" && method === "GET") {
       return handleOwnerCloudArrearsProjection(request, env, user);

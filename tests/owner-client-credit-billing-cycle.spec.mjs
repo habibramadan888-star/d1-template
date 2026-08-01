@@ -45,11 +45,12 @@ test("client credit widget uses dedicated billing period while rent continuity r
   assert.doesNotMatch(rcPeriod, /getClientCreditBillingPeriod/);
 });
 
-test("client page opens with loading state and forced recompute", async () => {
+test("client page opens with cloud projection loading state and refresh", async () => {
   const js = await source();
 
   assert.match(js, /function ccShowLoading\(\)/);
-  assert.match(js, /正在计算客户信用档案/);
+  assert.match(js, /正在读取云端客户信用影射/);
+  assert.match(js, /\/api\/owner\/customer-credit-projection/);
   assert.match(js, /function ccOpenView\(\)/);
   assert.match(js, /await ccEnsureClientData\(false\)/);
   assert.match(js, /ccRender\(true\)/);

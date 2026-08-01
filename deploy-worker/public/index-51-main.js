@@ -272,7 +272,6 @@ function showOwnerAppShell(appRole){
   const db=document.getElementById('btnDashboard');
   if(db)db.style.display=canReadOwner?'':'none';
   applyReadonlyAdminUi();
-  if(canReadOwner)setTimeout(()=>ensureOwnerCoreReadData({force:false,reason:'owner_app_open'}).catch(e=>console.warn('[owner core autoload]',e)),80);
 }
 function denyReadonlyAdminWrite(){
   if(role!=='readonly_admin')return false;
@@ -7167,14 +7166,6 @@ function ccTtlockStatus(){
   const sync=document.getElementById('lastUpdate')?.textContent||'';
   return{loaded,rooms,cards,sync};
 }
-async function ccEnsureClientData(force=false){
-  if(force||!(roomsData&&Object.keys(roomsData).length)){
-    try{if(typeof cp_loadAll==='function')await cp_loadAll();}catch(e){console.warn('[client-credit ttlock load]',e);}
-  }
-  if(force||(!(state.arrears||[]).length&&!state.arrearsLoading)){
-    try{await loadArrearsForOwner({showLoading:false,limit:100});}catch(e){console.warn('[client-credit arrears load]',e);}
-  }
-}
 function ccDebtRows(){
   const cfg=rc_getRoomCfg();
   const latestPayments=rc_buildBedPaymentContinuityIndex(rc_allLedgerSessions());
@@ -7199,95 +7190,13 @@ function ccDebtRows(){
     };
   });
 }
-var _ownerCoreReadDataLoading=false;
-var _ownerCoreReadDataStatus={history:'idle',ttlock:'idle',rent:'idle',computed:'idle',lastLoadedAt:0,errors:[]};
-function ownerCoreDataStatusLabel(){
-  const s=_ownerCoreReadDataStatus||{};
-  const parts=[
-    s.history==='loading'?'正在加载历史流水':s.history==='ready'?'历史流水已加载':s.history==='missing'?'缺历史流水':'历史流水待加载',
-    s.ttlock==='loading'?'正在加载 Access Card':s.ttlock==='ready'?'Card Data Loaded / 卡片数据已加载':s.ttlock==='missing'?'Missing Access Cards / 缺门禁卡':'Card Data Pending / 卡片数据待加载',
-    s.rent==='ready'?'月租映射已加载':'缺月租映射',
-    s.computed==='loading'?'正在计算客户信用':s.computed==='ready'?'客户信用已计算':'客户信用待计算'
-  ];
-  return parts.join(' · ');
-}
-async function ownerHydrateHistoryForClientCredit(force=false){
-  _ownerCoreReadDataStatus.history='loading';
-  const qaRunId=ownerQaRunId();
-  const qaMapping=Array.isArray(_qaRunAnalysisContract?.mapping)?_qaRunAnalysisContract.mapping:[];
-  if(qaRunId){
-    if(!_qaRunAnalysisContract||String(_qaRunAnalysisContract.qa_run_id||'')!==qaRunId||!qaMapping.length)throw new Error('QA_PERIOD_ANALYSIS_CONTRACT_UNAVAILABLE');
-    // A QA Run is an immutable server-filtered review set. Never append a
-    // previous browser cache to it; rebuild the client projection from the
-    // exact structured History rows on every hydration.
-    state.analysisSessions=[];
-  }
-  const oldLimit=state.historyLimit;
-  if(force||Number(state.historyLimit||0)<OWNER_CORE_HISTORY_AUTOLOAD_LIMIT)state.historyLimit=OWNER_CORE_HISTORY_AUTOLOAD_LIMIT;
-  try{await updateHistCount();}
-  finally{state.historyLimit=oldLimit;}
-  const list=Array.isArray(window._histSessions)?window._histSessions:[];
-  if(!list.length){_ownerCoreReadDataStatus.history='missing';return 0;}
-  let added=0;
-  const job={timings:{historyFetchMs:0,normalizeMs:0,appendMs:0,recomputeMs:0,totalMs:0},cancelled:false,currentController:null};
-  for(const cs of list.slice(0,OWNER_CORE_HISTORY_AUTOLOAD_LIMIT)){
-    try{
-      const normalized=normalizeLedgerSession(cs);
-      let entries=normalized.entries||[];
-      if((force||!entries.length)&&typeof loadHistoryImportEntries==='function')entries=await loadHistoryImportEntries(cs,job);
-      const session=normalizeLedgerSession({
-        id:cs.id,
-        date:cs.date||'',
-        anchorId:cs.anchorId||cs.anchor_id||mkAnchor(cs.id,(cs.date||'').slice(0,10)),
-        canonicalAnchorId:cs.canonicalAnchorId||cs.canonical_anchor_id||'',
-        entryId:cs.entryId||cs.entry_id||'',
-        entries,
-        export_text:ledgerSessionRawText(normalized),
-        source:qaRunId?'employee_entry':normalized.source,
-        qa_run_id:qaRunId||cs.qa_run_id||''
-      });
-      if(session.entries&&session.entries.length&&!isDuplicate(session)){
-        state.analysisSessions.push(session);
-        added++;
-      }
-    }catch(e){
-      console.warn('[owner core history hydrate]',cs?.id||cs?.anchorId,e);
-      _ownerCoreReadDataStatus.errors.push(`history:${cs?.id||cs?.anchorId||'unknown'}`);
-    }
-  }
-  if(qaRunId){
-    const actualIds=state.analysisSessions.flatMap(session=>(session.entries||[]).map(entry=>String(entry?.entry_id||entry?.event_id||entry?.id||'').trim().toUpperCase())).filter(Boolean);
-    const expectedIds=(Array.isArray(_qaRunAnalysisContract.expected_entry_ids)?_qaRunAnalysisContract.expected_entry_ids:[]).map(id=>String(id||'').trim().toUpperCase()).sort();
-    const uniqueActual=[...new Set(actualIds)].sort();
-    const exact=actualIds.length===expectedIds.length&&uniqueActual.length===expectedIds.length&&JSON.stringify(uniqueActual)===JSON.stringify(expectedIds);
-    window.__qaPeriodAnalysisIdentitySummary={qa_run_id:qaRunId,expected_entry_ids:expectedIds,actual_entry_ids:uniqueActual,missing_entry_ids:expectedIds.filter(id=>!uniqueActual.includes(id)),extra_entry_ids:uniqueActual.filter(id=>!expectedIds.includes(id)),duplicate_entry_ids:[...new Set(actualIds.filter((id,index)=>actualIds.indexOf(id)!==index))],session_count:state.analysisSessions.length,transaction_leg_count:state.analysisSessions.reduce((sum,session)=>sum+(session.entries||[]).length,0),exact};
-    if(!exact)throw new Error('QA_PERIOD_ANALYSIS_IDENTITY_SET_MISMATCH');
-    saveAnalysis();
-  }else if(added)saveAnalysis();
-  _ownerCoreReadDataStatus.history=rc_allLedgerSessions().length?'ready':'missing';
-  return added;
-}
-async function ensureOwnerCoreReadData({force=false,reason=''}={}){
-  if(_ownerCoreReadDataLoading)return false;
-  _ownerCoreReadDataLoading=true;
-  _ownerCoreReadDataStatus={history:'loading',ttlock:'loading',rent:'idle',computed:'loading',lastLoadedAt:_ownerCoreReadDataStatus.lastLoadedAt||0,errors:[]};
-  try{
-    await ownerHydrateHistoryForClientCredit(force);
-    if(force||!(roomsData&&Object.keys(roomsData).length)){
-      try{if(typeof cp_loadAll==='function')await cp_loadAll();}catch(e){console.warn('[owner core ttlock load]',e);_ownerCoreReadDataStatus.errors.push('ttlock');}
-    }
-    _ownerCoreReadDataStatus.ttlock=(roomsData&&Object.keys(roomsData).length)?'ready':'missing';
-    _ownerCoreReadDataStatus.rent=Object.keys(rc_getRoomCfg()||{}).length?'ready':'missing';
-    _ownerCoreReadDataStatus.computed='ready';
-    _ownerCoreReadDataStatus.lastLoadedAt=Date.now();
-    console.info('[owner core read data]',{reason,history:rc_allLedgerSessions().length,ttlock:_ownerCoreReadDataStatus.ttlock,rent:_ownerCoreReadDataStatus.rent});
-    return true;
-  }finally{
-    _ownerCoreReadDataLoading=false;
-  }
-}
 async function ccEnsureClientData(force=false){
-  await ensureOwnerCoreReadData({force,reason:force?'client_recompute':'client_open'});
+  const suffix=force?`?refresh=${Date.now()}`:'';
+  const response=await apiFetch(`/api/owner/customer-credit-projection${suffix}`,{method:'GET',cache:'no-store'});
+  const payload=await response.json().catch(()=>null);
+  if(!response.ok||!payload||payload.success===false||payload.ok===false)throw new Error(payload?.error||payload?.error_code||`customer_credit_${response.status}`);
+  window._ownerCustomerCreditProjection=payload.data||payload;
+  return window._ownerCustomerCreditProjection;
 }
 function ccEntryText(e){return String(e?.rawLine||e?.raw||e?.note||'').trim();}
 function ccParseMoneyToken(v){return parseMoney(String(v||'').replace(/,/g,''));}
@@ -8015,80 +7924,63 @@ function ccBuildCache(){
 function ccShowLoading(){
   const bw=document.getElementById('billingWidget2');
   if(bw)bw.innerHTML=`<div class="card billing-widget"><div class="card-body" style="padding:16px">
-    <div style="font-size:15px;font-weight:800;color:var(--accent);margin-bottom:6px">正在计算客户信用档案</div>
-    <div style="font-size:12px;color:var(--text3);line-height:1.6">正在读取本账期收入、期内待续租和未来欠款，请稍候。</div>
-  </div></div>`;
-}
-function ccShowLoading(){
-  const bw=document.getElementById('billingWidget2');
-  if(bw)bw.innerHTML=`<div class="card billing-widget"><div class="card-body" style="padding:16px">
-    <div style="font-size:15px;font-weight:800;color:var(--accent);margin-bottom:6px">正在计算客户信用</div>
-    <div style="font-size:12px;color:var(--text3);line-height:1.6">${esc(ownerCoreDataStatusLabel())}</div>
-    <div style="font-size:11px;color:var(--text3);line-height:1.6;margin-top:4px">正在加载历史流水 / 正在加载 Access Card / 正在计算客户信用</div>
+    <div style="font-size:15px;font-weight:800;color:var(--accent);margin-bottom:6px">正在读取云端客户信用影射</div>
+    <div style="font-size:11px;color:var(--text3);line-height:1.6">历史、门禁、租金与欠款由服务端统一读取；浏览器不参与计算。</div>
   </div></div>`;
 }
 async function ccRecomputeClientCredit(){
   ccShowLoading();
-  await ccEnsureClientData(true);
-  _ccCache=null;
-  ccRender(true);
+  try{await ccEnsureClientData(true);ccRender(true)}catch(error){ccRenderError(error)}
 }
 function ccOpenView(){
   ccShowLoading();
   requestAnimationFrame(async()=>{
-    await ccEnsureClientData(false);
-    ccRender(true);
+    try{await ccEnsureClientData(false);ccRender(true)}catch(error){ccRenderError(error)}
   });
 }
 
 function ccRender(forceRebuild=false){
-  const hasLock=roomsData&&Object.keys(roomsData).length>0;
-  // ── 只在完整刷新时重渲染 widget（搜索/筛选不触发）──
-  if(forceRebuild||!_ccCache){
-    renderBillingWidget('billingWidget2');
-    renderClientContinuityPanel();
-    if(_clientContinuityOpen)rc_initPanel();
-    if(!hasLock){
-      const el=document.getElementById('ccCards');
-      if(el)el.innerHTML=`<div style="text-align:center;padding:32px 16px;color:var(--text3);font-size:13px;border:1px dashed var(--border);border-radius:12px">Click Refresh or load card data in Console / 请先点击「刷新」，或前往控制面板加载卡片</div>`;
-      return;
-    }
-    // ── Bug1 Fix: ccBuildCache 抛异常时 _ccCache 仍为 null 会崩溃，加兜底 ──
-    try{ccBuildCache();}catch(e){
-      console.error('[ccBuildCache]',e);
-      _ccCache={tenants:[],sorted:[],built:0};
-    }
-  }else if(!hasLock){
-    const el=document.getElementById('ccCards');
-    if(el)el.innerHTML=`<div style="text-align:center;padding:32px 16px;color:var(--text3);font-size:13px;border:1px dashed var(--border);border-radius:12px">Click Refresh to load card data / 请先点击「刷新」加载卡片`;
-    return;
+  const projection=window._ownerCustomerCreditProjection;
+  if(!projection){ccRenderError(new Error('客户信用影射尚未加载'));return}
+  const tenants=Array.isArray(projection.customers)?projection.customers:[];
+  const cnt=projection.summary?.grades||{good:0,watch:0,risk:0,new:0};
+  const billing=document.getElementById('billingWidget2');
+  if(billing){
+    const s=projection.summary||{},p=projection.period||{},status=projection.source_status||{};
+    billing.innerHTML=`<div class="card billing-widget"><div class="card-body" style="padding:16px"><div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start"><div><div style="font-weight:800;font-size:15px">${esc(p.start||'')} → ${esc(p.end||'')}</div><div style="font-size:10px;color:var(--text3);margin-top:3px">云端统一信用影射 · ${esc(projection.projection_version||'')}</div></div><button class="btn btn-ghost" style="font-size:11px;padding:5px 9px" onclick="ccRecomputeClientCredit()">刷新</button></div><div class="billing-kpis" style="margin-top:12px"><div class="billing-kpi"><div class="billing-kpi-label">本期实收</div><div class="billing-kpi-val">${fmtMoney(s.total_received||0)}</div><div class="billing-kpi-sub">现金 ${fmtMoney(s.cash_received||0)} · 银行 ${fmtMoney(s.bank_received||0)}</div></div><div class="billing-kpi"><div class="billing-kpi-label">未清欠款</div><div class="billing-kpi-val">${fmtMoney(s.outstanding_arrears||0)}</div><div class="billing-kpi-sub">${Number(s.outstanding_arrears_count||0)} 项</div></div></div><div style="margin-top:10px;font-size:10px;color:var(--text3)">历史 ${esc(status.history||'unknown')} · 门禁 ${esc(status.occupancy||'unknown')} · 租金 ${esc(status.rent||'unknown')} · 欠款 ${esc(status.arrears||'unknown')} · 浏览器缓存未参与</div></div></div>`;
   }
-  const{tenants,sorted:allSorted}=_ccCache; // 直接用预排序结果
-  // 汇总统计
-  const cnt={excellent:0,good:0,fair:0,poor:0,bad:0,new:0};
-  tenants.forEach(t=>cnt[t.sc.grade]=(cnt[t.sc.grade]||0)+1);
+  const continuity=document.getElementById('clientContinuityPanel');if(continuity)continuity.innerHTML='';
   const sum=document.getElementById('ccSummary');
   if(sum){
     const chips=[
       {k:'全部',v:tenants.length,col:'var(--text2)'},
-      {k:'🌟优质+良好',v:(cnt.excellent||0)+(cnt.good||0),col:'var(--green)'},
-      {k:'⚠留意',v:cnt.fair||0,col:'var(--hl-yellow)'},
-      {k:'🔶问题',v:cnt.poor||0,col:'var(--orange)'},
-      {k:'🚨高风险',v:cnt.bad||0,col:'var(--red)'},
-      {k:'🆕新客户',v:cnt.new||0,col:'var(--text3)'},
+      {k:'✅正常',v:cnt.good||0,col:'var(--green)'},
+      {k:'⚠留意',v:cnt.watch||0,col:'var(--orange)'},
+      {k:'🚨需复核',v:cnt.risk||0,col:'var(--red)'},
+      {k:'🆕新记录',v:cnt.new||0,col:'var(--text3)'},
     ];
     sum.innerHTML=chips.map(c=>`<div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:7px 12px;display:flex;align-items:center;gap:6px"><span style="font-size:19px;font-weight:800;color:${c.col};font-family:JetBrains Mono,monospace;line-height:1">${c.v}</span><span style="font-size:10px;color:var(--text3)">${c.k}</span></div>`).join('');
   }
   // 搜索+筛选（纯内存，不重新评分也不重排）
   const search=(document.getElementById('ccSearch')?.value||'').toLowerCase();
   const filter=document.getElementById('ccFilter')?.value||'all';
-  let list=allSorted;
-  if(search)list=list.filter(t=>t.bed.toLowerCase().includes(search)||t.cardName.toLowerCase().includes(search)||t.lockRoom.toLowerCase().includes(search));
-  if(filter!=='all')list=list.filter(t=>t.sc.grade===filter);
+  let list=tenants;
+  if(search)list=list.filter(t=>String(t.bed||'').toLowerCase().includes(search)||String(t.card_label||'').toLowerCase().includes(search)||String(t.lock_room||'').toLowerCase().includes(search));
+  if(filter!=='all')list=list.filter(t=>t.classification===filter);
   const cards=document.getElementById('ccCards');if(!cards)return;
-  if(!tenants.length){cards.innerHTML=`<div style="text-align:center;padding:32px;color:var(--text3);font-size:13px;border:1px dashed var(--border);border-radius:12px">门禁卡暂无在住卡片</div>`;return;}
+  if(!tenants.length){cards.innerHTML=`<div style="text-align:center;padding:32px;color:var(--text3);font-size:13px;border:1px dashed var(--border);border-radius:12px">${projection.source_status?.occupancy==='unavailable'?'云端门禁事实源暂不可用，未猜测客户数据':'当前没有可确认的在住记录'}</div>`;return;}
   if(!list.length){cards.innerHTML='<div style="text-align:center;padding:20px;color:var(--text3);font-size:13px">没有匹配的租客</div>';return;}
-  cards.innerHTML=list.map(t=>ccAutoCardHtml(t)).join('');
+  cards.innerHTML=list.map(t=>ccProjectionCardHtml(t)).join('');
+}
+function ccRenderError(error){
+  const message=error?.message||'读取失败';
+  const billing=document.getElementById('billingWidget2');if(billing)billing.innerHTML=`<div class="card"><div class="card-body" style="color:var(--red)">客户信用影射读取失败：${esc(message)} <button class="btn btn-ghost" onclick="ccRecomputeClientCredit()">重试</button></div></div>`;
+  const cards=document.getElementById('ccCards');if(cards)cards.innerHTML='';
+}
+function ccProjectionCardHtml(customer){
+  const styles={good:{label:'正常',color:'var(--green)',bg:'rgba(26,138,74,.08)'},watch:{label:'留意',color:'var(--orange)',bg:'rgba(224,108,0,.08)'},risk:{label:'需复核',color:'var(--red)',bg:'rgba(217,48,37,.08)'},new:{label:'新记录',color:'var(--text3)',bg:'var(--surface2)'}};
+  const style=styles[customer.classification]||styles.new,score=customer.score||{};
+  return `<div class="cc-card" style="border-color:var(--border)"><div style="padding:13px 15px"><div style="display:flex;justify-content:space-between;gap:10px"><div><b style="font-family:JetBrains Mono,monospace">床位 ${esc(customer.bed||'—')}</b><div style="font-size:10px;color:var(--text3);margin-top:3px">${esc(customer.lock_room||'')} · 到期 ${esc((customer.card_expires_at||'').slice(0,10)||'未知')}</div></div><span class="cc-badge" style="color:${style.color};background:${style.bg}">${style.label}</span></div><div style="margin-top:9px;font-size:11px;color:var(--text2)">${Number(score.cycle_count||0)} 个付款周期 · 平均延迟 ${Number(score.average_days_late||0)} 天 · 月租 ${customer.monthly_rent?fmtMoney(customer.monthly_rent):'未配置'}</div><div style="margin-top:5px;font-size:10px;color:var(--text3)">证据 ${esc(customer.data_quality||'UNKNOWN')} · 网络建议 ${esc(customer.network_access_recommendation||'MANUAL_REVIEW')}</div></div></div>`;
 }
 function ccAutoCardHtml(c){
   const g=CC_GRADES[c.sc.grade]||CC_GRADES.new;

@@ -1,0 +1,43 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+
+const workerPath = new URL('../deploy-worker/src/index.js', import.meta.url);
+const ownerJsPath = new URL('../deploy-worker/public/index-51-main.js', import.meta.url);
+const ownerHtmlPath = new URL('../deploy-worker/public/index-51.html', import.meta.url);
+
+test('customer credit is exposed as one authenticated read-only cloud projection', async () => {
+  const source = await readFile(workerPath, 'utf8');
+  assert.match(source, /async function buildOwnerCustomerCreditProjection/);
+  assert.match(source, /canonicalFinanceProjectionBuild\(env,user,period/);
+  assert.match(source, /canonicalFinanceProjectionFetchSessions\(env,user,historyRange/);
+  assert.match(source, /empLoadLockCardsWithCacheFallback/);
+  assert.match(source, /canonicalArrearsGateway/);
+  assert.match(source, /browser_storage_used:false,analysis_sessions_used:false,display_text_used:false/);
+  assert.match(source, /readonly:true,no_write:true/);
+  assert.match(source, /path === "\/api\/owner\/customer-credit-projection"/);
+});
+test('owner client page consumes only the cloud projection endpoint', async () => {
+  const source = await readFile(ownerJsPath, 'utf8');
+  const start = source.indexOf('async function ccEnsureClientData');
+  const end = source.indexOf('function ccEntryText', start);
+  const loader = source.slice(start, end);
+  assert.match(loader, /\/api\/owner\/customer-credit-projection/);
+  assert.doesNotMatch(loader, /ensureOwnerCoreReadData/);
+  const renderStart = source.indexOf('function ccRender(forceRebuild=false)');
+  const renderEnd = source.indexOf('function ccAutoCardHtml', renderStart);
+  const render = source.slice(renderStart, renderEnd);
+  assert.match(render, /_ownerCustomerCreditProjection/);
+  assert.doesNotMatch(render, /state\.analysisSessions|state\.saved|roomsData|ccBuildCache/);
+});
+
+test('credit model stays small and exposes one network recommendation', async () => {
+  const worker = await readFile(workerPath, 'utf8');
+  assert.match(worker, /const grades=\{good:0,watch:0,risk:0,new:0\}/);
+  assert.match(worker, /network_access_recommendation/);
+  assert.doesNotMatch(worker, /customer_credit_(?:identity|lifecycle)_system/i);
+  const html = await readFile(ownerHtmlPath, 'utf8');
+  assert.match(html, /value="good">✅ 正常/);
+  assert.match(html, /value="watch">⚠️ 留意/);
+  assert.match(html, /value="risk">🚨 需复核/);
+});
