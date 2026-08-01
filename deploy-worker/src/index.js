@@ -11473,6 +11473,80 @@ async function ownerOverviewFetchBedTransferReviews(env,user){
   return (rows.results||[]).map(bedTransferEventView);
 }
 __name(ownerOverviewFetchBedTransferReviews,"ownerOverviewFetchBedTransferReviews");
+async function reconcileOwnerTtlockReceivablesProjection(env,user,opts={}){
+  const sot=await resolveConsoleReceivablesSot(env,user,{
+    limit:500,
+    ttlockTimeoutMs:Math.min(Math.max(Number(opts.ttlockTimeoutMs||8000),1000),12000),
+    request_context:opts.request_context,
+    max_age_ms:opts.max_age_ms
+  });
+  const sourceStatus=sot?.source_status?.ttlock_expired_unpaid||{};
+  if(sourceStatus.ok!==true||sourceStatus.data_source!=="live_api"){
+    return {ok:false,reconciled:false,reason:"LIVE_TTLOCK_SOURCE_UNAVAILABLE",source_status:sourceStatus};
+  }
+  const now=empNow();
+  const rows=Array.isArray(sot.overdue)?sot.overdue:[];
+  const liveRefs=new Set();
+  let created=0;
+  let updated=0;
+  for(const source of rows){
+    const sourceRef=cleanText(source?.source_ref||"",180);
+    const bed=cleanText(source?.bed||source?.room_bed||source?.room||"",80).replace(/^#/,"");
+    if(!sourceRef||!bed)continue;
+    liveRefs.add(sourceRef);
+    const amount=Math.max(0,Math.round(Number(source?.amount_fils||0)))/100;
+    const dueDate=cleanDate(source?.due_date||"");
+    const fingerprint=await hscSha256(JSON.stringify(hscStableValue({
+      corpid:user.corpid,source_type:"ttlock_expired_unpaid",source_ref:sourceRef,bed,
+      due_date:dueDate,amount_fils:Math.round(amount*100),card_code:cleanText(source?.card_code||source?.customer_code||"",120)
+    })));
+    const existing=await env.DB.prepare("SELECT task_id,source_fingerprint,close_status FROM arrear_tasks WHERE corpid=? AND source_type='ttlock_expired_unpaid' AND source_ref=? LIMIT 1")
+      .bind(user.corpid,sourceRef).first();
+    if(existing?.task_id){
+      if(existing.source_fingerprint===fingerprint&&empCloseStatusIsOpen(existing.close_status))continue;
+      await env.DB.prepare(`UPDATE arrear_tasks SET bed=?, tenant_name=?, tenant_card_id=?, arrear_amount=?, arrear_reason=?, promise_date=?,
+        followup_status='pending_followup', close_status='', close_reason='', source_fingerprint=?, materialized_from='ttlock_projection_reconcile',
+        updated_by=?, updated_at=? WHERE task_id=? AND corpid=?`).bind(
+        bed,cleanText(source?.customer_code||bed,120),cleanText(source?.card_code||sourceRef,120),amount,
+        "TTLock expired unpaid; amount from bed rent mapping",dueDate,fingerprint,user.userid,now,existing.task_id,user.corpid
+      ).run();
+      updated++;
+    }else{
+      await empInsertDynamicMode(env,"arrear_tasks",{
+        task_id:empId("task"),corpid:user.corpid,userid:"",entry_id:"",bed,
+        tenant_name:cleanText(source?.customer_code||bed,120),tenant_card_id:cleanText(source?.card_code||sourceRef,120),
+        arrear_amount:amount,arrear_reason:"TTLock expired unpaid; amount from bed rent mapping",created_at:now,
+        followup_status:"pending_followup",promise_date:dueDate,promise_amount:0,actual_received:0,close_status:"",close_reason:"",
+        created_by:user.userid,updated_by:user.userid,updated_at:now,source_type:"ttlock_expired_unpaid",source_ref:sourceRef,
+        source_fingerprint:fingerprint,materialized_from:"ttlock_projection_reconcile"
+      },EMP_TASK_COLUMNS,"INSERT_OR_IGNORE");
+      created++;
+    }
+  }
+  const persisted=await env.DB.prepare(`SELECT task_id,source_ref FROM arrear_tasks
+    WHERE corpid=? AND source_type='ttlock_expired_unpaid' AND COALESCE(close_status,'') NOT IN ('CLOSED','closed') AND COALESCE(voided_at,'')=''`)
+    .bind(user.corpid).all();
+  let closed=0;
+  for(const row of persisted.results||[]){
+    const sourceRef=cleanText(row?.source_ref||"",180);
+    if(sourceRef&&liveRefs.has(sourceRef))continue;
+    await env.DB.prepare(`UPDATE arrear_tasks SET close_status='closed', close_reason='TTLOCK_NO_LONGER_EXPIRED',
+      followup_status='closed', updated_by=?, updated_at=? WHERE task_id=? AND corpid=?`)
+      .bind(user.userid,now,row.task_id,user.corpid).run();
+    closed++;
+  }
+  return {ok:true,reconciled:true,active_count:liveRefs.size,created_count:created,updated_count:updated,closed_count:closed,
+    source:{gateway:"owner_console_current_view",projection_table:"arrear_tasks",nested_client_gateways:0},generated_at:now};
+}
+__name(reconcileOwnerTtlockReceivablesProjection,"reconcileOwnerTtlockReceivablesProjection");
+async function syncOwnerHistoryReceivablesProjection(env,user,url){
+  return reconcileOwnerTtlockReceivablesProjection(env,user,{
+    ttlockTimeoutMs:8000,
+    request_context:{route_category:"owner_history_projection_sync",pathname:url?.pathname||""},
+    max_age_ms:TTLOCK_READ_CACHE_MAX_AGE_MS
+  });
+}
+__name(syncOwnerHistoryReceivablesProjection,"syncOwnerHistoryReceivablesProjection");
 async function ownerHistoryProjectionReceivables(env,user,limit=500){
   const empty={all_rows:[],rows:[],overdue:[],due_today:[],due_soon:[],summary:{total_count:0,action_count:0,ttlock_expired_unpaid_count:0,existing_arrears_count:0,outstanding_amount_fils:0},source_breakdown:{ttlock_expired_unpaid_count:0,existing_arrears_count:0},source:{table:"arrear_tasks",mode:"direct_cloud_projection"}};
   if(!await phase0TableExists(env,"arrear_tasks"))return empty;
@@ -11540,6 +11614,7 @@ function ownerHistoryProjectionTodos(receivables={}){
 __name(ownerHistoryProjectionTodos,"ownerHistoryProjectionTodos");
 async function phase0OwnerOverviewComparativeSummary(env,user,url){
   const today=empTodayDubai();
+  const receivablesSync=await syncOwnerHistoryReceivablesProjection(env,user,url);
   const lightweightPeriods=[-5,-4,-3,-2,-1,0].map(offset=>ownerOverviewBillingPeriodRange(today,offset));
   const [lightweightSummaries,historyReceivables]=await Promise.all([
     Promise.all(lightweightPeriods.map(range=>ownerOverviewFetchSessionPeriodSummary(env,user,range).catch(()=>({rows_checked:0,gross_received:0,cash_handover:0,bank_transfer_total:0,sessions:[],source_table:"sessions",rule:"owner_visible_sessions_summary"})))),
@@ -11568,6 +11643,7 @@ async function phase0OwnerOverviewComparativeSummary(env,user,url){
     bed_transfer_review:{recorded_count:0,records:[],pending_review_count:0,pending_review:[]},
     arrears:{cloud_arrears_collection:{total_remaining:0,open_count:0,partial_count:0,details:[]},cloud_arrears_details:[]},
     current_receivables_sot:historyReceivables,
+    receivables_projection_sync:receivablesSync,
     today_todos:ownerHistoryProjectionTodos(historyReceivables),
     risk_watch:{action_count:historyReceivables.summary.action_count,outstanding_amount_fils:historyReceivables.summary.outstanding_amount_fils},
     data_quality:{rows_checked:{current_billing_period_sessions:lightweightCurrentPeriodReceived.rows_checked},no_data:lightweightCurrentPeriodReceived.rows_checked?[]:["current_billing_period_sessions"],warnings:[]},

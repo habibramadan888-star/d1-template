@@ -14,6 +14,7 @@ test("owner history projection snapshot reads cloud projection tables directly",
   const worker = await readFile("deploy-worker/src/index.js", "utf8");
   const handler = block(worker, "async function phase0OwnerOverviewComparativeSummary", "__name(phase0OwnerOverviewComparativeSummary");
   const receivables = block(worker, "async function ownerHistoryProjectionReceivables", "__name(ownerHistoryProjectionReceivables");
+  const reconcile = block(worker, "async function reconcileOwnerTtlockReceivablesProjection", "__name(reconcileOwnerTtlockReceivablesProjection");
 
   assert.match(worker, /\/api\/owner\/history-projection-snapshot/);
   assert.match(worker, /\(path === "\/api\/owner\/history-projection-snapshot" \|\| path === "\/api\/owner\/overview\/comparative-summary"\) && method === "GET"/);
@@ -22,10 +23,19 @@ test("owner history projection snapshot reads cloud projection tables directly",
   assert.match(receivables, /mode:"direct_cloud_projection"/);
   assert.match(handler, /ownerOverviewFetchSessionPeriodSummary/);
   assert.match(handler, /ownerHistoryProjectionReceivables/);
+  assert.match(handler, /syncOwnerHistoryReceivablesProjection/);
+  assert.match(handler, /receivables_projection_sync:receivablesSync/);
   assert.match(handler, /current_receivables_sot:historyReceivables/);
   assert.match(handler, /today_todos:ownerHistoryProjectionTodos\(historyReceivables\)/);
   assert.match(handler, /nested_gateway_calls:0/);
   assert.doesNotMatch(handler.slice(0, handler.indexOf("Legacy expanded comparison pipeline")), /resolveCurrentReceivablesSot|canonicalFinanceProjectionBuild|empLoadLockCards/);
+  assert.match(reconcile, /resolveConsoleReceivablesSot/);
+  assert.match(reconcile, /Array\.isArray\(sot\.overdue\)\?sot\.overdue:\[\]/);
+  assert.match(reconcile, /sourceStatus\.ok!==true\|\|sourceStatus\.data_source!=="live_api"/);
+  assert.match(reconcile, /TTLOCK_NO_LONGER_EXPIRED/);
+  assert.match(reconcile, /ttlock_projection_reconcile/);
+  assert.match(reconcile, /existing\.source_fingerprint===fingerprint&&empCloseStatusIsOpen/);
+  assert.doesNotMatch(reconcile, /DELETE\s+FROM/i);
 });
 
 test("owner overview consumes one direct snapshot and lazy-loads collapsed panels", async () => {
