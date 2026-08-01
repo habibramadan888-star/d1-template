@@ -6249,6 +6249,7 @@ function renderOwnerOverview(){
   const outstandingRows=ownerOverviewConsoleSotRows();
   const outstandingAmount=outstandingRows.reduce((sum,row)=>sum+ownerOverviewReceivableAmount(row),0);
   const outstandingCount=outstandingRows.length;
+  const outstandingConfigMissing=Number(consoleSummary.config_missing_count||0);
   const todayTodo=ownerOverviewTodayTodoCount();
   const consoleRiskNote=`欠款中 ${Number(consoleSummary.overdue_count||0)} / 今天 ${Number(consoleSummary.due_today_count||0)} / 3天内 ${Number(consoleSummary.due_soon_count||0)}`;
   const todoRiskNote=ownerOverviewTodayTodoNote();
@@ -6292,7 +6293,7 @@ function renderOwnerOverview(){
     </div>`).join(''):`<div class="empty-state hl-empty-state"><div class="empty-title">暂无最近流水</div><div class="empty-text">刷新历史或导入流水后显示最近记录。</div></div>`;
   wrap.innerHTML=`
     <div class="owner-overview-grid">
-      ${kpi('待收尾款','OUTSTANDING COLLECTION',fmtMoney(outstandingAmount),'var(--color-warning)',`${outstandingCount} 项未结清`)}
+      ${kpi('待收尾款','OUTSTANDING COLLECTION',fmtMoney(outstandingAmount),'var(--color-warning)',`${outstandingCount} 项未结清${outstandingConfigMissing?` · ${outstandingConfigMissing} 项租金待配置`:''}`)}
       ${kpi('今日待办','TODAY ACTIONS',String(todayTodo),'#142033','逾期、承诺逾期、待核对')}
       ${kpi('当前账期实收','CURRENT PERIOD RECEIVED',fmtMoney(periodReceived),'var(--color-primary)',state.overviewComparativeStatus==='success'?currentPeriodRange:'读取云端中')}
       ${kpi('欠款代收','CLOUD ARREARS COLLECTION',fmtMoney(cloudArrearsRemaining),'#1a73e8',`Open ${Number(cloudArrearsCollection.open_count||0)} / Partial ${Number(cloudArrearsCollection.partial_count||0)}`,'role="button" tabindex="0" data-owner-cloud-arrears-card="true"')}

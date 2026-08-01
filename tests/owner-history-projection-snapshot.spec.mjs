@@ -21,6 +21,8 @@ test("owner history projection snapshot reads cloud projection tables directly",
   assert.match(receivables, /FROM arrear_tasks/);
   assert.match(receivables, /source_type==="ttlock_expired_unpaid"/);
   assert.match(receivables, /mode:"direct_cloud_projection"/);
+  assert.match(receivables, /row\.source_type==="ttlock_expired_unpaid"\|\|row\.amount_fils>0/);
+  assert.match(receivables, /config_missing_count:configMissingCount/);
   assert.match(handler, /ownerOverviewFetchSessionPeriodSummary/);
   assert.match(handler, /ownerHistoryProjectionReceivables/);
   assert.match(handler, /syncOwnerHistoryReceivablesProjection/);
@@ -55,5 +57,7 @@ test("owner overview consumes one direct snapshot and lazy-loads collapsed panel
   assert.doesNotMatch(overview, /\n  ensureOwnerFinanceAsync\(\);/);
   assert.doesNotMatch(overview, /\n  ensureOwnerOverviewArrearsAsync\(\);/);
   assert.doesNotMatch(overview, /ensureOwnerTodayTodosAsync\(\);/);
-  assert.match(html, /owner-history-projection-v22/);
+  assert.match(ui, /outstandingConfigMissing/);
+  assert.match(ui, /项租金待配置/);
+  assert.match(html, /owner-history-projection-v23/);
 });

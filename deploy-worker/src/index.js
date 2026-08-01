@@ -11585,9 +11585,10 @@ async function ownerHistoryProjectionReceivables(env,user,limit=500){
       source_table:"arrear_tasks",
       source_mode:"direct_cloud_projection"
     };
-  }).filter(row=>row.amount_fils>0);
+  }).filter(row=>row.source_type==="ttlock_expired_unpaid"||row.amount_fils>0);
   const ttlock=mapped.filter(row=>row.source_type==="ttlock_expired_unpaid");
   const existing=mapped.filter(row=>row.source_type!=="ttlock_expired_unpaid");
+  const configMissingCount=ttlock.filter(row=>row.amount_fils<=0).length;
   const outstandingFils=mapped.reduce((sum,row)=>sum+row.amount_fils,0);
   return {
     all_rows:mapped,
@@ -11595,7 +11596,7 @@ async function ownerHistoryProjectionReceivables(env,user,limit=500){
     overdue:ttlock,
     due_today:[],
     due_soon:[],
-    summary:{total_count:mapped.length,action_count:mapped.length,ttlock_expired_unpaid_count:ttlock.length,existing_arrears_count:existing.length,outstanding_amount_fils:outstandingFils},
+    summary:{total_count:mapped.length,action_count:mapped.length,ttlock_expired_unpaid_count:ttlock.length,existing_arrears_count:existing.length,config_missing_count:configMissingCount,outstanding_amount_fils:outstandingFils},
     source_breakdown:{ttlock_expired_unpaid_count:ttlock.length,existing_arrears_count:existing.length},
     source:{table:"arrear_tasks",mode:"direct_cloud_projection",nested_gateway_calls:0}
   };
