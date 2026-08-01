@@ -9,10 +9,10 @@ const ownerHtmlPath = new URL('../deploy-worker/public/index-51.html', import.me
 test('customer credit is exposed as one authenticated read-only cloud projection', async () => {
   const source = await readFile(workerPath, 'utf8');
   assert.match(source, /async function buildOwnerCustomerCreditProjection/);
-  assert.match(source, /canonicalFinanceProjectionBuild\(env,user,period/);
+  assert.match(source, /ownerOverviewFetchSessionPeriodSummary\(env,user,period\)/);
   assert.match(source, /canonicalFinanceProjectionFetchSessions\(env,user,historyRange/);
   assert.match(source, /empLoadLockCardsWithCacheFallback/);
-  assert.match(source, /canonicalArrearsGateway/);
+  assert.match(source, /ownerHistoryProjectionReceivables\(env,user,500\)/);
   assert.match(source, /browser_storage_used:false,analysis_sessions_used:false,display_text_used:false/);
   assert.match(source, /readonly:true,no_write:true/);
   assert.match(source, /path === "\/api\/owner\/customer-credit-projection"/);

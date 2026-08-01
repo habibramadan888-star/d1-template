@@ -11363,12 +11363,12 @@ async function buildOwnerCustomerCreditProjection(env,user,options={}){
   const today=cleanText(options.today||empTodayDubai(),20);
   const period=ownerOverviewBillingPeriodRange(today,0);
   const historyRange={start:empAddMonths(period.start,-24)||"2024-01-01",end:period.end};
-  const [finance,sessions,lockResult,rentConfig,arrears]=await Promise.all([
-    canonicalFinanceProjectionBuild(env,user,period,{include_voided:false,include_corrections:true}),
+  const [periodSummary,sessions,lockResult,rentConfig,receivables]=await Promise.all([
+    ownerOverviewFetchSessionPeriodSummary(env,user,period),
     canonicalFinanceProjectionFetchSessions(env,user,historyRange,{include_voided:false}),
     empLoadLockCardsWithCacheFallback(env,user,{timeoutMs:8000,limit:500,max_age_ms:300000}),
     empRentConfigReadOnly(env,user.corpid),
-    canonicalArrearsGateway(env,user,{limit:1000}).catch(error=>({ok:false,error_code:empReadErrorCode(error),open_items:[],closed_items:[]}))
+    ownerHistoryProjectionReceivables(env,user,500)
   ]);
   const ledger=ownerCustomerCreditLedgerRows(sessions);
   const tenancyStartByBed=new Map();
@@ -11397,7 +11397,8 @@ async function buildOwnerCustomerCreditProjection(env,user,options={}){
   }
   const grades={good:0,watch:0,risk:0,new:0};
   customers.forEach(row=>{grades[row.classification]=(grades[row.classification]||0)+1});
-  return {ok:true,projection_version:"owner-customer-credit-v1",generated_at:empNow(),period,summary:{cash_received:ownerOverviewMoney(finance.cash_received),bank_received:ownerOverviewMoney(finance.bank_received),total_received:ownerOverviewMoney(finance.gross_received),active_session_count:Number(finance.active_session_count||0),outstanding_arrears:ownerOverviewMoney(arrears?.total_remaining),outstanding_arrears_count:Array.isArray(arrears?.open_items)?arrears.open_items.length:0,customer_count:customers.length,grades},customers,source_proof:{history:"canonical_event_archive/sessions.entries_json",finance:finance.source_proof,occupancy:lockOk?"TTLock gateway with server cache fallback":"unavailable",rent:"cloud rent configuration",arrears:"Canonical Arrears Gateway",browser_storage_used:false,analysis_sessions_used:false,display_text_used:false},source_status:{history:"ready",finance:"ready",occupancy:lockOk?"ready":"unavailable",rent:Object.keys(rentConfig||{}).length?"ready":"partial",arrears:arrears?.ok===false?"unavailable":"ready"},warnings:[...(finance.reconciliation_warnings||[]),...(!lockOk?[{code:empTtlockReadErrorCode(lockResult),message:"Access-card source unavailable; no customer rows were guessed."}]:[])],readonly:true,no_write:true};
+  const receivableSummary=receivables?.summary||{};
+  return {ok:true,projection_version:"owner-customer-credit-v1",generated_at:empNow(),period,summary:{cash_received:ownerOverviewMoney(periodSummary.cash_handover),bank_received:ownerOverviewMoney(periodSummary.bank_transfer_total),total_received:ownerOverviewMoney(periodSummary.gross_received),active_session_count:Number(periodSummary.rows_checked||0),outstanding_arrears:ownerOverviewMoney(Number(receivableSummary.outstanding_amount_fils||0)/100),outstanding_arrears_count:Number(receivableSummary.action_count||0),customer_count:customers.length,grades},customers,source_proof:{history:"canonical_event_archive/sessions.entries_json",finance:"owner_visible_sessions_summary",occupancy:lockOk?"TTLock gateway with server cache fallback":"unavailable",rent:"cloud rent configuration",arrears:"owner_history_projection_snapshot/arrear_tasks",browser_storage_used:false,analysis_sessions_used:false,display_text_used:false},source_status:{history:"ready",finance:"ready",occupancy:lockOk?"ready":"unavailable",rent:Object.keys(rentConfig||{}).length?"ready":"partial",arrears:"ready"},warnings:[...(!lockOk?[{code:empTtlockReadErrorCode(lockResult),message:"Access-card source unavailable; no customer rows were guessed."}]:[])],readonly:true,no_write:true};
 }
 __name(buildOwnerCustomerCreditProjection,"buildOwnerCustomerCreditProjection");
 async function handleOwnerCustomerCreditProjection(request,env,user){
