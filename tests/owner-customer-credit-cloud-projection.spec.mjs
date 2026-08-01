@@ -9,7 +9,7 @@ const ownerHtmlPath = new URL('../deploy-worker/public/index-51.html', import.me
 test('customer credit is exposed as one authenticated read-only cloud projection', async () => {
   const source = await readFile(workerPath, 'utf8');
   assert.match(source, /async function buildOwnerCustomerCreditProjection/);
-  assert.match(source, /ownerOverviewFetchSessionPeriodSummary\(env,user,period\)/);
+  assert.doesNotMatch(source.slice(source.indexOf('async function buildOwnerCustomerCreditProjection'), source.indexOf('__name(buildOwnerCustomerCreditProjection')), /ownerOverviewFetchSessionPeriodSummary/);
   assert.match(source, /canonicalFinanceProjectionFetchSessions\(env,user,historyRange/);
   assert.match(source, /empLoadLockCardsWithCacheFallback/);
   assert.match(source, /ownerHistoryProjectionReceivables\(env,user,500\)/);
@@ -40,4 +40,20 @@ test('credit model stays small and exposes one network recommendation', async ()
   assert.match(html, /value="good">✅ 正常/);
   assert.match(html, /value="watch">⚠️ 留意/);
   assert.match(html, /value="risk">🚨 需复核/);
+});
+
+test('business period income is excluded from customer credit', async () => {
+  const worker = await readFile(workerPath, 'utf8');
+  const start = worker.indexOf('async function buildOwnerCustomerCreditProjection');
+  const end = worker.indexOf('__name(buildOwnerCustomerCreditProjection', start);
+  const projection = worker.slice(start, end);
+  assert.doesNotMatch(projection, /cash_received|bank_received|total_received|ownerOverviewFetchSessionPeriodSummary/);
+  assert.match(projection, /financial_period_totals_used_for_credit:false/);
+
+  const source = await readFile(ownerJsPath, 'utf8');
+  const renderStart = source.indexOf('function ccRender(forceRebuild=false)');
+  const renderEnd = source.indexOf('function ccRenderError', renderStart);
+  const render = source.slice(renderStart, renderEnd);
+  assert.doesNotMatch(render, /本期实收|s\.total_received|s\.cash_received|s\.bank_received/);
+  assert.match(render, /账期收入不参与信用/);
 });
