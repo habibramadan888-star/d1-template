@@ -43,6 +43,9 @@ test('global rent configuration is restored in owner control panel', async () =>
   assert.match(owner, /function rc_activeCfgContainer\(\)/);
   assert.match(owner, /getElementById\('cpGlobalRentConfig'\)\|\|document\.getElementById\('rc_cfgPanel'\)/);
   assert.match(owner, /function rc_toggleCfgGroup\(group\)[\s\S]*?const c=rc_activeCfgContainer\(\);if\(c\)rc_renderCfg\(c\)/);
+  assert.match(owner, /data-rc-toggle-group="\$\{esc\(g\)\}"/);
+  assert.match(owner, /querySelectorAll\('\[data-rc-toggle-group\]'\)[\s\S]*?addEventListener\('click'/);
+  assert.doesNotMatch(owner.slice(owner.lastIndexOf('function rc_renderCfg(container)'), owner.indexOf('function rc_setBatchValue', owner.lastIndexOf('function rc_renderCfg(container)'))), /onclick="rc_toggleCfgGroup/);
   assert.match(owner, /id="rc_cfgRows" class="rc-config-rows"/);
   assert.doesNotMatch(owner.slice(owner.lastIndexOf('function rc_renderCfg(container)'), owner.indexOf('function rc_setBatchValue', owner.lastIndexOf('function rc_renderCfg(container)'))), /max-height:410px;overflow-y:auto/);
   assert.match(html, /#cpGlobalRentSection \.rc-config-rows\{overflow:visible/);

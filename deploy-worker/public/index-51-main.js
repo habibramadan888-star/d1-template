@@ -4654,7 +4654,7 @@ function rc_renderCfg(container){
     }).join('');
     return `<div style="margin-bottom:9px;border:1px solid ${groupBorder};border-radius:9px;background:${groupBg};overflow:hidden">
       <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;gap:8px">
-        <button onclick="rc_toggleCfgGroup(${jsArg(g)})" style="background:transparent;border:none;display:flex;align-items:center;gap:7px;cursor:pointer;min-width:0;flex:1;text-align:left">
+        <button type="button" data-rc-toggle-group="${esc(g)}" style="background:transparent;border:none;display:flex;align-items:center;gap:7px;cursor:pointer;min-width:0;flex:1;text-align:left">
           <span style="font-size:12px;color:${groupColor};font-weight:800">${open?'▾':'▸'}</span>
           <span style="font-size:12px;font-weight:800;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(g)}</span>
           <span style="font-size:10px;font-weight:700;color:${groupColor};background:${complete?'rgba(26,138,74,0.12)':'rgba(224,108,0,0.12)'};border-radius:999px;padding:2px 7px;white-space:nowrap">${complete?'已完成':'未完成'}</span>
@@ -4682,6 +4682,9 @@ function rc_renderCfg(container){
     <div id="rc_cfgRows" class="rc-config-rows">
       ${beds.length?rows:'<div style="color:var(--text3);font-size:12px;padding:14px 0;text-align:center">No bed data. Reload cards first. / 暂无床位数据，请先重新读取卡片</div>'}
     </div>`;
+  container.querySelectorAll('[data-rc-toggle-group]').forEach(button=>{
+    button.addEventListener('click',()=>rc_toggleCfgGroup(String(button.dataset.rcToggleGroup||'')));
+  });
 }
 function rc_setBatchValue(v){
   const inp=document.getElementById('rc_batchVal')||document.getElementById('rc_bulkVal');
