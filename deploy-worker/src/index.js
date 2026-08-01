@@ -10663,7 +10663,7 @@ async function ownerOverviewFetchSessionPeriodSummary(env,user,range){
   };
   if(!await phase0TableExists(env,"sessions"))return summary;
   const result=await env.DB.prepare(
-    "SELECT id, anchor_id, date, source, entries_count, cash_handover, bank_transfer_total, gross_received, handover_status, voided_at, created_at, export_text FROM sessions WHERE corpid=? AND COALESCE(voided_at,'')='' AND COALESCE(handover_status,'')<>'VOID' AND substr(COALESCE(date,created_at,''),1,10) BETWEEN ? AND ? ORDER BY substr(COALESCE(date,created_at,''),1,10) DESC, created_at DESC LIMIT 500"
+    "SELECT id, anchor_id, date, source, entries_count, cash_handover, bank_transfer_total, gross_received, handover_status, voided_at, created_at, export_text, entries_json FROM sessions WHERE corpid=? AND COALESCE(voided_at,'')='' AND COALESCE(handover_status,'')<>'VOID' AND substr(COALESCE(date,created_at,''),1,10) BETWEEN ? AND ? ORDER BY substr(COALESCE(date,created_at,''),1,10) DESC, created_at DESC LIMIT 500"
   ).bind(user.corpid,range.start,range.end).all();
   const rows=Array.isArray(result?.results)?result.results:[];
   const seenAnchors=new Set();
@@ -10671,13 +10671,14 @@ async function ownerOverviewFetchSessionPeriodSummary(env,user,range){
     const source=cleanText(row?.source||"",80).toLowerCase();
     const anchor=cleanText(row?.anchor_id||"",160);
     const status=cleanText(row?.handover_status||"",40).toUpperCase();
-    if(source==="employee_entry"||source==="employee_entry_raw_held"||source.startsWith("owner_")||source.includes("correction"))return false;
-    if(["RAW_ACCEPTED_HELD_FOR_REVIEW","TRANSFER_VOID_APPLIED","OWNER_ACKNOWLEDGED","CORRECTION_APPLIED"].includes(status))return false;
-    if(/^(?:RAW-|QA-|CODEX_|HL_(?:EMPLOYEE|LIVE|QA|TEST|FULL|MATRIX))/i.test(anchor))return false;
+    if(source==="employee_entry"||source.startsWith("owner_")||source.includes("correction"))return false;
+    if(["TRANSFER_VOID_APPLIED","OWNER_ACKNOWLEDGED","CORRECTION_APPLIED"].includes(status))return false;
+    if(/^(?:QA-|CODEX_|HL_(?:EMPLOYEE|LIVE|QA|TEST|FULL|MATRIX))/i.test(anchor))return false;
     return true;
   });
   summary.rows_checked=eligibleRows.length;
   for(const row of eligibleRows){
+    const rawHeld=projectRawHeldSessionReadModel(row);
     const storedGross=ownerOverviewMoney(row?.gross_received);
     const storedCash=ownerOverviewMoney(row?.cash_handover);
     const storedBank=ownerOverviewMoney(row?.bank_transfer_total);
@@ -10692,9 +10693,9 @@ async function ownerOverviewFetchSessionPeriodSummary(env,user,range){
     const textGross=readTextMoney([/^Total Received[^\n]*?AED\s*([\d,.]+)/im,/总收入\s*([\d,.]+)\s*AED/i]);
     const textBank=readTextMoney([/^Bank Received[^\n]*?AED\s*([\d,.]+)/im,/银行收款\s*([\d,.]+)\s*AED/i]);
     const textCash=readTextMoney([/^Cash Received[^\n]*?AED\s*([\d,.]+)/im]);
-    const gross=storedGross||textGross;
-    const bank=storedBank||textBank;
-    const cash=storedCash||textCash||ownerOverviewMoney(Math.max(0,gross-bank));
+    const gross=storedGross||ownerOverviewMoney(rawHeld?.ok?rawHeld.total_received:0)||textGross;
+    const bank=storedBank||ownerOverviewMoney(rawHeld?.ok?rawHeld.bank_received:0)||textBank;
+    const cash=storedCash||ownerOverviewMoney(rawHeld?.ok?rawHeld.cash_received:0)||textCash||ownerOverviewMoney(Math.max(0,gross-bank));
     if(gross<=0)continue;
     const anchor=cleanText(row?.anchor_id||"",160);
     if(anchor&&seenAnchors.has(anchor))continue;
@@ -10711,7 +10712,7 @@ async function ownerOverviewFetchSessionPeriodSummary(env,user,range){
       cash,
       bank,
       gross,
-      included_reason:"active_owner_statement_session"
+      included_reason:rawHeld?.ok?"active_owner_history_raw_held_session":"active_owner_statement_session"
     });
   }
   summary.rows_checked=summary.sessions.length;
@@ -11741,7 +11742,7 @@ async function phase0OwnerOverviewComparativeSummary(env,user,url){
     ownerHistoryProjectionReceivables(env,user,500)
   ]);
   const currentBillingPeriod=lightweightPeriods[lightweightPeriods.length-1];
-  const lightweightCurrentPeriodReceived={...lightweightSummaries[lightweightSummaries.length-1],range:currentBillingPeriod,rule:"billing_period_3_to_2_owner_visible_sessions",inclusion_rule:"active_owner_statement_sessions_only"};
+  const lightweightCurrentPeriodReceived={...lightweightSummaries[lightweightSummaries.length-1],range:currentBillingPeriod,rule:"billing_period_3_to_2_owner_visible_sessions",inclusion_rule:"active_owner_history_sessions_including_raw_held"};
   const lightweightBillingPeriodTrend=lightweightSummaries.map((summary,index)=>({summary,range:lightweightPeriods[index]})).filter(({summary})=>summary.rows_checked&&ownerOverviewMoney(summary.gross_received)>0).map(({summary,range})=>({
     label:range.label.slice(0,7),
     start:range.start,

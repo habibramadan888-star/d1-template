@@ -12,11 +12,19 @@ test("owner overview current period received uses owner-visible session summarie
   assert.match(worker, /Date\.UTC\(startYear,startMonth,3\)/);
   assert.match(worker, /function ownerOverviewFetchSessionPeriodSummary/);
   assert.match(worker, /FROM sessions WHERE corpid=\?/);
+  assert.match(worker, /export_text, entries_json FROM sessions/);
   assert.match(worker, /COALESCE\(voided_at,''\)=''/);
   assert.match(worker, /COALESCE\(handover_status,''\)<>'VOID'/);
   assert.match(worker, /current_period_received:currentPeriodReceived/);
   assert.match(worker, /billing_period_3_to_2_owner_visible_sessions/);
   assert.match(worker, /owner_history_projection_snapshot/);
+  assert.match(worker, /projectRawHeldSessionReadModel\(row\)/);
+  assert.match(worker, /rawHeld\?\.ok\?rawHeld\.total_received/);
+  assert.match(worker, /active_owner_history_raw_held_session/);
+  assert.match(worker, /active_owner_history_sessions_including_raw_held/);
+  const periodSummary=worker.slice(worker.indexOf("async function ownerOverviewFetchSessionPeriodSummary"),worker.indexOf("__name(ownerOverviewFetchSessionPeriodSummary"));
+  assert.doesNotMatch(periodSummary, /source==="employee_entry_raw_held"/);
+  assert.doesNotMatch(periodSummary, /RAW_ACCEPTED_HELD_FOR_REVIEW/);
   assert.match(worker, /const lightweightPeriods=\[-5,-4,-3,-2,-1,0\]/);
   const summaryHandler=worker.slice(worker.indexOf("async function phase0OwnerOverviewComparativeSummary"),worker.indexOf("__name(phase0OwnerOverviewComparativeSummary"));
   assert.ok(
