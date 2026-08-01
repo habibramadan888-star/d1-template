@@ -469,7 +469,8 @@ label .en-sub{letter-spacing:0.04em;font-size:8.5px}
 #cp-overlay .kpi-sub{font-size:10px;color:var(--text3);margin-top:5px;font-family:var(--mono);}
 
 /* 警示卡：更大数字，有颜色底色 */
-#cp-overlay .kpi-alerts .kpi{padding:13px 14px 12px;border:0;border-right:1px solid var(--border);border-radius:0;box-shadow:none;min-width:0;}
+#cp-overlay .kpi-alerts .kpi{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:13px 14px 12px;border:0;border-right:1px solid var(--border);border-radius:0;box-shadow:none;min-width:0;}
+#cp-overlay .kpi-alerts .kpi-cn,#cp-overlay .kpi-alerts .kpi-en,#cp-overlay .kpi-alerts .kpi-val,#cp-overlay .kpi-alerts .kpi-sub,#cp-overlay .kpi-alerts .kpi-tap{width:100%;text-align:center;}
 #cp-overlay .kpi-alerts .kpi:last-child{border-right:0;}
 #cp-overlay .kpi-alerts .kpi:hover{box-shadow:none;transform:none;filter:brightness(.985);}
 #cp-overlay .kpi-alerts .kpi:active{transform:none;filter:brightness(.97);}
