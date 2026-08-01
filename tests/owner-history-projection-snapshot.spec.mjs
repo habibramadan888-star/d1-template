@@ -41,5 +41,6 @@ test("owner overview consumes one direct snapshot and lazy-loads collapsed panel
   assert.match(overview, /arrearsDetails\.open/);
   assert.doesNotMatch(overview, /\n  ensureOwnerFinanceAsync\(\);/);
   assert.doesNotMatch(overview, /\n  ensureOwnerOverviewArrearsAsync\(\);/);
-  assert.match(html, /owner-history-projection-v21/);
+  assert.doesNotMatch(overview, /ensureOwnerTodayTodosAsync\(\);/);
+  assert.match(html, /owner-history-projection-v22/);
 });

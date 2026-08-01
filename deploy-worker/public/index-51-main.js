@@ -5788,7 +5788,8 @@ function renderOwnerOverview(){
     </div>`;
   ensureOwnerOverviewComparativeAsync();
   ensureOwnerOverviewArrearsAsync();
-  ensureOwnerTodayTodosAsync();
+  // The overview snapshot already includes its todo projection. Do not launch
+  // the legacy todo gateway here: it can race and overwrite the same state.
 }
 
 function ownerOverviewCloudData(){
@@ -6331,7 +6332,8 @@ function renderOwnerOverview(){
   if(financeDetails)financeDetails.addEventListener('toggle',()=>{if(financeDetails.open)ensureOwnerFinanceAsync();},{once:true});
   const arrearsDetails=wrap.querySelector('#ownerOverviewArrearsPanel')?.closest('details');
   if(arrearsDetails)arrearsDetails.addEventListener('toggle',()=>{if(arrearsDetails.open)ensureOwnerOverviewArrearsAsync();},{once:true});
-  ensureOwnerTodayTodosAsync();
+  // Today Actions is part of the same cloud history snapshot. A second gateway
+  // request here would race and replace the projection with unrelated state.
 }
 
 /* ── ANALYSIS IMPORT — 正式身份去重 ── */

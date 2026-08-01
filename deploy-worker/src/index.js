@@ -10661,10 +10661,10 @@ async function ownerOverviewFetchSessionPeriodSummary(env,user,range){
     rule:"owner_visible_sessions_summary"
   };
   if(!await phase0TableExists(env,"sessions"))return summary;
-  const rows=await phase0All(env,
-    "SELECT id, anchor_id, date, source, entries_count, cash_handover, bank_transfer_total, gross_received, handover_status, voided_at, created_at, export_text FROM sessions WHERE corpid=? AND COALESCE(voided_at,'')='' AND COALESCE(handover_status,'')<>'VOID' AND substr(COALESCE(date,created_at,''),1,10) BETWEEN ? AND ? ORDER BY substr(COALESCE(date,created_at,''),1,10) DESC, created_at DESC LIMIT 500",
-    [user.corpid,range.start,range.end]
-  ).catch(()=>[]);
+  const result=await env.DB.prepare(
+    "SELECT id, anchor_id, date, source, entries_count, cash_handover, bank_transfer_total, gross_received, handover_status, voided_at, created_at, export_text FROM sessions WHERE corpid=? AND COALESCE(voided_at,'')='' AND COALESCE(handover_status,'')<>'VOID' AND substr(COALESCE(date,created_at,''),1,10) BETWEEN ? AND ? ORDER BY substr(COALESCE(date,created_at,''),1,10) DESC, created_at DESC LIMIT 500"
+  ).bind(user.corpid,range.start,range.end).all();
+  const rows=Array.isArray(result?.results)?result.results:[];
   const seenAnchors=new Set();
   const eligibleRows=rows.filter(row=>{
     const source=cleanText(row?.source||"",80).toLowerCase();
@@ -11476,11 +11476,12 @@ __name(ownerOverviewFetchBedTransferReviews,"ownerOverviewFetchBedTransferReview
 async function ownerHistoryProjectionReceivables(env,user,limit=500){
   const empty={all_rows:[],rows:[],overdue:[],due_today:[],due_soon:[],summary:{total_count:0,action_count:0,ttlock_expired_unpaid_count:0,existing_arrears_count:0,outstanding_amount_fils:0},source_breakdown:{ttlock_expired_unpaid_count:0,existing_arrears_count:0},source:{table:"arrear_tasks",mode:"direct_cloud_projection"}};
   if(!await phase0TableExists(env,"arrear_tasks"))return empty;
-  const rows=await phase0All(env,`SELECT task_id, entry_id, bed, tenant_name, arrear_amount, actual_received, close_status, followup_status, promise_date, staff_note, owner_note, source_type, source_ref, created_at, updated_at
+  const result=await env.DB.prepare(`SELECT task_id, entry_id, bed, tenant_name, arrear_amount, actual_received, close_status, followup_status, promise_date, staff_note, owner_note, source_type, source_ref, created_at, updated_at
     FROM arrear_tasks
     WHERE corpid=? AND COALESCE(close_status,'')<>'closed' AND COALESCE(voided_at,'')=''
     ORDER BY COALESCE(updated_at,created_at,'') DESC
-    LIMIT ?`,[user.corpid,Math.min(Math.max(Number(limit||500),1),500)]).catch(()=>[]);
+    LIMIT ?`).bind(user.corpid,Math.min(Math.max(Number(limit||500),1),500)).all();
+  const rows=Array.isArray(result?.results)?result.results:[];
   const mapped=rows.map(row=>{
     const amount=ownerOverviewMoney(row?.arrear_amount);
     const received=ownerOverviewMoney(row?.actual_received);
