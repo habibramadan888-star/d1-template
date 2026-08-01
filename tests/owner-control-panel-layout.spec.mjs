@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 test("control panel mobile shell avoids compressed topbar layout", async () => {
-  const html = await readFile("deploy-worker/public/index.html", "utf8");
+  const html = await readFile("deploy-worker/public/index-51.html", "utf8");
 
   assert.match(
     html,
