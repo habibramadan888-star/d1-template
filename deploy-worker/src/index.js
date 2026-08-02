@@ -4838,19 +4838,25 @@ async function handleEmployeeEntrySyncState(request,env,user){
     return success({...base,session_status:status,archive_state:archiveState,cloud_session:{id:session.id,anchor_id:session.anchor_id,handover_status:session.handover_status||"",voided_at:session.voided_at||""},correction_anchor:correction?.anchor_id||"",entries:(entries||[]).map((entry,index)=>({index,local_event_id:cleanText(entry?.event_id||entry?.anchor_id||entry?.id||entry?.cloud_entry_id||"",120),status,sync_status:syncStatus,archive_state:archiveState,cloud_match:false,matched:false,matched_by:"",cloud_record_id:cleanText(session.id||"",160),source_proof:{source:"canonical_event_archive",session_id:session.id||"",anchor_id:session.anchor_id||"",correction_anchor:correction?.anchor_id||""},allowed_next_action:"owner_review_required",reason:status}))});
   }
   const cloudEntries=extractEmployeeEntryAnchorsFromSession(session);
-  const cloudKeySets=cloudEntries.map(row=>employeeEntryCloudSyncKeySet(row,user));
   const localEntryIds=[...new Set((entries||[]).map(entry=>cleanId(entry?.event_id||entry?.anchor_id||entry?.id||entry?.cloud_entry_id||'')).filter(Boolean))].slice(0,100);
-  const persistedTransactionIds=new Set();
-  if(localEntryIds.length&&await empTableExists(env,'transactions').catch(()=>false)){
+  if(localEntryIds.length&&await empTableExists(env,"entry_events").catch(()=>false)){
     const placeholders=localEntryIds.map(()=>'?').join(',');
-    const rows=(await env.DB.prepare(`SELECT id FROM transactions WHERE corpid=? AND id IN (${placeholders})`).bind(user.corpid,...localEntryIds).all().catch(()=>({results:[]}))).results||[];
-    for(const row of rows)persistedTransactionIds.add(cleanId(row?.id||''));
+    const eventRows=(await env.DB.prepare(`SELECT ref_id, new_value FROM entry_events
+      WHERE corpid=? AND ref_type='employee_raw_entry' AND event_type='raw_ingestion_accepted'
+        AND ref_id IN (${placeholders})`).bind(user.corpid,...localEntryIds).all().catch(()=>({results:[]}))).results||[];
+    const existingKeys=new Set(cloudEntries.flatMap(row=>[row?.event_id,row?.anchor_id,row?.id].map(cleanId).filter(Boolean)));
+    for(const row of eventRows){
+      let saved=null;
+      try{saved=JSON.parse(row?.new_value||"");}catch{}
+      const anchor=saved?.canonical_anchor;
+      const anchorId=cleanId(anchor?.event_id||anchor?.anchor_id||anchor?.id||row?.ref_id||"");
+      if(anchor&&anchorId&&!existingKeys.has(anchorId)){
+        cloudEntries.push(anchor);
+        existingKeys.add(anchorId);
+      }
+    }
   }
-  let effectiveTransferAnchorIds=null;
-  if(cloudEntries.some(row=>parseBedTransferDerivedArrearsRef(row?.arrears_ref||row?.original_arrears_id||""))){
-    const projection=await rebuildAllCloudArrears(env,user,{limit:2000});
-    effectiveTransferAnchorIds=new Set((projection.transfer_effective_events||[]).map(row=>cleanText(row.transfer_anchor_id,180)));
-  }
+  const cloudKeySets=cloudEntries.map(row=>employeeEntryCloudSyncKeySet(row,user));
   const results=(entries||[]).map((entry,index)=>{
     const localKeys=employeeEntryCloudSyncKeySet(entry,user);
     let matchedIndex=-1;
@@ -4862,14 +4868,8 @@ async function handleEmployeeEntrySyncState(request,env,user){
     }
     if(matchedIndex>=0){
       const matched=cloudEntries[matchedIndex]||{};
-      const parsed=parseBedTransferDerivedArrearsRef(matched.arrears_ref||matched.original_arrears_id||"");
-      if(parsed&&effectiveTransferAnchorIds&&!effectiveTransferAnchorIds.has(cleanText(matched.source_anchor_ref||parsed.source_anchor_ref,180))){
-        return {index,local_event_id:cleanText(entry?.event_id||entry?.anchor_id||entry?.id||entry?.cloud_entry_id||"",120),status:"cloud_source_reconciliation",sync_status:"OWNER_REVIEW_REQUIRED",archive_state:"source_transfer_voided",cloud_match:true,matched:true,matched_by:"canonical_fingerprint_or_event_id",cloud_record_id:cleanText(session.id||"",160),matched_event_id:cleanText(matched.event_id||matched.anchor_id||matched.id||"",120),source_proof:{source:"canonical_event_archive",session_id:session.id||"",anchor_id:session.anchor_id||"",source_anchor_ref:matched.source_anchor_ref||parsed.source_anchor_ref},allowed_next_action:"owner_review_required",reason:"source_transfer_voided_reconciliation_required"};
-      }
       return {index,local_event_id:cleanText(entry?.event_id||entry?.anchor_id||entry?.id||entry?.cloud_entry_id||"",120),status:"cloud_confirmed",sync_status:"SYNCED",archive_state:"exists_active",cloud_match:true,matched:true,matched_by:"canonical_fingerprint_or_event_id",cloud_record_id:cleanText(session.id||"",160),matched_event_id:cleanText(matched.event_id||matched.anchor_id||matched.id||"",120),source_proof:{source:"canonical_event_archive",session_id:session.id||"",anchor_id:session.anchor_id||""},allowed_next_action:"none",reason:"matched_cloud_anchor"};
     }
-    const localEventId=cleanId(entry?.event_id||entry?.anchor_id||entry?.id||entry?.cloud_entry_id||'');
-    if(localEventId&&persistedTransactionIds.has(localEventId))return {index,local_event_id:localEventId,status:'cloud_confirmed',sync_status:'SYNCED',archive_state:'exists_active',cloud_match:true,matched:true,matched_by:'transaction_entry_id',cloud_record_id:cleanText(session.id||'',160),matched_event_id:localEventId,source_proof:{source:'transactions',session_id:session.id||'',anchor_id:session.anchor_id||''},allowed_next_action:'none',reason:'matched_persisted_transaction'};
     return {index,local_event_id:cleanText(entry?.event_id||entry?.anchor_id||entry?.id||entry?.cloud_entry_id||"",120),status:"cloud_mismatch",sync_status:"CLOUD_MISMATCH",archive_state:"mismatch",cloud_match:false,matched:false,matched_by:"",cloud_record_id:cleanText(session.id||"",160),source_proof:{source:"canonical_event_archive",session_id:session.id||"",anchor_id:session.anchor_id||"",cloud_entries_count:cloudEntries.length},allowed_next_action:"owner_review_required",reason:cloudEntries.length?"no_matching_cloud_anchor":"no_cloud_entries"};
   });
   return success({...base,session_status:"cloud_active",archive_state:"exists_active",cloud_session:{id:session.id,anchor_id:session.anchor_id,handover_status:session.handover_status||"",voided_at:session.voided_at||""},entries:results});

@@ -3623,8 +3623,10 @@ async function reconcileEmployeeCloudSyncState({silent=false}={}){
   if(!state.user||!synced.length)return {ok:true,skipped:true};
   const cloudSessionId=state.sessionId||synced.map(e=>String(e.session_id||'').trim()).find(Boolean)||'';
   const session={id:cloudSessionId,session_id:cloudSessionId,entries:synced};
+  const controller=typeof AbortController==='function'?new AbortController():null;
+  const timeoutId=controller?setTimeout(()=>controller.abort(),5000):null;
   try{
-    const r=await apiFetch('/api/employee/entry/sync-state',{method:'POST',body:JSON.stringify({session_id:cloudSessionId,session,entries:synced,no_write:true})});
+    const r=await apiFetch('/api/employee/entry/sync-state',{method:'POST',signal:controller?.signal,body:JSON.stringify({session_id:cloudSessionId,session,entries:synced,no_write:true})});
     const data=await r.json();
     if(!r.ok||data?.ok===false)throw new Error(data?.error_code||data?.message||('sync_state_'+r.status));
     const byLocal=new Map((data.entries||[]).map(x=>[String(x.local_event_id||''),x]));
@@ -3655,6 +3657,8 @@ async function reconcileEmployeeCloudSyncState({silent=false}={}){
     refreshSessionViews();
     if(!silent)toast('Cloud sync state unavailable / 云端同步状态暂不可用',6000);
     return {ok:false,error:String(err?.message||err||'cloud_sync_failed')};
+  }finally{
+    if(timeoutId)clearTimeout(timeoutId);
   }
 }
 function currentSessionId(){
