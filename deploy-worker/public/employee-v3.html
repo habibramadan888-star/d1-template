@@ -3456,22 +3456,21 @@ function employeeBedTransferUiGateState(capabilities=state.bedTransferCapabiliti
   const ready=capabilities?.status==='success';
   const validate=ready&&capabilities?.bed_transfer_validate_enabled===true;
   const write=ready&&capabilities?.bed_transfer_write_enabled===true;
-  return {fields_enabled:validate,context_loading_enabled:validate,validate_enabled:validate,final_upload_enabled:validate&&write,error_code:validate?'':(capabilities?.status==='error'?'BED_TRANSFER_CAPABILITY_UNAVAILABLE':'BED_TRANSFER_VALIDATE_NOT_ENABLED')};
+  return {fields_enabled:true,context_loading_enabled:true,validate_enabled:true,final_upload_enabled:true,reference_available:validate&&write,error_code:validate?'':(capabilities?.status==='error'?'BED_TRANSFER_CAPABILITY_UNAVAILABLE':'BED_TRANSFER_VALIDATE_NOT_ENABLED')};
 }
 function applyEmployeeBedTransferUiGate(){
   const gate=employeeBedTransferUiGateState();
-  document.querySelectorAll('#transferFields input,#transferFields select,#transferFields textarea').forEach(control=>{control.disabled=!gate.fields_enabled});
+  document.querySelectorAll('#transferFields input,#transferFields select,#transferFields textarea').forEach(control=>{control.disabled=false});
   const chip=document.querySelector('.event-chip[data-type="TF"]');
-  if(chip){chip.disabled=!gate.validate_enabled;chip.title=gate.validate_enabled?'':gate.error_code;if(gate.validate_enabled)chip.removeAttribute('aria-disabled');else chip.setAttribute('aria-disabled','true');}
+  if(chip){chip.disabled=false;chip.title=gate.reference_available?'':`${gate.error_code} · raw entry remains available`;chip.removeAttribute('aria-disabled');}
   const saveButton=$('btnSaveEntry');
   if(saveButton&&$('entryType')?.value==='TF'){
-    const contextReady=state.bedTransferContext?.status==='ready';
-    saveButton.disabled=!gate.fields_enabled||!contextReady;
+    saveButton.disabled=false;
     saveButton.setAttribute('aria-disabled',String(saveButton.disabled));
-    saveButton.title=saveButton.disabled?(gate.error_code||'BED_TRANSFER_BED_CONTEXT_REQUIRED'):'';
+    saveButton.title='';
   }
   const notice=$('bedTransferWriteDisabledNotice');
-  if(notice){notice.textContent=gate.final_upload_enabled?'Save Transfer adds one local Current Session record; Upload Session performs the canonical write.':'Formal Bed Transfer upload is not enabled; local Save Transfer remains read-only.';}
+  if(notice){notice.textContent=gate.reference_available?'Save Transfer adds one raw Current Session record.':'Business context is unavailable; the raw transfer can still be saved with a review warning.';}
   return gate;
 }
 async function employeeLoadBedTransferCapabilities(){
@@ -4023,11 +4022,8 @@ function renderEntryTtlockStatus(){
   if(save){
     const entryType=$('entryType')?.value;
     const isTransfer=entryType==='TF';
-    const rawDraftWithoutTtlock=entryType==='R'||exitEvent;
-    const blocked=isTransfer?!employeeBedTransferValidateEnabled():(rawDraftWithoutTtlock?false:!ttlockCacheReady());
-    save.disabled=blocked;
-    save.classList.toggle('disabled',blocked);
-    save.title=blocked?(isTransfer?employeeBedTransferUiGateState().error_code:'Load Cards before formal entry / 请先加载卡片'):'';
+    save.title=ttlockCacheReady()?'':'Card context unavailable; raw entry remains available for review.';
+    validate();
   }
 }
 async function ensureEntryTtlockReady(opts={}){
@@ -4733,7 +4729,7 @@ function validateRentEntry(){
   employeeValidateCommonAmount(errors,{label:'Paid Amount',allowZeroWithExplanation:true});
   employeeRequire(errors,!!employeePaymentMethodValue(),'Payment Method is required.');
   if(employeePaymentMethodValue()==='M'){
-    if(!employeeRentSplitPaymentV2Enabled())errors.push('Cash + Bank Rent is not enabled in this environment.');
+    if(!employeeRentSplitPaymentV2Enabled())warns.push('Cash + Bank reference capability is unavailable. The employee split will be saved for Owner Review.');
     if(num(employeeFieldValue('rentCashAmount'))<=0)errors.push('Cash + Bank Rent requires a positive Cash amount.');
     if(num(employeeFieldValue('rentBankAmount'))<=0)errors.push('Cash + Bank Rent requires a positive Bank amount.');
     const splitTotal=Math.round((num(employeeFieldValue('rentCashAmount'))+num(employeeFieldValue('rentBankAmount')))*100)/100;
@@ -4751,31 +4747,31 @@ function validateRentEntry(){
     else errors.push('Expected Rent / Period Due is required.');
   }
   const samePeriodTask=openTaskForCurrentRentPeriod();
-  if(samePeriodTask)errors.push(`This period already has an open arrears task: ${fmtMoney(taskRemain(samePeriodTask))} AED. Use Arrears Payment instead.`);
+  if(samePeriodTask)warns.push(`This period already has an open arrears task: ${fmtMoney(taskRemain(samePeriodTask))} AED. The employee-reported Rent will still be saved for Owner Review.`);
   const tail=Math.max(0,(due||num(employeeFieldValue('periodDue')))-amount);
   if(tail>0){
-    if(employeeFieldValue('arrearHandling')!=='ARREAR')errors.push('Short-paid rent must create an arrears task.');
-    if(!employeeTrimField('arrearReasonDetail'))errors.push('Short-paid rent requires a reason or note.');
+    if(employeeFieldValue('arrearHandling')!=='ARREAR')warns.push('Short-paid rent has no arrears handling selection. The raw payment will be reviewed.');
+    if(!employeeTrimField('arrearReasonDetail'))warns.push('Short-paid rent requires a reason or note for review. The raw payment remains recordable.');
     if(!employeeFieldValue('arrearPromiseDate'))warns.push('Promised payment date is unknown. The employee explanation will be sent for Owner Review.');
     if(employeeFieldValue('arrearPromiseDate')&&employeeFieldValue('arrearPromiseDate')<today())warns.push('Promised payment date is historical. The employee explanation will be sent for Owner Review.');
   }
-  if(due>0&&amount>due&&!employeeFieldValue('excessTo'))errors.push('Overpaid rent requires an excess handling choice.');
+  if(due>0&&amount>due&&!employeeFieldValue('excessTo'))warns.push('Overpaid rent has no excess handling choice. The raw amount will be reviewed.');
   return employeeValidationResult(errors,warns);
 }
 function validateArrearsPaymentEntry(){
   const errors=[],warns=[];
   employeeRequire(errors,!!employeeTrimField('bed'),'Bed is required.');
-  employeeRequire(errors,!!employeeFieldValue('linkedTaskId'),'Cloud arrears ref or Legacy Arrears Payment must be selected.');
+  if(!employeeFieldValue('linkedTaskId'))warns.push('Cloud arrears reference is unavailable. The employee-reported payment will be saved for Owner Review.');
   employeeValidateCommonAmount(errors,{label:'Payment Amount'});
   employeeRequire(errors,!!employeePaymentMethodValue(),'Payment Method is required.');
   const task=selectedTask();
   const amount=num(employeeFieldValue('amount'));
   if(employeeLegacyArrearsSelected())employeeRequire(errors,!!employeeTrimField('remark'),'Legacy Arrears Payment requires a source Remark.');
-  if(!task&&employeeFieldValue('linkedTaskId')&&!employeeLegacyArrearsSelected())errors.push('Selected arrears ref is no longer open. Refresh arrears and select again.');
+  if(!task&&employeeFieldValue('linkedTaskId')&&!employeeLegacyArrearsSelected())warns.push('Selected arrears ref is no longer open. The employee-reported payment will be saved for Owner Review.');
   if(task){
     const remain=taskRemain(task);
-    if(remain<=0)errors.push('Selected arrears item is no longer open. Refresh arrears.');
-    if(amount>remain+0.01)errors.push('Payment Amount cannot exceed Remaining Before.');
+    if(remain<=0)warns.push('Selected arrears item is no longer open. The employee-reported payment will be reviewed.');
+    if(amount>remain+0.01)warns.push('Payment Amount exceeds the cloud Remaining Before value. The employee-reported amount will be reviewed.');
   }
   return employeeValidationResult(errors,warns);
 }
@@ -4784,7 +4780,7 @@ function validateDepositInEntry(){
   employeeRequire(errors,!!employeeTrimField('bed'),'Bed is required.');
   employeeValidateCommonAmount(errors,{label:'Deposit Amount'});
   employeeRequire(errors,!!employeePaymentMethodValue(),'Payment Method is required.');
-  if(state.current?.deposit&&num(employeeFieldValue('amount'))>0&&Math.abs(num(employeeFieldValue('amount'))-num(state.current.deposit))>0.01&&!employeeTrimField('remark'))errors.push('Deposit amount differs from system deposit. Note is required.');
+  if(state.current?.deposit&&num(employeeFieldValue('amount'))>0&&Math.abs(num(employeeFieldValue('amount'))-num(state.current.deposit))>0.01&&!employeeTrimField('remark'))warns.push('Deposit amount differs from the system reference. The employee-reported amount will be reviewed.');
   return employeeValidationResult(errors,warns);
 }
 function validateDepositOutEntry(){
@@ -4806,7 +4802,7 @@ function validateCheckoutEntry(){
   employeeRequire(errors,!!employeeTrimField('bed'),'Bed is required.');
   employeeRequire(errors,!!employeeFieldValue('leftWithArrearsMode'),'Checkout Type is required.');
   if(!left)employeeRequire(errors,!!employeeFieldValue('checkoutDate'),'Checkout Date is required for normal checkout.');
-  if(!left&&openTasksForBed().some(t=>taskRemain(t)>0))errors.push('Open Arrears Found: This customer has unpaid arrears. Normal checkout is not allowed. / 发现未清欠款：该客户存在未清欠款，不能直接正常退房。');
+  if(!left&&openTasksForBed().some(t=>taskRemain(t)>0))warns.push('Open Arrears Found. The employee-reported Checkout will be saved for Owner Review.');
   if(left){
     employeeRequire(errors,num(employeeFieldValue('leftArrearsAmount'))>0,'Left Arrears Amount is required.');
     employeeRequire(errors,!!employeeTrimField('remark'),'Note is required for Left With Arrears.');
@@ -4825,7 +4821,7 @@ function validateExpenseEntry(){
 function validateBedTransferEntry(){
   const errors=[],warns=[];
   const capabilityGate=employeeBedTransferUiGateState();
-  if(!capabilityGate.validate_enabled)errors.push(capabilityGate.error_code);
+  if(!capabilityGate.reference_available)warns.push(`${capabilityGate.error_code}: business context unavailable; raw transfer remains recordable.`);
   const from=employeeTrimField('transferFromBed').replace(/^#/,'')||employeeTrimField('bed').replace(/^#/,'');
   const to=employeeTrimField('bedTo').replace(/^#/,'');
   const feeMode=employeeFieldValue('feePaid');
@@ -4833,8 +4829,8 @@ function validateBedTransferEntry(){
   const differenceAmount=num(employeeFieldValue('bedDifferenceAmount'));
   employeeRequire(errors,!!from,'From Bed is required.');
   employeeRequire(errors,!!to,'To Bed is required.');
-  if(from&&to&&from===to)errors.push('From Bed and To Bed cannot be the same.');
-  if(from==='334'||to==='334')errors.push('Bed 334 is not allowed for Bed Transfer.');
+  if(from&&to&&from===to)warns.push('From Bed and To Bed are the same. Preserve the employee report for Owner Review.');
+  if(from==='334'||to==='334')warns.push('Bed 334 requires Owner Review. Preserve the employee report.');
   employeeRequire(errors,['paid','waived','unpaid'].includes(feeMode),'Fee Status is required.');
   employeeRequire(errors,!!employeeTrimField('transferReason'),'Transfer Reason is required.');
   if(feeMode==='paid')employeeRequire(errors,!!employeeFieldValue('transferFeePaymentMethod'),'Payment Method is required for paid transfer fee.');
@@ -4844,9 +4840,9 @@ function validateBedTransferEntry(){
   if(differenceMode!=='none')employeeRequire(errors,differenceAmount>0,'Bed Price Difference Amount must be greater than 0.');
   if(differenceMode==='paid')employeeRequire(errors,!!employeeFieldValue('bedDifferencePaymentMethod'),'Bed Price Difference Payment Method is required.');
   if(differenceMode==='unpaid')employeeRequire(errors,!!employeeFieldValue('bedDifferenceDueDate'),'Bed Price Difference Due Date is required.');
-  if(state.bedTransferContext.status==='ambiguous')errors.push('BED_TRANSFER_CONTEXT_AMBIGUOUS');
+  if(state.bedTransferContext.status==='ambiguous')warns.push('BED_TRANSFER_CONTEXT_AMBIGUOUS');
   const expectedContextKey=from&&to?`${from}->${to}`:'';
-  if(state.bedTransferContext.status!=='ready'||state.bedTransferContext.requestKey!==expectedContextKey)errors.push('BED_TRANSFER_BED_CONTEXT_REQUIRED');
+  if(state.bedTransferContext.status!=='ready'||state.bedTransferContext.requestKey!==expectedContextKey)warns.push('BED_TRANSFER_BED_CONTEXT_UNAVAILABLE: raw transfer will be reviewed.');
   return employeeValidationResult(errors,warns);
 }
 function employeeBedTransferBed(value){return String(value||'').trim().replace(/^#+/,'');}
@@ -4947,7 +4943,7 @@ function employeeBedTransferCanonicalSessionId(entry={},session={}){
     .replace(/[^A-Za-z0-9_-]/g,'-').slice(0,80);
 }
 function employeeBedTransferValidatePayload(entry={},session={}){
-  const allowed=['event_type','type','source','from_bed','to_bed','transfer_reason','fee_mode','fee_amount_aed','payment_method','fee_waiver_reason','fee_due_date','bed_price_difference_mode','bed_price_difference_amount_aed','bed_price_difference_due_date','bed_price_difference_payment_method','bed_price_difference_reason','note'];
+  const allowed=['id','entry_id','event_id','anchor_id','session_id','event_type','type','source','from_bed','to_bed','transfer_reason','fee_mode','fee_amount_aed','payment_method','fee_waiver_reason','fee_due_date','bed_price_difference_mode','bed_price_difference_amount_aed','bed_price_difference_due_date','bed_price_difference_payment_method','bed_price_difference_reason','note','remark','created_at','operator','operator_id','operator_name','employee'];
   const clean=Object.fromEntries(allowed.filter(field=>entry[field]!==undefined).map(field=>[field,entry[field]]));
   const entryIdentity=employeeEntryStableIdentity(entry);
   if(state.bedTransferCapabilities?.controlled_beta_preview===true&&!String(clean.transfer_reason||'').includes('CONTROLLED_BETA_TEST'))clean.transfer_reason=`CONTROLLED_BETA_TEST|${String(clean.transfer_reason||'employee_beta').slice(0,180)}`;
@@ -5580,7 +5576,7 @@ function renderSessionPreview(){
 function entrySessionUploaded(){
   return state.drafts.length>0&&state.drafts.every(employeeEntryCloudConfirmed);
 }
-function updateEntrySessionActionState(){
+function deprecatedUpdateEntrySessionActionState(){
   const uploaded=entrySessionUploaded();
   const hasRows=state.drafts.length>0;
   const exportBtn=$('btnExportSession');
@@ -5595,9 +5591,6 @@ function currentSessionHasUploadBlockingError(){
     const key=employeeSessionRecordState(entry,index).key;
     return key==='VALIDATION_FAILED'||key==='STALE'||key==='CLOUD_MISMATCH'||key==='CLOUD_DELETED'||key==='CLOUD_VOIDED'||key==='CLOUD_CORRECTED';
   });
-}
-function currentSessionHasCloudReviewBlock(){
-  return (state.drafts||[]).some((entry,index)=>['CLOUD_MISMATCH','CLOUD_DELETED','CLOUD_VOIDED','CLOUD_CORRECTED'].includes(employeeSessionRecordState(entry,index).key));
 }
 function employeeQaAcceptanceFinalizeOnlyReady(recordCount=(state.drafts||[]).length){
   const qa=state.qaAcceptance||{};
@@ -5614,7 +5607,6 @@ function employeeQaAcceptanceFinalizeOnlyReady(recordCount=(state.drafts||[]).le
 }
 updateEntrySessionActionState=function(){
   const uploaded=entrySessionUploaded();
-  const blocked=currentSessionHasUploadBlockingError();
   const hasRows=state.drafts.length>0;
   const preview=$('btnPreviewSession');
   if(preview){
@@ -5857,7 +5849,6 @@ function syncForm(){
   if(type==='AP'){
     const task=selectedTask();
     const remain=task?taskRemain(task):0;
-    if(task&&!num($('amount').value))$('amount').value=fmtMoney(remain);
     if(task){
       $('due').value=fmtMoney(num($('amount').value));
       $('periodDue').value='';
@@ -5882,7 +5873,6 @@ function syncForm(){
     $('entryClr').value=task?(after<=0?'Y':'P'):'Y';
   }else $('entryClr').value=due&&amt<due?'N':'Y';
   if(type==='R'&&due>0&&amt>0&&amt<due&&!$('reasonCode').value)$('reasonCode').value='SHORT_PAID';
-  if(type==='DR'&&depositHeld()>0&&!$('amount').value)$('amount').value=fmtMoney(depositHeld());
   if(type==='CO'){const co=checkoutCalc();$('overdayDeduction').value=fmtMoney(co.overDed);$('depositDeduction').value=fmtMoney(co.total);$('depositReturnAmount').value=fmtMoney(Math.max(0,depositHeld()-co.total));}
   syncArrearPlan();
   visible(['exceptionStep'],needsException());
@@ -6164,11 +6154,6 @@ function exportLine(e){
   return `#${e.room||e.expense_category} ${fmtMoney(e.amount)} AED ${e.pay_type} ${e.expense_desc||e.note||''}\n  EID ${e.id}`;
 }
 async function saveCanonicalBedTransferDraft(){
-  if(!employeeBedTransferValidateEnabled()){
-    const message=employeeBedTransferUiGateState().error_code;
-    showStatus(message,'warn');
-    return false;
-  }
   const validation=validateBedTransferEntry();
   if(validation.errors.length){toast('Bed Transfer cannot be saved until the displayed fields and Bed Context are complete.',7000);return false;}
   const button=$('btnSaveEntry');
@@ -6298,8 +6283,6 @@ async function saveEntry(){
 }
 const saveEntryWithoutTtlockGate=saveEntry;
 async function saveEntryWithTtlockGate(){
-  if(['TF','E','DR','CO','R'].includes($('entryType')?.value)||employeeLegacyArrearsSelected())return saveEntryWithoutTtlockGate();
-  if(state.user&&!(await ensureEntryTtlockReady({auto:false})))return;
   return saveEntryWithoutTtlockGate();
 }
 saveEntry=saveEntryWithTtlockGate;
@@ -7762,7 +7745,7 @@ previewSession=function(){
 function closePreviewModal(){
   $('previewModal').classList.remove('show');
 }
-async function commitSessionAndExport(){
+async function deprecatedCommitSessionAndExport(){
   const uploadT0=performance.now();
   const uploadTiming={payload_build_ms:0,validation_ms:0,api_request_ms:0,response_parse_ms:0,total_ms:0};
   if(!state.user){applyEmployeeUser(null);toast('请先登录员工账号',6000);return}
