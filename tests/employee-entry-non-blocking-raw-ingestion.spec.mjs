@@ -28,8 +28,8 @@ test("raw aggregate preflight avoids business-source reads that can time out a w
 });
 
 test("formal raw ingestion does not re-run business validation before persistence", () => {
-  const start = worker.indexOf("async function handleEmployeeEntry(");
-  const end = worker.indexOf("__name(handleEmployeeEntry", start);
+  const start = worker.indexOf("async function handleEmployeeRawIngestionEntry(");
+  const end = worker.indexOf("__name(handleEmployeeRawIngestionEntry", start);
   const body = worker.slice(start, end);
   const rawReturn = body.indexOf("return persistEmployeeRawIngestion");
   assert.ok(rawReturn > 0);
