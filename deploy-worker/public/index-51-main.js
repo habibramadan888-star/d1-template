@@ -1141,7 +1141,7 @@ function ownerRawHeldHistoryEntries(session){
 function ownerRawHeldHistorySummaryHtml(session,count){
   const model=session?.raw_held_read_model;
   if(model?.ok===true){
-    return `<div class="hist-stat"><span>记录</span><b>${Number(model.entry_count||count||0)}笔</b></div><div class="hist-stat"><span>总收款</span><b>AED ${fmtMoney(model.total_received)}</b></div><div class="hist-stat"><span>总支出</span><b>AED ${fmtMoney(model.total_outflow)}</b></div><div class="hist-stat"><span>净资金</span><b>AED ${fmtMoney(model.net_funds)}</b></div>`;
+    return `<div class="hist-stat"><span>记录</span><b>${Number(model.entry_count||count||0)}笔</b></div><div class="hist-stat"><span>总收款</span><b>AED ${fmtMoney(model.total_received)}</b></div><div class="hist-stat"><span>总支出</span><b>AED ${fmtMoney(model.total_outflow)}</b></div><div class="hist-stat"><span>净资金</span><b>AED ${fmtMoney(model.net_funds)}</b></div><div class="hist-stat"><span>现金结余</span><b>AED ${fmtMoney(model.cash_net)}</b></div>`;
   }
   const entries=ownerRawHeldHistoryEntries(session);
   if(!entries.length)return '';
@@ -1153,7 +1153,8 @@ function ownerRawHeldHistorySummaryHtml(session,count){
   const received=value('Total Received');
   const outflow=value('Total Outflow');
   const net=value('Net Funds');
-  return `<div class="hist-stat"><span>记录</span><b>${Number(count||entries.length)}笔</b></div><div class="hist-stat"><span>总收款</span><b>AED ${fmtMoney(received)}</b></div><div class="hist-stat"><span>总支出</span><b>AED ${fmtMoney(outflow)}</b></div><div class="hist-stat"><span>净资金</span><b>AED ${fmtMoney(net)}</b></div>`;
+  const cashNet=value('Cash Net');
+  return `<div class="hist-stat"><span>记录</span><b>${Number(count||entries.length)}笔</b></div><div class="hist-stat"><span>总收款</span><b>AED ${fmtMoney(received)}</b></div><div class="hist-stat"><span>总支出</span><b>AED ${fmtMoney(outflow)}</b></div><div class="hist-stat"><span>净资金</span><b>AED ${fmtMoney(net)}</b></div><div class="hist-stat"><span>现金结余</span><b>AED ${fmtMoney(cashNet)}</b></div>`;
 }
 
 function normalizeLedgerSession(session){

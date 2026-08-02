@@ -74,4 +74,7 @@ test("Owner history keeps the raw-held status card and separate audit disclosure
   assert.match(source, /<span>总收款<\/span>/);
   assert.match(source, /<span>总支出<\/span>/);
   assert.match(source, /<span>净资金<\/span>/);
+  assert.match(source, /<span>现金结余<\/span>/);
+  assert.match(source, /fmtMoney\(model\.cash_net\)/);
+  assert.match(source, /const cashNet=value\('Cash Net'\)/);
 });
