@@ -3150,7 +3150,7 @@ label .label-en{
     <div class="card employee-session-card" id="employeeSessionRecordsCard">
       <div class="head">
         <div><div class="title">本次会话</div><div class="small" id="sessionMeta">Restoring session / 正在恢复登录</div></div>
-        <div class="employee-session-actions" style="flex:0 0 auto"><div class="employee-session-actions-primary"><button class="btn" id="btnPreviewSession"><span class="employee-btn-main">Preview &amp; Copy</span><span class="label-en">预览并复制</span></button><button class="btn" id="btnValidateSession"><span class="employee-btn-main">Validate Session</span><span class="label-en">仅预校验</span></button><button class="btn primary" id="btnExportSession"><span class="employee-btn-main">Upload Session</span><span class="label-en">确认本票并上传云端</span></button></div><button class="btn employee-new-session-action" id="btnNewSessionTop"><span class="employee-btn-main">New Session</span><span class="label-en">新会话</span></button></div>
+        <div class="employee-session-actions" style="flex:0 0 auto"><div class="employee-session-actions-primary"><button class="btn" id="btnPreviewSession"><span class="employee-btn-main">Preview &amp; Copy</span><span class="label-en">预览并复制</span></button><button class="btn primary" id="btnExportSession"><span class="employee-btn-main">Confirm &amp; Upload</span><span class="label-en">确认并上传</span></button></div><details data-employee-validation-tools="true" style="margin-top:8px"><summary class="small" style="cursor:pointer">Advanced / QA tools · 高级 / QA 工具</summary><button class="btn" id="btnValidateSession" style="margin-top:8px"><span class="employee-btn-main">Validate Only</span><span class="label-en">仅预校验（不上传）</span></button></details><button class="btn employee-new-session-action" id="btnNewSessionTop"><span class="employee-btn-main">New Session</span><span class="label-en">新会话</span></button></div>
       </div>
       <div class="body"><div class="preview-list" id="sessionPreview"></div></div>
     </div>
@@ -5657,7 +5657,7 @@ updateEntrySessionActionState=function(){
       return;
     }
     const qaSpecialAction=state.qaAcceptance?.runId&&(qaFinalizeOnlyReady||(Number(state.qaAcceptance.alreadyPersistedCount||0)>0&&Number(state.qaAcceptance.remainingCount||0)>0));
-    if(!qaSpecialAction)exportBtn.innerHTML=renderEmployeeButtonLabel('Upload Session','\u786e\u8ba4\u672c\u7968\u5e76\u4e0a\u4f20\u4e91\u7aef');
+    if(!qaSpecialAction)exportBtn.innerHTML=renderEmployeeButtonLabel('Confirm & Upload','\u786e\u8ba4\u5e76\u4e0a\u4f20');
     exportBtn.disabled=!hasRows;
     exportBtn.classList.toggle('disabled',!hasRows);
   }
@@ -10010,8 +10010,8 @@ function applyBilingualUI(){
   $('btnSaveEntry').innerHTML=renderEmployeeButtonLabel('Add to Session','\u52a0\u5165\u672c\u7968');
   $('btnReset').innerHTML=renderEmployeeButtonLabel('Reset','\u6e05\u7a7a');
   $('btnPreviewSession').innerHTML=renderEmployeeButtonLabel('Preview & Copy','\u9884\u89c8\u5e76\u590d\u5236');
-  $('btnValidateSession').innerHTML=renderEmployeeButtonLabel('Validate Session','\u4ec5\u9884\u6821\u9a8c');
-  $('btnExportSession').innerHTML=renderEmployeeButtonLabel('Upload Session','\u786e\u8ba4\u672c\u7968\u5e76\u4e0a\u4f20\u4e91\u7aef');
+  $('btnValidateSession').innerHTML=renderEmployeeButtonLabel('Validate Only','\u4ec5\u9884\u6821\u9a8c\uff08\u4e0d\u4e0a\u4f20\uff09');
+  $('btnExportSession').innerHTML=renderEmployeeButtonLabel('Confirm & Upload','\u786e\u8ba4\u5e76\u4e0a\u4f20');
   const steps=[
     ['Step 1 · Select Event Type','\u7b2c\u4e00\u6b65\uff1a\u9009\u62e9\u4e8b\u4ef6\u7c7b\u578b'],
     ['Step 2 · Confirm Target','\u7b2c\u4e8c\u6b65\uff1a\u786e\u5b9a\u5bf9\u8c61'],
