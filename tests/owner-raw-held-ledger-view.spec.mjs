@@ -34,6 +34,7 @@ test("raw-held Owner detail renders the employee Ledger while retaining full aud
       { event_type: "rent", type: "R", room: "857", amount: 700, paid: 700, due: 700, tag: "O", payment_method: "cash", created_at: "2026-07-31T01:25:00+04:00", event_id: "rent-857" },
       { event_type: "rent", type: "R", room: "737", amount: 460, paid: 460, due: 680, expected_rent: 680, arrears_amount: 220, tag: "O", payment_method: "bank", created_at: "2026-07-31T01:32:00+04:00", arrears_due_date: "2026-08-07", custom_reason: "Balance 220 AED on 2026-08-07; employee statement", event_id: "rent-737" },
       { event_type: "deposit_out", type: "DR", room: "946", amount: 200, actual_refund_amount: 200, tag: "O", payment_method: "cash", created_at: "2026-07-31T01:32:00+04:00", refund_reason: "Employee-reported refund 200 AED; system deposit balance 100 AED; changed location; preserve raw fact for Owner Review", event_id: "refund-946" },
+      { event_type: "checkout", type: "CO", room: "99105", amount: 0, checkout_date: "2026-07-31", tag: "O", payment_method: "cash", created_at: "2026-07-31T01:33:00+04:00", remark: "zero amount checkout remains visible", event_id: "checkout-99105" },
       { event_type: "expense", type: "E", room: "401-103", amount: 150, expense_amount: 150, payment_method: "cash", created_at: "2026-07-31T01:32:00+04:00", expense_desc: "100 for 103 1st room AC service; 50 for 401 1st room AC smart switch removing and fixing", event_id: "expense-401-103" }
     ]
   };
@@ -54,6 +55,7 @@ test("raw-held Owner detail renders the employee Ledger while retaining full aud
   assert.match(ledger, /Other Expense 150/);
   assert.match(ledger, /\[9114\] paid 1,000 O cash 0125 250 balance from this month; 750 for next month advance/);
   assert.match(ledger, /Deposit Refund Details[\s\S]*preserve raw fact for Owner Review/);
+  assert.match(ledger, /Checkout Details[\s\S]*\[99105\] checkout 2026-07-31 O zero amount checkout remains visible/);
   assert.match(ledger, /Expense Details[\s\S]*50 for 401 1st room AC smart switch removing and fixing/);
   assert.match(audit, /record_id: rent-848/);
   assert.match(audit, /ingestion_status: ACCEPTED/);

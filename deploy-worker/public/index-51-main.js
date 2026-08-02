@@ -1009,6 +1009,7 @@ function ownerRawHeldLedgerText(session){
   const refunds=typeRows('deposit_out');
   const expenses=typeRows('expense');
   const arrears=typeRows('arrears_payment');
+  const checkouts=typeRows('checkout');
   const transfers=typeRows('bed_transfer');
   const rentCash=rents.filter(entry=>ownerRawHeldPayment(entry)==='cash');
   const rentBank=rents.filter(entry=>ownerRawHeldPayment(entry)==='bank');
@@ -1068,6 +1069,7 @@ function ownerRawHeldLedgerText(session){
     ownerRawHeldLedgerSection(rentBank.map(ownerRawHeldLine),'🏦','Bank Details'),
     ownerRawHeldLedgerSection(rentMixed.map(ownerRawHeldLine),'💳','Cash + Bank Rent Details'),
     ownerRawHeldLedgerSection(arrears.map(ownerRawHeldLine),'🧾','Arrears Details'),
+    ownerRawHeldLedgerSection(checkouts.map(ownerRawHeldLine),'🚪','Checkout Details'),
     ownerRawHeldLedgerSection(deposits.map(ownerRawHeldLine),'🏷️','Deposit Details'),
     ownerRawHeldLedgerSection(transfers.map(ownerRawHeldLine),'🔄','Transfer Details'),
     ownerRawHeldLedgerSection(refunds.map(ownerRawHeldLine),'💸','Deposit Refund Details'),
