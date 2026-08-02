@@ -8397,6 +8397,11 @@ function employeeAggregateValidationEntry(entry){
   ['sync_status','upload_status','cloud_sync_status','cloud_sync_checked_at','upload_validation_error','upload_validation_error_code','sync_error','cloud_entry_id','upload_attempt_id'].forEach(field=>delete clean[field]);
   return clean;
 }
+function employeeAggregateTechnicalValidationEntry(entry){
+  entry=entry||{};
+  const fields=['id','entry_id','event_id','anchor_id','original_local_entry_id','type','event_type','session_id','idempotency_key','amount','paid','paid_amount','payment_amount','expense_amount','deposit_amount','refund_amount','fee_amount_aed'];
+  return Object.fromEntries(fields.filter(field=>entry[field]!==undefined&&entry[field]!==null&&entry[field]!=='').map(field=>[field,entry[field]]));
+}
 function employeeAggregateValidationIdentityContract(validationResults,uploadList){
   const expected=(uploadList||[]).map(employeeEntryStableIdentity);
   const actual=(validationResults||[]).map(result=>String(result?.entry_identity||'').trim());
@@ -8444,14 +8449,15 @@ async function validateEmployeeUploadAggregateDryRun(validationRequests){
   let requestBody='',clientPrepareMs=0;
   const clientPrepareStart=performance.now();
   try{
+    const qa=typeof state==='object'?(state.qaAcceptance||{}):{};
+    const sanitizeEntry=qa.runId?employeeAggregateValidationEntry:employeeAggregateTechnicalValidationEntry;
     const sanitizedRequests=(validationRequests||[]).map(request=>{
-      const entry=employeeAggregateValidationEntry(request?.entry||request?.entries?.[0]||{});
-      const entries=(request?.entries||[entry]).map(employeeAggregateValidationEntry);
-      const sessionEntries=(request?.session?.entries||entries).map(employeeAggregateValidationEntry);
+      const entry=sanitizeEntry(request?.entry||request?.entries?.[0]||{});
+      const entries=(request?.entries||[entry]).map(sanitizeEntry);
+      const sessionEntries=(request?.session?.entries||entries).map(sanitizeEntry);
       const session={...(request?.session||{}),entries:sessionEntries,entries_json:JSON.stringify({anchor_contract_version:'employee_entry_anchor_v1',entries:sessionEntries})};
       return {...request,entry,entries,session};
     });
-    const qa=typeof state==='object'?(state.qaAcceptance||{}):{};
     const qaValidationContext=qa.runId?{qa_run_id:qa.runId,artifact_sha256:qa.artifactSha,qa_worker_version:qa.workerVersion,matrix_version:qa.matrixVersion,payload_hash:qa.payloadHash}:undefined;
     requestBody=JSON.stringify({aggregate_preflight:true,dry_run:true,validate_only:true,no_write:true,validation_requests:sanitizedRequests,diagnostic:employeeDiagnosticAssetMeta(),qa_validation_context:qaValidationContext});
     clientPrepareMs=Math.max(0,Math.round(performance.now()-clientPrepareStart));

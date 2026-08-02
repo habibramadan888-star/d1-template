@@ -32,6 +32,7 @@ function transportSandbox(apiFetch) {
   vm.runInContext([
     functionBlock(employee, "employeeAggregateValidationSessionFailure"),
     functionBlock(employee, "employeeAggregateValidationEntry"),
+    functionBlock(employee, "employeeAggregateTechnicalValidationEntry"),
     functionBlock(employee, "validateEmployeeUploadAggregateDryRun"),
     "this.validate=validateEmployeeUploadAggregateDryRun"
   ].join("\n"), sandbox);
@@ -101,6 +102,27 @@ test("transport failures remain diagnostic for Validate but do not gate ordinary
   assert.match(gateBlock, /formal_upload_technical_validation_deferred/);
   assert.match(gateBlock, /preflight_deferred_to_formal_upload:true/);
   assert.doesNotMatch(gateBlock, /upload_validation_error=/);
+});
+
+test("ordinary aggregate preflight sends a minimal technical envelope instead of four copies of raw evidence", async () => {
+  let capturedBody = "";
+  const largeEvidence = "x".repeat(200_000);
+  const requests = [{
+    entry_identity: "entry-1",
+    entry: { id: "entry-1", type: "R", session_id: "session-1", idempotency_key: "idem-1", amount: 700, ttlock_context: largeEvidence, source_evidence: largeEvidence },
+    entries: [{ id: "entry-1", type: "R", session_id: "session-1", idempotency_key: "idem-1", amount: 700, ttlock_context: largeEvidence }],
+    session: { id: "session-1", entries: [{ id: "entry-1", type: "R", session_id: "session-1", idempotency_key: "idem-1", amount: 700, source_evidence: largeEvidence }] }
+  }];
+  const sandbox = transportSandbox(async (_path, options) => {
+    capturedBody = options.body;
+    return { status: 200, headers: { get: () => "application/json" }, text: async () => JSON.stringify({ validation_results: [{ ok: true, entry_identity: "entry-1" }] }) };
+  });
+  sandbox.state = { qaAcceptance: { runId: "" } };
+  await sandbox.validate(requests);
+  assert.ok(capturedBody.length < 5000, `technical preflight body must stay bounded, got ${capturedBody.length}`);
+  assert.doesNotMatch(capturedBody, /ttlock_context|source_evidence/);
+  assert.match(capturedBody, /entry-1/);
+  assert.match(capturedBody, /idem-1/);
 });
 
 test("server error identity is preserved instead of collapsing every 503 into a timeout", async () => {
