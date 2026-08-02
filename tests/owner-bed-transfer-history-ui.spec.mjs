@@ -76,6 +76,15 @@ test('History transfer projection is linear and keeps void actions off voided tr
   assert.doesNotMatch(transferBranch,/void-transfer/);
 });
 
+test('raw-held mixed sessions stay on the generic Session history path', () => {
+  const start=worker.indexOf('async function canonicalOwnerHistorySessionRowsForList');
+  const end=worker.indexOf('\nfunction ownerHistoryTransferLineageRequestedBed',start);
+  const projection=worker.slice(start,end);
+  assert.match(projection,/isRawHeldSession=String\(row\?\.source\|\|""\)\.trim\(\)\.toLowerCase\(\)===\"employee_entry_raw_held\"/);
+  assert.match(projection,/eventType===\"bed_transfer\"&&anchorId&&!isRawHeldSession/);
+  assert.match(projection,/projectedBySessionId\.get/);
+});
+
 test('mixed History fixtures retain ordinary dated records rather than replacing them with transfer cards', () => {
   const mixedFixture=[
     ...Array.from({length:7},(_,index)=>({type:'bed_transfer',date:`2026-07-${String(index+1).padStart(2,'0')}`})),

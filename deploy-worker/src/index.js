@@ -9740,11 +9740,12 @@ async function canonicalOwnerHistorySessionRowsForList(env,user,rows=[]){
   const transferVoidSessionIds=new Set();
   for(const row of rows||[]){
     const sessionId=String(row?.id||"");
+    const isRawHeldSession=String(row?.source||"").trim().toLowerCase()==="employee_entry_raw_held";
     projectedBySessionId.set(sessionId,canonicalOwnerHistorySessionRow({...row,...canonicalOwnerHistoryIdentityFields(row)}));
     for(const anchor of extractEmployeeEntryAnchorsFromSession(row)){
       const eventType=String(anchor?.event_type||anchor?.type||"").trim().toLowerCase();
       const anchorId=cleanText(anchor?.transfer_anchor_id||anchor?.anchor_id||anchor?.event_id||"",180);
-      if(eventType==="bed_transfer"&&anchorId){
+      if(eventType==="bed_transfer"&&anchorId&&!isRawHeldSession){
         transferBySessionId.set(sessionId,{row,anchor,anchor_id:anchorId});
       }else if(["void_transfer","transfer_void"].includes(eventType)){
         const target=cleanText(anchor?.target_transfer_anchor_id||anchor?.voids_transfer_anchor_id||"",180);
