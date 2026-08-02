@@ -8467,7 +8467,9 @@ async function validateEmployeeUploadAggregateDryRun(validationRequests){
       const entry=sanitizeEntry(request?.entry||request?.entries?.[0]||{});
       const entries=(request?.entries||[entry]).map(sanitizeEntry);
       const sessionEntries=(request?.session?.entries||entries).map(sanitizeEntry);
-      const session={...(request?.session||{}),entries:sessionEntries,entries_json:JSON.stringify({anchor_contract_version:'employee_entry_anchor_v1',entries:sessionEntries})};
+      const rawSession=request?.session||{};
+      const compactSession={id:String(rawSession.id||rawSession.session_id||entry.session_id||''),session_id:String(rawSession.session_id||rawSession.id||entry.session_id||''),source:String(rawSession.source||'employee_entry'),entries:sessionEntries,entries_json:JSON.stringify({anchor_contract_version:'employee_entry_anchor_v1',entries:sessionEntries})};
+      const session=qa.runId?{...rawSession,...compactSession}:compactSession;
       return {...request,entry,entries,session};
     });
     const qaValidationContext=qa.runId?{qa_run_id:qa.runId,artifact_sha256:qa.artifactSha,qa_worker_version:qa.workerVersion,matrix_version:qa.matrixVersion,payload_hash:qa.payloadHash}:undefined;

@@ -111,7 +111,7 @@ test("ordinary aggregate preflight sends a minimal technical envelope instead of
     entry_identity: "entry-1",
     entry: { id: "entry-1", type: "R", session_id: "session-1", idempotency_key: "idem-1", amount: 700, ttlock_context: largeEvidence, source_evidence: largeEvidence },
     entries: [{ id: "entry-1", type: "R", session_id: "session-1", idempotency_key: "idem-1", amount: 700, ttlock_context: largeEvidence }],
-    session: { id: "session-1", entries: [{ id: "entry-1", type: "R", session_id: "session-1", idempotency_key: "idem-1", amount: 700, source_evidence: largeEvidence }] }
+    session: { id: "session-1", source: "employee_entry", export_text: largeEvidence, entries_json: largeEvidence, entries: [{ id: "entry-1", type: "R", session_id: "session-1", idempotency_key: "idem-1", amount: 700, source_evidence: largeEvidence }] }
   }];
   const sandbox = transportSandbox(async (_path, options) => {
     capturedBody = options.body;
@@ -120,7 +120,7 @@ test("ordinary aggregate preflight sends a minimal technical envelope instead of
   sandbox.state = { qaAcceptance: { runId: "" } };
   await sandbox.validate(requests);
   assert.ok(capturedBody.length < 5000, `technical preflight body must stay bounded, got ${capturedBody.length}`);
-  assert.doesNotMatch(capturedBody, /ttlock_context|source_evidence/);
+  assert.doesNotMatch(capturedBody, /ttlock_context|source_evidence|export_text/);
   assert.match(capturedBody, /entry-1/);
   assert.match(capturedBody, /idem-1/);
 });
