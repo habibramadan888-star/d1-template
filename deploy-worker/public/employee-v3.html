@@ -8472,7 +8472,7 @@ async function validateEmployeeUploadAggregateDryRun(validationRequests){
   if(Array.isArray(data?.validation_results)&&data.validation_results.length===validationRequests.length)return {...data,aggregate_http_status:response.status,client_timing:clientTiming};
   const contentType=String(response.headers?.get?.('content-type')||'');
   const serverErrorCode=typeof data?.error_code==='string'?data.error_code:'';
-  const errorCode=serverErrorCode==='QA_CLIENT_ASSET_STALE'?'QA_CLIENT_ASSET_STALE':[401,403].includes(response.status)?'SERVER_VALIDATE_AUTH_REQUIRED':response.status===404?'SERVER_VALIDATE_ROUTE_NOT_FOUND':response.status===503?'SERVER_PROCESSING_TIMEOUT':'SERVER_VALIDATE_MALFORMED_RESPONSE';
+  const errorCode=serverErrorCode||([401,403].includes(response.status)?'SERVER_VALIDATE_AUTH_REQUIRED':response.status===404?'SERVER_VALIDATE_ROUTE_NOT_FOUND':response.status===503?'SERVER_VALIDATE_HTTP_503':'SERVER_VALIDATE_MALFORMED_RESPONSE');
   return employeeAggregateValidationSessionFailure(errorCode,{http_status:response.status,response_content_type:contentType,response_body_kind:contentType.includes('json')?'json':(raw?'non_json':'empty'),response_error_code:data?.error_code||data?.code||'',request_body_bytes:new Blob([requestBody]).size,client_timing:clientTiming});
 }
 async function commitSessionAndExport(){
@@ -8635,7 +8635,7 @@ async function commitSessionAndExport(){
     validationRequests.push(requestPayload);
     if(isBedTransfer)bedTransferUploadPayloads.set(employeeEntryStableIdentity(e),employeeBedTransferRecordPayload(requestPayload));
   }
-  const aggregatePreflight=await validateEmployeeUploadAggregateDryRun(validationRequests);
+  let aggregatePreflight=await validateEmployeeUploadAggregateDryRun(validationRequests);
   if(aggregatePreflight?.transport_failure===true){
     state.drafts=allOriginalDrafts;
     state.sessionId=originalSessionId;
@@ -8643,17 +8643,31 @@ async function commitSessionAndExport(){
     state.uploadValidationFailedIndex=null;
     state.uploadValidationFailedEntryId='';
     state.uploadValidationFailedMessage='';
-    buildExport();
-    refreshSessionViews();
-    oldLabels.forEach(([b,html])=>{b.dataset.busy='0';b.disabled=false;b.classList.remove('disabled');b.innerHTML=html});
-    showStatus('Server validation unavailable. Please retry.','warn');
-    if($('validationBox'))$('validationBox').innerHTML=renderEmployeeAggregateSessionError(aggregatePreflight);
-    employeeBindAggregateValidationRetry();
-    toast('Server validation unavailable. Please retry.',6000);
-    updateEntrySessionActionState();
-    return;
+    if(validateOnly||state.qaAcceptance?.runId){
+      buildExport();
+      refreshSessionViews();
+      oldLabels.forEach(([b,html])=>{b.dataset.busy='0';b.disabled=false;b.classList.remove('disabled');b.innerHTML=html});
+      showStatus('Server validation unavailable. Your records are preserved.','warn');
+      if($('validationBox'))$('validationBox').innerHTML=renderEmployeeAggregateSessionError(aggregatePreflight);
+      employeeBindAggregateValidationRetry();
+      toast('Server validation unavailable. Your records are preserved.',6000);
+      updateEntrySessionActionState();
+      return;
+    }
+    aggregatePreflight={
+      ok:true,
+      source:'formal_upload_technical_validation_deferred',
+      preflight_transport_warning:aggregatePreflight,
+      validation_results:uploadList.map((entry,index)=>({
+        ok:true,
+        entry_identity:employeeEntryStableIdentity(entry),
+        event_index:index,
+        preflight_deferred_to_formal_upload:true
+      }))
+    };
+    showStatus('Preflight is temporarily unavailable. Formal upload will perform the authoritative technical validation; drafts remain until cloud confirmation.','warn');
   }
-  state.aggregateValidationSessionError=null;
+  if(!aggregatePreflight?.preflight_transport_warning)state.aggregateValidationSessionError=null;
   if(state.qaAcceptance?.runId){
     state.qaAcceptance.alreadyPersistedCount=Math.max(0,Number(aggregatePreflight?.already_persisted_count||0));
     state.qaAcceptance.remainingCount=Math.max(0,Number(aggregatePreflight?.remaining_count||0));
@@ -8682,8 +8696,8 @@ async function commitSessionAndExport(){
       buildExport();refreshSessionViews();oldLabels.forEach(([b,html])=>{b.dataset.busy='0';b.disabled=false;b.classList.remove('disabled');b.innerHTML=html});updateEntrySessionActionState();return;
     }
     if(rawResult?.ok===true){
-      e.upload_resume_state=rawResult.idempotent===true?'ALREADY_PERSISTED':'VALIDATED';
-      e.upload_status=rawResult.idempotent===true?'ALREADY_PERSISTED':'VALIDATION_PASSED';
+      e.upload_resume_state=rawResult.idempotent===true?'ALREADY_PERSISTED':rawResult.preflight_deferred_to_formal_upload===true?'READY_FOR_UPLOAD':'VALIDATED';
+      e.upload_status=rawResult.idempotent===true?'ALREADY_PERSISTED':rawResult.preflight_deferred_to_formal_upload===true?'READY_FOR_UPLOAD':'VALIDATION_PASSED';
       e.upload_validation_error=null;
       e.upload_validation_error_code='';
       e.sync_error='';

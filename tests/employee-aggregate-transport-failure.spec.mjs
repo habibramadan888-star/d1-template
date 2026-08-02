@@ -73,7 +73,7 @@ test("network, 404, 503, timeout and non-JSON failures stay session-scoped", asy
       headers: { get: () => "text/html" },
       text: async () => "<html>not exposed</html>"
     })).validate(requests);
-    assert.equal(result.error_code, status === 404 ? "SERVER_VALIDATE_ROUTE_NOT_FOUND" : "SERVER_PROCESSING_TIMEOUT");
+    assert.equal(result.error_code, status === 404 ? "SERVER_VALIDATE_ROUTE_NOT_FOUND" : "SERVER_VALIDATE_HTTP_503");
     assert.equal(result.response_body_kind, "non_json");
     assert.equal(result.transport_failure, true);
     assert.equal(result.session_error, true);
@@ -85,7 +85,7 @@ test("network, 404, 503, timeout and non-JSON failures stay session-scoped", asy
   }
 });
 
-test("transport failures render one retryable session error and never Remove Invalid Record", () => {
+test("transport failures remain diagnostic for Validate but do not gate ordinary formal upload", () => {
   const sessionError = functionBlock(employee, "renderEmployeeAggregateSessionError");
   const upload = functionBlock(employee, "commitSessionAndExport", true);
   assert.match(sessionError, /data-aggregate-session-error/);
@@ -97,7 +97,21 @@ test("transport failures render one retryable session error and never Remove Inv
   const gateBlock = upload.slice(transportGate, resultLoop);
   assert.match(gateBlock, /state\.drafts=allOriginalDrafts/);
   assert.match(gateBlock, /state\.aggregateValidationSessionError=aggregatePreflight/);
+  assert.match(gateBlock, /if\(validateOnly\|\|state\.qaAcceptance\?\.runId\)/);
+  assert.match(gateBlock, /formal_upload_technical_validation_deferred/);
+  assert.match(gateBlock, /preflight_deferred_to_formal_upload:true/);
   assert.doesNotMatch(gateBlock, /upload_validation_error=/);
+});
+
+test("server error identity is preserved instead of collapsing every 503 into a timeout", async () => {
+  const requests = [{ entry: { id: "entry-1", type: "E" } }];
+  const result = await transportSandbox(async () => ({
+    status: 503,
+    headers: { get: () => "application/json" },
+    text: async () => JSON.stringify({ error_code: "D1_TEMPORARILY_UNAVAILABLE" })
+  })).validate(requests);
+  assert.equal(result.error_code, "D1_TEMPORARILY_UNAVAILABLE");
+  assert.equal(result.response_error_code, "D1_TEMPORARILY_UNAVAILABLE");
 });
 
 test("pure Retry Validation validates all saved records and returns before formal write", () => {
