@@ -3550,9 +3550,6 @@ function employeeDisplayName(user){
   ].map(v=>String(v||'').trim()).filter(v=>!['staff','employee'].includes(v.toLowerCase())).find(Boolean)||'unknown';
 }
 function toast(msg,duration=2600){const el=$('toast');el.textContent=msg;el.style.display='block';clearTimeout(window.__toast);window.__toast=setTimeout(()=>el.style.display='none',duration)}
-function isBedTransferWriteGated(type=$('entryType')?.value){
-  return type==='TF'&&!employeeBedTransferWriteEnabled();
-}
 function bedTransferWriteGateHtml(){
   return `<div class="warn">${esc(BED_TRANSFER_WRITE_DISABLED_MESSAGE)}</div>`;
 }
@@ -5586,12 +5583,6 @@ function deprecatedUpdateEntrySessionActionState(){
     exportBtn.classList.toggle('disabled',!hasRows);
   }
 }
-function currentSessionHasUploadBlockingError(){
-  return (state.drafts||[]).some((entry,index)=>{
-    const key=employeeSessionRecordState(entry,index).key;
-    return key==='VALIDATION_FAILED'||key==='STALE'||key==='CLOUD_MISMATCH'||key==='CLOUD_DELETED'||key==='CLOUD_VOIDED'||key==='CLOUD_CORRECTED';
-  });
-}
 function employeeQaAcceptanceFinalizeOnlyReady(recordCount=(state.drafts||[]).length){
   const qa=state.qaAcceptance||{};
   const expected=Math.max(0,Number(qa.serverRecordCount||recordCount||0));
@@ -5890,67 +5881,6 @@ function syncForm(){
   employeeUpdatePeriodDisclosure();
   validate();
 }
-function validateDeprecatedGenericEntryValidation(){
-  const type=$('entryType').value, errors=[], warns=[];
-  const amt=num($('amount').value), due=num($('due').value);
-  const amountOptional=['CO','TF'].includes(type)&&amt===0;
-  if(!$('bed').value.trim()&&type!=='TF')errors.push(type==='E'?'Expense must include Target Bed / Room.':'必须填写床位。');
-  if((!amt||amt<=0)&&!amountOptional)errors.push('AMT 必须大于 0。');
-  if(['D','DR','CO'].includes(type)&&!$('tenantCardId').value.trim())errors.push('押金相关事件必须有门禁卡 CID，押金台账需要跟着租客走。');
-  if(state.current&&!state.current.remark_parse_ok)warns.push(`门禁卡备注解析不完整：缺少 ${state.current.remark_parse_missing.join('、')}。请先检查卡片备注是否为“床位 D押金 入住月日”。`);
-  if(['D','DR','CO'].includes(type)&&state.current&&!state.current.deposit)errors.push('押金相关事件必须从门禁卡备注解析到押金金额，不能靠员工猜。');
-  if(type==='D'&&state.current?.deposit&&amt>0&&Math.abs(amt-num(state.current.deposit))>0.01&&!$('remark').value.trim())errors.push('收押金金额与门禁卡备注押金不一致，必须填写原因。');
-  if(type==='R'&&$('cycle').value==='1M'&&!rentForBed())errors.push('该床位没有老板端月租配置，不能提交整月收租。请先到老板端设置租金。');
-  if(type==='R'&&$('cycle').value==='CUST'&&num($('periodDays').value)<=0)errors.push('自定义天数必须填写大于 0 的天数，系统按每天 40 AED 计算。');
-  if(type==='R'&&$('cycle').value==='CUST'&&num($('periodDays').value)>0&&!Number.isInteger(num($('periodDays').value)))errors.push('自定义天数必须是整数天。金额不等于 40 的整数倍时，应作为尾款或异常处理，不能改成小数天。');
-  if(['R','TFF'].includes(type)&&(!$('periodStart').value||!$('periodEnd').value))errors.push('账期事件必须有开始和截止日期。');
-  if(type==='R'&&!num($('periodDue').value))errors.push('收租必须确认 period_due，作为账期应收锚点。');
-  if(type==='R'&&$('periodEnd').value&&$('periodStart').value&&$('periodEnd').value<$('periodStart').value)errors.push('period_end 不能早于 period_start。');
-  const tail=rentShortfall();
-  const samePeriodTask=openTaskForCurrentRentPeriod();
-  if(type==='R'&&samePeriodTask)errors.push(`当前账期已有未清尾款任务 ${fmtMoney(taskRemain(samePeriodTask))} AED，请改用“还欠款 AP”处理，不能重复按收租录入。`);
-  if(type==='R'&&tail>0){
-    if($('arrearHandling').value!=='ARREAR')errors.push('实收小于账期应收时，只能生成尾款任务；如金额或账期录错，请先返回修改，不能提交。');
-    if(!$('arrearPromiseDate').value)errors.push('尾款必须填写承诺支付日期，作为后续跟进锚点。');
-    if($('arrearPromiseDate').value&&$('arrearPromiseDate').value<today())errors.push('尾款承诺支付日期不能早于今天。');
-    if(!$('arrearReasonDetail').value.trim())errors.push('尾款必须填写原因或承诺说明，方便老板端追踪。');
-  }
-  if(type==='CO'&&!$('checkoutDate').value)errors.push('退房必须填写实际离开日期。');
-  if(type==='DR'){
-    const expectedRefund=depositHeld();
-    const diff=amt-expectedRefund;
-    if(!$('depositOutRefundDate')?.value)errors.push('Refund Date is required for Deposit Out / 退押金必须填写退款日期。');
-    if(Math.abs(diff)>0.01&&!($('depositOutDifferenceReason')?.value||'').trim())errors.push('Difference Reason is required when actual refund differs from deposit balance / 实退金额与应退押金不一致时必须填写差异原因。');
-  }
-  if(type==='R'&&due>0&&amt>due&&!$('excessTo').value)errors.push('收租超收必须选择处理方式：找零已退还，或转老板处理。');
-  if(type==='TF'&&!$('transferFromBed').value.trim())errors.push('换床必须填写原床位 from_bed。');
-  if(type==='TF'&&!$('bedTo').value.trim())errors.push('换床必须填写目标床位 to_bed。');
-  if(type==='TF'&&$('transferFromBed').value.trim().replace(/^#/,'')===$('bedTo').value.trim().replace(/^#/,''))errors.push('换床 from_bed 和 to_bed 不能相同。');
-  if(type==='TF'&&state.current?.vacant)errors.push('原床位没有 active tenant，不能直接保存换床。');
-  if(type==='TF'){
-    const transferReview=bedTransferValidationSummary(transferValue('transferFromBed')||transferValue('bed'),transferValue('bedTo'),bedTransferReviewContext());
-    if(isBedTransferWriteGated(type))warns.push(BED_TRANSFER_WRITE_DISABLED_MESSAGE);
-    transferReview.review.forEach(code=>warns.push(`换床需复核：${code}`));
-  }
-  if(type==='TF'&&$('feePaid').value==='Y'&&amt!==50)errors.push('换床收取费用时，系统固定按 50 AED 计入，员工不能手动改金额。');
-  if(type==='E'&&!$('expenseDesc').value.trim())errors.push('支出必须填写说明。');
-  if(type==='AP'&&!$('linkedTaskId').value)errors.push('还欠款必须选择一条欠款任务，不能自由录入。');
-  if(type==='AP'){
-    const task=selectedTask();
-    if(task){
-      const remain=taskRemain(task);
-      if(amt>remain+0.01)errors.push('本次还款不能超过该欠款剩余金额。');
-    }
-  }
-  if($('reasonCode').value==='OTHER'&&!$('remark').value.trim())errors.push('RC=OTHER 时备注不能为空。');
-  if($('reasonCode').value==='DISCOUNT'&&!$('customReason').value.trim())errors.push('折扣必须填写原因，方便老板端复核。');
-  if(type==='TF'&&$('feePaid').value==='N'&&!$('transferWaiverReason').value.trim())errors.push('Waiver Reason is required when Bed Transfer fee is waived / 免收换床费必须填写豁免原因。');
-  if(amt>due&&due>0&&type==='R')warns.push('AMT>DUE：系统不会自动把超收当作本期收入，必须明确超收去向。');
-  $('validationBox').innerHTML=[...errors.map(x=>`<div class="bad">阻断：${esc(x)}</div>`),...warns.map(x=>`<div class="warn">提醒：${esc(x)}</div>`),(!errors.length&&!warns.length?'<div>校验通过，可以加入本票。整票上云请点击“导出交接”。</div>':'')].join('');
-  const submit=$('btnSaveEntry');
-  if(submit){submit.disabled=errors.length>0;submit.classList.toggle('disabled',errors.length>0);submit.classList.toggle('primary',errors.length===0);}
-  return {errors,warns};
-}
 function validate(){
   const key=employeeEntryTemplateKeyForType(employeeFieldValue('entryType'));
   const template=employeeEntryTemplates[key]||employeeEntryTemplates.rent;
@@ -5960,62 +5890,6 @@ function entryPayload(){
   const key=employeeEntryTemplateKeyForType(employeeFieldValue('entryType'));
   const template=employeeEntryTemplates[key]||employeeEntryTemplates.rent;
   return (template.anchorBuilder||buildRentAnchor)();
-}
-function entryPayloadDeprecatedGenericBuilder(){
-  const type=$('entryType').value, amt=num($('amount').value), due=num($('due').value), paid=num($('paid').value)||Math.min(amt,due||amt);
-  const pay=$('payType').value;
-  const apTask=type==='AP'?selectedTask():null;
-  const apAlready=apTask?num(apTask.actual_received||apTask.already_paid_amount||apTask.paid_amount):0;
-  const apOriginal=apTask?num(apTask.arrear_amount||apTask.amount||apTask.original_arrears_amount||(taskRemain(apTask)+apAlready)):0;
-  const apBefore=Math.max(0,apOriginal-apAlready);
-  const apRemaining=Math.max(0,apOriginal-apAlready-amt);
-  const co=checkoutCalc();
-  const dedReasons=[];
-  if(co.overDed>0)dedReasons.push('OVERDAY');
-  if(co.noNotice>0)dedReasons.push('NO_NOTICE');
-  if(co.other>0)dedReasons.push('OTHER');
-  const tail=rentShortfall();
-  const tailReason=$('arrearReasonDetail').value.trim();
-  const noteText=$('remark').value.trim()||tailReason;
-  const reasonCode=tail>0?'SHORT_PAID':($('reasonCode').value||type);
-  const openArrearsTotal=openTasksForBed().reduce((s,t)=>s+taskRemain(t),0);
-  const leftMode=leftWithArrearsSelected();
-  const leftTask=leftMode?leftWithArrearsPrimaryTask():null;
-  const leftArrearsRef=leftTask?employeeTaskRef(leftTask):'';
-  const leftBelongingsHeld=$('leftBelongingsHeld')?.value==='yes';
-  const ownerApprovalRequired=['CO','DR'].includes(type)&&openArrearsTotal>0&&!leftMode;
-  const payload={
-    id:uid('E'),entry_id:null,type,reason_code:reasonCode,cat:pay==='B'?'bank':(type==='E'?'expense':'cash'),pay_type:pay,bank_ref:$('bankRef').value.trim(),
-    room:$('bed').value.trim().replace(/^#/,''),roomTo:$('bedTo').value.trim().replace(/^#/,''),bed_from:($('transferFromBed').value.trim()||$('bed').value.trim()).replace(/^#/,''),bed_to:$('bedTo').value.trim().replace(/^#/,''),
-    tenant_name:$('tenantName').value.trim(),tenant_card_id:$('tenantCardId').value.trim(),tag:type==='D'?'N':type==='TF'?'T':'O',
-    amount:amt,due,paid,deficit:Math.max(0,due-paid),entry_clr:$('entryClr').value,clr:$('entryClr').value,excess:Math.max(0,amt-due),excess_to:$('excessTo').value,
-    list_price:num($('listPrice').value),period_start:$('periodStart').value,period_end:$('periodEnd').value,cycle:$('cycle').value,
-    period_day_count:num($('periodDays').value),period_due:num($('periodDue').value)||due,custom_reason:$('customReason').value.trim()||tailReason,
-    checkout_date:$('checkoutDate').value,refund_date:type==='DR'?($('depositOutRefundDate')?.value||today()):'',deposit_held:depositHeld(),deposit_balance:depositHeld(),deposit_return:type==='CO'?'':(type==='DR'?'DR':''),deposit_amt:type==='CO'?0:0,deposit_deduction:type==='CO'?0:0,
-    actual_refund_amount:type==='DR'?amt:0,refund_amount:type==='DR'?amt:0,refund_difference:type==='DR'?Math.round((amt-depositHeld())*100)/100:0,refund_method:type==='DR'?(pay==='B'?'bank':'cash'):'',refund_reason:type==='DR'?(($('depositOutDifferenceReason')?.value||'').trim()||$('remark').value.trim()):'',difference_reason:type==='DR'?($('depositOutDifferenceReason')?.value||'').trim():'',
-    ded_reason:type==='DR'?(($('depositOutDifferenceReason')?.value||'').trim()?'DIFFERENCE':''):dedReasons.join('+'),ded_days:type==='CO'?0:co.overDays,ded_rate:40,ded_note:type==='DR'?(($('depositOutDifferenceReason')?.value||'').trim()||$('remark').value.trim()):$('dedNote').value.trim(),early_days:type==='CO'?0:co.earlyDays,
-    fee_paid:$('feePaid').value,fee_mode:$('feePaid').value==='N'?'waived':'charged',amount_fils:$('feePaid').value==='N'?0:5000,fee_waiver_reason:$('feePaid').value==='N'?$('transferWaiverReason').value.trim():'',
-    transfer_reason:$('transferReason').value,transfer_validation_status:type==='TF'?bedTransferValidationSummary(transferValue('transferFromBed')||transferValue('bedTo'),transferValue('bedTo'),bedTransferReviewContext()).status:'',
-    carry_over_arrears:openArrearsTotal,outstanding_arrears:['CO','DR'].includes(type)?openArrearsTotal:0,owner_approval_required:ownerApprovalRequired,owner_approval_status:ownerApprovalRequired?'pending_owner_approval':'not_required',
-    checkout_mode:leftMode?'left_with_arrears':'normal',left_with_arrears:leftMode,customer_left:leftMode,cloud_arrears_ref:leftArrearsRef,
-    former_customer_ref:leftMode?($('tenantCardId').value.trim()||leftArrearsRef):'',former_customer_name:leftMode?($('leftFormerCustomerName').value.trim()||$('tenantName').value.trim()):'',card_name:leftMode?($('leftFormerCustomerName').value.trim()||$('tenantName').value.trim()):'',
-    former_customer_phone:leftMode?$('leftWhatsappPhone').value.trim():'',whatsapp_phone:leftMode?$('leftWhatsappPhone').value.trim():'',contact_method:leftMode?$('leftContactMethod').value:'',contact_note:leftMode?$('leftContactNote').value.trim():'',
-    arrears_amount:leftMode?num($('leftArrearsAmount')?.value||openArrearsTotal):0,left_arrears_amount:leftMode?num($('leftArrearsAmount')?.value||openArrearsTotal):0,belongings_held:leftMode?leftBelongingsHeld:false,belongings_note:leftMode?$('leftBelongingsNote').value.trim():'',
-    coverage_end_date:leftMode?$('leftCoverageEndDate').value:'',rent_coverage_end:leftMode?$('leftCoverageEndDate').value:'',card_end_date:leftMode?$('leftCoverageEndDate').value:'',
-    promised_payment_date:leftMode?$('leftPromisedPaymentDate').value:'',promised_return_date:leftMode?($('leftPromisedReturnDate')?.value||''):'',promise_return_date:leftMode?($('leftPromisedReturnDate')?.value||''):'',
-    deposit_balance:leftMode?depositHeld():depositHeld(),left_date:leftMode?$('checkoutDate').value:'',checkout_attempt_date:leftMode?$('checkoutDate').value:'',
-    left_status:leftMode?'left_pending_return':'',final_status:leftMode?'left_pending_return':'',confirmed_not_returning_date:leftMode?($('leftConfirmedNotReturningDate')?.value||''):'',grace_days_after_promise:0,review_date:'',
-    original_session_id:leftMode?(leftTask?.session_id||leftTask?.original_session_id||''):'',original_event_id:leftMode?(leftTask?.entry_id||leftTask?.original_entry_id||leftTask?.original_event_id||leftTask?.task_id||''):'',
-    deposit_carried:depositHeld(),old_ttlock_ref:state.current?.tenant_card_id||'',old_lock_valid_from:state.current?.start||state.current?.start_md||'',old_lock_valid_until:state.current?.end||'',rent_difference:toRentMinusFrom(bedTransferReviewContext()),
-    expense_category:$('expenseCategory').value,expense_desc:$('expenseDesc').value.trim(),
-    linked_task_id:$('linkedTaskId').value,original_period_start:type==='AP'?'':$('periodStart').value,original_period_end:type==='AP'?'':$('periodEnd').value,
-    arrears_ref:type==='AP'?$('linkedTaskId').value:'',original_arrears_id:type==='AP'?$('linkedTaskId').value:'',original_arrears_amount:type==='AP'?apOriginal:0,
-    already_paid_amount:type==='AP'?apAlready:0,payment_amount:type==='AP'?amt:0,remaining_arrears_before_payment:type==='AP'?apBefore:0,remaining_arrears:type==='AP'?apRemaining:0,remaining_arrears_after_payment:type==='AP'?apRemaining:0,settlement_status:type==='AP'?(apRemaining<=0?'settled':'partial'):'',
-    arrear_handling:tail>0?$('arrearHandling').value:'',arrear_promise_date:tail>0?$('arrearPromiseDate').value:'',arrear_reason_detail:tail>0?tailReason:'',
-    promise_date:tail>0?$('arrearPromiseDate').value:'',promise_amount:tail>0?tail:0,
-    note:noteText,remark:noteText,operator_id:operatorId(),operator_name:operatorName(),src:'EMP',status:'ACTIVE',created_at:nowIso(),ts:nowIso()
-  };
-  return applyEntryAnchors(payload);
 }
 function bedTransferEventIdempotencyKey(e){
   const basis=[
@@ -6066,76 +5940,6 @@ function appendSyncedBedTransferSessionEntry(entry){
   state.drafts=state.drafts.filter(e=>e.id!==entry.id&&e.entry_event_id!==entry.entry_event_id&&e.transfer_id!==entry.transfer_id);
   state.drafts.unshift(entry);
   saveDrafts();
-}
-async function submitBedTransferEvent(){
-  if(isBedTransferWriteGated('TF')){
-    $('validationBox').innerHTML=bedTransferWriteGateHtml();
-    toast(BED_TRANSFER_WRITE_DISABLED_MESSAGE,6000);
-    return false;
-  }
-  let e;
-  try{e=entryPayload();}catch(err){
-    console.error('bed transfer payload failed',err);
-    $('validationBox').innerHTML=`<div class="bad">阻断：换床申请数据异常，未提交。${esc(err?.message||err)}</div>`;
-    toast('换床申请失败：页面数据异常',6000);
-    return false;
-  }
-  if(!(await ensureEntryTtlockReady({auto:false})))return;
-  const btn=$('btnSaveEntry');
-  const old=btn?.innerHTML;
-  if(e.fee_mode==='waived'&&!e.fee_waiver_reason){
-    $('validationBox').innerHTML='<div class="bad">Waiver Reason is required when Bed Transfer fee is waived / 免收换床费必须填写豁免原因。</div>';
-    toast('Waiver Reason required / 必须填写豁免原因',6000);
-    return false;
-  }
-  if(btn){btn.dataset.busy='1';btn.disabled=true;btn.classList.add('disabled');btn.innerHTML='Submitting<span class="label-en">提交中</span>'}
-  const payload={
-    from_bed:e.bed_from,
-    to_bed:e.bed_to,
-    reason:e.transfer_reason,
-    note:e.note,
-    payment_method:bedTransferPaymentMethod(),
-    pay_type:e.pay_type,
-    fee_status:e.fee_mode==='waived'?'waived':'paid',
-    fee_mode:e.fee_mode,
-    amount_fils:e.amount_fils,
-    waiver_reason:e.fee_waiver_reason,
-    old_ttlock_ref:e.old_ttlock_ref,
-    old_lock_valid_from:e.old_lock_valid_from,
-    old_lock_valid_until:e.old_lock_valid_until,
-    review_flags:bedTransferValidationSummary(
-      transferValue('transferFromBed')||transferValue('bed'),
-      transferValue('bedTo'),
-      bedTransferReviewContext()
-    ).review,
-    transfer_fee:e.fee_paid==='Y'?50:0,
-    qa_tag:'employee-ui-bed-transfer',
-    idempotency_key:bedTransferEventIdempotencyKey(e)
-  };
-  try{
-    const r=await apiFetch('/api/employee/bed-transfers',{method:'POST',body:JSON.stringify(payload),headers:{'Idempotency-Key':payload.idempotency_key}});
-    const data=await r.json().catch(()=>({}));
-    if(!r.ok){
-      const msg=data?.message||data?.error||`bed_transfer_submit_failed_${r.status}`;
-      throw new Error(msg);
-    }
-    appendSyncedBedTransferSessionEntry(bedTransferSessionEntryFromResponse(data,e));
-    resetForm();
-    refreshSessionViews();
-    const transferId=data?.transfer_id?` · ${data.transfer_id}`:'';
-    const successMessage=data?.message||BED_TRANSFER_SUBMITTED_MESSAGE;
-    $('validationBox').innerHTML=`<div>${esc(successMessage)}${esc(transferId)}</div>`;
-    toast(successMessage,6000);
-    return true;
-  }catch(err){
-    const msg=err?.message||String(err||'submit_failed');
-    setTimeout(()=>toast(`Bed transfer not saved / 换床记录未保存：${msg}`,6000),0);
-    $('validationBox').innerHTML=`<div class="bad">换床申请未提交：${esc(msg)}</div>`;
-    toast('换床申请未提交，请重试',6000);
-    return false;
-  }finally{
-    if(btn){btn.dataset.busy='0';btn.disabled=false;btn.classList.remove('disabled');btn.innerHTML=old||'保存';validate();}
-  }
 }
 function exportLine(e){
   const name=e.tenant_name||'-', cid=e.tenant_card_id||'-', period=e.period_start&&e.period_end?` ${e.period_start}->${e.period_end}`:'';
@@ -6224,35 +6028,6 @@ function employeeBedTransferSessionCardModel(entry={}){
 }
 function renderEmployeeBedTransferCanonicalReceipt(receipt={}){
   return `<div class="bed-transfer-canonical-receipt"><b>${esc(receipt.beds_label||'')}</b><span>${esc(receipt.amount_label||'')}</span><span>${esc(receipt.fee_label||'')}</span><span>${esc(receipt.payment_label||'')}</span><strong>${esc(receipt.status_label||'Recorded / 已记录')}</strong></div>`;
-}
-async function recordCanonicalBedTransfer(){
-  const button=$('btnRecordBedTransfer');
-  if(button?.dataset.busy==='1'||state.bedTransferContext?.recordedResult)return false;
-  const validated=state.bedTransferContext?.validatedRecord;
-  if(!validated||state.bedTransferContext?.serverValidation?.ok!==true){showStatus('请先验证换床信息。','warn');applyEmployeeBedTransferUiGate();return false;}
-  await employeeLoadBedTransferCapabilities();
-  if(!employeeBedTransferWriteEnabled()){showStatus(BED_TRANSFER_WRITE_DISABLED_MESSAGE,'warn');applyEmployeeBedTransferUiGate();return false;}
-  if(!String(validated.entry?.transfer_reason||'').includes('CONTROLLED_BETA_TEST')&&state.bedTransferCapabilities?.controlled_beta_preview===true){showStatus('CONTROLLED_BETA_TEST_MARKER_REQUIRED','warn');return false;}
-  if(button){button.dataset.busy='1';button.disabled=true;button.setAttribute('aria-disabled','true');button.textContent='Recording / 记录中';}
-  try{
-    const response=await apiFetch('/api/employee/entry',{method:'POST',body:JSON.stringify(validated)});
-    const body=await response.json().catch(()=>({})),data=unwrapStandardResponse(body)||{};
-    if(!response.ok||data.ok!==true)throw Object.assign(new Error(data.error_code||body.error_code||`RECORD_FAILED_${response.status}`),{recordResult:data});
-    const canonical=data.canonical_entry||{};
-    const receipt=employeeBedTransferCanonicalReceipt(canonical,validated.entry||{});
-    state.bedTransferContext.recordedResult={ok:true,idempotent:data.idempotent===true,session_id:data.session_id||'',transfer_anchor_id:canonical.transfer_anchor_id||'',transfer_lineage_id:canonical.transfer_lineage_id||'',receipt};
-    $('validationBox').innerHTML=`${renderEmployeeBedTransferCanonicalReceipt(receipt)}<div>Canonical accepted · session ${esc(state.bedTransferContext.recordedResult.session_id)} · anchor ${esc(state.bedTransferContext.recordedResult.transfer_anchor_id)} · lineage ${esc(state.bedTransferContext.recordedResult.transfer_lineage_id)}</div>`;
-    if($('bedTransferServerValidation'))$('bedTransferServerValidation').textContent=`Canonical accepted · idempotent=${state.bedTransferContext.recordedResult.idempotent}`;
-    applyEmployeeBedTransferUiGate();
-    return true;
-  }catch(error){
-    $('validationBox').innerHTML=`<div class="bad">${esc(error?.message||error)} · draft retained</div>`;
-    if($('bedTransferServerValidation'))$('bedTransferServerValidation').textContent=`${error?.message||'RECORD_FAILED'} · draft retained`;
-    return false;
-  }finally{
-    if(button){button.dataset.busy='0';button.textContent='Record Transfer / 记录换床';}
-    applyEmployeeBedTransferUiGate();
-  }
 }
 async function saveEntry(){
   if(!state.user){applyEmployeeUser(null);toast('请先登录员工账号',6000);return}
