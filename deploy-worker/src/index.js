@@ -5512,11 +5512,13 @@ function extractEmployeeEntryAnchorsFromSession(session){
     fromBlock=block?parseEmployeeEntryAnchorJson(block[1]):[];
   }
   const canonicalTransferFields=['transfer_anchor_id','transfer_lineage_id','previous_transfer_anchor_id','canonical_accepted_at','transfer_at','canonical_request_fingerprint','source_context_mode','lineage_genesis','owner_confirmation_scope','source_context_anchor_refs','carried_arrears_refs','rent_coverage_ref','deposit_context_ref','expiry_context_ref','ttlock_sequence','physical_state_before_submission','continuity_checks','reconciliation_required'];
+  const rawIngestionEvidenceFields=['raw_payload','anomalies','review_required','ingestion_status','projection_status','validation_status','source_references','submitted_at','idempotency_fingerprint','idempotency_key'];
   const rows=(direct.length?direct:fromBlock).map(row=>{
     const envelope={session_id:session?.id||row?.session_id||"",corpid:session?.corpid||row?.corpid||"",userid:session?.created_by||session?.operator_id||row?.userid||"",operator_id:session?.operator_id||row?.operator_id||"",operator_name:session?.operator_name||row?.operator_name||"",created_at:session?.created_at||session?.exported_at||row?.created_at||"",ts:session?.exported_at||session?.created_at||row?.ts||"",source:"employee_entry",source_detail:direct.length?"employee_entry_entries_json":"employee_entry_export_anchor_json",...row};
     const archiveType=String(row?.event_type||row?.type||"").trim().toLowerCase();
     if(['void_transfer','transfer_void','reversal','transfer_reversal'].includes(archiveType))return envelope;
     const normalized=normalizeEntryAnchor(envelope);
+    for(const field of rawIngestionEvidenceFields)if(Object.prototype.hasOwnProperty.call(row,field))normalized[field]=row[field];
     if(entryAnchorType(row)==="TF")for(const field of canonicalTransferFields)if(Object.prototype.hasOwnProperty.call(row,field))normalized[field]=row[field];
     return normalized;
   });

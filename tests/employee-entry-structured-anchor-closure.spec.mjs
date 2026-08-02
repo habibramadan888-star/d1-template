@@ -15,7 +15,9 @@ async function loadWorkerAnchorHarness() {
     `
     function __name(fn){ return fn; }
     function cleanText(value,max=10000){ return String(value ?? '').slice(0,max); }
+    function cleanId(value){ return String(value ?? ''); }
     function cleanDate(value){ return String(value || '').slice(0, 10); }
+    const employeeEntryAnchorParseCache = new WeakMap();
     ${worker.slice(start, end)}
     globalThis.extractEmployeeEntryAnchorsFromSession = extractEmployeeEntryAnchorsFromSession;
     globalThis.employeeEntryExportTextWithAnchors = employeeEntryExportTextWithAnchors;
@@ -167,6 +169,46 @@ test("owner session detail route prefers structured anchors over legacy text dec
   assert.match(worker, /const anchorRows=extractEmployeeEntryAnchorsFromSession\(sessionRow\)/);
   assert.match(worker, /const exportRows=parseEmployeeEntryExportRows\(sessionRow\)/);
   assert.match(worker, /chooseOwnerEmployeeSessionDetailRows\(sessionRow,results,anchorRows,exportRows\)/);
+});
+
+test("owner session detail preserves authoritative raw-ingestion review evidence", async () => {
+  const harness = await loadWorkerAnchorHarness();
+  const anomaly = {
+    code: "TTLOCK_CONTEXT_UNAVAILABLE",
+    severity: "warning",
+    review_required: true
+  };
+  const [row] = harness.extractEmployeeEntryAnchorsFromSession({
+    id: "S-raw-held",
+    source: "employee_entry_raw_held",
+    entries_json: JSON.stringify({
+      entries: [{
+        id: "E-transfer",
+        event_type: "bed_transfer",
+        type: "TF",
+        from_bed: "QA907",
+        to_bed: "QA908",
+        raw_payload: { event_type: "bed_transfer", from_bed: "QA907", to_bed: "QA908" },
+        anomalies: [anomaly],
+        review_required: true,
+        ingestion_status: "ACCEPTED",
+        projection_status: "HELD_FOR_REVIEW",
+        validation_status: "accepted_with_anomaly",
+        source_references: { ttlock_context_present: false },
+        submitted_at: "2026-08-02T07:41:50.090Z",
+        idempotency_key: "employee-entry-S-raw-held-E-transfer"
+      }]
+    })
+  });
+
+  assert.equal(JSON.stringify(row.anomalies), JSON.stringify([anomaly]));
+  assert.equal(row.review_required, true);
+  assert.equal(row.ingestion_status, "ACCEPTED");
+  assert.equal(row.projection_status, "HELD_FOR_REVIEW");
+  assert.equal(row.validation_status, "accepted_with_anomaly");
+  assert.equal(JSON.stringify(row.source_references), JSON.stringify({ ttlock_context_present: false }));
+  assert.equal(row.submitted_at, "2026-08-02T07:41:50.090Z");
+  assert.equal(row.idempotency_key, "employee-entry-S-raw-held-E-transfer");
 });
 
 test("owner detail mapper preserves all structured employee anchor fields", async () => {
