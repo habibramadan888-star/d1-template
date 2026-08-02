@@ -25,10 +25,11 @@ test('business references warn but do not block employee draft entry', () => {
 
 test('TTLock and capability availability cannot disable Add to Session', () => {
   const ttlock = body('renderEntryTtlockStatus');
-  const saveGate = body('saveEntryWithTtlockGate');
+  const save = body('saveEntry');
   const transferGate = body('employeeBedTransferUiGateState');
   assert.doesNotMatch(ttlock, /save\.disabled\s*=\s*blocked/);
-  assert.doesNotMatch(saveGate, /ensureEntryTtlockReady/);
+  assert.doesNotMatch(save, /ensureEntryTtlockReady/);
+  assert.equal((source.match(/async function saveEntry\(\)/g) || []).length, 1);
   assert.match(transferGate, /fields_enabled:true/);
   assert.match(transferGate, /final_upload_enabled:true/);
 });

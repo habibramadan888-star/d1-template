@@ -5884,11 +5884,24 @@ function syncForm(){
   renderEmployeeBedInfoStrips();
   employeeUpdatePeriodDisclosure();
   validate();
+  renderLeftWithArrearsFields();
+  employeeUpdateCollapsedStepSummaries();
 }
 function validate(){
   const key=employeeEntryTemplateKeyForType(employeeFieldValue('entryType'));
   const template=employeeEntryTemplates[key]||employeeEntryTemplates.rent;
-  return (template.validator||validateRentEntry)();
+  const result=(template.validator||validateRentEntry)();
+  employeeRenderValidation(result);
+  const submit=$('btnSaveEntry');
+  const blocked=Array.isArray(result?.errors)&&result.errors.length>0;
+  if(submit){
+    submit.disabled=blocked;
+    submit.classList.toggle('disabled',blocked);
+    submit.classList.toggle('primary',!blocked);
+    if(blocked)submit.setAttribute('aria-disabled','true');else submit.removeAttribute('aria-disabled');
+  }
+  employeeUpdateCollapsedStepSummaries(result);
+  return result;
 }
 function entryPayload(){
   const key=employeeEntryTemplateKeyForType(employeeFieldValue('entryType'));
@@ -6060,11 +6073,6 @@ async function saveEntry(){
   $('validationBox').innerHTML=localOk?'<div>已加入本票流水。本笔暂存本地，点击“导出交接”后整票统一上传云端并生成交接文本。</div>':'<div class="warn">已加入页面本票，但本地保存失败，请先不要关闭页面。</div>';
   toast(localOk?'已加入本票流水；整票上云请点导出交接':'已加入页面本票，本地保存失败');
 }
-const saveEntryWithoutTtlockGate=saveEntry;
-async function saveEntryWithTtlockGate(){
-  return saveEntryWithoutTtlockGate();
-}
-saveEntry=saveEntryWithTtlockGate;
 function resetForm(){['bed','transferFromBed','bedTo','transferReason','transferWaiverReason','transferFeeDueDate','transferFeePaymentMethod','bedDifferenceAmount','bedDifferencePaymentMethod','bedDifferenceDueDate','bedDifferenceReason','amount','rentCashAmount','rentBankAmount','due','paid','tenantName','tenantCardId','periodStart','periodEnd','periodDays','periodDue','listPrice','customReason','bankRef','checkoutDate','depositOutBalance','depositOutRefundDate','depositOutDifferenceReason','depositDeduction','depositReturnAmount','overdayDeduction','noNoticeDeduction','otherDeduction','dedNote','leftFormerCustomerName','leftWhatsappPhone','leftContactNote','leftDepositBalance','leftCoverageEndDate','leftArrearsAmount','leftBelongingsNote','leftPromisedPaymentDate','leftPromisedReturnDate','leftConfirmedNotReturningDate','leftGraceDays','expenseDesc','expenseEvidenceRef','remark','excessTo','reasonCode','linkedTaskId','arrearAmount','arrearPromiseDate','arrearReasonDetail'].forEach(id=>{if($(id))$(id).value=''});if($('amount'))delete $('amount').dataset.periodAmountComplete;if($('rentCustomerTag'))$('rentCustomerTag').value='O';$('cycle').value='1M';$('payType').value='C';$('feePaid').value='paid';$('bedDifferenceMode').value='none';$('leftWithArrearsMode').value='normal';$('leftContactMethod').value='whatsapp';$('leftBelongingsHeld').value='no';$('arrearHandling').value='ARREAR';state.current=null;state.depositBalance=null;state.depositContext=null;state.bedTransferContext={status:'idle',source:null,target:null,requestKey:'',serverValidation:null};employeeRenderBedTransferContext();renderContext();syncForm();refreshSessionViews()}
 function hasLocalOnly(){return state.drafts.some(e=>!employeeEntryCloudConfirmed(e))}
 function newSession(){
@@ -10062,20 +10070,6 @@ function employeeRenderValidation(result){
     (!errors.length&&!warns.length?'<div>Validation passed. Add this entry to the current session. / 校验通过，可以加入本票。</div>':'')
   ].join('');
 }
-const employeeLegacyValidate=validate;
-validate=function(){
-  const result=employeeLegacyValidate();
-  employeeRenderValidation(result);
-  const submit=$('btnSaveEntry');
-  const blocked=Array.isArray(result?.errors)&&result.errors.length>0;
-  if(submit){
-    submit.disabled=blocked;
-    submit.classList.toggle('disabled',blocked);
-    submit.classList.toggle('primary',!blocked);
-    if(blocked)submit.setAttribute('aria-disabled','true');else submit.removeAttribute('aria-disabled');
-  }
-  return result;
-};
 renderSessionPreview=function(){
   const rows=state.drafts;
   $('sessionMeta').textContent=`${today()} ${new Date().toTimeString().slice(0,8)} · ${rows.length} records`;
@@ -10753,60 +10747,6 @@ function employeeAssociateEntryFieldLabels(){
     if(label&&control?.id&&!label.htmlFor)label.htmlFor=control.id;
   });
 }
-const employeeCollapsedLegacyValidate=validate;
-validate=function(){
-  const result=employeeCollapsedLegacyValidate();
-  employeeUpdateCollapsedStepSummaries(result);
-  return result;
-};
-const employeeCheckoutArrearsLegacyValidate=validate;
-validate=function(){
-  const result=employeeCheckoutArrearsLegacyValidate();
-  return result;
-  const type=$('entryType')?.value||'';
-  const leftMode=leftWithArrearsSelected();
-  if(false&&leftMode){
-    const rows=leftWithArrearsRows();
-    const phone=($('leftWhatsappPhone')?.value||'').trim();
-    const belongingsHeld=$('leftBelongingsHeld')?.value==='yes';
-    const addError=msg=>{if(!result.errors.includes(msg))result.errors.push(msg);};
-    if(!rows.length)addError('Left With Arrears requires an open Cloud Arrears item. / 离店未清欠款必须关联未清云端欠款。');
-    if(!phone)addError('Blocked: WhatsApp phone is required for left customer arrears. / 阻断：离店未清欠款必须填写客户 WhatsApp 号码。');
-    if(num($('leftArrearsAmount')?.value)<=0)addError('Left Arrears Amount is required. / 必须填写离店欠款总金额。');
-    if(!($('leftPromisedPaymentDate')?.value||''))addError('Promised Payment Date is required. / 必须填写承诺付款日期。');
-    if(!($('leftConfirmedNotReturningDate')?.value||''))addError('Confirmed Not Returning Date is required. / 确认不再回来日期必填。');
-    if(($('leftFinalStatus')?.value||$('leftStatus')?.value||'')==='abandoned_confirmed'&&!($('leftConfirmedNotReturningDate')?.value||''))addError('Confirmed Not Returning Date is required when abandoned is confirmed. / 确认不再回来时必须填写确认日期。');
-    if(belongingsHeld&&!($('leftBelongingsNote')?.value||'').trim())addError('Belongings Note is required when belongings are held. / 物品留存时必须填写物品说明。');
-  }
-  if(false&&leftMode){
-    result.errors=result.errors.filter(msg=>!/WhatsApp phone is required|Confirmed Not Returning Date is required\.|Belongings Note is required when belongings are held/.test(msg));
-    const contact=($('leftWhatsappPhone')?.value||$('leftContactMethod')?.value||'').trim();
-    const addError=msg=>{if(!result.errors.includes(msg))result.errors.push(msg);};
-    if(!contact)addError('Phone or Contact Method is required for Left With Arrears. / 离店未清欠款必须填写联系方式。');
-    if(!($('remark')?.value||'').trim())addError('Note is required for Left With Arrears. / 离店未清欠款必须填写备注。');
-  }
-  const blocked=type==='CO'&&!leftMode&&openTasksForBed().length>0;
-  if(blocked&&!(type==='CO'&&leftMode)){
-    const msg=type==='CO'
-      ?'Open Arrears Found: This customer has unpaid arrears. Normal checkout is not allowed. / \u53d1\u73b0\u672a\u6e05\u6b20\u6b3e\uff1a\u8be5\u5ba2\u6237\u5b58\u5728\u672a\u6e05\u6b20\u6b3e\uff0c\u4e0d\u80fd\u76f4\u63a5\u6b63\u5e38\u9000\u623f\u3002'
-      :'Open Arrears Found: This customer has unpaid arrears. Deposit refund requires owner approval. / \u53d1\u73b0\u672a\u6e05\u6b20\u6b3e\uff1a\u8be5\u5ba2\u6237\u5b58\u5728\u672a\u6e05\u6b20\u6b3e\uff0c\u9000\u62bc\u91d1\u5fc5\u987b\u7531\u8001\u677f\u5ba1\u6838\u3002';
-    if(!result.errors.includes(msg))result.errors.push(msg);
-    const box=$('validationBox');
-    if(box&&!box.innerHTML.includes('Open Arrears Found'))box.innerHTML=`<div class="bad">Blocked: ${esc(msg)}</div>`+box.innerHTML;
-    const submit=$('btnSaveEntry');
-    if(submit){submit.disabled=true;submit.classList.add('disabled');submit.classList.remove('primary');}
-    employeeUpdateCollapsedStepSummaries(result);
-  }else if(leftMode){
-    const box=$('validationBox');
-    if(box&&result.errors.length){
-      box.innerHTML=result.errors.map(x=>`<div class="bad">${esc(x)}</div>`).join('')+(result.warns||[]).map(x=>`<div class="warn">${esc(x)}</div>`).join('');
-    }
-    const submit=$('btnSaveEntry');
-    if(submit){submit.disabled=result.errors.length>0;submit.classList.toggle('disabled',result.errors.length>0);submit.classList.toggle('primary',result.errors.length===0);}
-    employeeUpdateCollapsedStepSummaries(result);
-  }
-  return result;
-};
 const employeeCollapsedLegacyRenderSummary=renderSummary;
 renderSummary=function(){
   employeeCollapsedLegacyRenderSummary();
@@ -10848,12 +10788,6 @@ function employeeRenderEventSpecificSummary(){
 const employeeCollapsedLegacyRenderContext=renderContext;
 renderContext=function(){
   employeeCollapsedLegacyRenderContext();
-  employeeUpdateCollapsedStepSummaries();
-};
-const employeeCollapsedLegacySyncForm=syncForm;
-syncForm=function(){
-  employeeCollapsedLegacySyncForm();
-  renderLeftWithArrearsFields();
   employeeUpdateCollapsedStepSummaries();
 };
 const employeeLeftArrearsLegacyRenderTaskInfo=renderTaskInfo;
